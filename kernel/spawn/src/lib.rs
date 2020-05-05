@@ -648,23 +648,7 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         //     debug!("BEFORE : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
         // }
 
-        let mut se = SwapRanges{
-            old_text_low : None,
-            old_rodata_low : None,
-            old_data_low : None,
-
-            old_text_high : None,
-            old_rodata_high : None,
-            old_data_high :  None,
-
-            new_text_low : None,
-            new_rodata_low : None,
-            new_data_low : None,
-
-            new_text_high : None,
-            new_rodata_high : None,
-            new_data_high : None,
-        };
+        let mut se = SwapRanges::new();
 
         // Get the crate we should swap. Will be None if nothing is picked
         let crate_to_swap = get_crate_to_swap();
@@ -708,7 +692,7 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
                     // func_ptr is of size 16. Argument is of the argument_size + 8.
                     // This extra size comes due to argument and function both stored in +8 location pointed by the pointer. 
                     // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?). 
-                    if fault_crate_swap::constant_offset_fix_elaborated(&se, func_ptr, func_ptr + 16).is_ok() &&  fault_crate_swap::constant_offset_fix_elaborated(&se, arg_ptr, arg_ptr + 8).is_ok() {
+                    if fault_crate_swap::constant_offset_fix(&se, func_ptr, func_ptr + 16).is_ok() &&  fault_crate_swap::constant_offset_fix(&se, arg_ptr, arg_ptr + 8).is_ok() {
                         #[cfg(not(downtime_eval))]
                         debug!("Fucntion and argument addresses corrected");
                     }

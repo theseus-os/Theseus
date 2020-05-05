@@ -51,6 +51,25 @@ pub struct SwapRanges{
     pub new_data_high : Option<VirtualAddress>
 }
 
+impl SwapRanges {
+    /// Returns an empty `SwapRanges` with all fields set to None
+    pub fn new () -> SwapRanges {
+        SwapRanges {
+            old_text_low : None,
+            old_rodata_low : None,
+            old_data_low : None,
+            old_text_high : None,
+            old_rodata_high : None,
+            old_data_high : None,
+            new_text_low : None,
+            new_rodata_low : None,
+            new_data_low : None,
+            new_text_high : None,
+            new_rodata_high : None,
+            new_data_high : None,
+        }
+    }
+}
 
 /// For swapping of a crate from the identical object file in the disk. 
 /// Wraps arpund the crate_swap function by creating an appropriate  Swap request. 
@@ -335,89 +354,6 @@ pub fn constant_offset_fix(
         let p = (x) as *const u64;
         let n =  unsafe { ptr::read(p) };
         //debug!("{:#X} = {:#X}", x ,n);
-        let ra = memory::VirtualAddress::new_canonical(n as usize);
-
-        if swap_ranges.old_text_low.is_some() && swap_ranges.new_text_low.is_some() {
-            if swap_ranges.old_text_low.unwrap() < ra && swap_ranges.old_text_high.unwrap() > ra {
-
-                #[cfg(not(downtime_eval))]
-                debug!("Match text at address {:#X}, value  = {:#X}", x , n);
-
-                // Note : Does not use saturation add since underflow is not possible and overflow could not be caused in proper execution
-                let n_ra = ra - swap_ranges.old_text_low.unwrap() + swap_ranges.new_text_low.unwrap();
-                let p1 = (x) as *mut usize;
-                unsafe { ptr::write(p1,n_ra.value()) };
-                // For debug purposes we re-read teh value
-                #[cfg(not(downtime_eval))]
-                {
-                    let n =  unsafe { ptr::read(p) };
-                    debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                }
-            }
-        }
-
-        if swap_ranges.old_rodata_low.is_some() && swap_ranges.new_rodata_low.is_some() {
-            if swap_ranges.old_rodata_low.unwrap() < ra && swap_ranges.old_rodata_high.unwrap() > ra {
-
-                #[cfg(not(downtime_eval))]
-                debug!("Match rodata at address {:#X}, value  = {:#X}", x , n);
-                let n_ra = ra - swap_ranges.old_rodata_low.unwrap() + swap_ranges.new_rodata_low.unwrap();
-                let p1 = (x) as *mut usize;
-                unsafe { ptr::write(p1,n_ra.value()) };
-
-                #[cfg(not(downtime_eval))]
-                {
-                    let n =  unsafe { ptr::read(p) };
-                    debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                }
-            }
-        }
-
-        if swap_ranges.old_data_low.is_some() && swap_ranges.new_data_low.is_some() {
-            if swap_ranges.old_data_low.unwrap() < ra && swap_ranges.old_data_high.unwrap() > ra {
-
-                #[cfg(not(downtime_eval))]
-                debug!("Match data at address {:#X}, value  = {:#X}", x , n);
-                let n_ra = ra - swap_ranges.old_data_low.unwrap() + swap_ranges.new_data_low.unwrap();
-                let p1 = (x) as *mut usize;
-                unsafe { ptr::write(p1,n_ra.value()) };
-                #[cfg(not(downtime_eval))]
-                {
-                    let n =  unsafe { ptr::read(p) };
-                    debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                }
-            }
-        }
-
-        x = x + 8;
-        if x > top {
-            break;
-        }
-    }
-    Ok(())
-}
-
-pub fn constant_offset_fix_elaborated(
-    swap_ranges : &SwapRanges, 
-    bottom : usize,
-    top : usize
-) -> Result<(), String> {
-
-    if top < bottom {
-        return Err("In constant_offset_fix bottom must be less than or equal to top".to_string())
-    }
-
-    if swap_ranges.new_text_low.is_none(){
-        // crate swap haven't happened. No constant_offset_fix to be done
-        return Ok(())
-    } 
-    // start from the bottom value
-    let mut x = bottom;
-    loop {
-        // read the value at that location
-        let p = (x) as *const u64;
-        let n =  unsafe { ptr::read(p) };
-        info!("{:#X} = {:#X}", x ,n);
         let ra = memory::VirtualAddress::new_canonical(n as usize);
 
         if swap_ranges.old_text_low.is_some() && swap_ranges.new_text_low.is_some() {
