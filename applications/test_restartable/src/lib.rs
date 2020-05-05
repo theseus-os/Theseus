@@ -20,6 +20,7 @@ use getopts::Options;
 use spawn::new_task_builder;
 use core::ptr;
 
+/// A simple struct to verify dropping of objects.
 struct DropStruct {
     index : usize
 }
@@ -31,11 +32,11 @@ impl Drop for DropStruct {
 }
 
 lazy_static! {
-    /// The structure to hold the list of all faults so far occured in the system
+    /// A lock to check and verify releasing of locks
     static ref STATIC_LOCK: Mutex<Vec<usize>> = Mutex::new(Vec::new());
 }
 
-
+/// An enum to hold the methods we plan to exit a task
 #[derive(Clone)]
 enum ExitMethod {
     Graceful,
@@ -65,6 +66,7 @@ fn simple_restartable_loop(exit_method: ExitMethod) -> Result<(), &'static str> 
     Ok(())   
 }
 
+/// A restartable task where the lock is released
 fn restartable_loop_with_lock(exit_method: ExitMethod) -> Result<(), &'static str> {
     debug!("Running a restart loop with a lock");
     let mut te = STATIC_LOCK.lock();
@@ -73,6 +75,8 @@ fn restartable_loop_with_lock(exit_method: ExitMethod) -> Result<(), &'static st
     return Ok(());
 }
 
+/// A restartable task where the lock is failed to release. 
+/// This is due to no entry point between lock acquiring and fault occuring. 
 fn restartable_lock_fail(_exit_method: ExitMethod) -> Result<(), &'static str> {
     debug!("Running a restart loop with undroppable lock");
     let mut te = STATIC_LOCK.lock();
@@ -84,10 +88,12 @@ fn restartable_lock_fail(_exit_method: ExitMethod) -> Result<(), &'static str> {
     return Ok(());
 }
 
+/// Same as `restartable_lock_fail` but the lock will be released due to 
+/// entry point caused by calling `recursive_add_fault`.
 fn restartable_lock_modified(_exit_method: ExitMethod) -> Result<(), &'static str> {
     debug!("Running a restart loop with a droppable");
     let mut te = STATIC_LOCK.lock();
-    debug!("This debug enables proper unlock");
+    recursive_add_fault(ExitMethod::Graceful, 3);
     let x :usize = 0x5050DEADBEEF;
     let mut p = (x) as *const u64;
     let n = unsafe{ptr::read(p)};
@@ -95,6 +101,8 @@ fn restartable_lock_modified(_exit_method: ExitMethod) -> Result<(), &'static st
     te.push(3);
     return Ok(());
 }
+
+/// A restartable function to call `recursive_ add_fault`
 fn restartable_lock_recursive(exit_method: ExitMethod) -> Result<(), &'static str> {
     debug!("Recurive function with holding multiple objects");
     let mut te = STATIC_LOCK.lock();
@@ -103,14 +111,26 @@ fn restartable_lock_recursive(exit_method: ExitMethod) -> Result<(), &'static st
     return Ok(());
 }
 
+/// A recurisive function acquiring structures and will be dropping them 
+/// during unwinding
+#[inline(never)]
 fn recursive_add_fault(exit_method: ExitMethod, i: usize) -> DropStruct{
     if i==0 {
+        match exit_method {
+            ExitMethod::Graceful => {},
+            ExitMethod::Panic => {
+                panic!("paniced");
+            },
+            ExitMethod::Exception => {
+                debug!("Exception occured");
+                #[cfg(not(unwind_exceptions))]{
+                    debug!("Will not restart as it is compiled without unwind_exceptions directive");
+                }
+                // causes a page fault
+                unsafe {*(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555;}
+            },
+        }
         let mut drop_struct = DropStruct{index : i};
-        debug!("Reading unsafe value");
-        let x :usize = 0x5050DEADBEEF;
-        let mut p = (x) as *const u64;
-        let n = unsafe{ptr::read(p)};
-        debug!("unsafe value is {:X}",n);
         return drop_struct
     } else {
         let mut drop_struct = DropStruct{index : i};
@@ -121,9 +141,10 @@ fn recursive_add_fault(exit_method: ExitMethod, i: usize) -> DropStruct{
     
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help menu");
     opts.optflag("p", "panic", "induce panic to restartable task");
     opts.optflag("x", "exception", "induce exception to restartable task");
+
+    opts.optflag("h", "help", "print this help menu");
     opts.optflag("s", "simple", "runs a simple restartable task");
     opts.optflag("l", "lock", "runs a simple restartable task with lock");
     opts.optflag("f", "fail", "runs a simple restartable task with lock but fails to unlock");
@@ -200,5 +221,5 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "Usage: test_restartable [OPTION]
+const USAGE: &'static str = "Usage: test_restartable [OPTION] ARG
 Spawns a simple restartable task that can encounter panic and exceptions.";
