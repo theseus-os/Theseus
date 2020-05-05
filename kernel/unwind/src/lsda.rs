@@ -96,7 +96,10 @@ impl<R: Reader> GccExceptTableArea<R> {
                 return Ok(entry);
             }
         }
-        debug!("DARN we dont have a covered address");
+        
+        #[cfg(not(downtime_eval))]
+        debug!("The address is not covered so we have to look for most recent previous address");
+
         {    
             let mut new_address = address - 0x1;
             while true {
