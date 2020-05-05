@@ -645,6 +645,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "debug_info 0.1.0",
+ "fault_log 0.1.0",
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -672,6 +673,19 @@ dependencies = [
 name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "fault_log"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "print 0.1.0",
+ "task 0.1.0",
+ "vga_buffer 0.1.0",
+]
 
 [[package]]
 name = "first_application"
@@ -1340,6 +1354,7 @@ name = "multiple_heaps"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "heap 0.1.0",
  "intrusive-collections 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1522,6 +1537,7 @@ dependencies = [
 name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
+ "fault_log 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
@@ -1657,6 +1673,13 @@ dependencies = [
  "event_types 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "print_fault_log"
+version = "0.1.0"
+dependencies = [
+ "fault_log 0.1.0",
 ]
 
 [[package]]
