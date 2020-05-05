@@ -266,7 +266,8 @@ impl fmt::Debug for LoadedCrate {
 
 impl Drop for LoadedCrate {
     fn drop(&mut self) {
-         #[cfg(not(downtime_eval))]
+        
+        #[cfg(not(downtime_eval))]
         trace!("### Dropped LoadedCrate: {}", self.crate_name);
     }
 }
