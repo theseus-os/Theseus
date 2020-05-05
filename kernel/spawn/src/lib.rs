@@ -636,17 +636,17 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
     remove_current_task_from_runqueue(&current_task);
 
     {
-        let mut rbp: usize;
-        let mut rsp: usize;
-        let mut rip: usize;
+        // let mut rbp: usize;
+        // let mut rsp: usize;
+        // let mut rip: usize;
 
-        #[cfg(not(downtime_eval))]
-        {
-            unsafe{
-                asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-            }
-            debug!("BEFORE : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
-        }
+        // #[cfg(not(downtime_eval))]
+        // {
+        //     unsafe{
+        //         asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+        //     }
+        //     debug!("BEFORE : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+        // }
 
         let mut se = SwapRanges{
             old_text_low : None,
@@ -666,10 +666,10 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
             new_data_high : None,
         };
 
-        // Enable this section to enable crate swapping. Disabled since we don't have a policy to decide swapping crate
-        // TODO : Implement a policy to detect crate to swap.
+        // Get the crate we should swap. Will be None if nothing is picked
         let crate_to_swap = get_crate_to_swap();
         if crate_to_swap.is_some(){
+            // Call the handler to swap the crates
             let version = self_swap_handler(&crate_to_swap.unwrap());
             match version {
                 Ok(v) => {
@@ -681,13 +681,13 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
             }
         }
 
-        #[cfg(not(downtime_eval))]
-        {
-            unsafe{
-                asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-            }
-            debug!("AFTER : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
-        }
+        // #[cfg(not(downtime_eval))]
+        // {
+        //     unsafe{
+        //         asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+        //     }
+        //     debug!("AFTER : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+        // }
 
 
         // Re-spawn a new instance of the task if it was spawned as a restartable task. 
@@ -696,16 +696,24 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
             let t = current_task.lock();
             if let Some(restart_info) = t.restart_info.as_ref() {
                 let func_ptr = &(restart_info.func) as *const _ as usize;
-                debug!("func_ptr {:#X}", func_ptr);
-
                 let arg_ptr = &(restart_info.argument) as *const _ as usize;
-                let arg_size = mem::size_of::<A>();
-                debug!("arg_ptr {:#X} , {}", arg_ptr, arg_size);
+                
+                #[cfg(use_crate_swap)] {
+                    let arg_size = mem::size_of::<A>();
+                    #[cfg(not(downtime_eval))] {
+                        debug!("func_ptr {:#X}", func_ptr);
+                        debug!("arg_ptr {:#X} , {}", arg_ptr, arg_size);
+                    }
 
-                if fault_crate_swap::constant_offset_fix_elaborated(&se, func_ptr, func_ptr + 32).is_ok() &&  fault_crate_swap::constant_offset_fix_elaborated(&se, arg_ptr, arg_ptr + 32).is_ok() {
-                    #[cfg(not(downtime_eval))]
-                    debug!("Fucntion and argument addresses corrected");
+                    // func_ptr is of size 16. Argument is of the argument_size + 8.
+                    // This extra size comes due to argument and function both stored in +8 location pointed by the pointer. 
+                    // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?). 
+                    if fault_crate_swap::constant_offset_fix_elaborated(&se, func_ptr, func_ptr + 16).is_ok() &&  fault_crate_swap::constant_offset_fix_elaborated(&se, arg_ptr, arg_ptr + 8).is_ok() {
+                        #[cfg(not(downtime_eval))]
+                        debug!("Fucntion and argument addresses corrected");
+                    }
                 }
+                
 
                 let func: &F = restart_info.func.downcast_ref().expect("BUG: failed to downcast restartable task's function");
                 let arg : &A = restart_info.argument.downcast_ref().expect("BUG: failed to downcast restartable task's argument");
@@ -717,9 +725,7 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
 
         if let Some((name, func, arg)) = restartable_info {
             let func_ptr = &(func) as *const _ as usize;
-            debug!("boxed_func_ptr {:#X}", func_ptr);
             let arg_ptr = &(arg) as *const _ as usize;
-            debug!("boxed_arg_ptr {:#X}", arg_ptr);
             new_task_builder(func, arg)
                 .name(name)
                 .spawn_restartable()
