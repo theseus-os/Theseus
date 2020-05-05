@@ -10,6 +10,7 @@ extern crate mod_mgmt;
 extern crate fs_node;
 extern crate path;
 extern crate crate_swap;
+extern crate task;
 
 use core::ptr;
 
@@ -414,4 +415,107 @@ pub fn constant_offset_fix(
         }
     }
     Ok(())
+}
+
+/// This function calls the crate swapping routine for a corrupted crate (referred to as self swap)
+/// Swapping a crate with a new copy of object file includes following steps in high level
+/// 1) Call generic crate swapping routine with self_swap = true
+/// 2) Change the calues in the stack to the reloaded crate
+/// 3) Change any other references in the heap to the reloaded crate
+/// This function handles 1 and 2 operations and 3 is handled in the call site depending on necessity
+pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
+
+    let taskref = task::get_my_current_task()
+        .ok_or_else(|| format!("failed to get current task"))?;
+
+    #[cfg(not(downtime_eval))]
+    debug!("The taskref is {:?}",taskref);
+
+    let curr_dir = {
+        let locked_task = taskref.lock();
+        let curr_env = locked_task.env.lock();
+        Arc::clone(&curr_env.working_dir)
+    };
+
+    let override_namespace_crate_dir = Option::<NamespaceDir>::None;
+
+    let verbose = false;
+    let state_transfer_functions: Vec<String> = Vec::new();
+
+    let mut tuples: Vec<(&str, &str, bool)> = Vec::new();
+
+    tuples.push((crate_name, crate_name , false));
+
+    #[cfg(not(downtime_eval))]
+    debug!("tuples: {:?}", tuples);
+
+
+    let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();    
+
+    // 1) Call generic crate swapping routine
+    let swap_result = do_self_swap(
+        crate_name, 
+        &curr_dir, 
+        override_namespace_crate_dir,
+        state_transfer_functions,
+        namespace,
+        verbose
+    );
+
+    // let mut rbp: usize;
+    // let mut rsp: usize;
+    // let mut rip: usize;
+
+    // unsafe{
+    //     asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+    // }
+    // debug!("rmain : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+
+    let swap_ranges = match swap_result {
+        Ok(x) => {
+
+            #[cfg(not(downtime_eval))]
+            debug!("Swap operation complete");
+            x
+        }
+        Err(e) => {
+            debug!("SWAP FAILED at do_self_swap");
+            return Err(e.to_string())
+        }
+    };
+
+
+    let taskref = task::get_my_current_task()
+        .ok_or_else(|| format!("failed to get current task"))?;
+
+    // debug!("The taskref is {:?}",taskref);
+
+    // Find the range of stack to iterate
+    let locked_task = taskref.lock();
+    let bottom = locked_task.kstack.bottom().value();
+    let top = locked_task.kstack.top_usable().value();
+
+    #[cfg(not(downtime_eval))]
+    debug!("Bottom and top of stack are{:X} {:X}", bottom, top);
+
+
+    // On x86 you cannot directly read the value of the instruction pointer (RIP),
+    // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)
+    // asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+    // debug!("register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+
+    //let mut x = rsp - 8;
+    #[cfg(not(downtime_eval))]
+    debug!("Perform constant offset fix for stack");
+
+    // Perform constant offset fix for the stack range
+    match constant_offset_fix(&swap_ranges, bottom, top) {
+        Ok(()) => {
+            Ok(swap_ranges)
+        }
+        Err (e) => {
+            debug! {"Failed to perform constant offset fix for the stack"};
+            Err(e.to_string())
+        }
+    }
 }

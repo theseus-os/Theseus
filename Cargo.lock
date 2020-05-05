@@ -684,6 +684,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "path 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]

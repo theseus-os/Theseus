@@ -25,5 +25,8 @@ path = "../mod_mgmt"
 [dependencies.crate_swap]
 path = "../crate_swap"
 
+[dependencies.task]
+path = "../task"
+
 [lib]
 crate-type = ["rlib"]
