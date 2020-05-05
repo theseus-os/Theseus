@@ -40,6 +40,7 @@
 
 extern crate memory;
 #[macro_use] extern crate log;
+extern crate alloc;
 
 mod pages;
 mod sc;
@@ -54,7 +55,7 @@ use core::fmt;
 use core::mem;
 use core::ptr::{self, NonNull};
 use memory::{MappedPages, VirtualAddress};
-
+use alloc::vec::Vec;
 
 #[cfg(target_arch = "x86_64")]
 const CACHE_LINE_SIZE: usize = 64;

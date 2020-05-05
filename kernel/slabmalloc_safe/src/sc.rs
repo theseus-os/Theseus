@@ -52,11 +52,11 @@ pub struct SCAllocator {
     /// max objects per page
     pub(crate) obj_per_page: usize,
     /// Array to hold empty MappedPages (nothing allocated in these).
-    pub(crate) empty_slabs: [Option<MappedPages8k>; Self::PAGE_LIST_SIZE],
+    pub(crate) empty_slabs: Vec<Option<MappedPages8k>>, //[Option<MappedPages8k>; Self::PAGE_LIST_SIZE],
     /// Array to hold partially used MappedPages (some objects allocated but pages are not full).
-    pub(crate) slabs: [Option<MappedPages8k>; Self::PAGE_LIST_SIZE],
+    pub(crate) slabs: Vec<Option<MappedPages8k>>, //[Option<MappedPages8k>; Self::PAGE_LIST_SIZE],
     /// Array to hold full MappedPages (everything allocated in these don't need to search them).
-    pub(crate) full_slabs: [Option<MappedPages8k>; Self::PAGE_LIST_SIZE],
+    pub(crate) full_slabs: Vec<Option<MappedPages8k>>, //[Option<MappedPages8k>; Self::PAGE_LIST_SIZE],
 }
 
 /// Creates an instance of a scallocator, we do this in a macro because we
@@ -67,26 +67,25 @@ macro_rules! new_sc_allocator {
             size: $size,
             allocation_count: 0,
             obj_per_page: cmin((MappedPages8k::SIZE - MappedPages8k::METADATA_SIZE) / $size, 8 * 64),
-            empty_slabs: [None; Self::PAGE_LIST_SIZE],
-            slabs: [None; Self::PAGE_LIST_SIZE],
-            full_slabs: [None; Self::PAGE_LIST_SIZE],
+            empty_slabs: Vec::new(),
+            slabs: Vec::new(),//with_capacity(Self::PAGE_LIST_SIZE),
+            full_slabs: Vec::new() //with_capacity(Self::PAGE_LIST_SIZE),
         }
     };
 }
 
 impl SCAllocator {
     const _REBALANCE_COUNT: usize = 10_000;
-    pub const PAGE_LIST_SIZE: usize = 15; //8 MiB
+    pub const PAGE_LIST_SIZE: usize = 24 * 4; //8 MiB
 
-    /// Create a new SCAllocator.
-    #[cfg(feature = "unstable")]
-    pub const fn new(size: usize) -> SCAllocator {
-        new_sc_allocator!(size)
-    }
-
-    #[cfg(not(feature = "unstable"))]
     pub fn new(size: usize) -> SCAllocator {
-        new_sc_allocator!(size)
+        let mut sc = new_sc_allocator!(size);
+        for _ in 0..Self::PAGE_LIST_SIZE {
+            sc.empty_slabs.push(None);
+            sc.slabs.push(None);
+            sc.full_slabs.push(None);
+        }
+        sc
     }
 
     /// Returns the maximum supported object size of this allocator.
@@ -204,10 +203,11 @@ impl SCAllocator {
                         if page.is_full() {
                             need_to_move = true;
                             list_id = page.list_id;
-                            trace!("move {:p} partial -> full", page);
+                            // trace!("move {:p} partial -> full", page);
                         }
                         self.allocation_count += 1;
                         ret_ptr = ptr;
+                        break;
                     } else {
                         continue;
                     }
@@ -219,7 +219,6 @@ impl SCAllocator {
         };
 
         if need_to_move {
-            // trace!("move {:p} partial -> full", );
             self.move_partial_to_full(list_id)?;
         }
 
@@ -340,17 +339,6 @@ impl SCAllocator {
                 mp = self.full_slabs.iter_mut()
                 .find(|ref mut mp| mp.as_ref().map_or(VirtualAddress::zero(), |page| page.start_address()) == page_vaddr);
             }
-
-            // if mp.is_none() {
-            //     error!("No mp: {:p}", page_vaddr);
-
-            //     for page in self.slabs.iter_mut() {
-            //         if page.is_some() {
-            //             error!("{:p}", page.as_ref().unwrap().start_address());
-            //         }
-            //     }
-            //     loop{}
-            // }
 
             let mut mapped_page = mp.ok_or("Couldn't find page for deallocation!")?;
 

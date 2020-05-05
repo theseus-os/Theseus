@@ -69,7 +69,7 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = MappedPages8k::SIZE / PAGE_SIZE;
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
 /// The number of pages each size class in the ZoneAllocator is initialized with.
-const PAGES_PER_SIZE_CLASS: usize = 30; 
+const PAGES_PER_SIZE_CLASS: usize = 24 * 8; 
 
 /// Starting size of each per-core heap. It's approximately 1 MiB.
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
@@ -136,7 +136,7 @@ pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> R
 
     let mapped_pages_per_size_class = PER_CORE_HEAP_INITIAL_SIZE_PAGES / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * HEAP_MAPPED_PAGES_SIZE_IN_PAGES);
 trace!("what");
-    let mut zone_allocator = Box::new(ZoneAllocator::new(key));
+    let mut zone_allocator = ZoneAllocator::new(key);
 trace!("hello");
     let alloc_sizes = &ZoneAllocator::BASE_ALLOC_SIZES;
     for size in alloc_sizes {
@@ -203,11 +203,11 @@ impl<'a> KeyAdapter<'a> for LargeAllocationAdapter {
 }
 
 #[repr(align(64))]
-struct LockedHeap (MutexIrqSafe<Box<ZoneAllocator>>);
+struct LockedHeap (MutexIrqSafe<ZoneAllocator>);
 
 impl Deref for LockedHeap {
-    type Target = MutexIrqSafe<Box<ZoneAllocator>>;
-    fn deref(&self) -> &MutexIrqSafe<Box<ZoneAllocator>> {
+    type Target = MutexIrqSafe<ZoneAllocator>;
+    fn deref(&self) -> &MutexIrqSafe<ZoneAllocator> {
         &self.0
     }
 }
