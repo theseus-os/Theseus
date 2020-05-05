@@ -24,7 +24,7 @@ use block_allocator::FixedSizeBlockAllocator;
 
 
 #[global_allocator]
-static ALLOCATOR: Heap = Heap::empty();
+pub static ALLOCATOR: Heap = Heap::empty();
 
 /// The heap mapped pages should be writable
 pub const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
