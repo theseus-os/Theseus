@@ -92,7 +92,6 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     #[cfg(not(unwind_exceptions))] {
         println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
     }
-    fault_log::print_fault_log();
     // Dump some info about the this loaded app crate
     // and test out using debug info for recovery
     if false {
@@ -152,8 +151,10 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     {
         let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
         if let Some(ref kh_func) = kill_handler {
+
             #[cfg(not(downtime_eval))]
             debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+            
             kh_func(&cause);
         }
         else {
