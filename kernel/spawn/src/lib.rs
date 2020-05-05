@@ -36,18 +36,18 @@ use core::{
 };
 use alloc::{
     vec::Vec,
-    string::{String, ToString},
+    string::String,
     sync::Arc,
     boxed::Box,
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
-use mod_mgmt::{NamespaceDir, CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
+use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
 use fs_node::FileOrDir;
-use fault_crate_swap::{SwapRanges, do_self_swap, constant_offset_fix, get_crate_to_swap};
+use fault_crate_swap::{SwapRanges, get_crate_to_swap};
 
 #[cfg(simd_personality)]
 use task::SimdExt;
@@ -706,8 +706,6 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         };
 
         if let Some((name, func, arg)) = restartable_info {
-            let func_ptr = &(func) as *const _ as usize;
-            let arg_ptr = &(arg) as *const _ as usize;
             new_task_builder(func, arg)
                 .name(name)
                 .spawn_restartable()

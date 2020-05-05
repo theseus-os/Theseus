@@ -81,7 +81,7 @@ fn restartable_lock_fail(_exit_method: ExitMethod) -> Result<(), &'static str> {
     debug!("Running a restart loop with undroppable lock");
     let mut te = STATIC_LOCK.lock();
     let x :usize = 0x5050DEADBEEF;
-    let mut p = (x) as *const u64;
+    let p = (x) as *const u64;
     let n = unsafe{ptr::read(p)};
     debug!("unsafe value is {:X}",n);
     te.push(3);
@@ -95,7 +95,7 @@ fn restartable_lock_modified(_exit_method: ExitMethod) -> Result<(), &'static st
     let mut te = STATIC_LOCK.lock();
     recursive_add_fault(ExitMethod::Graceful, 3);
     let x :usize = 0x5050DEADBEEF;
-    let mut p = (x) as *const u64;
+    let p = (x) as *const u64;
     let n = unsafe{ptr::read(p)};
     debug!("unsafe value is {:X}",n);
     te.push(3);
@@ -130,7 +130,7 @@ fn recursive_add_fault(exit_method: ExitMethod, i: usize) -> DropStruct{
                 unsafe {*(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555;}
             },
         }
-        let mut drop_struct = DropStruct{index : i};
+        let drop_struct = DropStruct{index : i};
         return drop_struct
     } else {
         let mut drop_struct = DropStruct{index : i};
@@ -175,7 +175,7 @@ pub fn main(args: Vec<String>) -> isize {
         exit_method = ExitMethod::Exception;
     }
 
-    let mut work_done = false;
+
     if matches.opt_present("s"){
         let taskref1  = new_task_builder(simple_restartable_loop, exit_method)
             .name(String::from("restartable_loop"))
@@ -183,7 +183,6 @@ pub fn main(args: Vec<String>) -> isize {
             .expect("Couldn't start the restartable task"); 
 
         taskref1.join().expect("Task 1 join failed");
-        work_done = false;
     } else if matches.opt_present("l"){
         let taskref1  = new_task_builder(restartable_loop_with_lock, exit_method)
             .name(String::from("restartable_loop with lock"))

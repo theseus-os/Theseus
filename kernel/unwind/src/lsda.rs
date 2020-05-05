@@ -96,13 +96,13 @@ impl<R: Reader> GccExceptTableArea<R> {
                 return Ok(entry);
             }
         }
-        
+
         #[cfg(not(downtime_eval))]
         debug!("The address is not covered so we have to look for most recent previous address");
 
         {    
             let mut new_address = address - 0x1;
-            while true {
+            loop {
                 let mut iter = self.call_site_table_entries()?;
                 debug!("We are trying {:X}", new_address);
                 while let Some(entry) = iter.next()? {
@@ -113,7 +113,7 @@ impl<R: Reader> GccExceptTableArea<R> {
                 new_address = new_address - 0x1;
             }
         }
-        Err(gimli::Error::NoUnwindInfoForAddress)
+        // Err(gimli::Error::NoUnwindInfoForAddress)
     }
 }
 

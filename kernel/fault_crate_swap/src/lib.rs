@@ -617,7 +617,7 @@ fn iterative_swap_policy() -> Option<String> {
     debug!("Running iterative swap policy");
 
     // We get all unhanlded faults
-    let mut unhandled_list: Vec<FaultEntry> = remove_unhandled_exceptions();
+    let unhandled_list: Vec<FaultEntry> = remove_unhandled_exceptions();
     if unhandled_list.is_empty(){
         debug!("No unhandled errors in the fault log");
         return None
