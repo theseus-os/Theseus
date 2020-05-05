@@ -28,7 +28,6 @@ extern crate path;
 extern crate fs_node;
 extern crate catch_unwind;
 extern crate fault_crate_swap;
-extern crate fault_log;
 
 
 use core::{
@@ -48,8 +47,7 @@ use mod_mgmt::{NamespaceDir, CrateNamespace, SectionType, SECTION_HASH_DELIMITER
 use path::Path;
 use apic::get_my_apic_id;
 use fs_node::FileOrDir;
-use fault_crate_swap::{SwapRanges, do_self_swap, constant_offset_fix};
-use fault_log::get_crate_to_swap;
+use fault_crate_swap::{SwapRanges, do_self_swap, constant_offset_fix, get_crate_to_swap};
 
 #[cfg(simd_personality)]
 use task::SimdExt;

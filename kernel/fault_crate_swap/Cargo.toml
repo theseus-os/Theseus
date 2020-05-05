@@ -28,5 +28,8 @@ path = "../crate_swap"
 [dependencies.task]
 path = "../task"
 
+[dependencies.fault_log]
+path = "../fault_log"
+
 [lib]
 crate-type = ["rlib"]

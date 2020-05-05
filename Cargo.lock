@@ -679,6 +679,7 @@ name = "fault_crate_swap"
 version = "0.1.0"
 dependencies = [
  "crate_swap 0.1.0",
+ "fault_log 0.1.0",
  "fs_node 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
