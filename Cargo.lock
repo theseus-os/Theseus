@@ -2364,6 +2364,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_downtime"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "async_channel 0.1.0",
+ "color 0.1.0",
+ "framebuffer 0.1.0",
+ "framebuffer_drawer 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "hpet 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rendezvous 0.1.0",
+ "runqueue 0.1.0",
+ "scheduler 0.1.0",
+ "shapes 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+ "unified_channel 0.1.0",
+ "window 0.1.0",
+]
+
+[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [

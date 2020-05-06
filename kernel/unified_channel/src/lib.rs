@@ -22,6 +22,7 @@ pub fn new_string_channel(_minimum_capacity: usize) -> (StringSender, StringRece
     }
 }
 
+#[derive(Clone)]
 pub struct StringSender {
     #[cfg(use_async_channel)]
     sender: async_channel::Sender<String>,
@@ -34,7 +35,7 @@ impl StringSender {
     }
 }
 
-
+#[derive(Clone)]
 pub struct StringReceiver {
     #[cfg(use_async_channel)]
     receiver: async_channel::Receiver<String>,

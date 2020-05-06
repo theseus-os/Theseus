@@ -19,6 +19,7 @@ extern crate framebuffer_drawer;
 extern crate color;
 extern crate shapes;
 extern crate hpet;
+extern crate unified_channel;
 
 
 use alloc::{
@@ -35,6 +36,7 @@ use window::Window;
 use spin::Mutex;
 use spawn::new_task_builder;
 use hpet::get_hpet;
+use unified_channel::{new_string_channel, StringSender, StringReceiver};
 
 const NANO_TO_FEMTO: u64 = 1_000_000;
 
@@ -54,18 +56,18 @@ lazy_static! {
     pub static ref DOWNTIME_RECEIVE_LOCK: Mutex<PassStruct> = Mutex::new(PassStruct{count : 0, user : 0});
 }
 
-pub fn set_watch_task() -> (){
+pub fn set_graphics_measuring_task() -> (){
     let arg_val = 0;
 
     // setup a task to send coordinates
-    let taskref1  = new_task_builder(watch_task, arg_val)
+    let taskref1  = new_task_builder(graphics_measuring_task, arg_val)
         .name(String::from("watch task"))
         .pin_on_core(pick_child_core())
         .spawn_restartable()
         .expect("Couldn't start the watch task");
 
     // setup a task to receive responses
-    let taskref2  = new_task_builder(send_task, arg_val)
+    let taskref2  = new_task_builder(graphics_send_task, arg_val)
         .name(String::from("send task"))
         .pin_on_core(pick_child_core())
         .spawn_restartable()
@@ -73,7 +75,7 @@ pub fn set_watch_task() -> (){
 
 }
 
-fn send_task(_arg_val: usize) -> Result<(), &'static str>{
+fn graphics_send_task(_arg_val: usize) -> Result<(), &'static str>{
 
     // This task send cordates from 100 to 300 and keeps on repeating
     let mut start_hpet: u64;
@@ -101,7 +103,7 @@ fn send_task(_arg_val: usize) -> Result<(), &'static str>{
     Ok(())
 }
 
-fn watch_task(_arg_val: usize) -> Result<(), &'static str>{
+fn graphics_measuring_task(_arg_val: usize) -> Result<(), &'static str>{
 
 
     let mut vec = Vec::with_capacity(200);
@@ -133,7 +135,7 @@ fn watch_task(_arg_val: usize) -> Result<(), &'static str>{
             // When count = 199 an iteration is completed
             if(count == 200){
                 warn!("TEST MSG : TEST COMPLETED");
-                let (new_count, new_total) = print_stats(vec.clone(),aggregted_count.clone(),aggregated_total.clone());
+                let (new_count, new_total) = graphics_print_stats(vec.clone(),aggregted_count.clone(),aggregated_total.clone());
                 aggregted_count = new_count;
                 aggregated_total = new_total;
                 // loop{
@@ -147,7 +149,7 @@ fn watch_task(_arg_val: usize) -> Result<(), &'static str>{
     Ok(())
 }
 
-fn print_stats(vec: Vec<u64>, aggregted_count: u64, aggregted_total :u64) ->(u64,u64){
+fn graphics_print_stats(vec: Vec<u64>, aggregted_count: u64, aggregted_total :u64) ->(u64,u64){
     let mut count1 = 0;
     for (i,val) in vec.iter().enumerate() {
 
@@ -183,6 +185,107 @@ fn print_stats(vec: Vec<u64>, aggregted_count: u64, aggregted_total :u64) ->(u64
     (count,total)
 }
 
+fn ipc_fault_task((sender,receiver) : (StringSender, StringReceiver)) -> Result<(), &'static str>{
+
+    // sending the initial message of staring
+    let start_msg = format!("99999999");
+    sender.send(start_msg)?;
+
+    let mut i = 0;
+    loop {
+        let msg = receiver.receive()?;
+        let value = get_hpet().as_ref().unwrap().get_counter();
+        // warn!("test_multiple(): REceived {} at {}", msg, value);
+        sender.send(msg)?;
+        i = i + 1;
+    }
+    Ok(())
+}
+
+pub fn set_ipc_watch_task() -> (StringSender, StringReceiver){
+
+    // create two channels to pass messages
+    let (sender, receiver) = unified_channel::new_string_channel(2);
+    let (sender_reply, receiver_reply) = unified_channel::new_string_channel(2);
+
+    // Create the sending task
+    let taskref1  = new_task_builder(ipc_watch_task, (sender, receiver_reply))
+        .name(String::from("watch task"))
+        .pin_on_core(pick_child_core())
+        .spawn()
+        .expect("Couldn't start the watch task");
+
+    (sender_reply, receiver)
+}
+
+fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result<(), &'static str>{
+
+    #[cfg(not(use_async_channel))]
+    warn!("test_multiple(): Entered receiver task! : using rendevouz channel");
+
+    #[cfg(use_async_channel)]
+    warn!("test_multiple(): Entered receiver task! : using async channel");
+
+    #[cfg(use_crate_replacement)]
+    warn!("test_multiple(): Crate replacement will occur at the fault");
+
+    // 
+    let mut array: [u64; 128] = [0; 128];
+    let mut i = 0;
+
+    // received the initial config message (we need this to prevent deadlock in task restarts)
+    receiver.receive()?;
+
+    loop {
+        let msg = format!("{:08}", i);
+        let msg_copy = format!("{:08}", i);
+
+        let time_send = get_hpet().as_ref().unwrap().get_counter();
+        // warn!("test_multiple(): Sender sending message {:08} {}", i, time_send);
+        sender.send(msg)?;
+        let msg_received = receiver.receive()?;
+        let time_received = get_hpet().as_ref().unwrap().get_counter();
+
+        // If the test occured correctly we update the round trip log
+        if msg_copy == msg_received {
+            array[i%128] = time_received - time_send;
+        }
+
+        // warn!("test_multiple(): Receiver got {:?}  ({:08}) {} {} {}", msg_received, i, time_send, time_received, time_received - time_send);
+
+        // If an error occured we received the restart message
+        if msg_copy != msg_received {
+
+            // We ignore faults immediatelty occuring after restart
+            if i > 256 {
+
+                // warn!("Sender restart noted");
+                let fault_ticks = time_received - time_send;
+
+                let average_ticks : u64 = array.iter().sum();
+                let average_ticks = average_ticks / 128;
+
+                warn!("Sender restart noted at {}
+                        Fault : {} : {}
+                        Average : {} : {} ", i,
+                        fault_ticks, hpet_2_ns (fault_ticks),
+                        average_ticks, hpet_2_ns (average_ticks));
+
+                // for i in &array {
+                //     debug!("{}", i);
+                // }
+                //loop{}
+            } else {
+                warn!("Ignoring error at {}", i);
+            }
+            i = 0;
+        }
+
+        i = i + 1;
+    }
+    Ok(())
+}
+
 
 pub fn pick_child_core() -> u8 {
 	// try with current core -1
@@ -214,6 +317,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("w", "window", "measures downtime of window");
+    opts.optflag("a", "async", "measures downtime of IPC connection based on async channel");
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -227,7 +331,7 @@ pub fn main(args: Vec<String>) -> isize {
     let arg_val = 0;
     if matches.opt_present("w"){
 
-        set_watch_task();
+        set_graphics_measuring_task();
         
         let taskref1  = new_task_builder(fault_graphics_task, arg_val)
             .name(String::from("fault_graphics_task"))
@@ -236,6 +340,50 @@ pub fn main(args: Vec<String>) -> isize {
             .expect("Couldn't start the fault_graphics_task");
 
         taskref1.join().expect("Task 1 join failed");
+    }
+
+    if matches.opt_present("a") { 
+
+        #[cfg(use_async_channel)] 
+        {
+            // Set the channel
+            let (sender_reply, receiver) = set_ipc_watch_task();
+
+            debug!("Channel set up completed");
+
+            let taskref1  = new_restartable_task_builder(ipc_fault_task, (sender_reply, receiver))
+                .name(String::from("fault_task"))
+                .pin_on_core(pick_child_core())
+                .spawn()
+                .expect("Couldn't start the restartable task"); 
+
+            taskref1.join().expect("Task 1 join failed");
+        }
+
+        #[cfg(not(use_async_channel))]
+        println!("compile with use_async_channel to enable async channel");
+    }
+
+    if matches.opt_present("r") { 
+
+       #[cfg(not(use_async_channel))] 
+        {
+            // Set the channel
+            let (sender_reply, receiver) = set_ipc_watch_task();
+
+            debug!("Channel set up completed");
+
+            let taskref1  = new_task_builder(ipc_fault_task, (sender_reply, receiver))
+                .name(String::from("fault_task"))
+                .pin_on_core(pick_child_core())
+                .spawn_restartable()
+                .expect("Couldn't start the restartable task"); 
+
+            taskref1.join().expect("Task 1 join failed");
+        }
+
+        #[cfg(use_async_channel)]
+        println!("compile without use_async_channel to enable rendezvous channel");
     }
 
     return 0; 
