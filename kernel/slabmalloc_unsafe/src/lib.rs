@@ -6,11 +6,9 @@
 
 
 //! A slab allocator implementation for objects less than 8KiB.
-//! This allocator uses only safe Rust and associates an `AllocablePages`'s lifetime with its `MappedPages` object.
-//! The only way to achieve this is to store the MappedPages in statically sized buffers (Page Lists),
-//! so the heap size is set at compile time and cannot grow. 
-//! Additional pages cannot be added when an OOM error occurs.
-//! 
+//! This allocator does not use any of Theseus's memory management abstractions, and 
+//! works with pointers to the start of allocable pages.
+//!
 //! # Overview
 //!
 //! The organization is as follows:
@@ -27,9 +25,7 @@
 #![cfg_attr(feature = "unstable", feature(const_fn))]
 #![no_std]
 
-extern crate memory;
-#[macro_use] extern crate log;
-extern crate alloc;
+// #[macro_use] extern crate log;
 
 mod pages;
 mod sc;
@@ -40,15 +36,13 @@ pub use sc::*;
 pub use zone::*;
 
 use core::alloc::Layout;
+use core::fmt;
 use core::mem;
 use core::ptr::{self, NonNull};
-use memory::{MappedPages, VirtualAddress};
-use alloc::vec::Vec;
+
 
 #[cfg(target_arch = "x86_64")]
 const CACHE_LINE_SIZE: usize = 64;
 
-
-
-
-
+#[cfg(target_arch = "x86_64")]
+type VAddr = usize;

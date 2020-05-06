@@ -155,7 +155,9 @@ impl Bitfield for [AtomicU64] {
 ///
 /// The implementor of this trait needs to provide access to the page meta-data,
 /// which consists of:
+/// - `MappedPages8k` object that owns this memory
 /// - A bitfield (to track allocations),
+/// - `prev` and `next` pointers to insert the page in free lists
 pub trait AllocablePage {
     /// The total size (in bytes) of the page.
     ///
@@ -167,9 +169,22 @@ pub trait AllocablePage {
 
     const HEAP_ID_OFFSET: usize;
 
+    fn new(mp: MappedPages8k, heap_id: usize) -> Self 
+    where
+        Self: core::marker::Sized;
+    fn retrieve_mapped_pages(&mut self) -> Option<MappedPages8k>;
     fn clear_metadata(&mut self);
+    fn set_heap_id(&mut self, heap_id: usize);
+    fn heap_id(&self) -> usize;
     fn bitfield(&self) -> &[AtomicU64; 8];
     fn bitfield_mut(&mut self) -> &mut [AtomicU64; 8];
+    fn prev(&mut self) -> &mut Rawlink<Self>
+    where
+        Self: core::marker::Sized;
+    fn next(&mut self) -> &mut Rawlink<Self>
+    where
+        Self: core::marker::Sized;
+    fn buffer_size() -> usize;
 
     /// Tries to find a free block within `data` that satisfies `alignment` requirement.
     fn first_fit(&self, layout: Layout) -> Option<(usize, usize)> {
@@ -225,7 +240,7 @@ pub trait AllocablePage {
 /// Holds allocated data within 2 4-KiB pages.
 ///
 /// Has a data-section where objects are allocated from
-/// and a small amount of meta-data in the form of a bitmap
+/// and a small amount of meta-data in form of a bitmap
 /// to track allocations at the end of the page.
 ///
 /// # Notes
@@ -233,91 +248,104 @@ pub trait AllocablePage {
 /// It is marked `repr(C)` because we rely on a well defined order of struct
 /// members (e.g., dealloc does a cast to find the bitfield).
 #[repr(C)]
-pub struct ObjectPage8k {
+pub struct ObjectPage8k<'a> {
     /// Holds memory objects.
     #[allow(dead_code)]
-    data: [u8; ObjectPage8k::SIZE -ObjectPage8k::METADATA_SIZE],
+    data: [u8; ObjectPage8k::SIZE - ObjectPage8k::METADATA_SIZE],
+    
+    /// The MappedPages this memory area belongs to
+    pub mp: Option<MappedPages8k>,
 
-    pub(crate) heap_id: usize,
-    /// the index in the list where this page is stored
-    pub(crate) list_id: usize,
+    pub heap_id: usize,
+
+    /// Next element in list (used by `PageList`).
+    next: Rawlink<ObjectPage8k<'a>>,
+    /// Previous element in  list (used by `PageList`)
+    prev: Rawlink<ObjectPage8k<'a>>,
+
     /// A bit-field to track free/allocated memory within `data`.
-    bitfield: [AtomicU64; 8],
+    pub(crate) bitfield: [AtomicU64; 8],
 }
 
 
+// These needs some more work to be really safe...
+unsafe impl<'a> Send for ObjectPage8k<'a> {}
+unsafe impl<'a> Sync for ObjectPage8k<'a> {}
 
-impl AllocablePage for ObjectPage8k {
+impl<'a> AllocablePage for ObjectPage8k<'a> {
     const SIZE: usize = 8192;
-    const METADATA_SIZE: usize = (2 * core::mem::size_of::<usize>())  + (8*8);
-    const HEAP_ID_OFFSET: usize = Self::SIZE - ((2 * core::mem::size_of::<usize>()) + (8*8));
+    const METADATA_SIZE: usize = core::mem::size_of::<Option<MappedPages8k>>() + core::mem::size_of::<usize>() + (2*core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>()) + (8*8);
+    const HEAP_ID_OFFSET: usize = Self::SIZE - (core::mem::size_of::<usize>() + (2*core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>()) + (8*8));
+
+    /// Creates a new 8KiB allocable page and stores the MappedPages object in the metadata portion.
+    fn new(mp: MappedPages8k, heap_id: usize) -> ObjectPage8k<'a> {
+        ObjectPage8k {
+            data: [0; ObjectPage8k::SIZE -ObjectPage8k::METADATA_SIZE],
+            mp: Some(mp),
+            heap_id: heap_id,
+            next: Rawlink::default(),
+            prev: Rawlink::default(),
+            bitfield: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),AtomicU64::new(0) ],
+        }
+    }
+
+    /// Returns the MappedPages object that was stored in the metadata portion of the page.
+    fn retrieve_mapped_pages(&mut self) -> Option<MappedPages8k> {
+        let mut mp = None;
+        core::mem::swap(&mut self.mp, &mut mp);
+        mp
+    }
 
     /// clears the metadata section of the page
     fn clear_metadata(&mut self) {
         self.heap_id = 0;
-        self.list_id = 0;
+        self.next = Rawlink::default();
+        self.prev = Rawlink::default();
         for bf in &self.bitfield {
             bf.store(0, Ordering::SeqCst);
         }
     }
 
+    fn set_heap_id(&mut self, heap_id: usize){
+        self.heap_id = heap_id;
+    }
+
+    fn heap_id(&self) -> usize {
+        self.heap_id
+    }
+
     fn bitfield(&self) -> &[AtomicU64; 8] {
         &self.bitfield
     }
-    
     fn bitfield_mut(&mut self) -> &mut [AtomicU64; 8] {
         &mut self.bitfield
     }
 
-    /// Tries to find a free block within `data` that satisfies `alignment` requirement.
-    fn first_fit(&self, layout: Layout) -> Option<(usize, usize)> {
-        let base_addr = (&*self as *const Self as *const u8) as usize;
-        self.bitfield().first_fit(base_addr, layout, Self::SIZE, Self::METADATA_SIZE)
+    fn prev(&mut self) -> &mut Rawlink<Self> {
+        &mut self.prev
     }
 
-    /// Tries to allocate an object within this page.
-    ///
-    /// In case the slab is full, returns a null ptr.
-    fn allocate(&mut self, layout: Layout) -> *mut u8 {
-        match self.first_fit(layout) {
-            Some((idx, addr)) => {
-                self.bitfield().set_bit(idx);
-                addr as *mut u8
-            }
-            None => ptr::null_mut(),
-        }
+    fn next(&mut self) -> &mut Rawlink<Self> {
+        &mut self.next
     }
 
-    /// Checks if we can still allocate more objects of a given layout within the page.
-    fn is_full(&self) -> bool {
-        self.bitfield().is_full()
-    }
-
-    /// Checks if the page has currently no allocations.
-    fn is_empty(&self, relevant_bits: usize) -> bool {
-        self.bitfield().all_free(relevant_bits)
-    }
-
-    /// Deallocates a memory object within this page.
-    fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
-        // trace!(
-        //     "AllocablePage deallocating ptr = {:p} with {:?}",
-        //     ptr,
-        //     layout
-        // );
-        let page_offset = (ptr.as_ptr() as usize) & (Self::SIZE - 1);
-        assert!(page_offset % layout.size() == 0);
-        let idx = page_offset / layout.size();
-        assert!(
-            self.bitfield().is_allocated(idx),
-            "{:p} not marked allocated?",
-            ptr
-        );
-
-        self.bitfield().clear_bit(idx);
-        Ok(())
+    fn buffer_size() -> usize {
+        ObjectPage8k::SIZE - ObjectPage8k::METADATA_SIZE
     }
 }
+
+impl<'a> Default for ObjectPage8k<'a> {
+    fn default() -> ObjectPage8k<'a> {
+        unsafe { mem::MaybeUninit::zeroed().assume_init() }
+    }
+}
+
+impl<'a> fmt::Debug for ObjectPage8k<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ObjectPage8k")
+    }
+}
+
 
 /// A wrapper type around MappedPages which ensures that the MappedPages
 /// have a size and alignment of 8 KiB and are writable.
@@ -357,7 +385,7 @@ impl MappedPages8k {
     }
 
     // /// Return the pages represented by the MappedPages8k as an ObjectPage8k reference
-    // pub(crate) fn as_objectpage8k(&self) -> &ObjectPage8k {
+    // fn as_objectpage8k(&self) -> &ObjectPage8k {
     //     // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
     //     unsafe {
     //         mem::transmute(self.0.start_address())
@@ -365,15 +393,213 @@ impl MappedPages8k {
     // }
 
     /// Return the pages represented by the MappedPages8k as a mutable ObjectPage8k reference
-    pub(crate) fn as_objectpage8k_mut(&mut self) -> &mut ObjectPage8k {
+    fn as_objectpage8k_mut(&mut self) -> &mut ObjectPage8k {
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         unsafe {
-            mem::transmute(self.start_address())
+            mem::transmute(self.0.start_address())
         }
     }
 
     pub fn start_address(&self) -> VirtualAddress {
         self.0.start_address()
+    }
+}
+
+
+/// A list of pages.
+pub(crate) struct PageList<'a, T: AllocablePage> {
+    /// Points to the head of the list.
+    pub(crate) head: Option<&'a mut T>,
+    /// Number of elements in the list.
+    pub(crate) elements: usize,
+}
+
+impl<'a, T: AllocablePage> PageList<'a, T> {
+    #[cfg(feature = "unstable")]
+    pub(crate) const fn new() -> PageList<'a, T> {
+        PageList {
+            head: None,
+            elements: 0,
+        }
+    }
+
+    #[cfg(not(feature = "unstable"))]
+    pub(crate) fn new() -> PageList<'a, T> {
+        PageList {
+            head: None,
+            elements: 0,
+        }
+    }
+
+    pub(crate) fn iter_mut<'b: 'a>(&mut self) -> ObjectPageIterMut<'b, T> {
+        let m = match self.head {
+            None => Rawlink::none(),
+            Some(ref mut m) => Rawlink::some(*m),
+        };
+
+        ObjectPageIterMut {
+            head: m,
+            phantom: core::marker::PhantomData,
+        }
+    }
+
+    /// Inserts `new_head` at the front of the list.
+    pub(crate) fn insert_front<'b>(&'b mut self, mut new_head: &'a mut T) {
+        match self.head {
+            None => {
+                *new_head.prev() = Rawlink::none();
+                self.head = Some(new_head);
+            }
+            Some(ref mut head) => {
+                *new_head.prev() = Rawlink::none();
+                *head.prev() = Rawlink::some(new_head);
+                mem::swap(head, &mut new_head);
+                *head.next() = Rawlink::some(new_head);
+            }
+        }
+
+        self.elements += 1;
+    }
+
+    /// Removes `slab_page` from the list.
+    pub(crate) fn remove_from_list(&mut self, slab_page: &mut T) {
+        unsafe {
+            match slab_page.prev().resolve_mut() {
+                None => {
+                    self.head = slab_page.next().resolve_mut();
+                }
+                Some(prev) => {
+                    *prev.next() = match slab_page.next().resolve_mut() {
+                        None => Rawlink::none(),
+                        Some(next) => Rawlink::some(next),
+                    };
+                }
+            }
+
+            match slab_page.next().resolve_mut() {
+                None => (),
+                Some(next) => {
+                    *next.prev() = match slab_page.prev().resolve_mut() {
+                        None => Rawlink::none(),
+                        Some(prev) => Rawlink::some(prev),
+                    };
+                }
+            }
+        }
+
+        *slab_page.prev() = Rawlink::none();
+        *slab_page.next() = Rawlink::none();
+        self.elements -= 1;
+    }
+
+    /// Removes `slab_page` from the list.
+    pub(crate) fn pop<'b>(&'b mut self) -> Option<&'a mut T> {
+        match self.head {
+            None => None,
+            Some(ref mut head) => {
+                let head_next = head.next();
+                let mut new_head = unsafe { head_next.resolve_mut() };
+                mem::swap(&mut self.head, &mut new_head);
+                let _ = self.head.as_mut().map(|n| {
+                    *n.prev() = Rawlink::none();
+                });
+
+                self.elements -= 1;
+                new_head.map(|node| {
+                    *node.prev() = Rawlink::none();
+                    *node.next() = Rawlink::none();
+                    node
+                })
+            }
+        }
+    }
+
+    /// Does the list contain `s`?
+    pub(crate) fn contains(&mut self, s: *const T) -> bool {
+        for slab_page in self.iter_mut() {
+            if slab_page as *const T == s as *const T {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
+/// Iterate over all the pages inside a slab allocator
+pub(crate) struct ObjectPageIterMut<'a, P: AllocablePage> {
+    head: Rawlink<P>,
+    phantom: core::marker::PhantomData<&'a P>,
+}
+
+impl<'a, P: AllocablePage + 'a> Iterator for ObjectPageIterMut<'a, P> {
+    type Item = &'a mut P;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a mut P> {
+        unsafe {
+            self.head.resolve_mut().map(|next| {
+                self.head = match next.next().resolve_mut() {
+                    None => Rawlink::none(),
+                    Some(ref mut sp) => Rawlink::some(*sp),
+                };
+                next
+            })
+        }
+    }
+}
+
+/// Rawlink is a type like Option<T> but for holding a raw pointer.
+///
+/// We use it to link AllocablePages together. You probably won't need
+/// to use this type if you're not implementing AllocablePage
+/// for a custom page-size.
+pub struct Rawlink<T> {
+    p: *mut T,
+}
+
+impl<T> Default for Rawlink<T> {
+    fn default() -> Self {
+        Rawlink { p: ptr::null_mut() }
+    }
+}
+
+impl<T> Rawlink<T> {
+    /// Like Option::None for Rawlink
+    pub(crate) fn none() -> Rawlink<T> {
+        Rawlink { p: ptr::null_mut() }
+    }
+
+    /// Like Option::Some for Rawlink
+    pub(crate) fn some(n: &mut T) -> Rawlink<T> {
+        Rawlink { p: n }
+    }
+
+    /// Convert the `Rawlink` into an Option value
+    ///
+    /// **unsafe** because:
+    ///
+    /// - Dereference of raw pointer.
+    /// - Returns reference of arbitrary lifetime.
+    #[allow(dead_code)]
+    pub(crate) unsafe fn resolve<'a>(&self) -> Option<&'a T> {
+        self.p.as_ref()
+    }
+
+    /// Convert the `Rawlink` into an Option value
+    ///
+    /// **unsafe** because:
+    ///
+    /// - Dereference of raw pointer.
+    /// - Returns reference of arbitrary lifetime.
+    pub(crate) unsafe fn resolve_mut<'a>(&mut self) -> Option<&'a mut T> {
+        self.p.as_mut()
+    }
+
+    /// Return the `Rawlink` and replace with `Rawlink::none()`
+    #[allow(dead_code)]
+    pub(crate) fn take(&mut self) -> Rawlink<T> {
+        mem::replace(self, Rawlink::none())
     }
 }
 

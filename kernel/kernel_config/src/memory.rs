@@ -54,7 +54,7 @@ pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 
 /// The size in pages of each kernel stack. 
 /// If it's too small, complex kernel functions will overflow, causing a page fault / double fault.
-pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 32;
+pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 16;
 
 /// The virtual address where the initial kernel (the nano_core) is mapped to.
 /// Actual value: 0xFFFFFFFF80000000.

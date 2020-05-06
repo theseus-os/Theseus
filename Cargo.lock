@@ -1362,7 +1362,9 @@ dependencies = [
  "kernel_config 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "slabmalloc 0.7.0",
  "slabmalloc_safe 0.7.0",
+ "slabmalloc_unsafe 0.7.0",
  "static_assertions 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2127,11 +2129,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "slabmalloc"
+version = "0.7.0"
+dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+]
+
+[[package]]
 name = "slabmalloc_safe"
 version = "0.7.0"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+]
+
+[[package]]
+name = "slabmalloc_unsafe"
+version = "0.7.0"
+dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2361,22 +2378,6 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "terminal_print 0.1.0",
-]
-
-[[package]]
-name = "test_heap"
-version = "0.1.0"
-dependencies = [
- "apic 0.1.0",
- "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
- "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "hpet 0.1.0",
- "libtest 0.1.0",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
- "runqueue 0.1.0",
- "spawn 0.1.0",
  "terminal_print 0.1.0",
 ]
 
