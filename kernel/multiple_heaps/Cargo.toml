@@ -40,7 +40,3 @@ path = "../heap"
 [dependencies.hashbrown]
 version = "0.1.8"
 features = ["nightly"]
-
-[features]
-unsafe_large_allocations = []
-unsafe_heap = []
