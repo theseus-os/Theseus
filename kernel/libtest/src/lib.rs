@@ -69,7 +69,7 @@ pub fn stop_counting_reference_cycles(counter: Counter) -> Result<u64, &'static 
 	Ok(count)
 }
 
-const THRESHOLD_ERROR_RATIO: u64 = 1;
+pub const THRESHOLD_ERROR_RATIO: u64 = 1;
 
 /// Measures the overhead of using the PMU reference cycles counter.
 /// Calls `timing_overhead_inner` multiple times and averages the value. 
