@@ -108,7 +108,6 @@ pub fn do_self_swap(
         };
 
 
-
         let swap_req = SwapRequest::new(
             Some(crate_name),
             Arc::clone(&namespace),
@@ -116,6 +115,10 @@ pub fn do_self_swap(
             new_namespace,
             false, //reexport
         ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
+
+        // debug!("Crate name {}", crate_name);
+        // debug!("old_namespace {:?}", namespace);
+        // debug!("new_namespace {:?}", new_namespace);
 
         #[cfg(not(downtime_eval))]
         debug!("swap call {:?}", swap_req);
@@ -142,21 +145,12 @@ pub fn do_self_swap(
     let mut new_rodata_high : Option<VirtualAddress> = None;
     let mut new_data_high : Option<VirtualAddress> = None;
 
+    let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
 
-    for req in &swap_requests {
+    if matching_crates.len() == 1 {
+        let (_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(0);
 
-        let SwapRequest { old_crate_name, old_namespace, new_crate_object_file: _, new_namespace: _, reexport_new_symbols_as_old: _ } = req;
-
-        let old_crate_ref = match old_crate_name.as_deref().and_then(|ocn| CrateNamespace::get_crate_and_namespace(old_namespace, ocn)) {
-            Some((ocr, _ns)) => {
-                ocr
-            }
-            _ => {
-                continue;
-            }
-        };
-
-        #[cfg(not(downtime_eval))]
+         #[cfg(not(downtime_eval))]
         debug!("{:?}",old_crate_ref);
 
         let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
@@ -198,6 +192,8 @@ pub fn do_self_swap(
             };
         }
 
+    } else {
+        return Err("More than 1 matching crates currently loaded".to_string());
     }
 
     // Swap crates
