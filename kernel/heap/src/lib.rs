@@ -26,6 +26,17 @@ use block_allocator::FixedSizeBlockAllocator;
 #[global_allocator]
 pub static ALLOCATOR: Heap = Heap::empty();
 
+#[cfg(direct_access_to_heap)]
+/// The default allocator is the one which is set up after the basic system initialization is completed. 
+/// Currently it is initialized with an instance of `MultipleHeaps`.
+/// Only make the default allocator visible when we want to explicitly use it without going through the global allocator
+pub static DEFAULT_ALLOCATOR: Once<Box<dyn GlobalAlloc + Send + Sync>> = Once::new();
+
+#[cfg(not(direct_access_to_heap))]
+/// The default allocator is the one which is set up after the basic system initialization is completed. 
+/// Currently it is initialized with an instance of `MultipleHeaps`.
+static DEFAULT_ALLOCATOR: Once<Box<dyn GlobalAlloc + Send + Sync>> = Once::new();
+
 /// The heap mapped pages should be writable
 pub const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
 
@@ -41,16 +52,15 @@ pub fn init_single_heap(start_virt_addr: usize, size_in_bytes: usize) {
 
 /// Sets a new default allocator for the global heap. It will start being used after this function is called.
 pub fn set_allocator(allocator: Box<dyn GlobalAlloc + Send + Sync>) {
-    ALLOCATOR.set_allocator(allocator);
+    DEFAULT_ALLOCATOR.call_once(|| allocator);
 }
 
 
 /// The heap which is used as a global allocator for the system.
 /// It starts off with one basic fixed size allocator, the `initial allocator`. 
-/// When a more complex heap is created it is set as the default allocator by initializing the `allocator` field.
+/// When a more complex heap is created and set as the DEFAULT_ALLOCATOR, then it is used.
 pub struct Heap {
     initial_allocator: MutexIrqSafe<block_allocator::FixedSizeBlockAllocator>, 
-    allocator: Once<Box<dyn GlobalAlloc + Send + Sync>>,
 }
 
 
@@ -59,19 +69,14 @@ impl Heap {
     pub const fn empty() -> Heap {
         Heap {
             initial_allocator: MutexIrqSafe::new(FixedSizeBlockAllocator::new()),
-            allocator: Once::new(),
         }
-    }
-
-    fn set_allocator(&self, allocator: Box<dyn GlobalAlloc + Send + Sync>) {
-        self.allocator.call_once(|| allocator);
     }
 }
 
 unsafe impl GlobalAlloc for Heap {
 
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        match self.allocator.try() {
+        match DEFAULT_ALLOCATOR.try() {
             Some(allocator) => {
                 allocator.alloc(layout)
             }
@@ -86,7 +91,7 @@ unsafe impl GlobalAlloc for Heap {
             self.initial_allocator.lock().deallocate(ptr, layout);
         }
         else {
-            self.allocator.try()
+            DEFAULT_ALLOCATOR.try()
                 .expect("Ptr passed to dealloc is not within the initial allocator's range, and another allocator has not been set up")
                 .dealloc(ptr, layout);
         }

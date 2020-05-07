@@ -3,6 +3,7 @@ authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "heap"
 description = "global allocator for the system"
 version = "0.1.0"
+build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
