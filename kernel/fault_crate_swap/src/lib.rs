@@ -116,10 +116,6 @@ pub fn do_self_swap(
             false, //reexport
         ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
 
-        // debug!("Crate name {}", crate_name);
-        // debug!("old_namespace {:?}", namespace);
-        // debug!("new_namespace {:?}", new_namespace);
-
         #[cfg(not(downtime_eval))]
         debug!("swap call {:?}", swap_req);
 
@@ -147,6 +143,7 @@ pub fn do_self_swap(
 
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
 
+    // There can be only one matching crate for a given crate name
     if matching_crates.len() == 1 {
         let (_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(0);
 
