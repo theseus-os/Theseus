@@ -499,7 +499,7 @@ fn task_wrapper<F, A, R>() -> !
 fn task_wrapper_restartable<F, A, R>() -> !
     where A: Send + Clone + 'static, 
           R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone +'static,
+          F: FnOnce(A) -> R + Send + Clone + 'static,
 {
     let result = task_wrapper_internal::<F, A, R>();
 
@@ -586,7 +586,7 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
 fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
     where A: Send + Clone + 'static, 
           R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone +'static, 
+          F: FnOnce(A) -> R + Send + Clone + 'static, 
 {
     let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
     task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
@@ -596,25 +596,19 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
-fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
     remove_current_task_from_runqueue(&current_task);
-    drop(_held_interrupts); // reenables preemption (interrupts)
+    drop(current_task);
+    drop(held_interrupts);
+    // ****************************************************
+    // NOTE: nothing below here is guaranteed to run again!
+    // ****************************************************
 
-    // Yield the CPU
-    let success = scheduler::schedule();
-    // Yielding will be succesful if there is atleast one task to schedule to. Which is true
-    // in most cases as at least the idle task will be there. However on rare instances where 
-    // the idle task has crashed this will fail. If so we spawn a new idle task.
-    if !success {
-        spawn_idle_task();
-    }
     scheduler::schedule();
-
-    // nothing below here should ever run again, we should never ever reach this point
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { }
 }
@@ -622,10 +616,10 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
 /// The final piece of the task cleanup logic for restartable tasks.
 /// which removes the task from its runqueue and spawns it again with 
 /// same entry function (F) and argument (A). 
-fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
    where A: Send + Clone + 'static, 
          R: Send + 'static,
-         F: FnOnce(A) -> R + Send + Clone +'static, 
+         F: FnOnce(A) -> R + Send + Clone + 'static, 
 {
     // remove the task from runqueue
     remove_current_task_from_runqueue(&current_task);
@@ -654,19 +648,13 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         }
     }
 
-    drop(_held_interrupts); // reenables preemption (interrupts)
+    drop(current_task);
+    drop(held_interrupts);
+    // ****************************************************
+    // NOTE: nothing below here is guaranteed to run again!
+    // ****************************************************
 
-    // Yield the CPU
-    let success = scheduler::schedule();
-    // Yielding will be succesful if there is atleast one task to schedule to. Which is true
-    // in most cases as at least the idle task will be there. However on rare instances where 
-    // the idle task has crashed this will fail. If so we spawn a new idle task.
-    if !success {
-        spawn_idle_task();
-    }
     scheduler::schedule();
-
-    // nothing below here should ever run again, we should never ever reach this point
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { }
 }
@@ -680,7 +668,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
-            error!("BUG: task_cleanup_final(): couldn't remove exited task from runqueue: {}", e);
+            error!("BUG: couldn't remove exited task from runqueue: {}", e);
         }
     }
 }
@@ -695,7 +683,8 @@ fn spawn_idle_task() -> () {
     let _idle_taskref = new_task_builder(dummy_idle_task, 0)
         .name(String::from(format!("idle_task_ap{}", apic_id)))
         .idle(apic_id)
-        .spawn().expect("failed to initiate idle task");
+        .spawn()
+        .expect("failed to initiate idle task");
 }
 
 /// Dummy `idle_task` to be used if original `idle_task` crashes.
