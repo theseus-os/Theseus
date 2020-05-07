@@ -6,14 +6,17 @@
 use alloc::{
     vec::Vec,
     string::String,
-    alloc::{GlobalAlloc, Layout},
+    alloc::Layout,
 };
+#[cfg(not(direct_access_to_multiple_heaps))]
+use alloc::alloc::GlobalAlloc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::ptr;
 use hpet::get_hpet;
 use libtest::hpet_2_ns;
-use heap::ALLOCATOR;
-use crate::NTHREADS;
+use crate::{NTHREADS, ALLOCATOR};
+#[cfg(direct_access_to_multiple_heaps)]
+use crate::overhead_of_accessing_multiple_heaps;
 
 pub(crate) static NITERATIONS: AtomicUsize = AtomicUsize::new(1000);
 pub(crate) static MAX_BLOCK_SIZE: AtomicUsize = AtomicUsize::new(MAX_REGULAR);
@@ -36,6 +39,12 @@ pub fn do_shbench() -> Result<(), &'static str> {
     let hpet = get_hpet(); 
     println!("Running shbench for {} threads, {} total iterations, {} iterations per thread, {} max block size, {} min block size ...", 
         nthreads, niterations, niterations/nthreads, MAX_BLOCK_SIZE.load(Ordering::SeqCst), MIN_BLOCK_SIZE.load(Ordering::SeqCst));
+    
+    #[cfg(direct_access_to_multiple_heaps)]
+    {
+        let overhead = overhead_of_accessing_multiple_heaps()?;
+        println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_ns(overhead));
+    }
 
     let start = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
@@ -56,6 +65,21 @@ pub fn do_shbench() -> Result<(), &'static str> {
 
 
 fn worker(_:()) {
+    #[cfg(not(direct_access_to_multiple_heaps))]
+    let allocator = &ALLOCATOR;
+
+    // In the case of directly accessing the multiple heaps, we do have to access them through the Once wrapper
+    // at the beginning, but the time it takes to do this once at the beginning of thread is
+    // insignificant compared to the number of iterations we run. It also printed above.
+    #[cfg(direct_access_to_multiple_heaps)]
+    let allocator = match ALLOCATOR.try() {
+        Some(allocator) => allocator,
+        None => {
+            error!("Multiple heaps not initialized!");
+            return;
+        }
+    };
+
     let nthreads = NTHREADS.load(Ordering::SeqCst);
     let niterations = NITERATIONS.load(Ordering::SeqCst) / nthreads;
     // the total number of allocations that will be stored at one time
@@ -94,7 +118,7 @@ fn worker(_:()) {
 
                 for _ in 0..iterations {
                     let layout = Layout::from_size_align(size, 2).unwrap();
-                    let ptr = unsafe{ ALLOCATOR.alloc(layout) };
+                    let ptr = unsafe{ allocator.alloc(layout) };
 
                     if ptr.is_null() {
                         error!("Out of Heap Memory");
@@ -124,14 +148,14 @@ fn worker(_:()) {
                         }
                         // free the top part of the buffer, the oldest allocations first
                         while mp < save_start {
-                            unsafe { ALLOCATOR.dealloc(allocations[mp], layouts[mp]); }
+                            unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
                             mp += 1;
                         }
                         mp = mpe;
                         // free the end of the buffer, the newest allocations first
                         while mp > save_end {
                             mp -= 1;
-                            unsafe { ALLOCATOR.dealloc(allocations[mp], layouts[mp]); }
+                            unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
                         }
                         mp = 0;
                     }
@@ -147,9 +171,8 @@ fn worker(_:()) {
     mp = 0;
 
     while mp < mpe {
-        unsafe{ ALLOCATOR.dealloc(allocations[mp], layouts[mp]); }
+        unsafe{ allocator.dealloc(allocations[mp], layouts[mp]); }
     }        
 }
-
 
 

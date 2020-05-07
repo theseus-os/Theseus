@@ -23,5 +23,6 @@ path = "../kernel_config"
 [dependencies.block_allocator]
 path = "../block_allocator"
 
-
+[features]
+direct_access_to_multiple_heaps = []
 

@@ -24,15 +24,15 @@ use block_allocator::FixedSizeBlockAllocator;
 
 
 #[global_allocator]
-pub static ALLOCATOR: Heap = Heap::empty();
+pub static GLOBAL_ALLOCATOR: Heap = Heap::empty();
 
-#[cfg(direct_access_to_heap)]
+#[cfg(direct_access_to_multiple_heaps)]
 /// The default allocator is the one which is set up after the basic system initialization is completed. 
 /// Currently it is initialized with an instance of `MultipleHeaps`.
-/// Only make the default allocator visible when we want to explicitly use it without going through the global allocator
+/// We only make the default allocator visible when we want to explicitly use it without going through the global allocator.
 pub static DEFAULT_ALLOCATOR: Once<Box<dyn GlobalAlloc + Send + Sync>> = Once::new();
 
-#[cfg(not(direct_access_to_heap))]
+#[cfg(not(direct_access_to_multiple_heaps))]
 /// The default allocator is the one which is set up after the basic system initialization is completed. 
 /// Currently it is initialized with an instance of `MultipleHeaps`.
 static DEFAULT_ALLOCATOR: Once<Box<dyn GlobalAlloc + Send + Sync>> = Once::new();
@@ -46,11 +46,11 @@ const INITIAL_HEAP_END_ADDR: usize = KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZ
 
 /// Initializes the single heap, which is the first heap used by the system.
 pub fn init_single_heap(start_virt_addr: usize, size_in_bytes: usize) {
-    unsafe { ALLOCATOR.initial_allocator.lock().init(start_virt_addr, size_in_bytes); }
+    unsafe { GLOBAL_ALLOCATOR.initial_allocator.lock().init(start_virt_addr, size_in_bytes); }
 }
 
 
-/// Sets a new default allocator for the global heap. It will start being used after this function is called.
+/// Sets a new default allocator to be used by the global heap. It will start being used after this function is called.
 pub fn set_allocator(allocator: Box<dyn GlobalAlloc + Send + Sync>) {
     DEFAULT_ALLOCATOR.call_once(|| allocator);
 }
@@ -58,14 +58,14 @@ pub fn set_allocator(allocator: Box<dyn GlobalAlloc + Send + Sync>) {
 
 /// The heap which is used as a global allocator for the system.
 /// It starts off with one basic fixed size allocator, the `initial allocator`. 
-/// When a more complex heap is created and set as the DEFAULT_ALLOCATOR, then it is used.
+/// When a more complex heap is created and set as the `DEFAULT_ALLOCATOR`, then it is used.
 pub struct Heap {
     initial_allocator: MutexIrqSafe<block_allocator::FixedSizeBlockAllocator>, 
 }
 
 
 impl Heap {
-    /// Returns a heap in which only the empty initial allocator has been created.
+    /// Returns a heap in which only an empty initial allocator has been created.
     pub const fn empty() -> Heap {
         Heap {
             initial_allocator: MutexIrqSafe::new(FixedSizeBlockAllocator::new()),
