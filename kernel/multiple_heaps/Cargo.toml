@@ -26,7 +26,13 @@ path = "../kernel_config"
 path = "../apic"
 
 [dependencies.slabmalloc]
-path = "../../libs/rust-slabmalloc"
+path = "../slabmalloc"
+
+[dependencies.slabmalloc_safe]
+path = "../slabmalloc_safe"
+
+[dependencies.slabmalloc_unsafe]
+path = "../slabmalloc_unsafe"
 
 [dependencies.heap]
 path = "../heap"
@@ -37,3 +43,4 @@ features = ["nightly"]
 
 [features]
 unsafe_large_allocations = []
+unsafe_heap = []

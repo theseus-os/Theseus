@@ -1,0 +1,16 @@
+[package]
+name = "slabmalloc_unsafe"
+version = "0.7.0"
+authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ramla Ijaz <ijazramla@gmail.com>"]
+description = "Simple slab based malloc implementation in rust"
+
+keywords = ["os", "malloc", "slab", "alloc", "memory"]
+
+[features]
+unstable = []
+default = [ "unstable" ]
+
+[dependencies.log]
+version = "0.4.8"
+
+
