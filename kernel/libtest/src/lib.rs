@@ -217,7 +217,7 @@ pub fn calculate_stats(vec: &Vec<u64>) -> Option<Stats>{
       	}
 
     	var = (diff_sum) / (len as f64);
-        std_dev = libm::sqrt(var as f64);
+        std_dev = libm::sqrt(var);
 	}
 
 	{ // calculate mode
