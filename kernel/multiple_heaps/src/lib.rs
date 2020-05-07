@@ -2,12 +2,12 @@
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
 //! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate "slab allocators" for sizes
-//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8KiB - bytes of metadata) bytes. 8056 is the maximum allocation size given by `ZoneAllocator::MAX_ALLOC_SIZE`.
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and (8KiB - bytes of metadata) bytes. The maximum allocation size is given by `ZoneAllocator::MAX_ALLOC_SIZE`.
 //! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
-//! The allocable pages are 8 KiB (`ObjectPage8K::SIZE`), and have metadata stored in the last 136 bytes (`ObjectPage8K::METADATA_SIZE`).
+//! The allocable pages are 8 KiB (`ObjectPage8k::SIZE`), and have metadata stored in the ending bytes (`ObjectPage8k::METADATA_SIZE`).
 //! The metadata includes a heap id, MappedPages object this allocable page belongs to, forward and back pointers to pages stored in a linked list and a
 //! bitmap to keep track of allocations. The maximum allocation size can change if the size of the objects in the metadata change. If that happens it will be automatically
-//! reflected in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8K::METADATA_SIZE`
+//! reflected in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8k::METADATA_SIZE`
 //! 
 //! Any memory request greater than maximum allocation size, a large allocation, is satisfied through a request for pages from the kernel.
 //! All other requests are satisfied through the per-core heaps.
@@ -23,34 +23,44 @@
 #![feature(allocator_api)]
 #![no_std]
 
-extern crate alloc;
 extern crate irq_safety; 
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate kernel_config;
-extern crate slabmalloc;
 extern crate apic;
 extern crate heap;
 extern crate hashbrown;
 #[macro_use] extern crate cfg_if;
 
+#[cfg(all(not(unsafe_heap), not(safe_heap)))]
+extern crate slabmalloc;
+
+#[cfg(unsafe_heap)]
+extern crate slabmalloc_unsafe;
+
+#[cfg(safe_heap)]
+extern crate slabmalloc_safe;
 
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
-use alloc::{
-    boxed::Box
-};
+use alloc::boxed::Box;
 use hashbrown::HashMap;
-
 use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange, create_mapping};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_MAX_SIZE};
-use irq_safety::MutexIrqSafe;
-use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, Allocator};
 use core::ops::{Add, Deref, DerefMut};
 use core::ptr;
 use heap::HEAP_FLAGS;
+use irq_safety::MutexIrqSafe;
 
+#[cfg(all(not(unsafe_heap), not(safe_heap)))]
+use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};
+
+#[cfg(unsafe_heap)]
+use slabmalloc_unsafe::{ZoneAllocator, ObjectPage8k, AllocablePage};
+
+#[cfg(safe_heap)]
+use slabmalloc_safe::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
 /// We curently work with 8KiB, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
@@ -60,15 +70,22 @@ const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
 /// We curently work with 2 pages, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.   
 const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 
+#[cfg(not(safe_heap))]
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
-/// The number of pages each size class in the ZoneAllocator is initialized with.
+#[cfg(not(safe_heap))]
+/// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 100 KiB.
 const PAGES_PER_SIZE_CLASS: usize = 24; 
 
-/// Starting size of each per-core heap. It's approximately 1 MiB.
+#[cfg(safe_heap)]
+/// The number of pages each size class in the ZoneAllocator is initialized with.
+/// In the case of the safe heap which does not grow, it is set to the maximum limit.
+const PAGES_PER_SIZE_CLASS: usize = slabmalloc_safe::SCAllocator::MAX_PAGE_LIST_SIZE * HEAP_MAPPED_PAGES_SIZE_IN_PAGES; 
+
+/// Starting size of each per-core heap. 
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
 
 
@@ -123,50 +140,132 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 }
 
 
-/// Initializes the heap given by `key`.
-/// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].
-/// We evenly distribute the pages allocated for each heap between the size classes. 
-pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> Result<(), &'static str> {
+// Initialization function for the heap differs depending on the slabmalloc version used.
+//
+// For the unsafe version, the new heap mapping is merged into the heap MappedPages object in the kernel mmi
+// and then a reference to the starting address is passed to the ZoneAllocator.
+//
+// For the default and safe versions, MappedPages8k objects are created from the new heap mapping and passed to the ZoneAllocator.
+cfg_if! {
+if #[cfg(unsafe_heap)] {
+    #[macro_use] extern crate alloc;
 
-    let mut heap_end = multiple_heaps.end.lock();
-    let mut heap_end_addr = *heap_end;
-
-    let mapped_pages_per_size_class = PER_CORE_HEAP_INITIAL_SIZE_PAGES / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * HEAP_MAPPED_PAGES_SIZE_IN_PAGES);
-    let mut zone_allocator = ZoneAllocator::new(key);
-
-    let alloc_sizes = &ZoneAllocator::BASE_ALLOC_SIZES;
-    for size in alloc_sizes {
-        for _ in 0..mapped_pages_per_size_class {
-            // the alignment is equal to the size unless the size is not a multiple of 2
-            let mut alignment = *size;
-            if alignment == ZoneAllocator::MAX_BASE_ALLOC_SIZE {
-                alignment = 8;
-            }
-            let layout = Layout::from_size_align(*size, alignment).map_err(|_e| "Incorrect layout")?;
-
-            // create the mapped pages starting from the previous end of the heap
-            let mapping = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
-
-            // add page to the allocator
-            zone_allocator.refill(layout, mapping)?; 
-
-            // update the end address of the heap
-            heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
-            // trace!("Added an object page {:#X} to slab of size {}", addr, sizes[slab]);
+    /// Merge mapped pages `mp` with the heap mapped pages stored in the kernel memory management information.
+    /// 
+    /// # Warning
+    /// The new mapped pages must start from the virtual address that the current heap mapped pages end at.
+    fn extend_heap_mp(mp: MappedPages) -> Result<(), &'static str> {
+        let heap_start_addr = KERNEL_HEAP_START;
+        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("extend_heap_mp(): KERNEL_MMI was not yet initialized!")?;
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        let heap_mp = kernel_mmi.extra_mapped_pages.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
+        
+        if let Err((e,_mp)) = heap_mp.merge(vec!(mp)) {
+            return Err(e);
         }
+
+        Ok(())
     }
 
-    // store the new end of the heap after this core has been initialized
-    *heap_end = heap_end_addr;
+    /// Initializes the heap given by `key`.
+    /// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].
+    /// We evenly distribute the pages allocated for each heap between the size classes. 
+    pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> Result<(), &'static str> {
 
-    // store the newly created allocator in the multiple heaps object
-    if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
-        return Err("New heap created with a previously used id");
+        let mut heap_end = multiple_heaps.end.lock();
+        let mut heap_end_addr = *heap_end;
+
+        let mapped_pages_per_size_class = PER_CORE_HEAP_INITIAL_SIZE_PAGES / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * HEAP_MAPPED_PAGES_SIZE_IN_PAGES);
+        let mut zone_allocator = ZoneAllocator::new(key);
+
+        let alloc_sizes = &ZoneAllocator::BASE_ALLOC_SIZES;
+        for size in alloc_sizes {
+            for _ in 0..mapped_pages_per_size_class {
+                // the alignment is equal to the size unless the size is not a multiple of 2
+                let mut alignment = *size;
+                if alignment == ZoneAllocator::MAX_BASE_ALLOC_SIZE {
+                    alignment = 8;
+                }
+                let layout = Layout::from_size_align(*size, alignment).map_err(|_e| "Incorrect layout")?;
+
+                // create the mapped pages starting from the previous end of the heap
+                let mp = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+
+                let start_addr = mp.start_address().value();
+                if start_addr % ObjectPage8k::SIZE != 0 {
+                    return Err("MappedPages allocated for heap are not aligned on an 8k boundary");
+                }
+                extend_heap_mp(mp)?;
+                let page = unsafe{ core::mem::transmute(start_addr) };
+                zone_allocator.refill(layout, page)?;
+
+                // update the end address of the heap
+                heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
+                // trace!("Added an object page {:#X} to slab of size {}", addr, sizes[slab]);
+            }
+        }
+
+        // store the new end of the heap after this core has been initialized
+        *heap_end = heap_end_addr;
+
+        // store the newly created allocator in the multiple heaps object
+        if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
+            return Err("New heap created with a previously used id");
+        }
+        trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
+
+        Ok(())
     }
-    trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
 
-    Ok(())
+} else {
+    extern crate alloc;
+
+    /// Initializes the heap given by `key`.
+    /// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].
+    /// We evenly distribute the pages allocated for each heap between the size classes. 
+    pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> Result<(), &'static str> {
+
+        let mut heap_end = multiple_heaps.end.lock();
+        let mut heap_end_addr = *heap_end;
+
+        let mapped_pages_per_size_class = PER_CORE_HEAP_INITIAL_SIZE_PAGES / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * HEAP_MAPPED_PAGES_SIZE_IN_PAGES);
+        let mut zone_allocator = ZoneAllocator::new(key);
+
+        let alloc_sizes = &ZoneAllocator::BASE_ALLOC_SIZES;
+        for size in alloc_sizes {
+            for _ in 0..mapped_pages_per_size_class {
+                // the alignment is equal to the size unless the size is not a multiple of 2
+                let mut alignment = *size;
+                if alignment == ZoneAllocator::MAX_BASE_ALLOC_SIZE {
+                    alignment = 8;
+                }
+                let layout = Layout::from_size_align(*size, alignment).map_err(|_e| "Incorrect layout")?;
+
+                // create the mapped pages starting from the previous end of the heap
+                let mp = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+                let mapping = MappedPages8k::new(mp)?;
+                // add page to the allocator
+                zone_allocator.refill(layout, mapping)?;
+
+                // update the end address of the heap
+                // trace!("Added an object page {:#X} to slab of size {}", heap_end_addr, size);
+                heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
+            }
+        }
+
+        // store the new end of the heap after this core has been initialized
+        *heap_end = heap_end_addr;
+
+        // store the newly created allocator in the multiple heaps object
+        if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
+            return Err("New heap created with a previously used id");
+        }
+        trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
+
+        Ok(())
+    }
 }
+} // end cfg_if for initialization functions
 
 
 /// Returns the key which determines the heap that will be used.
@@ -177,16 +276,31 @@ fn get_key() -> usize {
     apic::get_my_apic_id() as usize
 }
 
+// The LockedHeap struct definition changes depending on the slabmalloc version used.
+// The safe version does not pass any lifetime parameter to the ZoneAllocator, while the unsafe and default versions do.
+cfg_if! {
+if #[cfg(safe_heap)] {
+    #[repr(align(64))]
+    struct LockedHeap (MutexIrqSafe<ZoneAllocator>);
 
-#[repr(align(64))]
-struct LockedHeap (MutexIrqSafe<ZoneAllocator<'static>>);
+    impl Deref for LockedHeap {
+        type Target = MutexIrqSafe<ZoneAllocator>;
+        fn deref(&self) -> &MutexIrqSafe<ZoneAllocator> {
+            &self.0
+        }
+    }
+} else {
+    #[repr(align(64))]
+    struct LockedHeap (MutexIrqSafe<ZoneAllocator<'static>>);
 
-impl Deref for LockedHeap {
-    type Target = MutexIrqSafe<ZoneAllocator<'static>>;
-    fn deref(&self) -> &MutexIrqSafe<ZoneAllocator<'static>> {
-        &self.0
+    impl Deref for LockedHeap {
+        type Target = MutexIrqSafe<ZoneAllocator<'static>>;
+        fn deref(&self) -> &MutexIrqSafe<ZoneAllocator<'static>> {
+            &self.0
+        }
     }
 }
+} // end cfg_if for LockedHeap versions
 
 
 /// An allocator that contains multiple heaps. The heap that is used on each allocation is
@@ -203,44 +317,113 @@ pub struct MultipleHeaps{
     end: MutexIrqSafe<VirtualAddress>, 
 }
 
-impl MultipleHeaps {
-    pub fn empty() -> MultipleHeaps {
-        MultipleHeaps{
-            heaps: HashMap::new(),
+// The grow_heap() function for the MultipleHeaps changes depending on the slabmalloc version used.
+//
+// In the default version, MappedPages8k objects are passed to the heap that needs to be grown.
+// In the unsafe version, the new heap mapping is merged into the heap MappedPages object in the kernel mmi
+// and then a reference to the starting address is passed to the heap that needs to be grown.
+// In the safe version, an Err is returned since the heap is statically sized.
+cfg_if! {
+if #[cfg(unsafe_heap)] {
+    impl MultipleHeaps {
+        pub fn empty() -> MultipleHeaps {
+            MultipleHeaps{
+                heaps: HashMap::new(),
 
-            #[cfg(not(unsafe_large_allocations))]
-            large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+                #[cfg(not(unsafe_large_allocations))]
+                large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
 
-            end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
-        }
-    }
-
-    /// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
-    /// (1) Pages are first taken from another heap.
-    /// (2) If the above fails, then more pages are allocated from the OS.
-    /// 
-    /// An Err is returned if there is no more memory to be allocated in the heap memory area.
-    /// 
-    /// # Arguments
-    /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
-    /// * `heap`: heap that needs to grow.
-    fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
-        // (1) Try to retrieve a page from the another heap
-        for locked_heap in self.heaps.values() {
-            if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                info!("Added page from another heap to heap: {}", heap.heap_id);
-                return heap.refill(layout, mp);
+                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
             }
         }
-        // (2) Allocate page from the OS
-        let mut heap_end = self.end.lock();
-        let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
-        info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
-        *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
-        heap.refill(layout, mp)
-    }
 
+        /// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
+        /// (1) Pages are first taken from another heap.
+        /// (2) If the above fails, then more pages are allocated from the OS.
+        /// 
+        /// An Err is returned if there is no more memory to be allocated in the heap memory area.
+        /// 
+        /// # Arguments
+        /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
+        /// * `heap`: heap that needs to grow.
+        fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
+            // (1) Try to retrieve a page from the another heap
+            for locked_heap in self.heaps.values() {
+                if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
+                    info!("Added page from another heap to heap: {}", heap.heap_id);
+                    return heap.refill(layout, mp);
+                }
+            }
+            // (2) Allocate page from the OS
+            let mut heap_end = self.end.lock();
+            let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+            let start_addr = mp.start_address().value();
+            extend_heap_mp(mp)?;
+            let page = unsafe{ core::mem::transmute(start_addr) };
+            info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
+            *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+            heap.refill(layout, page)
+        } 
+    }
+} else if #[cfg(safe_heap)] {
+    impl MultipleHeaps {
+        pub fn empty() -> MultipleHeaps {
+            MultipleHeaps{
+                heaps: HashMap::new(),
+
+                #[cfg(not(unsafe_large_allocations))]
+                large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+
+                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
+            }
+        }
+
+        /// Returns an error if called since the safe heap cannot grow.
+        fn grow_heap(&self, _layout: Layout, _heap: &mut ZoneAllocator) -> Result<(), &'static str> {
+            error!("Cannot grow the safe heap. To increase size at compile time, set constant `MAX_PAGE_LIST_SIZE` in the SCAllocator");
+            Err("Cannot grow the safe heap. To increase size at compile time, set constant `MAX_PAGE_LIST_SIZE` in the SCAllocator") 
+        }
+    }
+} else {
+    impl MultipleHeaps {
+        pub fn empty() -> MultipleHeaps {
+            MultipleHeaps{
+                heaps: HashMap::new(),
+
+                #[cfg(not(unsafe_large_allocations))]
+                large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+
+                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
+            }
+        }
+
+        /// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
+        /// (1) Pages are first taken from another heap.
+        /// (2) If the above fails, then more pages are allocated from the OS.
+        /// 
+        /// An Err is returned if there is no more memory to be allocated in the heap memory area.
+        /// 
+        /// # Arguments
+        /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
+        /// * `heap`: heap that needs to grow.
+        fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
+            // (1) Try to retrieve a page from the another heap
+            for locked_heap in self.heaps.values() {
+                if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
+                    info!("Added page from another heap to heap: {}", heap.heap_id);
+                    return heap.refill(layout, mp);
+                }
+            }
+            // (2) Allocate page from the OS
+            let mut heap_end = self.end.lock();
+            let mp = MappedPages8k::new(create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?)?;
+            info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
+            *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+            heap.refill(layout, mp)
+        }  
+    }
 }
+} // end cfg_if for MultipleHeaps impl
 
 
 unsafe impl GlobalAlloc for MultipleHeaps {
@@ -403,7 +586,7 @@ if #[cfg(unsafe_large_allocations)] {
     }
 
 }
-}
+} // end cfg_if for large allocation variations
 
 
 
