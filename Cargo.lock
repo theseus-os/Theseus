@@ -1084,6 +1084,7 @@ dependencies = [
  "apic 0.1.0",
  "atomic 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "hpet 0.1.0",
  "libm 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
