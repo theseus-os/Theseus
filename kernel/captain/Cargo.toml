@@ -89,9 +89,6 @@ path = "../simd_personality"
 [dependencies.task_fs]
 path = "../task_fs"
 
-[dependencies.pause]
-path = "../pause"
-
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
 
