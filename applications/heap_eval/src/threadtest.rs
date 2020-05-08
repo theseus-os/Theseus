@@ -13,8 +13,8 @@ use alloc::alloc::GlobalAlloc;
 use core::sync::atomic::{Ordering, AtomicUsize};
 use core::ptr;
 use hpet::get_hpet;
-use libtest::hpet_2_ns;
-use crate::{NTHREADS, ALLOCATOR};
+use libtest::{hpet_2_us, calculate_stats, hpet_timing_overhead};
+use crate::{NTHREADS, ALLOCATOR, TRIES};
 #[cfg(direct_access_to_multiple_heaps)]
 use crate::overhead_of_accessing_multiple_heaps;
 
@@ -32,30 +32,47 @@ pub const LARGE_SIZE: usize = 8192;
 pub fn do_threadtest() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
-    let mut threads = Vec::with_capacity(nthreads);
-    let hpet = get_hpet(); 
+    let mut tries = Vec::with_capacity(TRIES as usize);
+
+    let hpet_overhead = hpet_timing_overhead()?;
+    let hpet_ref = get_hpet(); 
+    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+
     println!("Running threadtest for {} threads, {} iterations, {} total objects, {} obj size ...", 
         nthreads, NITERATIONS.load(Ordering::SeqCst), NOBJECTS.load(Ordering::SeqCst), OBJSIZE.load(Ordering::SeqCst));
 
     #[cfg(direct_access_to_multiple_heaps)]
     {
         let overhead = overhead_of_accessing_multiple_heaps()?;
-        println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_ns(overhead));
+        println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    let start = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    for _ in 0..TRIES {
+        let mut threads = Vec::with_capacity(nthreads);
 
-    for _ in 0..nthreads {
-        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
-    }  
+        let start = hpet.get_counter();
 
-    for i in 0..nthreads {
-        threads[i].join()?;
-        threads[i].take_exit_value();
+        for _ in 0..nthreads {
+            threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
+        }  
+
+        for i in 0..nthreads {
+            threads[i].join()?;
+        }
+
+        let end = hpet.get_counter() - hpet_overhead;
+
+        // Don't want this to be part of the timing measurement
+        for thread in threads {
+            thread.take_exit_value();
+        }
+
+        let diff = hpet_2_us(end - start);
+        tries.push(diff);
     }
 
-    let end = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-    println!("threadtest took {} ns", hpet_2_ns(end - start));
+    println!("threadtest stats (us)");
+    println!("{:?}", calculate_stats(&tries));
 
     Ok(())
 }

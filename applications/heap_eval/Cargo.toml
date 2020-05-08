@@ -1,5 +1,5 @@
 [package]
-name = "test_heap"
+name = "heap_eval"
 version = "0.1.0"
 description = "Tests Theseus's heap allocation performance"
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]

@@ -20,11 +20,18 @@ use hashbrown::HashMap;
 use core::fmt;
 
 const NANO_TO_FEMTO: u64 = 1_000_000;
+const MICRO_TO_FEMTO: u64 = 1_000_000_000;
 
 /// Helper function to convert ticks to nano seconds
 pub fn hpet_2_ns(hpet: u64) -> u64 {
 	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
 	hpet * hpet_period as u64 / NANO_TO_FEMTO
+}
+
+/// Helper function to convert ticks to micro seconds
+pub fn hpet_2_us(hpet: u64) -> u64 {
+	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
+	hpet * hpet_period as u64 / MICRO_TO_FEMTO
 }
 
 #[macro_export]
@@ -244,14 +251,14 @@ pub struct Stats {
 
 impl fmt::Debug for Stats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "stats \n 
+        write!(f, "\n 
         min:     {} \n 
         p_25:    {} \n 
         median:  {} \n 
         p_75:    {} \n 
         max:     {} \n 
         mode:    {} \n 
-        mean:    {} \n, 
+        mean:    {} \n 
         std_dev: {} \n", 
         self.min, self.p_25, self.median, self.p_75, self.max, self.mode, self.mean, self.std_dev)
     }
