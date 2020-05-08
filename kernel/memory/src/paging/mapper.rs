@@ -353,16 +353,17 @@ impl MappedPages {
     }
 
 
-    /// Merges the given `MappedPages` objects into a single `MappedPages` object.
+    /// Merges the given `MappedPages` objects into this `MappedPages` object.
     /// 
     /// Each of the `MappedPages` objects in `mappings` must be contiguous in virtual memory
     /// and have addresses that sequentially follow each other, in the same order as the vector `mappings`. 
     ///
-    /// For example, if you have the following three `MappedPages` objects:    
+    /// For example, if you have the following four `MappedPages` objects:    
+    /// * this mapping, with a page range including one page at 0x2000
     /// * first, with a page range including two pages at 0x3000 and 0x4000
     /// * second, with a page range including just one page at 0x5000
     /// * third, with a page range including three pages at 0x6000, 0x7000, 0x8000
-    /// Then the returned `MappedPages` object will cover six pages from `[0x3000:0x8000]` inclusive.
+    /// Then this `MappedPages` object will be updated to cover six pages from `[0x2000:0x8000]` inclusive.
     /// 
     /// In addition, each of the `MappedPages` objects must have the same flags and page table root frame
     /// (i.e., they must have all been mapped using the same set of page tables).
@@ -376,33 +377,25 @@ impl MappedPages {
     /// 
     /// # Note
     /// No remapping actions or page reallocations will occur on either a failure or a success.
-    pub fn merge(mappings: Vec<MappedPages>) -> Result<MappedPages, (&'static str, Vec<MappedPages>)> {
-        if mappings.len() <= 1 {
-            return Err(("cannot merge one or fewer mappings, nothing to do", mappings));
+    pub fn merge(&mut self, mappings: Vec<MappedPages>) -> Result<(), (&'static str, Vec<MappedPages>)> {
+        if mappings.len() < 1 {
+            return Err(("cannot merge zero mappings, nothing to do", mappings));
         };
 
-        let first_mapping = mappings.get(0).map(|first| {
-            (first.page_table_p4.clone(), first.flags, first.pages.is_allocated(), first.pages.deref().clone())
-        });
-        let (p4, flags, has_allocated, first_page_range) = match first_mapping {
-            Some(fm) => fm,
-            _ => return Err(("BUG: couldn't get the first MappedPages element", mappings)),
-        };
-
-        let mut previous_end: Page = *first_page_range.end(); // start at the end of the first mapping
+        let mut previous_end: Page = *self.pages.end(); // start at the end of this mapping
 
         // first, we need to double check that everything is contiguous and the flags and p4 Frame are the same.
         let mut err: Option<&'static str> = None;
-        for mp in &mappings[1..] {
-            if mp.page_table_p4 != p4 {
+        for mp in &mappings {
+            if mp.page_table_p4 != self.page_table_p4 {
                 error!("MappedPages::merge(): mappings weren't mapped using the same page table: {:?} vs. {:?}",
-                    mp.page_table_p4, p4);
+                    mp.page_table_p4, self.page_table_p4);
                 err = Some("mappings were mapped with different page tables");
                 break;
             }
-            if mp.flags != flags {
+            if mp.flags != self.flags {
                 error!("MappedPages::merge(): mappings had different flags: {:?} vs. {:?}",
-                    mp.flags, flags);
+                    mp.flags, self.flags);
                 err = Some("mappings were mapped with different flags");
                 break;
             }
@@ -412,7 +405,7 @@ impl MappedPages {
                 err = Some("mappings were not contiguous in virtual memory");
                 break;
             } 
-            if has_allocated != mp.pages.is_allocated() {
+            if mp.pages.is_allocated() != self.pages.is_allocated() {
                 error!("MappedPages::merge(): some mapping were mapped to AllocatedPages, while others were not.");
                 err = Some("some mappings were mapped to AllocatedPages, while others were not");
                 break;
@@ -423,14 +416,14 @@ impl MappedPages {
             return Err((e, mappings));
         }
 
-        // Here, all of our conditions were met, so we can create the merged MappedPages object
-        // that goes from the first start page to the last end page.
+        // Here, all of our conditions were met, so we can merge the MappedPages objects into this one so 
+        // that it goes from the first start page to the last end page.
         for mp in mappings.into_iter() {
             // to ensure the existing mappings don't run their drop handler and unmap those pages
             mem::forget(mp); 
         }
-        let new_page_range = PageRange::new(*first_page_range.start(), previous_end);
-        let new_pages = if has_allocated {
+        let new_page_range = PageRange::new(*self.pages.start(), previous_end);
+        let new_pages = if self.pages.is_allocated(){
             MaybeAllocatedPages::Allocated(AllocatedPages{
                 pages: new_page_range,
             })
@@ -438,11 +431,8 @@ impl MappedPages {
             MaybeAllocatedPages::NotAllocated(new_page_range)
         };
         
-        Ok(MappedPages {
-            page_table_p4: p4,
-            pages: new_pages,
-            flags: flags,
-        })
+        self.pages = new_pages;
+        Ok(())
     }
 
 

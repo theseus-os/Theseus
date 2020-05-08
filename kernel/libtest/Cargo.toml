@@ -34,6 +34,9 @@ path = "../hpet"
 [dependencies.pmu_x86]
 path = "../pmu_x86"
 
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
 
 [lib]
 crate-type = ["rlib"]

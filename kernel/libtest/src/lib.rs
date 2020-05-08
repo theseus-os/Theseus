@@ -11,10 +11,13 @@ extern crate runqueue;
 extern crate pmu_x86;
 extern crate libm;
 #[macro_use] extern crate log;
+extern crate hashbrown;
 
 use hpet::get_hpet;
 use pmu_x86::{Counter, EventType};
 use alloc::vec::Vec;
+use hashbrown::HashMap;
+use core::fmt;
 
 const NANO_TO_FEMTO: u64 = 1_000_000;
 
@@ -66,7 +69,7 @@ pub fn stop_counting_reference_cycles(counter: Counter) -> Result<u64, &'static 
 	Ok(count)
 }
 
-const THRESHOLD_ERROR_RATIO: u64 = 1;
+pub const THRESHOLD_ERROR_RATIO: u64 = 1;
 
 /// Measures the overhead of using the PMU reference cycles counter.
 /// Calls `timing_overhead_inner` multiple times and averages the value. 
@@ -168,6 +171,7 @@ fn hpet_timing_overhead_inner() -> Result<u64, &'static str> {
 pub fn calculate_stats(vec: &Vec<u64>) -> Option<Stats>{
 	let mean;
   	let median;
+	let mode;
   	let p_75;
 	let p_25;
 	let min;
@@ -182,12 +186,8 @@ pub fn calculate_stats(vec: &Vec<u64>) -> Option<Stats>{
 	let len = vec.len();
 
   	{ // calculate average
-		let mut sum: u64 = 0;
-		for &x in vec {
-			sum = sum + x;
-		}
-
-		mean = sum as u64 / len as u64;
+		let sum: u64 = vec.iter().sum();
+		mean = sum as f64 / len as f64;
   	}
 
 	{ // calculate median
@@ -205,28 +205,54 @@ pub fn calculate_stats(vec: &Vec<u64>) -> Option<Stats>{
   	}
 
 	{ // calculate sample variance
-		let mut diff_sum: u64 = 0;
-      	for &x in vec {
+		let mut diff_sum: f64 = 0.0;
+      	for &val in vec {
+			let x = val as f64; 
 			if x > mean {
-				diff_sum = diff_sum + ((x-mean)*(x-mean));
+				diff_sum = diff_sum + ((x - mean)*(x - mean));
 			}
 			else {
 				diff_sum = diff_sum + ((mean - x)*(mean - x));
 			}
       	}
 
-    	var = (diff_sum) / (len as u64);
-        std_dev = libm::sqrt(var as f64);
+    	var = (diff_sum) / (len as f64);
+        std_dev = libm::sqrt(var);
 	}
-	Some(Stats{ min, p_25, median, p_75, max, mean, std_dev })
+
+	{ // calculate mode
+		let mut values: HashMap<u64,usize> = HashMap::with_capacity(len);
+		for val in vec {
+			values.entry(*val).and_modify(|v| {*v += 1}).or_insert(1);
+		}
+		mode = *values.iter().max_by(|(_k1,v1), (_k2,v2)| v1.cmp(v2)).unwrap().0; // safe to call unwrap since we've already checked if the vector is empty
+	}
+	
+	Some(Stats{ min, p_25, median, p_75, max, mode, mean, std_dev })
 }
 
 pub struct Stats {
-	pub min: u64,
-	pub p_25: u64,
+	pub min: 	u64,
+	pub p_25: 	u64,
 	pub median: u64,
-	pub p_75: u64,
-	pub max: u64, 
-	pub mean: u64,
+	pub p_75:	u64,
+	pub max: 	u64, 
+	pub mode: 	u64,
+	pub mean: 	f64,
 	pub std_dev: f64,
+}
+
+impl fmt::Debug for Stats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "stats \n 
+        min:     {} \n 
+        p_25:    {} \n 
+        median:  {} \n 
+        p_75:    {} \n 
+        max:     {} \n 
+        mode:    {} \n 
+        mean:    {} \n, 
+        std_dev: {} \n", 
+        self.min, self.p_25, self.median, self.p_75, self.max, self.mode, self.mean, self.std_dev)
+    }
 }
