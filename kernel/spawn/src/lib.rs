@@ -650,9 +650,9 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
 
         // Get the crate we should swap. Will be None if nothing is picked
         let crate_to_swap = get_crate_to_swap();
-        if crate_to_swap.is_some(){
+        if let Some(crate_to_swap) = crate_to_swap {
             // Call the handler to swap the crates
-            let version = fault_crate_swap::self_swap_handler(&crate_to_swap.unwrap());
+            let version = fault_crate_swap::self_swap_handler(&crate_to_swap);
             match version {
                 Ok(v) => {
                     se = v

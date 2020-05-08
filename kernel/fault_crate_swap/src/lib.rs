@@ -352,14 +352,15 @@ pub fn constant_offset_fix(
         //debug!("{:#X} = {:#X}", x ,n);
         let ra = memory::VirtualAddress::new_canonical(n as usize);
 
-        if swap_ranges.old_text_low.is_some() && swap_ranges.new_text_low.is_some() {
-            if swap_ranges.old_text_low.unwrap() < ra && swap_ranges.old_text_high.unwrap() > ra {
+        if let (Some(old_text_low) , Some(old_text_high), Some(new_text_low) , Some(_new_text_high)) = 
+                (swap_ranges.old_text_low, swap_ranges.old_text_high, swap_ranges.new_text_low, swap_ranges.new_text_high) {
+            if old_text_low < ra && old_text_high > ra {
 
                 #[cfg(not(downtime_eval))]
                 debug!("Match text at address {:#X}, value  = {:#X}", x , n);
 
                 // Note : Does not use saturation add since underflow is not possible and overflow could not be caused in proper execution
-                let n_ra = ra - swap_ranges.old_text_low.unwrap() + swap_ranges.new_text_low.unwrap();
+                let n_ra = ra - old_text_low + new_text_low;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
                 // For debug purposes we re-read teh value
@@ -371,12 +372,13 @@ pub fn constant_offset_fix(
             }
         }
 
-        if swap_ranges.old_rodata_low.is_some() && swap_ranges.new_rodata_low.is_some() {
-            if swap_ranges.old_rodata_low.unwrap() < ra && swap_ranges.old_rodata_high.unwrap() > ra {
+        if let (Some(old_rodata_low) , Some(old_rodata_high), Some(new_rodata_low) , Some(_new_rodata_high)) = 
+                (swap_ranges.old_rodata_low, swap_ranges.old_rodata_high, swap_ranges.new_rodata_low, swap_ranges.new_rodata_high) {
+            if old_rodata_low < ra && old_rodata_high > ra {
 
                 #[cfg(not(downtime_eval))]
                 debug!("Match rodata at address {:#X}, value  = {:#X}", x , n);
-                let n_ra = ra - swap_ranges.old_rodata_low.unwrap() + swap_ranges.new_rodata_low.unwrap();
+                let n_ra = ra - old_rodata_low + new_rodata_low;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
 
@@ -388,12 +390,13 @@ pub fn constant_offset_fix(
             }
         }
 
-        if swap_ranges.old_data_low.is_some() && swap_ranges.new_data_low.is_some() {
-            if swap_ranges.old_data_low.unwrap() < ra && swap_ranges.old_data_high.unwrap() > ra {
+        if let (Some(old_data_low) , Some(old_data_high), Some(new_data_low) , Some(_new_data_high)) = 
+                (swap_ranges.old_data_low, swap_ranges.old_data_high, swap_ranges.new_data_low, swap_ranges.new_data_high) {
+            if old_data_low < ra && old_data_high > ra {
 
                 #[cfg(not(downtime_eval))]
                 debug!("Match data at address {:#X}, value  = {:#X}", x , n);
-                let n_ra = ra - swap_ranges.old_data_low.unwrap() + swap_ranges.new_data_low.unwrap();
+                let n_ra = ra - old_data_low + new_data_low;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
                 #[cfg(not(downtime_eval))]
@@ -585,18 +588,9 @@ fn simple_swap_policy() -> Option<String> {
 
     let crate_to_swap = unhandled_list[0].crate_error_occured.clone();
 
-    // We return None if the crate fault occured is not logged
-    if crate_to_swap.is_none() {
-        return None
-    }
+    debug!("Repalce : {:?}",crate_to_swap);
 
-    // We return the crate name if the crate fault occured is logged
-    let crate_name = crate_to_swap.unwrap();
-
-    #[cfg(not(downtime_eval))]
-    debug!("Repalce : {}",crate_name);
-
-    Some(crate_name)
+    crate_to_swap
 }
 
 /// slightly advanced swap policy. 
@@ -624,14 +618,10 @@ fn iterative_swap_policy() -> Option<String> {
     for (i, fe) in unhandled_list.iter().enumerate() {
         let mut fe = fe.clone();
         if i == 0 {
-            let error_crate = unhandled_list[0].crate_error_occured.clone();
 
-            // If the crate fault occured is not logged we can only restart
-            if error_crate.is_none() {
-                debug!("No information on where the first failure occured");
-                fe.action_taken = RecoveryAction::TaskRestarted;
-            } else {
-                let error_crate_name = error_crate.clone().unwrap();
+            if let Some(error_crate) = unhandled_list[0].crate_error_occured.clone() {
+
+                let error_crate_name = error_crate.clone();
                 let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
 
                 // We check whether the fault is logged previously
@@ -640,25 +630,32 @@ fn iterative_swap_policy() -> Option<String> {
 
                     // If the fault is logged we check the action taken and then take the next drastic action.
                     Some(fault_entry) => {
-                        if fault_entry.action_taken == RecoveryAction::FaultCrateReplaced && fault_entry.running_app_crate.is_some() {
-                            // last action : 2  -> Next action : 3
-                            crate_to_swap = fault_entry.running_app_crate.clone();
-                            fe.action_taken = RecoveryAction::IterativelyCrateReplaced;
-                            fe.replaced_crates.push(fault_entry.running_app_crate.clone().unwrap());
+                        if fault_entry.action_taken == RecoveryAction::FaultCrateReplaced {
+                            if let Some(app_crate) = fault_entry.running_app_crate {
+                                // last action : 2  -> Next action : 3
+                                crate_to_swap = Some(app_crate.clone());
+                                fe.action_taken = RecoveryAction::IterativelyCrateReplaced;
+                                fe.replaced_crates.push(app_crate.clone());
+                            } else {
+                                // last action : 2 -> Next action : 2 due to insufficient details
+                                crate_to_swap = Some(error_crate.clone());
+                                fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                                fe.replaced_crates.push(error_crate.clone());
+                            }
                         } else if fault_entry.action_taken == RecoveryAction::TaskRestarted {
                             // last action : 1  -> Next action : 2
-                            crate_to_swap = error_crate.clone();
+                            crate_to_swap = Some(error_crate.clone());
                             fe.action_taken = RecoveryAction::FaultCrateReplaced;
-                            fe.replaced_crates.push(error_crate.clone().unwrap());
+                            fe.replaced_crates.push(error_crate.clone());
                         } else if fault_entry.action_taken == RecoveryAction::None || fault_entry.action_taken == RecoveryAction::MultipleFaultRecovery {
                             // last action : None  -> Next action : 1
                             crate_to_swap = None;
                             fe.action_taken = RecoveryAction::TaskRestarted;
                         } else {
                             // We have exhausted all our fault tolerance stages. So we just reuse stage 2 
-                            crate_to_swap = error_crate.clone();
+                            crate_to_swap = Some(error_crate.clone());
                             fe.action_taken = RecoveryAction::FaultCrateReplaced;
-                            fe.replaced_crates.push(error_crate.clone().unwrap());
+                            fe.replaced_crates.push(error_crate.clone());
                         }
                     }
 
@@ -668,6 +665,10 @@ fn iterative_swap_policy() -> Option<String> {
                         fe.action_taken = RecoveryAction::TaskRestarted;
                     }
                 }
+            } else {
+                // If the crate fault occured is not logged we can only restart
+                debug!("No information on where the first failure occured");
+                fe.action_taken = RecoveryAction::TaskRestarted;
             }
         } else {
             fe.action_taken = RecoveryAction::MultipleFaultRecovery;
@@ -675,17 +676,9 @@ fn iterative_swap_policy() -> Option<String> {
         log_handled_fault(fe);
     }
 
-    // We return None if we didn't pick a crate to replace
-    if crate_to_swap.is_none() {
-        return None
-    }
+    debug!("Repalce : {:?}",crate_to_swap);
 
-    let crate_name = crate_to_swap.unwrap();
-
-    #[cfg(not(downtime_eval))]
-    debug!("full {}",crate_name);
-
-    Some(crate_name)
+    crate_to_swap
 }
 
 /// This function returns the name of the crate to replace if required. 

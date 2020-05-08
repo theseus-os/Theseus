@@ -246,8 +246,8 @@ pub fn get_the_most_recent_match(error_crate : &str) -> Option<FaultEntry> {
 
     let mut fe :Option<FaultEntry> = None;
     for fault_entry in FAULT_LIST.lock().iter() {
-        if fault_entry.crate_error_occured.is_some(){
-            let error_crate_name = fault_entry.crate_error_occured.clone().unwrap();
+        if let Some(crate_error_occured) = &fault_entry.crate_error_occured {
+            let error_crate_name = crate_error_occured.clone();
             let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
             if error_crate_name_simple == error_crate {
                 let item = fault_entry.clone();
