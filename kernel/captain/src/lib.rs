@@ -43,7 +43,6 @@ extern crate scheduler;
 extern crate first_application;
 extern crate exceptions_full;
 extern crate network_manager;
-extern crate pause;
 extern crate window_manager;
 extern crate multiple_heaps;
 #[cfg(simd_personality)] extern crate simd_personality;
@@ -56,7 +55,6 @@ use core::ops::DerefMut;
 use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
-use pause::spin_loop_hint;
 
 
 
@@ -110,8 +108,8 @@ pub fn init(
     // get BSP's apic id
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 
-    // create the initial `Task`, i.e., task_zero
-    spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
+    // create the initial `Task`, which is bootstrapped from this execution context.
+    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
@@ -155,20 +153,24 @@ pub fn init(
             .spawn()?;
     }
 
-
     // Now that initialization is complete, we can spawn the first application(s)
     first_application::start()?;
 
-    info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
-    enable_interrupts();
-    scheduler::schedule();
-    // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
-    // (unless there are no other tasks available to run on the BSP core, which never happens)
+    info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_apic_id);
+    spawn::create_idle_task(Some(bsp_apic_id))?;
     
+    // Now that we've created a new idle task for this core, we can drop ourself's bootstrapped task.
+    drop(bootstrap_task);
+    // Before we finish initialization, drop any other local stack variables that still exist.
+    drop(kernel_mmi_ref);
 
+    enable_interrupts();
+    // ****************************************************
+    // NOTE: nothing below here is guaranteed to run again!
+    // ****************************************************
+
+    scheduler::schedule();
     loop { 
-        spin_loop_hint();
-        // TODO: put this core into a low-power state
-        // TODO: exit this loop cleanly upon a shutdown signal
+        error!("BUG: captain::init(): captain's bootstrap task was rescheduled after being dead!");
     }
 }

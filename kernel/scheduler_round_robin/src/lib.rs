@@ -14,10 +14,9 @@ use task::TaskRef;
 use runqueue_round_robin::RunQueue;
 
 
-
 /// This defines the round robin scheduler policy.
 /// Returns None if there is no schedule-able task
-pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
+pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
@@ -43,20 +42,11 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         if !t.is_runnable() {
             continue;
         }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
-            if pinned != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                return None;
-            }
-        }
             
         // found a runnable task!
         chosen_task_index = Some(i);
         // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
-        break; 
+        break;
     }
 
     // idle task is a backup iff no other task has been chosen

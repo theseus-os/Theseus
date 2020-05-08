@@ -55,5 +55,8 @@ path = "../fault_crate_swap"
 [dependencies.fault_log]
 path = "../fault_log"
 
+[dependencies.pause]
+path = "../pause"
+
 [lib]
 crate-type = ["rlib"]

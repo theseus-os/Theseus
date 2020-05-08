@@ -16,9 +16,9 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::VecDeque;
-use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
+use irq_safety::RwLockIrqSafe;
 use atomic_linked_list::atomic_map::AtomicMap;
-use task::{TaskRef, Task};
+use task::TaskRef;
 use core::ops::{Deref, DerefMut};
 
 /// A cloneable reference to a `Taskref` that exposes more methods
@@ -39,7 +39,7 @@ pub struct RoundRobinTaskRef{
     taskref: TaskRef,
 
     /// Number of context switches the task has undergone. Not used in scheduling algorithm
-    context_switches: u32,
+    context_switches: usize,
 }
 
 // impl Drop for RoundRobinTaskRef {
@@ -64,20 +64,14 @@ impl DerefMut for RoundRobinTaskRef {
 impl RoundRobinTaskRef {
     /// Creates a new `RoundRobinTaskRef` that wraps the given `TaskRef`.
     pub fn new(taskref: TaskRef) -> RoundRobinTaskRef {
-        let round_robin_taskref = RoundRobinTaskRef {
+        RoundRobinTaskRef {
             taskref: taskref,
             context_switches: 0,
-        };
-        round_robin_taskref
-    }
-
-    /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
-    pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
-       self.taskref.lock()
+        }
     }
 
     /// Increment the number of times the task is picked
-    pub fn increment_context_switches(&mut self) -> (){
+    pub fn increment_context_switches(&mut self) {
         self.context_switches = self.context_switches.saturating_add(1);
     }
 }
@@ -122,19 +116,13 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
     pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
-        self.remove(index)
-            .map(|rr_taskref| {
-                let taskref = rr_taskref.taskref.clone();
-                self.push_back(rr_taskref);
-                taskref
-            })
+        self.swap_remove_front(index).map(|rr_taskref| {
+            let taskref = rr_taskref.taskref.clone();
+            self.push_back(rr_taskref);
+            taskref
+        })
     }
 
-    /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
-    // pub fn iter(&self) -> alloc::collections::vec_deque::Iter<RoundRobinTaskRef> {
-    //     self.queue.iter()
-    // }
-   
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         trace!("Created runqueue (round robin) for core {}", which_core);

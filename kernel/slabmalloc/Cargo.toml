@@ -1,0 +1,18 @@
+[package]
+name = "slabmalloc"
+version = "0.7.0"
+authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ramla Ijaz <ijazramla@gmail.com>"]
+description = "Simple slab based malloc implementation in rust. Edited to work more closely with Theseus's memory management abstractions"
+
+keywords = ["os", "malloc", "slab", "alloc", "memory"]
+
+[features]
+unstable = []
+default = [ "unstable" ]
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
