@@ -91,22 +91,13 @@ impl<R: Reader> GccExceptTableArea<R> {
     /// i.e., the entry that covers the range of addresses that the `ip` falls within.
     pub fn call_site_table_entry_for_address(&self, address: u64) -> gimli::Result<CallSiteTableEntry> {
         let mut iter = self.call_site_table_entries()?;
-        let mut closest_entry = None;
         while let Some(entry) = iter.next()? {
             if entry.range_of_covered_addresses().contains(&address) {
                 return Ok(entry);
             }
-            if entry.range_of_covered_addresses().start < address {
-                closest_entry =  Some(entry);
-            }
         }
 
-        if let Some (closest_entry) = closest_entry {
-            debug!("No unwind info for address using the closeset");
-            Ok(closest_entry)
-        } else {
-            Err(gimli::Error::NoUnwindInfoForAddress)
-        }
+        Err(gimli::Error::NoUnwindInfoForAddress)
     }
 }
 

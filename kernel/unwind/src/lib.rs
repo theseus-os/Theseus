@@ -788,10 +788,37 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                 //     }
                 // }
 
-                let entry = table.call_site_table_entry_for_address(frame.call_site_address()).map_err(|e| {
-                    error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address {:#X}. Error: {}", frame.call_site_address(), e);
-                    "continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address."
-                })?;
+                // let entry = table.call_site_table_entry_for_address(frame.call_site_address()).map_err(|e| {
+                //     error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address {:#X}. Error: {}", frame.call_site_address(), e);
+                //     "continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address."
+                // })?;
+
+                let entry = match table.call_site_table_entry_for_address(frame.call_site_address()) {
+                    Ok(x) => x,
+                    Err(e) => {
+
+                        error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address {:#X}. Error: {}", frame.call_site_address(), e);
+                        
+                        // Now we don't have an exact match. We try to use the previous
+                        let mut iter = table.call_site_table_entries().map_err(|_e| {"Couldn't find call_site_table_entries"})?;
+
+                        let mut closest_entry = None;
+                        while let Some(entry) = iter.next().map_err(|_e| {"Couldn't iterate through the entries"})? {
+                            if entry.range_of_covered_addresses().start < frame.call_site_address() {
+                                closest_entry =  Some(entry);
+                            }
+                        }
+                        
+                        if let Some (closest_entry) = closest_entry {
+                            debug!("No unwind info for address. Using the closeset");
+                            closest_entry
+                        } else {
+                            return Err("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address.");
+                        }
+                    }
+                };
+
+                
 
                 #[cfg(not(downtime_eval))]
                 debug!("Found call site entry for address {:#X}: {:#X?}", frame.call_site_address(), entry);
