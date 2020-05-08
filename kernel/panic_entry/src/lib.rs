@@ -121,13 +121,12 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
             };
             #[cfg(not(downtime_eval))]
             trace!("[LOADABLE MODE]: invoking unwind::unwind_resume()...");
+
             func(arg)
         }
-        #[cfg(not(downtime_eval))] {
-            match invoke_unwind_resume(arg) {
-                Ok(()) => error!("BUG: _Unwind_Resume: unexpectedly returned Ok(()) from unwind::unwind_resume()"),
-                Err(e) => error!("_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}", e),
-            }
+        match invoke_unwind_resume(arg) {
+            Ok(()) => error!("BUG: _Unwind_Resume: unexpectedly returned Ok(()) from unwind::unwind_resume()"),
+            Err(e) => error!("_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}", e),
         }
         loop { }
     }
