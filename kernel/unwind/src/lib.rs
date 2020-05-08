@@ -788,11 +788,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                 //     }
                 // }
 
-                // let entry = table.call_site_table_entry_for_address(frame.call_site_address()).map_err(|e| {
-                //     error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address {:#X}. Error: {}", frame.call_site_address(), e);
-                //     "continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address."
-                // })?;
-
                 let entry = match table.call_site_table_entry_for_address(frame.call_site_address()) {
                     Ok(x) => x,
                     Err(e) => {

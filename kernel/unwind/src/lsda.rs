@@ -96,7 +96,6 @@ impl<R: Reader> GccExceptTableArea<R> {
                 return Ok(entry);
             }
         }
-
         Err(gimli::Error::NoUnwindInfoForAddress)
     }
 }
