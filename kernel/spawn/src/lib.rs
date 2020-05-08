@@ -27,11 +27,8 @@ extern crate context_switch;
 extern crate path;
 extern crate fs_node;
 extern crate catch_unwind;
-<<<<<<< HEAD
 extern crate fault_crate_swap;
-=======
 extern crate pause;
->>>>>>> theseus_main
 
 
 use core::{
