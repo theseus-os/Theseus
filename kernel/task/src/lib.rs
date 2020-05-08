@@ -236,8 +236,8 @@ pub struct Task {
     pub mmi: MmiRef, 
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
-    /// Whether or not this task is pinned to a certain core
-    /// The idle tasks (like idle_task) are always pinned to their respective cores
+    /// Whether or not this task is pinned to a certain core.
+    /// The idle tasks (like idle_task) are always pinned to their respective cores.
     pub pinned_core: Option<u8>,
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
@@ -914,21 +914,18 @@ impl Eq for TaskRef { }
 
 
 
-/// Create and initialize an idle task, of which there is one per processor core/LocalApic.
-/// The idle task is a task that runs by default (one per core) when no other task is running.
-/// 
-/// Returns a reference to the newly-created idle `Task`.
+/// Bootstrap a new task from the current thread of execution.
 /// 
 /// # Note
-/// This function does not add the new idle task to any runqueue.
-pub fn create_idle_task(
+/// This function does not add the new task to any runqueue.
+pub fn bootstrap_task(
     apic_id: u8, 
     stack_bottom: VirtualAddress, 
     stack_top: VirtualAddress,
     kernel_mmi_ref: MmiRef,
 ) -> Result<TaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
-    // Instead, we generate all of the `Task` states manually, and create an initial idle task directly.
+    // Instead, we generate all of the `Task` states manually, and create an initial task directly.
     let kstack = Stack::new( 
         stack_top, 
         stack_bottom, 
@@ -941,30 +938,29 @@ pub fn create_idle_task(
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, idle_task_cleanup_failure);
-    idle_task.name = format!("idle_task_ap{}", apic_id);
-    idle_task.is_an_idle_task = true;
-    idle_task.runstate = RunState::Runnable;
-    idle_task.running_on_cpu = Some(apic_id); 
-    idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
+    let mut bootstrap_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, bootstrap_task_cleanup_failure);
+    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.runstate = RunState::Runnable;
+    bootstrap_task.running_on_cpu = Some(apic_id); 
+    bootstrap_task.pinned_core = Some(apic_id); // can only run on this CPU core
     // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
-    let idle_task_id = idle_task.id;
-    let task_ref = TaskRef::new(idle_task);
+    let bootstrap_task_id = bootstrap_task.id;
+    let task_ref = TaskRef::new(bootstrap_task);
 
     // set this as this core's current task, since it's obviously running
     task_ref.0.deref().0.lock().set_as_current_task();
     if get_my_current_task().is_none() {
-        error!("BUG: create_idle_task(): failed to properly set the new idle task as the current task on AP {}", 
-            apic_id);
-        return Err("BUG: create_idle_task(): failed to properly set the new idle task as the current task");
+        error!("BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}", apic_id);
+        return Err("BUG: bootstrap_task(): failed to properly set the new idle task as the current task");
     }
 
     // insert the new task into the task list
-    let old_task = TASKLIST.lock().insert(idle_task_id, task_ref.clone());
-    if old_task.is_some() {
-        error!("BUG: create_idle_task(): TASKLIST already contained a task with the same id {} as idle_task_ap{}!", 
-            idle_task_id, apic_id);
-        return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
+    let old_task = TASKLIST.lock().insert(bootstrap_task_id, task_ref.clone());
+    if let Some(ot) = old_task {
+        error!("BUG: bootstrap_task(): TASKLIST already contained a task {:?} with the same id {} as bootstrap_task_core_{}!", 
+            ot, bootstrap_task_id, apic_id
+        );
+        return Err("BUG: bootstrap_task(): TASKLIST already contained a task with the new bootstrap_task's ID");
     }
     
     Ok(task_ref)
@@ -972,15 +968,16 @@ pub fn create_idle_task(
 
 
 /// This is just like `spawn::task_cleanup_failure()`,
-/// but for idle tasks bootstrapped from a core's first execution context.
+/// but for the initial tasks bootstrapped from each core's first execution context.
 /// 
-/// However, for a bootstrapped (idle) task, we don't know (it doesn't really have) a function signature,
-/// argument type, and return value type.
+/// However, for a bootstrapped task, we don't know its function signature, argument type, or return value type
+/// because it was invoked from assembly and may not even have one. 
 /// 
 /// Therefore there's not much we can actually do.
-fn idle_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
-    error!("BUG: idle_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
-    loop { }
+fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
+    loop {
+        error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    }
 }
 
 

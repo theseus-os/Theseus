@@ -11,14 +11,12 @@ extern crate scheduler;
 extern crate kernel_config;
 extern crate apic;
 extern crate tlb_shootdown;
-extern crate pause;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 use irq_safety::{enable_interrupts, RwLockIrqSafe};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use apic::{LocalApic, get_lapics};
-use pause::spin_loop_hint;
 
 
 /// An atomic flag used for synchronizing progress between the BSP 
@@ -34,11 +32,11 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
                  nmi_lint: u8, nmi_flags: u16) -> ! 
 {
     info!("Booted AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}", 
-           processor_id, apic_id, stack_start, stack_end, nmi_lint, nmi_flags);
-
+        processor_id, apic_id, stack_start, stack_end, nmi_lint, nmi_flags
+    );
 
     // set a flag telling the BSP that this AP has entered Rust code
-    AP_READY_FLAG.store(true, Ordering::SeqCst); // must be Sequential Consistency because the BSP is polling it in a while loop
+    AP_READY_FLAG.store(true, Ordering::SeqCst);
 
 
     // initialize interrupts (including TSS/GDT) for this AP
@@ -53,7 +51,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
 
-    spawn::init(kernel_mmi_ref.clone(), apic_id, stack_start, stack_end).unwrap();
+    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, stack_start, stack_end).unwrap();
 
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
     // we do this last (after all other initialization) in order to prevent this lapic
@@ -67,13 +65,21 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
     tlb_shootdown::init();
 
+    info!("Initialization complete on AP core {}. Spawning idle task...", apic_id);
+    spawn::create_idle_task(Some(apic_id)).unwrap();
 
-    info!("Entering idle_task loop on AP {} ...", apic_id);
+    // Now that we've created a new idle task for this core, we can drop ourself's bootstrapped task.
+    drop(bootstrap_task);
+    // Before we finish initialization, drop any other local stack variables that still exist.
+    //   (currently none others to drop)    
+
     enable_interrupts();
-    scheduler::schedule();
+    // ****************************************************
+    // NOTE: nothing below here is guaranteed to run again!
+    // ****************************************************
 
+    scheduler::schedule();
     loop { 
-        spin_loop_hint();
-        // TODO: put this core into a low-power state
+        error!("BUG: ap_start::kstart_ap(): AP's bootstrap task was rescheduled after being dead!");
     }
 }
