@@ -169,9 +169,9 @@ pub fn do_self_swap(
 
         // Find the address range of the newl loaded crate
         {
-            return_struct.old_text = new_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-            return_struct.old_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-            return_struct.old_data = new_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+            return_struct.new_text = new_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+            return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+            return_struct.new_data = new_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
             if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
                  debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
