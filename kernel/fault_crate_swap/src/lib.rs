@@ -37,7 +37,7 @@ use fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_han
 /// A data structure to hold the ranges of memory used by the old crate and the new crate.
 /// The crate only maintains the values as virtual addresses and holds no references to any
 /// crate
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct SwapRanges{
     pub old_text : Option<Range<VirtualAddress>>,
     pub old_rodata : Option<Range<VirtualAddress>>,
@@ -46,20 +46,6 @@ pub struct SwapRanges{
     pub new_text : Option<Range<VirtualAddress>>,
     pub new_rodata : Option<Range<VirtualAddress>>,
     pub new_data : Option<Range<VirtualAddress>>,
-}
-
-impl SwapRanges {
-    /// Returns an empty `SwapRanges` with all fields set to None
-    pub fn new () -> SwapRanges {
-        SwapRanges {
-            old_text : None,
-            old_rodata : None,
-            old_data : None,
-            new_text : None,
-            new_rodata : None,
-            new_data : None,
-        }
-    }
 }
 
 /// For swapping of a crate from the identical object file in the disk. 
@@ -113,7 +99,7 @@ pub fn do_self_swap(
     };
 
     // Create a set of temporary variables to hold the data ranges
-    let mut return_struct = SwapRanges::new();
+    let mut return_struct = SwapRanges::default();
 
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
 

@@ -674,7 +674,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
         //     debug!("BEFORE : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
         // }
 
-        let mut se = SwapRanges::new();
+        let mut se = SwapRanges::default();
 
         // Get the crate we should swap. Will be None if nothing is picked
         let crate_to_swap = get_crate_to_swap();
