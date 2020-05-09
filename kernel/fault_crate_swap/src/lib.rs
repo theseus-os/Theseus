@@ -103,29 +103,33 @@ pub fn do_self_swap(
 
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
 
-    // There can be only one matching crate for a given crate name
-    if matching_crates.len() == 1 {
-        let (_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(0);
-
-         #[cfg(not(downtime_eval))]
-        debug!("{:?}",old_crate_ref);
-
-        let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
-            error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", old_crate_ref);
-            "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
-        })?;
-
-
-        // Find the text, data and rodata ranges of old crate
-        {
-            return_struct.old_text = old_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-            return_struct.old_rodata = old_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-            return_struct.old_data = old_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-        }
-
-    } else {
-        return Err("More than 1 matching crates currently loaded".to_string());
+    if matching_crates.len() == 0 {
+        return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
+
+    if matching_crates.len() > 1 {
+        return Err("More than one crate matches ".to_string() + crate_name);
+    }
+
+    // There can be only one matching crate for a given crate name
+    let (_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(0);
+
+        #[cfg(not(downtime_eval))]
+    debug!("{:?}",old_crate_ref);
+
+    let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
+        error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", old_crate_ref);
+        "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
+    })?;
+
+
+    // Find the text, data and rodata ranges of old crate
+    {
+        return_struct.old_text = old_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.old_rodata = old_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.old_data = old_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+    }
+
 
     // Swap crates
     let swap_result = swap_crates(
