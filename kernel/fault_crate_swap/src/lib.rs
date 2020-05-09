@@ -103,6 +103,7 @@ pub fn do_self_swap(
 
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
 
+    // There can be only one matching crate for a given crate name
     if matching_crates.len() == 0 {
         return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
@@ -111,10 +112,9 @@ pub fn do_self_swap(
         return Err("More than one crate matches ".to_string() + crate_name);
     }
 
-    // There can be only one matching crate for a given crate name
     let (_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(0);
 
-        #[cfg(not(downtime_eval))]
+    #[cfg(not(downtime_eval))]
     debug!("{:?}",old_crate_ref);
 
     let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
@@ -149,54 +149,55 @@ pub fn do_self_swap(
     // Find the new crate loaded. It should have the exact same name as the old crate
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, ocn);
 
-    // There can't be more than one match if swap occured correctly
-    if matching_crates.len() == 1 {
+    // There can be only one matching crate for a given crate name
+    if matching_crates.len() == 0 {
+        return Err("No crates currently loaded matches ".to_string() + crate_name);
+    }
 
-        #[cfg(not(downtime_eval))]
-         debug!("We got a match");
+    if matching_crates.len() > 1 {
+        return Err("More than one crate matches ".to_string() + crate_name);
+    }
 
-         let (new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(0);
-         let new_crate_ref = match CrateNamespace::get_crate_and_namespace(&real_new_namespace, &new_crate_full_name) {
-            Some((ocr, _ns)) => {
-                ocr
-            }
-            _ => {
-                debug!("Match occurs but cannot get the crate");
-                return Err("Cannot get reference".to_string());
-            }
-         };
+    #[cfg(not(downtime_eval))]
+    debug!("We got a match");
 
-        let new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| {
-            error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", new_crate_ref);
-            "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
-        })?;
+    let (new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(0);
+    let new_crate_ref = match CrateNamespace::get_crate_and_namespace(&real_new_namespace, &new_crate_full_name) {
+        Some((ocr, _ns)) => {
+            ocr
+        }
+        _ => {
+            debug!("Match occurs but cannot get the crate");
+            return Err("Cannot get reference".to_string());
+        }
+    };
 
-        // Find the address range of the newl loaded crate
-        {
-            return_struct.new_text = new_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-            return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-            return_struct.new_data = new_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+    let new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| {
+        error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", new_crate_ref);
+        "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
+    })?;
 
-            if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
-                 debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
-                 debug!("Text Range is {:X} - {:X}", new_text.start, new_text.end);
-            }
+    // Find the address range of the newl loaded crate
+    {
+        return_struct.new_text = new_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.new_data = new_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
-            if let (Some(old_data) , Some(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
-                 debug!("Data Range was {:X} - {:X}", old_data.start, old_data.end);
-                 debug!("Data Range is {:X} - {:X}", new_data.start, new_data.end);
-            }
-
-            if let (Some(old_rodata) , Some(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
-                 debug!("Rodata Range was {:X} - {:X}", old_rodata.start, old_rodata.end);
-                 debug!("Rodata Range is {:X} - {:X}", new_rodata.start, new_rodata.end);
-            }
+        if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
+                debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
+                debug!("Text Range is {:X} - {:X}", new_text.start, new_text.end);
         }
 
+        if let (Some(old_data) , Some(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
+                debug!("Data Range was {:X} - {:X}", old_data.start, old_data.end);
+                debug!("Data Range is {:X} - {:X}", new_data.start, new_data.end);
+        }
 
-     } else {
-         debug!("No match");
-     }
+        if let (Some(old_rodata) , Some(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
+                debug!("Rodata Range was {:X} - {:X}", old_rodata.start, old_rodata.end);
+                debug!("Rodata Range is {:X} - {:X}", new_rodata.start, new_rodata.end);
+        }
+    }
 
 
     match swap_result {
