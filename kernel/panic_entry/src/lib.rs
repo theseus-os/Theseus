@@ -119,8 +119,6 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
             let func: &UnwindResumeFunc = {
                 section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space)?
             };
-            #[cfg(not(downtime_eval))]
-            trace!("[LOADABLE MODE]: invoking unwind::unwind_resume()...");
 
             func(arg)
         }

@@ -118,32 +118,9 @@ pub fn do_self_swap(
 
         // Find the text, data and rodata ranges of old crate
         {
-            match &old_crate.text_pages {
-                Some((_pages,address)) => {
-                    #[cfg(not(downtime_eval))]
-                    debug!("Text Range is {:X} - {:X}", address.start, address.end);
-                    return_struct.old_text = Some(address.clone());
-                }
-                _=>{}
-            };
-
-            match &old_crate.rodata_pages {
-                Some((_pages,address)) => {
-                    #[cfg(not(downtime_eval))]
-                    debug!("Rodata Range is {:X} - {:X}", address.start, address.end);
-                    return_struct.old_rodata = Some(address.clone());
-                }
-                _=>{}
-            };
-
-            match &old_crate.data_pages {
-                Some((_pages,address)) => {
-                    #[cfg(not(downtime_eval))]
-                    debug!("data Range is {:X} - {:X}", address.start, address.end);
-                    return_struct.old_data = Some(address.clone());
-                }
-                _=>{}
-            };
+            return_struct.old_text = old_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+            return_struct.old_rodata = old_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+            return_struct.old_data = old_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
         }
 
     } else {
@@ -192,43 +169,24 @@ pub fn do_self_swap(
 
         // Find the address range of the newl loaded crate
         {
-            match &new_crate.text_pages {
-                Some((_pages, address)) => {
+            return_struct.old_text = new_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+            return_struct.old_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+            return_struct.old_data = new_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
-                    #[cfg(not(downtime_eval))]
-                    {
-                        debug!("Text Range was {:X} - {:X}", return_struct.old_text.clone().unwrap().start, return_struct.old_text.clone().unwrap().end);
-                        debug!("Text Range is  {:X} - {:X}", address.start, address.end);
-                    }
-                    return_struct.new_text = Some(address.clone());
-                }
-                _ => {}
-            };
+            if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
+                 debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
+                 debug!("Text Range is {:X} - {:X}", new_text.start, new_text.end);
+            }
 
-            match &new_crate.rodata_pages {
-                Some((_pages,address)) => {
-                    #[cfg(not(downtime_eval))]
-                    {
-                        debug!("Rodata Range was {:X} - {:X}", return_struct.old_rodata.clone().unwrap().start, return_struct.old_rodata.clone().unwrap().end);
-                        debug!("Rodata Range is  {:X} - {:X}", address.start, address.end);
-                    }
-                    return_struct.new_rodata = Some(address.clone());
-                }
-                _ => {}
-            };
+            if let (Some(old_data) , Some(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
+                 debug!("Data Range was {:X} - {:X}", old_data.start, old_data.end);
+                 debug!("Data Range is {:X} - {:X}", new_data.start, new_data.end);
+            }
 
-            match &new_crate.data_pages {
-                Some((_pages,address)) => {
-
-                    #[cfg(not(downtime_eval))]
-                    {
-                        debug!("data Range was {:X} - {:X}", return_struct.old_data.clone().unwrap().start, return_struct.old_data.clone().unwrap().end);
-                        debug!("data Range is  {:X} - {:X}", address.start, address.end);
-                    }
-                    return_struct.new_data = Some(address.clone());
-                }
-                _ => {}
-            };
+            if let (Some(old_rodata) , Some(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
+                 debug!("Rodata Range was {:X} - {:X}", old_rodata.start, old_rodata.end);
+                 debug!("Rodata Range is {:X} - {:X}", new_rodata.start, new_rodata.end);
+            }
         }
 
 
