@@ -98,9 +98,6 @@ pub fn do_self_swap(
         requests
     };
 
-    // Create a set of temporary variables to hold the data ranges
-    let mut return_struct = SwapRanges::default();
-
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
 
     // There can be only one matching crate for a given crate name
@@ -122,6 +119,7 @@ pub fn do_self_swap(
         "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
     })?;
 
+    let mut return_struct = SwapRanges::default();
 
     // Find the text, data and rodata ranges of old crate
     {

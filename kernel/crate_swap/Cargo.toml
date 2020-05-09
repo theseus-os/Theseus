@@ -35,5 +35,9 @@ path = "../path"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
+#[cfg(loscd_eval)]
+[dependencies.hpet]
+path = "../hpet"
+
 [lib]
 crate-type = ["rlib"]

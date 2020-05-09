@@ -15,6 +15,9 @@ extern crate qp_trie;
 extern crate path;
 extern crate by_address;
 
+#[cfg(loscd_eval)]
+extern crate hpet;
+
 use core::{
     fmt,
     ops::Deref,
@@ -173,7 +176,7 @@ pub fn swap_crates(
             let nn = CrateNamespace::new(
                 String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
                 // use the optionally-provided directory of crates instead of the current namespace's directories.
-                override_namespace_dirs.unwrap_or_else(|| this_namespace.dir().clone()),
+                override_namespace_dir.unwrap_or_else(|| this_namespace.dir().clone()),
                 None,
             );
             // Note that we only need to load the crates that are replacing already-loaded old crates in the old namespace.
