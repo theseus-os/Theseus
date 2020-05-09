@@ -14,6 +14,7 @@ extern crate task;
 extern crate fault_log;
 
 use core::ptr;
+use core::ops::Range;
 
 use alloc::{
     string::{String, ToString},
@@ -36,40 +37,27 @@ use fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_han
 /// A data structure to hold the ranges of memory used by the old crate and the new crate.
 /// The crate only maintains the values as virtual addresses and holds no references to any
 /// crate
+#[derive(Clone)]
 pub struct SwapRanges{
-    pub old_text_low : Option<VirtualAddress>,
-    pub old_rodata_low : Option<VirtualAddress>,
-    pub old_data_low : Option<VirtualAddress>,
+    pub old_text : Option<Range<VirtualAddress>>,
+    pub old_rodata : Option<Range<VirtualAddress>>,
+    pub old_data : Option<Range<VirtualAddress>>,
 
-    pub old_text_high : Option<VirtualAddress>,
-    pub old_rodata_high : Option<VirtualAddress>,
-    pub old_data_high : Option<VirtualAddress>,
-
-    pub new_text_low : Option<VirtualAddress>,
-    pub new_rodata_low : Option<VirtualAddress>,
-    pub new_data_low : Option<VirtualAddress>,
-
-    pub new_text_high : Option<VirtualAddress>,
-    pub new_rodata_high : Option<VirtualAddress>,
-    pub new_data_high : Option<VirtualAddress>
+    pub new_text : Option<Range<VirtualAddress>>,
+    pub new_rodata : Option<Range<VirtualAddress>>,
+    pub new_data : Option<Range<VirtualAddress>>,
 }
 
 impl SwapRanges {
     /// Returns an empty `SwapRanges` with all fields set to None
     pub fn new () -> SwapRanges {
         SwapRanges {
-            old_text_low : None,
-            old_rodata_low : None,
-            old_data_low : None,
-            old_text_high : None,
-            old_rodata_high : None,
-            old_data_high : None,
-            new_text_low : None,
-            new_rodata_low : None,
-            new_data_low : None,
-            new_text_high : None,
-            new_rodata_high : None,
-            new_data_high : None,
+            old_text : None,
+            old_rodata : None,
+            old_data : None,
+            new_text : None,
+            new_rodata : None,
+            new_data : None,
         }
     }
 }
@@ -125,21 +113,7 @@ pub fn do_self_swap(
     };
 
     // Create a set of temporary variables to hold the data ranges
-    let mut old_text_low : Option<VirtualAddress> = None;
-    let mut old_rodata_low : Option<VirtualAddress> = None;
-    let mut old_data_low : Option<VirtualAddress> = None;
-
-    let mut old_text_high : Option<VirtualAddress> = None;
-    let mut old_rodata_high : Option<VirtualAddress> = None;
-    let mut old_data_high : Option<VirtualAddress> = None;
-
-    let mut new_text_low : Option<VirtualAddress> = None;
-    let mut new_rodata_low : Option<VirtualAddress> = None;
-    let mut new_data_low : Option<VirtualAddress> = None;
-
-    let mut new_text_high : Option<VirtualAddress> = None;
-    let mut new_rodata_high : Option<VirtualAddress> = None;
-    let mut new_data_high : Option<VirtualAddress> = None;
+    let mut return_struct = SwapRanges::new();
 
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
 
@@ -162,8 +136,7 @@ pub fn do_self_swap(
                 Some((_pages,address)) => {
                     #[cfg(not(downtime_eval))]
                     debug!("Text Range is {:X} - {:X}", address.start, address.end);
-                    old_text_low = Some(address.start.clone());
-                    old_text_high = Some(address.end.clone());
+                    return_struct.old_text = Some(address.clone());
                 }
                 _=>{}
             };
@@ -172,8 +145,7 @@ pub fn do_self_swap(
                 Some((_pages,address)) => {
                     #[cfg(not(downtime_eval))]
                     debug!("Rodata Range is {:X} - {:X}", address.start, address.end);
-                    old_rodata_low = Some(address.start.clone());
-                    old_rodata_high = Some(address.end.clone());
+                    return_struct.old_rodata = Some(address.clone());
                 }
                 _=>{}
             };
@@ -182,8 +154,7 @@ pub fn do_self_swap(
                 Some((_pages,address)) => {
                     #[cfg(not(downtime_eval))]
                     debug!("data Range is {:X} - {:X}", address.start, address.end);
-                    old_data_low = Some(address.start.clone());
-                    old_data_high = Some(address.end.clone());
+                    return_struct.old_data = Some(address.clone());
                 }
                 _=>{}
             };
@@ -240,11 +211,10 @@ pub fn do_self_swap(
 
                     #[cfg(not(downtime_eval))]
                     {
-                        debug!("Text Range was {:X} - {:X}", old_text_low.unwrap(), old_text_high.unwrap());
+                        debug!("Text Range was {:X} - {:X}", return_struct.old_text.clone().unwrap().start, return_struct.old_text.clone().unwrap().end);
                         debug!("Text Range is  {:X} - {:X}", address.start, address.end);
                     }
-                    new_text_low = Some(address.start.clone());
-                    new_text_high = Some(address.end.clone());
+                    return_struct.new_text = Some(address.clone());
                 }
                 _ => {}
             };
@@ -253,12 +223,10 @@ pub fn do_self_swap(
                 Some((_pages,address)) => {
                     #[cfg(not(downtime_eval))]
                     {
-                        debug!("Rodata Range was {:X} - {:X}", old_rodata_low.unwrap(), old_rodata_high.unwrap());
+                        debug!("Rodata Range was {:X} - {:X}", return_struct.old_rodata.clone().unwrap().start, return_struct.old_rodata.clone().unwrap().end);
                         debug!("Rodata Range is  {:X} - {:X}", address.start, address.end);
                     }
-
-                    new_rodata_low = Some(address.start.clone());
-                    new_rodata_high = Some(address.end.clone());
+                    return_struct.new_rodata = Some(address.clone());
                 }
                 _ => {}
             };
@@ -268,11 +236,10 @@ pub fn do_self_swap(
 
                     #[cfg(not(downtime_eval))]
                     {
-                        debug!("data Range was {:X} - {:X}", old_data_low.unwrap(), old_data_high.unwrap());
+                        debug!("data Range was {:X} - {:X}", return_struct.old_data.clone().unwrap().start, return_struct.old_data.clone().unwrap().end);
                         debug!("data Range is  {:X} - {:X}", address.start, address.end);
                     }
-                    new_data_low = Some(address.start.clone());
-                    new_data_high = Some(address.end.clone());
+                    return_struct.new_data = Some(address.clone());
                 }
                 _ => {}
             };
@@ -282,25 +249,6 @@ pub fn do_self_swap(
      } else {
          debug!("No match");
      }
-
-    let return_struct = SwapRanges{
-        old_text_low : old_text_low,
-        old_rodata_low : old_rodata_low,
-        old_data_low : old_data_low,
-
-        old_text_high : old_text_high,
-        old_rodata_high : old_rodata_high,
-        old_data_high :  old_data_high,
-
-        new_text_low : new_text_low,
-        new_rodata_low : new_rodata_low,
-        new_data_low : new_data_low,
-
-        new_text_high : new_text_high,
-        new_rodata_high : new_rodata_high,
-        new_data_high : new_data_high
-    };
-
 
 
     match swap_result {
@@ -339,7 +287,7 @@ pub fn constant_offset_fix(
         return Err("In constant_offset_fix bottom must be less than or equal to top".to_string())
     }
 
-    if swap_ranges.new_text_low.is_none(){
+    if swap_ranges.new_text.is_none(){
         // crate swap haven't happened. No constant_offset_fix to be done
         return Ok(())
     } 
@@ -352,15 +300,14 @@ pub fn constant_offset_fix(
         //debug!("{:#X} = {:#X}", x ,n);
         let ra = memory::VirtualAddress::new_canonical(n as usize);
 
-        if let (Some(old_text_low) , Some(old_text_high), Some(new_text_low) , Some(_new_text_high)) = 
-                (swap_ranges.old_text_low, swap_ranges.old_text_high, swap_ranges.new_text_low, swap_ranges.new_text_high) {
-            if old_text_low < ra && old_text_high > ra {
+        if let (Some(old_text) , Some(new_text)) = (swap_ranges.old_text.clone(), swap_ranges.new_text.clone()) {
+            if old_text.start < ra && old_text.end > ra {
 
                 #[cfg(not(downtime_eval))]
                 debug!("Match text at address {:#X}, value  = {:#X}", x , n);
 
                 // Note : Does not use saturation add since underflow is not possible and overflow could not be caused in proper execution
-                let n_ra = ra - old_text_low + new_text_low;
+                let n_ra = ra - old_text.start + new_text.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
                 // For debug purposes we re-read teh value
@@ -372,13 +319,12 @@ pub fn constant_offset_fix(
             }
         }
 
-        if let (Some(old_rodata_low) , Some(old_rodata_high), Some(new_rodata_low) , Some(_new_rodata_high)) = 
-                (swap_ranges.old_rodata_low, swap_ranges.old_rodata_high, swap_ranges.new_rodata_low, swap_ranges.new_rodata_high) {
-            if old_rodata_low < ra && old_rodata_high > ra {
+        if let (Some(old_rodata) , Some(new_rodata)) = (swap_ranges.old_rodata.clone(), swap_ranges.new_rodata.clone()) {
+            if old_rodata.start < ra && old_rodata.end > ra {
 
                 #[cfg(not(downtime_eval))]
                 debug!("Match rodata at address {:#X}, value  = {:#X}", x , n);
-                let n_ra = ra - old_rodata_low + new_rodata_low;
+                let n_ra = ra - old_rodata.start + new_rodata.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
 
@@ -390,13 +336,12 @@ pub fn constant_offset_fix(
             }
         }
 
-        if let (Some(old_data_low) , Some(old_data_high), Some(new_data_low) , Some(_new_data_high)) = 
-                (swap_ranges.old_data_low, swap_ranges.old_data_high, swap_ranges.new_data_low, swap_ranges.new_data_high) {
-            if old_data_low < ra && old_data_high > ra {
+        if let (Some(old_data) , Some(new_data)) = (swap_ranges.old_data.clone(), swap_ranges.new_data.clone()) {
+            if old_data.start < ra && old_data.end > ra {
 
                 #[cfg(not(downtime_eval))]
                 debug!("Match data at address {:#X}, value  = {:#X}", x , n);
-                let n_ra = ra - old_data_low + new_data_low;
+                let n_ra = ra - old_data.start + new_data.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
                 #[cfg(not(downtime_eval))]
