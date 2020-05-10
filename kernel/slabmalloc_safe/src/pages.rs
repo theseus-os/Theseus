@@ -352,7 +352,7 @@ impl MappedPages8k {
         }
 
         let mut mp_8k = MappedPages8k(mp);
-        mp_8k.as_objectpage8k_mut().clear_metadata();
+        // mp_8k.as_objectpage8k_mut().clear_metadata();
         Ok(mp_8k)
     }
 

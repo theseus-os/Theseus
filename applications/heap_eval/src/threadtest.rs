@@ -19,9 +19,9 @@ use crate::{NTHREADS, ALLOCATOR, TRIES};
 use crate::overhead_of_accessing_multiple_heaps;
 
 
-pub(crate) static NITERATIONS: AtomicUsize = AtomicUsize::new(50);
+pub(crate) static NITERATIONS: AtomicUsize = AtomicUsize::new(1000);
 /// Sum total of objects to be allocated by all threads
-pub(crate) static NOBJECTS: AtomicUsize = AtomicUsize::new(30_000);
+pub(crate) static NOBJECTS: AtomicUsize = AtomicUsize::new(100_000);
 /// Size of the objects we're allocating in bytes
 pub(crate) static OBJSIZE: AtomicUsize = AtomicUsize::new(REGULAR_SIZE);
 /// The default size of objects to allocate
@@ -38,7 +38,7 @@ pub fn do_threadtest() -> Result<(), &'static str> {
     let hpet_ref = get_hpet(); 
     let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
 
-    println!("Running threadtest for {} threads, {} iterations, {} total objects, {} obj size ...", 
+    println!("Running threadtest for {} threads, {} iterations, {} total objects allocated every iteration by all threads, {} obj size ...", 
         nthreads, NITERATIONS.load(Ordering::SeqCst), NOBJECTS.load(Ordering::SeqCst), OBJSIZE.load(Ordering::SeqCst));
 
     #[cfg(direct_access_to_multiple_heaps)]
@@ -47,7 +47,7 @@ pub fn do_threadtest() -> Result<(), &'static str> {
         println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    for _ in 0..TRIES {
+    for try in 0..TRIES {
         let mut threads = Vec::with_capacity(nthreads);
 
         let start = hpet.get_counter();
@@ -68,6 +68,7 @@ pub fn do_threadtest() -> Result<(), &'static str> {
         }
 
         let diff = hpet_2_us(end - start);
+        println!("[{}] threadtest time: {} us", try, diff);
         tries.push(diff);
     }
 

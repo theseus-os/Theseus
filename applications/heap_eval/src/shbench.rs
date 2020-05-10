@@ -29,7 +29,8 @@ const MAX_REGULAR: usize = 1000;
 pub const MIN_LARGE: usize = 8192;
 /// The maximum size allocated when the large allocations option is chosen
 pub const MAX_LARGE: usize = 16384;
-
+/// The number of allocations that take place in one iteration
+const ALLOCATIONS_PER_ITER: usize = 19_300;
 
 pub fn do_shbench() -> Result<(), &'static str> {
 
@@ -41,8 +42,8 @@ pub fn do_shbench() -> Result<(), &'static str> {
     let hpet_ref = get_hpet(); 
     let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
 
-    println!("Running shbench for {} threads, {} total iterations, {} iterations per thread, {} max block size, {} min block size ...", 
-        nthreads, niterations, niterations/nthreads, MAX_BLOCK_SIZE.load(Ordering::SeqCst), MIN_BLOCK_SIZE.load(Ordering::SeqCst));
+    println!("Running shbench for {} threads, {} total iterations, {} iterations per thread, {} total objects allocated by all threads, {} max block size, {} min block size ...", 
+        nthreads, niterations, niterations/nthreads, ALLOCATIONS_PER_ITER * niterations, MAX_BLOCK_SIZE.load(Ordering::SeqCst), MIN_BLOCK_SIZE.load(Ordering::SeqCst));
     
     #[cfg(direct_access_to_multiple_heaps)]
     {
@@ -50,7 +51,12 @@ pub fn do_shbench() -> Result<(), &'static str> {
         println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    for _ in 0..TRIES {
+    // #[cfg(not(safe_heap))]
+    let num_tries = TRIES;
+    // #[cfg(safe_heap)]
+    // let num_tries = 1;
+
+    for try in 0..num_tries {
         let mut threads = Vec::with_capacity(nthreads);
 
         let start = hpet.get_counter();
@@ -71,11 +77,18 @@ pub fn do_shbench() -> Result<(), &'static str> {
         }
 
         let diff = hpet_2_us(end - start);
+        println!("[{}] shbench time: {} us", try, diff);
         tries.push(diff);
     }
 
-    println!("shbench stats (us)");
-    println!("{:?}", calculate_stats(&tries));
+    // #[cfg(safe_heap)]
+    // println!("Ran shbench using the safe heap which has reached its maximum size limit. To get next measurement point, restart Theseus and run again");
+
+    // #[cfg(not(safe_heap))]
+    // {
+        println!("shbench stats (us)");
+        println!("{:?}", calculate_stats(&tries));
+    // }
 
     Ok(())
 }
@@ -121,75 +134,85 @@ fn worker(_:()) {
         layouts.push(Layout::new::<u8>());
     }
 
-    for _ in 0..niterations {
-        let mut size_base = min_block_size;
-        while size_base < max_block_size {
-            let mut size = size_base;
-            while size > 0 {
-                let mut iterations = 1;
+    // for _ in 0..1000 {
+    //     mp = 0;
+    //     mpe = alloc_count;
+    //     ave_start = 0;
+    //     save_end = 0;
+        for _ in 0..niterations {
+            let mut size_base = min_block_size;
+            while size_base < max_block_size {
+                let mut size = size_base;
+                while size > 0 {
+                    let mut iterations = 1;
 
-                // smaller sizes will be allocated a larger amount
-                if size < 10000 { iterations = 10; }
-                if size < 1000 { iterations *= 5; }
-                if size < 100 {iterations *= 5; }
+                    // smaller sizes will be allocated a larger amount
+                    if size < 10000 { iterations = 10; }
+                    if size < 1000 { iterations *= 5; }
+                    if size < 100 {iterations *= 5; }
 
-                for _ in 0..iterations {
-                    let layout = Layout::from_size_align(size, 2).unwrap();
-                    let ptr = unsafe{ allocator.alloc(layout) };
+                    for _ in 0..iterations {
+                        let layout = Layout::from_size_align(size, 2).unwrap();
+                        let ptr = unsafe{ allocator.alloc(layout) };
 
-                    if ptr.is_null() {
-                        error!("Out of Heap Memory");
-                        return;
+                        if ptr.is_null() {
+                            error!("Out of Heap Memory");
+                            return;
+                        }
+
+                        allocations[mp] = ptr;
+                        layouts[mp] = layout;
+                        mp += 1;
+
+                        // start storing new allocations after the region of pointers that have been saved
+                        if mp == save_start {
+                            mp = save_end;
+                        }
+
+                        // reached the end of the buffer, so now free all allocations except a portion marked by 
+                        // save_start and save_end
+                        if mp >= mpe {
+                            mp = 0;
+                            save_start = save_end;
+                            if save_start >= mpe {
+                                save_start = mp;
+                            }
+                            save_end = save_start + (alloc_count/5);
+                            if save_end > mpe {
+                                save_end = mpe;
+                            }
+                            // free the top part of the buffer, the oldest allocations first
+                            while mp < save_start {
+                                unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
+                                mp += 1;
+                            }
+                            mp = mpe;
+                            // free the end of the buffer, the newest allocations first
+                            while mp > save_end {
+                                mp -= 1;
+                                unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
+                            }
+                            mp = 0;
+                        }
                     }
-
-                    allocations[mp] = ptr;
-                    layouts[mp] = layout;
-                    mp += 1;
-
-                    // start storing new allocations after the region of pointers that have been saved
-                    if mp == save_start {
-                        mp = save_end;
-                    }
-
-                    // reached the end of the buffer, so now free all allocations except a portion marked by 
-                    // save_start and save_end
-                    if mp >= mpe {
-                        mp = 0;
-                        save_start = save_end;
-                        if save_start >= mpe {
-                            save_start = mp;
-                        }
-                        save_end = save_start + (alloc_count/5);
-                        if save_end > mpe {
-                            save_end = mpe;
-                        }
-                        // free the top part of the buffer, the oldest allocations first
-                        while mp < save_start {
-                            unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
-                            mp += 1;
-                        }
-                        mp = mpe;
-                        // free the end of the buffer, the newest allocations first
-                        while mp > save_end {
-                            mp -= 1;
-                            unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
-                        }
-                        mp = 0;
-                    }
+                    size /= 2;
                 }
-                size /= 2;
+                size_base = size_base * 3 / 2 + 1
             }
-            size_base = size_base * 3 / 2 + 1
         }
-    }
 
-    //free residual allocations
-    mpe = mp;
-    mp = 0;
+        //free residual allocations
+        mpe = mp;
+        mp = 0;
 
-    while mp < mpe {
-        unsafe{ allocator.dealloc(allocations[mp], layouts[mp]); }
-    }        
+        while mp < mpe {
+            unsafe{ allocator.dealloc(allocations[mp], layouts[mp]); }
+            mp += 1;
+        }
+
+
+    // }        
+
 }
 
 

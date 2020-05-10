@@ -113,24 +113,27 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
         do_qptrie();
     }
     else if matches.opt_present("threadtest") {
-        if matches.opt_present("large") {
-            OBJSIZE.store(LARGE_SIZE, Ordering::SeqCst);
-        }
         if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
             threadtest::NITERATIONS.store(iterations, Ordering::SeqCst);
         }
         if let Some(objects) = matches.opt_str("o").and_then(|i| i.parse::<usize>().ok()) {
             threadtest::NOBJECTS.store(objects, Ordering::SeqCst);
         }
+        if matches.opt_present("large") {
+            OBJSIZE.store(LARGE_SIZE, Ordering::SeqCst);
+            threadtest::NITERATIONS.store(100, Ordering::SeqCst);
+            threadtest::NOBJECTS.store(100, Ordering::SeqCst);
+        }
         do_threadtest()?;
     }
     else if matches.opt_present("shbench") {
+        if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
+            shbench::NITERATIONS.store(iterations, Ordering::SeqCst);
+        }
         if matches.opt_present("large") {
             MAX_BLOCK_SIZE.store(MAX_LARGE, Ordering::SeqCst);
             MIN_BLOCK_SIZE.store(MIN_LARGE, Ordering::SeqCst);
-        }
-        if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
-            shbench::NITERATIONS.store(iterations, Ordering::SeqCst);
+            shbench::NITERATIONS.store(1, Ordering::SeqCst);
         }
         do_shbench()?;
     }

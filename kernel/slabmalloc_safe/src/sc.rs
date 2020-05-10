@@ -49,6 +49,8 @@ pub struct SCAllocator {
     pub(crate) page_count: usize,
     /// max objects per page
     pub(crate) obj_per_page: usize,
+    /// Keeps track of the empty pages in the heap.
+    pub(crate) empty_count: usize, 
     /// List to hold empty MappedPages (nothing allocated in these).
     pub(crate) empty_slabs: Vec<Option<MappedPages8k>>, 
     /// List to hold partially used MappedPages (some objects allocated but pages are not full).
@@ -66,6 +68,7 @@ macro_rules! new_sc_allocator {
             allocation_count: 0,
             page_count: 0,
             obj_per_page: cmin((MappedPages8k::SIZE - MappedPages8k::METADATA_SIZE) / $size, 8 * 64),
+            empty_count: 0,
             empty_slabs: Vec::new(),
             slabs: Vec::new(),
             full_slabs: Vec::new()
@@ -76,17 +79,23 @@ macro_rules! new_sc_allocator {
 impl SCAllocator {
     const _REBALANCE_COUNT: usize = 10_000;
     /// The maximum number of allocable pages the SCAllocator can hold.
-    pub const MAX_PAGE_LIST_SIZE: usize = 122; // ~1 MiB
+    pub const MAX_PAGE_LIST_SIZE: usize = 122*100; // ~100 MiB
 
     /// Creates a new SCAllocator and initializes the page lists to have a length of `PAGE_LIST_SIZE`.
     /// After initialization, the length of the list won't change. 
     pub fn new(size: usize) -> SCAllocator {
         let mut sc = new_sc_allocator!(size);
+        let mut empty_slabs = Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE);
+        let mut slabs = Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE);
+        let mut full_slabs = Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE);
         for _ in 0..Self::MAX_PAGE_LIST_SIZE {
-            sc.empty_slabs.push(None);
-            sc.slabs.push(None);
-            sc.full_slabs.push(None);
+            empty_slabs.push(None);
+            slabs.push(None);
+            full_slabs.push(None);
         }
+        sc.empty_slabs = empty_slabs;
+        sc.slabs = slabs;
+        sc.full_slabs = full_slabs;
         sc
     }
 
@@ -116,6 +125,7 @@ impl SCAllocator {
             if page.is_none() {
                 new_page.as_objectpage8k_mut().list_id = idx;
                 *page = Some(new_page);
+                self.empty_count += 1;
                 return Ok(());
             }
         }
@@ -143,6 +153,7 @@ impl SCAllocator {
         for page in self.empty_slabs.iter_mut() {
             if page.is_some() {
                 core::mem::swap(&mut mp, page);
+                self.empty_count -= 1;
                 break;
             }
         }
@@ -152,14 +163,14 @@ impl SCAllocator {
     fn remove_partial(&mut self, idx: usize) -> Option<MappedPages8k> {
         let mut mp = None;
         core::mem::swap(&mut self.slabs[idx], &mut mp);
-        assert!(mp.is_some());
+        // assert!(mp.is_some());
         mp
     }
 
     fn remove_full(&mut self, idx: usize) -> Option<MappedPages8k> {
         let mut mp = None;
         core::mem::swap(&mut self.full_slabs[idx], &mut mp);
-        assert!(mp.is_some());        
+        // assert!(mp.is_some());        
         mp
     }
 
@@ -195,10 +206,12 @@ impl SCAllocator {
         let mut need_to_move = false;
         let mut list_id = 0;
         let mut ret_ptr = ptr::null_mut();
+        let mut addr = VirtualAddress::zero();
 
         for slab_page in self.slabs.iter_mut() {
             match slab_page {
                 Some(mp) => {
+                    addr = mp.start_address();
                     let page = mp.as_objectpage8k_mut();
                     let ptr = page.allocate(sc_layout);
                     if !ptr.is_null() {
@@ -255,7 +268,11 @@ impl SCAllocator {
 
     /// Returns an empty page from the allocator if available.
     pub fn retrieve_empty_page(&mut self) -> Option<MappedPages8k> {
-        self.remove_empty()
+        if let Some(mp) = self.remove_empty(){
+            self.page_count -= 1;
+            return Some(mp);
+        }
+        None
     }
 
     /// Allocates a block of memory descriped by `layout`.
