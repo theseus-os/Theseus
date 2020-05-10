@@ -6,10 +6,15 @@ build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"
+spin = "0.4.10"
 
 [dependencies.log]
 default-features = false
 version = "0.4.8"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.spawn]
 path = "../../kernel/spawn"

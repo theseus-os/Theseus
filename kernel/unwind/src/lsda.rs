@@ -269,6 +269,7 @@ impl<R: Reader> FallibleIterator for CallSiteTableIterator<R> {
         if self.reader.offset_id().0 < self.end_of_call_site_table {
             let entry = CallSiteTableEntry::parse(&mut self.reader, self.call_site_table_encoding, self.landing_pad_base)?;
             if let Some(action_offset) = entry.action_offset() {
+                #[cfg(not(downtime_eval))]
                 warn!("unsupported/unhandled call site action, offset (with 1 added): {:#X}", action_offset);
             }
             Ok(Some(entry))
