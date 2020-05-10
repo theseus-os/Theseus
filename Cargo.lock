@@ -117,9 +117,11 @@ version = "0.1.0"
 dependencies = [
  "atomic 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "debugit 0.1.0",
+ "hpet 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mpmc 0.1.6-pre",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
  "wait_queue 0.1.0",
 ]
 
@@ -419,6 +421,7 @@ dependencies = [
  "by_address 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs_node 0.1.0",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hpet 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -1834,6 +1837,7 @@ dependencies = [
 name = "rendezvous"
 version = "0.1.0"
 dependencies = [
+ "hpet 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "scheduler 0.1.0",

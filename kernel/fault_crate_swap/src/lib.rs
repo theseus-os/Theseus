@@ -137,8 +137,6 @@ pub fn do_self_swap(
         false // enable crate_cahce
     );
 
-    debug!("Swap crates returned");
-
     let ocn = crate_name;
 
     // Find the new crate loaded. It should have the exact same name as the old crate
@@ -174,19 +172,22 @@ pub fn do_self_swap(
         return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
         return_struct.new_data   = new_crate.data_pages  .as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
-        if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
-                debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
-                debug!("Text Range is {:X} - {:X}", new_text.start, new_text.end);
-        }
+        #[cfg(not(downtime_eval))]
+        {
+            if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
+                    debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
+                    debug!("Text Range is {:X} - {:X}", new_text.start, new_text.end);
+            }
 
-        if let (Some(old_data) , Some(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
-                debug!("Data Range was {:X} - {:X}", old_data.start, old_data.end);
-                debug!("Data Range is {:X} - {:X}", new_data.start, new_data.end);
-        }
+            if let (Some(old_data) , Some(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
+                    debug!("Data Range was {:X} - {:X}", old_data.start, old_data.end);
+                    debug!("Data Range is {:X} - {:X}", new_data.start, new_data.end);
+            }
 
-        if let (Some(old_rodata) , Some(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
-                debug!("Rodata Range was {:X} - {:X}", old_rodata.start, old_rodata.end);
-                debug!("Rodata Range is {:X} - {:X}", new_rodata.start, new_rodata.end);
+            if let (Some(old_rodata) , Some(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
+                    debug!("Rodata Range was {:X} - {:X}", old_rodata.start, old_rodata.end);
+                    debug!("Rodata Range is {:X} - {:X}", new_rodata.start, new_rodata.end);
+            }
         }
     }
 
@@ -426,7 +427,6 @@ fn simple_swap_policy() -> Option<String> {
     #[cfg(not(downtime_eval))]
     debug!("Running simple swap policy");
 
-    fault_log::print_fault_log();
     // We get all unhanlded faults
     let unhandled_list: Vec<FaultEntry> = remove_unhandled_exceptions();
     if unhandled_list.is_empty(){
@@ -459,6 +459,7 @@ fn simple_swap_policy() -> Option<String> {
 
     let crate_to_swap = unhandled_list[0].crate_error_occured.clone();
 
+    #[cfg(not(downtime_eval))]
     debug!("Repalce : {:?}",crate_to_swap);
 
     crate_to_swap

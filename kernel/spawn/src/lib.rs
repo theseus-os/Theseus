@@ -495,7 +495,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
             curr_task_name, debugit!(func), core::any::type_name::<F>(), debugit!(arg)
         );
-        
+
         (func, arg)
     };
 
@@ -597,7 +597,9 @@ fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillR
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
 
+    #[cfg(not(downtime_eval))]
     debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
+
     if current_task.mark_as_killed(kill_reason).is_err() {
         error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
     }

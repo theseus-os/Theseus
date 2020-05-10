@@ -323,7 +323,9 @@ pub fn swap_crates(
             // i.e., those that were previously added to this namespace's symbol map,
             // because other crates could not possibly depend on non-public sections in the old crate.
             for old_sec in old_crate.global_sections_iter() {
+                #[cfg(not(loscd_eval))]
                 debug!("swap_crates(): looking for old_sec_name: {:?}", old_sec.name);
+
                 let old_sec_ns = this_namespace.get_symbol_and_namespace(&old_sec.name)
                     .map(|(_weak_sec, ns)| ns)
                     .ok_or_else(|| {
@@ -401,9 +403,11 @@ pub fn swap_crates(
 
                     // get the section from the new crate that corresponds to the `old_sec`
                     let new_source_sec = if let Some(ref nsr) = new_sec {
+                        #[cfg(not(loscd_eval))]
                         trace!("using cached version of new source section");
                         nsr
                     } else {
+                        #[cfg(not(loscd_eval))]
                         trace!("Finding new source section from scratch");
                         let nsr = find_corresponding_new_section(&mut new_crate.reexported_symbols)?;
                         new_sec.get_or_insert(nsr)
@@ -534,6 +538,8 @@ pub fn swap_crates(
         if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove_str(old_crate_name) {
             {
                 let old_crate = old_crate_ref.lock_as_ref();
+
+                #[cfg(not(loscd_eval))]
                 info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name());
 
                 if cache_old_crates {
@@ -682,7 +688,9 @@ pub fn swap_crates(
         if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
             // If we replaced a crate object file, put that replaced file back in the source directory, thus completing the "swap" operation.
             // (Note that the file that we replaced should be the same as the old_crate_file.) 
+            #[cfg(not(downtime_eval))]
             trace!("swap_crates(): new_crate_object_file replaced existing (old_crate) object file {:?}", replaced_old_crate_file.get_name());
+
             replaced_old_crate_file.set_parent_dir(Arc::downgrade(&original_source_dir));
             if let Some(_f) = original_source_dir.lock().insert(replaced_old_crate_file)? {
                 // There shouldn't be a similarly-named file in the original source dir anymore, since we moved it.
@@ -693,6 +701,7 @@ pub fn swap_crates(
             // If inserting the new crate object file didn't end up replacing the existing crate object file (the old_crate's object file), 
             // then we need to remove the old_crate's object file here, if one was specified. 
             if let Some(ocn) = old_crate_name {
+                #[cfg(not(downtime_eval))]
                 trace!("swap_crates(): new_crate_object_file did not replace old_crate's object file, so we're removing the old_crate's object file now");
                 let (old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, &*ocn).ok_or_else(|| {
                     error!("BUG: swap_crates(): couldn't find old crate's object file starting with {:?} in old namespace {:?}.", ocn, old_namespace.name());

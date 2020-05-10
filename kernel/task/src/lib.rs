@@ -619,6 +619,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
+        #[cfg(not(downtime_eval))]
         trace!("Task::drop(): {}", self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
