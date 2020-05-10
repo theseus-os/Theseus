@@ -15,6 +15,9 @@ extern crate qp_trie;
 extern crate path;
 extern crate by_address;
 
+#[cfg(loscd_eval)]
+extern crate hpet;
+
 use core::{
     fmt,
     ops::Deref,
@@ -723,29 +726,26 @@ pub fn swap_crates(
     }
 
 
-    #[cfg(loscd_eval)] {
+    #[cfg(all(loscd_eval, not(downtime_eval)))] {
         // done with everything, print out values
 
-        #[cfg(not(downtime_eval))]
-        {
-            warn!("
-                load crates, {}
-                find symbols, {}
-                rewrite relocations, {}
-                fix dependencies, {}
-                BSS transfer, {}
-                symbol cleanup, {}
-                HPET PERIOD (femtosec): {}
-                ",
-                hpet_after_load_crates - hpet_start_swap,
-                hpet_total_symbol_finding,
-                hpet_total_rewriting_relocations,
-                hpet_total_fixing_dependencies,
-                hpet_total_bss_transfer,
-                end_symbol_cleanup - start_symbol_cleanup,
-                hpet.counter_period_femtoseconds(),
-            );
-        }
+        warn!("
+            load crates, {}
+            find symbols, {}
+            rewrite relocations, {}
+            fix dependencies, {}
+            BSS transfer, {}
+            symbol cleanup, {}
+            HPET PERIOD (femtosec): {}
+            ",
+            hpet_after_load_crates - hpet_start_swap,
+            hpet_total_symbol_finding,
+            hpet_total_rewriting_relocations,
+            hpet_total_fixing_dependencies,
+            hpet_total_bss_transfer,
+            end_symbol_cleanup - start_symbol_cleanup,
+            hpet.counter_period_femtoseconds(),
+        );
     }
 
     Ok(())
