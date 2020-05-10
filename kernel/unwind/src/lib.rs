@@ -791,7 +791,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                 let entry = match table.call_site_table_entry_for_address(frame.call_site_address()) {
                     Ok(x) => x,
                     Err(e) => {
-
+                        #[cfg(not(downtime_eval))]
                         error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address {:#X}. Error: {}", frame.call_site_address(), e);
                         
                         // Now we don't have an exact match. We try to use the previous
@@ -805,6 +805,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                         }
                         
                         if let Some (closest_entry) = closest_entry {
+                            #[cfg(not(downtime_eval))]
                             debug!("No unwind info for address. Using the closeset");
                             closest_entry
                         } else {
@@ -812,8 +813,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                         }
                     }
                 };
-
-                
 
                 #[cfg(not(downtime_eval))]
                 debug!("Found call site entry for address {:#X}: {:#X?}", frame.call_site_address(), entry);
@@ -837,6 +836,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
     let landing_pad_address = match landing_pad_address {
         Some(lpa) => lpa,
         _ => {
+            #[cfg(not(downtime_eval))]
             warn!("continue_unwinding(): stack frame has LSDA but no landing pad");
             return continue_unwinding(unwinding_context_ptr);
         }
@@ -846,6 +846,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
     // Thus, we skip unwinding an exception handler frame because its landing pad will point to an invalid instruction (usually `ud2`).
     if stack_frame_iter.last_frame_was_exception_handler {
         let landing_pad_value: u16 = unsafe { *(landing_pad_address as *const u16) };
+        #[cfg(not(downtime_eval))]
         warn!("Skipping exception/interrupt handler's landing pad (cleanup function) at {:#X}, which points to {:#X} (UD2: {})", 
             landing_pad_address, landing_pad_value, landing_pad_value == 0x0B0F,  // the `ud2` instruction
         );
@@ -853,6 +854,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
     }
 
     // Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
+    #[cfg(not(downtime_eval))]
     debug!("Jumping to landing pad (cleanup function) at {:#X}", landing_pad_address);
     // Once the unwinding cleanup function is done, it will call _Unwind_Resume (technically, it jumps to it),
     // and pass the value in the landing registers' RAX register as the argument to _Unwind_Resume. 
@@ -879,6 +881,7 @@ pub fn unwind_resume(unwinding_context_ptr: usize) -> ! {
 
     match continue_unwinding(unwinding_context_ptr) {
         Ok(()) => {
+            #[cfg(not(downtime_eval))]
             debug!("unwind_resume(): continue_unwinding() returned Ok(), meaning it's at the end of the call stack.");
         }
         Err(e) => {
@@ -903,6 +906,7 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
         let t = current_task.lock();
         t.failure_cleanup_function.clone()
     };
+    #[cfg(not(downtime_eval))]
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     failure_cleanup_function(current_task, cause)
 }
