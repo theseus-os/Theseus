@@ -9,6 +9,7 @@
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
+#[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;
 extern crate task;
@@ -229,4 +230,36 @@ pub fn print_fault_log() {
         println_both!("{:?}", x);
     }
     println_both!("------------------ END OF LOG --------------------------");
+}
+
+/// Add a `FaultEntry` to fault log.
+pub fn log_handled_fault(fe: FaultEntry){
+    FAULT_LIST.lock().push(fe);
+}
+
+/// Provides the most recent entry in the log for given crate
+/// Utility function for iterative crate replacement
+pub fn get_the_most_recent_match(error_crate : &str) -> Option<FaultEntry> {
+
+    #[cfg(not(downtime_eval))]
+    debug!("getting the most recent match");
+
+    let mut fe :Option<FaultEntry> = None;
+    for fault_entry in FAULT_LIST.lock().iter() {
+        if let Some(crate_error_occured) = &fault_entry.crate_error_occured {
+            let error_crate_name = crate_error_occured.clone();
+            let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
+            if error_crate_name_simple == error_crate {
+                let item = fault_entry.clone();
+                fe = Some(item);
+            }
+        }
+    }
+
+    if fe.is_none(){
+
+        #[cfg(not(downtime_eval))]
+        debug!("No recent entries for the given crate {}", error_crate);
+    }
+    fe
 }

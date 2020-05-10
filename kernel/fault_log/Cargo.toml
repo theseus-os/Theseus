@@ -27,3 +27,8 @@ path = "../task"
 
 [dependencies.apic]
 path = "../apic"
+
+[dependencies.log]
+default-features = false
+version = "0.4.8"
+
