@@ -15,9 +15,6 @@ extern crate qp_trie;
 extern crate path;
 extern crate by_address;
 
-#[cfg(loscd_eval)]
-extern crate hpet;
-
 use core::{
     fmt,
     ops::Deref,
@@ -256,7 +253,7 @@ pub fn swap_crates(
             error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", old_crate_ref);
             "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
         })?;
-        
+
         let new_crate_ref = if is_optimized {
             debug!("swap_crates(): OPTIMIZED: looking for new crate {:?} in cache", new_crate_name);
             namespace_of_new_crates.get_crate(&new_crate_name)
@@ -273,7 +270,7 @@ pub fn swap_crates(
             let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| 
                 "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?"
             )?;
-            
+
             // currently we're always clearing out the new crate's reexports because we recalculate them every time
             new_crate.reexported_symbols.clear();
 
