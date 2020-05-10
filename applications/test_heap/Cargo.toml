@@ -34,3 +34,6 @@ path = "../../kernel/libtest"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
+[dependencies.heap]
+path = "../../kernel/heap"
+

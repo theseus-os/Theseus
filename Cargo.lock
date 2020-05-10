@@ -58,7 +58,6 @@ dependencies = [
  "kernel_config 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
- "pause 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -255,7 +254,6 @@ dependencies = [
  "multiple_heaps 0.1.0",
  "network_manager 0.1.0",
  "ota_update_client 0.1.0",
- "pause 0.1.0",
  "print 0.1.0",
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
@@ -675,12 +673,27 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "fault_crate_swap"
+version = "0.1.0"
+dependencies = [
+ "crate_swap 0.1.0",
+ "fault_log 0.1.0",
+ "fs_node 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "path 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "print 0.1.0",
  "task 0.1.0",
@@ -1084,6 +1097,7 @@ dependencies = [
  "apic 0.1.0",
  "atomic 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "hpet 0.1.0",
  "libm 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1354,6 +1368,7 @@ name = "multiple_heaps"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "heap 0.1.0",
  "intrusive-collections 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1362,6 +1377,8 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "slabmalloc 0.7.0",
+ "slabmalloc_safe 0.7.0",
+ "slabmalloc_unsafe 0.7.0",
  "static_assertions 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2134,6 +2151,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "slabmalloc_safe"
+version = "0.7.0"
+dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+]
+
+[[package]]
+name = "slabmalloc_unsafe"
+version = "0.7.0"
+dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "smoltcp"
 version = "0.5.0"
 source = "git+https://github.com/m-labs/smoltcp#0fedb1db9aa26712830822dd61f065deaa34d611"
@@ -2162,6 +2194,8 @@ dependencies = [
  "catch_unwind 0.1.0",
  "context_switch 0.1.0",
  "debugit 0.1.0",
+ "fault_crate_swap 0.1.0",
+ "fault_log 0.1.0",
  "fs_node 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2169,6 +2203,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "path 0.1.0",
+ "pause 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
  "task 0.1.0",
@@ -2402,8 +2437,10 @@ name = "test_restartable"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "terminal_print 0.1.0",
 ]
 

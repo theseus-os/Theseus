@@ -1,0 +1,20 @@
+[package]
+name = "slabmalloc_safe"
+version = "0.7.0"
+authors = ["Ramla Ijaz <ijazramla@gmail.com", "Gerd Zellweger <mail@gerdzellweger.com>"]
+description = "Simple slab based malloc implementation in rust. A version of the slabmalloc crate that uses only safe features"
+homepage = "https://github.com/gz/rust-slabmalloc"
+license = "MIT"
+
+keywords = ["os", "malloc", "slab", "alloc", "memory"]
+
+[features]
+unstable = []
+default = [ "unstable" ]
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.memory]
+path = "../memory"
+

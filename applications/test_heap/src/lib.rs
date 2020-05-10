@@ -2,6 +2,7 @@
 
 extern crate alloc;
 #[macro_use] extern crate terminal_print;
+#[macro_use] extern crate log;
 extern crate hpet;
 extern crate hashbrown;
 extern crate qp_trie;
@@ -10,32 +11,46 @@ extern crate runqueue;
 extern crate libtest;
 extern crate spawn;
 extern crate getopts;
+extern crate heap;
 
 use alloc::{
     string::{String, ToString},
     vec::Vec,
-    collections::{BTreeSet,BTreeMap}
+    collections::{BTreeSet,BTreeMap},
 };
+#[cfg(direct_access_to_multiple_heaps)]
+use alloc::alloc::Layout;
 use hpet::get_hpet;
 use hashbrown::HashMap;
 use qp_trie::{Trie, wrapper::BString};
 use getopts::{Matches, Options};
 use libtest::*;
-use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+#[cfg(not(direct_access_to_multiple_heaps))]
+use heap::GLOBAL_ALLOCATOR as ALLOCATOR;
+
+#[cfg(direct_access_to_multiple_heaps)]
+use heap::DEFAULT_ALLOCATOR as ALLOCATOR;
 
 mod threadtest;
-use threadtest::{NTHREADS, do_threadtest};
+use threadtest::{OBJSIZE, LARGE_SIZE, do_threadtest};
+
+mod shbench;
+use shbench::{MAX_BLOCK_SIZE, MIN_BLOCK_SIZE, MAX_LARGE, MIN_LARGE, do_shbench};
 
 const ITERATIONS: u64 = 10_000;
 const TRIES: u64 = 10;
 const CAPACITY: [usize; 10] = [8,16,32,64,128,256,512,1024,2048,4096];
 const VERBOSE: bool = false;
-
+pub static NTHREADS: AtomicUsize = AtomicUsize::new(1);
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optopt("t", "threads", "number of worker threads to spawn on separate cores for threadtest", "THREADS");
+    opts.optopt("t", "threads", "total number of worker threads to spawn across all cores for threadtest or shbench", "THREADS");
+    opts.optopt("i", "iterations", "number of iterations to run for threadtest or shbench", "ITERATIONS");
+    opts.optopt("o", "objects", "total number of objects to be allocated by all threads in threadtest", "OBJECTS");
 
     opts.optflag("", "vector", "run the test with a vector as the heap based data structure");
     opts.optflag("", "hashmap", "run the test with a hashmap as the heap based data structure");
@@ -43,6 +58,9 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("", "btreeset", "run the test with a btreeset as the heap based data structure");
     opts.optflag("", "qptrie", "run the test with a qp-trie as the heap based data structure");
     opts.optflag("", "threadtest", "run the threadtest heap benchmark");
+    opts.optflag("", "shbench", "run the shbench heap benchmark");
+    opts.optflag("", "large", "run threadtest or shbench for large allocations");
+
 
     
     let matches = match opts.parse(&args) {
@@ -95,13 +113,81 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
         do_qptrie();
     }
     else if matches.opt_present("threadtest") {
+        if matches.opt_present("large") {
+            OBJSIZE.store(LARGE_SIZE, Ordering::SeqCst);
+        }
+        if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
+            threadtest::NITERATIONS.store(iterations, Ordering::SeqCst);
+        }
+        if let Some(objects) = matches.opt_str("o").and_then(|i| i.parse::<usize>().ok()) {
+            threadtest::NOBJECTS.store(objects, Ordering::SeqCst);
+        }
         do_threadtest()?;
+    }
+    else if matches.opt_present("shbench") {
+        if matches.opt_present("large") {
+            MAX_BLOCK_SIZE.store(MAX_LARGE, Ordering::SeqCst);
+            MIN_BLOCK_SIZE.store(MIN_LARGE, Ordering::SeqCst);
+        }
+        if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
+            shbench::NITERATIONS.store(iterations, Ordering::SeqCst);
+        }
+        do_shbench()?;
     }
     else {
         return Err("Unknown command")
     }
 
     Ok(())
+}
+
+#[cfg(direct_access_to_multiple_heaps)]
+/// Returns the overhead in hpet ticks of trying to access the multiple heaps through its Once wrapper.
+fn overhead_of_accessing_multiple_heaps() -> Result<u64, &'static str> {
+	const TRIES: u64 = 100;
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+
+	for _ in 0..TRIES {
+		let overhead = overhead_of_accessing_multiple_heaps_inner()?;
+		tries += overhead;
+		if overhead > max {max = overhead;}
+		if overhead < min {min = overhead;}
+	}
+
+	let overhead = tries / TRIES as u64;
+	let err = (overhead * 10 + overhead * THRESHOLD_ERROR_RATIO) / 10;
+	if 	max - overhead > err || overhead - min > err {
+		warn!("overhead_of_accessing_multiple_heaps diff is too big: {} ({} - {}) ctr", max-min, max, min);
+	}
+	Ok(overhead)
+}
+
+#[cfg(direct_access_to_multiple_heaps)]
+/// Internal function that actually calculates overhead of accessing multiple heaps. 
+/// Only tries to access the multiple heaps once since if we try to run many iterations the loop is optimized away. 
+/// Returns value in hpet ticks.
+fn overhead_of_accessing_multiple_heaps_inner() -> Result<u64, &'static str> {
+    let hpet = get_hpet(); 
+    let start = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+ 
+    let allocator = match ALLOCATOR.try() {
+        Some(allocator) => allocator,
+        None => {
+            error!("Multiple heaps not initialized!");
+            return Err("Multiple heaps not initialized!");
+        }
+    };
+
+
+    let end = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();    
+
+    let layout = Layout::from_size_align(8, 8).unwrap();
+    let ptr = unsafe {allocator.alloc(layout)};
+    unsafe{allocator.dealloc(ptr, layout)};
+
+    Ok(end-start)
 }
 
 
