@@ -177,7 +177,7 @@ pub fn do_self_swap(
         "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
     })?;
 
-    // Find the address range of the newl loaded crate
+    // Find the address range of the newly loaded crate
     {
         return_struct.new_text = new_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
         return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
