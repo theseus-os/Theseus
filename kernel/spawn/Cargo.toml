@@ -49,6 +49,12 @@ path = "../path"
 [dependencies.fs_node]
 path = "../fs_node"
 
+[dependencies.fault_crate_swap]
+path = "../fault_crate_swap"
+
+[dependencies.fault_log]
+path = "../fault_log"
+
 [dependencies.pause]
 path = "../pause"
 
