@@ -25,6 +25,9 @@ extern crate wait_queue;
 extern crate task;
 extern crate scheduler;
 
+#[cfg(downtime_eval)]
+extern crate hpet;
+
 use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
@@ -214,7 +217,7 @@ impl <T: Send> Sender<T> {
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
 
         #[cfg(downtime_eval)]
-        let value = get_hpet().as_ref().unwrap().get_counter();
+        let value = hpet::get_hpet().as_ref().unwrap().get_counter();
         // debug!("Value {} {}", value, value % 1024);
 
         // trace!("rendezvous: send() entry");

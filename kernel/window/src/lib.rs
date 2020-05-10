@@ -330,7 +330,7 @@ impl Window {
     pub fn render(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
 
         // Induced bug rendering attempting to access out of bound memory
-        #[cfg(downtime_eval)]
+        //#[cfg(downtime_eval)]
         {
             if(bounding_box.unwrap().top_left == Coord::new(150,150)){
                 unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }

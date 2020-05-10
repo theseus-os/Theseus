@@ -902,6 +902,10 @@ impl TaskRef {
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
+
+    pub fn is_restartable(&self) -> bool {
+        self.0.deref().0.lock().restart_info.is_some()
+    }
 }
 
 impl PartialEq for TaskRef {

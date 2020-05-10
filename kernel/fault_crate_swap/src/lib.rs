@@ -426,6 +426,7 @@ fn simple_swap_policy() -> Option<String> {
     #[cfg(not(downtime_eval))]
     debug!("Running simple swap policy");
 
+    fault_log::print_fault_log();
     // We get all unhanlded faults
     let unhandled_list: Vec<FaultEntry> = remove_unhandled_exceptions();
     if unhandled_list.is_empty(){

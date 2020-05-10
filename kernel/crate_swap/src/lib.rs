@@ -675,11 +675,8 @@ pub fn swap_crates(
 
         let source_dir_ref = namespace_of_new_crates.dir().deref();
         let dest_dir_ref   = new_namespace.dir().deref();
-        // // If the directories are the same (not overridden), we don't need to do anything.
-        // if Arc::ptr_eq(source_dir_ref, dest_dir_ref) {
-        //     trace!("swap_crates(): skipping crate file swap for {:?}", req);
-        //     continue;
-        // }
+
+        // debug!("source dir ref : {:?} dest_dir_ref : {:?}", source_dir_ref.lock().get_absolute_path(), dest_dir_ref.lock().get_absolute_path());
 
         // Move the new crate object file from the temp namespace dir into the namespace dir that it belongs to.
         if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
@@ -705,8 +702,8 @@ pub fn swap_crates(
                     error!("BUG: swap_crates(): couldn't remove old crate's object file {:?} from old namespace {:?}.", old_crate_object_file.lock().get_name(), old_namespace.name());
                     "BUG: swap_crates(): couldn't remove old crate's object file from old namespace!"
                 })?;
-                removed_old_crate_file.set_parent_dir(Arc::downgrade(source_dir_ref));
-                if let Some(_f) = source_dir_ref.lock().insert(removed_old_crate_file)? {
+                removed_old_crate_file.set_parent_dir(Arc::downgrade(dest_dir_ref));
+                if let Some(_f) = dest_dir_ref.lock().insert(removed_old_crate_file)? {
                     // This is not necessarily a problem, but is currently unexpected behavior.
                     warn!("swap_crates(): unexpectedly replaced file {:?} that was in source directory {:?}", _f.get_name(), source_dir_ref.lock().get_absolute_path());
                 } 

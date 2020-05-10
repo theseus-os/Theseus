@@ -18,6 +18,11 @@ extern crate wait_queue;
 extern crate mpmc;
 extern crate atomic;
 
+#[cfg(downtime_eval)]
+extern crate hpet;
+#[cfg(downtime_eval)]
+extern crate task;
+
 use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
@@ -193,7 +198,7 @@ impl <T: Send> Sender<T> {
         // Injected Randomized fault : Page fault
         #[cfg(downtime_eval)]
         {
-            let value = get_hpet().as_ref().unwrap().get_counter();
+            let value = hpet::get_hpet().as_ref().unwrap().get_counter();
             // debug!("Value {} {}", value, value % 1024);
 
             match task::get_my_current_task() {

@@ -490,9 +490,12 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
             *tfa_boxed // un-box it
         };
         let (func, arg) = (task_func_arg.func, task_func_arg.arg);
+
+        #[cfg(not(downtime_eval))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
             curr_task_name, debugit!(func), core::any::type_name::<F>(), debugit!(arg)
         );
+        
         (func, arg)
     };
 

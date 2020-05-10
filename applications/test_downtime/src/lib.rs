@@ -318,6 +318,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("w", "window", "measures downtime of window");
     opts.optflag("a", "async", "measures downtime of IPC connection based on async channel");
+    opts.optflag("r", "rendezvous", "measures downtime of IPC connection based on rendezvous channel");
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -329,6 +330,18 @@ pub fn main(args: Vec<String>) -> isize {
     };
     
     let arg_val = 0;
+
+    if matches.opt_present("h") {
+        print_usage(opts);
+        return 0;
+    }
+
+    // #[cfg(all(not(downtime_eval), not(loscd_eval)))]
+    // {
+    //     println!("Compile with downtime_eval and loscd_eval cfg options to run the tests");
+    //     return 0;
+    // }
+
     if matches.opt_present("w"){
 
         set_graphics_measuring_task();
@@ -393,7 +406,7 @@ fn fault_graphics_task(_arg_val: usize) -> Result<(), &'static str>{
 
     // This task draws a circile on the cordinates received from the watch thread
     {
-        debug!("Starting the fault task");
+        // debug!("Starting the fault task");
         let window_wrap =  Window::new(
             Coord::new(500,50),
             500,
