@@ -118,12 +118,7 @@ pub fn do_self_swap(
     debug!("{:?}",old_crate_ref);
 
     {
-        let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
-            error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", old_crate_ref);
-            "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
-        })?;
-
-
+        let old_crate = old_crate_ref.lock_as_ref();
         // Find the text, data and rodata ranges of old crate
         return_struct.old_text = old_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
         return_struct.old_rodata = old_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
@@ -171,17 +166,13 @@ pub fn do_self_swap(
             return Err("Cannot get reference".to_string());
         }
     };
-
-    let new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| {
-        error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", new_crate_ref);
-        "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
-    })?;
-
+    
     // Find the address range of the newly loaded crate
     {
-        return_struct.new_text = new_crate.text_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        let new_crate = new_crate_ref.lock_as_ref();
+        return_struct.new_text   = new_crate.text_pages  .as_ref().map(|(_mp, addr_range)| addr_range.clone());
         return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
-        return_struct.new_data = new_crate.data_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
+        return_struct.new_data   = new_crate.data_pages  .as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
         if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
                 debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
