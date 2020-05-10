@@ -662,18 +662,6 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
     remove_current_task_from_runqueue(&current_task);
 
     {
-        // let mut rbp: usize;
-        // let mut rsp: usize;
-        // let mut rip: usize;
-
-        // #[cfg(not(downtime_eval))]
-        // {
-        //     unsafe{
-        //         asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-        //     }
-        //     debug!("BEFORE : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
-        // }
-
         let mut se = SwapRanges::default();
 
         // Get the crate we should swap. Will be None if nothing is picked
@@ -690,15 +678,6 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
                 }
             }
         }
-
-        // #[cfg(not(downtime_eval))]
-        // {
-        //     unsafe{
-        //         asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-        //     }
-        //     debug!("AFTER : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
-        // }
-
 
         // Re-spawn a new instance of the task if it was spawned as a restartable task. 
         // We must not hold the current task's lock when calling spawn().

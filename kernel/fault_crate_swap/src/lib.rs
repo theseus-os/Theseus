@@ -354,15 +354,6 @@ pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
         verbose
     );
 
-    // let mut rbp: usize;
-    // let mut rsp: usize;
-    // let mut rip: usize;
-
-    // unsafe{
-    //     asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-    // }
-    // debug!("rmain : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
-
     let swap_ranges = match swap_result {
         Ok(x) => {
 
@@ -389,12 +380,6 @@ pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
 
     #[cfg(not(downtime_eval))]
     debug!("Bottom and top of stack are{:X} {:X}", bottom, top);
-
-
-    // On x86 you cannot directly read the value of the instruction pointer (RIP),
-    // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)
-    // asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-    // debug!("register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
 
     //let mut x = rsp - 8;
     #[cfg(not(downtime_eval))]
