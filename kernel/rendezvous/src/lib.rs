@@ -24,12 +24,14 @@ extern crate irq_safety;
 extern crate wait_queue;
 extern crate task;
 extern crate scheduler;
+extern crate atomic;
 
-use core::fmt;
+use core::{fmt, sync::atomic::Ordering};
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
 use spin::Mutex;
 use wait_queue::{WaitQueue, WaitGuard, WaitError};
+use atomic::Atomic;
 
 
 /// A wrapper type for an `ExchangeSlot` that is used for sending only.
@@ -133,6 +135,7 @@ pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
         slot: ExchangeSlot::new(),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
+        channel_status: Atomic::new(ChannelStatus::Connected)
     });
     (
         Sender   { channel: channel.clone() },
@@ -140,6 +143,43 @@ pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
     )
 }
 
+/// Indicates whether channel is Connected or Disconnected
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ChannelStatus {
+    /// Channel is working. Initially channel is created with Connected status.
+    Connected,
+    /// Set to Disconnected when one end is dropped.
+    Disconnected,
+}
+
+/// Error type for tracking different type of errors sender and receiver 
+/// can encounter.
+#[derive(Debug, PartialEq)]
+pub enum ChannelError {
+    /// The Exchange slot was dropped by other end of the channel
+    SlotDropped,
+    /// The channel was in an invalid state before begining operations
+    InvalidInitialState,
+    /// Occurs when one end of channel is dropped
+    ChannelDisconnected,
+    /// Occurs when an error occur in `WaitQueue`
+    WaitError(wait_queue::WaitError),
+    /// Tasking system did not return current task when needed
+    TaskSubsystemFailure
+}
+
+/// Implemented this in case some function needs to convert error to a string 
+impl From<ChannelError> for &'static str {
+    fn from(error: ChannelError) -> &'static str {
+        match error {
+            ChannelError::SlotDropped           => "SlotDropped",
+            ChannelError::InvalidInitialState   => "InvalidInitialState",
+            ChannelError::ChannelDisconnected   => "ChannelDisconnected",
+            ChannelError::WaitError(..)         => "WaitError",
+            ChannelError::TaskSubsystemFailure  => "TaskSubsystemFailure",
+        }
+    }
+}
 
 
 /// The inner channel for synchronous rendezvous-based communication
@@ -159,6 +199,7 @@ struct Channel<T: Send> {
     slot: ExchangeSlot<T>,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
+    channel_status: Atomic<ChannelStatus>
 }
 impl<T: Send> Channel<T> {
     /// Obtain a sender slot, blocking until one is available.
@@ -198,6 +239,12 @@ impl<T: Send> Channel<T> {
     fn try_take_receiver_slot(&self) -> Option<ReceiverSlot<T>> {
         self.slot.take_receiver_slot()
     }
+
+    /// Returns true if the channel is disconnected.
+    #[inline(always)]
+    fn is_disconnected(&self) -> bool {
+        self.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected
+    }
 }
 
 
@@ -210,12 +257,12 @@ impl <T: Send> Sender<T> {
     /// 
     /// Returns `Ok(())` if the message was sent and received successfully,
     /// otherwise returns an error. 
-    pub fn send(&self, msg: T) -> Result<(), &'static str> {
+    pub fn send(&self, msg: T) -> Result<(), ChannelError> {
         // trace!("rendezvous: send() entry");
-        let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
+        let curr_task = task::get_my_current_task().ok_or(ChannelError::TaskSubsystemFailure)?;
 
         // obtain a sender-side exchange slot, blocking if necessary
-        let sender_slot = self.channel.take_sender_slot().map_err(|_| "failed to take_sender_slot")?;
+        let sender_slot = self.channel.take_sender_slot().map_err(|wait_error| ChannelError::WaitError(wait_error))?;
 
         // Here, either the sender (this task) arrived first and needs to wait for a receiver,
         // or a receiver has already arrived and is waiting for a sender. 
@@ -249,18 +296,26 @@ impl <T: Send> Sender<T> {
         };
         // In the above block, we handled advancing the state of the exchange slot. 
         // Now we need to handle other stuff (like notifying waiters) without holding the sender_slot lock.
+
+        
         match retval {
             Some(Ok(receiver_to_notify)) => {
                 drop(receiver_to_notify);
                 return Ok(());
             }
-            Some(Err(e)) => {
+            Some(Err(_e)) => {
                 // Restore the sender slot and notify waiting senders.
                 self.channel.slot.replace_sender_slot(sender_slot);
                 self.channel.waiting_senders.notify_one();
-                return Err(e);
+                return Err(ChannelError::InvalidInitialState);
             }
             None => {
+                if self.channel.is_disconnected() {
+                    error!("Channel Disconnected");
+                    self.channel.slot.replace_sender_slot(sender_slot);
+                    self.channel.waiting_senders.notify_one();
+                    return Err(ChannelError::ChannelDisconnected);
+                }
                 scheduler::schedule();
             }
         }
@@ -268,11 +323,13 @@ impl <T: Send> Sender<T> {
         // Here, the sender (this task) is waiting for a receiver
         loop {
             {
+                
                 let exchange_state = sender_slot.0.lock();
+                
                 match &*exchange_state {
                     ExchangeState::WaitingForReceiver(blocked_sender, ..) => {
                         if blocked_sender.task() != curr_task {
-                            return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER");
+                            return Err(ChannelError::TaskSubsystemFailure);
                         }
                         blocked_sender.block_again();
                     }
@@ -297,7 +354,13 @@ impl <T: Send> Sender<T> {
                 state => {
                     error!("BUG: Sender (while waiting) in invalid state {:?}", state);
                     *exchange_state = state;
-                    Err("BUG: Sender (while waiting) in invalid state")
+                    if self.channel.is_disconnected() {
+                        error!("Channel Disconnected");
+                        Err(ChannelError::ChannelDisconnected)
+                    } else {
+                        // Channel will be reset to initial state if receiver slot is dropped
+                        Err(ChannelError::SlotDropped)
+                    }
                 }
             }
         };
@@ -357,12 +420,12 @@ impl <T: Send> Receiver<T> {
     /// 
     /// Returns the message if it was received properly,
     /// otherwise returns an error.
-    pub fn receive(&self) -> Result<T, &'static str> {
+    pub fn receive(&self) -> Result<T, ChannelError> {
         // trace!("rendezvous: receive() entry");
-        let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
+        let curr_task = task::get_my_current_task().ok_or(ChannelError::TaskSubsystemFailure)?;
         
         // obtain a receiver-side exchange slot, blocking if necessary
-        let receiver_slot = self.channel.take_receiver_slot().map_err(|_| "failed to take_receiver_slot")?;
+        let receiver_slot = self.channel.take_receiver_slot().map_err(|wait_error| ChannelError::WaitError(wait_error))?;
 
         // Here, either the receiver (this task) arrived first and needs to wait for a sender,
         // or a sender has already arrived and is waiting for a receiver. 
@@ -371,6 +434,7 @@ impl <T: Send> Receiver<T> {
             // Temporarily take ownership of the channel's waiting state so we can modify it;
             // the match statement below will advance the waiting state to the proper next state.
             let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::Init);
+
             match current_state {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
@@ -396,18 +460,25 @@ impl <T: Send> Receiver<T> {
         };
         // In the above block, we handled advancing the state of the exchange slot. 
         // Now we need to handle other stuff (like notifying waiters) without holding the receiver_slot lock.
+
+        
         match retval {
             Some(Ok((sender_to_notify, msg))) => {
                 drop(sender_to_notify);
                 return Ok(msg);
             }
-            Some(Err(e)) => {
+            Some(Err(_e)) => {
                 // Restore the receiver slot and notify waiting receivers.
                 self.channel.slot.replace_receiver_slot(receiver_slot);
                 self.channel.waiting_receivers.notify_one();
-                return Err(e);
+                return Err(ChannelError::InvalidInitialState);
             }
             None => {
+                if self.channel.is_disconnected() {
+                    self.channel.slot.replace_receiver_slot(receiver_slot);
+                    self.channel.waiting_receivers.notify_one();
+                    return Err(ChannelError::ChannelDisconnected);
+                }
                 scheduler::schedule();
             }
         }
@@ -420,7 +491,7 @@ impl <T: Send> Receiver<T> {
                     ExchangeState::WaitingForSender(blocked_receiver) => {
                         warn!("spurious wakeup while receiver is WaitingForSender... re-blocking task.");
                         if blocked_receiver.task() != curr_task {
-                            return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER");
+                            return Err(ChannelError::TaskSubsystemFailure);
                         }
                         blocked_receiver.block_again();
                     }
@@ -446,7 +517,13 @@ impl <T: Send> Receiver<T> {
                 state => {
                     error!("BUG: Receiver (at end) in invalid state {:?}", state);
                     *exchange_state = state;
-                    Err("BUG: Receiver (at end) in invalid state")
+                    if self.channel.is_disconnected() {
+                        error!("Channel Disconnected");
+                        Err(ChannelError::ChannelDisconnected)
+                    } else {
+                        // Channel will be reset to initial state if sender slot is dropped
+                        Err(ChannelError::SlotDropped)
+                    }
                 }
             }
         };
@@ -475,5 +552,148 @@ impl <T: Send> Receiver<T> {
     }
 }
 
+impl<T: Send> Drop for Receiver<T> {
+    fn drop(&mut self) {
+        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
 
-// TODO: implement drop for sender and receiver in order to notify the other side of a disconnect
+        loop{
+            if let Some(receiver_slot) = self.channel.try_take_receiver_slot() {
+                let retval = {
+                    let mut exchange_state = receiver_slot.0.lock();
+                    let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::Init);
+                    match current_state {
+                        ExchangeState::WaitingForReceiver(sender_to_notify, _msg) => {
+                            // Need to notify the receiver
+                            Some(sender_to_notify)
+                        }
+                        _state => {
+                            // Nothing to do
+                            None
+                        }
+                    }
+                };
+
+                match retval {
+                    Some(sender_to_notify) => {
+                        drop(sender_to_notify);
+                    }
+                    _ => {},
+                }
+
+                self.channel.slot.replace_receiver_slot(receiver_slot);
+                self.channel.waiting_receivers.notify_one();
+                break;
+            }
+        }
+        // trace!("Dropped the receiver");
+    }
+}
+
+impl<T: Send> Drop for Sender<T> {
+    fn drop(&mut self) {
+        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
+
+        loop{
+            if let Some(sender_slot) = self.channel.try_take_sender_slot() {
+                let retval = {
+                    let mut exchange_state = sender_slot.0.lock();
+                    let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::Init);
+                    match current_state {
+                        ExchangeState::WaitingForSender(receiver_to_notify) => {
+                            // Need to notify the receiver
+                            Some(receiver_to_notify)
+                        }
+                        _state => {
+                            // Nothing to do
+                            None
+                        }
+                    }
+                };
+
+                match retval {
+                    Some(receiver_to_notify) => {
+                        drop(receiver_to_notify);
+                    }
+                    _ => {},
+                }
+
+                self.channel.slot.replace_sender_slot(sender_slot);
+                self.channel.waiting_senders.notify_one();
+                break;
+            }
+        }
+        // trace!("Dropped the sender");
+    }
+}
+
+impl<T> Drop for SenderSlot<T> {
+    fn drop(&mut self) {
+        let success = {
+            // if senderslot got dropped at SenderFinishedFirst stage we are fine
+            let exchange_state = self.0.lock();
+            match &*exchange_state {
+                ExchangeState::SenderFinishedFirst(..) => true,
+                _ => false,
+            }
+        };
+        if !success {
+            let retval = {
+                let mut exchange_state = self.0.lock();
+                let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::Init);
+                match current_state {
+                    ExchangeState::WaitingForSender(receiver_to_notify) => {
+                        // Need to notify the receiver
+                        Some(receiver_to_notify)
+                    }
+                    _ => {
+                        // Nothing to do
+                        None
+                    }
+                }
+            };
+            match retval {
+                Some(receiver_to_notify) => {
+                    drop(receiver_to_notify);
+                }
+                _ => {},
+            }
+        }
+        // trace!("Sender slot dropped")
+    }
+}
+
+impl<T> Drop for ReceiverSlot<T> {
+    fn drop(&mut self) {
+        let success = {
+            // if receiverslot got dropped at ReceiverFinishedFirst stage we are fine
+            let exchange_state = self.0.lock();
+            match &*exchange_state {
+                ExchangeState::ReceiverFinishedFirst => true,
+                _ => false,
+            }
+        };
+        if !success {
+            let retval = {
+                let mut exchange_state = self.0.lock();
+                let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::Init);
+                match current_state {
+                    ExchangeState::WaitingForReceiver(sender_to_notify, _msg) => {
+                        // Need to notify the receiver
+                        Some(sender_to_notify)
+                    }
+                    _ => {
+                        // Nothing to do
+                        None
+                    }
+                }
+            };
+            match retval {
+                Some(sender_to_notify) => {
+                    drop(sender_to_notify);
+                }
+                _ => {},
+            }
+        }
+        // trace!("Receiver Slot dropped");
+    }
+}

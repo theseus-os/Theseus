@@ -7,6 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
+atomic = { version = "0.4.4", features = [ "nightly" ] }
 
 [dependencies.log]
 version = "0.4.8"
