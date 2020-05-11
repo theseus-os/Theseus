@@ -683,6 +683,7 @@ pub fn swap_crates(
         let dest_dir_ref   = new_namespace.dir().deref();
         // // If the directories are the same (not overridden), we don't need to do anything.
         if Arc::ptr_eq(&source_dir_ref, dest_dir_ref) {
+            #[cfg(not(downtime_eval))]
             trace!("swap_crates(): skipping crate file swap for {:?}", req);
             continue;
         }
