@@ -673,7 +673,7 @@ pub fn swap_crates(
     for req in swap_requests.iter() {
         let SwapRequest { old_crate_name, old_namespace, new_crate_object_file, new_namespace, reexport_new_symbols_as_old: _ } = req;
 
-        let source_dir_ref = new_crate_object_file.lock().get_parent_dir().ok_or("Cannot get parent directory")?;
+        let source_dir_ref = new_crate_object_file.lock().get_parent_dir().ok_or("BUG: new_crate_object_file has no parent directory")?;
         let dest_dir_ref   = new_namespace.dir().deref();
         // // If the directories are the same (not overridden), we don't need to do anything.
         if Arc::ptr_eq(&source_dir_ref, dest_dir_ref) {
