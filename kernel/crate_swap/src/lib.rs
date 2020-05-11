@@ -676,10 +676,10 @@ pub fn swap_crates(
         let source_dir_ref = new_crate_object_file.lock().get_parent_dir().ok_or("Cannot get parent directory")?;
         let dest_dir_ref   = new_namespace.dir().deref();
         // // If the directories are the same (not overridden), we don't need to do anything.
-        // if Arc::ptr_eq(source_dir_ref, dest_dir_ref) {
-        //     trace!("swap_crates(): skipping crate file swap for {:?}", req);
-        //     continue;
-        // }
+        if Arc::ptr_eq(&source_dir_ref, dest_dir_ref) {
+            trace!("swap_crates(): skipping crate file swap for {:?}", req);
+            continue;
+        }
 
         // Move the new crate object file from the temp namespace dir into the namespace dir that it belongs to.
         if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
