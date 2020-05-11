@@ -765,13 +765,15 @@ pub fn swap_crates(
 /// This function obtains the lock on both `file`, the `file`'s parent directory, and the `dest_dir`. 
 fn move_file(file: &FileRef, dest_dir: &DirRef) -> Result<Option<(FileOrDir, DirRef)>, &'static str> {
     let parent = file.lock().get_parent_dir().ok_or("couldn't get file's parent directory")?;
-    if Arc::ptr_eq(&parent, dest_dir) {
-        #[cfg(not(downtime_eval))]
-        trace!("swap_crates::move_file(): skipping move between same directory {:?} for file {:?}", 
-            dest_dir.try_lock().map(|f| f.get_absolute_path()), file.try_lock().map(|f| f.get_absolute_path())
-        );
-        return Ok(None);
-    }
+    // This section is redundent as it is checked before calling the function
+    // if Arc::ptr_eq(&parent, dest_dir) {
+    //     #[cfg(not(downtime_eval))]
+    //     trace!("swap_crates::move_file(): skipping move between same directory {:?} for file {:?}", 
+    //         dest_dir.try_lock().map(|f| f.get_absolute_path()), file.try_lock().map(|f| f.get_absolute_path())
+    //     );
+    //     return Ok(None);
+    // }
+
     // Perform the actual move operation.
     let mut removed_file = parent.lock().remove(&FileOrDir::File(Arc::clone(file))).ok_or("Couldn't remove file from its parent directory")?;
     removed_file.set_parent_dir(Arc::downgrade(dest_dir));
