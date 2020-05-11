@@ -679,10 +679,13 @@ pub fn swap_crates(
     for req in swap_requests.iter() {
         let SwapRequest { old_crate_name, old_namespace, new_crate_object_file, new_namespace, reexport_new_symbols_as_old: _ } = req;
 
-        let source_dir_ref = namespace_of_new_crates.dir().deref();
+        let source_dir_ref = new_crate_object_file.lock().get_parent_dir().ok_or("BUG: new_crate_object_file has no parent directory")?;
         let dest_dir_ref   = new_namespace.dir().deref();
-
-        // debug!("source dir ref : {:?} dest_dir_ref : {:?}", source_dir_ref.lock().get_absolute_path(), dest_dir_ref.lock().get_absolute_path());
+        // // If the directories are the same (not overridden), we don't need to do anything.
+        if Arc::ptr_eq(&source_dir_ref, dest_dir_ref) {
+            trace!("swap_crates(): skipping crate file swap for {:?}", req);
+            continue;
+        }
 
         // Move the new crate object file from the temp namespace dir into the namespace dir that it belongs to.
         if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
@@ -711,8 +714,8 @@ pub fn swap_crates(
                     error!("BUG: swap_crates(): couldn't remove old crate's object file {:?} from old namespace {:?}.", old_crate_object_file.lock().get_name(), old_namespace.name());
                     "BUG: swap_crates(): couldn't remove old crate's object file from old namespace!"
                 })?;
-                removed_old_crate_file.set_parent_dir(Arc::downgrade(dest_dir_ref));
-                if let Some(_f) = dest_dir_ref.lock().insert(removed_old_crate_file)? {
+                removed_old_crate_file.set_parent_dir(Arc::downgrade(&source_dir_ref));
+                if let Some(_f) = source_dir_ref.lock().insert(removed_old_crate_file)? {
                     // This is not necessarily a problem, but is currently unexpected behavior.
                     warn!("swap_crates(): unexpectedly replaced file {:?} that was in source directory {:?}", _f.get_name(), source_dir_ref.lock().get_absolute_path());
                 } 
