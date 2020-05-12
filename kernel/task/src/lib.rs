@@ -469,14 +469,16 @@ impl Task {
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
         // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
-        if !next.is_runnable() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-            return;
-        }
-        if next.is_running() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-            return;
-        }
+
+        // task_switch is only called in schedule(), and these conditions are already checked when choosing a new task to run before calling task_switch()
+        // if !next.is_runnable() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
+        //     return;
+        // }
+        // if next.is_running() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
+        //     return;
+        // }
         if let Some(pc) = next.pinned_core {
             if pc != apic_id {
                 error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
