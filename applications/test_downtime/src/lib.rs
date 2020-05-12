@@ -265,7 +265,8 @@ fn ipc_fault_task((sender,receiver) : (StringSender, StringReceiver)) -> Result<
     let mut i = 0;
     loop {
         let msg = receiver.receive()?;
-        let value = get_hpet().as_ref().unwrap().get_counter();
+        // let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
+        // let value = hpet().get_counter();
         // warn!("test_multiple(): Received {} at {}", msg, value);
         sender.send(msg)?;
         i = i + 1;
