@@ -317,7 +317,13 @@ fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result
         let time_send = get_hpet().as_ref().unwrap().get_counter();
         // warn!("test_multiple(): Sender sending message {:08} {}", i, time_send);
         sender.send(msg)?;
-        let msg_received = receiver.receive()?;
+        let mut msg_received;
+        loop {
+            if let Ok(msg) = receiver.receive() {
+                msg_received = msg;
+                break;
+            }
+        }
         let time_received = get_hpet().as_ref().unwrap().get_counter();
 
         // If the test occured correctly we update the round trip log
@@ -434,10 +440,10 @@ pub fn main(args: Vec<String>) -> isize {
 
             debug!("Channel set up completed");
 
-            let taskref1  = new_restartable_task_builder(ipc_fault_task, (sender_reply, receiver))
+            let taskref1  = new_task_builder(ipc_fault_task, (sender_reply, receiver))
                 .name(String::from("fault_task"))
                 .pin_on_core(pick_child_core())
-                .spawn()
+                .spawn_restartable()
                 .expect("Couldn't start the restartable task"); 
 
             taskref1.join().expect("Task 1 join failed");
