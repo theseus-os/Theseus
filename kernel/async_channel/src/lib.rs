@@ -62,7 +62,11 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
 pub enum ChannelStatus {
     /// Channel is working. Initially channel is created with Connected status.
     Connected,
-    /// Set to Disconnected when one end is dropped.
+    /// Set to Disconnected when Sender end is dropped.
+    SenderDisconnected,
+    /// Set to Disconnected when Receiver end is dropped.
+    ReceiverDisconnected,
+    /// Set to Disconnected when Both ends are dropped.
     Disconnected,
 }
 
@@ -98,7 +102,7 @@ impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
     #[inline(always)]
     fn is_disconnected(&self) -> bool {
-        self.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected
+        self.channel_status.load(Ordering::SeqCst) != ChannelStatus::Connected
     }
 }
 
@@ -192,7 +196,11 @@ impl <T: Send> Sender<T> {
     pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelError)> {
         // first we'll check whether the channel is active
         if self.channel.is_disconnected() {
-                return Err((msg, ChannelError::ChannelDisconnected));
+                if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::SenderDisconnected {
+                    self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
+                } else {
+                    return Err((msg, ChannelError::ChannelDisconnected));
+                }
         }
 
         // Injected Randomized fault : Page fault
@@ -304,7 +312,12 @@ impl <T: Send> Receiver<T> {
             Ok(msg)
         } else {
             if self.channel.is_disconnected() {
-                Err(ChannelError::ChannelDisconnected)
+                if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::ReceiverDisconnected {
+                    self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
+                    Err(ChannelError::ChannelEmpty)
+                } else {
+                    Err(ChannelError::ChannelDisconnected)
+                }
             } else {
                 Err(ChannelError::ChannelEmpty)
             }
@@ -322,7 +335,11 @@ impl <T: Send> Receiver<T> {
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping the receiver");
-        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
+        if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::SenderDisconnected {
+            self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
+        } else if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Connected {
+            self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected, Ordering::SeqCst);
+        }
         self.channel.waiting_senders.notify_one();
     }
 }
@@ -331,7 +348,11 @@ impl<T: Send> Drop for Receiver<T> {
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping the sender");
-        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
+        if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::ReceiverDisconnected {
+            self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
+        } else if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Connected {
+            self.channel.channel_status.store(ChannelStatus::SenderDisconnected, Ordering::SeqCst);
+        }
         self.channel.waiting_receivers.notify_one();
     }
 }
