@@ -109,13 +109,13 @@ fn graphics_send_task(_arg_val: usize) -> Result<(), &'static str>{
 /// This task measures the time difference between two received responses
 fn graphics_measuring_task(_arg_val: usize) -> Result<(), &'static str>{
 
-
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let mut vec = Vec::with_capacity(200);
 
     let mut start_hpet: u64;
     let mut end_hpet: u64;
 
-    start_hpet = get_hpet().as_ref().unwrap().get_counter();
+    start_hpet = hpet.get_counter();
     warn!("TEST MSG : RECEIVE STARTED");
     let mut send_val: usize = 0;
     let mut count = 1;
@@ -128,7 +128,7 @@ fn graphics_measuring_task(_arg_val: usize) -> Result<(), &'static str>{
         let mut element = DOWNTIME_RECEIVE_LOCK.lock();
         if(element.user == 0){
             element.user = 1;
-            end_hpet = get_hpet().as_ref().unwrap().get_counter();
+            end_hpet = hpet.get_counter();
             element.count = count;
 
             // We actually measure the time between two responses - inverse throughoutput
@@ -306,6 +306,7 @@ fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result
     // Cyclic buffer to store the round trip times
     let mut array: [u64; 128] = [0; 128];
     let mut i = 0;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     // received the initial config message (we need this to prevent deadlock in task restarts)
     receiver.receive()?;
@@ -314,7 +315,7 @@ fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result
         let msg = format!("{:08}", i);
         let msg_copy = format!("{:08}", i);
 
-        let time_send = get_hpet().as_ref().unwrap().get_counter();
+        let time_send = hpet.get_counter();
         // warn!("test_multiple(): Sender sending message {:08} {}", i, time_send);
         sender.send(msg)?;
         let mut msg_received;
@@ -324,7 +325,7 @@ fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result
                 break;
             }
         }
-        let time_received = get_hpet().as_ref().unwrap().get_counter();
+        let time_received = hpet.get_counter();
 
         // If the test occured correctly we update the round trip log
         if msg_copy == msg_received {
