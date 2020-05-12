@@ -86,7 +86,7 @@ macro_rules! println_both {
 /// 
 #[inline(never)]
 fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
-    #[cfg(unwind_exceptions)] {
+    #[cfg(all(unwind_exceptions, not(downtime_eval)))] {
         println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
     }
     #[cfg(not(unwind_exceptions))] {
@@ -347,6 +347,8 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
 /// exception 0x0e
 pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
+
+    #[cfg(not(downtime_eval))]
     println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#X}\nerror code: \
                                   {:?}\n{:#?}\n",
              control_regs::cr2(),

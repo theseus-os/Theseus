@@ -328,6 +328,15 @@ impl Window {
     /// 
     /// This method should be invoked after updating the window's contents in order to see its new content.
     pub fn render(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
+
+        // Induced bug rendering attempting to access out of bound memory
+        #[cfg(downtime_eval)]
+        {
+            if(bounding_box.unwrap().top_left == Coord::new(150,150)){
+                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+            }
+        }
+
         let wm_ref = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?;
 
         // Convert the given relative `bounding_box` to an absolute one (relative to the screen, not the window).

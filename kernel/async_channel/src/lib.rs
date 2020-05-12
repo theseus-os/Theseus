@@ -18,6 +18,11 @@ extern crate wait_queue;
 extern crate mpmc;
 extern crate atomic;
 
+#[cfg(downtime_eval)]
+extern crate hpet;
+#[cfg(downtime_eval)]
+extern crate task;
+
 use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
@@ -57,8 +62,10 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
 pub enum ChannelStatus {
     /// Channel is working. Initially channel is created with Connected status.
     Connected,
-    /// Set to Disconnected when one end is dropped.
-    Disconnected,
+    /// Set to Disconnected when Sender end is dropped.
+    SenderDisconnected,
+    /// Set to Disconnected when Receiver end is dropped.
+    ReceiverDisconnected,
 }
 
 /// Error type for tracking different type of errors sender and receiver 
@@ -93,11 +100,18 @@ impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
     #[inline(always)]
     fn is_disconnected(&self) -> bool {
-        self.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected
+        self.get_channel_status() != ChannelStatus::Connected
+    }
+
+    /// Returns the channel Status
+    #[inline(always)]
+    fn get_channel_status(&self) -> ChannelStatus {
+        self.channel_status.load(Ordering::SeqCst)
     }
 }
 
 /// The sender (transmit) side of a channel.
+#[derive(Clone)]
 pub struct Sender<T: Send> {
     channel: Arc<Channel<T>>,
 }
@@ -185,8 +199,33 @@ impl <T: Send> Sender<T> {
     /// If no buffer space is available, it returns the `msg`  with `ChannelError` back to the caller without blocking. 
     pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelError)> {
         // first we'll check whether the channel is active
-        if self.channel.is_disconnected() {
+        match self.channel.get_channel_status() {
+            ChannelStatus::SenderDisconnected => {
+                self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
+            },
+            ChannelStatus::ReceiverDisconnected  => {
                 return Err((msg, ChannelError::ChannelDisconnected));
+            },
+            _ => {},
+        }
+
+        // Injected Randomized fault : Page fault
+        #[cfg(downtime_eval)]
+        {
+            let value = hpet::get_hpet().as_ref().unwrap().get_counter();
+            // debug!("Value {} {}", value, value % 1024);
+
+            match task::get_my_current_task() {
+                Some(curr_task) => {
+
+                    // We restrict the fault to a specific task to make measurements consistent
+                    if (value % 4096) == 0  && curr_task.is_restartable() {
+                        // debug!("Fake error {}", value);
+                        unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+                    }
+                },
+                _ => (),
+            }
         }
 
         match self.channel.queue.push(msg) {
@@ -208,6 +247,7 @@ impl <T: Send> Sender<T> {
 }
 
 /// The receiver side of a channel.
+#[derive(Clone)]
 pub struct Receiver<T: Send> {
     channel: Arc<Channel<T>>,
 }
@@ -277,10 +317,18 @@ impl <T: Send> Receiver<T> {
             self.channel.waiting_senders.notify_one();
             Ok(msg)
         } else {
-            if self.channel.is_disconnected() {
-                Err(ChannelError::ChannelDisconnected)
-            } else {
-                Err(ChannelError::ChannelEmpty)
+            // We check whther the channel is disconnected
+            match self.channel.get_channel_status() {
+                ChannelStatus::ReceiverDisconnected => {
+                    self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
+                    Err(ChannelError::ChannelEmpty)
+                },
+                ChannelStatus::SenderDisconnected  => {
+                    Err(ChannelError::ChannelDisconnected)
+                },
+                _ => {
+                    Err(ChannelError::ChannelEmpty)
+                },
             }
         }
     }
@@ -296,7 +344,7 @@ impl <T: Send> Receiver<T> {
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping the receiver");
-        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
+        self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected, Ordering::SeqCst);
         self.channel.waiting_senders.notify_one();
     }
 }
@@ -305,7 +353,7 @@ impl<T: Send> Drop for Receiver<T> {
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping the sender");
-        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
+        self.channel.channel_status.store(ChannelStatus::SenderDisconnected, Ordering::SeqCst);
         self.channel.waiting_receivers.notify_one();
     }
 }
