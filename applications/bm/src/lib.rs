@@ -115,7 +115,7 @@ fn do_null() -> Result<(), &'static str> {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
-	let mut vec = Vec::new();
+	let mut vec = Vec::with_capacity(TRIES);
 
 	let overhead_ct = hpet_timing_overhead()?;
 	print_header(TRIES, ITERATIONS*1000);
@@ -193,7 +193,7 @@ fn do_spawn() -> Result<(), &'static str>{
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
-	let mut vec = Vec::new();
+	let mut vec = Vec::with_capacity(TRIES);
 
 	let overhead_ct = hpet_timing_overhead()?;
 	print_header(TRIES, ITERATIONS);
@@ -232,15 +232,11 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 	let mut delta_hpet = 0;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
-	// Get path to application hello that we're going to spawn
+	// Get path to application "hello" that we're going to spawn
 	let namespace_dir = task::get_my_current_task()
 		.map(|t| t.get_namespace().dir().clone())
 		.ok_or("could not find the application namespace")?;
-	let cmd_crate_name = "hello-";
-	let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
-	let app_file = matching_apps.next();
-	let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
-	let app_path = app_file.xor(second_match)
+	let app_path = namespace_dir.get_file_starting_with("hello-")
 		.map(|f| Path::new(f.lock().get_absolute_path()))
 		.ok_or("Could not find the application 'hello'")?;
 
@@ -285,7 +281,7 @@ fn do_ctx() -> Result<(), &'static str> {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
-	let mut vec = Vec::new();
+	let mut vec = Vec::with_capacity(TRIES);
 	
 	print_header(TRIES, ITERATIONS*1000*2);
 

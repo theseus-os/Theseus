@@ -467,25 +467,11 @@ impl Task {
 
     /// Switches from the current (`self`)  to the given `next` Task
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
+    /// 
+    /// # Warning
+    /// Before calling this function make sure that the `next` task is runnable, not currently running, and not pinned to another core besides `apic_id`.
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
-        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
-
-        // task_switch is only called in schedule(), and these conditions are already checked when choosing a new task to run before calling task_switch()
-        // if !next.is_runnable() {
-        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-        //     return;
-        // }
-        // if next.is_running() {
-        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-        //     return;
-        // }
-        if let Some(pc) = next.pinned_core {
-            if pc != apic_id {
-                error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
-                return;
-            }
-        }
-         
+        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);         
 
         // Change the privilege stack (RSP0) in the TSS.
         // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
