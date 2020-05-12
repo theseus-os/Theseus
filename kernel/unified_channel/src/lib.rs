@@ -31,6 +31,10 @@ pub struct StringSender {
 }
 impl StringSender {
     pub fn send(&self, msg: String) -> Result<(), &'static str> {
+        #[cfg(use_async_channel)]
+        return self.sender.send(msg).map_err("Sender returned error");
+
+        #[cfg(not(use_async_channel))]
         self.sender.send(msg)
     }
 }
@@ -44,6 +48,10 @@ pub struct StringReceiver {
 }
 impl StringReceiver {
     pub fn receive(&self) -> Result<String, &'static str> {
+        #[cfg(use_async_channel)]
+        return self.receiver.receive().map_err("Receiver returned error");
+
+        #[cfg(not(use_async_channel))]
         self.receiver.receive()
     }
 }
