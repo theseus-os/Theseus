@@ -22,6 +22,7 @@ pub fn new_string_channel(_minimum_capacity: usize) -> (StringSender, StringRece
     }
 }
 
+#[derive(Clone)]
 pub struct StringSender {
     #[cfg(use_async_channel)]
     sender: async_channel::Sender<String>,
@@ -29,12 +30,18 @@ pub struct StringSender {
     sender: rendezvous::Sender<String>, 
 }
 impl StringSender {
+    #[cfg(use_async_channel)]
+    pub fn send(&self, msg: String) -> Result<(), async_channel::ChannelError> {
+        self.sender.send(msg)
+    }
+
+    #[cfg(not(use_async_channel))]
     pub fn send(&self, msg: String) -> Result<(), &'static str> {
         self.sender.send(msg)
     }
 }
 
-
+#[derive(Clone)]
 pub struct StringReceiver {
     #[cfg(use_async_channel)]
     receiver: async_channel::Receiver<String>,
@@ -42,6 +49,12 @@ pub struct StringReceiver {
     receiver: rendezvous::Receiver<String>, 
 }
 impl StringReceiver {
+    #[cfg(use_async_channel)]
+    pub fn receive(&self) -> Result<String, async_channel::ChannelError> {
+        self.receiver.receive()
+    }
+
+    #[cfg(not(use_async_channel))]
     pub fn receive(&self) -> Result<String, &'static str> {
         self.receiver.receive()
     }

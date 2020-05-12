@@ -23,6 +23,9 @@ path = "../scheduler"
 [dependencies.wait_queue]
 path = "../wait_queue"
 
+[dependencies.hpet]
+path = "../hpet"
+
 
 [lib]
 crate-type = ["rlib"]
