@@ -100,7 +100,13 @@ impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
     #[inline(always)]
     fn is_disconnected(&self) -> bool {
-        self.channel_status.load(Ordering::SeqCst) != ChannelStatus::Connected
+        self.get_channel_status() != ChannelStatus::Connected
+    }
+
+    /// Returns the channel Status
+    #[inline(always)]
+    fn get_channel_status(&self) -> ChannelStatus {
+        self.channel_status.load(Ordering::SeqCst)
     }
 }
 
@@ -193,12 +199,14 @@ impl <T: Send> Sender<T> {
     /// If no buffer space is available, it returns the `msg`  with `ChannelError` back to the caller without blocking. 
     pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelError)> {
         // first we'll check whether the channel is active
-        if self.channel.is_disconnected() {
-                if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::SenderDisconnected {
-                    self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
-                } else {
-                    return Err((msg, ChannelError::ChannelDisconnected));
-                }
+        match self.channel.get_channel_status() {
+            ChannelStatus::SenderDisconnected => {
+                self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
+            },
+            ChannelStatus::ReceiverDisconnected  => {
+                return Err((msg, ChannelError::ChannelDisconnected));
+            },
+            _ => {},
         }
 
         // Injected Randomized fault : Page fault
@@ -309,15 +317,18 @@ impl <T: Send> Receiver<T> {
             self.channel.waiting_senders.notify_one();
             Ok(msg)
         } else {
-            if self.channel.is_disconnected() {
-                if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::ReceiverDisconnected {
+            // We check whther the channel is disconnected
+            match self.channel.get_channel_status() {
+                ChannelStatus::ReceiverDisconnected => {
                     self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
                     Err(ChannelError::ChannelEmpty)
-                } else {
+                },
+                ChannelStatus::SenderDisconnected  => {
                     Err(ChannelError::ChannelDisconnected)
-                }
-            } else {
-                Err(ChannelError::ChannelEmpty)
+                },
+                _ => {
+                    Err(ChannelError::ChannelEmpty)
+                },
             }
         }
     }
