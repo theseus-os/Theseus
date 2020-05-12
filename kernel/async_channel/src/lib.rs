@@ -66,8 +66,6 @@ pub enum ChannelStatus {
     SenderDisconnected,
     /// Set to Disconnected when Receiver end is dropped.
     ReceiverDisconnected,
-    /// Set to Disconnected when Both ends are dropped.
-    Disconnected,
 }
 
 /// Error type for tracking different type of errors sender and receiver 
@@ -335,11 +333,7 @@ impl <T: Send> Receiver<T> {
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping the receiver");
-        if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::SenderDisconnected {
-            self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
-        } else if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Connected {
-            self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected, Ordering::SeqCst);
-        }
+        self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected, Ordering::SeqCst);
         self.channel.waiting_senders.notify_one();
     }
 }
@@ -348,11 +342,7 @@ impl<T: Send> Drop for Receiver<T> {
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping the sender");
-        if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::ReceiverDisconnected {
-            self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
-        } else if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Connected {
-            self.channel.channel_status.store(ChannelStatus::SenderDisconnected, Ordering::SeqCst);
-        }
+        self.channel.channel_status.store(ChannelStatus::SenderDisconnected, Ordering::SeqCst);
         self.channel.waiting_receivers.notify_one();
     }
 }
