@@ -306,6 +306,7 @@ pub fn swap_crates(
                         )
                 }?;
 
+                #[cfg(not(loscd_eval))]
                 debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
                 old_sec.copy_section_data_to(&new_dest_sec)?;
             }
