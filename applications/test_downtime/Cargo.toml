@@ -1,0 +1,64 @@
+[package]
+name = "test_downtime"
+version = "0.1.0"
+description = "Measure the downtime when various subsystems crash"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+getopts = "0.2.21"
+spin = "0.4.10"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.apic]
+path = "../../kernel/apic"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.rendezvous]
+path = "../../kernel/rendezvous"
+
+[dependencies.async_channel]
+path = "../../kernel/async_channel"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+# for WM
+
+[dependencies.window]
+path = "../../kernel/window"
+
+[dependencies.shapes]
+path = "../../kernel/shapes"
+
+[dependencies.color]
+path = "../../kernel/color"
+
+[dependencies.framebuffer]
+path = "../../kernel/framebuffer"
+
+[dependencies.framebuffer_drawer]
+path = "../../kernel/framebuffer_drawer"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
+[dependencies.hpet]
+path = "../../kernel/hpet"
+
+[dependencies.unified_channel]
+path = "../../kernel/unified_channel" 

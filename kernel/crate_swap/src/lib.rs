@@ -15,6 +15,9 @@ extern crate qp_trie;
 extern crate path;
 extern crate by_address;
 
+#[cfg(loscd_eval)]
+extern crate hpet;
+
 use core::{
     fmt,
     ops::Deref,
@@ -173,7 +176,7 @@ pub fn swap_crates(
             let nn = CrateNamespace::new(
                 String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
                 // use the optionally-provided directory of crates instead of the current namespace's directories.
-                override_namespace_dirs.unwrap_or_else(|| this_namespace.dir().clone()),
+                override_namespace_dir.unwrap_or_else(|| this_namespace.dir().clone()),
                 None,
             );
             // Note that we only need to load the crates that are replacing already-loaded old crates in the old namespace.
@@ -253,7 +256,7 @@ pub fn swap_crates(
             error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", old_crate_ref);
             "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
         })?;
-        
+
         let new_crate_ref = if is_optimized {
             debug!("swap_crates(): OPTIMIZED: looking for new crate {:?} in cache", new_crate_name);
             namespace_of_new_crates.get_crate(&new_crate_name)
@@ -270,7 +273,7 @@ pub fn swap_crates(
             let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| 
                 "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?"
             )?;
-            
+
             // currently we're always clearing out the new crate's reexports because we recalculate them every time
             new_crate.reexported_symbols.clear();
 
@@ -320,7 +323,9 @@ pub fn swap_crates(
             // i.e., those that were previously added to this namespace's symbol map,
             // because other crates could not possibly depend on non-public sections in the old crate.
             for old_sec in old_crate.global_sections_iter() {
+                #[cfg(not(loscd_eval))]
                 debug!("swap_crates(): looking for old_sec_name: {:?}", old_sec.name);
+
                 let old_sec_ns = this_namespace.get_symbol_and_namespace(&old_sec.name)
                     .map(|(_weak_sec, ns)| ns)
                     .ok_or_else(|| {
@@ -398,9 +403,11 @@ pub fn swap_crates(
 
                     // get the section from the new crate that corresponds to the `old_sec`
                     let new_source_sec = if let Some(ref nsr) = new_sec {
+                        #[cfg(not(loscd_eval))]
                         trace!("using cached version of new source section");
                         nsr
                     } else {
+                        #[cfg(not(loscd_eval))]
                         trace!("Finding new source section from scratch");
                         let nsr = find_corresponding_new_section(&mut new_crate.reexported_symbols)?;
                         new_sec.get_or_insert(nsr)
@@ -531,6 +538,8 @@ pub fn swap_crates(
         if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove_str(old_crate_name) {
             {
                 let old_crate = old_crate_ref.lock_as_ref();
+
+                #[cfg(not(loscd_eval))]
                 info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name());
 
                 if cache_old_crates {
@@ -670,19 +679,22 @@ pub fn swap_crates(
     for req in swap_requests.iter() {
         let SwapRequest { old_crate_name, old_namespace, new_crate_object_file, new_namespace, reexport_new_symbols_as_old: _ } = req;
 
-        let source_dir_ref = namespace_of_new_crates.dir().deref();
+        let source_dir_ref = new_crate_object_file.lock().get_parent_dir().ok_or("BUG: new_crate_object_file has no parent directory")?;
         let dest_dir_ref   = new_namespace.dir().deref();
         // // If the directories are the same (not overridden), we don't need to do anything.
-        // if Arc::ptr_eq(source_dir_ref, dest_dir_ref) {
-        //     trace!("swap_crates(): skipping crate file swap for {:?}", req);
-        //     continue;
-        // }
+        if Arc::ptr_eq(&source_dir_ref, dest_dir_ref) {
+            #[cfg(not(downtime_eval))]
+            trace!("swap_crates(): skipping crate file swap for {:?}", req);
+            continue;
+        }
 
         // Move the new crate object file from the temp namespace dir into the namespace dir that it belongs to.
         if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
             // If we replaced a crate object file, put that replaced file back in the source directory, thus completing the "swap" operation.
             // (Note that the file that we replaced should be the same as the old_crate_file.) 
+            #[cfg(not(downtime_eval))]
             trace!("swap_crates(): new_crate_object_file replaced existing (old_crate) object file {:?}", replaced_old_crate_file.get_name());
+
             replaced_old_crate_file.set_parent_dir(Arc::downgrade(&original_source_dir));
             if let Some(_f) = original_source_dir.lock().insert(replaced_old_crate_file)? {
                 // There shouldn't be a similarly-named file in the original source dir anymore, since we moved it.
@@ -693,6 +705,7 @@ pub fn swap_crates(
             // If inserting the new crate object file didn't end up replacing the existing crate object file (the old_crate's object file), 
             // then we need to remove the old_crate's object file here, if one was specified. 
             if let Some(ocn) = old_crate_name {
+                #[cfg(not(downtime_eval))]
                 trace!("swap_crates(): new_crate_object_file did not replace old_crate's object file, so we're removing the old_crate's object file now");
                 let (old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, &*ocn).ok_or_else(|| {
                     error!("BUG: swap_crates(): couldn't find old crate's object file starting with {:?} in old namespace {:?}.", ocn, old_namespace.name());
@@ -702,7 +715,7 @@ pub fn swap_crates(
                     error!("BUG: swap_crates(): couldn't remove old crate's object file {:?} from old namespace {:?}.", old_crate_object_file.lock().get_name(), old_namespace.name());
                     "BUG: swap_crates(): couldn't remove old crate's object file from old namespace!"
                 })?;
-                removed_old_crate_file.set_parent_dir(Arc::downgrade(source_dir_ref));
+                removed_old_crate_file.set_parent_dir(Arc::downgrade(&source_dir_ref));
                 if let Some(_f) = source_dir_ref.lock().insert(removed_old_crate_file)? {
                     // This is not necessarily a problem, but is currently unexpected behavior.
                     warn!("swap_crates(): unexpectedly replaced file {:?} that was in source directory {:?}", _f.get_name(), source_dir_ref.lock().get_absolute_path());
@@ -723,8 +736,9 @@ pub fn swap_crates(
     }
 
 
-    #[cfg(loscd_eval)] {
+    #[cfg(all(loscd_eval, not(downtime_eval)))] {
         // done with everything, print out values
+
         warn!("
             load crates, {}
             find symbols, {}
@@ -761,12 +775,15 @@ pub fn swap_crates(
 /// This function obtains the lock on both `file`, the `file`'s parent directory, and the `dest_dir`. 
 fn move_file(file: &FileRef, dest_dir: &DirRef) -> Result<Option<(FileOrDir, DirRef)>, &'static str> {
     let parent = file.lock().get_parent_dir().ok_or("couldn't get file's parent directory")?;
-    if Arc::ptr_eq(&parent, dest_dir) {
-        trace!("swap_crates::move_file(): skipping move between same directory {:?} for file {:?}", 
-            dest_dir.lock().get_absolute_path(), file.lock().get_absolute_path()
-        );
-        return Ok(None);
-    }
+    // This section is redundent as it is checked before calling the function
+    // if Arc::ptr_eq(&parent, dest_dir) {
+    //     #[cfg(not(downtime_eval))]
+    //     trace!("swap_crates::move_file(): skipping move between same directory {:?} for file {:?}", 
+    //         dest_dir.try_lock().map(|f| f.get_absolute_path()), file.try_lock().map(|f| f.get_absolute_path())
+    //     );
+    //     return Ok(None);
+    // }
+
     // Perform the actual move operation.
     let mut removed_file = parent.lock().remove(&FileOrDir::File(Arc::clone(file))).ok_or("Couldn't remove file from its parent directory")?;
     removed_file.set_parent_dir(Arc::downgrade(dest_dir));
@@ -775,12 +792,14 @@ fn move_file(file: &FileRef, dest_dir: &DirRef) -> Result<Option<(FileOrDir, Dir
     // Log success or failure
     match res {
         Ok(replaced_file) => {
+            #[cfg(not(downtime_eval))]
             debug!("swap_crates::move_file(): moved file {:?} ({:?}) from {:?} to {:?}",
                 file.try_lock().map(|f| f.get_name()), removed_file.get_name(), parent.try_lock().map(|p| p.get_name()), dest_dir.try_lock().map(|d| d.get_name())
             );
             Ok(replaced_file.map(|f| (f, parent)))
         }
         Err(e) => {
+            #[cfg(not(downtime_eval))]
             error!("swap_crates::move_file(): failed to moved file {:?} ({:?}) from {:?} to {:?}.\n    Error: {:?}",
                 file.try_lock().map(|f| f.get_name()), removed_file.get_name(), parent.try_lock().map(|p| p.get_name()), dest_dir.try_lock().map(|d| d.get_name()), e
             );
@@ -958,11 +977,13 @@ impl SwapRequest {
         };
 
         if !Arc::ptr_eq(&old_namespace, real_old_namespace) {
+            #[cfg(not(downtime_eval))]
             trace!("SwapRequest::new(): changing old namespace from {:?} to {:?}", old_namespace.name(), real_old_namespace.name());
         }
         
         // If no new namespace was given, use the same namespace that the old crate was found in.
         let mut new_namespace = new_namespace.unwrap_or_else(|| {
+            #[cfg(not(downtime_eval))]
             trace!("SwapRequest::new(): new namespace was None, using old namespace {:?}", real_old_namespace.name());
             Arc::clone(real_old_namespace)
         });
@@ -992,6 +1013,7 @@ impl SwapRequest {
                     }
                 };
                 if !Arc::ptr_eq(&new_namespace, real_new_namespace) {
+                    #[cfg(not(downtime_eval))]
                     trace!("SwapRequest::new(): changing new namespace from {:?} to {:?}", new_namespace.name(), real_new_namespace.name());
                     new_namespace = Arc::clone(real_new_namespace);
                 }

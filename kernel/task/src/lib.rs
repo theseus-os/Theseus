@@ -619,7 +619,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        #[cfg(not(rq_eval))]
+        #[cfg(not(any(rq_eval, downtime_eval)))]
         trace!("Task::drop(): {}", self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
@@ -897,6 +897,10 @@ impl TaskRef {
     #[doc(hidden)]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
+    }
+
+    pub fn is_restartable(&self) -> bool {
+        self.0.deref().0.lock().restart_info.is_some()
     }
 }
 
