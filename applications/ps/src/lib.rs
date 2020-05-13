@@ -46,20 +46,28 @@ pub fn main(args: Vec<String>) -> isize {
     let mut task_string = String::new();
     for (id, taskref) in TASKLIST.lock().iter() {
         num_tasks += 1;
-        let task = taskref.lock();
-        let name = &task.name;
-        let runstate = match &task.runstate {
-            RunState::Initing    => "Initing",
-            RunState::Runnable   => "Runnable",
-            RunState::Blocked    => "Blocked",
-            RunState::Exited(_)  => "Exited",
-            RunState::Reaped     => "Reaped",
-        };
-        let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
-        let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
-        let task_type = if task.is_an_idle_task {"I"}
-            else if task.is_application() {"A"}
-            else {" "} ;     
+        let name;
+        let runstate;
+        let cpu;
+        let pinned; 
+        let task_type;
+        // only hold the task's lock for a short time
+        {
+            let task = taskref.lock();
+            name = task.name.clone();
+            runstate = match &task.runstate {
+                RunState::Initing    => "Initing",
+                RunState::Runnable   => "Runnable",
+                RunState::Blocked    => "Blocked",
+                RunState::Exited(_)  => "Exited",
+                RunState::Reaped     => "Reaped",
+            };
+            cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
+            pinned = task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
+            task_type = if task.is_an_idle_task {"I"}
+                else if task.is_application() {"A"}
+                else {" "} ;
+        }    
         if matches.opt_present("b") {
             task_string.push_str(&format!("{0:<5}  {1}\n", id, name));
         }
