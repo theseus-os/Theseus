@@ -756,6 +756,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<(), &'static str> {
     let stack_frame_iter = unsafe { &mut (*unwinding_context_ptr).stack_frame_iter };
     
+    #[cfg(not(downtime_eval))]
     trace!("continue_unwinding(): stack_frame_iter: {:#X?}", stack_frame_iter);
     
     let (mut regs, landing_pad_address) = if let Some(frame) = stack_frame_iter.next().map_err(|e| {

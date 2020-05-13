@@ -25,6 +25,9 @@ extern crate wait_queue;
 extern crate task;
 extern crate scheduler;
 
+#[cfg(downtime_eval)]
+extern crate hpet;
+
 use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
@@ -202,6 +205,7 @@ impl<T: Send> Channel<T> {
 
 
 /// The sender (transmit) side of a channel.
+#[derive(Clone)]
 pub struct Sender<T: Send> {
     channel: Arc<Channel<T>>,
 }
@@ -211,8 +215,23 @@ impl <T: Send> Sender<T> {
     /// Returns `Ok(())` if the message was sent and received successfully,
     /// otherwise returns an error. 
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
+
+        #[cfg(downtime_eval)]
+        let value = hpet::get_hpet().as_ref().unwrap().get_counter();
+        // debug!("Value {} {}", value, value % 1024);
+
         // trace!("rendezvous: send() entry");
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
+
+        // Fault mimicing a memory write. Function could panic when getting task
+        #[cfg(downtime_eval)]
+        {
+            if (value % 4096) == 0  && curr_task.is_restartable() {
+                // debug!("Fake error {}", value);
+                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+            }
+        }
+
 
         // obtain a sender-side exchange slot, blocking if necessary
         let sender_slot = self.channel.take_sender_slot().map_err(|_| "failed to take_sender_slot")?;
@@ -349,6 +368,7 @@ impl <T: Send> Sender<T> {
 }
 
 /// The receiver side of a channel.
+#[derive(Clone)]
 pub struct Receiver<T: Send> {
     channel: Arc<Channel<T>>,
 }

@@ -735,6 +735,7 @@ impl MappedPages {
     pub fn as_func<'a, F>(&self, offset: usize, space: &'a mut usize) -> Result<&'a F, &'static str> {
         let size = mem::size_of::<F>();
         if true {
+            #[cfg(not(downtime_eval))]
             debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
                 core::any::type_name::<F>(),
                 size, offset, self.size_in_bytes()
