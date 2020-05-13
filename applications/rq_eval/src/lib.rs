@@ -1,34 +1,61 @@
 //! This application tests the performance of the runqueue implementation,
 //! which is used to compare a standard runqueue with a state spill-free runqueue.
+//! 
+//! # Instructions for Running
+//! When running experiments, enable the proper configs:
+//! * For the state spill-free (regular) version, use THESEUS_CONFIG="rq_eval"
+//! * For the state spillful version, use THESEUS_CONFIG="rq_eval runqueue_spillful"
+//! You should do a clean build in between each one.
+//! 
+//! You can run the experiments as such:
+//! * `rq_eval -w 100`
+//! * `rq_eval -s 100`
+//! Larger iteration values should be used to eliminate the constant overhead
+//! or jitter due to random context switches.
+//! 
+//! See the options in the main function for more details.
+//! 
 
 #![no_std]
 
+#[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
-extern crate log;
 extern crate task;
+extern crate apic;
 extern crate spawn;
 extern crate runqueue;
 extern crate getopts;
 extern crate hpet;
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{
+    boxed::Box,
+    string::String,
+    vec::Vec,
+};
 use getopts::{Matches, Options};
 use hpet::get_hpet;
 use task::{Task, TaskRef};
 
 
 
-#[cfg(runqueue_state_spill_evaluation)]
+#[cfg(runqueue_spillful)]
 const CONFIG: &'static str = "WITH state spill";
-#[cfg(not(runqueue_state_spill_evaluation))]
+#[cfg(not(runqueue_spillful))]
 const CONFIG: &'static str = "WITHOUT state spill";
 
 const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
 
 
+// #[cfg(not(rq_eval))]
+// pub fn main(args: Vec<String>) -> isize {
+//     println!("Error: the \"rq_eval\" cfg option must be enabled!");
+//     -1
+// }
+
+// #[cfg(rq_eval)]
 pub fn main(args: Vec<String>) -> isize {
+
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optopt("w", "whole", "spawn N whole empty tasks and run them each to completion", "N");
@@ -88,7 +115,8 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
 fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with WHOLE tasks, {} tasks...", CONFIG, num_tasks);
-    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
+    let start = hpet.get_counter();
     
     for i in 0..num_tasks {
         let taskref = spawn::new_task_builder(whole_task, i)
@@ -98,8 +126,8 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
         let _ = taskref.take_exit_value();
     }
 
-    let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
+    let end = hpet.get_counter();
+    let hpet_period = hpet.counter_period_femtoseconds();
 
     println!("Completed runqueue WHOLE evaluation.");
     let elapsed_ticks = end - start;
@@ -118,13 +146,14 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     )?;
     task.name = String::from("rq_eval_single_task_unrunnable");
     let taskref = TaskRef::new(task);
-
-    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
+    let start = hpet.get_counter();
     
     for _i in 0..iterations {
-        runqueue::add_task_to_any_runqueue(taskref.clone())?;
+        runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
 
-        #[cfg(runqueue_state_spill_evaluation)] 
+        #[cfg(runqueue_spillful)] 
         {   
             let task_on_rq = { taskref.lock().on_runqueue.clone() };
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.try() {
@@ -133,26 +162,31 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
                 }
             }
         }
-        #[cfg(not(runqueue_state_spill_evaluation))]
+        #[cfg(not(runqueue_spillful))]
         {
             runqueue::remove_task_from_all(&taskref)?;
         }
     }
 
-    let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
+    let end = hpet.get_counter();
+    let hpet_period = hpet.counter_period_femtoseconds();
 
     println!("Completed runqueue SINGLE evaluation.");
     let elapsed_ticks = end - start;
     println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
         elapsed_ticks, hpet_period);
 
+    // cleanup the dummy task we created earlier
+    taskref.mark_as_exited(Box::new(0usize))?;
+    taskref.take_exit_value();
+    
     Ok(())
 }
 
 
 fn whole_task(task_num: usize) -> usize {
-    // warn!("in whole_task, task {}.", task_num);
+    #[cfg(not(rq_eval))]
+    warn!("in whole_task, task {}.", task_num);
     task_num
 }
 
