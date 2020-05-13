@@ -478,7 +478,6 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
     let (func, arg) = {
         let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
-        let curr_task_name = curr_task_ref.lock().name.clone();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = {
@@ -491,9 +490,9 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
         };
         let (func, arg) = (task_func_arg.func, task_func_arg.arg);
 
-        #[cfg(not(downtime_eval))]
+        #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task_name, debugit!(func), core::any::type_name::<F>(), debugit!(arg)
+            curr_task_ref.lock().name.clone(), debugit!(func), core::any::type_name::<F>(), debugit!(arg)
         );
 
         (func, arg)
@@ -561,6 +560,7 @@ fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (ir
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
 
+    #[cfg(not(rq_eval))]
     debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.lock().name, debugit!(exit_value));
     if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
         error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.lock().name);
@@ -739,9 +739,22 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
 
 /// Helper function to remove a task from it's runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &TaskRef) {
-    // Remove the task from its runqueue
-    #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
-    {
+    // Special behavior when evaluating runqueues
+    #[cfg(rq_eval)] {
+        // The special spillful version does nothing here, since it was already done in `internal_exit()`
+        #[cfg(runqueue_spillful)] {
+            // do nothing
+        }
+        // The regular spill-free version does brute-force removal of the task from ALL runqueues.
+        #[cfg(not(runqueue_spillful))] {
+            runqueue::remove_task_from_all(current_task).unwrap();
+        }
+    }
+
+
+    // In the regular case, we do not perform task migration between cores,
+    // so we can use the heuristic that the task is only on the current core's runqueue.
+    #[cfg(not(rq_eval))] {
         if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 

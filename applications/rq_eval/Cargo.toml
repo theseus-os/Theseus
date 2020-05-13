@@ -21,6 +21,9 @@ path = "../../kernel/hpet"
 [dependencies.task]
 path = "../../kernel/task"
 
+[dependencies.apic]
+path = "../../kernel/apic"
+
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
