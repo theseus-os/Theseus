@@ -465,41 +465,43 @@ impl Task {
         }
     }
 
-    /// Switches from the current (`self`)  to the given `next` Task
-    /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
+    /// Switches from the current (`self`)  to the given `next` Task.
+    /// 
+    /// No locks need to be held to call this, but interrupts (later, preemption) should be disabled.
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
-        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
-        if !next.is_runnable() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-            return;
-        }
-        if next.is_running() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-            return;
-        }
-        if let Some(pc) = next.pinned_core {
-            if pc != apic_id {
-                error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
-                return;
-            }
-        }
-         
+        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);         
 
-        // Change the privilege stack (RSP0) in the TSS.
-        // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
-        // i.e., when `next` is not a userspace task.
-        //
-        // Note that because userspace support is currently disabled, this will always be `false`.
-        if next.is_userspace() {
-            let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
-            if tss_set_rsp0(new_tss_rsp0).is_ok() { 
-                // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
-            }
-            else {
-                error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-                return;
-            }
-        }
+        // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
+        // if !next.is_runnable() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
+        //     return;
+        // }
+        // if next.is_running() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
+        //     return;
+        // }
+        // if let Some(pc) = next.pinned_core {
+        //     if pc != apic_id {
+        //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
+        //         return;
+        //     }
+        // }
+
+        // Note that because userspace support is currently disabled, this will never happen.
+        // // Change the privilege stack (RSP0) in the TSS.
+        // // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
+        // // i.e., when `next` is not a userspace task.
+        // //
+        // if next.is_userspace() {
+        //     let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
+        //     if tss_set_rsp0(new_tss_rsp0).is_ok() { 
+        //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+        //     }
+        //     else {
+        //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+        //         return;
+        //     }
+        // }
 
         // update runstates
         self.running_on_cpu = None; // no longer running
