@@ -487,6 +487,22 @@ impl Task {
         //     }
         // }
 
+        // Note that because userspace support is currently disabled, this will never happen.
+        // // Change the privilege stack (RSP0) in the TSS.
+        // // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
+        // // i.e., when `next` is not a userspace task.
+        // //
+        // if next.is_userspace() {
+        //     let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
+        //     if tss_set_rsp0(new_tss_rsp0).is_ok() { 
+        //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+        //     }
+        //     else {
+        //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+        //         return;
+        //     }
+        // }
+
         // update runstates
         self.running_on_cpu = None; // no longer running
         next.running_on_cpu = Some(apic_id); // now running on this core
