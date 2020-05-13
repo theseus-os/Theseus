@@ -13,6 +13,7 @@ extern crate runqueue;
 extern crate heapfile;
 extern crate scheduler;
 extern crate libtest;
+extern crate memory;
 
 use core::str;
 use alloc::vec::Vec;
@@ -23,6 +24,7 @@ use heapfile::HeapFile;
 use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
+use memory::{create_mapping, EntryFlags};
 
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
@@ -76,6 +78,9 @@ pub fn main(args: Vec<String>) -> isize {
 		}
 		"ctx" => {
 			do_ctx()
+		}
+		"memory_map" => {
+			do_memory_map()
 		}
 		"fs_read_with_open" | "fs1" => {
 			do_fs_read(true /*with_open*/)
@@ -375,6 +380,68 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 	Ok(delta_time_avg)
 }
 
+/// Measures the time to create and destroy a mapping. 
+/// Calls `do_memory_map_inner` multiple times to perform the actual operation
+fn do_memory_map() -> Result<(), &'static str> {
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::with_capacity(TRIES);
+
+	let overhead_ct = hpet_timing_overhead()?;
+	print_header(TRIES, ITERATIONS);
+
+	for i in 0..TRIES {
+		let lat = do_memory_map_inner(overhead_ct, i+1, TRIES)?;
+
+		tries += lat;
+		vec.push(lat);
+
+		if lat > max {max = lat;}
+		if lat < min {min = lat;}
+	}
+	
+	let lat = tries / TRIES as u64;
+	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
+	if 	max - lat > err || lat - min > err {
+		printlnwarn!("memory_map_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+	}
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
+	
+	printlninfo!("MEMORY MAP result: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
+	printlninfo!("This test is equivalent to `lat_mmap` in LMBench");
+	Ok(())
+}
+
+/// Internal function that actually calculates the time to create and destroy a memory mapping.
+/// Measures this by continually allocating and dropping `MappedPages`.
+fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
+	const MAPPING_SIZE: usize = 4096;
+
+    let start_hpet: u64;
+	let end_hpet: u64;
+	let delta_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+	start_hpet = hpet.get_counter();
+
+	for _ in 0..ITERATIONS{
+		let mapping = create_mapping(MAPPING_SIZE, EntryFlags::WRITABLE)?;
+		drop(mapping);
+	}
+
+	end_hpet = hpet.get_counter();
+
+	delta_hpet = end_hpet - start_hpet - overhead_ct;
+    let delta_time = hpet_2_time("", delta_hpet);
+    let delta_time_avg = delta_time / ITERATIONS as u64;
+	printlninfo!("memory_map_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
+		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
+
+	Ok(delta_time_avg)
+}
 
 /// Wrapper function used to measure file read and file read with open. 
 /// Accepts a bool argument. If true includes the latency to open a file
