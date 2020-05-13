@@ -1,5 +1,20 @@
 //! This application tests the performance of the runqueue implementation,
 //! which is used to compare a standard runqueue with a state spill-free runqueue.
+//! 
+//! # Instructions for Running
+//! When running experiments, enable the proper configs:
+//! * For the state spill-free (regular) version, use THESEUS_CONFIG="rq_eval"
+//! * For the state spillful version, use THESEUS_CONFIG="rq_eval runqueue_spillful"
+//! You should do a clean build in between each one.
+//! 
+//! You can run the experiments as such:
+//! * `rq_eval -w 100`
+//! * `rq_eval -s 100`
+//! Larger iteration values should be used to eliminate the constant overhead
+//! or jitter due to random context switches.
+//! 
+//! See the options in the main function for more details.
+//! 
 
 #![no_std]
 
