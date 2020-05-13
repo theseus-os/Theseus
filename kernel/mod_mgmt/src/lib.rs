@@ -1855,6 +1855,7 @@ impl CrateNamespace {
         if let Some(weak_sec) = self.load_crate_for_missing_symbol(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
             weak_sec
         } else {
+            #[cfg(not(loscd_eval))]
             error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
             Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
         }

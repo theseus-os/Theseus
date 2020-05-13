@@ -70,7 +70,7 @@ pub fn clear_unloaded_crate_cache() {
 /// A state transfer function is an arbitrary function called when swapping crates. 
 /// 
 /// See the `swap_crates()` function for more details. 
-pub type StateTransferFunction = fn(&CrateNamespace, &CrateNamespace) -> Result<(), &'static str>;
+pub type StateTransferFunction = fn(&Arc<CrateNamespace>, &CrateNamespace) -> Result<(), &'static str>;
 
 
 /// Swaps in new crates that can optionally replace existing crates in this `CrateNamespace`.
@@ -140,9 +140,7 @@ pub fn swap_crates(
     );
 
     #[cfg(loscd_eval)]
-    let hpet_ref = hpet::get_hpet();
-    #[cfg(loscd_eval)]
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = hpet::get_hpet().ok_or("couldn't get HPET timer")?;
     #[cfg(loscd_eval)]
     let hpet_start_swap = hpet.get_counter();
     
@@ -246,6 +244,7 @@ pub fn swap_crates(
                 // Therefore, we don't need to do any symbol dependency replacement. 
                 // All we need to do is replace that old crate's object file in the old namespace's directory.
                 if let Some(ref ocn) = old_crate_name {
+                    #[cfg(not(loscd_eval))]
                     info!("swap_crates(): note: old crate {:?} was not currently loaded into old_namespace {:?}", ocn, old_namespace.name());
                 }
                 old_crates_are_loaded.push(false);
@@ -516,7 +515,7 @@ pub fn swap_crates(
             let mapped_pages = state_transfer_fn_sec.mapped_pages.lock();
             mapped_pages.as_func::<StateTransferFunction>(state_transfer_fn_sec.mapped_pages_offset, &mut space)?
         };
-        info!("swap_crates(): invoking the state transfer function {:?}", symbol);
+        info!("swap_crates(): invoking the state transfer function {:?} with old_ns: {:?}, new_ns: {:?}", symbol, this_namespace.name(), namespace_of_new_crates.name());
         st_fn(this_namespace, &namespace_of_new_crates)?;
     }
 
@@ -538,6 +537,9 @@ pub fn swap_crates(
         if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove_str(old_crate_name) {
             {
                 let old_crate = old_crate_ref.lock_as_ref();
+
+                core::mem::forget(old_crate_ref.clone());
+
 
                 #[cfg(not(loscd_eval))]
                 info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name());
@@ -792,14 +794,14 @@ fn move_file(file: &FileRef, dest_dir: &DirRef) -> Result<Option<(FileOrDir, Dir
     // Log success or failure
     match res {
         Ok(replaced_file) => {
-            #[cfg(not(downtime_eval))]
+            #[cfg(not(any(loscd_eval, downtime_eval)))]
             debug!("swap_crates::move_file(): moved file {:?} ({:?}) from {:?} to {:?}",
                 file.try_lock().map(|f| f.get_name()), removed_file.get_name(), parent.try_lock().map(|p| p.get_name()), dest_dir.try_lock().map(|d| d.get_name())
             );
             Ok(replaced_file.map(|f| (f, parent)))
         }
         Err(e) => {
-            #[cfg(not(downtime_eval))]
+            #[cfg(not(any(loscd_eval, downtime_eval)))]
             error!("swap_crates::move_file(): failed to moved file {:?} ({:?}) from {:?} to {:?}.\n    Error: {:?}",
                 file.try_lock().map(|f| f.get_name()), removed_file.get_name(), parent.try_lock().map(|p| p.get_name()), dest_dir.try_lock().map(|d| d.get_name()), e
             );
