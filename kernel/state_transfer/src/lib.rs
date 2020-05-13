@@ -25,7 +25,9 @@ use task::TaskRef;
 /// Used for the evolution from a round robin scheduler to a priority scheduler
 pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateNamespace) -> Result<(), &'static str> {
 
+    #[cfg(not(loscd_eval))]
     warn!("prio_sched(): at the top.");
+    /*
     // Since we don't currently support updating a running application's code with the new object code, 
     // we just hack together a solution for the terminal, since it's the only long-running app. 
     // We only need to fix up this dependency:
@@ -45,7 +47,7 @@ pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateName
     warn!("prio_sched(): calling rewrite_section_dependents...");
     CrateNamespace::rewrite_section_dependents(&old_section, &new_section, &kernel_mmi_ref)?;
     warn!("prio_sched(): finished rewrite_section_dependents.");
-
+    */
 
     // Extract the taskrefs from the round robin Runqueue, 
     // then convert them into priority taskrefs and place them on the priority Runqueue.
@@ -60,12 +62,11 @@ pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateName
         }
     }
 
+    #[cfg(not(loscd_eval))]
     warn!("REPLACING LAZY_STATIC RUNQUEUES...");
 
     #[cfg(loscd_eval)]
-    let hpet_ref = hpet::get_hpet();
-    #[cfg(loscd_eval)]
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = hpet::get_hpet().ok_or("couldn't get HPET timer")?;
     #[cfg(loscd_eval)]
     let hpet_start_state_transfer = hpet.get_counter();
 
@@ -100,6 +101,7 @@ pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateName
 
     core::mem::drop(once_rq);
 
+    #[cfg(not(loscd_eval))]
     warn!("REPLACED LAZY_STATIC RUNQUEUES...");
 
 
