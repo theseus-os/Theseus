@@ -42,15 +42,6 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
         if !t.is_runnable() {
             continue;
         }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
-            if pinned != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                return None;
-            }
-        }
             
         // found a runnable task!
         chosen_task_index = Some(i);
