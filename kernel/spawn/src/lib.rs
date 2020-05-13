@@ -379,6 +379,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self.post_build_function = Some(Box::new(
             move |new_task| {
                 new_task.restart_info = Some(restart_info);
+                new_task.failure_cleanup_function = task_restartable_cleanup_failure::<F, A, R>;
                 setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
                 Ok(())
             }
@@ -688,10 +689,10 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
         let restartable_info = {
             let t = current_task.lock();
             if let Some(restart_info) = t.restart_info.as_ref() {
-                let func_ptr = &(restart_info.func) as *const _ as usize;
-                let arg_ptr = &(restart_info.argument) as *const _ as usize;
-
                 #[cfg(use_crate_replacement)] {
+                    let func_ptr = &(restart_info.func) as *const _ as usize;
+                    let arg_ptr = &(restart_info.argument) as *const _ as usize;
+
                     let arg_size = mem::size_of::<A>();
                     #[cfg(not(downtime_eval))] {
                         debug!("func_ptr {:#X}", func_ptr);
