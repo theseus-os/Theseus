@@ -178,10 +178,10 @@ pub enum RunState {
 }
 
 
-#[cfg(runqueue_state_spill_evaluation)]
+#[cfg(runqueue_spillful)]
 /// A callback that will be invoked to remove a specific task from a specific runqueue.
 /// Should be initialized by the runqueue crate.
-pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
+pub static RUNQUEUE_REMOVAL_FUNCTION: spin::Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = spin::Once::new();
 
 
 #[cfg(simd_personality)]
@@ -219,7 +219,7 @@ pub struct Task {
     /// `None` if not currently running.
     pub running_on_cpu: Option<u8>,
     
-    #[cfg(runqueue_state_spill_evaluation)]
+    #[cfg(runqueue_spillful)]
     /// The runqueue that this Task is on.
     pub on_runqueue: Option<u8>,
     
@@ -328,7 +328,7 @@ impl Task {
             runstate: RunState::Initing,
             running_on_cpu: None,
             
-            #[cfg(runqueue_state_spill_evaluation)]
+            #[cfg(runqueue_spillful)]
             on_runqueue: None,
             
             saved_sp: 0,
@@ -619,6 +619,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
+        #[cfg(not(rq_eval))]
         trace!("Task::drop(): {}", self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
@@ -737,12 +738,12 @@ impl TaskRef {
             // Corner case: if the task isn't running (as with killed tasks), 
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
             if !task.is_running() {
-                trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
+                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
                 let _tld = task.take_task_local_data();
             }
         }
 
-        #[cfg(runqueue_state_spill_evaluation)] 
+        #[cfg(runqueue_spillful)] 
         {   
             let task_on_rq = { self.0.deref().0.lock().on_runqueue.clone() };
             if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.try() {
@@ -757,10 +758,9 @@ impl TaskRef {
 
     /// Call this function to indicate that this task has successfully ran to completion,
     /// and that it has returned the given `exit_value`.
-    /// This task must be the currently executing task, 
-    /// you cannot invoke `mark_as_exited()` on a different task.
     /// 
-    /// This should only be used at the end of the `task_wrapper` function once it has cleanly exited.
+    /// This should only be used within task cleanup functions to indicate
+    /// that the current task has cleanly exited.
     /// 
     /// # Locking / Deadlock
     /// This method obtains a writable lock on the underlying Task in order to mutate its state.
@@ -774,22 +774,18 @@ impl TaskRef {
     /// it will finish running its current timeslice, and then never be run again.
     #[doc(hidden)]
     pub fn mark_as_exited(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
-        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
-        if curr_task == self {
-            self.internal_exit(ExitValue::Completed(exit_value))
-        } else {
-            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
-        }
+        self.internal_exit(ExitValue::Completed(exit_value))
     }
 
     /// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
     /// and it is ready to be marked as killed, i.e., it will never run again.
-    /// This task must be the currently executing task, 
+    /// This task (`self`) must be the currently executing task, 
     /// you cannot invoke `mark_as_killed()` on a different task.
     /// 
     /// If you want to kill another task, use the [`kill()`](method.kill) method instead.
     /// 
-    /// This should only be used by the unwinding routines once they have finished.
+    /// This should only be used within task cleanup functions (e.g., after unwinding) to indicate
+    /// that the current task has crashed or failed and has been killed by the system.
     /// 
     /// # Locking / Deadlock
     /// This method obtains a writable lock on the underlying Task in order to mutate its state.
