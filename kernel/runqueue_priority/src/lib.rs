@@ -324,15 +324,12 @@ impl RunQueue {
     /// The priority of the first task that matches is shown.
     fn get_priority_internal(&self, task: &TaskRef) -> Option<u8> {
         // debug!("called_assign_priority_internal called per core");
-        let mut return_priority :Option<u8> = None;
         for x in self.iter() {
             if &x.taskref == task {
-                // A matching task has been found
-                return_priority =  Some(x.priority);
-                break;
+                return Some(x.priority);
             }
         }
-        return_priority
+        None
     }
 
     /// Output the priority of the given task.
@@ -340,7 +337,7 @@ impl RunQueue {
     pub fn get_priority(task: &TaskRef) -> Option<u8> {
         // debug!("assign priority wrapper. called once per call");
         for (_core, rq) in RUNQUEUES.iter() {
-            let return_priority = rq.write().get_priority_internal(task);
+            let return_priority = rq.read().get_priority_internal(task);
             match return_priority {
                 //If a matching task is found the iteration terminates
                 Some(x) => return Some(x),
