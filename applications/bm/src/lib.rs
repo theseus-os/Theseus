@@ -80,7 +80,12 @@ pub fn main(args: Vec<String>) -> isize {
 			do_ctx()
 		}
 		"memory_map" => {
-			do_memory_map()
+			if cfg!(bm_map) {
+				do_memory_map()
+			}
+			else {
+				Err("Need to enable bm_map config option to run the memory_map benchmark")
+			}
 		}
 		"fs_read_with_open" | "fs1" => {
 			do_fs_read(true /*with_open*/)

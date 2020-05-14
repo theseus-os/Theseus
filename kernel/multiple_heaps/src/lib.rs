@@ -78,7 +78,7 @@ const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
 #[cfg(not(safe_heap))]
 /// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 100 KiB.
-const PAGES_PER_SIZE_CLASS: usize = 24 * 10; 
+const PAGES_PER_SIZE_CLASS: usize = 24; 
 
 #[cfg(safe_heap)]
 /// The number of pages each size class in the ZoneAllocator is initialized with.
