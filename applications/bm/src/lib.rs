@@ -82,8 +82,7 @@ pub fn main(args: Vec<String>) -> isize {
 		"memory_map" => {
 			if cfg!(bm_map) {
 				do_memory_map()
-			}
-			else {
+			} else {
 				Err("Need to enable bm_map config option to run the memory_map benchmark")
 			}
 		}
