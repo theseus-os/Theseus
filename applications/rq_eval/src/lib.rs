@@ -37,7 +37,7 @@ use alloc::{
 use getopts::{Matches, Options};
 use hpet::get_hpet;
 use task::{Task, TaskRef};
-use libtest::{hpet_timing_overhead, hpet_2_us, calculate_stats};
+use libtest::{hpet_timing_overhead, hpet_2_us};
 
 
 #[cfg(runqueue_spillful)]
@@ -46,8 +46,6 @@ const CONFIG: &'static str = "WITH state spill";
 const CONFIG: &'static str = "WITHOUT state spill";
 
 const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
-
-const TRIES: usize = 10;
 
 // #[cfg(not(rq_eval))]
 // pub fn main(args: Vec<String>) -> isize {
@@ -183,7 +181,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
         elapsed_ticks, hpet_period);
     println!("Elapsed time:{} us", elapsed_time);
-    
+
     // cleanup the dummy task we created earlier
     taskref.mark_as_exited(Box::new(0usize))?;
     taskref.take_exit_value();

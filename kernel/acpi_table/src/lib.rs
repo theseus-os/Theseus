@@ -68,7 +68,7 @@ impl AcpiTables {
         let first_frame = Frame::containing_address(sdt_phys_addr);
         // If the Frame containing the given `sdt_phys_addr` wasn't already mapped, then we need to map it.
         if !self.frames.contains(&first_frame) {
-            let mut new_frames = self.frames.to_extended(first_frame);
+            let new_frames = self.frames.to_extended(first_frame);
 
             let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
@@ -89,7 +89,7 @@ impl AcpiTables {
         // Here we check if the header of the ACPI table fits at the offset.
         // If not, we add the next frame as well.
         if sdt_offset + core::mem::size_of::<Sdt>() > self.mapped_pages.size_in_bytes() {
-            let mut new_frames = self.frames.to_extended(first_frame.add(1));
+            let new_frames = self.frames.to_extended(first_frame.add(1));
 
             let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
