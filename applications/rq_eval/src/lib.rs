@@ -27,6 +27,7 @@ extern crate spawn;
 extern crate runqueue;
 extern crate getopts;
 extern crate hpet;
+extern crate libtest;
 
 use alloc::{
     boxed::Box,
@@ -36,7 +37,7 @@ use alloc::{
 use getopts::{Matches, Options};
 use hpet::get_hpet;
 use task::{Task, TaskRef};
-
+use libtest::{hpet_timing_overhead, hpet_2_us};
 
 
 #[cfg(runqueue_spillful)]
@@ -115,6 +116,7 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
 fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with WHOLE tasks, {} tasks...", CONFIG, num_tasks);
+    let overhead = hpet_timing_overhead()?;
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start = hpet.get_counter();
     
@@ -128,11 +130,13 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
     let end = hpet.get_counter();
     let hpet_period = hpet.counter_period_femtoseconds();
-
+    let elapsed_ticks = end - start - overhead;
+    let elapsed_time = hpet_2_us(elapsed_ticks);
+    
     println!("Completed runqueue WHOLE evaluation.");
-    let elapsed_ticks = end - start;
     println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
         elapsed_ticks, hpet_period);
+    println!("Elapsed time:{} us", elapsed_time);
         
     Ok(())
 }
@@ -140,6 +144,7 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
 fn run_single(iterations: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with SINGLE tasks, {} iterations...", CONFIG, iterations);
+    let overhead = hpet_timing_overhead()?;
     let mut task = Task::new(
         None,
         |_, _| loop { }, // dummy failure function
@@ -170,11 +175,13 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
 
     let end = hpet.get_counter();
     let hpet_period = hpet.counter_period_femtoseconds();
+    let elapsed_ticks = end - start - overhead;
+    let elapsed_time = hpet_2_us(elapsed_ticks);
 
     println!("Completed runqueue SINGLE evaluation.");
-    let elapsed_ticks = end - start;
     println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
         elapsed_ticks, hpet_period);
+    println!("Elapsed time:{} us", elapsed_time);
 
     // cleanup the dummy task we created earlier
     taskref.mark_as_exited(Box::new(0usize))?;

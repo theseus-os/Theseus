@@ -1884,6 +1884,7 @@ dependencies = [
  "apic 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "hpet 0.1.0",
+ "libtest 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
  "spawn 0.1.0",
