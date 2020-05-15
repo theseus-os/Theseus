@@ -145,7 +145,7 @@ impl RunQueue {
             queue: VecDeque::new(),
         });
 
-        #[cfg(runqueue_state_spill_evaluation)] 
+        #[cfg(runqueue_spillful)] 
         {
             task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| RunQueue::remove_task_from_within_task);
         }
@@ -216,7 +216,7 @@ impl RunQueue {
         #[cfg(single_simd_task_optimization)]
         let is_simd = task.lock().simd;
         
-        #[cfg(runqueue_state_spill_evaluation)]
+        #[cfg(runqueue_spillful)]
         {
             task.lock_mut().on_runqueue = Some(self.core);
         }
@@ -259,7 +259,7 @@ impl RunQueue {
 
     /// Removes a `TaskRef` from this RunQueue.
     pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        #[cfg(runqueue_state_spill_evaluation)]
+        #[cfg(runqueue_spillful)]
         {
             // For the runqueue state spill evaluation, we disable this method because we 
             // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
@@ -282,7 +282,7 @@ impl RunQueue {
     }
 
 
-    #[cfg(runqueue_state_spill_evaluation)]
+    #[cfg(runqueue_spillful)]
     /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
     /// Note: This method is only used by the state spillful runqueue implementation.
     pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
@@ -294,7 +294,7 @@ impl RunQueue {
                 // Instead of calling `remove_task`, we directly call `remove_internal`
                 // because we want to actually remove the task from the runqueue,
                 // as calling `remove_task` would do nothing due to it skipping the actual removal
-                // when the `runqueue_state_spill_evaluation` cfg is enabled.
+                // when the `runqueue_spillful` cfg is enabled.
                 rq.write().remove_internal(task)
             })
     }
@@ -324,15 +324,12 @@ impl RunQueue {
     /// The priority of the first task that matches is shown.
     fn get_priority_internal(&self, task: &TaskRef) -> Option<u8> {
         // debug!("called_assign_priority_internal called per core");
-        let mut return_priority :Option<u8> = None;
         for x in self.iter() {
             if &x.taskref == task {
-                // A matching task has been found
-                return_priority =  Some(x.priority);
-                break;
+                return Some(x.priority);
             }
         }
-        return_priority
+        None
     }
 
     /// Output the priority of the given task.
@@ -340,7 +337,7 @@ impl RunQueue {
     pub fn get_priority(task: &TaskRef) -> Option<u8> {
         // debug!("assign priority wrapper. called once per call");
         for (_core, rq) in RUNQUEUES.iter() {
-            let return_priority = rq.write().get_priority_internal(task);
+            let return_priority = rq.read().get_priority_internal(task);
             match return_priority {
                 //If a matching task is found the iteration terminates
                 Some(x) => return Some(x),

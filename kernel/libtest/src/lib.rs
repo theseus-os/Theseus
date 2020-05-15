@@ -18,19 +18,20 @@ use pmu_x86::{Counter, EventType};
 use alloc::vec::Vec;
 use hashbrown::HashMap;
 use core::fmt;
+use apic::get_lapics;
 
-const NANO_TO_FEMTO: u64 = 1_000_000;
 const MICRO_TO_FEMTO: u64 = 1_000_000_000;
+const NANO_TO_FEMTO: u64 = 1_000_000;
 
 /// Helper function to convert ticks to nano seconds
 pub fn hpet_2_ns(hpet: u64) -> u64 {
-	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
+	let hpet_period = get_hpet().unwrap().counter_period_femtoseconds();
 	hpet * hpet_period as u64 / NANO_TO_FEMTO
 }
 
 /// Helper function to convert ticks to micro seconds
 pub fn hpet_2_us(hpet: u64) -> u64 {
-	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
+	let hpet_period = get_hpet().unwrap().counter_period_femtoseconds();
 	hpet * hpet_period as u64 / MICRO_TO_FEMTO
 }
 
@@ -47,6 +48,7 @@ pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
 	}
 }
 
+
 /// True if only two tasks are running in the current runqueue.
 /// Used to verify if there are any other tasks than the current task and idle task in the runqueue
 pub fn check_myrq() -> bool {
@@ -55,6 +57,27 @@ pub fn check_myrq() -> bool {
 		_ => { false }
 	}
 }
+
+
+/// Helper function to pick a free child core if possible
+pub fn pick_free_core() -> Result<u8, &'static str> {
+	// a free core will only have 1 task, the idle task, running on it.
+	const NUM_TASKS_ON_FREE_CORE: usize = 1;
+
+	// try with current core -1
+	let child_core: u8 = CPU_ID!() as u8 - 1;
+	if nr_tasks_in_rq(child_core) == Some(NUM_TASKS_ON_FREE_CORE) {return Ok(child_core);}
+
+	// if failed, iterate through all cores
+	for lapic in get_lapics().iter() {
+		let child_core = lapic.0;
+		if nr_tasks_in_rq(*child_core) == Some(1) {return Ok(*child_core);}
+	}
+
+	warn!("Cannot pick a free core because cores are busy");
+	Err("Cannot pick a free core because cores are busy")
+}
+
 
 #[inline(always)]
 /// Starts the PMU counter to measure reference cycles.
@@ -156,8 +179,7 @@ fn hpet_timing_overhead_inner() -> Result<u64, &'static str> {
 	let mut _start_hpet_tmp: u64;
 	let start_hpet: u64;
 	let end_hpet: u64;
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
 	// to warm cache and remove error
 	_start_hpet_tmp = hpet.get_counter();
@@ -251,7 +273,7 @@ pub struct Stats {
 
 impl fmt::Debug for Stats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\n 
+        write!(f, "stats \n 
         min:     {} \n 
         p_25:    {} \n 
         median:  {} \n 

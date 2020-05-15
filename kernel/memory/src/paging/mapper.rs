@@ -519,9 +519,12 @@ impl MappedPages {
             // TODO free p(1,2,3) table if empty
             // _allocator_ref.lock().deallocate_frame(frame);
         }
-
-        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
-            func(self.pages.deref().clone());
+    
+        #[cfg(not(bm_map))]
+        {
+            if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+                func(self.pages.deref().clone());
+            }
         }
 
         Ok(())
@@ -723,6 +726,7 @@ impl MappedPages {
     pub fn as_func<'a, F>(&self, offset: usize, space: &'a mut usize) -> Result<&'a F, &'static str> {
         let size = mem::size_of::<F>();
         if true {
+            #[cfg(not(downtime_eval))]
             debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
                 core::any::type_name::<F>(),
                 size, offset, self.size_in_bytes()

@@ -178,10 +178,10 @@ pub enum RunState {
 }
 
 
-#[cfg(runqueue_state_spill_evaluation)]
+#[cfg(runqueue_spillful)]
 /// A callback that will be invoked to remove a specific task from a specific runqueue.
 /// Should be initialized by the runqueue crate.
-pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
+pub static RUNQUEUE_REMOVAL_FUNCTION: spin::Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = spin::Once::new();
 
 
 #[cfg(simd_personality)]
@@ -219,7 +219,7 @@ pub struct Task {
     /// `None` if not currently running.
     pub running_on_cpu: Option<u8>,
     
-    #[cfg(runqueue_state_spill_evaluation)]
+    #[cfg(runqueue_spillful)]
     /// The runqueue that this Task is on.
     pub on_runqueue: Option<u8>,
     
@@ -236,8 +236,8 @@ pub struct Task {
     pub mmi: MmiRef, 
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
-    /// Whether or not this task is pinned to a certain core
-    /// The idle tasks (like idle_task) are always pinned to their respective cores
+    /// Whether or not this task is pinned to a certain core.
+    /// The idle tasks (like idle_task) are always pinned to their respective cores.
     pub pinned_core: Option<u8>,
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
@@ -328,7 +328,7 @@ impl Task {
             runstate: RunState::Initing,
             running_on_cpu: None,
             
-            #[cfg(runqueue_state_spill_evaluation)]
+            #[cfg(runqueue_spillful)]
             on_runqueue: None,
             
             saved_sp: 0,
@@ -465,41 +465,43 @@ impl Task {
         }
     }
 
-    /// Switches from the current (`self`)  to the given `next` Task
-    /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
+    /// Switches from the current (`self`)  to the given `next` Task.
+    /// 
+    /// No locks need to be held to call this, but interrupts (later, preemption) should be disabled.
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
-        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
-        if !next.is_runnable() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-            return;
-        }
-        if next.is_running() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-            return;
-        }
-        if let Some(pc) = next.pinned_core {
-            if pc != apic_id {
-                error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
-                return;
-            }
-        }
-         
+        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);         
 
-        // Change the privilege stack (RSP0) in the TSS.
-        // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
-        // i.e., when `next` is not a userspace task.
-        //
-        // Note that because userspace support is currently disabled, this will always be `false`.
-        if next.is_userspace() {
-            let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
-            if tss_set_rsp0(new_tss_rsp0).is_ok() { 
-                // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
-            }
-            else {
-                error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-                return;
-            }
-        }
+        // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
+        // if !next.is_runnable() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
+        //     return;
+        // }
+        // if next.is_running() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
+        //     return;
+        // }
+        // if let Some(pc) = next.pinned_core {
+        //     if pc != apic_id {
+        //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
+        //         return;
+        //     }
+        // }
+
+        // Note that because userspace support is currently disabled, this will never happen.
+        // // Change the privilege stack (RSP0) in the TSS.
+        // // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
+        // // i.e., when `next` is not a userspace task.
+        // //
+        // if next.is_userspace() {
+        //     let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
+        //     if tss_set_rsp0(new_tss_rsp0).is_ok() { 
+        //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+        //     }
+        //     else {
+        //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+        //         return;
+        //     }
+        // }
 
         // update runstates
         self.running_on_cpu = None; // no longer running
@@ -619,6 +621,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
+        #[cfg(not(any(rq_eval, downtime_eval)))]
         trace!("Task::drop(): {}", self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
@@ -737,12 +740,12 @@ impl TaskRef {
             // Corner case: if the task isn't running (as with killed tasks), 
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
             if !task.is_running() {
-                trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
+                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
                 let _tld = task.take_task_local_data();
             }
         }
 
-        #[cfg(runqueue_state_spill_evaluation)] 
+        #[cfg(runqueue_spillful)] 
         {   
             let task_on_rq = { self.0.deref().0.lock().on_runqueue.clone() };
             if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.try() {
@@ -757,10 +760,9 @@ impl TaskRef {
 
     /// Call this function to indicate that this task has successfully ran to completion,
     /// and that it has returned the given `exit_value`.
-    /// This task must be the currently executing task, 
-    /// you cannot invoke `mark_as_exited()` on a different task.
     /// 
-    /// This should only be used at the end of the `task_wrapper` function once it has cleanly exited.
+    /// This should only be used within task cleanup functions to indicate
+    /// that the current task has cleanly exited.
     /// 
     /// # Locking / Deadlock
     /// This method obtains a writable lock on the underlying Task in order to mutate its state.
@@ -774,22 +776,18 @@ impl TaskRef {
     /// it will finish running its current timeslice, and then never be run again.
     #[doc(hidden)]
     pub fn mark_as_exited(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
-        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
-        if curr_task == self {
-            self.internal_exit(ExitValue::Completed(exit_value))
-        } else {
-            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
-        }
+        self.internal_exit(ExitValue::Completed(exit_value))
     }
 
     /// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
     /// and it is ready to be marked as killed, i.e., it will never run again.
-    /// This task must be the currently executing task, 
+    /// This task (`self`) must be the currently executing task, 
     /// you cannot invoke `mark_as_killed()` on a different task.
     /// 
     /// If you want to kill another task, use the [`kill()`](method.kill) method instead.
     /// 
-    /// This should only be used by the unwinding routines once they have finished.
+    /// This should only be used within task cleanup functions (e.g., after unwinding) to indicate
+    /// that the current task has crashed or failed and has been killed by the system.
     /// 
     /// # Locking / Deadlock
     /// This method obtains a writable lock on the underlying Task in order to mutate its state.
@@ -902,6 +900,10 @@ impl TaskRef {
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
+
+    pub fn is_restartable(&self) -> bool {
+        self.0.deref().0.lock().restart_info.is_some()
+    }
 }
 
 impl PartialEq for TaskRef {
@@ -914,21 +916,18 @@ impl Eq for TaskRef { }
 
 
 
-/// Create and initialize an idle task, of which there is one per processor core/LocalApic.
-/// The idle task is a task that runs by default (one per core) when no other task is running.
-/// 
-/// Returns a reference to the newly-created idle `Task`.
+/// Bootstrap a new task from the current thread of execution.
 /// 
 /// # Note
-/// This function does not add the new idle task to any runqueue.
-pub fn create_idle_task(
+/// This function does not add the new task to any runqueue.
+pub fn bootstrap_task(
     apic_id: u8, 
     stack_bottom: VirtualAddress, 
     stack_top: VirtualAddress,
     kernel_mmi_ref: MmiRef,
 ) -> Result<TaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
-    // Instead, we generate all of the `Task` states manually, and create an initial idle task directly.
+    // Instead, we generate all of the `Task` states manually, and create an initial task directly.
     let kstack = Stack::new( 
         stack_top, 
         stack_bottom, 
@@ -941,30 +940,29 @@ pub fn create_idle_task(
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, idle_task_cleanup_failure);
-    idle_task.name = format!("idle_task_ap{}", apic_id);
-    idle_task.is_an_idle_task = true;
-    idle_task.runstate = RunState::Runnable;
-    idle_task.running_on_cpu = Some(apic_id); 
-    idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
+    let mut bootstrap_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, bootstrap_task_cleanup_failure);
+    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.runstate = RunState::Runnable;
+    bootstrap_task.running_on_cpu = Some(apic_id); 
+    bootstrap_task.pinned_core = Some(apic_id); // can only run on this CPU core
     // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
-    let idle_task_id = idle_task.id;
-    let task_ref = TaskRef::new(idle_task);
+    let bootstrap_task_id = bootstrap_task.id;
+    let task_ref = TaskRef::new(bootstrap_task);
 
     // set this as this core's current task, since it's obviously running
     task_ref.0.deref().0.lock().set_as_current_task();
     if get_my_current_task().is_none() {
-        error!("BUG: create_idle_task(): failed to properly set the new idle task as the current task on AP {}", 
-            apic_id);
-        return Err("BUG: create_idle_task(): failed to properly set the new idle task as the current task");
+        error!("BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}", apic_id);
+        return Err("BUG: bootstrap_task(): failed to properly set the new idle task as the current task");
     }
 
     // insert the new task into the task list
-    let old_task = TASKLIST.lock().insert(idle_task_id, task_ref.clone());
-    if old_task.is_some() {
-        error!("BUG: create_idle_task(): TASKLIST already contained a task with the same id {} as idle_task_ap{}!", 
-            idle_task_id, apic_id);
-        return Err("BUG: TASKLIST already contained a task with the new idle_task's ID");
+    let old_task = TASKLIST.lock().insert(bootstrap_task_id, task_ref.clone());
+    if let Some(ot) = old_task {
+        error!("BUG: bootstrap_task(): TASKLIST already contained a task {:?} with the same id {} as bootstrap_task_core_{}!", 
+            ot, bootstrap_task_id, apic_id
+        );
+        return Err("BUG: bootstrap_task(): TASKLIST already contained a task with the new bootstrap_task's ID");
     }
     
     Ok(task_ref)
@@ -972,15 +970,16 @@ pub fn create_idle_task(
 
 
 /// This is just like `spawn::task_cleanup_failure()`,
-/// but for idle tasks bootstrapped from a core's first execution context.
+/// but for the initial tasks bootstrapped from each core's first execution context.
 /// 
-/// However, for a bootstrapped (idle) task, we don't know (it doesn't really have) a function signature,
-/// argument type, and return value type.
+/// However, for a bootstrapped task, we don't know its function signature, argument type, or return value type
+/// because it was invoked from assembly and may not even have one. 
 /// 
 /// Therefore there's not much we can actually do.
-fn idle_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
-    error!("BUG: idle_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
-    loop { }
+fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
+    loop {
+        error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    }
 }
 
 

@@ -12,6 +12,8 @@ extern crate path;
 extern crate runqueue;
 extern crate heapfile;
 extern crate scheduler;
+extern crate libtest;
+extern crate memory;
 
 use core::str;
 use alloc::vec::Vec;
@@ -21,19 +23,16 @@ use hpet::get_hpet;
 use heapfile::HeapFile;
 use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};
+use libtest::*;
+use memory::{create_mapping, EntryFlags};
 
-
-const MICRO_TO_FEMTO: u64 = 1_000_000_000;
-const NANO_TO_FEMTO: u64 = 1_000_000;
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
-// const MB_IN_KB: usize = 1024;
 const MB: u64 = 1024 * 1024;
 const KB: u64 = 1024;
 
 const ITERATIONS: usize = 10_000;
 const TRIES: usize = 10;
-const THRESHOLD_ERROR_RATIO: u64 = 1;
 
 const READ_BUF_SIZE: usize = 64*1024;
 const WRITE_BUF_SIZE: usize = 1024*1024;
@@ -45,15 +44,6 @@ const T_UNIT: &str = "micro sec";
 #[cfg(not(bm_in_us))]
 const T_UNIT: &str = "nano sec";
 
-/*macro_rules! printlninfo {
-	($fmt:expr) => (warn!(concat!("BM-INFO: ", $fmt)));
-	($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-INFO: ", $fmt), $($arg)*));
-}
-
-macro_rules! printlnwarn {
-	($fmt:expr) => (warn!(concat!("BM-WARN: ", $fmt)));
-	($fmt:expr, $($arg:tt)*) => (warn!(concat!("BM-WARN: ", $fmt), $($arg)*));
-}*/
 
 macro_rules! printlninfo {
 	($fmt:expr) => (println!(concat!("BM-INFO: ", $fmt)));
@@ -65,9 +55,6 @@ macro_rules! printlnwarn {
 	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
 }
 
-macro_rules! CPU_ID {
-	() => (apic::get_my_apic_id())
-}
 
 pub fn main(args: Vec<String>) -> isize {
 	let prog = get_prog_name();
@@ -82,107 +69,68 @@ pub fn main(args: Vec<String>) -> isize {
 		return 0;
 	}
 
-	print_header();
-
-	match args[0].as_str() {
+	let res = match args[0].as_str() {
 		"null" => {
-			do_null();
+			do_null()
 		}
 		"spawn" => {
-			do_spawn();
-		}
-		"fs_read_with_open" | "fs1" => {
-			do_fs_read(true /*with_open*/);
-		}
-		"fs_read_only" | "fs2" => {
-			do_fs_read(false /*with_open*/);
-		}
-		"fs_create" | "fs3" => {
-			do_fs_create_del();
-		}
-		"fs_delete" | "fs4" => {
-			do_fs_delete();
+			do_spawn()
 		}
 		"ctx" => {
-			do_ctx();
+			do_ctx()
+		}
+		"memory_map" => {
+			if cfg!(bm_map) {
+				do_memory_map()
+			} else {
+				Err("Need to enable bm_map config option to run the memory_map benchmark")
+			}
+		}
+		"fs_read_with_open" | "fs1" => {
+			do_fs_read(true /*with_open*/)
+		}
+		"fs_read_only" | "fs2" => {
+			do_fs_read(false /*with_open*/)
+		}
+		"fs_create" | "fs3" => {
+			do_fs_create_del()
+		}
+		"fs_delete" | "fs4" => {
+			do_fs_delete()
 		}
 		"fs" => {	// test code for checking FS' ability
-			do_fs_cap_check();
+			do_fs_cap_check()
 		}
 		_arg => {
-			printlninfo!("Unknown command: {}", args[0]);
+			printlnwarn!("Unknown command: {}", args[0]);
 			print_usage(&prog);
 			return 0;
 		}
-	}
+	};
 
-	0
+	match res {
+		Ok(()) => return 0,
+		Err(e) => {
+			println!("Error in completing benchmark: {:?}", e);
+			return -1;
+		}
+	}
 }
 
-/// Measures the overhead of the timer. 
-/// Calls `timing_overhead_inner` multiple times and average the value. 
-/// Overhead is a count value. It is not time. 
-fn timing_overhead() -> u64 {
-	let mut tries: u64 = 0;
-	let mut max: u64 = core::u64::MIN;
-	let mut min: u64 = core::u64::MAX;
-
-	// printlninfo!("Calculating timing_overhead. Patience...");
-	for i in 0..TRIES {
-		let overhead = timing_overhead_inner(i+1, TRIES);
-		tries += overhead;
-		if overhead > max {max = overhead;}
-		if overhead < min {min = overhead;}
-	}
-
-	let overhead = tries / TRIES as u64;
-	let err = (overhead * 10 + overhead * THRESHOLD_ERROR_RATIO) / 10;
-	if 	max - overhead > err || overhead - min > err {
-		printlnwarn!("timing_overhead diff is too big: {} ({} - {}) ctr", max-min, max, min);
-	}
-
-	printlninfo!("Timing overhead: {} ctr\n\n", overhead);
-
-	overhead
-}
-
-/// Internal function that actually calculates timer overhead. 
-/// Calls the timing instruction multiple times and average the value. 
-/// Overhead is a count value. It is not time. 
-fn timing_overhead_inner(th: usize, nr: usize) -> u64 {
-	let mut start_hpet_tmp: u64;
-	let start_hpet: u64;
-	let end_hpet: u64;
-
-	// to warm cache and remove error
-	start_hpet_tmp = get_hpet().as_ref().unwrap().get_counter();
-
-	start_hpet = get_hpet().as_ref().unwrap().get_counter();
-	for _ in 0..ITERATIONS {
-		start_hpet_tmp = get_hpet().as_ref().unwrap().get_counter();
-	}
-	end_hpet = get_hpet().as_ref().unwrap().get_counter();
-
-	let delta_hpet = end_hpet - start_hpet;
-	let delta_hpet_avg = (end_hpet - start_hpet) / ITERATIONS as u64;
-
-	printlninfo!("t_overhead_inner ({}/{}): {} total_ctr -> {} avg_ctr (ignore: {})", 
-		th, nr, delta_hpet, delta_hpet_avg, start_hpet_tmp);
-	delta_hpet_avg
-}
 
 /// Measures the time for null syscall. 
-/// Calls `do_null_inner` multiple times and average the value. 
-fn do_null() {
+/// Calls `do_null_inner` multiple times and averages the value. 
+fn do_null() -> Result<(), &'static str> {
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
-	let mut vec = Vec::new();
+	let mut vec = Vec::with_capacity(TRIES);
 
-	let overhead_ct = timing_overhead();
-	
+	let overhead_ct = hpet_timing_overhead()?;
+	print_header(TRIES, ITERATIONS*1000);
+
 	for i in 0..TRIES {
-		let lat = do_null_inner(overhead_ct, i+1, TRIES);
+		let lat = do_null_inner(overhead_ct, i+1, TRIES)?;
 
 		tries += lat;
 		vec.push(lat);
@@ -190,76 +138,77 @@ fn do_null() {
 		if lat > max {max = lat;}
 		if lat < min {min = lat;}
 	}
-
-	print_stats(vec);
+	
 	let lat = tries / TRIES as u64;
-	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
+	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
 	if 	max - lat > err || lat - min > err {
 		printlnwarn!("null_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
 	}
-
-	printlninfo!("NULL result: {} {}", lat, T_UNIT);
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
+	
+	printlninfo!("NULL result: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_syscall null` in LMBench");
+	Ok(())
 }
 
 /// Internal function that actually calculates the time for null syscall.
 /// Measures this by calling `get_my_current_task_id` of the current task. 
-fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> u64 {
+fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
 	let mut mypid = core::usize::MAX;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// Since this test takes very little time we multiply the default iterations by 1000
 	let tmp_iterations = ITERATIONS *1000;
 
-
-	start_hpet = get_hpet().as_ref().unwrap().get_counter();
+	start_hpet = hpet.get_counter();
 	for _ in 0..tmp_iterations {
 		mypid = task::get_my_current_task_id().unwrap();
 	}
-	end_hpet = get_hpet().as_ref().unwrap().get_counter();
-
+	end_hpet = hpet.get_counter();
 
 	let mut delta_hpet: u64 = end_hpet - start_hpet;
-
-	if delta_hpet < overhead_ct { // Errorneous case
+	if delta_hpet < overhead_ct { // Erroneous case
 		printlnwarn!("Ignore overhead for null because overhead({}) > diff({})", overhead_ct, delta_hpet);
 	} else {
 		delta_hpet -= overhead_ct;
 	}
-
 	let delta_time = hpet_2_time("", delta_hpet);
-	let delta_time_avg = delta_time / ((ITERATIONS*1000) as u64);
+	let delta_time_avg = delta_time / (tmp_iterations as u64);
 
 	printlninfo!("null_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {} (ignore: {})",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT, mypid);
 
-	delta_time_avg
+	Ok(delta_time_avg)
 }
 
 /// Measures the time to spawn an application. 
-/// Calls `do_spawn_inner` multiple times and average the value. 
-fn do_spawn() {
-	let child_core = match pick_child_core() {
+/// Calls `do_spawn_inner` multiple times and averages the value. 
+fn do_spawn() -> Result<(), &'static str>{
+	let child_core = match pick_free_core() {
 		Ok(child_core) => { 
 			printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
 			child_core
 		}
 		_ => {
-			printlninfo!("Cannot conduct spawn test because cores are busy");
-			return;
+			printlnwarn!("Cannot conduct spawn test because cores are busy");
+			return Err("Cannot conduct spawn test because cores are busy");
 		}
 	};
 
 	let mut tries: u64 = 0;
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
-	let mut vec = Vec::new();
+	let mut vec = Vec::with_capacity(TRIES);
 
-	let overhead_ct = timing_overhead();
+	let overhead_ct = hpet_timing_overhead()?;
+	print_header(TRIES, ITERATIONS);
 	
 	for i in 0..TRIES {
-		let lat = do_spawn_inner(overhead_ct, i+1, TRIES, child_core).expect("Error in spawn inner()");
+		let lat = do_spawn_inner(overhead_ct, i+1, TRIES, child_core)?;
 
 		tries += lat;
 		vec.push(lat);
@@ -268,45 +217,231 @@ fn do_spawn() {
 		if lat < min {min = lat;}
 	}
 
-	print_stats(vec);
-
 	let lat = tries / TRIES as u64;
-	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
 
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
 	if 	max - lat > err || lat - min > err {
 		printlnwarn!("spawn_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
 	}
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
 
-	printlninfo!("SPAWN result: {} {}", lat, T_UNIT);
+	printlninfo!("SPAWN result: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
+
+	Ok(())
 }
 
-/// Internal function that actually calculates the time for spawn an application.
+/// Internal function that actually calculates the time to spawn an application.
 /// Measures this by using `TaskBuilder` to spawn a application task.
 fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
-    let start_hpet: u64;
-	let end_hpet: u64;
-	let tmp_iterations: u64 = 100;
+    let mut start_hpet: u64;
+	let mut end_hpet: u64;
+	let mut delta_hpet = 0;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
+	// Get path to application "hello" that we're going to spawn
+	let namespace_dir = task::get_my_current_task()
+		.map(|t| t.get_namespace().dir().clone())
+		.ok_or("could not find the application namespace")?;
+	let app_path = namespace_dir.get_file_starting_with("hello-")
+		.map(|f| Path::new(f.lock().get_absolute_path()))
+		.ok_or("Could not find the application 'hello'")?;
 
-	start_hpet = get_hpet().as_ref().unwrap().get_counter();
-	for _ in 0..tmp_iterations {
-		let child = spawn::new_application_task_builder(Path::new(String::from("hello")), None)?
-	        .pin_on_core(child_core) // the child is always in the my core -1
-	        //.argument(Vec::new())
+	// here we are taking the time at every iteration. 
+	// otherwise the crate is not fully unloaded from the namespace before the next iteration starts 
+	// so it cannot be loaded again and we are returned an error.
+	for _ in 0..ITERATIONS{
+		start_hpet = hpet.get_counter();
+		let child = spawn::new_application_task_builder(app_path.clone(), None)?
+	        .pin_on_core(child_core) 
 	        .spawn()?;
 
-	    child.join().expect("Cannot join child");
-	    child.take_exit_value().expect("Cannot take the exit value");
+	    child.join()?;
+	    child.take_exit_value().ok_or("Couldn't retrieve exit value")?;
+	    end_hpet = hpet.get_counter();
+		delta_hpet += end_hpet - start_hpet - overhead_ct;		
 	}
-    end_hpet = get_hpet().as_ref().unwrap().get_counter();
 
-
-    let delta_hpet = end_hpet - start_hpet - overhead_ct;
     let delta_time = hpet_2_time("", delta_hpet);
-    let delta_time_avg = delta_time / tmp_iterations as u64;
+    let delta_time_avg = delta_time / ITERATIONS as u64;
 	printlninfo!("spawn_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
+		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
+
+	Ok(delta_time_avg)
+}
+
+
+/// Measures the time to switch between two kernel threads. 
+/// Calls `do_ctx_inner` multiple times to perform the actual operation
+fn do_ctx() -> Result<(), &'static str> {
+	let child_core = match pick_free_core() {
+		Ok(child_core) => { 
+			printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
+			child_core
+		}
+		_ => {
+			printlnwarn!("Cannot conduct ctx test because cores are busy");
+			return Err("Cannot conduct ctx test because cores are busy");
+		}
+	};
+
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::with_capacity(TRIES);
+	
+	print_header(TRIES, ITERATIONS*1000*2);
+
+	for i in 0..TRIES {
+		let lat = do_ctx_inner(i+1, TRIES, child_core)?;
+	
+		tries += lat;
+		vec.push(lat);
+
+		if lat > max {max = lat;}
+		if lat < min {min = lat;}
+	}
+
+	let lat = tries / TRIES as u64;
+
+	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
+	if 	max - lat > err || lat - min > err {
+		printlnwarn!("ctx_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+	}
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
+
+	printlninfo!("Context switch result: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
+	printlninfo!("This test does not have an equivalent test in LMBench");
+
+	Ok(())
+}
+
+/// Internal function that actually calculates the time to context switch between two threads.
+/// This is measured by creating two tasks and pinning them to the same core.
+/// The tasks yield to each other repetitively.
+/// Overhead is measured by doing the above operation with two tasks that just return.
+fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
+    let start_hpet: u64;
+	let end_hpet: u64;
+	let overhead_end_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+	// we first spawn two tasks to get the overhead of creating and joining 2 tasks
+	// we will subtract this time from the total time so that we are left with the actual time to context switch
+	start_hpet = hpet.get_counter();
+
+		let taskref3 = spawn::new_task_builder(overhead_task ,1)
+			.name(String::from("overhead_task_1"))
+			.pin_on_core(child_core)
+			.spawn()?;
+
+		let taskref4 = spawn::new_task_builder(overhead_task ,2)
+			.name(String::from("overhead_task_2"))
+			.pin_on_core(child_core)
+			.spawn()?;
+
+		taskref3.join()?;
+		taskref4.join()?;
+
+		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref4.take_exit_value().ok_or("could not retrieve exit value")?;
+
+
+	overhead_end_hpet = hpet.get_counter();
+
+	// we then spawn them with yielding enabled
+
+		let taskref1 = spawn::new_task_builder(yield_task ,1)
+			.name(String::from("yield_task_1"))
+			.pin_on_core(child_core)
+			.spawn()?;
+
+		let taskref2 = spawn::new_task_builder(yield_task ,2)
+			.name(String::from("yield_task_2"))
+			.pin_on_core(child_core)
+			.spawn()?;
+
+		taskref1.join()?;
+		taskref2.join()?;
+
+		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref2.take_exit_value().ok_or("could not retrieve exit value")?;
+
+    end_hpet = hpet.get_counter();
+
+    let delta_overhead = overhead_end_hpet - start_hpet;
+	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
+    let delta_time = hpet_2_time("", delta_hpet);
+	let overhead_time = hpet_2_time("", delta_overhead);
+    let delta_time_avg = delta_time / (ITERATIONS*1000*2) as u64; //*2 because each thread yields ITERATION number of times
+	printlninfo!("ctx_switch_test_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+
+	Ok(delta_time_avg)
+}
+
+/// Measures the time to create and destroy a mapping. 
+/// Calls `do_memory_map_inner` multiple times to perform the actual operation
+fn do_memory_map() -> Result<(), &'static str> {
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::with_capacity(TRIES);
+
+	let overhead_ct = hpet_timing_overhead()?;
+	print_header(TRIES, ITERATIONS);
+
+	for i in 0..TRIES {
+		let lat = do_memory_map_inner(overhead_ct, i+1, TRIES)?;
+
+		tries += lat;
+		vec.push(lat);
+
+		if lat > max {max = lat;}
+		if lat < min {min = lat;}
+	}
+	
+	let lat = tries / TRIES as u64;
+	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
+	if 	max - lat > err || lat - min > err {
+		printlnwarn!("memory_map_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+	}
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
+	
+	printlninfo!("MEMORY MAP result: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
+	printlninfo!("This test is equivalent to `lat_mmap` in LMBench");
+	Ok(())
+}
+
+/// Internal function that actually calculates the time to create and destroy a memory mapping.
+/// Measures this by continually allocating and dropping `MappedPages`.
+fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static str> {
+	const MAPPING_SIZE: usize = 4096;
+
+    let start_hpet: u64;
+	let end_hpet: u64;
+	let delta_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+	start_hpet = hpet.get_counter();
+
+	for _ in 0..ITERATIONS{
+		let mapping = create_mapping(MAPPING_SIZE, EntryFlags::WRITABLE)?;
+		drop(mapping);
+	}
+
+	end_hpet = hpet.get_counter();
+
+	delta_hpet = end_hpet - start_hpet - overhead_ct;
+    let delta_time = hpet_2_time("", delta_hpet);
+    let delta_time_avg = delta_time / ITERATIONS as u64;
+	printlninfo!("memory_map_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
 
 	Ok(delta_time_avg)
@@ -316,27 +451,28 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 /// Accepts a bool argument. If true includes the latency to open a file
 /// If false only measure the time to read from file.
 /// Actual measuring is deferred to `do_fs_read_with_size` function
-fn do_fs_read(with_open: bool) {
+fn do_fs_read(with_open: bool) -> Result<(), &'static str>{
 	let fsize_kb = 1024;
 	printlninfo!("File size     : {} KB", fsize_kb);
 	printlninfo!("Read buf size : {} KB", READ_BUF_SIZE / 1024);
 	printlninfo!("========================================");
 
-	let overhead_ct = timing_overhead();
+	let overhead_ct = hpet_timing_overhead()?;
 
-	do_fs_read_with_size(overhead_ct, fsize_kb, with_open);
+	do_fs_read_with_size(overhead_ct, fsize_kb, with_open)?;
 	if with_open {
 		printlninfo!("This test is equivalent to `bw_file_rd open2close` in LMBench");
 	} else {
 		printlninfo!("This test is equivalent to `bw_file_rd io_only` in LMBench");
 	}
+	Ok(())
 }
 
 /// Internal function measure file read and read with open time.
 /// Accepts `timing overhead`, `file size` and `with_open` bool parameter.
 /// If `with_open` is true calls `do_fs_read_with_open_inner` to measure time to open and read.
 /// If `with_open` is false calls `do_fs_read_only_inner` to measure time to read only.
-fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
+fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) -> Result<(), &'static str> {
 	let mut tries: u64 = 0;
 	let mut tries_mb: u64 = 0;
 	let mut tries_kb: u64 = 0;
@@ -366,7 +502,7 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 		if lat < min {min = lat;}
 	}
 
-	print_stats(vec);
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
 
 	let lat = tries / TRIES as u64;
 	let tput_mb = tries_mb / TRIES as u64;
@@ -376,9 +512,12 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 		printlnwarn!("test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
 	}
 
+	print_header(TRIES, ITERATIONS);
 	printlninfo!("{} for {} KB: {} {} {} MB/sec {} KB/sec", 
 		if with_open {"READ WITH OPEN"} else {"READ ONLY"}, 
 		fsize_kb, lat, T_UNIT, tput_mb, tput_kb);
+	printlninfo!("{:?}", stats);
+	Ok(())
 }
 
 /// Internal function that actually calculates the time for open and read a file.
@@ -387,6 +526,9 @@ fn do_fs_read_with_size(overhead_ct: u64, fsize_kb: usize, with_open: bool) {
 fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+
 	let path = Path::new(filename.to_string());
 	let mut _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
@@ -402,7 +544,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 		return Err("File size is not alligned");
 	}
 
-	start_hpet = get_hpet().as_ref().unwrap().get_counter();
+	start_hpet = hpet.get_counter();
 	for _ in 0..ITERATIONS 	{
 		let file_dir_enum = path.get(&get_cwd().unwrap()).expect("Cannot find file");
 		match file_dir_enum {
@@ -427,7 +569,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 			}
         }
 	}
-	end_hpet = get_hpet().as_ref().unwrap().get_counter();
+	end_hpet = hpet.get_counter();
 
 	let delta_hpet = end_hpet - start_hpet - overhead_ct;
 	let delta_time = hpet_2_time("", delta_hpet);
@@ -449,6 +591,9 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize) -> Result<(u64, u64, u64), &'static str> {
 	let start_hpet: u64;
 	let end_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+
 	let path = Path::new(filename.to_string());
 	let _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
@@ -469,7 +614,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
         FileOrDir::File(fileref) => { 
         	let file = fileref.lock();	// so far, open()
 
-			start_hpet = get_hpet().as_ref().unwrap().get_counter();
+			start_hpet = hpet.get_counter();
 			for _ in 0..ITERATIONS 	{
 				unread_size = size;
             	while unread_size > 0 {	// now read()
@@ -483,7 +628,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 					// _dummy_sum += buf.iter().fold(0 as u64, |acc, &x| acc + x as u64);
             	}
 			}	// for
-			end_hpet = get_hpet().as_ref().unwrap().get_counter();
+			end_hpet = hpet.get_counter();
 
         }
         _ => {
@@ -508,18 +653,21 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 /// Measures the time to create and write to a file. 
 /// Calls `do_fs_create_del_inner` multiple times to perform the actual operation
 /// File sizes of 1K, 4K and 10K are measured in this function
-fn do_fs_create_del() {
+fn do_fs_create_del() -> Result<(), &'static str> {
 	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
 	let	fsizes_b = [1024_usize, 4096, 10*1024];
 	// let	fsizes_b = [1024*1024];
 
-	let overhead_ct = timing_overhead();
+	let overhead_ct = hpet_timing_overhead()?;
 
+	print_header(TRIES, ITERATIONS);
 	printlninfo!("SIZE(KB)    Iteration    created(files/s)     time(ns/file)");
 	for fsize_b in fsizes_b.iter() {
-		do_fs_create_del_inner(*fsize_b, overhead_ct).expect("Cannot test File Create & Del");
+		do_fs_create_del_inner(*fsize_b, overhead_ct)?;
 	}
 	printlninfo!("This test is equivalent to file create in `lat_fs` in LMBench");
+
+	Ok(())
 }
 
 /// Internal function that actually calculates the time to create and write to a file.
@@ -531,6 +679,8 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	let end_hpet_create: u64;
 	let _start_hpet_del: u64;
 	let _end_hpet_del: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
 
 	// don't put these (populating files, checks, etc) into the loop to be timed
 	// The loop must be doing minimal operations to exclude unnecessary overhead
@@ -557,13 +707,13 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	let wbuf = &WRITE_BUF[0..fsize_b];
 
 	// Measuring loop - create
-	start_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+	start_hpet_create = hpet.get_counter();
 	for filename in filenames {
 		// We first create a file and then write to resemble LMBench.
 		let file = HeapFile::new(filename, &cwd).expect("File cannot be created.");
 		file.lock().write(wbuf, 0)?;
 	}
-	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+	end_hpet_create = hpet.get_counter();
 
 	let delta_hpet_create = end_hpet_create - start_hpet_create - overhead_ct;
 	let delta_time_create = hpet_2_time("", delta_hpet_create);
@@ -579,18 +729,20 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 /// File sizes of 1K, 4K and 10K are measured in this function
 /// Note : In `LMBench` creating and deleting is done in the same operation.
 /// Here we use two functions to avoid time to searach a file.
-fn do_fs_delete() {
+fn do_fs_delete() -> Result<(), &'static str> {
 	// let	fsizes_b = [0 as usize, 1024, 4096, 10*1024];	// Theseus thinks creating an empty file is stupid (for memfs)
 	let	fsizes_b = [1024_usize, 4096, 10*1024];
 
-	let overhead_ct = timing_overhead();
+	let overhead_ct = hpet_timing_overhead()?;
 
 	// printlninfo!("SIZE(KB)    Iteration    created(files/s)    deleted(files/s)");
+	print_header(TRIES, ITERATIONS);
 	printlninfo!("SIZE(KB)    Iteration    deleted(files/s)    time(ns/file)");
 	for fsize_b in fsizes_b.iter() {
-		do_fs_delete_inner(*fsize_b, overhead_ct).expect("Cannot test File Delete");
+		do_fs_delete_inner(*fsize_b, overhead_ct)?;
 	}
 	printlninfo!("This test is equivalent to file delete in `lat_fs` in LMBench");
+	Ok(())
 }
 
 /// Internal function that actually calculates the time to delete to a file.
@@ -603,6 +755,8 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 	let end_hpet_create: u64;
 	let _start_hpet_del: u64;
 	let _end_hpet_del: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
 	let mut file_list = Vec::new();
 
 	// don't put these (populating files, checks, etc) into the loop to be timed
@@ -640,14 +794,14 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 
 	let mut cwd_locked = cwd.lock();
 
-	start_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+	start_hpet_create = hpet.get_counter();
 
 	// Measuring loop file delete
 	for fileref in file_list{
 		cwd_locked.remove(&FileOrDir::File(fileref)).expect("Cannot remove File in Create & Del inner");
 	}
 
-	end_hpet_create = get_hpet().as_ref().unwrap().get_counter();
+	end_hpet_create = hpet.get_counter();
 
 	let delta_hpet_delete = end_hpet_create - start_hpet_create - overhead_ct;
 	let delta_time_delete = hpet_2_time("", delta_hpet_delete);
@@ -658,106 +812,7 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 	Ok(())
 }
 
-/// Measures the time to switch between two kernel threads. 
-/// Calls `do_ctx_inner` multiple times to perform the actual operation
-fn do_ctx() {
-	let child_core = match pick_child_core() {
-		Ok(child_core) => { 
-			printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
-			child_core
-		}
-		_ => {
-			printlninfo!("Cannot conduct spawn test because cores are busy");
-			return;
-		}
-	};
 
-	// let child_core: u8 = CPU_ID!() as u8 - 1;
-
-	let mut tries: u64 = 0;
-	let mut max: u64 = core::u64::MIN;
-	let mut min: u64 = core::u64::MAX;
-	let mut vec = Vec::new();
-
-	// let overhead_ct = timing_overhead(); // timing overhead is already calculated within inner
-	let lots_of_tries = 1000;
-	for i in 0..lots_of_tries {
-		let lat = do_ctx_inner(i+1, TRIES, child_core).expect("Error in ctx inner()");
-	
-		tries += lat;
-		vec.push(lat);
-
-		if lat > max {max = lat;}
-		if lat < min {min = lat;}
-	}
-
-	print_stats(vec);
-
-	let lat = tries / lots_of_tries as u64;
-	let err = (lat * 10 + lat * THRESHOLD_ERROR_RATIO) / 10;
-	if 	max - lat > err || lat - min > err {
-		printlnwarn!("ctx_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
-	}
-
-	printlninfo!("Context switch result: {} {}", lat, T_UNIT);
-	printlninfo!("This test does not have an equivalent test in LMBench");
-}
-
-/// Internal function that actually calculates the time to context switch between two threads.
-/// This is mesured by creating two tasks and pinning them to the same core.
-/// The tasks yield to each other repetitively.
-/// Overhead is measured by doing the above operation with two tasks that just returns.
-fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
-    let start_hpet: u64;
-	let end_hpet: u64;
-	let overhead_end_hpet: u64;
-
-	// we first span two tasks to get the overhead
-
-	start_hpet = get_hpet().as_ref().unwrap().get_counter();
-
-		let taskref3 = spawn::new_task_builder(overhead_task ,1)
-			.name(String::from("overhead_task"))
-			.pin_on_core(child_core)
-			.spawn().expect("failed to initiate task");
-
-		let taskref4 = spawn::new_task_builder(overhead_task ,2)
-			.name(String::from("overhead_task"))
-			.pin_on_core(child_core)
-			.spawn().expect("failed to initiate task");
-
-		taskref3.join().expect("Task 1 join failed");
-		taskref4.join().expect("Task 2 join failed");
-
-	overhead_end_hpet = get_hpet().as_ref().unwrap().get_counter();
-
-	// we then span them with yielding enabled
-
-		let taskref1 = spawn::new_task_builder(yield_task ,1)
-        .name(String::from("yield_task"))
-        .pin_on_core(child_core)
-        .spawn().expect("failed to initiate task");
-
-		let taskref2 = spawn::new_task_builder(yield_task ,2)
-			.name(String::from("yield_task"))
-			.pin_on_core(child_core)
-			.spawn().expect("failed to initiate task");
-
-		taskref1.join().expect("Task 1 join failed");
-		taskref2.join().expect("Task 2 join failed");
-
-    end_hpet = get_hpet().as_ref().unwrap().get_counter();
-
-    let delta_overhead = overhead_end_hpet - start_hpet;
-	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
-    let delta_time = hpet_2_time("", delta_hpet);
-	let overhead_time = hpet_2_time("", delta_overhead);
-    let delta_time_avg = delta_time / (ITERATIONS*1000*2) as u64; //*2 because each thread yields ITERATION number of times
-	printlninfo!("ctx_switch_test_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
-		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
-
-	Ok(delta_time_avg)
-}
 
 /// Helper function to get the name of current task
 fn get_prog_name() -> String {
@@ -787,17 +842,6 @@ fn getpid() -> usize {
     locked_task.id
 }
 
-/// Helper function to convert ticks to micro seconds
-fn hpet_2_us(hpet: u64) -> u64 {
-	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	hpet * hpet_period as u64 / MICRO_TO_FEMTO
-}
-
-/// Helper function to convert ticks to nano seconds
-fn hpet_2_ns(hpet: u64) -> u64 {
-	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	hpet * hpet_period as u64 / NANO_TO_FEMTO
-}
 
 /// Helper function to convert ticks to time
 fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
@@ -811,77 +855,6 @@ fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
 	t
 }
 
-/// Helper function to print statistics of a provided dataset
-fn print_stats(vec: Vec<u64>) {
-	let avg;
-  	let median;
-  	let perf_75;
-	let perf_25;
-	let min;
-	let max;
-	let var;
-
-  	{ // calculate average
-		let mut sum: u64 = 0;
-		for x in &vec {
-			sum = sum + x;
-		}
-
-		avg = sum as u64 / vec.len() as u64;
-  	}
-
-	{ // calculate median
-		let mut vec2 = vec.clone();
-		vec2.sort();
-		let mid = vec2.len() / 2;
-		let p_75 = vec2.len() *3 / 4;
-		let p_25 = vec2.len() *1 / 4;
-
-		median = vec2[mid];
-		perf_25 = vec2[p_25];
-		perf_75 = vec2[p_75];
-		min = vec2[0];
-		max = vec2[vec.len() - 1];
-  	}
-
-	{ // calculate sample variance
-		let mut diff_sum: u64 = 0;
-      	for x in &vec {
-			if x > &avg {
-				diff_sum = diff_sum + ((x-avg)*(x-avg));
-			}
-			else {
-				diff_sum = diff_sum + ((avg - x)*(avg -x));
-			}
-      	}
-
-    	var = (diff_sum) / (vec.len() as u64 - 1);
-
-	}
-	printlninfo!("\n  mean : {}",avg);
-	printlninfo!("\n  var  : {}",var);
-	printlninfo!("\n  max  : {}",max);
-	printlninfo!("\n  min  : {}",min);
-	printlninfo!("\n  p_50 : {}",median);
-	printlninfo!("\n  p_25 : {}",perf_25);
-	printlninfo!("\n  p_75 : {}",perf_75);
-	printlninfo!("\n");
-}
-
-/// Helper function to pick a free child core if possible
-fn pick_child_core() -> Result<u8, &'static str> {
-	// try with current core -1
-	let child_core: u8 = CPU_ID!() as u8 - 1;
-	if nr_tasks_in_rq(child_core) == Some(1) {return Ok(child_core);}
-
-	// if failed, try from the last to the first
-	for child_core in (0..apic::core_count() as u8).rev() {
-		if nr_tasks_in_rq(child_core) == Some(1) {return Ok(child_core);}
-	}
-	printlninfo!("WARNING : Cannot pick a child core because cores are busy");
-	printlninfo!("WARNING : Selecting current core");
-	return Ok(child_core);
-}
 
 /// Helper function to get current working directory
 fn get_cwd() -> Option<DirRef> {
@@ -997,50 +970,35 @@ fn test_file(filename: &str) {
 }
 
 /// Wrapper of helper function to check file system
-fn do_fs_cap_check() {
+fn do_fs_cap_check() -> Result<(), &'static str> {
 	let filename = format!("tmp{}.txt", getpid());
 	if mk_tmp_file(&filename, 4).is_ok() {
 		printlninfo!("Testing with the file...");
 		test_file(&filename);
 	}
+	Ok(())
 }
 
-/// Helper function return the tasks in a given core's runqueue
-fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
-		_ => { None }
-	}
-}
-
-/// True if only two tasks are running in the current runqueue
-/// Used to verify if there are any other tasks than the current task and idle task in the runqueue
-fn check_myrq() -> bool {
-	match nr_tasks_in_rq(CPU_ID!()) {
-		Some(2) => { true }
-		_ => { false }
-	}
-}
 
 /// Print help
 fn print_usage(prog: &String) {
 	printlninfo!("\nUsage: {} cmd", prog);
-	printlninfo!("\n  availavle cmds:");
+	printlninfo!("\n  available cmds:");
 	printlninfo!("\n    null             : null syscall");
 	printlninfo!("\n    spawn            : process creation");
+	printlninfo!("\n    ctx        		 : inter-thread context switching overhead");
 	printlninfo!("\n    fs_read_with_open: file read including open");
 	printlninfo!("\n    fs_read_only     : file read");
 	printlninfo!("\n    fs_create        : file create");
 	printlninfo!("\n    fs_delete        : file delete");
-	printlninfo!("\n    ctx        		 : inter thread context switching overhead");
 }
 
 /// Print header of each test
-fn print_header() {
+fn print_header(tries: usize, iterations: usize) {
 	printlninfo!("========================================");
 	printlninfo!("Time unit : {}", T_UNIT);
-	printlninfo!("Iterations: {}", ITERATIONS);
-	printlninfo!("Tries     : {}", TRIES);
+	printlninfo!("Iterations: {}", iterations);
+	printlninfo!("Tries     : {}", tries);
 	printlninfo!("Core      : {}", CPU_ID!());
 	printlninfo!("========================================");
 }
