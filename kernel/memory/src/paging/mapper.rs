@@ -531,9 +531,12 @@ impl MappedPages {
             // TODO free p(1,2,3) table if empty
             // _allocator_ref.lock().deallocate_frame(frame);
         }
-
-        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
-            func(self.pages.deref().clone());
+    
+        #[cfg(not(bm_map))]
+        {
+            if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+                func(self.pages.deref().clone());
+            }
         }
 
         Ok(())

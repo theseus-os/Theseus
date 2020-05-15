@@ -16,6 +16,7 @@ use core::ops::DerefMut;
 use alloc::collections::BTreeMap;
 use memory::{MappedPages, allocate_pages, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, get_frame_allocator_ref, PhysicalMemoryArea};
 use sdt::Sdt;
+use core::ops::Add;
 
 /// All ACPI tables are identified by a 4-byte signature,
 /// typically an ASCII string like "APIC" or "RSDT".
@@ -67,7 +68,29 @@ impl AcpiTables {
         let first_frame = Frame::containing_address(sdt_phys_addr);
         // If the Frame containing the given `sdt_phys_addr` wasn't already mapped, then we need to map it.
         if !self.frames.contains(&first_frame) {
-            let new_frames = self.frames.to_extended(first_frame);
+            let mut new_frames = self.frames.to_extended(first_frame);
+
+            let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
+            let new_mapped_pages = page_table.map_allocated_pages_to(
+                new_pages, 
+                new_frames.clone(),
+                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                allocator.lock().deref_mut(),
+            )?;
+
+            self.adjust_mapping_offsets(new_frames, new_mapped_pages);
+            mapping_changed = true;
+        }
+
+
+        let sdt_offset = self.frames.offset_from_start(sdt_phys_addr)
+            .ok_or("BUG: AcpiTables::map_new_table(): SDT physical address wasn't in expected frame iter")?;
+
+        // Here we check if the header of the ACPI table fits at the offset.
+        // If not, we add the next frame as well.
+        if sdt_offset + core::mem::size_of::<Sdt>() > self.mapped_pages.size_in_bytes() {
+            let mut new_frames = self.frames.to_extended(first_frame.add(1));
+
             let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
@@ -82,8 +105,6 @@ impl AcpiTables {
 
         // Here, if the current mapped_pages is insufficient to cover the table's full length,
         // then we need to create a new mapping to cover it and the length of all of its entries.
-        let sdt_offset = self.frames.offset_from_start(sdt_phys_addr)
-            .ok_or("BUG: AcpiTables::map_new_table(): SDT physical address wasn't in expected frame iter")?;
         let (sdt_signature, sdt_length) = {
             let sdt: &Sdt = self.mapped_pages.as_type(sdt_offset)?;
             (sdt.signature, sdt.length as usize)

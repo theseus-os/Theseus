@@ -211,6 +211,7 @@ dependencies = [
  "heapfile 0.1.0",
  "hpet 0.1.0",
  "libtest 0.1.0",
+ "memory 0.1.0",
  "path 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",

@@ -117,32 +117,27 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
 fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with WHOLE tasks, {} tasks...", CONFIG, num_tasks);
-    let mut tries = Vec::with_capacity(TRIES);
     let overhead = hpet_timing_overhead()?;
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
-
-    for try in 0..TRIES {
-        let start = hpet.get_counter();
-        
-        for i in 0..num_tasks {
-            let taskref = spawn::new_task_builder(whole_task, i)
-                .name(format!("rq_whole_task_{}", i))
-                .spawn()?;
-            taskref.join()?;
-            let _ = taskref.take_exit_value();
-        }
-
-        let end = hpet.get_counter();
-        let elapsed_ticks = end - start -overhead;
-        let elapsed_time = hpet_2_us(elapsed_ticks);
-        
-        println!("({}/{}): Elapsed Time {} us", try, TRIES, elapsed_time);
-        tries.push(elapsed_time);
+    let start = hpet.get_counter();
+    
+    for i in 0..num_tasks {
+        let taskref = spawn::new_task_builder(whole_task, i)
+            .name(format!("rq_whole_task_{}", i))
+            .spawn()?;
+        taskref.join()?;
+        let _ = taskref.take_exit_value();
     }
 
-    println!("Completed runqueue WHOLE evaluation. (us)");
-    let stats = calculate_stats(&tries);
-    println!("{:?}", stats);
+    let end = hpet.get_counter();
+    let hpet_period = hpet.counter_period_femtoseconds();
+    let elapsed_ticks = end - start - overhead;
+    let elapsed_time = hpet_2_us(elapsed_ticks);
+    
+    println!("Completed runqueue WHOLE evaluation.");
+    println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
+        elapsed_ticks, hpet_period);
+    println!("Elapsed time:{} us", elapsed_time);
         
     Ok(())
 }
@@ -150,7 +145,6 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
 fn run_single(iterations: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with SINGLE tasks, {} iterations...", CONFIG, iterations);
-    let mut tries = Vec::with_capacity(TRIES);
     let overhead = hpet_timing_overhead()?;
     let mut task = Task::new(
         None,
@@ -160,40 +154,36 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let taskref = TaskRef::new(task);
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
-    
-    for try in 0..TRIES {
-        let start = hpet.get_counter();
+    let start = hpet.get_counter();
         
-        for _i in 0..iterations {
-            runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
+    for _i in 0..iterations {
+        runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
 
-            #[cfg(runqueue_spillful)] 
-            {   
-                let task_on_rq = { taskref.lock().on_runqueue.clone() };
-                if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.try() {
-                    if let Some(rq) = task_on_rq {
-                        remove_from_runqueue(&taskref, rq)?;
-                    }
+        #[cfg(runqueue_spillful)] 
+        {   
+            let task_on_rq = { taskref.lock().on_runqueue.clone() };
+            if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.try() {
+                if let Some(rq) = task_on_rq {
+                    remove_from_runqueue(&taskref, rq)?;
                 }
             }
-            #[cfg(not(runqueue_spillful))]
-            {
-                runqueue::remove_task_from_all(&taskref)?;
-            }
         }
-
-        let end = hpet.get_counter();
-        let elapsed_ticks = end - start -overhead;
-        let elapsed_time = hpet_2_us(elapsed_ticks);
-        
-        println!("({}/{}): Elapsed Time {} us", try, TRIES, elapsed_time);
-        tries.push(elapsed_time);
+        #[cfg(not(runqueue_spillful))]
+        {
+            runqueue::remove_task_from_all(&taskref)?;
+        }
     }
 
-    println!("Completed runqueue SINGLE evaluation. (us)");
-    let stats = calculate_stats(&tries);
-    println!("{:?}", stats);
+    let end = hpet.get_counter();
+    let hpet_period = hpet.counter_period_femtoseconds();
+    let elapsed_ticks = end - start -overhead;
+    let elapsed_time = hpet_2_us(elapsed_ticks);
 
+    println!("Completed runqueue SINGLE evaluation.");
+    println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
+        elapsed_ticks, hpet_period);
+    println!("Elapsed time:{} us", elapsed_time);
+    
     // cleanup the dummy task we created earlier
     taskref.mark_as_exited(Box::new(0usize))?;
     taskref.take_exit_value();
