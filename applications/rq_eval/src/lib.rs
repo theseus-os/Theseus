@@ -47,6 +47,7 @@ const CONFIG: &'static str = "WITHOUT state spill";
 
 const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
 
+
 // #[cfg(not(rq_eval))]
 // pub fn main(args: Vec<String>) -> isize {
 //     println!("Error: the \"rq_eval\" cfg option must be enabled!");
@@ -153,7 +154,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start = hpet.get_counter();
-        
+    
     for _i in 0..iterations {
         runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
 
@@ -174,7 +175,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
 
     let end = hpet.get_counter();
     let hpet_period = hpet.counter_period_femtoseconds();
-    let elapsed_ticks = end - start -overhead;
+    let elapsed_ticks = end - start - overhead;
     let elapsed_time = hpet_2_us(elapsed_ticks);
 
     println!("Completed runqueue SINGLE evaluation.");

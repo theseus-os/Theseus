@@ -69,7 +69,6 @@ impl AcpiTables {
         // If the Frame containing the given `sdt_phys_addr` wasn't already mapped, then we need to map it.
         if !self.frames.contains(&first_frame) {
             let new_frames = self.frames.to_extended(first_frame);
-
             let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
@@ -81,7 +80,6 @@ impl AcpiTables {
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
             mapping_changed = true;
         }
-
 
         let sdt_offset = self.frames.offset_from_start(sdt_phys_addr)
             .ok_or("BUG: AcpiTables::map_new_table(): SDT physical address wasn't in expected frame iter")?;
