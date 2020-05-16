@@ -17,3 +17,4 @@ version = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"
+

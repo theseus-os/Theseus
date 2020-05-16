@@ -15,7 +15,6 @@ use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, get_frame_al
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
-use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
 use super::{EntryFlags, tlb_flush_virt_addr};
 

@@ -93,7 +93,7 @@ impl SCAllocator {
     }
 
     /// Add a page to the partial list
-    fn insert_partial(&mut self, mut new_page: MappedPages8k) {
+    fn insert_partial(&mut self, new_page: MappedPages8k) {
         self.slabs.push(new_page);
         // Any recently used page, we move to the front of the list
         if self.slabs.len() > 1 {
@@ -103,13 +103,13 @@ impl SCAllocator {
     }
 
     /// Add page to empty list.
-    fn insert_empty(&mut self, mut new_page: MappedPages8k) {
+    fn insert_empty(&mut self, new_page: MappedPages8k) {
         self.empty_slabs.push(new_page);
         self.empty_count += 1;
     }
 
     /// Add page to full list.
-    fn insert_full(&mut self, mut new_page: MappedPages8k) {
+    fn insert_full(&mut self, new_page: MappedPages8k) {
         self.full_slabs.push(new_page);
         // Any recently used page, we move to the front of the list
         if self.full_slabs.len() > 1 {
@@ -298,12 +298,12 @@ impl SCAllocator {
         let (ret, slab_page_is_empty, slab_page_was_full, list_id) = {
             // find slab page from partial slabs
             let mut page = self.slabs.iter_mut().enumerate()
-                .find(|(id,mp)| mp.start_address() == page_vaddr);
+                .find(|(_id,mp)| mp.start_address() == page_vaddr);
             
             // if it was not in the partial slabs then it should be in the full slabs
             if page.is_none() {
                 page = self.full_slabs.iter_mut().enumerate()
-                .find(|(id,mp)| mp.start_address() == page_vaddr)
+                .find(|(_id,mp)| mp.start_address() == page_vaddr)
             }
 
             let mp = page.ok_or("could not find page to deallocate from")?;
