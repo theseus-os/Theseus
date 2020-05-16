@@ -83,7 +83,7 @@ pub const KERNEL_HEAP_INITIAL_SIZE: usize = 16 * 1024 * 1024; //16 MiB
 #[cfg(safe_heap)]
 /// When using the safe version of the heap we are creating large, statically sized buffers on the initial heap.
 /// So the initial heap size is larger in this case.
-pub const KERNEL_HEAP_INITIAL_SIZE: usize = 20 * 1024 * 1024; //256 MiB
+pub const KERNEL_HEAP_INITIAL_SIZE: usize = 20 * 1024 * 1024; //20 MiB
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
