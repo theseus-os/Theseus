@@ -30,8 +30,6 @@
 extern crate memory;
 #[macro_use] extern crate log;
 extern crate alloc;
-extern crate hashbrown;
-extern crate fnv;
 
 mod pages;
 mod sc;
@@ -46,14 +44,9 @@ use core::mem;
 use core::ptr::{self, NonNull};
 use memory::{MappedPages, VirtualAddress};
 use alloc::vec::Vec;
-use hashbrown::HashMap;
-use fnv::{FnvBuildHasher, FnvHasher};
-use core::hash::{Hasher, BuildHasherDefault};
 
 #[cfg(target_arch = "x86_64")]
 const CACHE_LINE_SIZE: usize = 64;
-
-pub type FnvHashMap<K, V> = HashMap<K, V, FnvBuildHasher>;
 
 
 

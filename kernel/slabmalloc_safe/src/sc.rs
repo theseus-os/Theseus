@@ -69,9 +69,9 @@ macro_rules! new_sc_allocator {
             page_count: 0,
             obj_per_page: cmin((MappedPages8k::SIZE - MappedPages8k::METADATA_SIZE) / $size, 8 * 64),
             empty_count: 0,
-            empty_slabs: Vec::new(),
-            slabs: Vec::new(),
-            full_slabs: Vec::new()
+            empty_slabs: Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE),
+            slabs: Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE),
+            full_slabs: Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE)
         }
     };
 }
@@ -79,16 +79,12 @@ macro_rules! new_sc_allocator {
 impl SCAllocator {
     const _REBALANCE_COUNT: usize = 10_000;
     /// The maximum number of allocable pages the SCAllocator can hold.
-    pub const MAX_PAGE_LIST_SIZE: usize = 122*100; // ~100 MiB
+    pub const MAX_PAGE_LIST_SIZE: usize = 122*10; // ~10 MiB
 
-    /// Creates a new SCAllocator and initializes the page lists to have a length of `PAGE_LIST_SIZE`.
-    /// After initialization, the length of the list won't change. 
+    /// Creates a new SCAllocator and initializes the page lists to have a capacity of `MAX_PAGE_LIST_SIZE`.
+    /// After initialization, the length of the list won't exceed the capacity. 
     pub fn new(size: usize) -> SCAllocator {
-        let mut sc = new_sc_allocator!(size);
-        sc.empty_slabs = Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE);
-        sc.slabs = Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE);
-        sc.full_slabs = Vec::with_capacity(Self::MAX_PAGE_LIST_SIZE);
-        sc
+        new_sc_allocator!(size)
     }
 
     /// Returns the maximum supported object size of this allocator.
@@ -99,59 +95,57 @@ impl SCAllocator {
     /// Add a page to the partial list
     fn insert_partial(&mut self, mut new_page: MappedPages8k) {
         self.slabs.push(new_page);
+        // Any recently used page, we move to the front of the list
         if self.slabs.len() > 1 {
             let mp = self.slabs.swap_remove(0);
             self.slabs.push(mp);
         }
-        // error!("partial list size: {}", self.slabs.len());
     }
 
     /// Add page to empty list.
     fn insert_empty(&mut self, mut new_page: MappedPages8k) {
         self.empty_slabs.push(new_page);
+        self.empty_count += 1;
     }
 
     /// Add page to full list.
     fn insert_full(&mut self, mut new_page: MappedPages8k) {
         self.full_slabs.push(new_page);
+        // Any recently used page, we move to the front of the list
         if self.full_slabs.len() > 1 {
             let mp = self.full_slabs.swap_remove(0);
             self.full_slabs.push(mp);
         }
-        // error!("full list size: {}", self.full_slabs.len());
     }
 
     fn remove_empty(&mut self) -> Option<MappedPages8k> {
-        self.empty_slabs.pop()
+        self.empty_slabs.pop().and_then(|mp| {self.empty_count -= 1; Some(mp)} )
     }
 
-    fn remove_partial(&mut self, id: usize) -> Result<MappedPages8k, &'static str> {
-        Ok(self.slabs.swap_remove(id))
+    fn remove_partial(&mut self, id: usize) -> MappedPages8k {
+        self.slabs.swap_remove(id)
     }
 
-    fn remove_full(&mut self, id: usize) -> Result<MappedPages8k, &'static str> {
-        Ok(self.full_slabs.swap_remove(id))
+    fn remove_full(&mut self, id: usize) -> MappedPages8k {
+        self.full_slabs.swap_remove(id)
     }
 
     /// Move a page from `slabs` to `empty_slabs`.
-    fn move_partial_to_empty(&mut self, id: usize) -> Result<(), &'static str>{
-        let page = self.remove_partial(id)?;
+    fn move_partial_to_empty(&mut self, id: usize) {
+        let page = self.remove_partial(id);
         self.insert_empty(page);
-        Ok(())
     }
 
     /// Move a page from `slabs` to `full_slabs`.
-    fn move_partial_to_full(&mut self, id: usize) -> Result<(), &'static str> {
-        let page = self.remove_partial(id)?;
+    fn move_partial_to_full(&mut self, id: usize) {
+        let page = self.remove_partial(id);
         self.insert_full(page);
-        Ok(())
     }
 
     /// Move a page from `full_slabs` to `slab`.
-    fn move_full_to_partial(&mut self, id: usize) -> Result<(), &'static str> {
-        let page = self.remove_full(id)?;
+    fn move_full_to_partial(&mut self, id: usize) {
+        let page = self.remove_full(id);
         self.insert_partial(page);
-        Ok(())
     }
 
     /// Tries to allocate a block of memory with respect to the `layout`.
@@ -161,17 +155,15 @@ impl SCAllocator {
     /// # Arguments
     ///  * `sc_layout`: This is not the original layout but adjusted for the
     ///     SCAllocator size (>= original).
-    fn try_allocate_from_pagelist(&mut self, sc_layout: Layout) -> Result<*mut u8, &'static str> {
+    fn try_allocate_from_pagelist(&mut self, sc_layout: Layout) -> *mut u8 {
         // TODO: Do we really need to check multiple slab pages (due to alignment)
         // If not we can get away with a singly-linked list and have 8 more bytes
         // for the bitfield in an ObjectPage.
         let mut need_to_move = false;
         let mut ret_ptr = ptr::null_mut();
-        let mut addr = VirtualAddress::zero();
         let mut list_id = 0;
 
         for (id, slab_page) in self.slabs.iter_mut().enumerate() {
-            addr = slab_page.start_address();
             let page = slab_page.as_objectpage8k_mut();
             let ptr = page.allocate(sc_layout);
             if !ptr.is_null() {
@@ -189,7 +181,7 @@ impl SCAllocator {
         }
 
         if need_to_move {
-            self.move_partial_to_full(list_id)?;
+            self.move_partial_to_full(list_id);
         }
 
         // // Periodically rebalance page-lists (since dealloc can't do it for us)
@@ -197,7 +189,7 @@ impl SCAllocator {
         //     self.check_page_assignments();
         // }
 
-        Ok(ret_ptr)
+        ret_ptr
     }
 
     /// Refill the SCAllocator
@@ -248,7 +240,7 @@ impl SCAllocator {
         let ptr = {
             // Try to allocate from partial slabs,
             // if we fail check if we have empty pages and allocate from there
-            let mut ptr = self.try_allocate_from_pagelist(new_layout)?;
+            let mut ptr = self.try_allocate_from_pagelist(new_layout);
             if ptr.is_null() {
                 if let Some(mut empty_page) =  self.remove_empty() {
                     ptr = empty_page.as_objectpage8k_mut().allocate(layout);
@@ -329,11 +321,11 @@ impl SCAllocator {
         if slab_page_is_empty {
             // We need to move it from self.slabs -> self.empty_slabs
             // trace!("move {:p} partial -> empty", page_vaddr);
-            self.move_partial_to_empty(list_id)?;
+            self.move_partial_to_empty(list_id);
         } else if slab_page_was_full {
             // We need to move it from self.full_slabs -> self.slabs
             // trace!("move {:p} full -> partial", page_vaddr);
-            self.move_full_to_partial(list_id)?;
+            self.move_full_to_partial(list_id);
         }
 
         ret
