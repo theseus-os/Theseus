@@ -29,3 +29,6 @@ path = "../../kernel/runqueue"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
+
+[dependencies.libtest]
+path = "../../kernel/libtest"
