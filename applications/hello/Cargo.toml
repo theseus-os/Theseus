@@ -16,3 +16,22 @@ path = "../../kernel/terminal_print"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
+
+[dependencies.slabmalloc]
+path = "../../kernel/slabmalloc"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+[dependencies.hpet]
+path = "../../kernel/hpet"
+
+[dependencies.libtest]
+path = "../../kernel/libtest"
+
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
+[dependencies.fnv]
+version = "1.0.7"
+default-features = false

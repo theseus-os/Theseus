@@ -716,6 +716,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "fnv"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "font"
 version = "0.1.0"
 dependencies = [
@@ -878,7 +883,13 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
+ "fnv 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hpet 0.1.0",
+ "libtest 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "slabmalloc 0.7.0",
  "terminal_print 0.1.0",
 ]
 
@@ -2178,6 +2189,8 @@ dependencies = [
 name = "slabmalloc_safe"
 version = "0.7.0"
 dependencies = [
+ "fnv 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
 ]
@@ -2745,6 +2758,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)" = "<none>"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
+"checksum fnv 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 "checksum generic-array 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"
 "checksum getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)" = "<none>"
 "checksum gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)" = "162d18ae5f2e3b90a993d202f1ba17a5633c2484426f8bcae201f86194bacd00"

@@ -2,6 +2,9 @@
 //! 
 //! The original version can be found on MicroQuill's website
 //! http://www.microquill.com/smartheap/shbench/bench.zip
+//! 
+//! Since shbench stresses the system and continuously grows the heap,
+//! we run each trial after restarting Theseus so that the initial size of the heap is the same for each trial.
 
 use alloc::{
     vec::Vec,
@@ -14,7 +17,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use core::ptr;
 use hpet::get_hpet;
 use libtest::{hpet_2_us, calculate_stats, hpet_timing_overhead};
-use crate::{NTHREADS, ALLOCATOR, TRIES};
+use crate::{NTHREADS, ALLOCATOR};
 #[cfg(direct_access_to_multiple_heaps)]
 use crate::overhead_of_accessing_multiple_heaps;
 
@@ -36,7 +39,6 @@ pub fn do_shbench() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
     let niterations = NITERATIONS.load(Ordering::SeqCst);
-    let mut tries = Vec::with_capacity(TRIES as usize);
 
     let hpet_overhead = hpet_timing_overhead()?;
     let hpet_ref = get_hpet(); 
@@ -51,44 +53,27 @@ pub fn do_shbench() -> Result<(), &'static str> {
         println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    // #[cfg(not(safe_heap))]
-    let num_tries = TRIES;
-    // #[cfg(safe_heap)]
-    // let num_tries = 1;
+    let mut threads = Vec::with_capacity(nthreads);
 
-    for try in 0..num_tries {
-        let mut threads = Vec::with_capacity(nthreads);
+    let start = hpet.get_counter();
 
-        let start = hpet.get_counter();
+    for _ in 0..nthreads {
+        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
+    }  
 
-        for _ in 0..nthreads {
-            threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
-        }  
-
-        for i in 0..nthreads {
-            threads[i].join()?;
-        }
-
-        let end = hpet.get_counter() - hpet_overhead;
-
-        // Don't want this to be part of the timing measurement
-        for thread in threads {
-            thread.take_exit_value();
-        }
-
-        let diff = hpet_2_us(end - start);
-        println!("[{}] shbench time: {} us", try, diff);
-        tries.push(diff);
+    for i in 0..nthreads {
+        threads[i].join()?;
     }
 
-    // #[cfg(safe_heap)]
-    // println!("Ran shbench using the safe heap which has reached its maximum size limit. To get next measurement point, restart Theseus and run again");
+    let end = hpet.get_counter() - hpet_overhead;
 
-    // #[cfg(not(safe_heap))]
-    // {
-        println!("shbench stats (us)");
-        println!("{:?}", calculate_stats(&tries));
-    // }
+    // Don't want this to be part of the timing measurement
+    for thread in threads {
+        thread.take_exit_value();
+    }
+
+    let diff = hpet_2_us(end - start);
+    println!("shbench time: {} us", diff);
 
     Ok(())
 }
@@ -134,85 +119,75 @@ fn worker(_:()) {
         layouts.push(Layout::new::<u8>());
     }
 
-    // for _ in 0..1000 {
-    //     mp = 0;
-    //     mpe = alloc_count;
-    //     ave_start = 0;
-    //     save_end = 0;
-        for _ in 0..niterations {
-            let mut size_base = min_block_size;
-            while size_base < max_block_size {
-                let mut size = size_base;
-                while size > 0 {
-                    let mut iterations = 1;
+    for _ in 0..niterations {
+        let mut size_base = min_block_size;
+        while size_base < max_block_size {
+            let mut size = size_base;
+            while size > 0 {
+                let mut iterations = 1;
 
-                    // smaller sizes will be allocated a larger amount
-                    if size < 10000 { iterations = 10; }
-                    if size < 1000 { iterations *= 5; }
-                    if size < 100 {iterations *= 5; }
+                // smaller sizes will be allocated a larger amount
+                if size < 10000 { iterations = 10; }
+                if size < 1000 { iterations *= 5; }
+                if size < 100 {iterations *= 5; }
 
-                    for _ in 0..iterations {
-                        let layout = Layout::from_size_align(size, 2).unwrap();
-                        let ptr = unsafe{ allocator.alloc(layout) };
-
-                        if ptr.is_null() {
-                            error!("Out of Heap Memory");
-                            return;
-                        }
-
-                        allocations[mp] = ptr;
-                        layouts[mp] = layout;
-                        mp += 1;
-
-                        // start storing new allocations after the region of pointers that have been saved
-                        if mp == save_start {
-                            mp = save_end;
-                        }
-
-                        // reached the end of the buffer, so now free all allocations except a portion marked by 
-                        // save_start and save_end
-                        if mp >= mpe {
-                            mp = 0;
-                            save_start = save_end;
-                            if save_start >= mpe {
-                                save_start = mp;
-                            }
-                            save_end = save_start + (alloc_count/5);
-                            if save_end > mpe {
-                                save_end = mpe;
-                            }
-                            // free the top part of the buffer, the oldest allocations first
-                            while mp < save_start {
-                                unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
-                                mp += 1;
-                            }
-                            mp = mpe;
-                            // free the end of the buffer, the newest allocations first
-                            while mp > save_end {
-                                mp -= 1;
-                                unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
-                            }
-                            mp = 0;
-                        }
+                for _ in 0..iterations {
+                    let layout = Layout::from_size_align(size, 2).unwrap();
+                    let ptr = unsafe{ allocator.alloc(layout) };
+                    if ptr.is_null() {
+                        error!("Out of Heap Memory");
+                        return;
                     }
-                    size /= 2;
+
+                    allocations[mp] = ptr;
+                    layouts[mp] = layout;
+                    mp += 1;
+
+                    // start storing new allocations after the region of pointers that have been saved
+                    if mp == save_start {
+                        mp = save_end;
+                    }
+
+                    // reached the end of the buffer, so now free all allocations except a portion marked by 
+                    // save_start and save_end
+                    if mp >= mpe {
+                        mp = 0;
+                        save_start = save_end;
+                        if save_start >= mpe {
+                            save_start = mp;
+                        }
+                        save_end = save_start + (alloc_count/5);
+                        if save_end > mpe {
+                            save_end = mpe;
+                        }
+                        // free the top part of the buffer, the oldest allocations first
+                        while mp < save_start {
+                            unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
+                            mp += 1;
+                        }
+                        mp = mpe;
+                        // free the end of the buffer, the newest allocations first
+                        while mp > save_end {
+                            mp -= 1;
+                            unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
+                        }
+                        mp = 0;
+                    }
                 }
-                size_base = size_base * 3 / 2 + 1
+                size /= 2;
             }
+            size_base = size_base * 3 / 2 + 1
         }
+    }
 
-        //free residual allocations
-        mpe = mp;
-        mp = 0;
+    //free residual allocations
+    mpe = mp;
+    mp = 0;
 
-        while mp < mpe {
-            unsafe{ allocator.dealloc(allocations[mp], layouts[mp]); }
-            mp += 1;
-        }
-
-
-    // }        
-
+    while mp < mpe {
+        unsafe{ allocator.dealloc(allocations[mp], layouts[mp]); }
+        mp += 1;
+    }
 }
 
 

@@ -18,3 +18,10 @@ version = "0.4.8"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
+[dependencies.fnv]
+version = "1.0.7"
+default-features = false
