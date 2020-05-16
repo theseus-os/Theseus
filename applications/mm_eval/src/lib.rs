@@ -56,8 +56,7 @@ fn create_mappings(
     let size_in_bytes = size_in_pages * PAGE_SIZE;
 
     let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     let start_time = hpet.get_counter();
 
@@ -97,8 +96,7 @@ fn remap_normal(
     hpet_overhead: u64
 ) -> Result<u64, &'static str> {
 
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start_time = hpet.get_counter();
 
     for mp in mapped_pages.iter_mut() {
@@ -119,8 +117,7 @@ fn remap_spillful(
     hpet_overhead: u64
 ) -> Result<u64, &'static str> {
 
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start_time = hpet.get_counter();
 
     for i in 0..num_mappings {
@@ -141,8 +138,7 @@ fn unmap_normal(
 ) -> Result<u64, &'static str> {
 
     let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start_time = hpet.get_counter();
 
     for mp in &mut mapped_pages {
@@ -170,8 +166,7 @@ fn unmap_spillful(
 ) -> Result<u64, &'static str> {
 
     let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     let start_time = hpet.get_counter();
 

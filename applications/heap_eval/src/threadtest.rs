@@ -35,8 +35,7 @@ pub fn do_threadtest() -> Result<(), &'static str> {
     let mut tries = Vec::with_capacity(TRIES as usize);
 
     let hpet_overhead = hpet_timing_overhead()?;
-    let hpet_ref = get_hpet(); 
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     println!("Running threadtest for {} threads, {} iterations, {} total objects allocated every iteration by all threads, {} obj size ...", 
         nthreads, NITERATIONS.load(Ordering::SeqCst), NOBJECTS.load(Ordering::SeqCst), OBJSIZE.load(Ordering::SeqCst));

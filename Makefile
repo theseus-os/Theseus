@@ -527,7 +527,7 @@ help:
 ###################################################################################################
 ### This section has QEMU arguments and configuration
 ###################################################################################################
-QEMU_MEMORY ?= 2G
+QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 ## multicore 
 QEMU_FLAGS += -smp 4

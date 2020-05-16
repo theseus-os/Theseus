@@ -361,11 +361,11 @@ impl MappedPages8k {
     pub fn new(mp: MappedPages) -> Result<MappedPages8k, &'static str> {
         let vaddr = mp.start_address().value();
         
-        // // check that the mapped pages are aligned to 8k
-        // if vaddr % Self::SIZE != 0 {
-        //     error!("Trying to create a MappedPages8k but MappedPages were not aligned at 8k bytes");
-        //     return Err("Trying to create a MappedPages8k but MappedPages were not aligned at 8k bytes");
-        // }
+        // check that the mapped pages are aligned to 8k
+        if vaddr % Self::SIZE != 0 {
+            error!("Trying to create a MappedPages8k but MappedPages were not aligned at 8k bytes");
+            return Err("Trying to create a MappedPages8k but MappedPages were not aligned at 8k bytes");
+        }
 
         // check that the mapped pages is writable
         if !mp.flags().is_writable() {
@@ -393,7 +393,7 @@ impl MappedPages8k {
     // }
 
     /// Return the pages represented by the MappedPages8k as a mutable ObjectPage8k reference
-    pub fn as_objectpage8k_mut(&mut self) -> &mut ObjectPage8k {
+    fn as_objectpage8k_mut(&mut self) -> &mut ObjectPage8k {
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         unsafe {
             mem::transmute(self.0.start_address())

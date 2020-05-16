@@ -375,7 +375,7 @@ if #[cfg(unsafe_heap)] {
         /// (1) Pages are first taken from another heap.
         /// (2) If the above fails, then more pages are allocated from the OS.
         /// 
-        /// An Err is returned if there is no more memory to be allocated in the heap memory area.
+        /// An Err is returned if there is no more memory to be allocated in the heap memory area or if the heap page limit is reached.
         /// 
         /// # Arguments
         /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 

@@ -41,8 +41,7 @@ pub fn do_shbench() -> Result<(), &'static str> {
     let niterations = NITERATIONS.load(Ordering::SeqCst);
 
     let hpet_overhead = hpet_timing_overhead()?;
-    let hpet_ref = get_hpet(); 
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     println!("Running shbench for {} threads, {} total iterations, {} iterations per thread, {} total objects allocated by all threads, {} max block size, {} min block size ...", 
         nthreads, niterations, niterations/nthreads, ALLOCATIONS_PER_ITER * niterations, MAX_BLOCK_SIZE.load(Ordering::SeqCst), MIN_BLOCK_SIZE.load(Ordering::SeqCst));
