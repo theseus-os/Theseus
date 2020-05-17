@@ -372,34 +372,6 @@ pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
     }
 
     Ok(swap_ranges)
-
-    // let taskref = task::get_my_current_task()
-    //     .ok_or_else(|| format!("failed to get current task"))?;
-
-    // // debug!("The taskref is {:?}",taskref);
-
-    // // Find the range of stack to iterate
-    // let locked_task = taskref.lock();
-    // let bottom = locked_task.kstack.bottom().value();
-    // let top = locked_task.kstack.top_usable().value();
-
-    // #[cfg(not(downtime_eval))]
-    // debug!("Bottom and top of stack are{:X} {:X}", bottom, top);
-
-    // //let mut x = rsp - 8;
-    // #[cfg(not(downtime_eval))]
-    // debug!("Perform constant offset fix for stack");
-
-    // // Perform constant offset fix for the stack range
-    // match constant_offset_fix(&swap_ranges, bottom, top) {
-    //     Ok(()) => {
-    //         Ok(swap_ranges)
-    //     }
-    //     Err (e) => {
-    //         debug! {"Failed to perform constant offset fix for the stack"};
-    //         Err(e.to_string())
-    //     }
-    // }
 }
 
 /// null crate swap policy.
