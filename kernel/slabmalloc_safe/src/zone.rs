@@ -74,8 +74,8 @@ impl ZoneAllocator {
     /// The set of sizes the allocator has lists for.
     pub const BASE_ALLOC_SIZES: [usize; ZoneAllocator::MAX_BASE_SIZE_CLASSES] = [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, ZoneAllocator::MAX_BASE_ALLOC_SIZE];
 
-    // /// A slab must have greater than this number of empty pages to return one.
-    // const SLAB_EMPTY_PAGES_THRESHOLD: usize = 0;
+    /// A slab must have greater than this number of empty pages to return one.
+    const SLAB_EMPTY_PAGES_THRESHOLD: usize = 0;
 
 
     pub fn new(heap_id: usize) -> ZoneAllocator {
@@ -123,6 +123,40 @@ impl ZoneAllocator {
 }
 
 impl ZoneAllocator {
+    /// Returns a MappedPages8k from the SCAllocator with the maximum number of empty pages,
+    /// if there are more empty pages than the threshold.
+    pub fn retrieve_empty_page(
+        &mut self,
+        heap_empty_page_threshold: usize
+    ) -> Option<MappedPages8k> {
+        if self.empty_pages() <= heap_empty_page_threshold {
+            return None;
+        }
+        else {
+            for slab in self.small_slabs.iter_mut() {
+                let empty_pages = slab.empty_count;
+                if empty_pages > ZoneAllocator::SLAB_EMPTY_PAGES_THRESHOLD {
+                    return slab.retrieve_empty_page()
+                }
+            }
+        }
+        None
+    }
+
+    pub fn exchange_pages_within_heap(&mut self, layout: Layout) -> Result<(), &'static str> {
+        let mp = self.retrieve_empty_page(0).ok_or("Couldn't find an empty page to exchange within the heap")?;
+        self.refill(layout, mp)
+    }  
+
+    /// The total number of empty pages in this zone allocator
+    pub fn empty_pages(&self) -> usize {
+        let mut empty_pages = 0;
+        for sca in &self.small_slabs {
+            empty_pages += sca.empty_count;
+        }
+        empty_pages
+    }
+
     /// Allocate a pointer to a block of memory described by `layout`.
     pub fn allocate(&mut self, layout: Layout) -> Result<NonNull<u8>, &'static str> {
         match ZoneAllocator::get_slab(layout.size()) {

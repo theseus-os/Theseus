@@ -30,7 +30,7 @@ extern crate mapper_spillful;
 use getopts::{Matches, Options};
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::PageRange;
-use libtest::{hpet_timing_overhead, hpet_2_ns, calculate_stats, check_myrq, Stats};
+use libtest::{hpet_timing_overhead, hpet_2_ns, calculate_stats, check_myrq};
 use memory::{get_frame_allocator_ref, VirtualAddress, Mapper, MappedPages, EntryFlags, mapped_pages_unmap};
 use mapper_spillful::MapperSpillful;
 use hpet::get_hpet;
@@ -56,8 +56,7 @@ fn create_mappings(
     let size_in_bytes = size_in_pages * PAGE_SIZE;
 
     let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     let start_time = hpet.get_counter();
 
@@ -75,7 +74,7 @@ fn create_mappings(
             MapperType::Spillful(ref mut mapper) => {
                 let _res = mapper.map(vaddr, size_in_bytes,
                     EntryFlags::WRITABLE | EntryFlags::PRESENT,
-                    &mut *frame_allocator.lock(),
+                    frame_allocator
                 )?;
             }
         }
@@ -97,8 +96,7 @@ fn remap_normal(
     hpet_overhead: u64
 ) -> Result<u64, &'static str> {
 
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start_time = hpet.get_counter();
 
     for mp in mapped_pages.iter_mut() {
@@ -119,8 +117,7 @@ fn remap_spillful(
     hpet_overhead: u64
 ) -> Result<u64, &'static str> {
 
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start_time = hpet.get_counter();
 
     for i in 0..num_mappings {
@@ -141,8 +138,7 @@ fn unmap_normal(
 ) -> Result<u64, &'static str> {
 
     let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start_time = hpet.get_counter();
 
     for mp in &mut mapped_pages {
@@ -170,14 +166,13 @@ fn unmap_spillful(
 ) -> Result<u64, &'static str> {
 
     let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
-    let hpet_ref = get_hpet();
-    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     let start_time = hpet.get_counter();
 
     for i in 0..num_mappings {
         let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
-        let _res = mapper_spillful.unmap(vaddr, &mut *frame_allocator.lock())?;
+        let _res = mapper_spillful.unmap(vaddr, frame_allocator)?;
     }
 
     let end_time = hpet.get_counter() - hpet_overhead;
@@ -225,7 +220,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
-    const TRIES: usize = 100;
+    const TRIES: usize = 10;
     let mut mapper_normal   = Mapper::from_current();
     let mut mapper_spillful = MapperSpillful::new();
 
@@ -296,32 +291,20 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
 
     println!("Create Mappings (ns)");
     let stats_create = calculate_stats(&mut create_times).ok_or("Could not calculate stats for mappings")?;
-    print_stats(stats_create);
+    println!("{:?}", stats_create);
 
     println!("Remap Mappings (ns)");
     let stats_remap = calculate_stats(&mut remap_times).ok_or("Could not calculate stats for remappings")?;
-    print_stats(stats_remap);
+    println!("{:?}", stats_remap);
     
     println!("Unmap Mappings (ns)");
     let stats_unmap = calculate_stats(&mut unmap_times).ok_or("Could not calculate stats for unmappings")?;
-    print_stats(stats_unmap);
+    println!("{:?}", stats_unmap);
 
     Ok(())
 
 }
 
-fn print_stats(stats: Stats) {
-    println!("
-        min:        {}
-        p_25:       {}
-        median:     {}
-        p_75:       {}
-        max:        {}
-        mean:       {}
-        std_dev:    {}
-        ",
-    stats.min, stats.p_25, stats.median, stats.p_75, stats.max, stats.mean, stats.std_dev);
-}
 
 fn print_usage(opts: &Options) {
     println!("{}", opts.usage(USAGE));

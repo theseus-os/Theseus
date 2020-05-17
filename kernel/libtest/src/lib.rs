@@ -280,7 +280,7 @@ impl fmt::Debug for Stats {
         p_75:    {} \n 
         max:     {} \n 
         mode:    {} \n 
-        mean:    {} \n, 
+        mean:    {} \n 
         std_dev: {} \n", 
         self.min, self.p_25, self.median, self.p_75, self.max, self.mode, self.mean, self.std_dev)
     }
