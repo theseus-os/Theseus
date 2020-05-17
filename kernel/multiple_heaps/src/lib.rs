@@ -70,20 +70,13 @@ const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
 /// We curently work with 2 pages, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.   
 const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 
-#[cfg(not(safe_heap))]
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
-#[cfg(not(safe_heap))]
 /// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 100 KiB.
 const PAGES_PER_SIZE_CLASS: usize = 24; 
-
-#[cfg(safe_heap)]
-/// The number of pages each size class in the ZoneAllocator is initialized with.
-/// In the case of the safe heap which does not grow, it is set to the maximum limit.
-const PAGES_PER_SIZE_CLASS: usize = slabmalloc_safe::SCAllocator::MAX_PAGE_LIST_SIZE * HEAP_MAPPED_PAGES_SIZE_IN_PAGES; 
 
 /// Starting size of each per-core heap. 
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
@@ -159,11 +152,11 @@ if #[cfg(unsafe_heap)] {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("extend_heap_mp(): KERNEL_MMI was not yet initialized!")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let heap_mp = kernel_mmi.extra_mapped_pages.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
-        
-        if let Err((e,_mp)) = heap_mp.merge(vec!(mp)) {
+
+        if let Err((e,_mp)) = heap_mp.merge(mp){
+            error!("Could not merge MappedPages: {:?}", e);
             return Err(e);
         }
-
         Ok(())
     }
 
@@ -378,12 +371,32 @@ if #[cfg(unsafe_heap)] {
             }
         }
 
-        /// Returns an error if called since the safe heap cannot grow.
-        fn grow_heap(&self, _layout: Layout, _heap: &mut ZoneAllocator) -> Result<(), &'static str> {
-            error!("Cannot grow the safe heap. To increase size at compile time, set constant `MAX_PAGE_LIST_SIZE` in the SCAllocator");
-            Err("Cannot grow the safe heap. To increase size at compile time, set constant `MAX_PAGE_LIST_SIZE` in the SCAllocator") 
-        }
+        /// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
+        /// (1) Pages are first taken from another heap.
+        /// (2) If the above fails, then more pages are allocated from the OS.
+        /// 
+        /// An Err is returned if there is no more memory to be allocated in the heap memory area or if the heap page limit is reached.
+        /// 
+        /// # Arguments
+        /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
+        /// * `heap`: heap that needs to grow.
+        fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator) -> Result<(), &'static str> {
+            // (1) Try to retrieve a page from the another heap
+            for locked_heap in self.heaps.values() {
+                if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
+                    info!("Added page from another heap to heap: {}", heap.heap_id);
+                    return heap.refill(layout, mp);
+                }
+            }
+            // (2) Allocate page from the OS
+            let mut heap_end = self.end.lock();
+            let mp = MappedPages8k::new(create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?)?;
+            info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
+            *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+            heap.refill(layout, mp)
+        }  
     }
+
 } else {
     impl MultipleHeaps {
         pub fn empty() -> MultipleHeaps {

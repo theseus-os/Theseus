@@ -2,6 +2,9 @@
 //! 
 //! The original version can be found on MicroQuill's website
 //! http://www.microquill.com/smartheap/shbench/bench.zip
+//! 
+//! Since shbench stresses the system and continuously grows the heap,
+//! we run each trial after restarting Theseus so that the initial size of the heap is the same for each trial.
 
 use alloc::{
     vec::Vec,
@@ -13,7 +16,7 @@ use alloc::alloc::GlobalAlloc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::ptr;
 use hpet::get_hpet;
-use libtest::hpet_2_ns;
+use libtest::{hpet_2_us, calculate_stats, hpet_timing_overhead};
 use crate::{NTHREADS, ALLOCATOR};
 #[cfg(direct_access_to_multiple_heaps)]
 use crate::overhead_of_accessing_multiple_heaps;
@@ -29,24 +32,29 @@ const MAX_REGULAR: usize = 1000;
 pub const MIN_LARGE: usize = 8192;
 /// The maximum size allocated when the large allocations option is chosen
 pub const MAX_LARGE: usize = 16384;
-
+/// The number of allocations that take place in one iteration
+const ALLOCATIONS_PER_ITER: usize = 19_300;
 
 pub fn do_shbench() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
-    let mut threads = Vec::with_capacity(nthreads);
     let niterations = NITERATIONS.load(Ordering::SeqCst);
-    let hpet = get_hpet(); 
-    println!("Running shbench for {} threads, {} total iterations, {} iterations per thread, {} max block size, {} min block size ...", 
-        nthreads, niterations, niterations/nthreads, MAX_BLOCK_SIZE.load(Ordering::SeqCst), MIN_BLOCK_SIZE.load(Ordering::SeqCst));
+
+    let hpet_overhead = hpet_timing_overhead()?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
+
+    println!("Running shbench for {} threads, {} total iterations, {} iterations per thread, {} total objects allocated by all threads, {} max block size, {} min block size ...", 
+        nthreads, niterations, niterations/nthreads, ALLOCATIONS_PER_ITER * niterations, MAX_BLOCK_SIZE.load(Ordering::SeqCst), MIN_BLOCK_SIZE.load(Ordering::SeqCst));
     
     #[cfg(direct_access_to_multiple_heaps)]
     {
         let overhead = overhead_of_accessing_multiple_heaps()?;
-        println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_ns(overhead));
+        println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    let start = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let mut threads = Vec::with_capacity(nthreads);
+
+    let start = hpet.get_counter();
 
     for _ in 0..nthreads {
         threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
@@ -54,11 +62,17 @@ pub fn do_shbench() -> Result<(), &'static str> {
 
     for i in 0..nthreads {
         threads[i].join()?;
-        threads[i].take_exit_value();
     }
 
-    let end = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-    println!("shbench took {} ns", hpet_2_ns(end - start));
+    let end = hpet.get_counter() - hpet_overhead;
+
+    // Don't want this to be part of the timing measurement
+    for thread in threads {
+        thread.take_exit_value();
+    }
+
+    let diff = hpet_2_us(end - start);
+    println!("shbench time: {} us", diff);
 
     Ok(())
 }
@@ -119,7 +133,6 @@ fn worker(_:()) {
                 for _ in 0..iterations {
                     let layout = Layout::from_size_align(size, 2).unwrap();
                     let ptr = unsafe{ allocator.alloc(layout) };
-
                     if ptr.is_null() {
                         error!("Out of Heap Memory");
                         return;
@@ -172,7 +185,8 @@ fn worker(_:()) {
 
     while mp < mpe {
         unsafe{ allocator.dealloc(allocations[mp], layouts[mp]); }
-    }        
+        mp += 1;
+    }
 }
 
 

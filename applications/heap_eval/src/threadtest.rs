@@ -13,15 +13,15 @@ use alloc::alloc::GlobalAlloc;
 use core::sync::atomic::{Ordering, AtomicUsize};
 use core::ptr;
 use hpet::get_hpet;
-use libtest::hpet_2_ns;
-use crate::{NTHREADS, ALLOCATOR};
+use libtest::{hpet_2_us, calculate_stats, hpet_timing_overhead};
+use crate::{NTHREADS, ALLOCATOR, TRIES};
 #[cfg(direct_access_to_multiple_heaps)]
 use crate::overhead_of_accessing_multiple_heaps;
 
 
-pub(crate) static NITERATIONS: AtomicUsize = AtomicUsize::new(50);
+pub(crate) static NITERATIONS: AtomicUsize = AtomicUsize::new(1000);
 /// Sum total of objects to be allocated by all threads
-pub(crate) static NOBJECTS: AtomicUsize = AtomicUsize::new(30_000);
+pub(crate) static NOBJECTS: AtomicUsize = AtomicUsize::new(100_000);
 /// Size of the objects we're allocating in bytes
 pub(crate) static OBJSIZE: AtomicUsize = AtomicUsize::new(REGULAR_SIZE);
 /// The default size of objects to allocate
@@ -32,30 +32,47 @@ pub const LARGE_SIZE: usize = 8192;
 pub fn do_threadtest() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
-    let mut threads = Vec::with_capacity(nthreads);
-    let hpet = get_hpet(); 
-    println!("Running threadtest for {} threads, {} iterations, {} total objects, {} obj size ...", 
+    let mut tries = Vec::with_capacity(TRIES as usize);
+
+    let hpet_overhead = hpet_timing_overhead()?;
+    let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
+
+    println!("Running threadtest for {} threads, {} iterations, {} total objects allocated every iteration by all threads, {} obj size ...", 
         nthreads, NITERATIONS.load(Ordering::SeqCst), NOBJECTS.load(Ordering::SeqCst), OBJSIZE.load(Ordering::SeqCst));
 
     #[cfg(direct_access_to_multiple_heaps)]
     {
         let overhead = overhead_of_accessing_multiple_heaps()?;
-        println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_ns(overhead));
+        println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    let start = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    for try in 0..TRIES {
+        let mut threads = Vec::with_capacity(nthreads);
 
-    for _ in 0..nthreads {
-        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
-    }  
+        let start = hpet.get_counter();
 
-    for i in 0..nthreads {
-        threads[i].join()?;
-        threads[i].take_exit_value();
+        for _ in 0..nthreads {
+            threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
+        }  
+
+        for i in 0..nthreads {
+            threads[i].join()?;
+        }
+
+        let end = hpet.get_counter() - hpet_overhead;
+
+        // Don't want this to be part of the timing measurement
+        for thread in threads {
+            thread.take_exit_value();
+        }
+
+        let diff = hpet_2_us(end - start);
+        println!("[{}] threadtest time: {} us", try, diff);
+        tries.push(diff);
     }
 
-    let end = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-    println!("threadtest took {} ns", hpet_2_ns(end - start));
+    println!("threadtest stats (us)");
+    println!("{:?}", calculate_stats(&tries));
 
     Ok(())
 }
