@@ -359,9 +359,7 @@ pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
         let locked_task = taskref.lock();
         let bottom = locked_task.kstack.bottom().value();
         let top = locked_task.kstack.top_usable().value();
-
-        #[cfg(not(downtime_eval))]
-        debug!("Bottom and top of stack of task {} are {:X} {:X}", locked_task.name, bottom, top);
+        // debug!("Bottom and top of stack of task {} are {:X} {:X}", locked_task.name, bottom, top);
 
         match constant_offset_fix(&swap_ranges, bottom, top) {
             Err (e) => {
