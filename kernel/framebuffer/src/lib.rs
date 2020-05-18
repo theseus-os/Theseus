@@ -90,7 +90,7 @@ impl<P: Pixel> Framebuffer<P> {
             )?
         };
 
-        // create a refence to transmute the mapped framebuffer pages as a slice
+        // obtain a slice reference to the framebuffer's memory
         let buffer = BoxRefMut::new(Box::new(mapped_framebuffer))
             .try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
 

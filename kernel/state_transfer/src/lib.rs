@@ -23,7 +23,7 @@ use task::TaskRef;
 
 
 /// Used for the evolution from a round robin scheduler to a priority scheduler
-pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateNamespace) -> Result<(), &'static str> {
+pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNamespace) -> Result<(), &'static str> {
 
     #[cfg(not(loscd_eval))]
     warn!("prio_sched(): at the top.");
@@ -85,8 +85,7 @@ pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateName
         warn!("\t{:?}: {:?}", core, rq);
         runqueue_priority::RunQueue::init(*core)?;
         for t in rq.read().iter() {
-            let rrtref: &_RoundRobinTaskRef = unsafe { core::mem::transmute(t) };
-            runqueue_priority::RunQueue::add_task_to_specific_runqueue(*core, rrtref._taskref.clone())?;
+            runqueue_priority::RunQueue::add_task_to_specific_runqueue(*core, t.deref().clone())?;
         }
     }
 
@@ -108,11 +107,6 @@ pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateName
     Ok(())
 }
 
-
-struct _RoundRobinTaskRef{
-    _taskref: TaskRef,
-    _context_switches: u32,
-}
 
 
 //////////////////////////////////////////////////////////
