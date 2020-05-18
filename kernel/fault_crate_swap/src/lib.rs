@@ -33,7 +33,6 @@ use path::Path;
 use crate_swap::{SwapRequest, swap_crates};
 use fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_handled_fault, get_the_most_recent_match};
 
-
 /// A data structure to hold the ranges of memory used by the old crate and the new crate.
 /// The crate only maintains the values as virtual addresses and holds no references to any
 /// crate
@@ -244,52 +243,49 @@ pub fn constant_offset_fix(
         if let (Some(old_text) , Some(new_text)) = (swap_ranges.old_text.clone(), swap_ranges.new_text.clone()) {
             if old_text.start < ra && old_text.end > ra {
 
-                #[cfg(not(downtime_eval))]
-                debug!("Match text at address {:#X}, value  = {:#X}", x , n);
+                // debug!("Match text at address {:#X}, value  = {:#X}", x , n);
 
                 // Note : Does not use saturation add since underflow is not possible and overflow could not be caused in proper execution
                 let n_ra = ra - old_text.start + new_text.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
                 // For debug purposes we re-read teh value
-                #[cfg(not(downtime_eval))]
-                {
-                    let n =  unsafe { ptr::read(p) };
-                    debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                }
+                // #[cfg(not(downtime_eval))]
+                // {
+                //     let n =  unsafe { ptr::read(p) };
+                //     debug!("New value at address {:#X}, value  = {:#X}", x , n);
+                // }
             }
         }
 
         if let (Some(old_rodata) , Some(new_rodata)) = (swap_ranges.old_rodata.clone(), swap_ranges.new_rodata.clone()) {
             if old_rodata.start < ra && old_rodata.end > ra {
 
-                #[cfg(not(downtime_eval))]
-                debug!("Match rodata at address {:#X}, value  = {:#X}", x , n);
+                // debug!("Match rodata at address {:#X}, value  = {:#X}", x , n);
                 let n_ra = ra - old_rodata.start + new_rodata.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
 
-                #[cfg(not(downtime_eval))]
-                {
-                    let n =  unsafe { ptr::read(p) };
-                    debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                }
+                // #[cfg(not(downtime_eval))]
+                // {
+                //     let n =  unsafe { ptr::read(p) };
+                //     debug!("New value at address {:#X}, value  = {:#X}", x , n);
+                // }
             }
         }
 
         if let (Some(old_data) , Some(new_data)) = (swap_ranges.old_data.clone(), swap_ranges.new_data.clone()) {
             if old_data.start < ra && old_data.end > ra {
 
-                #[cfg(not(downtime_eval))]
-                debug!("Match data at address {:#X}, value  = {:#X}", x , n);
+                // debug!("Match data at address {:#X}, value  = {:#X}", x , n);
                 let n_ra = ra - old_data.start + new_data.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
-                #[cfg(not(downtime_eval))]
-                {
-                    let n =  unsafe { ptr::read(p) };
-                    debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                }
+                // #[cfg(not(downtime_eval))]
+                // {
+                //     let n =  unsafe { ptr::read(p) };
+                //     debug!("New value at address {:#X}, value  = {:#X}", x , n);
+                // }
             }
         }
 
@@ -359,34 +355,21 @@ pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
         }
     };
 
+    for (id, taskref) in task::TASKLIST.lock().iter() {
+        let locked_task = taskref.lock();
+        let bottom = locked_task.kstack.bottom().value();
+        let top = locked_task.kstack.top_usable().value();
+        // debug!("Bottom and top of stack of task {} are {:X} {:X}", locked_task.name, bottom, top);
 
-    let taskref = task::get_my_current_task()
-        .ok_or_else(|| format!("failed to get current task"))?;
-
-    // debug!("The taskref is {:?}",taskref);
-
-    // Find the range of stack to iterate
-    let locked_task = taskref.lock();
-    let bottom = locked_task.kstack.bottom().value();
-    let top = locked_task.kstack.top_usable().value();
-
-    #[cfg(not(downtime_eval))]
-    debug!("Bottom and top of stack are{:X} {:X}", bottom, top);
-
-    //let mut x = rsp - 8;
-    #[cfg(not(downtime_eval))]
-    debug!("Perform constant offset fix for stack");
-
-    // Perform constant offset fix for the stack range
-    match constant_offset_fix(&swap_ranges, bottom, top) {
-        Ok(()) => {
-            Ok(swap_ranges)
-        }
-        Err (e) => {
-            debug! {"Failed to perform constant offset fix for the stack"};
-            Err(e.to_string())
+        match constant_offset_fix(&swap_ranges, bottom, top) {
+            Err (e) => {
+                debug! {"Failed to perform constant offset fix for the stack for task {} due to {}",locked_task.name, e.to_string()};
+            },
+            _ => {},
         }
     }
+
+    Ok(swap_ranges)
 }
 
 /// null crate swap policy.
