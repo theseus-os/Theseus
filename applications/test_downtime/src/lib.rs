@@ -27,16 +27,14 @@ use alloc::{
     string::String,
 };
 
-use core::sync::atomic::{AtomicUsize, Ordering};
-use getopts::{Matches, Options};
-use spin::Once;
+use getopts::Options;
 use color::Color;
 use shapes::Coord;
 use window::Window;
 use spin::Mutex;
 use spawn::new_task_builder;
 use hpet::get_hpet;
-use unified_channel::{new_string_channel, StringSender, StringReceiver};
+use unified_channel::{StringSender, StringReceiver};
 
 const NANO_TO_FEMTO: u64 = 1_000_000;
 
@@ -63,14 +61,14 @@ pub fn set_graphics_measuring_task() -> (){
     let arg_val = 0;
 
     // setup a task to send coordinates
-    let taskref1  = new_task_builder(graphics_measuring_task, arg_val)
+    let _taskref1  = new_task_builder(graphics_measuring_task, arg_val)
         .name(String::from("watch task"))
         .pin_on_core(pick_child_core())
         .spawn_restartable()
         .expect("Couldn't start the watch task");
 
     // setup a task to receive responses
-    let taskref2  = new_task_builder(graphics_send_task, arg_val)
+    let _taskref2  = new_task_builder(graphics_send_task, arg_val)
         .name(String::from("send task"))
         .pin_on_core(pick_child_core())
         .spawn_restartable()
@@ -81,29 +79,24 @@ pub fn set_graphics_measuring_task() -> (){
 /// This task send cordates from 100 to 300 and keeps on repeating
 fn graphics_send_task(_arg_val: usize) -> Result<(), &'static str>{
 
-    let mut start_hpet: u64;
-    let mut end_hpet: u64;
-
     warn!("TEST MSG : SEND STARTED");
 
     #[cfg(use_crate_replacement)]
     warn!("test_multiple(): Crate replacement will occur at the fault");
 
-    let mut send_val: usize = 0;
     let mut count = 100;
     loop {
 
         let mut element = DOWNTIME_SEND_LOCK.lock();
-        if(element.user == 0){
+        if element.user == 0 {
             element.user = 1;
             element.count = count;
             count = count + 1;
-            if(count == 300){
+            if count == 300 {
                 count = 100;
             }
         }
     }
-    Ok(())
 }
 
 /// This task measures the time difference between two received responses
@@ -117,7 +110,6 @@ fn graphics_measuring_task(_arg_val: usize) -> Result<(), &'static str>{
 
     start_hpet = hpet.get_counter();
     warn!("TEST MSG : RECEIVE STARTED");
-    let mut send_val: usize = 0;
     let mut count = 1;
 
     // Aggregation of dowtime from multiple runs.
@@ -126,7 +118,7 @@ fn graphics_measuring_task(_arg_val: usize) -> Result<(), &'static str>{
     loop {
 
         let mut element = DOWNTIME_RECEIVE_LOCK.lock();
-        if(element.user == 0){
+        if element.user == 0 {
             element.user = 1;
             end_hpet = hpet.get_counter();
             element.count = count;
@@ -137,7 +129,7 @@ fn graphics_measuring_task(_arg_val: usize) -> Result<(), &'static str>{
             start_hpet = end_hpet;
             count = count + 1;
 
-            if(count == 200){
+            if count == 200 {
                 warn!("TEST MSG : TEST COMPLETED");
                 let (new_count, new_total) = graphics_print_stats(vec.clone(),aggregted_count.clone(),aggregated_total.clone());
                 aggregted_count = new_count;
@@ -150,28 +142,18 @@ fn graphics_measuring_task(_arg_val: usize) -> Result<(), &'static str>{
             }
         }
     }
-    Ok(())
 }
 
 /// Utility function to print the downtime and normal operation time
 fn graphics_print_stats(vec: Vec<u64>, aggregted_count: u64, aggregted_total :u64) ->(u64,u64){
-    let mut count1 = 0;
-    for (i,val) in vec.iter().enumerate() {
+    let slice = &vec[10..90];
+    let sum: u64  = Iterator::sum(slice.iter());
+    let count1 = sum / (slice.len() as u64);
 
-        // Get the normal operation time by averaging 128 samples from the middle of operations
-        //  WE take it from the middle to avoid initial setting up times
-        if i > 31 && i < 96 {
-            count1 = count1 + val;
-        }
-        if i > 127 && i < 192 {
-            count1 = count1 + val;
-        }
-    }
-
-    count1 = count1 / 128;
     debug!("Ticks in normal : {} ", count1);
     debug!("time in normal {}", hpet_2_ns(count1));
-    debug!("Ticks due to restart {}", vec[101]); // Since we injected the fault at this specific cordinate 
+    debug!("Ticks due to restart {}", vec[101]); // Since we injected the fault at this specific cordinate
+    debug!("Some random RT values {} {} {}", vec[40], vec[60], vec[80]); // To double check values are within range  
     debug!("Time due to restart {}", hpet_2_ns(vec[101]));
 
     // After 16 restarts we print the average of downtime.
@@ -193,6 +175,8 @@ fn fault_graphics_task(_arg_val: usize) -> Result<(), &'static str>{
     // This task draws a circile on the cordinates received from the watch thread
     {
         // debug!("Starting the fault task");
+        let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
+        let start_hpet = hpet.get_counter();
         let window_wrap =  Window::new(
             Coord::new(500,50),
             500,
@@ -201,15 +185,18 @@ fn fault_graphics_task(_arg_val: usize) -> Result<(), &'static str>{
         );
 
         let mut window = window_wrap.expect("Window creation failed");
+        let end_hpet = hpet.get_counter();
+        let mut first_round_val = 0;
+        let mut first_time = true;
 
         loop {
 
-            let mut send_val:isize = 0;
+            let send_val: isize;
 
             // Get a pair of cordinates
             loop{
                 let mut element = DOWNTIME_SEND_LOCK.lock();
-                if(element.user == 1){
+                if element.user == 1 {
                     element.user = 0;
                     send_val = element.count as isize;
                     break;
@@ -236,18 +223,25 @@ fn fault_graphics_task(_arg_val: usize) -> Result<(), &'static str>{
             // Send the response of success
             loop{
                 let mut element = DOWNTIME_RECEIVE_LOCK.lock();
-                if(element.user == 1){
+                if element.user == 1 {
                     element.user = 0;
                     break;
                 }
             }
+
+            if first_time {
+                first_round_val = hpet.get_counter();
+                first_time = false;
+            }
+
+            // When calculating average we ignore last few values. 
+            // So this don't interfere with measurements
+            if send_val == 295 {
+                debug!("Window creation took : {}",end_hpet - start_hpet);
+                debug!("Window creation remaining {}",first_round_val - end_hpet);
+            }
         }
     }
-
-    loop {
-
-    }
-    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -271,7 +265,6 @@ fn ipc_fault_task((sender,receiver) : (StringSender, StringReceiver)) -> Result<
         sender.send(msg)?;
         i = i + 1;
     }
-    Ok(())
 }
 
 // Setup the channels and measuring task
@@ -282,7 +275,7 @@ fn set_ipc_watch_task() -> (StringSender, StringReceiver){
     let (sender_reply, receiver_reply) = unified_channel::new_string_channel(2);
 
     // Create the sending task
-    let taskref1  = new_task_builder(ipc_watch_task, (sender, receiver_reply))
+    let _taskref1  = new_task_builder(ipc_watch_task, (sender, receiver_reply))
         .name(String::from("watch task"))
         .pin_on_core(pick_child_core())
         .spawn()
@@ -319,7 +312,7 @@ fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result
         let time_send = hpet.get_counter();
         // warn!("test_multiple(): Sender sending message {:08} {}", i, time_send);
         sender.send(msg)?;
-        let mut msg_received;
+        let msg_received;
         loop {
             if let Ok(msg) = receiver.receive() {
                 msg_received = msg;
@@ -361,7 +354,6 @@ fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result
         }
         i = i + 1;
     }
-    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------
