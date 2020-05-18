@@ -561,7 +561,7 @@ impl MappedPages {
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let t: &T = unsafe { 
-            mem::transmute(self.pages.start_address() + offset)
+            &*((self.pages.start_address().value() + offset) as *const T)
         };
 
         Ok(t)
@@ -601,7 +601,7 @@ impl MappedPages {
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let t: &mut T = unsafe {
-            mem::transmute(self.pages.start_address() + offset)
+            &mut *((self.pages.start_address().value() + offset) as *mut T)
         };
 
         Ok(t)
