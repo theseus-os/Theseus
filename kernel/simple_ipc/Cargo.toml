@@ -1,0 +1,16 @@
+[package]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "simple_ipc"
+description = "An extremely basic mechanism for IPC"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[lib]
+crate-type = ["rlib"]

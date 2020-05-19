@@ -4,7 +4,7 @@
 extern crate task;
 extern crate hpet;
 #[macro_use] extern crate terminal_print;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
 extern crate spawn;
@@ -14,6 +14,9 @@ extern crate heapfile;
 extern crate scheduler;
 extern crate libtest;
 extern crate memory;
+extern crate rendezvous;
+extern crate async_channel;
+extern crate simple_ipc;
 
 use core::str;
 use alloc::vec::Vec;
@@ -85,6 +88,31 @@ pub fn main(args: Vec<String>) -> isize {
 			} else {
 				Err("Need to enable bm_map config option to run the memory_map benchmark")
 			}
+		}
+		// THIS IS GETTING OUT OF HAND!!!!!!!!!! should switch to opts.
+		"ipc_rendezvous" => {
+			do_ipc_rendezvous(false) /*sender and receiver on different cores*/  
+		}
+		"ipc_rendezvous_pinned" => {
+			do_ipc_rendezvous(true) /*sender and receiver on the same core*/
+		}
+		"ipc_async_blocking" => {
+			do_ipc_async(false /*sender and receiver on different cores*/, true /*blocking*/) 
+		}
+		"ipc_async_pinned_blocking" => {
+			do_ipc_async(true/*sender and receiver on the same core*/, true /*blocking*/) 
+		}
+		"ipc_async_nonblocking" => {
+			do_ipc_async(false /*sender and receiver on different cores*/, false /*nonblocking*/) 
+		}
+		"ipc_async_pinned_nonblocking" => {
+			do_ipc_async(true /*sender and receiver on the same core*/, false /*nonblocking*/) 
+		}
+		"ipc_simple" => {
+			do_ipc_simple(false) /*sender and receiver on different cores*/
+		}
+		"ipc_simple_pinned" => {
+			do_ipc_simple(true) /*sender and receiver on the same core*/
 		}
 		"fs_read_with_open" | "fs1" => {
 			do_fs_read(true /*with_open*/)
@@ -446,6 +474,549 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 
 	Ok(delta_time_avg)
 }
+
+/// Measures the round trip time to send a 8-byte message on a rendezvous channel. 
+/// Calls `do_ipc_rendezvous_inner` multiple times to perform the actual operation
+fn do_ipc_rendezvous(pinned: bool) -> Result<(), &'static str> {
+	let child_core = if pinned {
+		match pick_free_core() {
+			Ok(child_core) => { 
+				printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
+				Some(child_core)
+			}
+			_ => {
+				printlnwarn!("Cannot conduct ipc_rendezvous test because cores are busy");
+				return Err("Cannot conduct ipc_rendezvous test because cores are busy");
+			}
+		}
+	} else {
+		None
+	};
+
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::with_capacity(TRIES);
+	
+	print_header(TRIES, ITERATIONS);
+
+	for i in 0..TRIES {
+		let lat = do_ipc_rendezvous_inner(i+1, TRIES, child_core)?;	
+
+		tries += lat;
+		vec.push(lat);
+
+		if lat > max {max = lat;}
+		if lat < min {min = lat;}
+	}
+
+	let lat = tries / TRIES as u64;
+
+	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
+	if 	max - lat > err || lat - min > err {
+		printlnwarn!("ipc_rendezvous_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+	}
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
+
+	printlninfo!("IPC RENDEZVOUS result: Round Trip Time: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
+	// printlninfo!("This test does not have an equivalent test in LMBench");
+
+	Ok(())
+}
+
+/// Internal function that actually calculates the round trip time to send a message between two threads.
+/// This is measured by creating two tasks, a sender and receiver, and sending messages between them.
+/// Overhead is measured by creating two tasks that just return.
+fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
+    let start_hpet: u64;
+	let end_hpet: u64;
+	let overhead_end_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+	// we first spawn two tasks to get the overhead of creating and joining 2 tasks
+	// we will subtract this time from the total time so that we are left with the actual time to context switch
+	start_hpet = hpet.get_counter();
+
+		let taskref3;
+		let taskref4;
+
+		if let Some(core) = child_core {		
+			taskref3 = spawn::new_task_builder(overhead_task ,1)
+				.name(String::from("overhead_task_1"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+			taskref4 = spawn::new_task_builder(overhead_task ,2)
+				.name(String::from("overhead_task_2"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+		} else {
+			taskref3 = spawn::new_task_builder(overhead_task ,1)
+				.name(String::from("overhead_task_1"))
+				.block()
+				.spawn()?;
+			taskref4 = spawn::new_task_builder(overhead_task ,2)
+				.name(String::from("overhead_task_2"))
+				.block()
+				.spawn()?;
+		}
+		
+		taskref3.unblock();
+		taskref4.unblock();
+
+		taskref3.join()?;
+		taskref4.join()?;
+
+		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref4.take_exit_value().ok_or("could not retrieve exit value")?;
+
+
+	overhead_end_hpet = hpet.get_counter();
+
+	// we then create the sender and receiver endpoints for the 2 tasks
+		let (sender1, receiver1) = rendezvous::new_channel();
+		let (sender2, receiver2) = rendezvous::new_channel();
+		
+		let taskref1;
+		let taskref2;
+
+		if let Some(core) = child_core {		
+			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
+				.name(String::from("sender"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+			taskref2 = spawn::new_task_builder(rendezvous_task_receiver, (sender2, receiver1))
+				.name(String::from("receiver"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+		} else {
+			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
+				.name(String::from("sender"))
+				.block()
+				.spawn()?;
+			taskref2 = spawn::new_task_builder(rendezvous_task_receiver, (sender2, receiver1))
+				.name(String::from("receiver"))
+				.block()
+				.spawn()?;
+		}
+
+		taskref1.unblock();
+		taskref2.unblock();
+
+		taskref1.join()?;
+		taskref2.join()?;
+
+		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref2.take_exit_value().ok_or("could not retrieve exit value")?;
+
+    end_hpet = hpet.get_counter();
+
+    let delta_overhead = overhead_end_hpet - start_hpet;
+	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
+    let delta_time = hpet_2_time("", delta_hpet);
+	let overhead_time = hpet_2_time("", delta_overhead);
+    let delta_time_avg = delta_time / ITERATIONS as u64;
+	printlninfo!("ipc_rendezvous_inner_pinned ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+
+	Ok(delta_time_avg)
+}
+
+/// A task which sends and then receives a message for a number of iterations
+fn rendezvous_task_sender((sender, receiver): (rendezvous::Sender<u8>, rendezvous::Receiver<u8>)) {
+	let mut msg = 0;
+    for _ in 0..ITERATIONS{
+		sender.send(msg + 1).expect("Rendezvous task: could not send message!");
+        msg = receiver.receive().expect("Rendezvous task: could not receive message");
+    }
+}
+
+/// A task which sends and then receives a message for a number of iterations
+fn rendezvous_task_receiver((sender, receiver): (rendezvous::Sender<u8>, rendezvous::Receiver<u8>)) {
+	let mut msg;
+    for _ in 0..ITERATIONS{
+		msg = receiver.receive().expect("Rendezvous task: could not receive message");
+		sender.send(msg + 1).expect("Rendezvous task: could not send message!");
+    }
+}
+
+/// Measures the round trip time to send a 8-byte message on a async channel. 
+/// Calls `do_ipc_async_inner` multiple times to perform the actual operation
+fn do_ipc_async(pinned: bool, blocking: bool) -> Result<(), &'static str> {
+	let child_core = if pinned {
+		match pick_free_core() {
+			Ok(child_core) => { 
+				printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
+				Some(child_core)
+			}
+			_ => {
+				printlnwarn!("Cannot conduct ipc_async test because cores are busy");
+				return Err("Cannot conduct ipc_async test because cores are busy");
+			}
+		}
+	} else {
+		None
+	};
+
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::with_capacity(TRIES);
+	
+	print_header(TRIES, ITERATIONS);
+
+	for i in 0..TRIES {
+		let lat = do_ipc_async_inner(i+1, TRIES, child_core, blocking)?;	
+
+		tries += lat;
+		vec.push(lat);
+
+		if lat > max {max = lat;}
+		if lat < min {min = lat;}
+	}
+
+	let lat = tries / TRIES as u64;
+
+	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
+	if 	max - lat > err || lat - min > err {
+		printlnwarn!("ipc_async_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+	}
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
+
+	printlninfo!("IPC ASYNC result: Round Trip Time: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
+	// printlninfo!("This test does not have an equivalent test in LMBench");
+
+	Ok(())
+}
+
+/// Internal function that actually calculates the round trip time to send a message between two threads.
+/// This is measured by creating two tasks, a sender and receiver, and sending messages between them.
+/// Overhead is measured by creating two tasks that just return.
+fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bool) -> Result<u64, &'static str> {
+    let start_hpet: u64;
+	let end_hpet: u64;
+	let overhead_end_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
+		(async_task_sender, async_task_receiver)
+	} else {
+		(async_task_sender_nonblocking, async_task_receiver_nonblocking)
+	};
+
+	// we first spawn two tasks to get the overhead of creating and joining 2 tasks
+	// we will subtract this time from the total time so that we are left with the actual time to context switch
+	start_hpet = hpet.get_counter();
+
+		let taskref3;
+		let taskref4;
+
+		if let Some(core) = child_core {		
+			taskref3 = spawn::new_task_builder(overhead_task ,1)
+				.name(String::from("overhead_task_1"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+			taskref4 = spawn::new_task_builder(overhead_task ,2)
+				.name(String::from("overhead_task_2"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+		} else {
+			taskref3 = spawn::new_task_builder(overhead_task ,1)
+				.name(String::from("overhead_task_1"))
+				.block()
+				.spawn()?;
+			taskref4 = spawn::new_task_builder(overhead_task ,2)
+				.name(String::from("overhead_task_2"))
+				.block()
+				.spawn()?;
+		}
+		
+		taskref3.unblock();
+		taskref4.unblock();
+
+		taskref3.join()?;
+		taskref4.join()?;
+
+		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref4.take_exit_value().ok_or("could not retrieve exit value")?;
+
+
+	overhead_end_hpet = hpet.get_counter();
+
+	// we then create the sender and receiver endpoints for the 2 tasks
+		let (sender1, receiver1) = async_channel::new_channel(1);
+		let (sender2, receiver2) = async_channel::new_channel(1);
+		
+		let taskref1;
+		let taskref2;
+
+		if let Some(core) = child_core {		
+			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
+				.name(String::from("sender"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+			taskref2 = spawn::new_task_builder(receiver_task, (sender2, receiver1))
+				.name(String::from("receiver"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+		} else {
+			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
+				.name(String::from("sender"))
+				.block()
+				.spawn()?;
+			taskref2 = spawn::new_task_builder(receiver_task, (sender2, receiver1))
+				.name(String::from("receiver"))
+				.block()
+				.spawn()?;
+		}
+
+		taskref1.unblock();
+		taskref2.unblock();
+
+		taskref1.join()?;
+		taskref2.join()?;
+
+		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref2.take_exit_value().ok_or("could not retrieve exit value")?;
+
+    end_hpet = hpet.get_counter();
+
+    let delta_overhead = overhead_end_hpet - start_hpet;
+	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
+    let delta_time = hpet_2_time("", delta_hpet);
+	let overhead_time = hpet_2_time("", delta_overhead);
+    let delta_time_avg = delta_time / ITERATIONS as u64;
+	printlninfo!("ipc_async_inner_pinned ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+
+	Ok(delta_time_avg)
+}
+
+/// A task which sends and then receives a message for a number of iterations
+fn async_task_sender((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+	let mut msg = 0;
+    for _ in 0..ITERATIONS{
+		sender.send(msg + 1).expect("async channel task: could not send message!");
+        msg = receiver.receive().expect("async channel task: could not receive message");
+    }
+}
+
+/// A task which receives and then sends a message for a number of iterations
+fn async_task_receiver((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+	let mut msg;
+    for _ in 0..ITERATIONS{
+		msg = receiver.receive().expect("async channel task: could not receive message");
+		sender.send(msg + 1).expect("async channel task: could not send message!");
+    }
+}
+
+/// A task which sends and then receives a message for a number of iterations
+fn async_task_sender_nonblocking((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+	let mut msg = Ok(0);
+    for _ in 0..ITERATIONS{
+		while sender.try_send(msg.as_ref().unwrap() + 1).is_err() {}
+        msg = receiver.try_receive();
+		while msg.is_err() {
+        	msg = receiver.try_receive();
+		}
+    }
+}
+
+/// A task which receives and then sends a message for a number of iterations
+fn async_task_receiver_nonblocking((sender, receiver): (async_channel::Sender<u8>, async_channel::Receiver<u8>)) {
+	let mut msg;
+    for _ in 0..ITERATIONS{
+		msg = receiver.try_receive();
+		while msg.is_err() {
+        	msg = receiver.try_receive();
+		}
+		while sender.try_send(msg.as_ref().unwrap() + 1).is_err() {}
+    }
+}
+
+/// Measures the round trip time to send a 8-byte message on a simple channel. 
+/// Calls `do_ipc_simple_inner` multiple times to perform the actual operation
+fn do_ipc_simple(pinned: bool) -> Result<(), &'static str> {
+	let child_core = if pinned {
+		match pick_free_core() {
+			Ok(child_core) => { 
+				printlninfo!("core_{} is idle, so my children will play on it.", child_core); 
+				Some(child_core)
+			}
+			_ => {
+				printlnwarn!("Cannot conduct ipc_simple test because cores are busy");
+				return Err("Cannot conduct ipc_simple test because cores are busy");
+			}
+		}
+	} else {
+		None
+	};
+
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+	let mut vec = Vec::with_capacity(TRIES);
+	
+	print_header(TRIES, ITERATIONS);
+
+	for i in 0..TRIES {
+		let lat = do_ipc_simple_inner(i+1, TRIES, child_core)?;	
+
+		tries += lat;
+		vec.push(lat);
+
+		if lat > max {max = lat;}
+		if lat < min {min = lat;}
+	}
+
+	let lat = tries / TRIES as u64;
+
+	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
+	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
+	if 	max - lat > err || lat - min > err {
+		printlnwarn!("ipc_simple_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+	}
+	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
+
+	printlninfo!("IPC SIMPLE result: Round Trip Time: ({})", T_UNIT);
+	printlninfo!("{:?}", stats);
+	// printlninfo!("This test does not have an equivalent test in LMBench");
+
+	Ok(())
+}
+
+/// Internal function that actually calculates the round trip time to send a message between two threads.
+/// This is measured by creating two tasks, a sender and receiver, and sending messages between them.
+/// Overhead is measured by creating two tasks that just return.
+fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
+    let start_hpet: u64;
+	let end_hpet: u64;
+	let overhead_end_hpet: u64;
+	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+
+	// we first spawn two tasks to get the overhead of creating and joining 2 tasks
+	// we will subtract this time from the total time so that we are left with the actual time to context switch
+	start_hpet = hpet.get_counter();
+
+		let taskref3;
+		let taskref4;
+
+		if let Some(core) = child_core {		
+			taskref3 = spawn::new_task_builder(overhead_task ,1)
+				.name(String::from("overhead_task_1"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+			taskref4 = spawn::new_task_builder(overhead_task ,2)
+				.name(String::from("overhead_task_2"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+		} else {
+			taskref3 = spawn::new_task_builder(overhead_task ,1)
+				.name(String::from("overhead_task_1"))
+				.block()
+				.spawn()?;
+			taskref4 = spawn::new_task_builder(overhead_task ,2)
+				.name(String::from("overhead_task_2"))
+				.block()
+				.spawn()?;
+		}
+		
+		taskref3.unblock();
+		taskref4.unblock();
+
+		taskref3.join()?;
+		taskref4.join()?;
+
+		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref4.take_exit_value().ok_or("could not retrieve exit value")?;
+
+
+	overhead_end_hpet = hpet.get_counter();
+
+	// we then create the sender and receiver endpoints for the 2 tasks
+		let (sender1, receiver1) = simple_ipc::new_channel();
+		let (sender2, receiver2) = simple_ipc::new_channel();
+		
+		let taskref1;
+		let taskref2;
+
+		if let Some(core) = child_core {		
+			taskref1 = spawn::new_task_builder(simple_task_sender, (sender1, receiver2))
+				.name(String::from("sender"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+			taskref2 = spawn::new_task_builder(simple_task_receiver, (sender2, receiver1))
+				.name(String::from("receiver"))
+				.pin_on_core(core)
+				.block()
+				.spawn()?;
+		} else {
+			taskref1 = spawn::new_task_builder(simple_task_sender, (sender1, receiver2))
+				.name(String::from("sender"))
+				.block()
+				.spawn()?;
+			taskref2 = spawn::new_task_builder(simple_task_receiver, (sender2, receiver1))
+				.name(String::from("receiver"))
+				.block()
+				.spawn()?;
+		}
+
+		taskref1.unblock();
+		taskref2.unblock();
+
+		taskref1.join()?;
+		taskref2.join()?;
+
+		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
+		taskref2.take_exit_value().ok_or("could not retrieve exit value")?;
+
+    end_hpet = hpet.get_counter();
+
+    let delta_overhead = overhead_end_hpet - start_hpet;
+	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
+    let delta_time = hpet_2_time("", delta_hpet);
+	let overhead_time = hpet_2_time("", delta_overhead);
+    let delta_time_avg = delta_time / ITERATIONS as u64;
+	printlninfo!("ipc_simple_inner_pinned ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+
+	Ok(delta_time_avg)
+}
+
+/// A task which sends and then receives a message for a number of iterations
+fn simple_task_sender((sender, receiver): (Arc<simple_ipc::Channel>, Arc<simple_ipc::Channel>)) {
+	let mut msg = 0;
+    for _ in 0..ITERATIONS{
+		sender.send(msg + 1);
+		trace!("sent");
+        msg = receiver.receive();
+		trace!("receive");
+    }
+}
+
+/// A task which receives and then sends a message for a number of iterations
+fn simple_task_receiver((sender, receiver): (Arc<simple_ipc::Channel>, Arc<simple_ipc::Channel>)) {
+	let mut msg;
+    for _ in 0..ITERATIONS{
+		msg = receiver.receive();
+		sender.send(msg + 1);
+    }
+}
+
 
 /// Wrapper function used to measure file read and file read with open. 
 /// Accepts a bool argument. If true includes the latency to open a file
