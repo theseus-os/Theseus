@@ -1,13 +1,11 @@
 [package]
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "simple_ipc"
-description = "An extremely basic mechanism for IPC"
+description = "An extremely basic mechanism for IPC that uses a lock-free shared buffer"
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-atomic = "0.4.5"
 bit_field = "0.7.0"
 
 [dependencies.log]

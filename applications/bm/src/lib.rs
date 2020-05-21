@@ -4,7 +4,7 @@
 extern crate task;
 extern crate hpet;
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
 extern crate spawn;
@@ -17,6 +17,7 @@ extern crate memory;
 extern crate rendezvous;
 extern crate async_channel;
 extern crate simple_ipc;
+extern crate getopts;
 
 use core::str;
 use alloc::vec::Vec;
@@ -28,6 +29,7 @@ use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
 use memory::{create_mapping, EntryFlags};
+use getopts::Options;
 
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
@@ -62,79 +64,113 @@ macro_rules! printlnwarn {
 pub fn main(args: Vec<String>) -> isize {
 	let prog = get_prog_name();
 
-	if args.len() != 1 {
-		print_usage(&prog);
-		return 0;
-	}
+	let mut opts = Options::new();
+    opts.optflag("h", "help", "print this help menu");
+
+    opts.optflag("", "null", "null syscall");
+    opts.optflag("", "ctx", "inter-thread context switching overhead");
+    opts.optflag("", "spawn", "process creation");
+    opts.optflag("", "memory_map", "create and destroy a memory mapping");
+    opts.optflag("", "ipc", "1-byte IPC round trip time. Need to specify channel type ('a' or 'r')");
+    opts.optflag("", "simple_ipc", "1-byte IPC round trip time with the simple ipc implementation");
+    opts.optflag("", "fs_read_with_open", "file read including open");
+    opts.optflag("", "fs_read_only", "file read");
+    opts.optflag("", "fs_create", "file create");
+    opts.optflag("", "fs_delete", "file delete");
+    opts.optflag("", "fs", "test code for checking FS' ability");
+
+    opts.optflag("a", "async", "Run IPC bm for the async channel");
+    opts.optflag("r", "rendezvous", "Run IPC bm for the rendezvous channel");
+    opts.optflag("p", "pinned", "Sender and Receiver should be pinned to the same core in the IPC bm");
+    opts.optflag("b", "blocking", "Sender and Receiver should use blocking versions in the async IPC bm");
+
+
+    let matches = match opts.parse(&args) {
+        Ok(m) => m,
+        Err(_f) => {
+            println!("{}", _f);
+            print_usage(opts);
+            return -1; 
+        }
+    };
+
+	if matches.opt_present("h") {
+        print_usage(opts);
+        return 0;
+    }
 
 	if !check_myrq() {
 		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
 		return 0;
 	}
 
-	let res = match args[0].as_str() {
-		"null" => {
+	let res = if matches.opt_present("null") {
 			do_null()
-		}
-		"spawn" => {
+		} else if matches.opt_present("spawn") {
 			do_spawn()
-		}
-		"ctx" => {
+		} else if matches.opt_present("ctx") {
 			do_ctx()
-		}
-		"memory_map" => {
+		} else if matches.opt_present("memory_map") {
 			if cfg!(bm_map) {
 				do_memory_map()
 			} else {
 				Err("Need to enable bm_map config option to run the memory_map benchmark")
 			}
-		}
-		// THIS IS GETTING OUT OF HAND!!!!!!!!!! should switch to opts.
-		"ipc_rendezvous" => {
-			do_ipc_rendezvous(false) /*sender and receiver on different cores*/  
-		}
-		"ipc_rendezvous_pinned" => {
-			do_ipc_rendezvous(true) /*sender and receiver on the same core*/
-		}
-		"ipc_async_blocking" => {
-			do_ipc_async(false /*sender and receiver on different cores*/, true /*blocking*/) 
-		}
-		"ipc_async_pinned_blocking" => {
-			do_ipc_async(true/*sender and receiver on the same core*/, true /*blocking*/) 
-		}
-		"ipc_async_nonblocking" => {
-			do_ipc_async(false /*sender and receiver on different cores*/, false /*nonblocking*/) 
-		}
-		"ipc_async_pinned_nonblocking" => {
-			do_ipc_async(true /*sender and receiver on the same core*/, false /*nonblocking*/) 
-		}
-		"ipc_simple" => {
-			do_ipc_simple(false) /*sender and receiver on different cores*/
-		}
-		"ipc_simple_pinned" => {
-			do_ipc_simple(true) /*sender and receiver on the same core*/
-		}
-		"fs_read_with_open" | "fs1" => {
+		} else if matches.opt_present("ipc") {
+			if matches.opt_present("r") {
+				if matches.opt_present("p"){
+					println!("IPC with RENDEZVOUS channel (pinned)");
+					do_ipc_rendezvous(true) /*sender and receiver on the same core*/
+				} else {
+					println!("IPC with RENDEZVOUS channel (not pinned)");
+					do_ipc_rendezvous(false) /*sender and receiver on different cores*/ 
+				}
+			} else if matches.opt_present("a") {
+				if matches.opt_present("p") {
+					if matches.opt_present("b") {
+						println!("IPC with ASYNC channel (pinned and blocking)");
+						do_ipc_async(true/*sender and receiver on the same core*/, true /*blocking*/) 
+					} else {
+						println!("IPC with ASYNC channel (pinned and non-blocking)");
+						do_ipc_async(true /*sender and receiver on the same core*/, false /*nonblocking*/)
+					}
+				} else {
+					if matches.opt_present("b") {
+						println!("IPC with ASYNC channel (not pinned and blocking)");
+						do_ipc_async(false /*sender and receiver on different cores*/, true /*blocking*/) 
+					} else {
+						println!("IPC with ASYNC channel (not pinned and non-blocking)");
+						do_ipc_async(false /*sender and receiver on different cores*/, false /*nonblocking*/) 
+					}
+				}
+			}
+			else {
+				Err("Specify channel type to use")
+			}
+		} else if matches.opt_present("simple_ipc") {
+			if matches.opt_present("p") {
+				println!("SIMPLE IPC (pinned)");
+				do_ipc_simple(true) /*sender and receiver on the same core*/
+			} else {
+				println!("SIMPLE IPC (not pinned)");
+				do_ipc_simple(false) /*sender and receiver on different cores*/
+
+			}
+		} else if matches.opt_present("fs_read_with_open") {
 			do_fs_read(true /*with_open*/)
-		}
-		"fs_read_only" | "fs2" => {
+		} else if matches.opt_present("fs_read_only") {
 			do_fs_read(false /*with_open*/)
-		}
-		"fs_create" | "fs3" => {
+		} else if matches.opt_present("fs_create") {
 			do_fs_create_del()
-		}
-		"fs_delete" | "fs4" => {
+		} else if matches.opt_present("fs_delete") {
 			do_fs_delete()
-		}
-		"fs" => {	// test code for checking FS' ability
+		} else if matches.opt_present("fs") {
 			do_fs_cap_check()
-		}
-		_arg => {
+		} else {
 			printlnwarn!("Unknown command: {}", args[0]);
-			print_usage(&prog);
-			return 0;
-		}
-	};
+			print_usage(opts);
+        	Err("Unknown command")
+		};
 
 	match res {
 		Ok(()) => return 0,
@@ -998,18 +1034,16 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 }
 
 /// A task which sends and then receives a message for a number of iterations
-fn simple_task_sender((sender, receiver): (Arc<simple_ipc::Channel>, Arc<simple_ipc::Channel>)) {
+fn simple_task_sender((sender, receiver): (simple_ipc::Sender, simple_ipc::Receiver)) {
 	let mut msg = 0;
     for _ in 0..ITERATIONS{
 		sender.send(msg + 1);
-		trace!("sent");
         msg = receiver.receive();
-		trace!("receive");
     }
 }
 
 /// A task which receives and then sends a message for a number of iterations
-fn simple_task_receiver((sender, receiver): (Arc<simple_ipc::Channel>, Arc<simple_ipc::Channel>)) {
+fn simple_task_receiver((sender, receiver): (simple_ipc::Sender, simple_ipc::Receiver)) {
 	let mut msg;
     for _ in 0..ITERATIONS{
 		msg = receiver.receive();
@@ -1552,17 +1586,11 @@ fn do_fs_cap_check() -> Result<(), &'static str> {
 
 
 /// Print help
-fn print_usage(prog: &String) {
-	printlninfo!("\nUsage: {} cmd", prog);
-	printlninfo!("\n  available cmds:");
-	printlninfo!("\n    null             : null syscall");
-	printlninfo!("\n    spawn            : process creation");
-	printlninfo!("\n    ctx        		 : inter-thread context switching overhead");
-	printlninfo!("\n    fs_read_with_open: file read including open");
-	printlninfo!("\n    fs_read_only     : file read");
-	printlninfo!("\n    fs_create        : file create");
-	printlninfo!("\n    fs_delete        : file delete");
+fn print_usage(opts: Options) {
+    println!("{}", opts.usage(USAGE));
 }
+
+const USAGE: &'static str = "Usage: OPTION ARG";
 
 /// Print header of each test
 fn print_header(tries: usize, iterations: usize) {

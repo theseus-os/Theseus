@@ -209,6 +209,7 @@ dependencies = [
  "apic 0.1.0",
  "async_channel 0.1.0",
  "fs_node 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "heapfile 0.1.0",
  "hpet 0.1.0",
  "libtest 0.1.0",
@@ -2149,10 +2150,8 @@ dependencies = [
 name = "simple_ipc"
 version = "0.1.0"
 dependencies = [
- "atomic 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
