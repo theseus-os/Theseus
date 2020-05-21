@@ -319,7 +319,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 	for _ in 0..ITERATIONS{
 		start_hpet = hpet.get_counter();
 		let child = spawn::new_application_task_builder(app_path.clone(), None)?
-	        .pin_on_core(child_core) 
+	        // .pin_on_core(child_core) 
 	        .spawn()?;
 
 	    child.join()?;
