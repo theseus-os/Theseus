@@ -11,7 +11,7 @@ use core::sync::atomic::{Ordering, AtomicU16, spin_loop_hint};
 use alloc::sync::Arc;
 use bit_field::BitField;
 
-/// A channel implemented using a shared buffer that is represented by an atomic number 
+/// A channel implemented using a lock-free shared buffer 
 struct Channel {
     // The upper 8 bits are the buffer and the LSB is the full flag which indicates
     // whether the buffer has been used and has a message stored in it. 
