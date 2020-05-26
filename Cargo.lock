@@ -216,6 +216,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "path 0.1.0",
+ "pmu_x86 0.1.0",
  "rendezvous 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",

@@ -18,6 +18,7 @@ extern crate rendezvous;
 extern crate async_channel;
 extern crate simple_ipc;
 extern crate getopts;
+extern crate pmu_x86;
 
 use core::str;
 use alloc::vec::Vec;
@@ -660,7 +661,8 @@ fn do_ipc_async(pinned: bool, blocking: bool) -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	
+	pmu_x86::init()?;
+
 	print_header(TRIES, ITERATIONS);
 
 	for i in 0..TRIES {
@@ -706,7 +708,8 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 
 	// we first spawn one task to get the overhead of creating and joining a task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
-	start_hpet = hpet.get_counter();
+	// start_hpet = hpet.get_counter();
+	let mut start = start_counting_reference_cycles()?;
 
 		let taskref3;
 
@@ -724,7 +727,9 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		taskref3.join()?;
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
-	overhead_end_hpet = hpet.get_counter();
+	// overhead_end_hpet = hpet.get_counter();
+	let overhead = start.diff();
+	start.start()?;
 
 		// We then create the sender and receiver endpoints for the 2 tasks.
 		// The capcity of the channels is set to match the capacity of pipes in Linux
@@ -753,12 +758,13 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		taskref1.join()?;
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
-    end_hpet = hpet.get_counter();
+    // end_hpet = hpet.get_counter();
+	let end = stop_counting_reference_cycles(start)?;
 
-    let delta_overhead = overhead_end_hpet - start_hpet;
-	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
-    let delta_time = hpet_2_time("", delta_hpet);
-	let overhead_time = hpet_2_time("", delta_overhead);
+    // let delta_overhead = overhead_end_hpet - start_hpet;
+	// let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
+    let delta_time = end - overhead;
+	let overhead_time = overhead;
     let delta_time_avg = delta_time / ITERATIONS as u64;
 	printlninfo!("ipc_async_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
 		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
@@ -858,10 +864,12 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 	let end_hpet: u64;
 	let overhead_end_hpet: u64;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
+	pmu_x86::init()?;
 
 	// we first spawn a task to get the overhead of creating and joining a task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
-	start_hpet = hpet.get_counter();
+	// start_hpet = hpet.get_counter();
+	let mut start = start_counting_reference_cycles()?;
 
 		let taskref3;
 
@@ -879,7 +887,9 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		taskref3.join()?;
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
-	overhead_end_hpet = hpet.get_counter();
+	// overhead_end_hpet = hpet.get_counter();
+	let overhead = start.diff();
+	start.start()?;
 
 		// we then create the sender and receiver endpoints for the 2 tasks
 		let (sender1, receiver1) = simple_ipc::new_channel();
@@ -905,12 +915,13 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		taskref1.join()?;
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
-    end_hpet = hpet.get_counter();
+    // end_hpet = hpet.get_counter();
+	let end = stop_counting_reference_cycles(start)?;
 
-    let delta_overhead = overhead_end_hpet - start_hpet;
-	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
-    let delta_time = hpet_2_time("", delta_hpet);
-	let overhead_time = hpet_2_time("", delta_overhead);
+    // let delta_overhead = overhead_end_hpet - start_hpet;
+	// let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
+    let delta_time = end - overhead;
+	let overhead_time = overhead;
     let delta_time_avg = delta_time / ITERATIONS as u64;
 	printlninfo!("ipc_simple_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
 		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
