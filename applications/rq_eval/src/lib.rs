@@ -116,31 +116,38 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
 fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with WHOLE tasks, {} tasks...", CONFIG, num_tasks);
+    
+    let mut tasks = Vec::with_capacity(num_tasks);
     let overhead = hpet_timing_overhead()?;
+    
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start = hpet.get_counter();
-    
+
     for i in 0..num_tasks {
         let taskref = spawn::new_task_builder(whole_task, i)
             .name(format!("rq_whole_task_{}", i))
             .spawn()?;
-        taskref.join()?;
-        let _ = taskref.take_exit_value();
+        tasks.push(taskref);
+    }
+
+    for t in &tasks {
+        t.join()?;
+        let _ = t.take_exit_value();
     }
 
     let end = hpet.get_counter();
     let hpet_period = hpet.counter_period_femtoseconds();
+
+    println!("Completed runqueue WHOLE evaluation.");
     let elapsed_ticks = end - start - overhead;
     let elapsed_time = hpet_2_us(elapsed_ticks);
-    
-    println!("Completed runqueue WHOLE evaluation.");
+
     println!("Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
         elapsed_ticks, hpet_period);
     println!("Elapsed time:{} us", elapsed_time);
-        
+
     Ok(())
 }
-
 
 fn run_single(iterations: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with SINGLE tasks, {} iterations...", CONFIG, iterations);

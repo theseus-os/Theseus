@@ -235,7 +235,7 @@ fn do_spawn() -> Result<(), &'static str>{
 
 /// Internal function that actually calculates the time to spawn an application.
 /// Measures this by using `TaskBuilder` to spawn a application task.
-fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
+fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Result<u64, &'static str> {
     let mut start_hpet: u64;
 	let mut end_hpet: u64;
 	let mut delta_hpet = 0;
