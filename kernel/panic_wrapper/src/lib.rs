@@ -31,8 +31,7 @@ use fault_log::log_panic_entry;
 /// Returns `Ok(())` if everything ran successfully, and `Err` otherwise.
 pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     trace!("at top of panic_wrapper: {:?}", panic_info);
-
-    log_panic_entry ();
+    log_panic_entry (panic_info);
     // fault_log::print_fault_log();
 
     // print a stack trace
