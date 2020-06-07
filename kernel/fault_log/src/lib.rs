@@ -203,8 +203,7 @@ pub fn log_exception (
 pub fn log_panic_entry(panic_info: &PanicInfo) {
     let mut fe = FaultEntry::new(FaultType::Panic);
     if let Some(location) = panic_info.location() {
-        debug!("panic occurred in file '{}' at line {}", location.file(),
-            location.line());
+        // debug!("panic occurred in file '{}' at line {}", location.file(), location.line());
         let panic_file = location.file();
         let mut error_crate_iter = panic_file.split("/");
         error_crate_iter.next();
