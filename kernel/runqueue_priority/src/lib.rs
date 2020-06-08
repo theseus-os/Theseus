@@ -15,11 +15,14 @@ extern crate task;
 #[cfg(single_simd_task_optimization)]
 extern crate single_simd_task_optimization;
 
-use alloc::collections::VecDeque;
+use alloc::collections::BinaryHeap;
+use alloc::vec::Vec;
+
 use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
 use core::ops::{Deref, DerefMut};
+use core::cmp::Ordering;
 
 pub const MAX_PRIORITY: u8 = 40;
 pub const DEFAULT_PRIORITY: u8 = 20;
@@ -33,7 +36,7 @@ pub const INITIAL_TOKENS: usize = 10;
 /// This makes storing them alongside the task prohibitive.
 /// context_switches is not used in scheduling algorithm
 /// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`. 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub struct PriorityTaskRef{
     /// `TaskRef` wrapped by `PriorityTaskRef`
     taskref: TaskRef,
@@ -58,6 +61,24 @@ impl Deref for PriorityTaskRef {
 impl DerefMut for PriorityTaskRef {
     fn deref_mut(&mut self) -> &mut TaskRef {
         &mut self.taskref
+    }
+}
+
+impl Ord for PriorityTaskRef {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.tokens_remaining.cmp(&other.tokens_remaining)
+    }
+}
+
+impl PartialOrd for PriorityTaskRef {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for PriorityTaskRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.tokens_remaining == other.tokens_remaining
     }
 }
 
@@ -102,18 +123,18 @@ lazy_static! {
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
-    queue: VecDeque<PriorityTaskRef>,
+    queue: BinaryHeap<PriorityTaskRef>,
 }
 
 impl Deref for RunQueue {
-    type Target = VecDeque<PriorityTaskRef>;
-    fn deref(&self) -> &VecDeque<PriorityTaskRef> {
+    type Target = BinaryHeap<PriorityTaskRef>;
+    fn deref(&self) -> &BinaryHeap<PriorityTaskRef> {
         &self.queue
     }
 }
 
 impl DerefMut for RunQueue {
-    fn deref_mut(&mut self) -> &mut VecDeque<PriorityTaskRef> {
+    fn deref_mut(&mut self) -> &mut BinaryHeap<PriorityTaskRef> {
         &mut self.queue
     }
 }
@@ -123,17 +144,12 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
     /// switches is increased by one. This function is used when the task is selected by the scheduler
-    pub fn update_and_move_to_end(&mut self, index: usize, tokens : usize) -> Option<TaskRef> {
-        if let Some(mut priority_task_ref) = self.remove(index) {
-            priority_task_ref.tokens_remaining = tokens;
-            priority_task_ref.increment_context_switches();
-            let taskref = priority_task_ref.taskref.clone();
-            self.push_back(priority_task_ref);
-            Some(taskref)
-        } 
-        else {
-            None 
-        }
+    pub fn update_and_move_to_end(&mut self, mut priority_task_ref : PriorityTaskRef, tokens : usize) -> Option<TaskRef> {
+        priority_task_ref.tokens_remaining = tokens;
+        priority_task_ref.increment_context_switches();
+        let taskref = priority_task_ref.taskref.clone();
+        self.push(priority_task_ref);
+        Some(taskref)
     }
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
@@ -142,7 +158,7 @@ impl RunQueue {
         trace!("Created runqueue (priority) for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
-            queue: VecDeque::new(),
+            queue: BinaryHeap::new(),
         });
 
         #[cfg(runqueue_spillful)] 
@@ -224,7 +240,7 @@ impl RunQueue {
         #[cfg(not(loscd_eval))]
         debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
         let priority_task_ref = PriorityTaskRef::new(task);
-        self.push_back(priority_task_ref);
+        self.push(priority_task_ref);
         
         #[cfg(single_simd_task_optimization)]
         {   
@@ -241,7 +257,19 @@ impl RunQueue {
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
-        self.retain(|x| &x.taskref != task);
+        let mut vec = Vec::new();
+        while let Some(priority_taskref) = self.pop() {
+            if &priority_taskref.taskref != task {
+                vec.push(priority_taskref);
+            }
+            else {
+                break;
+            }
+        }
+        while let Some(taskref) = vec.pop() {
+            self.push(taskref);
+        }
+        // self.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]
         {   
@@ -302,12 +330,24 @@ impl RunQueue {
     /// The internal function that sets the priority of a given `Task` in a single `RunQueue`
     fn set_priority_internal(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
         // debug!("called_assign_priority_internal called per core");
-        for x in self.iter_mut() {
-            if &x.taskref == task{
-                debug!("changed priority from {}  to {} ", x.priority, priority);
-                x.priority = priority;
+        let mut vec = Vec::new();
+        while let Some(mut priority_taskref) = self.pop() {
+            if &priority_taskref.taskref == task {
+                debug!("changed priority from {}  to {} ", priority_taskref.priority, priority);
+                priority_taskref.priority = priority;
             }
+            vec.push(priority_taskref);
         }
+        while let Some(taskref) = vec.pop() {
+            self.push(taskref);
+        }
+
+        // for x in self.iter_mut() {
+        //     if &x.taskref == task{
+        //         debug!("changed priority from {}  to {} ", x.priority, priority);
+        //         x.priority = priority;
+        //     }
+        // }
         Ok(())
     } 
 
