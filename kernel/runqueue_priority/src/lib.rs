@@ -171,6 +171,19 @@ impl RunQueue {
         }
     }
 
+    pub fn reconstruct_heap(&mut self) {
+        let len = self.blocked_queue.len();
+        for _x in 0..len {
+            if let Some(priority_task_ref) = self.blocked_queue.remove(0) {
+                if priority_task_ref.lock().is_runnable() {
+                    self.queue.push(priority_task_ref);
+                } else {
+                    self.blocked_queue.push_back(priority_task_ref);
+                }
+            }
+        } 
+    }
+
     pub fn update_within_queue(&mut self, tokens : usize) -> Option<TaskRef> {
         if let Some(mut priority_task_ref) = self.queue.pop() {
             priority_task_ref.tokens_remaining = tokens;
@@ -414,7 +427,12 @@ impl RunQueue {
     /// The priority of the first task that matches is shown.
     fn get_priority_internal(&self, task: &TaskRef) -> Option<u8> {
         // debug!("called_assign_priority_internal called per core");
-        for x in self.iter() {
+        for x in self.blocked_queue.iter() {
+            if &x.taskref == task {
+                return Some(x.priority);
+            }
+        }
+        for x in self.queue.iter() {
             if &x.taskref == task {
                 return Some(x.priority);
             }

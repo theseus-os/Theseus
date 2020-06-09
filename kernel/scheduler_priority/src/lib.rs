@@ -41,10 +41,17 @@ pub fn get_priority(task: &TaskRef) -> Option<u8> {
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task.
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
-    let priority_taskref_with_result = select_next_task_priority(apic_id); 
+    let priority_taskref_with_result = select_next_task_priority(apic_id);
     match priority_taskref_with_result {
         // A task has been selected
         Some(task) => {
+            // if apic_id == 3 {
+            //     if task.taskref.is_some() {
+            //         debug!("select_next_task(): Returned task is some {}", task.idle_task);
+            //     } else {
+            //         debug!("select_next_task(): Returned task is None {}", task.idle_task);
+            //     }
+            // } 
             // If the selected task is idle task we begin a new scheduling epoch
             if task.idle_task == true {
                 assign_tokens(apic_id);
@@ -58,6 +65,9 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
 
         // If no task is picked we pick a new scheduling epoch
         None    => {
+            // if apic_id == 3 {
+            //     debug!("select_next_task(): Returned task result is None");
+            // }
             assign_tokens(apic_id);
             select_next_task_priority(apic_id).and_then(|m| m.taskref)
         }
@@ -85,10 +95,12 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         let t = priority_taskref.lock();
 
         // we skip the idle task, and only choose it if no other tasks are runnable
-        // if t.is_an_idle_task {
-        //     idle_task_index = Some(i);
-        //     continue;
-        // }
+        if t.is_an_idle_task {
+            // if apic_id == 3 {
+            //     error!("select_next_task_priority() idle task can never be in a busy queue");
+            // }
+            continue;
+        }
 
         // must be runnable
         if !t.is_runnable() {
@@ -134,9 +146,17 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
             });
     }
 
-    let mut modified_tokens = 0;
+    // if apic_id == 3 {
+    //     debug!("select_next_task_priority(): Nothing to pick in blocked list");
+    // }
 
+    let mut modified_tokens = 0;
     if let Some(priority_taskref) = runqueue_locked.get_first_runnable_task(){
+
+        // if apic_id == 3 {
+        //     debug!("select_next_task_priority(): picked from heap : AP {} chose Task {:?}", apic_id, *priority_taskref);
+        // }
+
         let t = priority_taskref.lock();
 
         if !t.is_runnable() {
@@ -151,7 +171,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
             }
         }
 
-        if priority_taskref.tokens_remaining == 0 {
+        if priority_taskref.tokens_remaining > 0 {
             idle_task = false;
         }
 
@@ -207,7 +227,6 @@ fn assign_tokens(apic_id: u8) -> bool  {
 
     // We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
-    let mut idle_task_index = None;
     for (i, priority_taskref) in runqueue_locked.iter_mut().enumerate() { 
         let task_tokens;
         {
@@ -215,17 +234,6 @@ fn assign_tokens(apic_id: u8) -> bool  {
             // let priority_taskref = match runqueue_locked.get_priority_task_ref(i){ Some(x) => x, None => { continue;},};
 
             let t = priority_taskref.lock();
-
-            // we give zero tokens to the idle tasks
-            if t.is_an_idle_task {
-                idle_task_index = Some(i);
-                continue;
-            }
-
-            // we give zero tokens to none runnable tasks
-            if !t.is_runnable() {
-                continue;
-            }
 
             // if this task is pinned, it must not be pinned to a different core
             if let Some(pinned) = t.pinned_core {
@@ -236,19 +244,24 @@ fn assign_tokens(apic_id: u8) -> bool  {
                 }
             }
             // task_tokens = epoch * (taskref + 1) / total_priorities;
-            task_tokens = epoch.saturating_mul((priority_taskref.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
+            if !t.is_an_idle_task{
+                task_tokens = epoch.saturating_mul((priority_taskref.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
+            } else {
+                task_tokens = 0;
+            }
+            
         }
         
         {
             priority_taskref.tokens_remaining = task_tokens;
         }
-        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
+        // if apic_id == 3 {
+        //     debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *priority_taskref);
+        // }
         // break; 
     }
 
-    if let Some(index) = idle_task_index {
-        runqueue_locked.update_and_move_to_queue(index ,0);
-    }
+    runqueue_locked.reconstruct_heap();
 
     return true;
 }
