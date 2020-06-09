@@ -16,6 +16,7 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::BinaryHeap;
+use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
 use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
@@ -124,18 +125,19 @@ lazy_static! {
 pub struct RunQueue {
     core: u8,
     queue: BinaryHeap<PriorityTaskRef>,
+    blocked_queue: VecDeque<PriorityTaskRef>,
 }
 
 impl Deref for RunQueue {
-    type Target = BinaryHeap<PriorityTaskRef>;
-    fn deref(&self) -> &BinaryHeap<PriorityTaskRef> {
-        &self.queue
+    type Target = VecDeque<PriorityTaskRef>;
+    fn deref(&self) -> &VecDeque<PriorityTaskRef> {
+        &self.blocked_queue
     }
 }
 
 impl DerefMut for RunQueue {
-    fn deref_mut(&mut self) -> &mut BinaryHeap<PriorityTaskRef> {
-        &mut self.queue
+    fn deref_mut(&mut self) -> &mut VecDeque<PriorityTaskRef> {
+        &mut self.blocked_queue
     }
 }
 
@@ -144,12 +146,59 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
     /// switches is increased by one. This function is used when the task is selected by the scheduler
-    pub fn update_and_move_to_end(&mut self, mut priority_task_ref : PriorityTaskRef, tokens : usize) -> Option<TaskRef> {
-        priority_task_ref.tokens_remaining = tokens;
-        priority_task_ref.increment_context_switches();
-        let taskref = priority_task_ref.taskref.clone();
-        self.push(priority_task_ref);
-        Some(taskref)
+    pub fn update_and_move_to_queue(&mut self, index: usize, tokens : usize) -> Option<TaskRef> {
+        if let Some(mut priority_task_ref) = self.blocked_queue.remove(index) {
+            priority_task_ref.tokens_remaining = tokens;
+            priority_task_ref.increment_context_switches();
+            let taskref = priority_task_ref.taskref.clone();
+            self.queue.push(priority_task_ref);
+            Some(taskref)
+        } 
+        else {
+            None 
+        }
+    }
+
+    pub fn move_to_blocked(&mut self) {
+        if let Some(priority_task_ref) = self.queue.pop(){
+            self.blocked_queue.push_back(priority_task_ref);
+        }
+    }
+
+    pub fn move_all_to_blocked(&mut self) {
+        while let Some(priority_task_ref) = self.queue.pop(){
+            self.blocked_queue.push_back(priority_task_ref);
+        }
+    }
+
+    pub fn update_within_queue(&mut self, tokens : usize) -> Option<TaskRef> {
+        if let Some(mut priority_task_ref) = self.queue.pop() {
+            priority_task_ref.tokens_remaining = tokens;
+            priority_task_ref.increment_context_switches();
+            let taskref = priority_task_ref.taskref.clone();
+            self.queue.push(priority_task_ref);
+            Some(taskref)
+        } 
+        else {
+            None 
+        }
+    }
+
+    pub fn get_first_runnable_task(&mut self) -> Option<&PriorityTaskRef> {
+        while true {
+            let mut move_needed = false;
+            if let Some(priority_task_ref) = self.queue.peek() {
+                if !(priority_task_ref.lock().is_runnable()){
+                    move_needed = true;
+                }
+            }
+            if move_needed {
+                self.move_to_blocked();
+            } else {
+                break;
+            }
+        } 
+        return self.queue.peek();
     }
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
@@ -159,6 +208,7 @@ impl RunQueue {
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
             queue: BinaryHeap::new(),
+            blocked_queue: VecDeque::new(),
         });
 
         #[cfg(runqueue_spillful)] 
@@ -194,7 +244,7 @@ impl RunQueue {
         let mut min_rq: Option<(&'static RwLockIrqSafe<RunQueue>, usize)> = None;
 
         for (_, rq) in RUNQUEUES.iter() {
-            let rq_size = rq.read().queue.len();
+            let rq_size = rq.read().queue.len() + rq.read().blocked_queue.len();
 
             if let Some(min) = min_rq {
                 if rq_size < min.1 {
@@ -240,7 +290,7 @@ impl RunQueue {
         #[cfg(not(loscd_eval))]
         debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
         let priority_task_ref = PriorityTaskRef::new(task);
-        self.push(priority_task_ref);
+        self.queue.push(priority_task_ref);
         
         #[cfg(single_simd_task_optimization)]
         {   
@@ -258,7 +308,7 @@ impl RunQueue {
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
         let mut vec = Vec::new();
-        while let Some(priority_taskref) = self.pop() {
+        while let Some(priority_taskref) = self.queue.pop() {
             if &priority_taskref.taskref != task {
                 vec.push(priority_taskref);
             }
@@ -267,9 +317,9 @@ impl RunQueue {
             }
         }
         while let Some(taskref) = vec.pop() {
-            self.push(taskref);
+            self.queue.push(taskref);
         }
-        // self.retain(|x| &x.taskref != task);
+        self.blocked_queue.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]
         {   
@@ -331,7 +381,7 @@ impl RunQueue {
     fn set_priority_internal(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
         // debug!("called_assign_priority_internal called per core");
         let mut vec = Vec::new();
-        while let Some(mut priority_taskref) = self.pop() {
+        while let Some(mut priority_taskref) = self.queue.pop() {
             if &priority_taskref.taskref == task {
                 debug!("changed priority from {}  to {} ", priority_taskref.priority, priority);
                 priority_taskref.priority = priority;
@@ -339,15 +389,15 @@ impl RunQueue {
             vec.push(priority_taskref);
         }
         while let Some(taskref) = vec.pop() {
-            self.push(taskref);
+            self.queue.push(taskref);
         }
 
-        // for x in self.iter_mut() {
-        //     if &x.taskref == task{
-        //         debug!("changed priority from {}  to {} ", x.priority, priority);
-        //         x.priority = priority;
-        //     }
-        // }
+        for x in self.blocked_queue.iter_mut() {
+            if &x.taskref == task{
+                debug!("changed priority from {}  to {} ", x.priority, priority);
+                x.priority = priority;
+            }
+        }
         Ok(())
     } 
 

@@ -17,7 +17,6 @@ extern crate runqueue_priority;
 
 use task::TaskRef;
 use runqueue_priority::{RunQueue, MAX_PRIORITY};
-use alloc::vec::Vec;
 
 
 /// A data structure to transfer data from select_next_task_priority
@@ -78,54 +77,93 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
             return None;
         }
     };
-    
-    // let mut idle_task_index: Option<usize> = None;
-    // let mut chosen_task_index: Option<usize> = None;
-    // let mut idle_task = true;
 
-    let mut vec = Vec::new();
+    let mut chosen_task_index: Option<usize> = None;
+    let mut idle_task = true;
 
-    while let Some(priority_taskref) = runqueue_locked.pop() {
-    // for (i, priority_taskref) in runqueue_locked.iter().enumerate() {
+    for (i, priority_taskref) in runqueue_locked.iter().enumerate() {
         let t = priority_taskref.lock();
-        let mut is_idle_task = false;
+
+        // we skip the idle task, and only choose it if no other tasks are runnable
+        // if t.is_an_idle_task {
+        //     idle_task_index = Some(i);
+        //     continue;
+        // }
+
         // must be runnable
         if !t.is_runnable() {
-            vec.push(priority_taskref);
             continue;
         }
-
-        is_idle_task = t.is_an_idle_task;
-
-
 
         // if this task is pinned, it must not be pinned to a different core
         if let Some(pinned) = t.pinned_core {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
                 error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                while let Some(taskref) = vec.pop() {
-                    runqueue_locked.push(taskref);
-                }
-                vec.push(priority_taskref);
                 return None;
-
             }
         }
 
-        let tokens = priority_taskref.tokens_remaining.saturating_sub(1);
-        let taskref = runqueue_locked.update_and_move_to_end(priority_taskref, tokens);
-
-        while let Some(taskref) = vec.pop() {
-            runqueue_locked.push(taskref);
-        }
-        
-        return Some(NextTaskResult {
-            taskref : taskref,
-            idle_task  : is_idle_task, 
-        });
+        // if the task has no remaining tokens we ignore the task
+        // if priority_taskref.tokens_remaining == 0{
+        //     continue;
+        // }
+            
+        // found a runnable task!
+        chosen_task_index = Some(i);
+        idle_task = false;
+        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+        break; 
     }
-    return None;
+
+    if chosen_task_index != None {
+        // We then reduce the number of tokens of the task by one
+        let modified_tokens = {
+            let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get(index));
+            match chosen_task.map(|m| m.tokens_remaining){
+                Some(x) => x.saturating_sub(1),
+                None => 0,
+            }
+        };
+
+        return chosen_task_index
+            .and_then(|index| runqueue_locked.update_and_move_to_queue(index, modified_tokens))
+            .map(|taskref| NextTaskResult {
+                taskref : Some(taskref),
+                idle_task  : idle_task, 
+            });
+    }
+
+    let mut modified_tokens = 0;
+
+    if let Some(priority_taskref) = runqueue_locked.get_first_runnable_task(){
+        let t = priority_taskref.lock();
+
+        if !t.is_runnable() {
+            return None;
+        }
+
+        if let Some(pinned) = t.pinned_core {
+            if pinned != apic_id {
+                // with per-core runqueues, this should never happen!
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
+                return None;
+            }
+        }
+
+        if priority_taskref.tokens_remaining == 0 {
+            idle_task = false;
+        }
+
+        modified_tokens = priority_taskref.tokens_remaining.saturating_sub(1);
+    }
+
+    return runqueue_locked.update_within_queue(modified_tokens)
+            .map(|taskref| NextTaskResult {
+                taskref : Some(taskref),
+                idle_task  : idle_task, 
+            });
+
 }
 
 
@@ -143,34 +181,14 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
     };
     
-
+    runqueue_locked.move_all_to_blocked();
+    
     // We begin with total priorities = 1 to avoid division by zero 
     let mut total_priorities :usize = 1;
 
     // This loop calculates the total priorities of the runqueue
-    for (_i, priority_taskref) in runqueue_locked.iter().enumerate() {
-        let t = priority_taskref.lock();
+    for priority_taskref  in runqueue_locked.iter(){
 
-        // we skip the idle task, it contains zero tokens as it is picked last
-        if t.is_an_idle_task {
-            continue;
-        }
-
-        // we assign tokens only to runnable tasks
-        if !t.is_runnable() {
-            continue;
-        }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
-            if pinned != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                return false;
-            }
-        }
-            
-        // found a runnable task!
         // We add its priority
         // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, priority_taskref.priority);
         total_priorities = total_priorities.saturating_add(1).saturating_add(priority_taskref.priority as usize);
@@ -186,29 +204,26 @@ fn assign_tokens(apic_id: u8) -> bool  {
     // many concurrent tasks are running, we increase the epoch in such cases
     let epoch :usize = core::cmp::max(total_priorities, 100);
 
-    let mut vec = Vec::new();
 
     // We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
-    while let Some(priority_taskref) = runqueue_locked.pop(){
-
-    // for (_i, priority_taskref) in runqueue_locked.iter_mut().enumerate() { 
+    let mut idle_task_index = None;
+    for (i, priority_taskref) in runqueue_locked.iter_mut().enumerate() { 
         let task_tokens;
         {
 
-            //let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){ Some(x) => x, None => { continue;},};
+            // let priority_taskref = match runqueue_locked.get_priority_task_ref(i){ Some(x) => x, None => { continue;},};
 
             let t = priority_taskref.lock();
 
             // we give zero tokens to the idle tasks
             if t.is_an_idle_task {
-                vec.push(priority_taskref);
+                idle_task_index = Some(i);
                 continue;
             }
 
             // we give zero tokens to none runnable tasks
             if !t.is_runnable() {
-                vec.push(priority_taskref);
                 continue;
             }
 
@@ -217,10 +232,6 @@ fn assign_tokens(apic_id: u8) -> bool  {
                 if pinned != apic_id {
                     // with per-core runqueues, this should never happen!
                     error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                    while let Some(taskref) = vec.pop() {
-                        runqueue_locked.push(taskref);
-                    }
-                    runqueue_locked.push(priority_taskref);
                     return false;
                 }
             }
@@ -230,14 +241,13 @@ fn assign_tokens(apic_id: u8) -> bool  {
         
         {
             priority_taskref.tokens_remaining = task_tokens;
-            vec.push(priority_taskref);
         }
         // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
         // break; 
     }
 
-    while let Some(taskref) = vec.pop() {
-        runqueue_locked.push(taskref);
+    if let Some(index) = idle_task_index {
+        runqueue_locked.update_and_move_to_queue(index ,0);
     }
 
     return true;
