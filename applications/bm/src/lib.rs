@@ -146,8 +146,7 @@ pub fn main(args: Vec<String>) -> isize {
 							do_ipc_async(false /*sender and receiver on different cores*/, false /*nonblocking*/) 
 						}
 					}
-				}
-				else {
+				} else {
 					Err("Specify channel type to use")
 				}
 			}
@@ -728,7 +727,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 	overhead_end_hpet = hpet.get_counter();
 
 		// We then create the sender and receiver endpoints for the 2 tasks.
-		// The capcity of the channels is set to match the capacity of pipes in Linux
+		// The capacity of the channels is set to match the capacity of pipes in Linux
 		// which is 16 4 KiB-pages, or 65,536 bytes.
 		const CAPACITY: usize = 65536;
 
@@ -923,9 +922,8 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 fn simple_task_sender((sender, receiver): (simple_ipc::Sender, simple_ipc::Receiver)) {
 	let mut msg = 0;
     for _ in 0..ITERATIONS{
-		sender.send(msg+1);
+		sender.send(msg);
         msg = receiver.receive();
-		error!("sender {}", msg);
     }
 }
 
@@ -934,8 +932,7 @@ fn simple_task_receiver((sender, receiver): (simple_ipc::Sender, simple_ipc::Rec
 	let mut msg;
     for _ in 0..ITERATIONS{
 		msg = receiver.receive();
-		error!("reciver {}", msg);
-		sender.send(msg+1);
+		sender.send(msg);
     }
 }
 
