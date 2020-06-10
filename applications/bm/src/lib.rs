@@ -307,7 +307,7 @@ fn do_spawn() -> Result<(), &'static str>{
 
 /// Internal function that actually calculates the time to spawn an application.
 /// Measures this by using `TaskBuilder` to spawn a application task.
-fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
+fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Result<u64, &'static str> {
     let mut start_hpet: u64;
 	let mut end_hpet: u64;
 	let mut delta_hpet = 0;
@@ -327,7 +327,6 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 	for _ in 0..ITERATIONS{
 		start_hpet = hpet.get_counter();
 		let child = spawn::new_application_task_builder(app_path.clone(), None)?
-	        // .pin_on_core(child_core) 
 	        .spawn()?;
 
 	    child.join()?;
@@ -505,6 +504,8 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 
 	for _ in 0..ITERATIONS{
 		let mapping = create_mapping(MAPPING_SIZE, EntryFlags::WRITABLE)?;
+		// write 0xFF to the first byte as lmbench does
+		unsafe{ *(mapping.start_address().value() as *mut u8)  = 0xFF; }
 		drop(mapping);
 	}
 
