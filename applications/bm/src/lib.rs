@@ -4,7 +4,7 @@
 extern crate task;
 extern crate hpet;
 #[macro_use] extern crate terminal_print;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
 extern crate spawn;
@@ -117,9 +117,9 @@ pub fn main(args: Vec<String>) -> isize {
 				Err("Need to enable bm_map config option to run the memory_map benchmark")
 			}
 		} else if matches.opt_present("ipc") {
-			// if cfg!(not(bm_ipc)) {
-			// 	Err("Need to enable bm_ipc config option to run the IPC benchmark")
-			// } else {
+			if cfg!(not(bm_ipc)) {
+				Err("Need to enable bm_ipc config option to run the IPC benchmark")
+			} else {
 				if matches.opt_present("r") {
 					if matches.opt_present("p"){
 						println!("IPC with RENDEZVOUS channel (pinned)");
@@ -150,11 +150,11 @@ pub fn main(args: Vec<String>) -> isize {
 				else {
 					Err("Specify channel type to use")
 				}
-			// }
+			}
 		} else if matches.opt_present("simple_ipc") {
-			// if cfg!(not(bm_ipc)) {
-			// 	Err("Need to enable bm_ipc config option to run the IPC benchmark")
-			// } else {
+			if cfg!(not(bm_ipc)) {
+				Err("Need to enable bm_ipc config option to run the IPC benchmark")
+			} else {
 				if matches.opt_present("p") {
 					println!("SIMPLE IPC (pinned)");
 					do_ipc_simple(true) /*sender and receiver on the same core*/
@@ -163,7 +163,7 @@ pub fn main(args: Vec<String>) -> isize {
 					do_ipc_simple(false) /*sender and receiver on different cores*/
 
 				}
-			// }
+			}
 		} else if matches.opt_present("fs_read_with_open") {
 			do_fs_read(true /*with_open*/)
 		} else if matches.opt_present("fs_read_only") {
@@ -922,8 +922,9 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 fn simple_task_sender((sender, receiver): (simple_ipc::Sender, simple_ipc::Receiver)) {
 	let mut msg = 0;
     for _ in 0..ITERATIONS{
-		sender.send(msg);
+		sender.send(msg+1);
         msg = receiver.receive();
+		error!("sender {}", msg);
     }
 }
 
@@ -932,7 +933,8 @@ fn simple_task_receiver((sender, receiver): (simple_ipc::Sender, simple_ipc::Rec
 	let mut msg;
     for _ in 0..ITERATIONS{
 		msg = receiver.receive();
-		sender.send(msg);
+		error!("reciver {}", msg);
+		sender.send(msg+1);
     }
 }
 
