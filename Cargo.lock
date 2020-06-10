@@ -207,14 +207,19 @@ name = "bm"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "async_channel 0.1.0",
  "fs_node 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "heapfile 0.1.0",
  "hpet 0.1.0",
  "libtest 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "path 0.1.0",
+ "rendezvous 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
+ "simple_ipc 0.1.0",
  "spawn 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
@@ -2139,6 +2144,14 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "packed_simd 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pit_clock 0.1.0",
+]
+
+[[package]]
+name = "simple_ipc"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

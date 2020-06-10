@@ -1146,12 +1146,15 @@ impl Shell {
                 }
             }
 
-            // If the job is stopped (e.g. by ctrl-Z), print an noticifation to the terminal.
-            if is_stopped {
-                self.terminal.lock().print_to_terminal(
-                    format!("[{}] [stopped] {}\n", job_num, job.cmd)
-                    .to_string()
-                );
+            // If the job is stopped (e.g. by ctrl-Z), print an notification to the terminal.
+            #[cfg(not(bm_ipc))]
+            {
+                if is_stopped {
+                    self.terminal.lock().print_to_terminal(
+                        format!("[{}] [stopped] {}\n", job_num, job.cmd)
+                        .to_string()
+                    );
+                }
             }
 
             // Record the completed job and remove them from job list later if all tasks in the
@@ -1162,10 +1165,13 @@ impl Shell {
                     self.fg_job_num = None;
                     need_prompt = true;
                 } else {
-                    self.terminal.lock().print_to_terminal(
-                        format!("[{}] [finished] {}\n", job_num, job.cmd)
-                        .to_string()
-                    );
+                    #[cfg(not(bm_ipc))]
+                    {
+                        self.terminal.lock().print_to_terminal(
+                            format!("[{}] [finished] {}\n", job_num, job.cmd)
+                            .to_string()
+                        );
+                    }
                 }
             }
         }
