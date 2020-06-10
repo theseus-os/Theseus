@@ -4,7 +4,7 @@
 extern crate task;
 extern crate hpet;
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
 extern crate spawn;
@@ -12,7 +12,7 @@ extern crate path;
 extern crate runqueue;
 extern crate heapfile;
 extern crate scheduler;
-#[macro_use] extern crate libtest;
+extern crate libtest;
 extern crate memory;
 extern crate rendezvous;
 extern crate async_channel;

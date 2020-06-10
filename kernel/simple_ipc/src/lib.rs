@@ -8,7 +8,7 @@ extern crate alloc;
 // #[macro_use] extern crate log;
 extern crate bit_field;
 
-use core::sync::atomic::{Ordering, AtomicU16, spin_loop_hint};
+use core::sync::atomic::{Ordering, AtomicU16};
 use alloc::sync::Arc;
 use bit_field::BitField;
 
