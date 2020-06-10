@@ -8,12 +8,10 @@ build = "../../build.rs"
 bm_in_us = []
 
 [dependencies]
+getopts = "0.2.21"
 
-
-# [dependencies.log]
-# default-features = false
-# version = "0.4.8"
-
+[dependencies.log]
+version = "0.4.8"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
@@ -52,3 +50,12 @@ path = "../../kernel/libtest"
 
 [dependencies.memory]
 path = "../../kernel/memory"
+
+[dependencies.rendezvous]
+path = "../../kernel/rendezvous"
+
+[dependencies.async_channel]
+path = "../../kernel/async_channel"
+
+[dependencies.simple_ipc]
+path = "../../kernel/simple_ipc"
