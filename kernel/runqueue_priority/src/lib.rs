@@ -319,7 +319,7 @@ impl RunQueue {
 
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
+        // debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
         let mut vec = Vec::new();
         while let Some(priority_taskref) = self.queue.pop() {
             if &priority_taskref.taskref != task {
@@ -396,7 +396,7 @@ impl RunQueue {
         let mut vec = Vec::new();
         while let Some(mut priority_taskref) = self.queue.pop() {
             if &priority_taskref.taskref == task {
-                debug!("changed priority from {}  to {} ", priority_taskref.priority, priority);
+                // debug!("changed priority from {}  to {} ", priority_taskref.priority, priority);
                 priority_taskref.priority = priority;
             }
             vec.push(priority_taskref);
