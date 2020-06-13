@@ -117,7 +117,9 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
             if queue_id < QUEUE_COUNT - 1 {
                 idle_task = false;
             }
-            // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+            // if apic_id == 3 {
+            //     debug!("select_next_task(): AP {} chose Task {:?} priority {} tokens {} queue {}", apic_id, *t, priority_taskref.priority, priority_taskref.tokens_remaining, queue_id);
+            // }
             break; 
         }
 
@@ -130,7 +132,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
     let (modified_tokens, new_queue) = {
         let chosen_task = chosen_task_location.and_then(|location| runqueue_locked.queue[location.queue].get(location.index));
         match chosen_task.map(|m| m.tokens_remaining){
-            Some(0) => (10, chosen_task_location.map_or(2, |location| core::cmp::max(location.queue + 1, QUEUE_COUNT -1))),
+            Some(0) => (10, chosen_task_location.map_or(2, |location| core::cmp::min(location.queue + 1, QUEUE_COUNT -1))),
             Some(x) => (x.saturating_sub(1), chosen_task_location.map_or(2, |location| location.queue)),
             None => (0, QUEUE_COUNT - 1)
         }
@@ -150,7 +152,9 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
 /// Returns true if successful.
 /// Tokens are assigned based on  (prioirty of each task / prioirty of all tasks).
 fn assign_tokens(apic_id: u8) -> bool  {
-
+    // if apic_id == 3 {
+    //     warn!("assign token called");
+    // }
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
@@ -191,7 +195,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         let (modified_tokens, new_queue) = {
             let chosen_task = chosen_task_location.and_then(|location| runqueue_locked.queue[location.queue].get(location.index));
             match chosen_task {
-                Some(x) => ((usize::from(x.priority))%10, x.get_initial_priority_queue()),
+                Some(x) => (x.get_initial_token_count(), x.get_initial_priority_queue()),
                 None => (10, 2),
             }
         };

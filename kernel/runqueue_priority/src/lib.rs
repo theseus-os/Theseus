@@ -102,6 +102,19 @@ impl PriorityTaskRef {
             _ => 2,
         }
     }
+
+    pub fn get_initial_token_count(&self) -> usize {
+        if self.lock().is_an_idle_task {
+            return 0;
+        }
+        match (self.priority) {
+            0 ..=10 => usize::from(self.priority),
+            11 ..=20 => usize::from(self.priority) - 10,
+            21 ..=30 => usize::from(self.priority) - 20,
+            31 ..=40 => usize::from(self.priority) - 30,
+            _ => 10,
+        } 
+    }
 }
 
 
