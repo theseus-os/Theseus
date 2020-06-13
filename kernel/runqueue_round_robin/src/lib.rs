@@ -287,4 +287,11 @@ impl RunQueue {
                 rq.write().remove_internal(task)
             })
     }
+
+    pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
+        match RunQueue::get_runqueue(core).map(|rq| rq.read()) {
+            Some(rq) => { Some(rq.iter().count()) }
+            _ => { None }
+        }
+    }
 }
