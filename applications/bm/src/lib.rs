@@ -1,3 +1,10 @@
+//! A collection of micro-benchmarks for Theseus. 
+//! They include null syscall, context switching, process creation, memory mapping, IPC and file system benchmarks.
+//! 
+//! To run the memory mapping benchmark, Theseus should be compiled with the "bm_map" configuration option.
+//! To run the IPC benchmarks, Theseus should be compiled with the "bm_ipc" configuration option, and a PMU should be available on the test machine.
+//! When running on QEMU, the PMU can be made available by enabling KVM.
+
 #![no_std]
 
 #[macro_use] extern crate alloc;
@@ -18,6 +25,7 @@ extern crate rendezvous;
 extern crate async_channel;
 extern crate simple_ipc;
 extern crate getopts;
+extern crate pmu_x86;
 
 use core::str;
 use alloc::vec::Vec;
@@ -83,6 +91,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("r", "rendezvous", "Run IPC bm for the rendezvous channel");
     opts.optflag("p", "pinned", "Sender and Receiver should be pinned to the same core in the IPC bm");
     opts.optflag("b", "blocking", "Sender and Receiver should use blocking versions in the async IPC bm");
+    opts.optflag("c", "cycles", "Measure the IPC times in reference cycles");
 
 
     let matches = match opts.parse(&args) {
@@ -104,6 +113,28 @@ pub fn main(args: Vec<String>) -> isize {
 		return 0;
 	}
 
+	// store flags for ipc
+	let pinned = if matches.opt_present("p") {
+		print!("PINNED ");
+		true
+	} else {
+		false
+	};
+
+	let blocking = if matches.opt_present("b") {
+		print!("BLOCKING ");
+		true
+	} else {
+		false
+	};
+
+	let cycles = if matches.opt_present("c") {
+		print!("(cycles) ");
+		true
+	} else {
+		false
+	};
+
 	let res = if matches.opt_present("null") {
 			do_null()
 		} else if matches.opt_present("spawn") {
@@ -121,31 +152,11 @@ pub fn main(args: Vec<String>) -> isize {
 				Err("Need to enable bm_ipc config option to run the IPC benchmark")
 			} else {
 				if matches.opt_present("r") {
-					if matches.opt_present("p"){
-						println!("IPC with RENDEZVOUS channel (pinned)");
-						do_ipc_rendezvous(true) /*sender and receiver on the same core*/
-					} else {
-						println!("IPC with RENDEZVOUS channel (not pinned)");
-						do_ipc_rendezvous(false) /*sender and receiver on different cores*/ 
-					}
+					println!("RENDEZVOUS IPC");
+					do_ipc_rendezvous(pinned, cycles)
 				} else if matches.opt_present("a") {
-					if matches.opt_present("p") {
-						if matches.opt_present("b") {
-							println!("IPC with ASYNC channel (pinned and blocking)");
-							do_ipc_async(true/*sender and receiver on the same core*/, true /*blocking*/) 
-						} else {
-							println!("IPC with ASYNC channel (pinned and non-blocking)");
-							do_ipc_async(true /*sender and receiver on the same core*/, false /*nonblocking*/)
-						}
-					} else {
-						if matches.opt_present("b") {
-							println!("IPC with ASYNC channel (not pinned and blocking)");
-							do_ipc_async(false /*sender and receiver on different cores*/, true /*blocking*/) 
-						} else {
-							println!("IPC with ASYNC channel (not pinned and non-blocking)");
-							do_ipc_async(false /*sender and receiver on different cores*/, false /*nonblocking*/) 
-						}
-					}
+					println!("ASYNC IPC");
+					do_ipc_async(pinned, blocking, cycles)
 				} else {
 					Err("Specify channel type to use")
 				}
@@ -154,14 +165,8 @@ pub fn main(args: Vec<String>) -> isize {
 			if cfg!(not(bm_ipc)) {
 				Err("Need to enable bm_ipc config option to run the IPC benchmark")
 			} else {
-				if matches.opt_present("p") {
-					println!("SIMPLE IPC (pinned)");
-					do_ipc_simple(true) /*sender and receiver on the same core*/
-				} else {
-					println!("SIMPLE IPC (not pinned)");
-					do_ipc_simple(false) /*sender and receiver on different cores*/
-
-				}
+				println!("SIMPLE IPC");
+				do_ipc_simple(pinned, cycles)
 			}
 		} else if matches.opt_present("fs_read_with_open") {
 			do_fs_read(true /*with_open*/)
@@ -521,7 +526,7 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 
 /// Measures the round trip time to send a 1-byte message on a rendezvous channel. 
 /// Calls `do_ipc_rendezvous_inner` multiple times to perform the actual operation
-fn do_ipc_rendezvous(pinned: bool) -> Result<(), &'static str> {
+fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
 		Some(CPU_ID!())
 	} else {
@@ -532,11 +537,12 @@ fn do_ipc_rendezvous(pinned: bool) -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	
+	pmu_x86::init()?;
+
 	print_header(TRIES, ITERATIONS);
 
 	for i in 0..TRIES {
-		let lat = do_ipc_rendezvous_inner(i+1, TRIES, child_core)?;	
+		let lat = do_ipc_rendezvous_inner(i+1, TRIES, child_core, cycles)?;	
 
 		tries += lat;
 		vec.push(lat);
@@ -550,11 +556,16 @@ fn do_ipc_rendezvous(pinned: bool) -> Result<(), &'static str> {
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
 	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
 	if 	max - lat > err || lat - min > err {
-		printlnwarn!("ipc_rendezvous_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+		printlnwarn!("ipc_rendezvous_test diff is too big: {} ({} - {})", max-min, max, min);
 	}
 	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
 
-	printlninfo!("IPC RENDEZVOUS result: Round Trip Time: ({})", T_UNIT);
+	if cycles {
+		printlninfo!("IPC RENDEZVOUS result: Round Trip Time: (cycles)",);
+	} else {
+		printlninfo!("IPC RENDEZVOUS result: Round Trip Time: ({})", T_UNIT);
+	}
+
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test does not have an equivalent test in LMBench");
 
@@ -564,15 +575,20 @@ fn do_ipc_rendezvous(pinned: bool) -> Result<(), &'static str> {
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and the child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
-    let start_hpet: u64;
-	let end_hpet: u64;
-	let overhead_end_hpet: u64;
+fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>, cycles: bool) -> Result<u64, &'static str> {
+	// ideally we want to intialize only one counter depending on the `cycles` flag, but we get an error that a variable may be uninitialized
+	let mut counter = start_counting_reference_cycles()?;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// we first spawn one task to get the overhead of creating and joining the task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
-	start_hpet = hpet.get_counter();
+
+	let start = if cycles {
+		counter.start()?;
+		0
+	} else {
+		hpet.get_counter()
+	};
 
 		let taskref3;
 
@@ -590,7 +606,13 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		taskref3.join()?;
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
-	overhead_end_hpet = hpet.get_counter();
+	let overhead = if cycles {
+		let diff = counter.diff();
+		counter.start()?;
+		diff
+	} else {
+		hpet.get_counter()
+	};
 
 		// we then create the sender and receiver endpoints for the 2 tasks
 		let (sender1, receiver1) = rendezvous::new_channel();
@@ -616,17 +638,31 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		taskref1.join()?;
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
-    end_hpet = hpet.get_counter();
+	let end = if cycles {
+		counter.end()?
+	} else {
+    	hpet.get_counter()
+	};
 
-    let delta_overhead = overhead_end_hpet - start_hpet;
-	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
-    let delta_time = hpet_2_time("", delta_hpet);
-	let overhead_time = hpet_2_time("", delta_overhead);
-    let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("ipc_rendezvous_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
-		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+	let delta_avg = if cycles {
+		let delta_overhead = overhead;
+		let delta_cycles = end - delta_overhead;
+		let delta_cycles_avg = delta_cycles / ITERATIONS as u64;
+		printlninfo!("ipc_rendezvous_inner ({}/{}): total_overhead -> {} cycles , {} total_time -> {} cycles",
+			th, nr, delta_overhead, delta_cycles, delta_cycles_avg);
+		delta_cycles_avg
+	} else {
+		let delta_overhead = overhead - start;
+		let delta_hpet = end - overhead - delta_overhead;
+		let delta_time = hpet_2_time("", delta_hpet);
+		let overhead_time = hpet_2_time("", delta_overhead);
+		let delta_time_avg = delta_time / ITERATIONS as u64;
+		printlninfo!("ipc_rendezvous_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+			th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+		delta_time_avg
+	};
 
-	Ok(delta_time_avg)
+	Ok(delta_avg)
 }
 
 /// A task which sends and then receives a message for a number of iterations
@@ -649,7 +685,7 @@ fn rendezvous_task_receiver((sender, receiver): (rendezvous::Sender<u8>, rendezv
 
 /// Measures the round trip time to send a 1-byte message on an async channel. 
 /// Calls `do_ipc_async_inner` multiple times to perform the actual operation
-fn do_ipc_async(pinned: bool, blocking: bool) -> Result<(), &'static str> {
+fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
 		Some(CPU_ID!())
 	} else {
@@ -660,11 +696,12 @@ fn do_ipc_async(pinned: bool, blocking: bool) -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	
+	pmu_x86::init()?;
+
 	print_header(TRIES, ITERATIONS);
 
 	for i in 0..TRIES {
-		let lat = do_ipc_async_inner(i+1, TRIES, child_core, blocking)?;	
+		let lat = do_ipc_async_inner(i+1, TRIES, child_core, blocking, cycles)?;	
 
 		tries += lat;
 		vec.push(lat);
@@ -678,11 +715,15 @@ fn do_ipc_async(pinned: bool, blocking: bool) -> Result<(), &'static str> {
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
 	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
 	if 	max - lat > err || lat - min > err {
-		printlnwarn!("ipc_async_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+		printlnwarn!("ipc_async_test diff is too big: {} ({} - {})", max-min, max, min);
 	}
 	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
 
-	printlninfo!("IPC ASYNC result: Round Trip Time: ({})", T_UNIT);
+	if cycles {
+		printlninfo!("IPC ASYNC result: Round Trip Time: (cycles)",);
+	} else {
+		printlninfo!("IPC ASYNC result: Round Trip Time: ({})", T_UNIT);
+	}
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_pipe` in LMBench when run with the pinned flag enabled");
 
@@ -692,10 +733,9 @@ fn do_ipc_async(pinned: bool, blocking: bool) -> Result<(), &'static str> {
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bool) -> Result<u64, &'static str> {
-    let start_hpet: u64;
-	let end_hpet: u64;
-	let overhead_end_hpet: u64;
+fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bool, cycles: bool) -> Result<u64, &'static str> {
+	// ideally we want to intialize only one counter depending on the `cycles` flag, but we get an error that a variable may be uninitialized
+	let mut counter = start_counting_reference_cycles()?;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
@@ -704,9 +744,15 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		(async_task_sender_nonblocking, async_task_receiver_nonblocking)
 	};
 
-	// we first spawn one task to get the overhead of creating and joining a task
+	// we first spawn one task to get the overhead of creating and joining the task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
-	start_hpet = hpet.get_counter();
+
+	let start = if cycles {
+		counter.start()?;
+		0
+	} else {
+		hpet.get_counter()
+	};
 
 		let taskref3;
 
@@ -724,7 +770,13 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		taskref3.join()?;
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
-	overhead_end_hpet = hpet.get_counter();
+	let overhead = if cycles {
+		let diff = counter.diff();
+		counter.start()?;
+		diff
+	} else {
+		hpet.get_counter()
+	};
 
 		// We then create the sender and receiver endpoints for the 2 tasks.
 		// The capacity of the channels is set to match the capacity of pipes in Linux
@@ -753,17 +805,31 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		taskref1.join()?;
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
-    end_hpet = hpet.get_counter();
+	let end = if cycles {
+		counter.end()?
+	} else {
+    	hpet.get_counter()
+	};
 
-    let delta_overhead = overhead_end_hpet - start_hpet;
-	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
-    let delta_time = hpet_2_time("", delta_hpet);
-	let overhead_time = hpet_2_time("", delta_overhead);
-    let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("ipc_async_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
-		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+	let delta_avg = if cycles {
+		let delta_overhead = overhead;
+		let delta_cycles = end - delta_overhead;
+		let delta_cycles_avg = delta_cycles / ITERATIONS as u64;
+		printlninfo!("ipc_rendezvous_inner ({}/{}): total_overhead -> {} cycles , {} total_time -> {} cycles",
+			th, nr, delta_overhead, delta_cycles, delta_cycles_avg);
+		delta_cycles_avg
+	} else {
+		let delta_overhead = overhead - start;
+		let delta_hpet = end - overhead - delta_overhead;
+		let delta_time = hpet_2_time("", delta_hpet);
+		let overhead_time = hpet_2_time("", delta_overhead);
+		let delta_time_avg = delta_time / ITERATIONS as u64;
+		printlninfo!("ipc_rendezvous_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+			th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+		delta_time_avg
+	};
 
-	Ok(delta_time_avg)
+	Ok(delta_avg)
 }
 
 /// A task which sends and then receives a message for a number of iterations
@@ -810,7 +876,7 @@ fn async_task_receiver_nonblocking((sender, receiver): (async_channel::Sender<u8
 
 /// Measures the round trip time to send a 1-byte message on a simple channel. 
 /// Calls `do_ipc_simple_inner` multiple times to perform the actual operation
-fn do_ipc_simple(pinned: bool) -> Result<(), &'static str> {
+fn do_ipc_simple(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
 		Some(CPU_ID!())
 	} else {
@@ -821,11 +887,12 @@ fn do_ipc_simple(pinned: bool) -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
+	pmu_x86::init()?;
 	
 	print_header(TRIES, ITERATIONS);
 
 	for i in 0..TRIES {
-		let lat = do_ipc_simple_inner(i+1, TRIES, child_core)?;	
+		let lat = do_ipc_simple_inner(i+1, TRIES, child_core, cycles)?;	
 
 		tries += lat;
 		vec.push(lat);
@@ -839,11 +906,16 @@ fn do_ipc_simple(pinned: bool) -> Result<(), &'static str> {
 	// We expect the maximum and minimum to be within 10*THRESHOLD_ERROR_RATIO % of the mean value
 	let err = (lat * 10 * THRESHOLD_ERROR_RATIO) / 100;
 	if 	max - lat > err || lat - min > err {
-		printlnwarn!("ipc_simple_test diff is too big: {} ({} - {}) {}", max-min, max, min, T_UNIT);
+		printlnwarn!("ipc_simple_test diff is too big: {} ({} - {})", max-min, max, min);
 	}
 	let stats = calculate_stats(&vec).ok_or("couldn't calculate stats")?;
 
-	printlninfo!("IPC SIMPLE result: Round Trip Time: ({})", T_UNIT);
+	if cycles {
+		printlninfo!("IPC SIMPLE result: Round Trip Time: (cycles)");
+	} else {
+		printlninfo!("IPC SIMPLE result: Round Trip Time: ({})", T_UNIT);
+	}
+
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test does not have an equivalent test in LMBench");
 
@@ -853,15 +925,20 @@ fn do_ipc_simple(pinned: bool) -> Result<(), &'static str> {
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a tasks that just returns.
-fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
-    let start_hpet: u64;
-	let end_hpet: u64;
-	let overhead_end_hpet: u64;
+fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>, cycles: bool) -> Result<u64, &'static str> {
+	// ideally we want to intialize only one counter depending on the `cycles` flag, but we get an error that a variable may be uninitialized
+	let mut counter = start_counting_reference_cycles()?;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
-	// we first spawn a task to get the overhead of creating and joining a task
+	// we first spawn one task to get the overhead of creating and joining the task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
-	start_hpet = hpet.get_counter();
+
+	let start = if cycles {
+		counter.start()?;
+		0
+	} else {
+		hpet.get_counter()
+	};
 
 		let taskref3;
 
@@ -879,7 +956,13 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		taskref3.join()?;
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
-	overhead_end_hpet = hpet.get_counter();
+	let overhead = if cycles {
+		let diff = counter.diff();
+		counter.start()?;
+		diff
+	} else {
+		hpet.get_counter()
+	};
 
 		// we then create the sender and receiver endpoints for the 2 tasks
 		let (sender1, receiver1) = simple_ipc::new_channel();
@@ -905,17 +988,31 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		taskref1.join()?;
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
-    end_hpet = hpet.get_counter();
+	let end = if cycles {
+		counter.end()?
+	} else {
+    	hpet.get_counter()
+	};
 
-    let delta_overhead = overhead_end_hpet - start_hpet;
-	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
-    let delta_time = hpet_2_time("", delta_hpet);
-	let overhead_time = hpet_2_time("", delta_overhead);
-    let delta_time_avg = delta_time / ITERATIONS as u64;
-	printlninfo!("ipc_simple_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
-		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+	let delta_avg = if cycles {
+		let delta_overhead = overhead;
+		let delta_cycles = end - delta_overhead;
+		let delta_cycles_avg = delta_cycles / ITERATIONS as u64;
+		printlninfo!("ipc_rendezvous_inner ({}/{}): total_overhead -> {} cycles , {} total_time -> {} cycles",
+			th, nr, delta_overhead, delta_cycles, delta_cycles_avg);
+		delta_cycles_avg
+	} else {
+		let delta_overhead = overhead - start;
+		let delta_hpet = end - overhead - delta_overhead;
+		let delta_time = hpet_2_time("", delta_hpet);
+		let overhead_time = hpet_2_time("", delta_overhead);
+		let delta_time_avg = delta_time / ITERATIONS as u64;
+		printlninfo!("ipc_rendezvous_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
+			th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
+		delta_time_avg
+	};
 
-	Ok(delta_time_avg)
+	Ok(delta_avg)
 }
 
 /// A task which sends and then receives a message for a number of iterations
