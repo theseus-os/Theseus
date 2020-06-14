@@ -2,12 +2,13 @@
 //! We still need to make the channel generic to use atomics upto AtomicU64
 
 #![no_std]
+#![feature(no_more_cas)]
 
 extern crate alloc;
 // #[macro_use] extern crate log;
 extern crate bit_field;
 
-use core::sync::atomic::{Ordering, AtomicU16, spin_loop_hint};
+use core::sync::atomic::{Ordering, AtomicU16};
 use alloc::sync::Arc;
 use bit_field::BitField;
 
@@ -33,24 +34,25 @@ impl Sender{
 
     /// Tries to send a message once. If the buffer is full, then returns an Err.
     pub fn try_send(&self, msg: u8) -> Result<(), &'static str> {
-        if !self.0.buffer.load(Ordering::SeqCst).get_bit(0) {
-            let msg: u16 = ((msg as u16) << 8) | 0x1;
-            self.0.buffer.store(msg, Ordering::SeqCst);
-            Ok(())
-        } else {
-            Err("Buffer has reached its capacity")
-        }
-
+        self.0.buffer.fetch_update( |val| {
+            if !val.get_bit(0) {
+                let msg: u16 = ((msg as u16) << 8) | 0x1;
+                Some(msg)
+            } else {
+                None
+            }
+        }, Ordering::SeqCst, Ordering::SeqCst)
+        .map(|_prev_val| ())
+        .map_err(|_e| "Buffer has reached its capacity")
     }
 
     /// Tries to send a message until succesful.
     /// Task will spin in a loop until the full flag is cleared. 
     pub fn send(&self, msg: u8) {
-        let msg: u16 = ((msg as u16) << 8) | 0x1;
-        while self.0.buffer.load(Ordering::SeqCst).get_bit(0) {
-            spin_loop_hint(); // doesn't really make any difference in performance
+        let mut res = self.try_send(msg);
+        while res.is_err() {
+            res = self.try_send(msg);
         }
-        self.0.buffer.store(msg, Ordering::SeqCst);
     }
 }
 
@@ -61,24 +63,26 @@ impl Receiver {
 
     /// Tries to receive a message once. If the buffer is empty, then returns an Err.
     pub fn try_receive(&self) -> Result<u8, &'static str> {
-        if self.0.buffer.load(Ordering::SeqCst).get_bit(0) {
-            let msg = (self.0.buffer.load(Ordering::SeqCst) >> 8) & 0xFF;
-            self.0.buffer.store(0, Ordering::SeqCst);
-            Ok(msg as u8)
-        } else {
-            Err("There was no message in the buffer")
-        }
+        self.0.buffer.fetch_update( |val| {
+            if val.get_bit(0) {
+                Some(0)
+            } else {
+                None
+            }
+        }, Ordering::SeqCst, Ordering::SeqCst)
+        .map(|msg| (msg >> 8) as u8 & 0xFF)
+        .map_err(|_e| "There was no message in the buffer.")
     }
 
     /// Tries to receive a message until succesful.
     /// Task will spin in a loop until the full flag is set.
     pub fn receive(&self) -> u8 {
-        while !self.0.buffer.load(Ordering::SeqCst).get_bit(0) {
-            spin_loop_hint();
+        let mut res = self.try_receive();
+        while res.is_err() {
+            res = self.try_receive();
         }
-        let msg = (self.0.buffer.load(Ordering::SeqCst) >> 8) & 0xFF;
-        self.0.buffer.store(0, Ordering::SeqCst);
-        msg as u8
+        // unwrap is safe here since the condition is checked in the loop
+        res.unwrap()
     }
 }
 
