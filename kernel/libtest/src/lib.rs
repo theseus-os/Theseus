@@ -19,6 +19,7 @@ use alloc::vec::Vec;
 use hashbrown::HashMap;
 use core::fmt;
 use apic::get_lapics;
+use runqueue::nr_tasks_in_rq;
 
 const MICRO_TO_FEMTO: u64 = 1_000_000_000;
 const NANO_TO_FEMTO: u64 = 1_000_000;
@@ -38,14 +39,6 @@ pub fn hpet_2_us(hpet: u64) -> u64 {
 #[macro_export]
 macro_rules! CPU_ID {
 	() => (apic::get_my_apic_id())
-}
-
-/// Helper function return the tasks in a given core's runqueue
-pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
-		_ => { None }
-	}
 }
 
 

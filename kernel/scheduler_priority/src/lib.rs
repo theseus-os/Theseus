@@ -1,10 +1,15 @@
 //! This crate picks the next task on token based scheduling policy.
-//! At the begining of each scheduling epoch a set of tokens is distributed among tasks
-//! depending on their priority.
-//! [tokens assigned to each task = (prioirty of each task / prioirty of all tasks) * length of epoch].
+//! At the begining of each scheduling epoch tasks are added to different queues with
+//! a set of tokens distributed among tasks depending on their priority.
+//! Tasks with higher priority will be added to higher priority queue with higher token count.
 //! Each time a task is picked, the token count of the task is decremented by 1.
-//! A task is executed only if it has tokens remaining.
-//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated.
+//! A task is executed only if it has tokens remaining. 
+//! When a task run out of it's tokens it will be added to a lower priority queue with a 
+//! new set of tokens.
+//! When all runnable tasks gets pushed to the lowest priority queue a new scheduling epoch 
+//! is initiated and tasks will be redistributed among the queues.
+//! The overal distribution is such that task with priority 40 will be scheduled 40 times 
+//! a task of priority 1 will be scheduled (provided other conditions doesn't change).
 //! In addition this crate offers the interfaces to set and get priorities  of each task.
 
 
@@ -16,7 +21,7 @@ extern crate task;
 extern crate runqueue_priority;
 
 use task::TaskRef;
-use runqueue_priority::{RunQueue, MAX_PRIORITY};
+use runqueue_priority::{RunQueue, MAX_PRIORITY, QUEUE_COUNT, DEFAULT_TOKENS};
 
 
 /// A data structure to transfer data from select_next_task_priority
@@ -24,6 +29,13 @@ use runqueue_priority::{RunQueue, MAX_PRIORITY};
 struct NextTaskResult{
     taskref : Option<TaskRef>,
     idle_task : bool,
+}
+
+/// Helper data struct to store the location of the task with the queue 
+#[derive(Copy, Clone)]
+struct TaskLocation{
+    index : usize,
+    queue : usize
 }
 
 /// Changes the priority of the given task with the given priority level.
@@ -78,57 +90,66 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         }
     };
     
-    let mut idle_task_index: Option<usize> = None;
-    let mut chosen_task_index: Option<usize> = None;
+    let mut idle_task_location: Option<TaskLocation> = None;
+    let mut chosen_task_location: Option<TaskLocation> = None;
     let mut idle_task = true;
 
-    for (i, priority_taskref) in runqueue_locked.iter().enumerate() {
-        let t = priority_taskref.lock();
+    for queue_id in 0..runqueue_priority::QUEUE_COUNT {
+        for (i, priority_taskref) in runqueue_locked.queue[queue_id].iter().enumerate() {
+            let t = priority_taskref.lock();
 
-        // we skip the idle task, and only choose it if no other tasks are runnable
-        if t.is_an_idle_task {
-            idle_task_index = Some(i);
-            continue;
-        }
-
-        // must be runnable
-        if !t.is_runnable() {
-            continue;
-        }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
-            if pinned != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                return None;
+            // we skip the idle task, and only choose it if no other tasks are runnable
+            if t.is_an_idle_task {
+                idle_task_location = Some(TaskLocation{index : i, queue : queue_id});
+                continue;
             }
+
+            // must be runnable
+            if !t.is_runnable() {
+                continue;
+            }
+
+            // if this task is pinned, it must not be pinned to a different core
+            if let Some(pinned) = t.pinned_core {
+                if pinned != apic_id {
+                    // with per-core runqueues, this should never happen!
+                    error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
+                    return None;
+                }
+            }
+                
+            // found a runnable task!
+            chosen_task_location = Some(TaskLocation{index : i, queue : queue_id});
+
+            // If that task is in the last queue we still treat it like an idle task for this function.
+            // This is because a task get into the last queue only when it is run out of tokens.
+            // Therefore a token redistribution needs to be inititated if such task is picked.
+            if queue_id < QUEUE_COUNT - 1 {
+                idle_task = false;
+            }
+
+            break; 
         }
 
-        // if the task has no remaining tokens we ignore the task
-        if priority_taskref.tokens_remaining == 0{
-            continue;
+        if chosen_task_location.is_some() {
+            break;
         }
-            
-        // found a runnable task!
-        chosen_task_index = Some(i);
-        idle_task = false;
-        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
-        break; 
     }
 
-    // We then reduce the number of tokens of the task by one
-    let modified_tokens = {
-        let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get(index));
+    // We then reduce the number of tokens of the task by one.
+    // If it has run out of tokens we push it to the next queue with DEFAULT_TOKENS
+    let (modified_tokens, new_queue) = {
+        let chosen_task = chosen_task_location.and_then(|location| runqueue_locked.queue[location.queue].get(location.index));
         match chosen_task.map(|m| m.tokens_remaining){
-            Some(x) => x.saturating_sub(1),
-            None => 0,
+            Some(0) => (DEFAULT_TOKENS, chosen_task_location.map_or(2, |location| core::cmp::min(location.queue + 1, QUEUE_COUNT -1))),
+            Some(x) => (x.saturating_sub(1), chosen_task_location.map_or(2, |location| location.queue)),
+            None => (0, QUEUE_COUNT - 1)
         }
     };
 
-    chosen_task_index
-        .or(idle_task_index)
-        .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
+    chosen_task_location
+        .or(idle_task_location)
+        .and_then(|location| runqueue_locked.update_and_move_to_queue(location.index, location.queue, new_queue, modified_tokens))
         .map(|taskref| NextTaskResult {
             taskref : Some(taskref),
             idle_task  : idle_task, 
@@ -138,7 +159,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
 
 /// This assigns tokens between tasks.
 /// Returns true if successful.
-/// Tokens are assigned based on  (prioirty of each task / prioirty of all tasks).
+/// Tokens are assigned based on priority.
 fn assign_tokens(apic_id: u8) -> bool  {
 
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
@@ -149,89 +170,49 @@ fn assign_tokens(apic_id: u8) -> bool  {
             return false;
         }
     };
-    
 
-    // We begin with total priorities = 1 to avoid division by zero 
-    let mut total_priorities :usize = 1;
-
-    // This loop calculates the total priorities of the runqueue
-    for (_i, priority_taskref) in runqueue_locked.iter().enumerate() {
-        let t = priority_taskref.lock();
-
-        // we skip the idle task, it contains zero tokens as it is picked last
-        if t.is_an_idle_task {
-            continue;
+    // We first move all the tasks to the last queue
+    for queue_id in 0..(QUEUE_COUNT -1) {
+        while runqueue_locked.queue[queue_id].len() > 0 {
+            runqueue_locked.update_and_move_to_queue(0, queue_id, QUEUE_COUNT - 1, 0);
         }
-
-        // we assign tokens only to runnable tasks
-        if !t.is_runnable() {
-            continue;
-        }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core {
-            if pinned != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                return false;
-            }
-        }
-            
-        // found a runnable task!
-        // We add its priority
-        // debug!("assign_tokens(): AP {} Task {:?} priority {}", apic_id, *t, priority_taskref.priority);
-        total_priorities = total_priorities.saturating_add(1).saturating_add(priority_taskref.priority as usize);
-        
-        
-        
-        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
-        // break; 
     }
+    
+    // We run the following loop until all the possible tasks in last queue are moved to a different queue
+    let mut task_moved = true;
+    while task_moved {
+        task_moved = false;
+        let mut chosen_task_location: Option<TaskLocation> = None;
 
-    // We keep each epoch for 100 tokens by default
-    // However since this granularity could miss low priority tasks when 
-    // many concurrent tasks are running, we increase the epoch in such cases
-    let epoch :usize = core::cmp::max(total_priorities, 100);
-
-
-    // We iterate through each task in runqueue
-    // We dont use iterator as items are modified in the process
-    for (_i, priority_taskref) in runqueue_locked.iter_mut().enumerate() { 
-        let task_tokens;
-        {
-
-            //let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){ Some(x) => x, None => { continue;},};
-
+        for (i, priority_taskref) in runqueue_locked.queue[QUEUE_COUNT - 1].iter().enumerate() {
             let t = priority_taskref.lock();
 
-            // we give zero tokens to the idle tasks
+            // we skip the idle task, idle tasks always stay in last queue
             if t.is_an_idle_task {
                 continue;
             }
-
-            // we give zero tokens to none runnable tasks
-            if !t.is_runnable() {
-                continue;
-            }
-
-            // if this task is pinned, it must not be pinned to a different core
-            if let Some(pinned) = t.pinned_core {
-                if pinned != apic_id {
-                    // with per-core runqueues, this should never happen!
-                    error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, *t);
-                    return false;
-                }
-            }
-            // task_tokens = epoch * (taskref + 1) / total_priorities;
-            task_tokens = epoch.saturating_mul((priority_taskref.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
+                
+            // found a runnable task!
+            chosen_task_location = Some(TaskLocation{index : i, queue : QUEUE_COUNT - 1});
+            task_moved = true;
+            // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+            break; 
         }
-        
-        {
-            priority_taskref.tokens_remaining = task_tokens;
+
+        // Allocate tokens based on priority
+        let (modified_tokens, new_queue) = {
+            let chosen_task = chosen_task_location.and_then(|location| runqueue_locked.queue[location.queue].get(location.index));
+            match chosen_task {
+                Some(x) => (x.get_initial_token_count(), x.get_initial_priority_queue()),
+                None => (DEFAULT_TOKENS, 2),
+            }
+        };
+
+        // Move to the appropriate queue
+        if let Some(task_location) = chosen_task_location {
+            runqueue_locked.update_and_move_to_queue(task_location.index, task_location.queue, new_queue, modified_tokens);
         }
-        // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, *t);
-        // break; 
+
     }
-
-    return true;
+    true
 }

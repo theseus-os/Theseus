@@ -35,6 +35,7 @@ use spin::Mutex;
 use spawn::new_task_builder;
 use hpet::get_hpet;
 use unified_channel::{StringSender, StringReceiver};
+use runqueue::nr_tasks_in_rq;
 
 const NANO_TO_FEMTO: u64 = 1_000_000;
 
@@ -370,13 +371,6 @@ pub fn pick_child_core() -> u8 {
 	debug!("WARNING : Cannot pick a child core because cores are busy");
 	debug!("WARNING : Selecting current core");
 	return child_core;
-}
-
-fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
-		_ => { None }
-	}
 }
 
 fn hpet_2_ns(hpet: u64) -> u64 {

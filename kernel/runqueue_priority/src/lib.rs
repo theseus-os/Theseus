@@ -16,14 +16,20 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::VecDeque;
+
 use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::{TaskRef, Task};
 use core::ops::{Deref, DerefMut};
 
+/// Maximum priority that can be assigned to a task
 pub const MAX_PRIORITY: u8 = 40;
+/// Default priority assigned to a task
 pub const DEFAULT_PRIORITY: u8 = 20;
-pub const INITIAL_TOKENS: usize = 10;
+/// Default number of tokens allocated to a task when added to a queue
+pub const DEFAULT_TOKENS: usize = 10; 
+/// Number of queues holding tasks with different priorities
+pub const QUEUE_COUNT: usize = 5;
 
 /// A cloneable reference to a `Taskref` that exposes more methods
 /// related to task scheduling.
@@ -43,9 +49,6 @@ pub struct PriorityTaskRef{
 
     /// Remaining tokens in this epoch. A task will be scheduled in an epoch until tokens run out
     pub tokens_remaining: usize,
-
-    /// Number of context switches the task has undergone. Not used in scheduling algorithm
-    context_switches: usize,
 }
 
 impl Deref for PriorityTaskRef {
@@ -69,8 +72,7 @@ impl PriorityTaskRef {
         let priority_taskref = PriorityTaskRef {
             taskref: taskref,
             priority: DEFAULT_PRIORITY,
-            tokens_remaining: INITIAL_TOKENS,
-            context_switches: 0,
+            tokens_remaining: DEFAULT_TOKENS,
         };
         priority_taskref
     }
@@ -80,9 +82,32 @@ impl PriorityTaskRef {
        self.taskref.lock()
     }
 
-    /// Increment the number of times the task is picked
-    pub fn increment_context_switches(&mut self) -> (){
-        self.context_switches = self.context_switches.saturating_add(1);
+    /// Get the queue_number the task will be added based on priority
+    pub fn get_initial_priority_queue(&self) -> usize {
+        if self.lock().is_an_idle_task {
+            return 4;
+        }
+        match self.priority {
+            0 ..=10 => 3,
+            11 ..=20 => 2,
+            21 ..=30 => 1,
+            31 ..=40 => 0,
+            _ => 2,
+        }
+    }
+
+    /// Get the initial token count for a task when added to a queue
+    pub fn get_initial_token_count(&self) -> usize {
+        if self.lock().is_an_idle_task {
+            return 0;
+        }
+        match self.priority {
+            0 ..=10 => usize::from(self.priority),
+            11 ..=20 => usize::from(self.priority) - 10,
+            21 ..=30 => usize::from(self.priority) - 20,
+            31 ..=40 => usize::from(self.priority) - 30,
+            _ => DEFAULT_TOKENS,
+        } 
     }
 }
 
@@ -93,6 +118,54 @@ lazy_static! {
     static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 }
 
+/// A collection of queues to hold the tasks with different priority levels. 
+/// `queue[0]` holds the tasks with highest priority
+/// `queue[QUEUE_COUNT - 1]` holds the idle task and tasks that have run out of tokens.
+#[derive(Debug)]
+pub struct PriorityQueues<T> {
+    pub queue: [VecDeque<T>; QUEUE_COUNT],
+}
+
+impl<T> PriorityQueues<T> {
+    fn new () -> PriorityQueues<T> {
+        PriorityQueues{
+            queue: [VecDeque::<T>::new(), VecDeque::<T>::new(), VecDeque::<T>::new(), VecDeque::<T>::new(), VecDeque::<T>::new()],
+        }
+    }
+
+    /// Total number of tasks in all queues 
+    fn len(&self) -> usize {
+        let mut len = 0;
+        for i in 0..QUEUE_COUNT {
+            len = len + self.queue[i].len();
+        }
+        len
+    }
+
+    /// Remove task at location `index` in queue `queue_id`
+    fn remove(&mut self, index: usize, queue_id : usize) -> Option<T> {
+        if queue_id >= QUEUE_COUNT {
+            None
+        } else {
+            self.queue[queue_id].remove(index)
+        }
+    }
+
+    /// Add task T to queue `queue_id`
+    fn push_back(&mut self, item: T, queue_id : usize) {
+        if queue_id >= QUEUE_COUNT {
+            self.queue[QUEUE_COUNT - 1].push_back(item)
+        } else {
+            self.queue[queue_id].push_back(item)
+        }
+    }
+
+    pub fn iter(&self) -> Option<TaskRef> {
+        // self.queue[0].iter()
+        None
+    }
+    
+}
 
 /// A list of references to `Task`s (`PriorityTaskRef`s) 
 /// that is used to store the `Task`s (and associated scheduler related data) 
@@ -102,33 +175,32 @@ lazy_static! {
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
-    queue: VecDeque<PriorityTaskRef>,
+    queue: PriorityQueues<PriorityTaskRef>,
 }
 
 impl Deref for RunQueue {
-    type Target = VecDeque<PriorityTaskRef>;
-    fn deref(&self) -> &VecDeque<PriorityTaskRef> {
+    type Target = PriorityQueues<PriorityTaskRef>;
+    fn deref(&self) -> &PriorityQueues<PriorityTaskRef> {
         &self.queue
     }
 }
 
 impl DerefMut for RunQueue {
-    fn deref_mut(&mut self) -> &mut VecDeque<PriorityTaskRef> {
+    fn deref_mut(&mut self) -> &mut PriorityQueues<PriorityTaskRef> {
         &mut self.queue
     }
 }
 
 impl RunQueue {
 
-    /// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,
-    /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
-    /// switches is increased by one. This function is used when the task is selected by the scheduler
-    pub fn update_and_move_to_end(&mut self, index: usize, tokens : usize) -> Option<TaskRef> {
-        if let Some(mut priority_task_ref) = self.remove(index) {
+    /// Moves the `TaskRef` at the given index in a `current_queue_id` to the end (back) of `new_queue_id`
+    /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one.
+    /// This function is used when the task is selected by the scheduler
+    pub fn update_and_move_to_queue(&mut self, index: usize, current_queue_id : usize, new_queue_id : usize, tokens : usize) -> Option<TaskRef> {
+        if let Some(mut priority_task_ref) = self.remove(index, current_queue_id) {
             priority_task_ref.tokens_remaining = tokens;
-            priority_task_ref.increment_context_switches();
             let taskref = priority_task_ref.taskref.clone();
-            self.push_back(priority_task_ref);
+            self.push_back(priority_task_ref, new_queue_id);
             Some(taskref)
         } 
         else {
@@ -142,7 +214,7 @@ impl RunQueue {
         trace!("Created runqueue (priority) for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
-            queue: VecDeque::new(),
+            queue: PriorityQueues::new(),
         });
 
         #[cfg(runqueue_spillful)] 
@@ -224,7 +296,7 @@ impl RunQueue {
         #[cfg(not(loscd_eval))]
         debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
         let priority_task_ref = PriorityTaskRef::new(task);
-        self.push_back(priority_task_ref);
+        self.push_back(priority_task_ref, 2);
         
         #[cfg(single_simd_task_optimization)]
         {   
@@ -241,7 +313,10 @@ impl RunQueue {
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
-        self.retain(|x| &x.taskref != task);
+        
+        for i in 0..QUEUE_COUNT {
+            self.queue.queue[i].retain(|x| &x.taskref != task);
+        }
 
         #[cfg(single_simd_task_optimization)]
         {   
@@ -302,10 +377,12 @@ impl RunQueue {
     /// The internal function that sets the priority of a given `Task` in a single `RunQueue`
     fn set_priority_internal(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
         // debug!("called_assign_priority_internal called per core");
-        for x in self.iter_mut() {
-            if &x.taskref == task{
-                debug!("changed priority from {}  to {} ", x.priority, priority);
-                x.priority = priority;
+        for i in 0..QUEUE_COUNT {
+            for x in self.queue.queue[i].iter_mut() {
+                if &x.taskref == task{
+                    debug!("changed priority from {}  to {} ", x.priority, priority);
+                    x.priority = priority;
+                }
             }
         }
         Ok(())
@@ -324,9 +401,11 @@ impl RunQueue {
     /// The priority of the first task that matches is shown.
     fn get_priority_internal(&self, task: &TaskRef) -> Option<u8> {
         // debug!("called_assign_priority_internal called per core");
-        for x in self.iter() {
-            if &x.taskref == task {
-                return Some(x.priority);
+        for i in 0..QUEUE_COUNT {
+            for x in self.queue.queue[i].iter() {
+                if &x.taskref == task {
+                    return Some(x.priority);
+                }
             }
         }
         None
@@ -347,4 +426,11 @@ impl RunQueue {
         return None;
     }
 
+    /// Helper function return the total number of tasks in a given cores `RunQueue`. 
+    pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
+        match RunQueue::get_runqueue(core).map(|rq| rq.read()) {
+            Some(rq) => { Some(rq.queue.len()) }
+            _ => { None }
+        }
+    }
 }
