@@ -1,10 +1,15 @@
 //! This crate picks the next task on token based scheduling policy.
-//! At the begining of each scheduling epoch a set of tokens is distributed among tasks
-//! depending on their priority.
-//! [tokens assigned to each task = (prioirty of each task / prioirty of all tasks) * length of epoch].
+//! At the begining of each scheduling epoch tasks are added to different queues with
+//! a set of tokens distributed among tasks depending on their priority.
+//! Tasks with higher priority will be added to higher priority queue with higher token count.
 //! Each time a task is picked, the token count of the task is decremented by 1.
-//! A task is executed only if it has tokens remaining.
-//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated.
+//! A task is executed only if it has tokens remaining. 
+//! When a task run out of it's tokens it will be added to a lower priority queue with a 
+//! new set of tokens.
+//! When all runnable tasks gets pushed to the lowest priority queue a new scheduling epoch 
+//! is initiated and tasks will be redistributed among the queues.
+//! The overal distribution is such that task with priority 40 will be scheduled 40 times 
+//! a task of priority 1 will be scheduled (provided other conditions doesn't change).
 //! In addition this crate offers the interfaces to set and get priorities  of each task.
 
 
@@ -16,7 +21,7 @@ extern crate task;
 extern crate runqueue_priority;
 
 use task::TaskRef;
-use runqueue_priority::{RunQueue, MAX_PRIORITY, QUEUE_COUNT};
+use runqueue_priority::{RunQueue, MAX_PRIORITY, QUEUE_COUNT, DEFAULT_TOKENS};
 
 
 /// A data structure to transfer data from select_next_task_priority
@@ -26,6 +31,7 @@ struct NextTaskResult{
     idle_task : bool,
 }
 
+/// Helper data struct to store the location of the task with the queue 
 #[derive(Copy, Clone)]
 struct TaskLocation{
     index : usize,
@@ -114,12 +120,14 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
                 
             // found a runnable task!
             chosen_task_location = Some(TaskLocation{index : i, queue : queue_id});
+
+            // If that task is in the last queue we still treat it like an idle task for this function.
+            // This is because a task get into the last queue only when it is run out of tokens.
+            // Therefore a token redistribution needs to be inititated if such task is picked.
             if queue_id < QUEUE_COUNT - 1 {
                 idle_task = false;
             }
-            // if apic_id == 3 {
-            //     debug!("select_next_task(): AP {} chose Task {:?} priority {} tokens {} queue {}", apic_id, *t, priority_taskref.priority, priority_taskref.tokens_remaining, queue_id);
-            // }
+
             break; 
         }
 
@@ -128,11 +136,12 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         }
     }
 
-    // We then reduce the number of tokens of the task by one
+    // We then reduce the number of tokens of the task by one.
+    // If it has run out of tokens we push it to the next queue with DEFAULT_TOKENS
     let (modified_tokens, new_queue) = {
         let chosen_task = chosen_task_location.and_then(|location| runqueue_locked.queue[location.queue].get(location.index));
         match chosen_task.map(|m| m.tokens_remaining){
-            Some(0) => (10, chosen_task_location.map_or(2, |location| core::cmp::min(location.queue + 1, QUEUE_COUNT -1))),
+            Some(0) => (DEFAULT_TOKENS, chosen_task_location.map_or(2, |location| core::cmp::min(location.queue + 1, QUEUE_COUNT -1))),
             Some(x) => (x.saturating_sub(1), chosen_task_location.map_or(2, |location| location.queue)),
             None => (0, QUEUE_COUNT - 1)
         }
@@ -150,28 +159,26 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
 
 /// This assigns tokens between tasks.
 /// Returns true if successful.
-/// Tokens are assigned based on  (prioirty of each task / prioirty of all tasks).
+/// Tokens are assigned based on priority.
 fn assign_tokens(apic_id: u8) -> bool  {
-    // if apic_id == 3 {
-    //     warn!("assign token called");
-    // }
+
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
             #[cfg(not(loscd_eval))]
-            error!("BUG: select_next_task_priority(): couldn't get runqueue for core {}", apic_id); 
+            error!("BUG: assign_tokens(): couldn't get runqueue for core {}", apic_id); 
             return false;
         }
     };
 
-    
+    // We first move all the tasks to the last queue
     for queue_id in 0..(QUEUE_COUNT -1) {
         while runqueue_locked.queue[queue_id].len() > 0 {
             runqueue_locked.update_and_move_to_queue(0, queue_id, QUEUE_COUNT - 1, 0);
         }
     }
     
-    
+    // We run the following loop until all the possible tasks in last queue are moved to a different queue
     let mut task_moved = true;
     while task_moved {
         task_moved = false;
@@ -180,7 +187,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         for (i, priority_taskref) in runqueue_locked.queue[QUEUE_COUNT - 1].iter().enumerate() {
             let t = priority_taskref.lock();
 
-            // we skip the idle task, and only choose it if no other tasks are runnable
+            // we skip the idle task, idle tasks always stay in last queue
             if t.is_an_idle_task {
                 continue;
             }
@@ -192,14 +199,16 @@ fn assign_tokens(apic_id: u8) -> bool  {
             break; 
         }
 
+        // Allocate tokens based on priority
         let (modified_tokens, new_queue) = {
             let chosen_task = chosen_task_location.and_then(|location| runqueue_locked.queue[location.queue].get(location.index));
             match chosen_task {
                 Some(x) => (x.get_initial_token_count(), x.get_initial_priority_queue()),
-                None => (10, 2),
+                None => (DEFAULT_TOKENS, 2),
             }
         };
 
+        // Move to the appropriate queue
         if let Some(task_location) = chosen_task_location {
             runqueue_locked.update_and_move_to_queue(task_location.index, task_location.queue, new_queue, modified_tokens);
         }

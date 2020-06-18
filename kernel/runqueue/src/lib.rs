@@ -52,7 +52,7 @@ pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str>{
     RunQueue::remove_task_from_all(task)
 }
 
-/// Helper function return the tasks in a given core's runqueue
+/// Helper function return the total number of tasks in a given cores `RunQueue`. 
 pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
     RunQueue::nr_tasks_in_rq(core)
 }

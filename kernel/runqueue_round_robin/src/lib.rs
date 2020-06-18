@@ -288,6 +288,7 @@ impl RunQueue {
             })
     }
 
+    /// Helper function return the total number of tasks in a given cores `RunQueue`. 
     pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
         match RunQueue::get_runqueue(core).map(|rq| rq.read()) {
             Some(rq) => { Some(rq.iter().count()) }
