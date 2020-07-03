@@ -1,0 +1,15 @@
+[package]
+name = "cowsay"
+version = "0.1.0"
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"

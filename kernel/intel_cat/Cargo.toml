@@ -1,0 +1,11 @@
+[package]
+name = "intel_cat"
+version = "0.1.0"
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
+edition = "2018"
+description = "Driver for the Intel CAT (Cache Allocation Technology) capability on Intel server processors."
+build = "../../build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
