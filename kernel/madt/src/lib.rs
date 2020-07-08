@@ -92,6 +92,7 @@ impl<'t> Madt<'t> {
     /// (the first core to run).
     pub fn bsp_init(&self, page_table: &mut PageTable) -> Result<(), &'static str> {
         handle_ioapic_entries(self.iter(), page_table)?;
+	debug!("Handling BSP APIC initialization.");
         handle_bsp_lapic_entry(self.iter(), page_table)?;
         Ok(())
     }
@@ -304,9 +305,11 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
 
     let all_lapics = get_lapics();
     let me = get_my_apic_id();
-
+    debug!("Entering APIC forloop");
     for madt_entry in madt_iter.clone() {
-        if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
+	debug!("Line: 309: {:?}", madt_entry);
+        if let MadtEntry::LocalApic(lapic_entry) = madt_entry {
+	    debug!("{:?}", madt_entry);
             if lapic_entry.apic_id == me {
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 

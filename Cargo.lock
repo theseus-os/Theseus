@@ -933,6 +933,11 @@ dependencies = [
 [[package]]
 name = "intel_cat"
 version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "spawn 0.1.0",
+ "x86_64 0.1.2",
+]
 
 [[package]]
 name = "intel_ethernet"
@@ -2464,6 +2469,15 @@ dependencies = [
  "terminal_print 0.1.0",
  "unified_channel 0.1.0",
  "window 0.1.0",
+]
+
+[[package]]
+name = "test_intel_cat"
+version = "0.1.0"
+dependencies = [
+ "intel_cat 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]

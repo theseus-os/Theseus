@@ -9,3 +9,12 @@ build = "../../build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+[dependencies.x86_64]
+path = "../../libs/x86_64"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.spawn]
+path = "../spawn"

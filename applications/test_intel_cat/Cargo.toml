@@ -1,0 +1,20 @@
+[package]
+name = "test_intel_cat"
+version = "0.1.0"
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
+edition = "2018"
+description = "Short application to test the intel_cat crate."
+build = "../../build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[dependencies.intel_cat]
+path = "../../kernel/intel_cat"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
