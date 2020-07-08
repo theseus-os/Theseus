@@ -25,17 +25,20 @@ pub struct ClosList{
 
 // function for finding the maximum supported clos id
 // for more information, see page 2-48 vol. 4 of the Intel 64 and IA-32 Architectures Software Development manual
-pub unsafe fn get_max_closid() -> u16 {
+pub fn get_max_closid() -> u16 {
     let ret_32_bits : u32;
-    asm!("cpuid"
+    unsafe {
+	asm!("cpuid"
 	 : "={dx}"(ret_32_bits)
-	 : "{ax}"(10u32), "{cx}"(2u32)
-    );
+	 : "{ax}"(0x10u32), "{cx}"(0x1u32)
+	);
+    }
     let ret : u16= (ret_32_bits & 0xffff) as u16;
     ret
 }
 
 // function that checks whether an 11 bit integer contains any nonconsecutive ones
+
 fn only_consecutive_bits(mask : u32) -> bool{
     let mut reached_a_one = false;
     let mut reached_last_one = false;
@@ -79,7 +82,7 @@ pub fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
 	return Err("Invalid bitmask passed to CAT.");
     }
 
-    if clos.closid > 127{
+    if clos.closid > get_max_closid() as u8 {
 	return Err("Closid must be less than 128.");
     }
 

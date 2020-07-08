@@ -10,9 +10,7 @@ use intel_cat::*;
 
 pub fn main(args: Vec<String>) -> isize{
     // testing the maximum closid value
-    unsafe {
-	println!("Maximum supported closid is: {}", get_max_closid());
-    }
+    println!("Maximum supported closid is: {}", get_max_closid());
     
     // testing the three types of invalid bitmask
     // bitmask is 0
