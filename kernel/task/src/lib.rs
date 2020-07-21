@@ -26,7 +26,7 @@
 //! 
 
 #![no_std]
-#![feature(panic_info_message)]
+#![feature(panic_info_message,asm)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -262,6 +262,9 @@ pub struct Task {
     /// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
+
+    /// Stores the closid of the current task, used to specify resource allocation groups for use with Intel CAT
+    pub closid: u16,
     
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
@@ -345,6 +348,8 @@ impl Task {
             env,
             failure_cleanup_function,
             restart_info: None,
+
+	    closid: 0,
             
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -451,6 +456,16 @@ impl Task {
         }
     }
 
+    /// Attempts to set the closid associated with this `Task`
+    /// If the input closid is less than or equal to the maximum closid, then the closid field will be updated and return Ok, otherwise it will return an error message
+    fn set_closid(&mut self, new_closid: u16) -> Result<(), &'static str>{
+	if new_closid > get_max_closid(){
+	    return Err("Cannot update closid because new value is outside accepted range of closids.");
+	}
+	self.closid = new_closid;
+	Ok(())
+    }
+
     /// Removes this `Task`'s `TaskLocalData` cyclical task reference so that it can be dropped.
     /// This should only be called once, after the Task will never ever be used again. 
     fn take_task_local_data(&mut self) -> Option<Box<TaskLocalData>> {
@@ -531,6 +546,14 @@ impl Task {
         }
        
         // update the current task to `next`
+	// update the IA32_PQR_ASSOC MSR to point to the new task's CLOS
+	let IA32_PQR_ASSOC = 0xc8fu32;
+	unsafe{
+	asm!("wrmsr"
+		  :
+		  : "{cx}"(IA32_PQR_ASSOC), "{dx}"(next.closid as u32), "{ax}"(0)
+	);
+	}
         next.set_as_current_task();
 
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
@@ -884,6 +907,11 @@ impl TaskRef {
         self.0.deref().0.lock().set_env(new_env);
     }
 
+    /// Sets the closid of this `Task`
+    pub fn set_closid(&self, new_closid: u16) -> Result<(), &'static str>{
+	self.0.deref().0.lock().set_closid(new_closid)
+    }
+
     /// Gets a reference to this task's `Environment`.
     pub fn get_env(&self) -> Arc<Mutex<Environment>> {
         Arc::clone(&self.0.deref().0.lock().env)
@@ -1019,4 +1047,18 @@ pub fn get_my_current_task() -> Option<&'static TaskRef> {
 /// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
+}
+
+/// Function for finding the maximum supported clos id for use with Intel CAT (Cache Allocation Technology).
+// for more information, see page 2-48 vol. 4 of the Intel 64 and IA-32 Architectures Software Development manual
+pub fn get_max_closid() -> u16 {
+    let ret_32_bits : u32;
+    unsafe {
+	asm!("cpuid"
+	 : "={dx}"(ret_32_bits)
+	 : "{ax}"(0x10u32), "{cx}"(0x1u32)
+	);
+    }
+    let ret : u16= (ret_32_bits & 0xffff) as u16;
+    ret
 }

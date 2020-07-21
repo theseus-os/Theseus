@@ -41,6 +41,5 @@ path = "../environment"
 [dependencies.root]
 path = "../root"
 
-
 [lib]
 crate-type = ["rlib"]

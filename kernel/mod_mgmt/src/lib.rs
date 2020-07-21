@@ -697,6 +697,7 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<AppCrateRef, &'static str> {
+	debug!("Initializing crate loading.");
         debug!("load_crate_as_application(): trying to load application crate at {:?}", crate_object_file.lock().get_absolute_path());
         // Don't use a backup namespace when loading applications;
         // we must be able to find all symbols in only this namespace and its backing recursive namespaces.

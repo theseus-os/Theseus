@@ -935,7 +935,10 @@ name = "intel_cat"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
+ "task 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -2477,6 +2480,7 @@ version = "0.1.0"
 dependencies = [
  "intel_cat 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
  "terminal_print 0.1.0",
 ]
 
