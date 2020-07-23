@@ -307,7 +307,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
 
     for madt_entry in madt_iter.clone() {
 		if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
-	    	if lapic_entry.apic_id == me {
+			if lapic_entry.apic_id == me {
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
                 let bsp_lapic = LocalApic::new(page_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
