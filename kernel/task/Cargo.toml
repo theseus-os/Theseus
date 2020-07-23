@@ -41,5 +41,9 @@ path = "../environment"
 [dependencies.root]
 path = "../root"
 
+[dependencies.raw-cpuid]
+version = "7.0.3"
+features = [ "use_arch" ]
+
 [lib]
 crate-type = ["rlib"]

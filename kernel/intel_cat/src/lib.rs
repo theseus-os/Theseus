@@ -72,8 +72,12 @@ lazy_static! {
 // will return an error if the value of CURRENT_MAX_CLOSID is greater than or equal to the maximum closid on the system
 fn get_free_closid() -> Result<u16, &'static str>{
     let current_max = CURRENT_CLOS_LIST.lock().max_closid;
+
+    #[cfg(use_intel_cat)]
+    {
     if current_max >= task::get_max_closid(){
 	return Err("Could not create new clos, no free closids are available.");
+    }
     }
     Ok(current_max + 1)
 }
@@ -220,10 +224,13 @@ fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
 	return Err("Invalid bitmask passed to CAT.");
     }
 
+    #[cfg(use_intel_cat)]
+    {
     if clos.closid > task::get_max_closid() {
 	return Err("Closid must be less than 128.");
     }
-
+    }
+	
     // setting the address of the msr that we need to write and writing our bitmask to the proper register
     let msr : u32 = IA32_L3_CBM_BASE + clos.closid as u32;
     unsafe{
