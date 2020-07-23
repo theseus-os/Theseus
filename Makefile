@@ -530,7 +530,7 @@ help:
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 ## multicore 
-QEMU_FLAGS += -smp 8
+QEMU_FLAGS += -smp 4
 
 ## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
 MAC_ADDR ?= 52:54:00:d1:55:01

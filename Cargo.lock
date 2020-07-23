@@ -389,14 +389,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cowsay"
-version = "0.1.0"
-dependencies = [
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "terminal_print 0.1.0",
-]
-
-[[package]]
 name = "cpu"
 version = "0.1.0"
 dependencies = [
@@ -1513,15 +1505,6 @@ dependencies = [
 name = "nodrop"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "nprimes"
-version = "0.1.0"
-dependencies = [
- "libm 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "terminal_print 0.1.0",
-]
 
 [[package]]
 name = "ns"
