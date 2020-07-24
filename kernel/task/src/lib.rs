@@ -549,19 +549,18 @@ impl Task {
             }
         }
 	
-	#[cfg(use_intel_cat)]
-	{
-        // update the current task to `next`
-	// update the IA32_PQR_ASSOC MSR to point to the new task's CLOS
-	let IA32_PQR_ASSOC = 0xc8fu32;
-	unsafe{
-	asm!("wrmsr"
-		  :
-		  : "{cx}"(IA32_PQR_ASSOC), "{dx}"(next.closid as u32), "{ax}"(0)
-	);
+        #[cfg(use_intel_cat)]
+        {
+        // update the IA32_PQR_ASSOC MSR to point to the new task's CLOS
+        let IA32_PQR_ASSOC = 0xc8fu32;
+        unsafe{
+            asm!("wrmsr"
+                :
+                : "{cx}"(IA32_PQR_ASSOC), "{dx}"(next.closid as u32), "{ax}"(0)
+            );
+        }
+        }
 
-	}
-	}
         next.set_as_current_task();
 
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.

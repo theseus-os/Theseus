@@ -5,7 +5,6 @@
 #![feature(asm, drain_filter)]
 
 
-
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 extern crate irq_safety;
@@ -21,17 +20,26 @@ use irq_safety::MutexIrqSafe;
 //address of the base MSR for L3 CAT usage
 const IA32_L3_CBM_BASE: u32 = 0xc90u32;
 
+// number of bits in a clos bitmask
+const BITMASK_SIZE: u32 = 11;
+
 /// Struct to represent the cache allocation belonging to a class of service.
 #[derive(Clone, Copy, Debug)]
 pub struct ClosDescriptor{
+    /// Integer representing the class of service that this `ClosDescriptor` refers to. A `Task` whose `closid` field has the same value of `closid` will allocate to the cache region defined by `bitmask`.
     pub closid: u16,
+
+    /// A string of bits representing the cache ways that this class of service has access to. If the i-th bit is a 1, tasks in this class of service may occupy that cache way; if it is 0, they may not occupy that cache way.
     pub bitmask: u32,
+
+    /// If this value is true, the class of service occupies an exclusive region in the cache; if it is false, it occupies shared cache space with other classes of service.
     pub exclusive: bool,
 }
 
 impl ClosDescriptor{
-    // function to remove the cache ways specified by the bitmask exclusive_space from the bit mask of the CLOS
-    pub fn remove_exclusive_region(&mut self, exclusive_bitmask: u32){
+    /// Function to remove the cache ways specified by the bitmask exclusive_space from the bit mask of the CLOS.
+    /// This function is used within the `update_current_clos_list` function to remove the exclusive region from the allocations of all the other currently allocated classes of service.
+    fn remove_exclusive_region(&mut self, exclusive_bitmask: u32){
 	self.bitmask &= !exclusive_bitmask;
     }
 }
@@ -39,11 +47,15 @@ impl ClosDescriptor{
 /// List of `ClosDescriptor`s to describe the current state of existing cache allocations. 
 #[derive(Clone, Debug)]
 pub struct ClosList{
+    /// Vector containing a `ClosDescriptor` for every currently active class of service.
     pub descriptor_list: Vec<ClosDescriptor>,
+
+    /// Integer that describes the largest closid among the currently active classes of service.
     pub max_closid : u16,
 }
 
 impl ClosList{
+    /// Create a new `ClosList` from a vector of `ClosDescriptor`s
     pub fn new(vals: Vec<ClosDescriptor>) -> Self{
 	ClosList{
 	    descriptor_list: vals,
@@ -68,32 +80,31 @@ lazy_static! {
     );
 }
 
-// this function will return a new closid that is not in use
-// will return an error if the value of CURRENT_MAX_CLOSID is greater than or equal to the maximum closid on the system
+/// this function will return a new closid that is not in use
+/// will return an error if the value of CURRENT_MAX_CLOSID is greater than or equal to the maximum closid on the system
 fn get_free_closid() -> Result<u16, &'static str>{
     let current_max = CURRENT_CLOS_LIST.lock().max_closid;
-
-    #[cfg(use_intel_cat)]
-    {
-    if current_max >= task::get_max_closid(){
-	return Err("Could not create new clos, no free closids are available.");
-    }
+    #[cfg(use_intel_cat)]{
+        if current_max >= task::get_max_closid(){
+        return Err("Could not create new clos, no free closids are available.");
+        }
     }
     Ok(current_max + 1)
 }
 
-// this function will increment the current value of CURRENT_MAX_CLOSID
+/// this function will increment the current value of CURRENT_MAX_CLOSID
 fn increment_max_closid(){
     CURRENT_CLOS_LIST.lock().max_closid += 1;
 }
 
-// this function will update the clos_descriptor entry corresponding to the closid of clos into CURRENT_CLOS_LIST
-// if the closid has already been allocated, the corresponding entry in CURRENT_CLOS_LIST will be updated with the proper clos
-// otherwise clos will be appended onto the list
+/// this function will update the clos_descriptor entry corresponding to the closid of clos into CURRENT_CLOS_LIST
+/// if the closid has already been allocated, the corresponding entry in CURRENT_CLOS_LIST will be updated with the proper clos
+/// otherwise clos will be appended onto the list
 fn update_current_clos_list(clos: ClosDescriptor){
     let mut current_list = CURRENT_CLOS_LIST.lock();
+    // if the clos id in the clos descriptor is already in the current clos list we remove it
     current_list.descriptor_list.drain_filter(|x| x.closid == clos.closid);
-    //if clos is meant to have exclusive cache access, we will remove this region from all the other clos descriptors
+    // if clos is meant to have exclusive cache access, we will remove this region from all the other clos descriptors
     if clos.exclusive{
 	for i in 1..current_list.descriptor_list.len(){
 	    current_list.descriptor_list[i].remove_exclusive_region(clos.bitmask);
@@ -102,13 +113,12 @@ fn update_current_clos_list(clos: ClosDescriptor){
     current_list.descriptor_list.push(clos);
 }
 
-// function that checks whether an 11 bit integer contains any nonconsecutive ones
-
+/// function that checks whether an BITMASK_SIZE bit integer contains any nonconsecutive ones
 fn only_consecutive_bits(mask : u32) -> bool{
     let mut reached_a_one = false;
     let mut reached_last_one = false;
 
-    for i in 0..11{
+    for i in 0..BITMASK_SIZE{
 	// checking whether we have found a zero after a one, in which case we have found the location of the last one
 	if reached_a_one && (mask & (1 << i)  == 0){
 	    reached_last_one = true;
@@ -124,22 +134,23 @@ fn only_consecutive_bits(mask : u32) -> bool{
     true
 }
 
-// this function will return a bitmask representing all the space that is currently not allocated exclusively in the cache
+/// this function will return a bitmask representing all the space that is currently not allocated exclusively in the cache
 fn get_current_free_cache_space() -> u32 {
     // we will loop through the current cache allocation list and mark off all the regions that are allocated exclusively
     let exclusive_region: u32 = CURRENT_CLOS_LIST.lock().descriptor_list.iter().fold(0, |acc, x| if x.exclusive {acc | x.bitmask} else {acc});
+    // 0x7ff is the bitmask representing the entire space in the cache, so the formula below will yield the bitmask containing all the cache ways that are not exclusively allocated
     0x7ff & (!exclusive_region)
 }
 
-// attempt to create a `ClosDescriptor` to describe an allocation of n megabytes of exclusive cache space
-// if the requested space is not available or no new closids are available, then return an error
-fn create_exclusive_clos_descriptor(n: u32) -> Result<ClosDescriptor, &'static str>{
-    //check whether n is between 1 and 10 megabytes, exclusively
-    if n < 1 {
+/// attempt to create a `ClosDescriptor` to describe an allocation of n megabytes of exclusive cache space
+/// if the requested space is not available or no new closids are available, then return an error
+fn create_exclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDescriptor, &'static str>{
+    //check whether n is between 1 and BITMASK_SIZE megabytes, exclusively
+    if size_in_megabytes < 1 {
 	return Err("Cache allocations must contain at least one MB of cache space.");
     }
-    else if n > 10 {
-	return Err("You may only request up to 10 MB of cache space.");
+    else if size_in_megabytes > (BITMASK_SIZE - 1) {
+	return Err("You may only request up to (BITMASK_SIZE - 1) MB of cache space.");
     }
 
     // generate a free closid
@@ -147,10 +158,10 @@ fn create_exclusive_clos_descriptor(n: u32) -> Result<ClosDescriptor, &'static s
     let free_region = get_current_free_cache_space();
 
     // we will try to reserve n consecutive bits in a bitmask, if this is not possible, we will return an error
-    let mut attempt_bitmask = (1 << n) - 1;
+    let mut attempt_bitmask = (1 << size_in_megabytes) - 1;
 
     // try successive consecutive regions of the cache to see if there is a valid free region of n consecutive MBs
-    while attempt_bitmask < (1 << 10){
+    while attempt_bitmask < (1 << (BITMASK_SIZE - 1)){
 	if (attempt_bitmask & free_region) == attempt_bitmask{
 	    return Ok(
 		ClosDescriptor{
@@ -168,15 +179,15 @@ fn create_exclusive_clos_descriptor(n: u32) -> Result<ClosDescriptor, &'static s
     Err("Could not reserve the requested amount of cache space.")
 }
 
-// attempt to create a `ClosDescriptor` to describe an allocation of n megabytes of nonexclusive cache space
-// if the requested space is not available or no new closids are available, then return an error
-fn create_nonexclusive_clos_descriptor(n: u32) -> Result<ClosDescriptor, &'static str>{
-    //check whether n is between 1 and 10 megabytes, exclusively
-    if n < 1 {
+/// attempt to create a `ClosDescriptor` to describe an allocation of n megabytes of nonexclusive cache space
+/// if the requested space is not available or no new closids are available, then return an error
+fn create_nonexclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDescriptor, &'static str>{
+    //check whether n is between 1 and (BITMASK_SIZE - 1) megabytes, exclusively
+    if size_in_megabytes < 1 {
 	return Err("Cache allocations must contain at least one MB of cache space.");
     }
-    else if n > 11 {
-	return Err("You may only request up to 11 MB of cache space.");
+    else if size_in_megabytes > BITMASK_SIZE {
+	return Err("You may only request up to BITMASK_SIZE MB of cache space.");
     }
 
     // generate a free closid
@@ -184,7 +195,7 @@ fn create_nonexclusive_clos_descriptor(n: u32) -> Result<ClosDescriptor, &'stati
     let free_region = get_current_free_cache_space();
 
     // we will try to reserve the last  n consecutive bits in a bitmask, if this is not possible, we will return an error
-    let attempt_bitmask = ((1 << n) - 1) << (11 - n);
+    let attempt_bitmask = ((1 << size_in_megabytes) - 1) << (BITMASK_SIZE - size_in_megabytes);
 
     if (attempt_bitmask & free_region) == attempt_bitmask{
 	// the last n cache-ways are free to use, so we will return a `Clos Descriptor` representing this region
@@ -201,7 +212,7 @@ fn create_nonexclusive_clos_descriptor(n: u32) -> Result<ClosDescriptor, &'stati
     Err("Could not reserve the requested amount of cache space.")
 }
     
-// a valid bitmask for CAT must be less than 0x7ff and cannot be 0; also, it may not have any non-consecutive ones
+/// a valid bitmask for CAT must be less than 0x7ff and cannot be 0; also, it may not have any non-consecutive ones
 fn valid_bitmask(mask: u32) -> bool{
     // checking that the value is not greater than the maximum value of 0x7ff
     if mask > 0x7ff {
@@ -218,17 +229,16 @@ fn valid_bitmask(mask: u32) -> bool{
     true
 }
 
-// function that will overwrite a single MSR for the CLOS described by CLOSDescriptor
+/// function that will overwrite a single MSR for the CLOS described by CLOSDescriptor
 fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
     if !valid_bitmask(clos.bitmask){
 	return Err("Invalid bitmask passed to CAT.");
     }
-
     #[cfg(use_intel_cat)]
     {
-    if clos.closid > task::get_max_closid() {
-	return Err("Closid must be less than 128.");
-    }
+        if clos.closid > task::get_max_closid() {
+        return Err("Closid must be less than 128.");
+        }
     }
 	
     // setting the address of the msr that we need to write and writing our bitmask to the proper register
@@ -242,6 +252,7 @@ fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
     Ok(())
 }
 
+/// sets the MSRs on a single CPU core to the values described in `clos_list`
 fn set_clos_on_single_core(clos_list: ClosList) -> Result<(), &'static str>{
     for clos in clos_list.descriptor_list{
 	update_clos(clos)?;
@@ -249,6 +260,7 @@ fn set_clos_on_single_core(clos_list: ClosList) -> Result<(), &'static str>{
     Ok(())
 }
 
+/// calls `set_clos_on_single_core` on all available CPU cores
 fn set_clos() -> Result<(), &'static str>{
     let cores = apic::core_count();
     let mut tasks = Vec::with_capacity(cores);
@@ -256,7 +268,7 @@ fn set_clos() -> Result<(), &'static str>{
     for i in 0..cores {
         let taskref = spawn::new_task_builder(set_clos_on_single_core, CURRENT_CLOS_LIST.lock().clone())
             .name(format!("set_clos_on_core_{}", i))
-	    .pin_on_core(i as u8)
+            .pin_on_core(i as u8)
             .spawn()?;
         tasks.push(taskref);
     }
@@ -295,17 +307,23 @@ pub fn reset_cache_allocations() -> Result<(), &'static str>{
 	    }
 	]
     );
+
+    // setting all tasks to the default closid of 0
+    #[cfg(use_intel_cat)]
+    for (id, taskref) in task::TASKLIST.lock().iter() {
+        taskref.set_closid(0)?;
+    }
     
     Ok(())
 }
 
 /// Function that will add a class of service with either an exclusive or non-exclusive cache region of size n megabytes.
 /// The return value is the closid of the new class of service if successful, otherwise an error will be returned.
-pub fn allocate_clos(n : u32, exclusive: bool) -> Result<u16, &'static str>{
+pub fn allocate_clos(size_in_megabytes : u32, exclusive: bool) -> Result<u16, &'static str>{
     // attempting to create a new `ClosDescriptor` with the requested amount of space
     let allocated_clos = match exclusive{
-	true => create_exclusive_clos_descriptor(n)?,
-	false => create_nonexclusive_clos_descriptor(n)?
+        true => create_exclusive_clos_descriptor(size_in_megabytes)?,
+        false => create_nonexclusive_clos_descriptor(size_in_megabytes)?
     };
 
     // add the new clos to the current clos list and increment the max closid

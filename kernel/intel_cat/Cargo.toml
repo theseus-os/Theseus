@@ -9,6 +9,7 @@ build = "../../build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cfg-if = "0.1.6"
 
 [dependencies.x86_64]
 path = "../../libs/x86_64"

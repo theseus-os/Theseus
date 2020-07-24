@@ -927,6 +927,7 @@ name = "intel_cat"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
