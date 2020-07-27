@@ -2472,6 +2472,7 @@ dependencies = [
 name = "test_intel_cat"
 version = "0.1.0"
 dependencies = [
+ "closid_settings 0.1.0",
  "intel_cat 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",

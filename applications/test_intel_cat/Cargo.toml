@@ -21,3 +21,6 @@ version = "0.4.8"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
+
+[dependencies.closid_settings]
+path = "../../kernel/closid_settings"

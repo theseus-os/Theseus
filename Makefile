@@ -598,7 +598,6 @@ loadable : export override THESEUS_CONFIG += loadable
 loadable : export BUILD_MODE = release
 loadable: run
 
-run: export override THESEUS_CONFIG += use_intel_cat
 
 ### builds and runs Theseus in QEMU
 run: $(iso) 

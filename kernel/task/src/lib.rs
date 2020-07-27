@@ -627,6 +627,14 @@ impl Task {
         let _prev_task_data_to_drop = self.drop_after_task_switch.take();
 
     }
+
+    #[cfg(use_intel_cat)]
+    /// Sets the value of this `Task`'s closid field.
+    /// If new_closid is outside of the range of accepted closid's, an error will be returned.
+    fn set_closid(&mut self, new_closid: u16) -> Result<(), &'static str>{
+        self.closid = closid_settings::ClosId::new(new_closid)?;
+        Ok(())
+    }
 }
 
 impl Drop for Task {
@@ -902,6 +910,12 @@ impl TaskRef {
     /// Gets a reference to this task's `CrateNamespace`.
     pub fn get_namespace(&self) -> Arc<CrateNamespace> {
         Arc::clone(&self.0.deref().0.lock().namespace)
+    }
+
+    #[cfg(use_intel_cat)]
+    /// Sets the `closid` of this `Task`.
+    pub fn set_closid(&self, new_closid: u16) -> Result<(), &'static str>{
+        self.0.deref().0.lock().set_closid(new_closid)
     }
     
     /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.

@@ -4,6 +4,9 @@ extern crate alloc;
 
 extern crate intel_cat;
 
+#[cfg(use_intel_cat)]
+extern crate closid_settings;
+
 extern crate task;
 
 #[macro_use] extern crate log;
@@ -12,7 +15,7 @@ extern crate task;
 use alloc::vec::Vec;
 use alloc::string::String;
 #[cfg(use_intel_cat)]
-use intel_cat::{allocate_clos, get_current_cache_allocation, validate_clos_on_single_core, reset_cache_allocations, ClosDescriptor, ClosList};
+use intel_cat::{allocate_clos, get_current_cache_allocation, validate_clos_on_single_core, reset_cache_allocations, ClosDescriptor, ClosList, set_closid_on_current_task};
 
 pub fn main(args: Vec<String>) -> isize{
 
@@ -29,7 +32,7 @@ pub fn main(args: Vec<String>) -> isize{
     #[cfg(use_intel_cat)]
     {
 		// testing the maximum closid value
-		debug!("Maximum supported closid is: {}", task::get_max_closid());
+		debug!("Maximum supported closid is: {}", closid_settings::get_max_closid());
 
 		debug!("Testing valid and invalid cache allocation requests.");
 		// some invalid cache requests
@@ -69,9 +72,9 @@ pub fn main(args: Vec<String>) -> isize{
 
 		// trying some valid allocations
 		match allocate_clos(3, true){
-		Ok(1) => { },
+		Ok(closid_settings::ClosId(1)) => { },
 		Ok(i) => {
-			error!("test_intel_cat : ERROR: Expected a return value of 1. Instead returned: {}.", i);
+			error!("test_intel_cat : ERROR: Expected a return value of 1. Instead returned: {}.", i.0);
 			ret = 5;
 		}
 		Err(e) => {
@@ -81,9 +84,9 @@ pub fn main(args: Vec<String>) -> isize{
 		}
 
 		match allocate_clos(5, false){
-		Ok(2) => { },
+		Ok(closid_settings::ClosId(2)) => { },
 		Ok(i) => {
-			error!("test_intel_cat : ERROR: Expected a return value of 2. Instead returned: {}.", i);
+			error!("test_intel_cat : ERROR: Expected a return value of 2. Instead returned: {}.", i.0);
 			ret = 7;
 		}
 		Err(e) => {
@@ -93,9 +96,9 @@ pub fn main(args: Vec<String>) -> isize{
 		}
 
 		match allocate_clos(4, true){
-		Ok(3) => { },
+		Ok(closid_settings::ClosId(3)) => { },
 		Ok(i) => {
-			error!("test_intel_cat : ERROR: Expected a return value of 3. Instead returned: {}.", i);
+			error!("test_intel_cat : ERROR: Expected a return value of 3. Instead returned: {}.", i.0);
 			ret = 9;
 		}
 		Err(e) => {
@@ -118,36 +121,27 @@ pub fn main(args: Vec<String>) -> isize{
 		debug!("Attempting to set the closid of the task.");
 		// attempting to set the closid of our current task
 		// getting our task structure
-		if let Some(taskref) = task::get_my_current_task() {
-			debug!("Getting taskref succeeded.");
+		// invalid closid
+		match set_closid_on_current_task(256){
+			Ok(_) => {
+			error!("test_intel_cat : ERROR: Expected closid setting to fail.");
+			ret = 12;
+			},
+			Err(_) => {
+			debug!("Setting closid failed as expected.");
+			},
+		};
 
-			// invalid closid
-			match taskref.set_closid(256){
-				Ok(_) => {
-				error!("test_intel_cat : ERROR: Expected closid setting to fail.");
-				ret = 12;
-				},
-				Err(_) => {
-				debug!("Setting closid failed as expected.");
-				},
-			};
-
-			// valid closid
-			match taskref.set_closid(1) {
-				Ok(_) => {
-				debug!("Setting closid succeeded.");
-				},
-				Err(_) => {
-				error!("test_intel_cat : ERROR: Expected closid setting to succeed.");
-				ret = 13;
-				},
-			};
-		}
-		
-		else{
-			error!("test_intel_cat : ERROR: Failed to get task ref.");
-			ret = 14;
-		}
+		// valid closid
+		match set_closid_on_current_task(1) {
+			Ok(_) => {
+			debug!("Setting closid succeeded.");
+			},
+			Err(_) => {
+			error!("test_intel_cat : ERROR: Expected closid setting to succeed.");
+			ret = 13;
+			},
+		};
 
 		// verifying the results of our cache allocations
 		let current_list = get_current_cache_allocation();
@@ -156,7 +150,7 @@ pub fn main(args: Vec<String>) -> isize{
 
 		debug!("Verifying that MSRs were set properly.");
 
-		match validate_clos_on_single_core(current_list) {
+		match validate_clos_on_single_core() {
 		Ok(_) => { },
 		Err((expected, found)) => {
 			error!("test_intel_cat : ERROR: MSR read failed.\nExpected: {}\nFound: {}", expected, found);

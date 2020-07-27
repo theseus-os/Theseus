@@ -17,6 +17,7 @@ extern crate closid_settings;
 use alloc::vec::*;
 use x86_64::registers::msr::*;
 use irq_safety::MutexIrqSafe;
+#[cfg(use_intel_cat)]
 use closid_settings::{ClosId, zero, get_max_closid};
 
 //address of the base MSR for L3 CAT usage
@@ -25,6 +26,7 @@ const IA32_L3_CBM_BASE: u32 = 0xc90u32;
 // number of bits in a clos bitmask
 const BITMASK_SIZE: u32 = 11;
 
+#[cfg(use_intel_cat)]
 /// Struct to represent the cache allocation belonging to a class of service.
 #[derive(Clone, Copy, Debug)]
 pub struct ClosDescriptor{
@@ -38,6 +40,7 @@ pub struct ClosDescriptor{
     pub exclusive: bool,
 }
 
+#[cfg(use_intel_cat)]
 impl ClosDescriptor{
     /// Function to remove the cache ways specified by the bitmask exclusive_space from the bit mask of the CLOS.
     /// This function is used within the `update_current_clos_list` function to remove the exclusive region from the allocations of all the other currently allocated classes of service.
@@ -46,6 +49,7 @@ impl ClosDescriptor{
     }
 }
 
+#[cfg(use_intel_cat)]
 /// List of `ClosDescriptor`s to describe the current state of existing cache allocations. 
 #[derive(Clone, Debug)]
 pub struct ClosList{
@@ -56,6 +60,7 @@ pub struct ClosList{
     pub max_closid : u16,
 }
 
+#[cfg(use_intel_cat)]
 impl ClosList{
     /// Create a new `ClosList` from a vector of `ClosDescriptor`s
     pub fn new(vals: Vec<ClosDescriptor>) -> Self{
@@ -66,6 +71,7 @@ impl ClosList{
     }
 }
 
+#[cfg(use_intel_cat)]
 // this vector of clos descriptors will contain information about the clos that have been allocated so far
 lazy_static! {
     // `ClosList` that contains the current allocation of the cache
@@ -82,6 +88,7 @@ lazy_static! {
     );
 }
 
+#[cfg(use_intel_cat)]
 /// this function will return a new closid that is not in use
 /// will return an error if the value of CURRENT_MAX_CLOSID is greater than or equal to the maximum closid on the system
 fn get_free_closid() -> Result<u16, &'static str>{
@@ -94,11 +101,13 @@ fn get_free_closid() -> Result<u16, &'static str>{
     Ok(current_max + 1)
 }
 
+#[cfg(use_intel_cat)]
 /// this function will increment the current value of CURRENT_MAX_CLOSID
 fn increment_max_closid(){
     CURRENT_CLOS_LIST.lock().max_closid += 1;
 }
 
+#[cfg(use_intel_cat)]
 /// this function will update the clos_descriptor entry corresponding to the closid of clos into CURRENT_CLOS_LIST
 /// if the closid has already been allocated, the corresponding entry in CURRENT_CLOS_LIST will be updated with the proper clos
 /// otherwise clos will be appended onto the list
@@ -115,6 +124,7 @@ fn update_current_clos_list(clos: ClosDescriptor){
     current_list.descriptor_list.push(clos);
 }
 
+#[cfg(use_intel_cat)]
 /// function that checks whether an BITMASK_SIZE bit integer contains any nonconsecutive ones
 fn only_consecutive_bits(mask : u32) -> bool{
     let mut reached_a_one = false;
@@ -136,6 +146,7 @@ fn only_consecutive_bits(mask : u32) -> bool{
     true
 }
 
+#[cfg(use_intel_cat)]
 /// this function will return a bitmask representing all the space that is currently not allocated exclusively in the cache
 fn get_current_free_cache_space() -> u32 {
     // we will loop through the current cache allocation list and mark off all the regions that are allocated exclusively
@@ -144,6 +155,7 @@ fn get_current_free_cache_space() -> u32 {
     0x7ff & (!exclusive_region)
 }
 
+#[cfg(use_intel_cat)]
 /// attempt to create a `ClosDescriptor` to describe an allocation of n megabytes of exclusive cache space
 /// if the requested space is not available or no new closids are available, then return an error
 fn create_exclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDescriptor, &'static str>{
@@ -181,6 +193,7 @@ fn create_exclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDescri
     Err("Could not reserve the requested amount of cache space.")
 }
 
+#[cfg(use_intel_cat)]
 /// attempt to create a `ClosDescriptor` to describe an allocation of n megabytes of nonexclusive cache space
 /// if the requested space is not available or no new closids are available, then return an error
 fn create_nonexclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDescriptor, &'static str>{
@@ -214,7 +227,8 @@ fn create_nonexclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDes
     // the last n cache-ways were not free, so we will return an error
     Err("Could not reserve the requested amount of cache space.")
 }
-    
+
+#[cfg(use_intel_cat)]
 /// a valid bitmask for CAT must be less than 0x7ff and cannot be 0; also, it may not have any non-consecutive ones
 fn valid_bitmask(mask: u32) -> bool{
     // checking that the value is not greater than the maximum value of 0x7ff
@@ -232,6 +246,7 @@ fn valid_bitmask(mask: u32) -> bool{
     true
 }
 
+#[cfg(use_intel_cat)]
 /// function that will overwrite a single MSR for the CLOS described by CLOSDescriptor
 fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
     if !valid_bitmask(clos.bitmask){
@@ -250,6 +265,7 @@ fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
     Ok(())
 }
 
+#[cfg(use_intel_cat)]
 /// sets the MSRs on a single CPU core to the values described in `clos_list`
 fn set_clos_on_single_core(clos_list: ClosList) -> Result<(), &'static str>{
     for clos in clos_list.descriptor_list{
@@ -258,6 +274,7 @@ fn set_clos_on_single_core(clos_list: ClosList) -> Result<(), &'static str>{
     Ok(())
 }
 
+#[cfg(use_intel_cat)]
 /// calls `set_clos_on_single_core` on all available CPU cores
 fn set_clos() -> Result<(), &'static str>{
     let cores = apic::core_count();
@@ -277,6 +294,7 @@ fn set_clos() -> Result<(), &'static str>{
     Ok(())
 }
 
+#[cfg(use_intel_cat)]
 /// This function is intended to reset the current cache allocations to their default state, i.e. set all Classes of Service to occupy the whole LLC.
 /// After this, the value of `CURRENT_CLOS_LIST` will be reset to its default value.
 pub fn reset_cache_allocations() -> Result<(), &'static str>{
@@ -310,12 +328,19 @@ pub fn reset_cache_allocations() -> Result<(), &'static str>{
     // setting all tasks to the default closid of 0
     #[cfg(use_intel_cat)]
     for (id, taskref) in task::TASKLIST.lock().iter() {
-        set_closid_on_current_task(*id as u16)?;
+        taskref.set_closid(0)?;
+    }
+
+    // setting all tasks to the default closid of 0
+    #[cfg(use_intel_cat)]
+    for (id, taskref) in task::TASKLIST.lock().iter() {
+        taskref.set_closid(0)?;
     }
     
     Ok(())
 }
 
+#[cfg(use_intel_cat)]
 /// Function that will add a class of service with either an exclusive or non-exclusive cache region of size n megabytes.
 /// The return value is the closid of the new class of service if successful, otherwise an error will be returned.
 pub fn allocate_clos(size_in_megabytes : u32, exclusive: bool) -> Result<ClosId, &'static str>{
@@ -340,8 +365,8 @@ pub fn allocate_clos(size_in_megabytes : u32, exclusive: bool) -> Result<ClosId,
 #[cfg(use_intel_cat)]
 /// Sets the closid of the current `Task`
 pub fn set_closid_on_current_task(new_closid: u16) -> Result<(), &'static str>{
-    if let Some(mut taskref) = task::get_my_current_task() {
-        taskref.lock().closid = closid_settings::ClosId::new(new_closid)?;
+    if let Some(taskref) = task::get_my_current_task() {
+        taskref.set_closid(new_closid)?;
     }
     else{
         return Err("Could not find task struct.");
@@ -350,17 +375,6 @@ pub fn set_closid_on_current_task(new_closid: u16) -> Result<(), &'static str>{
 }
 
 #[cfg(use_intel_cat)]
-/// Sets the closid of the `Task` with the given pid
-pub fn set_closid_on_task_by_pid(new_closid: u16) -> Result<(), &'static str>{
-    if let Some(mut taskref) = task::get_my_current_task() {
-        taskref.lock().closid = closid_settings::ClosId::new(new_closid)?;
-    }
-    else{
-        return Err("Could not find task struct.");
-    }
-    Ok(())
-}
-
 /// Function that will validate whether the classes of service specified in a given `ClosList` are set to their proper value.
 /// Returns `Ok(())` upon success, otherwise the pair of values (expected value, value read from the msr). 
 pub fn validate_clos_on_single_core() -> Result<(), (u32, u32)>{
@@ -374,6 +388,7 @@ pub fn validate_clos_on_single_core() -> Result<(), (u32, u32)>{
     Ok(())
 }
 
+#[cfg(use_intel_cat)]
 /// Function that returns the current state of the `CURRENT_CLOS_LIST` variable.
 pub fn get_current_cache_allocation() -> ClosList{
     CURRENT_CLOS_LIST.lock().clone()
