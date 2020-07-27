@@ -26,7 +26,7 @@
 //! 
 
 #![no_std]
-#![feature(panic_info_message,asm)]
+#![feature(panic_info_message)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -41,6 +41,7 @@ extern crate root;
 extern crate x86_64;
 extern crate spin;
 extern crate kernel_config;
+
 
 use core::fmt;
 use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
@@ -62,7 +63,7 @@ use mod_mgmt::{
     AppCrateRef,
 };
 use environment::Environment;
-use spin::{Mutex};
+use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 
@@ -541,6 +542,7 @@ impl Task {
             next.closid.set_closid_on_processor();
         }
 
+        // update the current task to `next`
         next.set_as_current_task();
 
         // If the current task is exited, then we need to remove the cyclical TaskRef reference in its TaskLocalData.
