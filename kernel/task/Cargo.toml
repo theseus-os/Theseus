@@ -41,9 +41,8 @@ path = "../environment"
 [dependencies.root]
 path = "../root"
 
-[dependencies.raw-cpuid]
-version = "7.0.3"
-features = [ "use_arch" ]
+[dependencies.closid_settings]
+path = "../closid_settings"
 
 [lib]
 crate-type = ["rlib"]

@@ -29,3 +29,6 @@ version = "1.2.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.closid_settings]
+path = "../closid_settings"

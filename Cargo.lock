@@ -333,6 +333,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "closid_settings"
+version = "0.1.0"
+dependencies = [
+ "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "color"
 version = "0.1.0"
 
@@ -928,6 +936,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "closid_settings 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
@@ -2376,6 +2385,7 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "closid_settings 0.1.0",
  "context_switch 0.1.0",
  "environment 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -2384,7 +2394,6 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
- "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tss 0.1.0",

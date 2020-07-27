@@ -12,10 +12,12 @@ extern crate x86_64;
 extern crate apic;
 extern crate spawn;
 extern crate task;
+extern crate closid_settings;
 
 use alloc::vec::*;
 use x86_64::registers::msr::*;
 use irq_safety::MutexIrqSafe;
+use closid_settings::{ClosId, zero, get_max_closid};
 
 //address of the base MSR for L3 CAT usage
 const IA32_L3_CBM_BASE: u32 = 0xc90u32;
@@ -27,7 +29,7 @@ const BITMASK_SIZE: u32 = 11;
 #[derive(Clone, Copy, Debug)]
 pub struct ClosDescriptor{
     /// Integer representing the class of service that this `ClosDescriptor` refers to. A `Task` whose `closid` field has the same value of `closid` will allocate to the cache region defined by `bitmask`.
-    pub closid: u16,
+    pub closid: ClosId,
 
     /// A string of bits representing the cache ways that this class of service has access to. If the i-th bit is a 1, tasks in this class of service may occupy that cache way; if it is 0, they may not occupy that cache way.
     pub bitmask: u32,
@@ -71,7 +73,7 @@ lazy_static! {
 	ClosList::new(
 	    vec![
 		ClosDescriptor{
-		    closid: 0,
+		    closid: zero(),
 		    bitmask: 0x7ff,
 		    exclusive: false,
 		}
@@ -85,7 +87,7 @@ lazy_static! {
 fn get_free_closid() -> Result<u16, &'static str>{
     let current_max = CURRENT_CLOS_LIST.lock().max_closid;
     #[cfg(use_intel_cat)]{
-        if current_max >= task::get_max_closid(){
+        if current_max >= get_max_closid(){
         return Err("Could not create new clos, no free closids are available.");
         }
     }
@@ -103,7 +105,7 @@ fn increment_max_closid(){
 fn update_current_clos_list(clos: ClosDescriptor){
     let mut current_list = CURRENT_CLOS_LIST.lock();
     // if the clos id in the clos descriptor is already in the current clos list we remove it
-    current_list.descriptor_list.drain_filter(|x| x.closid == clos.closid);
+    current_list.descriptor_list.drain_filter(|x| x.closid.0 == clos.closid.0);
     // if clos is meant to have exclusive cache access, we will remove this region from all the other clos descriptors
     if clos.exclusive{
 	for i in 1..current_list.descriptor_list.len(){
@@ -165,7 +167,7 @@ fn create_exclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDescri
 	if (attempt_bitmask & free_region) == attempt_bitmask{
 	    return Ok(
 		ClosDescriptor{
-		    closid: new_closid,
+		    closid: ClosId::new(new_closid)?,
 		    bitmask: attempt_bitmask,
 		    exclusive: true,
 		}
@@ -198,14 +200,15 @@ fn create_nonexclusive_clos_descriptor(size_in_megabytes: u32) -> Result<ClosDes
     let attempt_bitmask = ((1 << size_in_megabytes) - 1) << (BITMASK_SIZE - size_in_megabytes);
 
     if (attempt_bitmask & free_region) == attempt_bitmask{
-	// the last n cache-ways are free to use, so we will return a `Clos Descriptor` representing this region
-	return Ok(
-	    ClosDescriptor{
-		closid: new_closid,
-		bitmask: attempt_bitmask,
-		exclusive: false,
-	    }
-	);
+        let closid_temp = ClosId::new(new_closid)?;
+	    // the last n cache-ways are free to use, so we will return a `Clos Descriptor` representing this region
+	    return Ok(
+            ClosDescriptor{
+            closid: closid_temp,
+            bitmask: attempt_bitmask,
+            exclusive: false,
+            }
+	    );
     }
     
     // the last n cache-ways were not free, so we will return an error
@@ -234,15 +237,10 @@ fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
     if !valid_bitmask(clos.bitmask){
 	return Err("Invalid bitmask passed to CAT.");
     }
-    #[cfg(use_intel_cat)]
-    {
-        if clos.closid > task::get_max_closid() {
-        return Err("Closid must be less than 128.");
-        }
-    }
+    
 	
     // setting the address of the msr that we need to write and writing our bitmask to the proper register
-    let msr : u32 = IA32_L3_CBM_BASE + clos.closid as u32;
+    let msr : u32 = IA32_L3_CBM_BASE + clos.closid.0 as u32;
     unsafe{
 	asm!("wrmsr"
 		  :
@@ -285,9 +283,10 @@ pub fn reset_cache_allocations() -> Result<(), &'static str>{
     // Creating a temporary `ClosList` to be used to reset all the bitmasks to 0x7ff
     let mut temp_vec : Vec<ClosDescriptor> = Vec::new();
     for i in 0..CURRENT_CLOS_LIST.lock().descriptor_list.len(){
+    let closid_temp = ClosId::new(i as u16)?;
 	temp_vec.push(
 	    ClosDescriptor{
-		closid: i as u16,
+		closid: closid_temp,
 		bitmask: 0x7ff,
 		exclusive: false,
 	    }
@@ -301,7 +300,7 @@ pub fn reset_cache_allocations() -> Result<(), &'static str>{
     *CURRENT_CLOS_LIST.lock() = ClosList::new(
 	vec![
 	    ClosDescriptor{
-		closid: 0,
+		closid: zero(),
 		bitmask: 0x7ff,
 		exclusive: false,
 	    }
@@ -311,7 +310,7 @@ pub fn reset_cache_allocations() -> Result<(), &'static str>{
     // setting all tasks to the default closid of 0
     #[cfg(use_intel_cat)]
     for (id, taskref) in task::TASKLIST.lock().iter() {
-        taskref.set_closid(0)?;
+        set_closid_on_current_task(*id as u16)?;
     }
     
     Ok(())
@@ -319,7 +318,7 @@ pub fn reset_cache_allocations() -> Result<(), &'static str>{
 
 /// Function that will add a class of service with either an exclusive or non-exclusive cache region of size n megabytes.
 /// The return value is the closid of the new class of service if successful, otherwise an error will be returned.
-pub fn allocate_clos(size_in_megabytes : u32, exclusive: bool) -> Result<u16, &'static str>{
+pub fn allocate_clos(size_in_megabytes : u32, exclusive: bool) -> Result<ClosId, &'static str>{
     // attempting to create a new `ClosDescriptor` with the requested amount of space
     let allocated_clos = match exclusive{
         true => create_exclusive_clos_descriptor(size_in_megabytes)?,
@@ -338,11 +337,35 @@ pub fn allocate_clos(size_in_megabytes : u32, exclusive: bool) -> Result<u16, &'
     }
 }
 
+#[cfg(use_intel_cat)]
+/// Sets the closid of the current `Task`
+pub fn set_closid_on_current_task(new_closid: u16) -> Result<(), &'static str>{
+    if let Some(mut taskref) = task::get_my_current_task() {
+        taskref.lock().closid = closid_settings::ClosId::new(new_closid)?;
+    }
+    else{
+        return Err("Could not find task struct.");
+    }
+    Ok(())
+}
+
+#[cfg(use_intel_cat)]
+/// Sets the closid of the `Task` with the given pid
+pub fn set_closid_on_task_by_pid(new_closid: u16) -> Result<(), &'static str>{
+    if let Some(mut taskref) = task::get_my_current_task() {
+        taskref.lock().closid = closid_settings::ClosId::new(new_closid)?;
+    }
+    else{
+        return Err("Could not find task struct.");
+    }
+    Ok(())
+}
+
 /// Function that will validate whether the classes of service specified in a given `ClosList` are set to their proper value.
 /// Returns `Ok(())` upon success, otherwise the pair of values (expected value, value read from the msr). 
-pub fn validate_clos_on_single_core(clos_list: ClosList) -> Result<(), (u32, u32)>{
-    for clos in clos_list.descriptor_list{
-	let reg = IA32_L3_CBM_BASE + clos.closid as u32;
+pub fn validate_clos_on_single_core() -> Result<(), (u32, u32)>{
+    for clos in CURRENT_CLOS_LIST.lock().descriptor_list.clone(){
+	let reg = IA32_L3_CBM_BASE + clos.closid.0 as u32;
 	let value : u32 = rdmsr(reg) as u32;
 	if value as u32 != clos.bitmask{
 	    return Err((clos.bitmask, value));

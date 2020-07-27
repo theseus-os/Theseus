@@ -174,6 +174,7 @@ pub fn main(args: Vec<String>) -> isize{
 		},
 		};
 
+		/*
 		//checking that the reset succeeded in resetting all the MSRs
 		let mut reset_vec : Vec<ClosDescriptor> = Vec::new();
 
@@ -188,8 +189,9 @@ pub fn main(args: Vec<String>) -> isize{
 		}
 
 		let reset_list = ClosList::new(reset_vec);
+		*/
 
-		match validate_clos_on_single_core(reset_list) {
+		match validate_clos_on_single_core() {
 		Ok(_) => { },
 		Err((expected, found)) => {
 			error!("test_intel_cat : ERROR: MSR read failed.\nExpected: {}\nFound: {}", expected, found);

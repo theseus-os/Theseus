@@ -1,0 +1,14 @@
+[package]
+name = "closid_settings"
+version = "0.1.0"
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
+description = "Structs and functions relevant to assigning tasks to classes of service for use with Intel CAT."
+edition = "2018"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.raw-cpuid]
+version = "7.0.3"
+features = [ "use_arch" ]
