@@ -29,15 +29,15 @@ const BITMASK_SIZE: u32 = 11;
 #[cfg(use_intel_cat)]
 /// Struct to represent the cache allocation belonging to a class of service.
 #[derive(Clone, Copy, Debug)]
-pub struct ClosDescriptor{
+struct ClosDescriptor{
     /// Integer representing the class of service that this `ClosDescriptor` refers to. A `Task` whose `closid` field has the same value of `closid` will allocate to the cache region defined by `bitmask`.
-    pub closid: ClosId,
+    closid: ClosId,
 
     /// A string of bits representing the cache ways that this class of service has access to. If the i-th bit is a 1, tasks in this class of service may occupy that cache way; if it is 0, they may not occupy that cache way.
-    pub bitmask: u32,
+    bitmask: u32,
 
     /// If this value is true, the class of service occupies an exclusive region in the cache; if it is false, it occupies shared cache space with other classes of service.
-    pub exclusive: bool,
+    exclusive: bool,
 }
 
 #[cfg(use_intel_cat)]
@@ -52,7 +52,7 @@ impl ClosDescriptor{
 #[cfg(use_intel_cat)]
 /// List of `ClosDescriptor`s to describe the current state of existing cache allocations. 
 #[derive(Clone, Debug)]
-pub struct ClosList{
+struct ClosList{
     /// Vector containing a `ClosDescriptor` for every currently active class of service.
     pub descriptor_list: Vec<ClosDescriptor>,
 
@@ -63,7 +63,7 @@ pub struct ClosList{
 #[cfg(use_intel_cat)]
 impl ClosList{
     /// Create a new `ClosList` from a vector of `ClosDescriptor`s
-    pub fn new(vals: Vec<ClosDescriptor>) -> Self{
+    fn new(vals: Vec<ClosDescriptor>) -> Self{
 	ClosList{
 	    descriptor_list: vals,
 	    max_closid: 0
@@ -383,8 +383,10 @@ pub fn validate_clos_on_single_core() -> Result<(), (u32, u32)>{
     Ok(())
 }
 
+/*
 #[cfg(use_intel_cat)]
 /// Function that returns the current state of the `CURRENT_CLOS_LIST` variable.
 pub fn get_current_cache_allocation() -> ClosList{
     CURRENT_CLOS_LIST.lock().clone()
 }
+*/

@@ -14,7 +14,7 @@ extern crate task;
 use alloc::vec::Vec;
 use alloc::string::String;
 #[cfg(use_intel_cat)]
-use intel_cat::{allocate_clos, get_current_cache_allocation, validate_clos_on_single_core, reset_cache_allocations, ClosDescriptor, ClosList, set_closid_on_current_task};
+use intel_cat::{allocate_clos, validate_clos_on_single_core, reset_cache_allocations, set_closid_on_current_task};
 
 pub fn main(args: Vec<String>) -> isize{
 
@@ -141,10 +141,12 @@ pub fn main(args: Vec<String>) -> isize{
 			},
 		};
 
+		/*
 		// verifying the results of our cache allocations
 		let current_list = get_current_cache_allocation();
 
 		debug!("Current Cache Allocation: {:?}", current_list);
+		*/
 
 		debug!("Verifying that MSRs were set properly.");
 

@@ -1,3 +1,8 @@
+//! This crate contains the `ClosId` structure and implements
+//! its related functionality for use with Intel CAT. When `use_intel_cat` is enabled,
+//! each `Task` structure will have a `ClosId` field, which will associate
+//! the `Task` with a specific allocated L3 cache region.
+
 #![no_std]
 
 extern crate x86_64;
