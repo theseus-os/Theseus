@@ -600,7 +600,6 @@ loadable: run
 
 
 ### builds and runs Theseus in QEMU
-run : export override THESEUS_CONFIG += use_intel_cat
 run: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
