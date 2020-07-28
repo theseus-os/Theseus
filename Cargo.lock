@@ -338,6 +338,7 @@ version = "0.1.0"
 dependencies = [
  "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
 ]
 
 [[package]]

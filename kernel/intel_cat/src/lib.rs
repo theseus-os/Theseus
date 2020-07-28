@@ -2,7 +2,7 @@
 //! Provides the ability to reserve exclusive or shared space in the LLC for a program or group of programs.
 
 #![no_std]
-#![feature(asm, drain_filter)]
+#![feature(drain_filter)]
 
 
 #[macro_use] extern crate alloc;
@@ -18,7 +18,7 @@ use alloc::vec::*;
 use x86_64::registers::msr::*;
 use irq_safety::MutexIrqSafe;
 #[cfg(use_intel_cat)]
-use closid_settings::{ClosId, zero, get_max_closid};
+use closid_settings::{ClosId, zero_closid, get_max_closid};
 
 //address of the base MSR for L3 CAT usage
 const IA32_L3_CBM_BASE: u32 = 0xc90u32;
@@ -79,7 +79,7 @@ lazy_static! {
 	ClosList::new(
 	    vec![
 		ClosDescriptor{
-		    closid: zero(),
+		    closid: zero_closid(),
 		    bitmask: 0x7ff,
 		    exclusive: false,
 		}
@@ -256,12 +256,7 @@ fn update_clos(clos: ClosDescriptor) -> Result<(), &'static str>{
 	
     // setting the address of the msr that we need to write and writing our bitmask to the proper register
     let msr : u32 = IA32_L3_CBM_BASE + clos.closid.0 as u32;
-    unsafe{
-	asm!("wrmsr"
-		  :
-		  : "{cx}"(msr), "{dx}"(0), "{ax}"(clos.bitmask)
-	);
-    }
+    unsafe { wrmsr(msr, clos.bitmask as u64); }
     Ok(())
 }
 
@@ -318,7 +313,7 @@ pub fn reset_cache_allocations() -> Result<(), &'static str>{
     *CURRENT_CLOS_LIST.lock() = ClosList::new(
 	vec![
 	    ClosDescriptor{
-		closid: zero(),
+		closid: zero_closid(),
 		bitmask: 0x7ff,
 		exclusive: false,
 	    }

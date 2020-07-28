@@ -351,7 +351,7 @@ impl Task {
             restart_info: None,
 
 	        #[cfg(use_intel_cat)]
-	        closid: closid_settings::zero(),
+	        closid: closid_settings::zero_closid(),
             
             #[cfg(simd_personality)]
             simd: SimdExt::None,

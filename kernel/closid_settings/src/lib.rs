@@ -1,11 +1,11 @@
 #![no_std]
-#![feature(asm)]
 
-
+extern crate x86_64;
 extern crate spin;
 #[macro_use] extern crate raw_cpuid;
 
 use spin::Once;
+use x86_64::registers::msr::*;
 
 #[cfg(use_intel_cat)]
 #[derive(Clone, Copy, Debug)]
@@ -13,11 +13,11 @@ use spin::Once;
 pub struct ClosId(pub u16);
 
 #[cfg(use_intel_cat)]
-// variables that will contain the maximum closid supported on the system, which will never change in a given hardware configuration, so it only needs to be calculated once
+/// variables that will contain the maximum closid supported on the system, which will never change in a given hardware configuration, so it only needs to be calculated once
 static MAX_CLOSID_INIT : Once<u16> = Once::new();
 
 #[cfg(use_intel_cat)]
-// for more information, see page 2-48 vol. 4 of the Intel 64 and IA-32 Architectures Software Development manual
+/// for more information, see page 2-48 vol. 4 of the Intel 64 and IA-32 Architectures Software Development manual
 fn get_max_closid_init() -> u16 {
     /*let ret_32_bits : u32;
     unsafe {
@@ -54,18 +54,13 @@ impl ClosId {
     /// Called during the context switching routine.
     pub fn set_closid_on_processor(&self) {
         // update the IA32_PQR_ASSOC MSR to point to the new task's CLOS
-        let IA32_PQR_ASSOC = 0xc8fu32;
-        unsafe{
-            asm!("wrmsr"
-                :
-                : "{cx}"(IA32_PQR_ASSOC), "{dx}"(self.0 as u32), "{ax}"(0)
-            );
-        }
+        const IA32_PQR_ASSOC: u32 = 0xc8fu32;
+        unsafe { wrmsr(IA32_PQR_ASSOC, (self.0 as u64) << 32); }
     }
 }
 
 #[cfg(use_intel_cat)]
 /// Returns a `ClosId` corresponding to clos 0. This will always be a valid closid, as the default closid is 0.
-pub const fn zero() -> ClosId{
+pub const fn zero_closid() -> ClosId{
     ClosId(0)
 }

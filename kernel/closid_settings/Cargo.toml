@@ -12,3 +12,6 @@ spin = "0.4.10"
 [dependencies.raw-cpuid]
 version = "7.0.3"
 features = [ "use_arch" ]
+
+[dependencies.x86_64]
+path = "../../libs/x86_64"
