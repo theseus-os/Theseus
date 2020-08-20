@@ -1,11 +1,8 @@
 #![no_std]
 
 extern crate alloc;
-
 extern crate intel_cat;
-
 extern crate closid_settings;
-
 extern crate task;
 
 #[macro_use] extern crate log;
@@ -122,22 +119,22 @@ pub fn main(args: Vec<String>) -> isize{
 		// invalid closid
 		match set_closid_on_current_task(256){
 			Ok(_) => {
-			error!("test_intel_cat : ERROR: Expected closid setting to fail.");
-			success = false;
+				error!("test_intel_cat : ERROR: Expected closid setting to fail.");
+				success = false;
 			},
 			Err(_) => {
-			debug!("Setting closid failed as expected.");
+				debug!("Setting closid failed as expected.");
 			},
 		};
 
 		// valid closid
 		match set_closid_on_current_task(1) {
-			Ok(_) => {
-			debug!("Setting closid succeeded.");
+				Ok(_) => {
+				debug!("Setting closid succeeded.");
 			},
 			Err(_) => {
-			error!("test_intel_cat : ERROR: Expected closid setting to succeed.");
-			success = false;
+				error!("test_intel_cat : ERROR: Expected closid setting to succeed.");
+				success = false;
 			},
 		};
 
