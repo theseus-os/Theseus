@@ -31,7 +31,7 @@ use mod_mgmt::{
 };
 use path::Path;
 use crate_swap::{SwapRequest, swap_crates};
-use fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_handled_fault, get_the_most_recent_match};
+use fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_handled_fault};
 
 /// A data structure to hold the ranges of memory used by the old crate and the new crate.
 /// The crate only maintains the values as virtual addresses and holds no references to any
@@ -355,7 +355,7 @@ pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
         }
     };
 
-    for (id, taskref) in task::TASKLIST.lock().iter() {
+    for (_id, taskref) in task::TASKLIST.lock().iter() {
         let locked_task = taskref.lock();
         let bottom = locked_task.kstack.bottom().value();
         let top = locked_task.kstack.top_usable().value();
@@ -405,6 +405,7 @@ fn null_swap_policy() -> Option<String> {
 /// simple swap policy. 
 /// When this swap policy is enabled always the crate which the last fault occurs 
 /// is swapped.
+#[cfg(use_crate_replacement)]
 fn simple_swap_policy() -> Option<String> {
 
     #[cfg(not(downtime_eval))]
@@ -453,6 +454,7 @@ fn simple_swap_policy() -> Option<String> {
 /// 1) Restart the task
 /// 2) Replace the crate fault is detected
 /// 3) Replace the application crate
+#[cfg(use_crate_replacement)]
 fn iterative_swap_policy() -> Option<String> {
 
     #[cfg(not(downtime_eval))]
@@ -480,7 +482,7 @@ fn iterative_swap_policy() -> Option<String> {
                 let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
 
                 // We check whether the fault is logged previously
-                let fe_last_fault = get_the_most_recent_match(error_crate_name_simple);
+                let fe_last_fault = fault_log::get_the_most_recent_match(error_crate_name_simple);
                 match fe_last_fault {
 
                     // If the fault is logged we check the action taken and then take the next drastic action.

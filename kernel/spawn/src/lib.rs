@@ -48,7 +48,6 @@ use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
 use fs_node::FileOrDir;
-use fault_crate_swap::{SwapRanges, get_crate_to_swap};
 
 #[cfg(simd_personality)]
 use task::SimdExt;
@@ -667,19 +666,21 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
     remove_current_task_from_runqueue(&current_task);
 
     {
-        let mut se = SwapRanges::default();
+        #[cfg(use_crate_replacement)]
+        let mut se = fault_crate_swap::SwapRanges::default();
 
         // Get the crate we should swap. Will be None if nothing is picked
-        let crate_to_swap = get_crate_to_swap();
-        if let Some(crate_to_swap) = crate_to_swap {
-            // Call the handler to swap the crates
-            let version = fault_crate_swap::self_swap_handler(&crate_to_swap);
-            match version {
-                Ok(v) => {
-                    se = v
-                }
-                Err(err) => {
-                    debug!(" Crate swapping failed {:?}", err)
+        #[cfg(use_crate_replacement)] {
+            if let Some(crate_to_swap) = fault_crate_swap::get_crate_to_swap() {
+                // Call the handler to swap the crates
+                let version = fault_crate_swap::self_swap_handler(&crate_to_swap);
+                match version {
+                    Ok(v) => {
+                        se = v
+                    }
+                    Err(err) => {
+                        debug!(" Crate swapping failed {:?}", err)
+                    }
                 }
             }
         }
@@ -704,7 +705,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
                     // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?). 
                     if fault_crate_swap::constant_offset_fix(&se, func_ptr, func_ptr + 16).is_ok() &&  fault_crate_swap::constant_offset_fix(&se, arg_ptr, arg_ptr + 8).is_ok() {
                         #[cfg(not(downtime_eval))]
-                        debug!("Fucntion and argument addresses corrected");
+                        debug!("Function and argument addresses corrected");
                     }
                 }
                 
@@ -738,7 +739,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
     loop { }
 }
 
-/// Helper function to remove a task from it's runqueue and drop it.
+/// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     // Special behavior when evaluating runqueues
     #[cfg(rq_eval)] {
@@ -751,7 +752,6 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
             runqueue::remove_task_from_all(current_task).unwrap();
         }
     }
-
 
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
