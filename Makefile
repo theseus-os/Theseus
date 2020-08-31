@@ -137,7 +137,7 @@ APP_CRATE_NAMES += getopts unicode_width
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
 		check_rustc check_xargo check_captain \
-		clean run run_pause iso build userspace cargo \
+		clean run run_pause iso build cargo \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs
@@ -162,7 +162,6 @@ check_captain:
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
-### It skips building userspace for now, but you can add it back in by adding "userspace" to the line below.
 $(iso): build check_captain
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -276,16 +275,16 @@ $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/
 
 
 
-## (This is currently not used in Theseus, since we don't run anything in userspace)
-## This builds all userspace programs
-userspace: 
-	@echo -e "\n======== BUILDING USERSPACE ========"
-	@$(MAKE) -C userspace all
-## copy userspace binary files and add the __u_ prefix
-	@mkdir -p $(GRUB_ISOFILES)/modules
-	@for f in `find $(ROOT_DIR)/userspace/build -type f` ; do \
-		cp -vf $${f}  $(GRUB_ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
-	done
+# ## (This is currently not used in Theseus, since we don't run anything in userspace)
+# ## This builds all userspace programs
+# userspace: 
+# 	@echo -e "\n======== BUILDING USERSPACE ========"
+# 	@$(MAKE) -C old_crates/userspace all
+# ## copy userspace binary files and add the __u_ prefix
+# 	@mkdir -p $(GRUB_ISOFILES)/modules
+# 	@for f in `find $(ROOT_DIR)/old_crates/userspace/build -type f` ; do \
+# 		cp -vf $${f}  $(GRUB_ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+# 	done
 
 
 
@@ -436,7 +435,6 @@ view-book: book
 clean:
 	cargo clean
 	@rm -rf build
-#@$(MAKE) -C userspace clean
 	
 
 
@@ -529,18 +527,18 @@ help:
 ###################################################################################################
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
+
 ## multicore 
-QEMU_FLAGS += -smp 4
+QEMU_CPUS ?= 4
+QEMU_FLAGS += -smp $(QEMU_CPUS)
 
 ## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
 MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=ide
-
+# QEMU_FLAGS += -drive format=raw,file=DISK_IMAGE.img,if=ide
 ## Add a disk drive, a SATA drive over the AHCI interface.
-## We don't yet have SATA support in Theseus.
-# QEMU_FLAGS += -drive id=my_disk,file=random_data2.img,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
+# QEMU_FLAGS += -drive id=my_disk,file=DISK_IMAGE.img,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)
@@ -601,7 +599,6 @@ loadable: run
 
 ### builds and runs Theseus in QEMU
 run: $(iso) 
-	# @qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
@@ -622,7 +619,6 @@ gdb:
 ### builds and runs Theseus in Bochs
 bochs : export override THESEUS_CONFIG += apic_timer_fixed
 bochs: $(iso) 
-	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
 
 

@@ -57,7 +57,7 @@ use alloc::{
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{Stack, MappedPages, PageRange, EntryFlags, MmiRef, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use tss::tss_set_rsp0;
+// use tss::tss_set_rsp0;
 use mod_mgmt::{
     CrateNamespace,
     AppCrateRef,

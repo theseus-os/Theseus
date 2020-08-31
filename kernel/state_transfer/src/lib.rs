@@ -19,7 +19,7 @@ use mod_mgmt::CrateNamespace;
 // use lazy_static::lazy::Lazy;
 use irq_safety::RwLockIrqSafe;
 use atomic_linked_list::atomic_map::AtomicMap;
-use task::TaskRef;
+// use task::TaskRef;
 
 
 /// Used for the evolution from a round robin scheduler to a priority scheduler
