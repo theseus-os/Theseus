@@ -57,15 +57,6 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
 
 /// exception 0x02
 pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
-    // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddr = apic::TLB_SHOOTDOWN_IPI_VIRT_ADDR.load(Ordering::Acquire);
-    if vaddr != 0 {
-        // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi();
-        return;
-    }
-    
-    // if vaddr is 0, then it's a regular NMI    
     println_raw!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
              stack_frame.instruction_pointer,
              stack_frame);

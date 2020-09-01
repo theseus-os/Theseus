@@ -847,15 +847,11 @@ lazy_static! {
 /// initialize the nic
 pub fn init_nic(e1000_pci: &PciDevice) -> Result<(), &'static str>{
 
-        let pci_dev = get_pci_device_vd(INTEL_VEND,E1000_DEV);
-        debug!("e1000 Device found: {:?}", pci_dev);
-        let e1000_pci = pci_dev.unwrap();
-        //debug!("e1000 Device unwrapped: {:?}", pci_dev);
         let mut e1000_nc = E1000_NIC.lock();       
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         //pci_write(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE,0x2B);
-        debug!("Int line: {}" ,pci_read_8(e1000_pci.bus, e1000_pci.slot, e1000_pci.func,PCI_INTERRUPT_LINE));
+        debug!("Int line: {}" ,pci_read_8(e1000_pci.bus, e1000_pci.slot, e1000_pci.func, PCI_INTERRUPT_LINE));
 
         e1000_nc.init(e1000_pci);
         try!(e1000_nc.mem_map(e1000_pci));

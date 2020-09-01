@@ -28,7 +28,7 @@ use core::ops::{DerefMut, Deref};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use keycodes_ascii::Keycode;
 use alloc::arc::{Arc, Weak};
-//use acpi::ACPI_TABLE;
+//use acpi::get_hpet;
 
 
 //static mut STARTING_TIME:u64 = 0;
@@ -288,9 +288,9 @@ pub fn put_key_code(keycode:Keycode) -> Result<(), &'static str>{
 
 
 //Test functions for performance evaluation
-/*pub fn set_time_start(){
-    let hpet = ACPI_TABLE.hpet.read();
-    unsafe { STARTING_TIME = (*hpet).as_ref().unwrap().get_counter(); }   
+/*pub fn set_time_start() {
+    let hpet_lock = get_hpet();
+    unsafe { STARTING_TIME = hpet_lock.as_ref().unwrap().get_counter(); }   
 }
 
 pub fn calculate_time_statistic() {
@@ -304,8 +304,8 @@ pub fn calculate_time_statistic() {
         return;
     }
 
-    let hpet = ACPI_TABLE.hpet.read();
-    let end_time = (*hpet).as_ref().unwrap().get_counter();  
+    let hpet_lock = get_hpet();
+    let end_time = hpet_lock.as_ref().unwrap().get_counter();  
 
    
     let mut queue = statistic.lock();

@@ -27,7 +27,7 @@ use super::*;
 use x86_64::registers::control_regs;
 use x86_64::instructions::tlb;
 
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, address_is_page_aligned, address_page_offset};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, address_is_page_aligned};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
@@ -35,7 +35,7 @@ use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_S
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
-    number: usize,
+    number: usize, 
 }
 impl fmt::Debug for Page {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -207,11 +207,9 @@ impl DerefMut for ActivePageTable {
 
 impl ActivePageTable {
     fn new(p4: Frame) -> ActivePageTable {
-        unsafe { 
-            ActivePageTable { 
-                mapper: Mapper::new(),
-                p4_frame: p4,
-            }
+        ActivePageTable { 
+            mapper: Mapper::new(),
+            p4_frame: p4,
         }
     }
 
@@ -565,12 +563,11 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 data_flags, allocator.deref_mut())
             ));
 
-
-            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xB_8000;
+            const VGA_DISPLAY_PHYS_START: PhysicalAddress = 0xA_0000;
             const VGA_DISPLAY_PHYS_END: PhysicalAddress = 0xC_0000;
 
             // map the VGA display memory as writable, which technically goes from 0xA_0000 - 0xC_0000 (exclusive),
-            // but currently we're only using VGA text mode, which goes from 0xB_8000 - 0XC_0000
+            // VGA text mode only goes from 0xB_8000 - 0XC_0000
             let vga_display_virt_addr: VirtualAddress = VGA_DISPLAY_PHYS_START + KERNEL_OFFSET;
             let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
             let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
@@ -668,43 +665,48 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 /// Get a stack trace, borrowed from Redox
 /// TODO: Check for stack being mapped before dereferencing
 #[inline(never)]
-pub unsafe fn stack_trace() {
+pub fn stack_trace() {
     use core::mem;
 
-    let mut rbp: usize;
-    asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
+    // SAFE, just a stack trace for debugging purposes, and pointers are checked. 
+    unsafe {
+        
+        // get the stack base pointer
+        let mut rbp: usize;
+        asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
 
-    // println_raw!("TRACE: {:>016X}", rbp);
-    error!("STACK TRACE: {:>016X}", rbp);
-    //Maximum 64 frames
-    let active_table = ActivePageTable::new(get_current_p4());
-    for _frame in 0..64 {
-        if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
-            if Page::is_valid_address(rbp) && Page::is_valid_address(rip_rbp) {
-                // println_raw!(" {:>016X}: INVALID ADDRESS", rbp);
-                error!(" {:>016X}: INVALID_ADDRESS", rbp);
-                break;
-            }
-            
-            if active_table.translate(rbp).is_some() && active_table.translate(rip_rbp).is_some() {
-                let rip = *(rip_rbp as *const usize);
-                if rip == 0 {
-                    // println_raw!(" {:>016X}: EMPTY RETURN", rbp);
-                    error!(" {:>016X}: EMPTY RETURN", rbp);
+        // println_raw!("TRACE: {:>016X}", rbp);
+        error!("STACK TRACE: {:>016X}", rbp);
+        //Maximum 64 frames
+        let active_table = ActivePageTable::new(get_current_p4());
+        for _frame in 0..64 {
+            if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
+                if Page::is_valid_address(rbp) && Page::is_valid_address(rip_rbp) {
+                    // println_raw!(" {:>016X}: INVALID ADDRESS", rbp);
+                    error!(" {:>016X}: INVALID_ADDRESS", rbp);
                     break;
                 }
-                // println_raw!("  {:>016X}: {:>016X}", rbp, rip);
-                error!("  {:>016X}: {:>016X}", rbp, rip);
-                rbp = *(rbp as *const usize);
-                // symbol_trace(rip);
+                
+                if active_table.translate(rbp).is_some() && active_table.translate(rip_rbp).is_some() {
+                    let rip = *(rip_rbp as *const usize);
+                    if rip == 0 {
+                        // println_raw!(" {:>016X}: EMPTY RETURN", rbp);
+                        error!(" {:>016X}: EMPTY RETURN", rbp);
+                        break;
+                    }
+                    // println_raw!("  {:>016X}: {:>016X}", rbp, rip);
+                    error!("  {:>016X}: {:>016X}", rbp, rip);
+                    rbp = *(rbp as *const usize);
+                    // symbol_trace(rip);
+                } else {
+                    // println_raw!("  {:>016X}: GUARD PAGE", rbp);
+                    error!("  {:>016X}: GUARD PAGE", rbp);
+                    break;
+                }
             } else {
-                // println_raw!("  {:>016X}: GUARD PAGE", rbp);
-                error!("  {:>016X}: GUARD PAGE", rbp);
-                break;
+                // println_raw!("  {:>016X}: RBP OVERFLOW", rbp);
+                error!("  {:>016X}: RBP OVERFLOW", rbp);
             }
-        } else {
-            // println_raw!("  {:>016X}: RBP OVERFLOW", rbp);
-            error!("  {:>016X}: RBP OVERFLOW", rbp);
         }
     }
 }

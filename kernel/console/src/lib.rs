@@ -16,10 +16,9 @@ extern crate console_types;
 use console_types::{ConsoleEvent, ConsoleOutputEvent};
 
 
+use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::String;
-use vga_buffer::{VgaBuffer, ColorCode, DisplayPosition};
-use core::sync::atomic::Ordering;
 use spin::{Once, Mutex};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 
@@ -47,7 +46,6 @@ macro_rules! print {
 lazy_static! {
     static ref CONSOLE_VGA_BUFFER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer::new());
 }
-
 
 static PRINT_PRODUCER: Once<DFQueueProducer<ConsoleEvent>> = Once::new();
 
@@ -110,20 +108,23 @@ fn main_loop(consumer: DFQueueConsumer<ConsoleEvent>) -> Result<(), &'static str
         match event.deref() {
             &ConsoleEvent::ExitEvent => {
                 use core::fmt::Write;
-                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n").map_err(|_| "error in VgaBuffer's write_str()"));
+                try!(CONSOLE_VGA_BUFFER.lock().write_str("\nSmoothly exiting console main loop.\n")
+                    .map_err(|_| "fmt::Error in VgaBuffer's write_str()")
+                );
                 return Ok(()); 
             }
             &ConsoleEvent::InputEvent(ref input_event) => {
                 try!(handle_key_event(input_event.key_event));
             }
             &ConsoleEvent::OutputEvent(ref output_event) => {
-                CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default());
+                try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&output_event.text, ColorCode::default())
+                    .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
+                );
             }
         }
 
         event.mark_completed();
     }
-
 }
 
 
@@ -141,25 +142,25 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
         return Ok(()); 
     }
 
-    if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
-        // use core::fmt::Write;
-        // use core::ops::DerefMut;
-        let s = format!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
-            ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
-            rtc::get_rtc_ticks().ok(),
-            unsafe{::interrupts::SPURIOUS_COUNT},
-            ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed)
-        );
+    // if keyevent.modifiers.control && keyevent.keycode == Keycode::T {
+    //     // use core::fmt::Write;
+    //     // use core::ops::DerefMut;
+    //     let s = format!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
+    //         ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
+    //         rtc::get_rtc_ticks().ok(),
+    //         unsafe{::interrupts::SPURIOUS_COUNT},
+    //         ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed)
+    //     );
 
-        CONSOLE_VGA_BUFFER.lock().write_string_with_color(&s, ColorCode::default());
+    //     CONSOLE_VGA_BUFFER.lock().write_string_with_color(&s, ColorCode::default());
         
-        // debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
-        //         ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
-        //         rtc::get_rtc_ticks().ok(),
-        //         unsafe{::interrupts::SPURIOUS_COUNT},
-        //         ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
-        return; 
-    }
+    //     // debug!("PIT_TICKS={}, RTC_TICKS={:?}, SPURIOUS={}, APIC={}", 
+    //     //         ::interrupts::pit_clock::PIT_TICKS.load(Ordering::Relaxed), 
+    //     //         rtc::get_rtc_ticks().ok(),
+    //     //         unsafe{::interrupts::SPURIOUS_COUNT},
+    //     //         ::interrupts::APIC_TIMER_TICKS.load(Ordering::Relaxed));
+    //     return; 
+    // }
 
 
     // PUT ADDITIONAL KEYBOARD-TRIGGERED BEHAVIORS HERE
@@ -168,27 +169,27 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
     // home, end, page up, page down, up arrow, down arrow for the console
     if keyevent.keycode == Keycode::Home {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Start);
-        return;
+        return Ok(());
     }
     if keyevent.keycode == Keycode::End {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::End);
-        return;
+        return Ok(());
     }
     if keyevent.keycode == Keycode::PageUp {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(20));
-        return;
+        return Ok(());
     }
     if keyevent.keycode == Keycode::PageDown {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(20));
-        return;
+        return Ok(());
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Up(1));
-        return;
+        return Ok(());
     }
     if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down {
         CONSOLE_VGA_BUFFER.lock().display(DisplayPosition::Down(1));
-        return;
+        return Ok(());
     }
     
     /*
@@ -221,7 +222,9 @@ fn handle_key_event(keyevent: KeyEvent) -> Result<(), &'static str> {
             // we echo key presses directly to the console without queuing an event
             // trace!("  {}  ", c);
             use alloc::string::ToString;
-            CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default());
+            try!(CONSOLE_VGA_BUFFER.lock().write_string_with_color(&c.to_string(), ColorCode::default())
+                .map_err(|_| "fmt::Error in VgaBuffer's write_string_with_color()")
+            );
         }
         _ => { } 
     }

@@ -146,10 +146,11 @@ pub fn init_handlers_apic() {
         for i in 32..255 {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
-        
+
         idt[0x20].set_handler_fn(pit_timer_handler);
         idt[0x21].set_handler_fn(ps2_keyboard_handler);
         idt[0x22].set_handler_fn(lapic_timer_handler);
+        // idt[0x23].set_handler_fn(irq_0x23_handler);
         idt[0x24].set_handler_fn(com1_serial_handler);
         // idt[0x25].set_handler_fn(irq_0x25_handler);
         idt[0x26].set_handler_fn(apic_irq_0x26_handler);
@@ -165,8 +166,6 @@ pub fn init_handlers_apic() {
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
 
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
-
-
         idt[apic::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
 
@@ -348,6 +347,7 @@ extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackF
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 
+
 /// 0x26
 extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
     // info!("APIX 0x26 IRQ handler");
@@ -363,7 +363,7 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
-    e1000::e1000_handler();
+    // e1000::e1000_handler();
 	eoi(Some(0x2B));
 }
 
@@ -579,10 +579,6 @@ extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFram
 
 
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // Currently, IPIs are only used for TLB shootdowns.
-    
-    // trace!("ipi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-    apic::handle_tlb_shootdown_ipi();
 
     eoi(None);
 }

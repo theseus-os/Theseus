@@ -2,7 +2,7 @@
 use super::{get_window_obj};
 use frame_buffer;
 use frame_buffer_3d;
-use acpi::ACPI_TABLE;  
+use acpi::get_hpet;  
 
 pub fn test_cursor(_: Option<u64>) -> Option<&'static str> {
     let mut x=20;
@@ -143,8 +143,8 @@ pub fn test_performance(_: Option<u64>) -> Option<&'static str> {
     for lop in 0..50 {
         trace!("Draw 2D square test case {}", lop);
 
-        let hpet = ACPI_TABLE.hpet.read();
-        let starting_time = try_opt!((*hpet).as_ref()).get_counter();
+        let hpet_lock = get_hpet();
+        let starting_time = try_opt!(hpet_lock.as_ref()).get_counter();
         let mut color = 0x342513 + lop;
         for i in 0..100 {
             for x in 20..300{
@@ -154,13 +154,13 @@ pub fn test_performance(_: Option<u64>) -> Option<&'static str> {
             }
             color = color + 20;
         }
-        let end_time = try_opt!((*hpet).as_ref()).get_counter();
+        let end_time = try_opt!(hpet_lock.as_ref()).get_counter();
         trace!("Time: {}", end_time - starting_time);
     } 
 
     for lop in 0..50 {
-        let hpet = ACPI_TABLE.hpet.read();
-        let starting_time = try_opt!((*hpet).as_ref()).get_counter();
+        let hpet_lock = get_hpet();
+        let starting_time = try_opt!(hpet_lock.as_ref()).get_counter();
         let mut color = 0x342513 + lop;
         for i in 1..100 {
             for x in 20..200{
@@ -170,7 +170,7 @@ pub fn test_performance(_: Option<u64>) -> Option<&'static str> {
             }
             color = color + 20;
         }
-        let end_time = try_opt!((*hpet).as_ref()).get_counter();
+        let end_time = try_opt!(hpet_lock.as_ref()).get_counter();
         trace!("Time: {}", end_time - starting_time);
     } 
 

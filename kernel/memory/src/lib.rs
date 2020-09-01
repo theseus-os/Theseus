@@ -504,20 +504,6 @@ pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
 }
 
 
-/// returns the `ModuleArea` corresponding to the given module name.
-pub fn get_module(name: &str) -> Option<&'static ModuleArea> {
-    let ma_pair = MODULE_AREAS.try().expect("get_module(): MODULE_AREAS not yet initialized.");
-    for i in 0..ma_pair.1 {
-        if name == ma_pair.0[i].name() {
-            return Some(&ma_pair.0[i]);
-        }
-    }
-
-    // not found    
-    None
-}
-
-
 
 /// A `Frame` is a chunk of **physical** memory, similar to how a `Page` is a chunk of **virtual** memory. 
 /// Frames do not implement Clone or Copy because they cannot be safely duplicated 
@@ -643,3 +629,4 @@ pub trait FrameAllocator {
     /// Call this when a heap is set up, and the `alloc` types can be used.
     fn alloc_ready(&mut self);
 }
+
