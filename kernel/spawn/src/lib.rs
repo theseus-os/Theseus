@@ -712,17 +712,24 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
 
                 let func: &F = restart_info.func.downcast_ref().expect("BUG: failed to downcast restartable task's function");
                 let arg : &A = restart_info.argument.downcast_ref().expect("BUG: failed to downcast restartable task's argument");
-                Some((t.name.clone(), func.clone(), arg.clone()))
+                Some((t.name.clone(), func.clone(), arg.clone(), t.pinned_core.clone()))
             } else {
                 None
             }
         };
 
-        if let Some((name, func, arg)) = restartable_info {
-            new_task_builder(func, arg)
-                .name(name)
+        if let Some((name, func, arg, pinned_core)) = restartable_info {
+            let new_task = new_task_builder(func, arg)
+                    .name(name);
+
+            if let Some(core) = pinned_core {
+                new_task.pin_on_core(core)
                 .spawn_restartable()
-                .expect("Could not restart the task"); 
+                .expect("Could not restart the task");
+            } else {
+                new_task.spawn_restartable()
+                .expect("Could not restart the task");
+            }
         } else {
             error!("BUG : Restartable task has no restart information available");
         }

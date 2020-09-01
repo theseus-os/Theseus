@@ -17,12 +17,13 @@ extern crate apic;
 extern crate irq_safety;
 
 use alloc::{
-    string::String,
+    string::{String,ToString},
     vec::Vec,
 };
 use memory::VirtualAddress;
 use apic::get_my_apic_id;
 use irq_safety::MutexIrqSafe;
+use core::panic::PanicInfo;
 
 /// The possible faults (panics and exceptions) encountered 
 /// during operations.
@@ -199,8 +200,19 @@ pub fn log_exception (
 }
 
 /// Add a new panic instance to the fault log. 
-pub fn log_panic_entry() {
-    let fe = FaultEntry::new(FaultType::Panic);
+pub fn log_panic_entry(panic_info: &PanicInfo) {
+    let mut fe = FaultEntry::new(FaultType::Panic);
+    if let Some(location) = panic_info.location() {
+        // debug!("panic occurred in file '{}' at line {}", location.file(), location.line());
+        let panic_file = location.file();
+        let mut error_crate_iter = panic_file.split("/");
+        error_crate_iter.next();
+        let error_crate_name_simple = error_crate_iter.next().unwrap_or_else(|| panic_file);
+        debug!("panic file {}",error_crate_name_simple);
+        fe.crate_error_occured = Some(error_crate_name_simple.to_string());
+    } else {
+        debug!("panic occurred but can't get location information...");
+    }
     update_and_insert_fault_entry_internal(fe, None);
 }
 

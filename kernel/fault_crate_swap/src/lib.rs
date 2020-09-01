@@ -499,12 +499,12 @@ fn iterative_swap_policy() -> Option<String> {
                                 fe.action_taken = RecoveryAction::FaultCrateReplaced;
                                 fe.replaced_crates.push(error_crate.clone());
                             }
-                        } else if fault_entry.action_taken == RecoveryAction::TaskRestarted {
+                        } else if fault_entry.action_taken == RecoveryAction::TaskRestarted || fault_entry.action_taken == RecoveryAction::MultipleFaultRecovery {
                             // last action : 1  -> Next action : 2
                             crate_to_swap = Some(error_crate.clone());
                             fe.action_taken = RecoveryAction::FaultCrateReplaced;
                             fe.replaced_crates.push(error_crate.clone());
-                        } else if fault_entry.action_taken == RecoveryAction::None || fault_entry.action_taken == RecoveryAction::MultipleFaultRecovery {
+                        } else if fault_entry.action_taken == RecoveryAction::None {
                             // last action : None  -> Next action : 1
                             crate_to_swap = None;
                             fe.action_taken = RecoveryAction::TaskRestarted;
