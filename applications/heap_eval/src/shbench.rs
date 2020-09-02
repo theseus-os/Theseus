@@ -2,9 +2,6 @@
 //! 
 //! The original version can be found on MicroQuill's website
 //! http://www.microquill.com/smartheap/shbench/bench.zip
-//! 
-//! Since shbench stresses the system and continuously grows the heap,
-//! we run each trial after restarting Theseus so that the initial size of the heap is the same for each trial.
 
 use alloc::{
     vec::Vec,
