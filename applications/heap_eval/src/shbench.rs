@@ -17,7 +17,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use core::ptr;
 use hpet::get_hpet;
 use libtest::{hpet_2_us, calculate_stats, hpet_timing_overhead};
-use crate::{NTHREADS, ALLOCATOR};
+use crate::{NTHREADS, ALLOCATOR, TRIES};
 #[cfg(direct_access_to_multiple_heaps)]
 use crate::overhead_of_accessing_multiple_heaps;
 
@@ -39,6 +39,7 @@ pub fn do_shbench() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
     let niterations = NITERATIONS.load(Ordering::SeqCst);
+    let mut tries = Vec::with_capacity(TRIES as usize);
 
     let hpet_overhead = hpet_timing_overhead()?;
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
@@ -52,27 +53,34 @@ pub fn do_shbench() -> Result<(), &'static str> {
         println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    let mut threads = Vec::with_capacity(nthreads);
+    for try in 0..TRIES {
 
-    let start = hpet.get_counter();
+        let mut threads = Vec::with_capacity(nthreads);
 
-    for _ in 0..nthreads {
-        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
-    }  
+        let start = hpet.get_counter();
 
-    for i in 0..nthreads {
-        threads[i].join()?;
+        for _ in 0..nthreads {
+            threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
+        }  
+
+        for i in 0..nthreads {
+            threads[i].join()?;
+        }
+
+        let end = hpet.get_counter() - hpet_overhead;
+
+        // Don't want this to be part of the timing measurement
+        for thread in threads {
+            thread.take_exit_value();
+        }
+
+        let diff = hpet_2_us(end - start);
+        println!("[{}] shbench time: {} us", try, diff);
+        tries.push(diff);
     }
 
-    let end = hpet.get_counter() - hpet_overhead;
-
-    // Don't want this to be part of the timing measurement
-    for thread in threads {
-        thread.take_exit_value();
-    }
-
-    let diff = hpet_2_us(end - start);
-    println!("shbench time: {} us", diff);
+    println!("shbench stats (us)");
+    println!("{:?}", calculate_stats(&tries));
 
     Ok(())
 }
@@ -137,8 +145,12 @@ fn worker(_:()) {
                         error!("Out of Heap Memory");
                         return;
                     }
-
-                    allocations[mp] = ptr;
+                    if allocations[mp] == ptr::null_mut() {
+                        allocations[mp] = ptr;
+                    } else {
+                        unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }                        
+                        allocations[mp] = ptr;
+                    }
                     layouts[mp] = layout;
                     mp += 1;
 
@@ -162,6 +174,7 @@ fn worker(_:()) {
                         // free the top part of the buffer, the oldest allocations first
                         while mp < save_start {
                             unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
+                            allocations[mp] = ptr::null_mut();
                             mp += 1;
                         }
                         mp = mpe;
@@ -169,6 +182,7 @@ fn worker(_:()) {
                         while mp > save_end {
                             mp -= 1;
                             unsafe { allocator.dealloc(allocations[mp], layouts[mp]); }
+                            allocations[mp] = ptr::null_mut();
                         }
                         mp = 0;
                     }
