@@ -6,6 +6,7 @@ This folder contains necessary components to measure state spill evaluation pres
 This folder contain two pre-built Theseus iso images. 
 
 1. spill_free.iso is compiled using default settings with flags
+
    `make iso THESEUS_CONFIG="rq_eval"`
 
 2. spillful.iso is compiled with state spill enabled. 
