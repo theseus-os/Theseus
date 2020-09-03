@@ -9,6 +9,8 @@ build = "../../build.rs"
 intrusive-collections = "0.9.0"
 static_assertions = "1.1.0"
 cfg-if = "0.1.6"
+spin = "0.4.10"
+
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"

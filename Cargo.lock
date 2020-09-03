@@ -1390,6 +1390,7 @@ dependencies = [
  "slabmalloc 0.7.0",
  "slabmalloc_safe 0.7.0",
  "slabmalloc_unsafe 0.7.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_assertions 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
