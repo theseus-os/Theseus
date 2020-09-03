@@ -17,7 +17,7 @@ We have even created a Docker image that automates the setup process and thus ma
 The source code of Theseus is well-documented and the documentation is hosted online for easy access.
 We also provide a "book" that explains higher-level concepts in Theseus, though this is less rigorously vetted than Theseus's source-level docs. 
 
-The subfolders in this directory contain scripts and pre-built images that allow others to verify the experiments described in the paper. 
+The subfolders in the [osdi20ae](../osdi20ae) directory contain scripts and pre-built images that allow others to verify the experiments described in the paper. 
 
 ## Results Reproducible 
-As mentioned above, each subfolder in this directory corresponds to an experiment in the paper and includes everything necessary to reproduce that experiment. 
+As mentioned above, each subfolder in [osdi20ae](../osdi20ae) corresponds to an experiment in the paper and includes everything necessary to reproduce that experiment. 
