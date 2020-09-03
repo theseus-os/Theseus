@@ -502,9 +502,9 @@ help:
 # @echo -e "   kvm=yes:"
 # @echo -e "\t Enable KVM acceleration (the host computer must support it)."
 	@echo -e "   host=yes:"
-	@echo -e "\t Use the host CPU model, which is required for using certain x86 hardware, e.g., PMU, AVX. This also enables KVM."
+	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
 	@echo -e "   int=yes:"
-	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
+	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
 
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
