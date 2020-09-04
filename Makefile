@@ -525,11 +525,11 @@ help:
 ###################################################################################################
 ### This section has QEMU arguments and configuration
 ###################################################################################################
-QEMU_MEMORY ?= 512M
+QEMU_MEMORY ?= 1G
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 
 ## multicore 
-QEMU_CPUS ?= 4
+QEMU_CPUS ?= 8
 QEMU_FLAGS += -smp $(QEMU_CPUS)
 
 ## QEMU's OUI dictates that the MAC addr start with "52:54:00:"

@@ -26,6 +26,7 @@ extern crate async_channel;
 extern crate simple_ipc;
 extern crate getopts;
 extern crate pmu_x86;
+extern crate mod_mgmt;
 
 use core::str;
 use alloc::vec::Vec;
@@ -38,6 +39,7 @@ use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
 use memory::{create_mapping, EntryFlags};
 use getopts::Options;
+use mod_mgmt::crate_name_from_path;
 
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
@@ -99,113 +101,98 @@ pub fn main(args: Vec<String>) -> isize {
 		return 0;
 	}
 
-	// for the artifacts just run the following set
-	if cfg!(bm_map) && cfg!(bm_ipc) {
-		do_null().expect("null failed");
-		do_ctx().expect("ctx failed");
-		do_spawn().expect("spawn failed");
-		do_memory_map().expect("mem map failed");
-		do_ipc_async(true, true, false).expect("ipc async failed");
-		do_ipc_simple(false, false).expect("simple ipc failed");
-		return 0;
+    let matches = match opts.parse(&args) {
+        Ok(m) => m,
+        Err(_f) => {
+            println!("{}", _f);
+            print_usage(opts);
+            return -1; 
+        }
+    };
+
+	if matches.opt_present("h") {
+        print_usage(opts);
+        return 0;
+    }
+
+	// store flags for ipc
+	let pinned = if matches.opt_present("p") {
+		print!("PINNED ");
+		true
 	} else {
-		println!("ERROR: Need to enable bm_map and bm_ipc config option to run the memory_map benchmark");
-		return -1;
+		false
+	};
+
+	let blocking = if matches.opt_present("b") {
+		print!("BLOCKING ");
+		true
+	} else {
+		false
+	};
+
+	let cycles = if matches.opt_present("c") {
+		print!("(cycles) ");
+		true
+	} else {
+		false
+	};
+
+	let res = if matches.opt_present("null") {
+			do_null()
+		} else if matches.opt_present("spawn") {
+			do_spawn()
+		} else if matches.opt_present("ctx") {
+			do_ctx()
+		} else if matches.opt_present("memory_map") {
+			if cfg!(bm_map) {
+				do_memory_map()
+			} else {
+				Err("Need to enable bm_map config option to run the memory_map benchmark")
+			}
+		} else if matches.opt_present("ipc") {
+			if cfg!(not(bm_ipc)) {
+				Err("Need to enable bm_ipc config option to run the IPC benchmark")
+			} else {
+				if matches.opt_present("r") {
+					println!("RENDEZVOUS IPC");
+					do_ipc_rendezvous(pinned, cycles)
+				} else if matches.opt_present("a") {
+					println!("ASYNC IPC");
+					do_ipc_async(pinned, blocking, cycles)
+				} else {
+					Err("Specify channel type to use")
+				}
+			}
+		} else if matches.opt_present("simple_ipc") {
+			if cfg!(not(bm_ipc)) {
+				Err("Need to enable bm_ipc config option to run the IPC benchmark")
+			} else {
+				println!("SIMPLE IPC");
+				do_ipc_simple(pinned, cycles)
+			}
+		} else if matches.opt_present("fs_read_with_open") {
+			do_fs_read(true /*with_open*/)
+		} else if matches.opt_present("fs_read_only") {
+			do_fs_read(false /*with_open*/)
+		} else if matches.opt_present("fs_create") {
+			do_fs_create_del()
+		} else if matches.opt_present("fs_delete") {
+			do_fs_delete()
+		} else if matches.opt_present("fs") {
+			do_fs_cap_check()
+		} else {
+			printlnwarn!("Unknown command: {}", args[0]);
+			print_usage(opts);
+        	Err("Unknown command")
+		};
+
+	match res {
+		Ok(()) => return 0,
+		Err(e) => {
+			println!("Error in completing benchmark: {:?}", e);
+			return -1;
+		}
 	}
-
-
-    // let matches = match opts.parse(&args) {
-    //     Ok(m) => m,
-    //     Err(_f) => {
-    //         println!("{}", _f);
-    //         print_usage(opts);
-    //         return -1; 
-    //     }
-    // };
-
-	// if matches.opt_present("h") {
-    //     print_usage(opts);
-    //     return 0;
-    // }
-
-	// // store flags for ipc
-	// let pinned = if matches.opt_present("p") {
-	// 	print!("PINNED ");
-	// 	true
-	// } else {
-	// 	false
-	// };
-
-	// let blocking = if matches.opt_present("b") {
-	// 	print!("BLOCKING ");
-	// 	true
-	// } else {
-	// 	false
-	// };
-
-	// let cycles = if matches.opt_present("c") {
-	// 	print!("(cycles) ");
-	// 	true
-	// } else {
-	// 	false
-	// };
-
-	// let res = if matches.opt_present("null") {
-	// 		do_null()
-	// 	} else if matches.opt_present("spawn") {
-	// 		do_spawn()
-	// 	} else if matches.opt_present("ctx") {
-	// 		do_ctx()
-	// 	} else if matches.opt_present("memory_map") {
-	// 		if cfg!(bm_map) {
-	// 			do_memory_map()
-	// 		} else {
-	// 			Err("Need to enable bm_map config option to run the memory_map benchmark")
-	// 		}
-	// 	} else if matches.opt_present("ipc") {
-	// 		if cfg!(not(bm_ipc)) {
-	// 			Err("Need to enable bm_ipc config option to run the IPC benchmark")
-	// 		} else {
-	// 			if matches.opt_present("r") {
-	// 				println!("RENDEZVOUS IPC");
-	// 				do_ipc_rendezvous(pinned, cycles)
-	// 			} else if matches.opt_present("a") {
-	// 				println!("ASYNC IPC");
-	// 				do_ipc_async(pinned, blocking, cycles)
-	// 			} else {
-	// 				Err("Specify channel type to use")
-	// 			}
-	// 		}
-	// 	} else if matches.opt_present("simple_ipc") {
-	// 		if cfg!(not(bm_ipc)) {
-	// 			Err("Need to enable bm_ipc config option to run the IPC benchmark")
-	// 		} else {
-	// 			println!("SIMPLE IPC");
-	// 			do_ipc_simple(pinned, cycles)
-	// 		}
-	// 	} else if matches.opt_present("fs_read_with_open") {
-	// 		do_fs_read(true /*with_open*/)
-	// 	} else if matches.opt_present("fs_read_only") {
-	// 		do_fs_read(false /*with_open*/)
-	// 	} else if matches.opt_present("fs_create") {
-	// 		do_fs_create_del()
-	// 	} else if matches.opt_present("fs_delete") {
-	// 		do_fs_delete()
-	// 	} else if matches.opt_present("fs") {
-	// 		do_fs_cap_check()
-	// 	} else {
-	// 		printlnwarn!("Unknown command: {}", args[0]);
-	// 		print_usage(opts);
-    //     	Err("Unknown command")
-	// 	};
-
-	// match res {
-	// 	Ok(()) => return 0,
-	// 	Err(e) => {
-	// 		println!("Error in completing benchmark: {:?}", e);
-	// 		return -1;
-	// 	}
-	// }
 }
 
 
@@ -242,7 +229,7 @@ fn do_null() -> Result<(), &'static str> {
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_syscall null` in LMBench");
 
-	error!("BM: null {:.3} {:.3}", stats.mean/1000.0, stats.std_dev/1000.0);
+	error!("BM: null {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 	Ok(())
 }
 
@@ -323,7 +310,7 @@ fn do_spawn() -> Result<(), &'static str>{
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
 	
-	error!("BM: spawn {:.3} {:.3}", stats.mean/1000.0, stats.std_dev/1000.0);
+	error!("BM: spawn {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 
 	Ok(())
 }
@@ -336,17 +323,24 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	let mut delta_hpet = 0;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
+	// Get path to application "hello" that we're going to spawn
+	let namespace = task::get_my_current_task()
+		.map(|t| t.get_namespace().clone())
+		.ok_or("could not find the application namespace")?;
+	let namespace_dir = task::get_my_current_task()
+		.map(|t| t.get_namespace().dir().clone())
+		.ok_or("could not find the application namespace")?;
+	let app_path = namespace_dir.get_file_starting_with("hello-")
+		.map(|f| Path::new(f.lock().get_absolute_path()))
+		.ok_or("Could not find the application 'hello'")?;
+    let crate_name = crate_name_from_path(&app_path).to_string();
+
 	// here we are taking the time at every iteration. 
 	// otherwise the crate is not fully unloaded from the namespace before the next iteration starts 
 	// so it cannot be loaded again and we are returned an error.
-	for _ in 0..ITERATIONS{
-		// Get path to application "hello" that we're going to spawn
-		let namespace_dir = task::get_my_current_task()
-			.map(|t| t.get_namespace().dir().clone())
-			.ok_or("could not find the application namespace")?;
-		let app_path = namespace_dir.get_file_starting_with("hello-")
-			.map(|f| Path::new(f.lock().get_absolute_path()))
-			.ok_or("Could not find the application 'hello'")?;
+	let iterations = 100;
+	for _ in 0..iterations{
+		while namespace.get_crate(&crate_name).is_some() {  }
 
 		start_hpet = hpet.get_counter();
 		let child = spawn::new_application_task_builder(app_path.clone(), None)?
@@ -359,7 +353,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	}
 
     let delta_time = hpet_2_time("", delta_hpet);
-    let delta_time_avg = delta_time / ITERATIONS as u64;
+    let delta_time_avg = delta_time / iterations as u64;
 	printlninfo!("spawn_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
 
@@ -411,7 +405,7 @@ fn do_ctx() -> Result<(), &'static str> {
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test does not have an equivalent test in LMBench");
 
-	error!("BM: ctx {:.3} {:.3}", stats.mean/1000.0, stats.std_dev/1000.0);
+	error!("BM: ctx {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 
 	Ok(())
 }
@@ -513,7 +507,7 @@ fn do_memory_map() -> Result<(), &'static str> {
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_mmap` in LMBench");
 
-	error!("BM: mem_map {:.3} {:.3}", stats.mean/1000.0, stats.std_dev/1000.0);
+	error!("BM: mem_map {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 
 	Ok(())
 }
@@ -561,7 +555,7 @@ fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	pmu_x86::init()?;
+	// pmu_x86::init()?;
 
 	print_header(TRIES, ITERATIONS);
 
@@ -601,14 +595,14 @@ fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 /// Overhead is measured by creating a task that just returns.
 fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>, cycles: bool) -> Result<u64, &'static str> {
 	// ideally we want to intialize only one counter depending on the `cycles` flag, but we get an error that a variable may be uninitialized
-	let mut counter = start_counting_reference_cycles()?;
+	// let mut counter = start_counting_reference_cycles()?;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// we first spawn one task to get the overhead of creating and joining the task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
 
 	let start = if cycles {
-		counter.start()?;
+		// counter.start()?;
 		0
 	} else {
 		hpet.get_counter()
@@ -631,9 +625,10 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>, cycles:
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = if cycles {
-		let diff = counter.diff();
-		counter.start()?;
-		diff
+		// let diff = counter.diff();
+		// counter.start()?;
+		// diff
+		0
 	} else {
 		hpet.get_counter()
 	};
@@ -663,7 +658,8 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>, cycles:
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = if cycles {
-		counter.end()?
+		// counter.end()?
+		0
 	} else {
     	hpet.get_counter()
 	};
@@ -751,7 +747,7 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_pipe` in LMBench when run with the pinned flag enabled");
 
-	error!("BM: ipc {:.3} {:.3}", stats.mean / 1000.0, stats.std_dev / 1000.0);
+	error!("BM: ipc {:.3} {:.3} ", stats.mean / 1000.0, stats.std_dev / 1000.0);
 
 	Ok(())
 }
@@ -947,7 +943,7 @@ fn do_ipc_simple(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test does not have an equivalent test in LMBench");
 
-	error!("BM: simple_ipc {:.3} {:.3}", stats.mean/1000.0, stats.std_dev/1000.0);
+	error!("BM: simple_ipc {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 
 
 	Ok(())
