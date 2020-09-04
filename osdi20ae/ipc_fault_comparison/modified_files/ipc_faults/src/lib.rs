@@ -52,8 +52,6 @@ pub fn main(args: Vec<String>) -> isize {
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {
-            println!("{}", _f);
-            print_usage(opts);
             return -1; 
         }
     };
@@ -61,6 +59,7 @@ pub fn main(args: Vec<String>) -> isize {
     let arg_val = 0;
 
     // A simple IPC loop to use in Minix fault injection comparsion
+    // receiver side faults
     if let Some(i) = matches.opt_str("r") {
         let fault_index = i.parse::<usize>().unwrap_or(0);
 	let fault_num = match fault_index {
@@ -72,6 +71,8 @@ pub fn main(args: Vec<String>) -> isize {
 		6 => 10,
 		_ => 0
 	}; 
+	
+	// Notify the type of fault to rendezvous channel
         rendezvous::set_fault_item(fault_num);
         // create two channels to pass messages
         let (sender, receiver) = rendezvous::new_channel::<String>();
@@ -89,6 +90,7 @@ pub fn main(args: Vec<String>) -> isize {
                 
     }
 
+    // sender side faults
     if let Some(i) = matches.opt_str("s") {
         let fault_index = i.parse::<usize>().unwrap_or(0);
 	let fault_num = match fault_index {
@@ -102,7 +104,9 @@ pub fn main(args: Vec<String>) -> isize {
 		_ => 0
 	};
 
+	// Notify the type of fault to rendezvous channel
         rendezvous::set_fault_item(fault_num);
+
         // create two channels to pass messages
         let (sender, receiver) = rendezvous::new_channel::<String>();
         let taskref1  = new_task_builder(ipc_send_task, sender)
@@ -157,10 +161,3 @@ fn ipc_receive_task((receiver, test) : (rendezvous::Receiver<String>, usize)) ->
 
     Ok(())
 }
-
-fn print_usage(opts: Options) {
-    println!("{}", opts.usage(USAGE));
-}
-
-const USAGE: &'static str = "Usage: test_channel OPTION ARG
-Provides a selection of different tests for channel-based communication.";
