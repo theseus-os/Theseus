@@ -27,12 +27,12 @@ Another way is to build the images as given below, launch Theseus, and run the f
 ### Theseus (Loadable)
 The loadable version of Theseus can be built for these benchmarks using the command:
 
-`make iso THESEUS_CONFIG+=bm_map THESEUS_CONFIG+=bm_ipc THESEUS_CONFIG+=loadable host=yes`
+`make iso THESEUS_CONFIG+=bm_map THESEUS_CONFIG+=bm_ipc THESEUS_CONFIG+=loadable`
 
 ### Theseus (Static)
 The statically-linked version of Theseus can be built for these benchmarks using the command:
 
-`make iso THESEUS_CONFIG+=bm_map THESEUS_CONFIG+=bm_ipc host=yes`
+`make iso THESEUS_CONFIG+=bm_map THESEUS_CONFIG+=bm_ipc`
 
 ### Linux (Rust)
 The Linux versions of the benchmarks and instructions to run them can be found at:
