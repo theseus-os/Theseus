@@ -72,14 +72,14 @@ Start with a clean slate:
 **[Host shell 1]**     
 In one shell, build and run Theseus in loadable mode. By default, this will build a version of Theseus that uses the synchronous `rendezvous` channel for ITC.  
 ```
-make loadable THESEUS_CONFIG=loscd_eval net=user host=yes
+make loadable THESEUS_CONFIG="loscd_eval trace_channel" net=user host=yes
 ```
 
 **[Host shell 2]**     
 After Theseus finishes building and is running, open another shell on your host machine. In that new shell, build the asynchronous channel update and start the build server using the following command:
 ```
 make build_server \
-     THESEUS_CONFIG="loadable loscd_eval use_async_channel" \
+     THESEUS_CONFIG="loadable loscd_eval trace_channel use_async_channel" \
      UPDATE_DIR=chan
 ```
 
@@ -102,6 +102,13 @@ upd ap chan
 
 If the `loscd_eval` config option was provided, you will see several yellow printouts towards the end of the console log (in Host Shell 1) that list the “Measured time in units of HPET ticks” for various live evolution stages.
 If you run the `channel_app` again within Theseus, you will also see that Theseus is using asynchronous channels for ITC instead of the synchronous rendezvous channel it was previously using before the evolution.
+
+The difference in behavior is illustrated below. 
+Before evolution, Theseus had a synchronous rendezvous-based (bufferless) channel implementation, so messages are sent and received in lockstep, as shown in this image:    
+<img src="./rendezvous_channel.png" width="630" />
+
+After evolution, Theseus has an asychronous buffered channel implementation, so multiple successive messages can be sent before the first one is received, as shown in this image:     
+<img src="./asynchronous_channel.png" width="600" />
 
 
 
