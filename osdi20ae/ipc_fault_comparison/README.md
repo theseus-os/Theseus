@@ -1,6 +1,6 @@
-# IPC fault comparison between Theseus and MINIX3
+IPC fault comparison between Theseus and MINIX3
 
-This folder contains necessary components to evaluate fault recovery in IPC channels of Theseus and MINIX3
+This folder contains necessary components to evaluate fault recovery in IPC channels of Theseus and MINIX3.
 
 ## Description
 This folder contains a Theseus iso image generated with settings:
@@ -41,18 +41,38 @@ Run [script.sh](./script.sh) to generate the results, as described above.
 
 If one wanted to generate the same results from source without prebuilt images (reproduce the results), simply run the `./script_modify` and afterwards build theseus using the flags given above. Upon booting Theseus, run the following commands in Theseus's shell.
 
-   `ipc_faults -FAULT_ID`
+   `ipc_faults --<FAULT_ID>`
 
-Eg
+e.g.,
 
-   `ipc_faults -r 3` to generate fault listed as r3 in the table
+   `ipc_faults --r3` to generate fault listed as `r3` in the table
 
 ## Evaluation Process on MINIX 3
 
-Modified source code for MINIX 3 is available at  [minix_osdi_ae](https://github.com/theseus-os/minix_osdi_ae). The repository contain a separate branch for each fault based on fault id. To reproduce each fault checkout the branch and build MINIX 3 using `bash ./releasetools/x86_hdimage.sh` . 
+Modified source code for MINIX 3 is available at  [minix_osdi_ae](https://github.com/theseus-os/minix_osdi_ae). The repository contain a separate branch for each fault where each branch has the same name as that fault id ( e.g., `r1`). Use the following steps to reproduce each fault. 
 
-Run MINIX 3 using the following command.
+1. Clone the repository
 
-`cd ../obj.i386/destdir.i386/boot/minix/.temp && qemu-system-i386 --enable-kvm -m 256M -kernel kernel -append "rootdevname=c0d0p0" -initrd "mod01_ds,mod02_rs,mod03_pm,mod04_sched,mod05_vfs,mod06_memory,mod07_tty,mod08_mib,mod09_vm,mod10_pfs,mod11_mfs,mod12_init" -hda ../../../../../src/minix_x86.img`
+   `git clone git@github.com:theseus-os/minix_osdi_ae.git`
 
-After booting up login to Minix 3 using `root` as username. The source is modified to inject each fault in the table listed above to the IPC channel between input process and tty process, when letter `x` is entered to the shell. 
+2. Checkout the required branch (e.g., to generate `s1` fault check `s1` branch)
+
+   `git checkout -b s1 origin/s1`
+
+3. Built MINIX 3
+
+   `cd minix_osdi_ae`
+
+   `bash ./releasetools/x86_hdimage.sh` 
+
+4. Run the build MINIX 3 version
+
+   `cd ../obj.i386/destdir.i386/boot/minix/.temp && qemu-system-i386 --enable-kvm -m 256M -kernel kernel -initrd "mod01_ds,mod02_rs,mod03_pm,mod04_sched,mod05_vfs,mod06_memory,mod07_tty,mod08_mib,mod09_vm,mod10_pfs,mod11_mfs,mod12_init" -hda ../../../../../minix_osdi_ae/minix_x86.img -serial file:../../../../../minix_osdi_ae/serial.out -append "rootdevname=c0d0p0 cttyline=0"`
+
+5. Login as root in MINIX 3 shell
+
+6. Press x and enter in MINIX 3 shell. The fault chosen by branch will be injected to the IPC channel between input and tty processes.
+
+7. Output is logged at `serial.out`. For all except `s1` and `s6` this will result in a panic followed by restart.
+
+8. Repeat from step 2 to regenerate other faults.
