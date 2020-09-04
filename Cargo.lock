@@ -852,23 +852,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "heap_eval"
-version = "0.1.0"
-dependencies = [
- "apic 0.1.0",
- "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
- "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "heap 0.1.0",
- "hpet 0.1.0",
- "libtest 0.1.0",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
- "runqueue 0.1.0",
- "spawn 0.1.0",
- "terminal_print 0.1.0",
-]
-
-[[package]]
 name = "heapfile"
 version = "0.1.0"
 dependencies = [
