@@ -738,14 +738,14 @@ impl CrateNamespace {
         debug!("load_crate: trying to load crate at {:?}", crate_object_file.lock().get_absolute_path());
         let new_crate_ref = self.load_crate_internal(crate_object_file, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         
-        let (new_crate_name, num_sections, new_syms) = {
+        let (new_crate_name, _num_sections, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
             let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
             (new_crate.crate_name.clone(), new_crate.sections.len(), new_syms)
         };
             
         #[cfg(not(loscd_eval))]
-        info!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, num_sections, new_syms);
+        info!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, _num_sections, new_syms);
         self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref.clone_shallow());
         Ok((new_crate_ref, new_syms))
     }
@@ -1872,7 +1872,7 @@ impl CrateNamespace {
         fuzzy_matching: bool,
         verbose_log: bool,
     ) -> Option<StrongSectionRef> {
-        let mut fuzzy_matched_symbol_name: Option<String> = None;
+        let mut _fuzzy_matched_symbol_name: Option<String> = None;
 
         let (weak_sec, _found_in_ns) = if !fuzzy_matching {
             // use exact (non-fuzzy) matching
@@ -1882,7 +1882,7 @@ impl CrateNamespace {
             let fuzzy_matches = temp_backup_namespace.find_symbols_starting_with_and_namespace(LoadedSection::section_name_without_hash(demangled_full_symbol));
             match fuzzy_matches.as_slice() {
                 [(sec_name, weak_sec, _found_in_ns)] => {
-                    fuzzy_matched_symbol_name = Some(sec_name.clone());
+                    _fuzzy_matched_symbol_name = Some(sec_name.clone());
                     (weak_sec.clone(), *_found_in_ns)
                 }
                 fuzzy_matches => {
@@ -1920,10 +1920,10 @@ impl CrateNamespace {
         };
         
         #[cfg(not(loscd_eval))]
-        info!("Symbol {:?} not initially found, using {} symbol {} from crate {:?} in backup namespace {:?} in new namespace {:?}",
+        info!("Symbol {:?} not initially found, using {}symbol {} from crate {:?} in backup namespace {:?} in new namespace {:?}",
             demangled_full_symbol, 
-            if fuzzy_matching { "fuzzy-matched" } else { "" },
-            fuzzy_matched_symbol_name.unwrap_or_default(),
+            if fuzzy_matching { "fuzzy-matched " } else { "" },
+            _fuzzy_matched_symbol_name.unwrap_or_default(),
             parent_crate_name,
             _found_in_ns.name,
             self.name

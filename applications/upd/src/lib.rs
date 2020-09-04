@@ -168,6 +168,7 @@ fn diff(remote_endpoint: IpEndpoint, update_build: &str) -> Result<(), String> {
 /// Downloads all of the new or changed crates from the `diff` file of the 
 fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<&[String]>) -> Result<(), String> {
     let iface = get_default_iface()?;
+    println!("Downloading crates...");
     let crate_list = if crate_list == Some(&[]) { None } else { crate_list };
 
     let mut diff_file_lines: Option<Vec<String>> = None;
