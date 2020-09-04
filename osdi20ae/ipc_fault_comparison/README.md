@@ -73,6 +73,6 @@ Modified source code for MINIX 3 is available at  [minix_osdi_ae](https://github
 
 6. Press x and enter in MINIX 3 shell. The fault chosen by branch will be injected to the IPC channel between input and tty processes.
 
-7. Output is logged at `serial.out`. For all except `s1` and `s6` this will result in a panic followed by restart.
+7. Output is logged at `serial.out`. For all except `s1` and `s6` the log will show a panic followed by restart.
 
 8. Repeat from step 2 to regenerate other faults.
