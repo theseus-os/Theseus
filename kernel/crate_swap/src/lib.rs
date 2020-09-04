@@ -393,6 +393,7 @@ pub fn swap_crates(
                     let target_sec = if let Some(sr) = weak_dep.section.upgrade() {
                         sr
                     } else {
+                        #[cfg(not(any(loscd_eval, downtime_eval)))]
                         trace!("Removing dead weak dependency on old_sec: {}", old_sec.name);
                         dead_weak_deps_to_remove.push(i);
                         continue;

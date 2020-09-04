@@ -70,10 +70,10 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     let (sender, receiver) = unified_channel::new_string_channel(2);
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("test_multiple(): Entered sender task!");
+        info!("test_multiple(): Entered sender task!");
         for i in 0..iterations {
             sender.send(format!("Message {:03}", i))?;
-            warn!("test_multiple(): Sender sent message {:03}", i);
+            info!("test_multiple(): Sender sent message {:03}", i);
         }
         Ok(())
     }, ())
@@ -83,10 +83,10 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
         .spawn()?;
 
     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("test_multiple(): Entered receiver task!");
+        info!("test_multiple(): Entered receiver task!");
         for i in 0..iterations {
             let msg = receiver.receive()?;
-            warn!("test_multiple(): Receiver got {:?}  ({:03})", msg, i);
+            info!("test_multiple(): Receiver got {:?}  ({:03})", msg, i);
         }
         Ok(())
     }, ())
@@ -95,12 +95,12 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
         .pin_on_core(my_cpu)
         .spawn()?;
 
-    warn!("test_multiple(): Finished spawning the sender and receiver tasks");
+    info!("test_multiple(): Finished spawning the sender and receiver tasks");
     t2.unblock(); t1.unblock();
 
     t1.join()?;
     t2.join()?;
-    warn!("test_multiple(): Joined the sender and receiver tasks.");
+    info!("test_multiple(): Joined the sender and receiver tasks.");
     let _t1_exit = t1.take_exit_value();
     let _t2_exit = t2.take_exit_value();
     

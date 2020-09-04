@@ -69,7 +69,7 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
 
     #[cfg(loscd_eval)] {
         let hpet_end_state_transfer = hpet.get_counter();
-        warn!("
+        warn!("Measured time in units of HPET ticks:
             state transfer, {}
             ",
             hpet_end_state_transfer - hpet_start_state_transfer,

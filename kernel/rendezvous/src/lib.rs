@@ -19,6 +19,8 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
+#[cfg(trace_channel)] 
+#[macro_use] extern crate debugit;
 extern crate spin;
 extern crate irq_safety;
 extern crate wait_queue;
@@ -215,12 +217,13 @@ impl <T: Send> Sender<T> {
     /// Returns `Ok(())` if the message was sent and received successfully,
     /// otherwise returns an error. 
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
+        #[cfg(trace_channel)]
+        trace!("rendezvous: sending msg: {:?}", debugit!(msg));
 
         #[cfg(downtime_eval)]
         let value = hpet::get_hpet().as_ref().unwrap().get_counter();
         // debug!("Value {} {}", value, value % 1024);
 
-        // trace!("rendezvous: send() entry");
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
 
         // Fault mimicing a memory write. Function could panic when getting task
@@ -419,6 +422,8 @@ impl <T: Send> Receiver<T> {
         match retval {
             Some(Ok((sender_to_notify, msg))) => {
                 drop(sender_to_notify);
+                #[cfg(trace_channel)]
+                trace!("rendezvous: received msg: {:?}", debugit!(msg));
                 return Ok(msg);
             }
             Some(Err(e)) => {
@@ -481,6 +486,9 @@ impl <T: Send> Receiver<T> {
         self.channel.slot.replace_receiver_slot(receiver_slot);
         self.channel.waiting_receivers.notify_one();
         // trace!("rendezvous: receiver done, returning from receive().");
+
+        #[cfg(trace_channel)]
+        trace!("rendezvous: received msg: {:?}", debugit!(retval));
         retval
     }
 

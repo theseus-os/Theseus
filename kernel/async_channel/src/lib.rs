@@ -12,8 +12,8 @@
 #![no_std]
 
 extern crate alloc;
-// #[macro_use] extern crate log;
-// #[macro_use] extern crate debugit;
+#[cfg(trace_channel)] #[macro_use] extern crate log;
+#[cfg(trace_channel)] #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
 extern crate atomic;
@@ -121,7 +121,8 @@ impl <T: Send> Sender<T> {
     /// Returns `Ok(())` if the message was sent successfully,
     /// otherwise returns an error of `ChannelError` type. 
     pub fn send(&self, msg: T) -> Result<(), ChannelError> {
-        // trace!("async_channel: send() entry");
+        #[cfg(trace_channel)]
+        trace!("async_channel: sending msg: {:?}", debugit!(msg));
         // Fast path: attempt to send the message, assuming the buffer isn't full
         let msg = match self.try_send(msg) {
             // if successful return ok
@@ -262,7 +263,11 @@ impl <T: Send> Receiver<T> {
         // empty channel
         match self.try_receive() {
             Err(ChannelError::ChannelEmpty) => {},
-            x => return x,
+            x => {
+                #[cfg(trace_channel)]
+                trace!("async_channel: received msg: {:?}", debugit!(x));
+                return x;
+            }
         };
 
         // Slow path: the buffer was empty, so we need to block until a message is sent.
@@ -299,10 +304,14 @@ impl <T: Send> Receiver<T> {
 
         // If we successfully received a message, we need to notify any waiting senders.
         // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
-        if res.is_ok() {
+        if let Ok(ref _msg) = res {
             // trace!("async_channel: successful receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
         }
+
+        #[cfg(trace_channel)]
+        trace!("async_channel: received msg: {:?}", debugit!(res));
+        
         res
     }
 
