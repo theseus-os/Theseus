@@ -1,0 +1,19 @@
+Entered nano_core_start().
+nano_core_start(): initialized logger.
+nano_core_start(): initialized early IDT with exception handlers.
+nano_core_start(): booted via multiboot2.
+nano_core_start(): initialized memory subsystem.
+nano_core_start(): initialized state store.
+nano_core_start(): initialized crate namespace subsystem.
+nano_core_start(): parsing nano_core crate, please wait ...
+nano_core_start(): finished parsing the nano_core crate.
+nano_core_start(): invoking the captain...
+[31m[E] applications/mm_eval/src/lib.rs:329:  mapped_pages 100 1086.400 0.000 48756.500 0.000 49201.800 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:327:  vmas 100 3259.800 0.000 51539.400 0.000 48375.600 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:329:  mapped_pages 1000 801.500 0.000 162047.710 0.000 61937.520 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:327:  vmas 1000 3553.200 0.000 50930.920 0.000 52162.010 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:329:  mapped_pages 10000 1217.550 0.000 51901.910 0.000 51060.653 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:327:  vmas 10000 4150.624 0.000 51227.889 0.000 54484.208 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:329:  mapped_pages 100000 1158.297 0.000 52041.853 0.000 56728.437 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:327:  vmas 100000 4754.681 0.000 52490.494 0.000 80075.849 0.000 [0m
+[31m[E] applications/mm_eval/src/lib.rs:337:  COMPLETED MEM_MAP EVALUATION [0m

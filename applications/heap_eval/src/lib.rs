@@ -103,8 +103,20 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
     let (mean_threadtest, std_dev_threadtest) = do_threadtest()?;
     let (mean_shbench, std_dev_shbench) = do_shbench()?;
 
-    println!("HEAP_EVAL: threadtest {:.3} {:.3}", mean_threadtest, std_dev_threadtest);
-    println!("HEAP_EVAL: shbench {:.3} {:.3}", mean_shbench, std_dev_shbench);
+    println!("HEAP_EVAL: threadtest {:.3} {:.3} ", mean_threadtest, std_dev_threadtest);
+    error!("HEAP_EVAL: threadtest {:.3} {:.3} ", mean_threadtest, std_dev_threadtest);
+    println!("HEAP_EVAL: shbench {:.3} {:.3} ", mean_shbench, std_dev_shbench);
+    error!("HEAP_EVAL: shbench {:.3} {:.3} ", mean_shbench, std_dev_shbench);
+    error!("COMPLETED HEAP EVALUATION ");
+
+    #[cfg(unsafe_heap)]
+    error!("UNSAFE HEAP");
+
+    #[cfg(safe_heap)]
+    error!("SAFE HEAP");
+
+    #[cfg(all(not(unsafe_heap), not(safe_heap)))]
+    error!("PARTIALLY SAFE HEAP");
 
     // if matches.opt_present("vector") {
     //     do_vec();

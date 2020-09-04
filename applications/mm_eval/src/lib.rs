@@ -7,7 +7,7 @@
 extern crate alloc;
 #[macro_use] extern crate cfg_if;
 #[macro_use] extern crate terminal_print;
-extern crate log;
+#[macro_use] extern crate log;
 extern crate memory;
 extern crate getopts;
 extern crate hpet;
@@ -220,7 +220,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
-    const TRIES: usize = 10;
+    const TRIES: usize = 1;
     let mut mapper_normal   = Mapper::from_current();
     let mut mapper_spillful = MapperSpillful::new();
 
@@ -323,65 +323,73 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
         unmap_mean.push(stats_unmap.mean);
         unmap_std_dev.push(stats_unmap.std_dev);
 
+        if use_spillful {
+            error!(" vmas {} {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} ", num_mappings, stats_create.mean/num_mappings as f64, stats_create.std_dev/num_mappings as f64, stats_remap.mean/num_mappings as f64, stats_remap.std_dev/num_mappings as f64, stats_unmap.mean/num_mappings as f64, stats_unmap.std_dev/num_mappings as f64);
+        } else {
+            error!(" mapped_pages {} {:.3} {:.3} {:.3} {:.3} {:.3} {:.3} ", num_mappings, stats_create.mean/num_mappings as f64, stats_create.std_dev/num_mappings as f64, stats_remap.mean/num_mappings as f64, stats_remap.std_dev/num_mappings as f64, stats_unmap.mean/num_mappings as f64, stats_unmap.std_dev/num_mappings as f64);
+        }
+
         create_times.clear();
         remap_times.clear();
         unmap_times.clear();
     }
 
-    /// Print Out Table
-    println!("Memory Mapping Benchmark Results (from Fig 3)");
-    println!("");
-    println!("");
+    error!(" COMPLETED MEM_MAP EVALUATION ");
+    // /// Print Out Table
+    // println!("Memory Mapping Benchmark Results (from Fig 3)");
+    // println!("");
+    // println!("");
 
-    println!("Mapping Type   Total Mappings   Map Mean (ns)   Map Std Dev (ns)");
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}              {:.3}            {:.3}", test_sizes[0], map_mean[0] / test_sizes[0] as f64, map_std_dev[0] / test_sizes[0] as f64);
-    println!("VMAs            {:.3}              {:.3}            {:.3}", test_sizes[1], map_mean[1] / test_sizes[1] as f64, map_std_dev[1] / test_sizes[1] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}             {:.3}            {:.3}", test_sizes[2], map_mean[2] / test_sizes[2] as f64, map_std_dev[2] / test_sizes[2] as f64);
-    println!("VMAs            {:.3}             {:.3}            {:.3}", test_sizes[3], map_mean[3] / test_sizes[3] as f64, map_std_dev[3] / test_sizes[3] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}            {:.3}            {:.3}", test_sizes[4], map_mean[4] / test_sizes[4] as f64, map_std_dev[4] / test_sizes[4] as f64);
-    println!("VMAs            {:.3}            {:.3}            {:.3}", test_sizes[5], map_mean[5] / test_sizes[5] as f64, map_std_dev[5] / test_sizes[5] as f64);
-    println!("_________________________________________________________________");
-    println!("MappedPages     {:.3}           {:.3}            {:.3}", test_sizes[6], map_mean[6] / test_sizes[6] as f64, map_std_dev[6] / test_sizes[6] as f64);
-    println!("VMAs            {:.3}           {:.3}            {:.3}", test_sizes[7], map_mean[7] / test_sizes[7] as f64, map_std_dev[7] / test_sizes[7] as f64);
-
-
-    println!("");
-    println!("");
+    // println!("Mapping Type   Total Mappings   Map Mean (ns)   Map Std Dev (ns)");
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}              {:.3}            {:.3}", test_sizes[0], map_mean[0] / test_sizes[0] as f64, map_std_dev[0] / test_sizes[0] as f64);
+    // println!("VMAs            {:.3}              {:.3}            {:.3}", test_sizes[1], map_mean[1] / test_sizes[1] as f64, map_std_dev[1] / test_sizes[1] as f64);
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}             {:.3}            {:.3}", test_sizes[2], map_mean[2] / test_sizes[2] as f64, map_std_dev[2] / test_sizes[2] as f64);
+    // println!("VMAs            {:.3}             {:.3}            {:.3}", test_sizes[3], map_mean[3] / test_sizes[3] as f64, map_std_dev[3] / test_sizes[3] as f64);
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}            {:.3}            {:.3}", test_sizes[4], map_mean[4] / test_sizes[4] as f64, map_std_dev[4] / test_sizes[4] as f64);
+    // println!("VMAs            {:.3}            {:.3}            {:.3}", test_sizes[5], map_mean[5] / test_sizes[5] as f64, map_std_dev[5] / test_sizes[5] as f64);
+    // println!("_________________________________________________________________");
+    // println!("MappedPages     {:.3}           {:.3}            {:.3}", test_sizes[6], map_mean[6] / test_sizes[6] as f64, map_std_dev[6] / test_sizes[6] as f64);
+    // println!("VMAs            {:.3}           {:.3}            {:.3}", test_sizes[7], map_mean[7] / test_sizes[7] as f64, map_std_dev[7] / test_sizes[7] as f64);
 
 
-    println!("Mapping Type   Total Mappings   Remap Mean (ns)   Remap Std Dev (ns)");
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}                {:.3}           {:.3}", test_sizes[0], remap_mean[0] / test_sizes[0] as f64, remap_std_dev[0] / test_sizes[0] as f64);
-    println!("VMAs            {:.3}                {:.3}           {:.3}", test_sizes[1], remap_mean[1] / test_sizes[1] as f64, remap_std_dev[1] / test_sizes[1] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}               {:.3}           {:.3}", test_sizes[2], remap_mean[2] / test_sizes[2] as f64, remap_std_dev[2] / test_sizes[2] as f64);
-    println!("VMAs            {:.3}               {:.3}           {:.3}", test_sizes[3], remap_mean[3] / test_sizes[3] as f64, remap_std_dev[3] / test_sizes[3] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}              {:.3}           {:.3}", test_sizes[4], remap_mean[4] / test_sizes[4] as f64, remap_std_dev[4] / test_sizes[4] as f64);
-    println!("VMAs            {:.3}              {:.3}           {:.3}", test_sizes[5], remap_mean[5] / test_sizes[5] as f64, remap_std_dev[5] / test_sizes[5] as f64);
-    println!("_________________________________________________________________");
-    println!("MappedPages     {:.3}             {:.3}           {:.3}", test_sizes[6], remap_mean[6] / test_sizes[6] as f64, remap_std_dev[6] / test_sizes[6] as f64);
-    println!("VMAs            {:.3}             {:.3}           {:.3}", test_sizes[7], remap_mean[7] / test_sizes[7] as f64, remap_std_dev[7] / test_sizes[7] as f64);
+    // println!("");
+    // println!("");
 
-    println!("");
-    println!("");
 
-    println!("Mapping Type   Total Mappings   Unmap Mean (ns)   Unmap Std Dev (ns)");
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}                {:.3}           {:.3}", test_sizes[0], unmap_mean[0] / test_sizes[0] as f64, unmap_std_dev[0] / test_sizes[0] as f64);
-    println!("VMAs            {:.3}                {:.3}           {:.3}", test_sizes[1], unmap_mean[1] / test_sizes[1] as f64, unmap_std_dev[1] / test_sizes[1] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}               {:.3}           {:.3}", test_sizes[2], unmap_mean[2] / test_sizes[2] as f64, unmap_std_dev[2] / test_sizes[2] as f64);
-    println!("VMAs            {:.3}               {:.3}           {:.3}", test_sizes[3], unmap_mean[3] / test_sizes[3] as f64, unmap_std_dev[3] / test_sizes[3] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}              {:.3}           {:.3}", test_sizes[4], unmap_mean[4] / test_sizes[4] as f64, unmap_std_dev[4] / test_sizes[4] as f64);
-    println!("VMAs            {:.3}              {:.3}           {:.3}", test_sizes[5], unmap_mean[5] / test_sizes[5] as f64, unmap_std_dev[5] / test_sizes[5] as f64);
-    println!("_________________________________________________________________");
-    println!("MappedPages     {:.3}             {:.3}           {:.3}", test_sizes[6], unmap_mean[6] / test_sizes[6] as f64, unmap_std_dev[6] / test_sizes[6] as f64);
-    println!("VMAs            {:.3}             {:.3}           {:.3}", test_sizes[7], unmap_mean[7] / test_sizes[7] as f64, unmap_std_dev[7] / test_sizes[7] as f64);
+    // println!("Mapping Type   Total Mappings   Remap Mean (ns)   Remap Std Dev (ns)");
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}                {:.3}           {:.3}", test_sizes[0], remap_mean[0] / test_sizes[0] as f64, remap_std_dev[0] / test_sizes[0] as f64);
+    // println!("VMAs            {:.3}                {:.3}           {:.3}", test_sizes[1], remap_mean[1] / test_sizes[1] as f64, remap_std_dev[1] / test_sizes[1] as f64);
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}               {:.3}           {:.3}", test_sizes[2], remap_mean[2] / test_sizes[2] as f64, remap_std_dev[2] / test_sizes[2] as f64);
+    // println!("VMAs            {:.3}               {:.3}           {:.3}", test_sizes[3], remap_mean[3] / test_sizes[3] as f64, remap_std_dev[3] / test_sizes[3] as f64);
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}              {:.3}           {:.3}", test_sizes[4], remap_mean[4] / test_sizes[4] as f64, remap_std_dev[4] / test_sizes[4] as f64);
+    // println!("VMAs            {:.3}              {:.3}           {:.3}", test_sizes[5], remap_mean[5] / test_sizes[5] as f64, remap_std_dev[5] / test_sizes[5] as f64);
+    // println!("_________________________________________________________________");
+    // println!("MappedPages     {:.3}             {:.3}           {:.3}", test_sizes[6], remap_mean[6] / test_sizes[6] as f64, remap_std_dev[6] / test_sizes[6] as f64);
+    // println!("VMAs            {:.3}             {:.3}           {:.3}", test_sizes[7], remap_mean[7] / test_sizes[7] as f64, remap_std_dev[7] / test_sizes[7] as f64);
+
+    // println!("");
+    // println!("");
+
+    // println!("Mapping Type   Total Mappings   Unmap Mean (ns)   Unmap Std Dev (ns)");
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}                {:.3}           {:.3}", test_sizes[0], unmap_mean[0] / test_sizes[0] as f64, unmap_std_dev[0] / test_sizes[0] as f64);
+    // println!("VMAs            {:.3}                {:.3}           {:.3}", test_sizes[1], unmap_mean[1] / test_sizes[1] as f64, unmap_std_dev[1] / test_sizes[1] as f64);
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}               {:.3}           {:.3}", test_sizes[2], unmap_mean[2] / test_sizes[2] as f64, unmap_std_dev[2] / test_sizes[2] as f64);
+    // println!("VMAs            {:.3}               {:.3}           {:.3}", test_sizes[3], unmap_mean[3] / test_sizes[3] as f64, unmap_std_dev[3] / test_sizes[3] as f64);
+    // println!("__________________________________________________________________");
+    // println!("MappedPages     {:.3}              {:.3}           {:.3}", test_sizes[4], unmap_mean[4] / test_sizes[4] as f64, unmap_std_dev[4] / test_sizes[4] as f64);
+    // println!("VMAs            {:.3}              {:.3}           {:.3}", test_sizes[5], unmap_mean[5] / test_sizes[5] as f64, unmap_std_dev[5] / test_sizes[5] as f64);
+    // println!("_________________________________________________________________");
+    // println!("MappedPages     {:.3}             {:.3}           {:.3}", test_sizes[6], unmap_mean[6] / test_sizes[6] as f64, unmap_std_dev[6] / test_sizes[6] as f64);
+    // println!("VMAs            {:.3}             {:.3}           {:.3}", test_sizes[7], unmap_mean[7] / test_sizes[7] as f64, unmap_std_dev[7] / test_sizes[7] as f64);
+
 
     Ok(())
 

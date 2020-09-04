@@ -36,78 +36,18 @@ pub fn start() -> Result<(), &'static str> {
 
     {
         let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-        let (rq_eval_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "bm-")
-            .ok_or("Couldn't find bm application in default app namespace")?;
+        let (rq_eval_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "mm_eval-")
+            .ok_or("Couldn't find mm_eval application in default app namespace")?;
 
         let path = Path::new(rq_eval_file.lock().get_absolute_path());
-        info!("Starting bm application: crate at {:?}", path);
+        info!("Starting mm_eval application: crate at {:?}", path);
         // Spawn the default shell
-        let args = vec!["bm".to_string(), "--null".to_string()];
+        // let args = vec!["bm".to_string(), "--null".to_string()];
         let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-            .name("bm_app".to_string())
-            .argument(args)
+            .name("mm_app".to_string())
+            // .argument(args)
             .spawn()?;
         
-    }
-
-    {
-        let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-        let (rq_eval_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "bm-")
-            .ok_or("Couldn't find bm application in default app namespace")?;
-
-        let path = Path::new(rq_eval_file.lock().get_absolute_path());
-        info!("Starting bm application: crate at {:?}", path);
-        // Spawn the default shell
-        let args = vec!["bm".to_string(), "--ctx".to_string()];
-        let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-            .name("bm_app".to_string())
-            .argument(args)
-            .spawn()?;
-    }
-
-    {
-        let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-        let (rq_eval_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "bm-")
-            .ok_or("Couldn't find bm application in default app namespace")?;
-
-        let path = Path::new(rq_eval_file.lock().get_absolute_path());
-        info!("Starting bm application: crate at {:?}", path);
-        // Spawn the default shell
-        let args = vec!["bm".to_string(), "--spawn".to_string()];
-        let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-            .name("bm_app".to_string())
-            .argument(args)
-            .spawn()?;
-    }
-
-    {
-        let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-        let (rq_eval_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "bm-")
-            .ok_or("Couldn't find bm application in default app namespace")?;
-
-        let path = Path::new(rq_eval_file.lock().get_absolute_path());
-        info!("Starting bm application: crate at {:?}", path);
-        // Spawn the default shell
-        let args = vec!["bm".to_string(), "--memory_map".to_string()];
-        let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-            .name("bm_app".to_string())
-            .argument(args)
-            .spawn()?;
-    }
-
-    {
-        let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-        let (rq_eval_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "bm-")
-            .ok_or("Couldn't find bm application in default app namespace")?;
-
-        let path = Path::new(rq_eval_file.lock().get_absolute_path());
-        info!("Starting bm application: crate at {:?}", path);
-        // Spawn the default shell
-        let args = vec!["bm".to_string(), "--ipc".to_string(), "-a".to_string(), "-p".to_string(), "-b".to_string()];
-        let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-            .name("bm_app".to_string())
-            .argument(args)
-            .spawn()?;
     }
 
     Ok(())
