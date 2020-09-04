@@ -16,6 +16,9 @@ build/
 # patched GDB directory
 /rust-os-gdb/
 
+# Theseus's local build server
+.theseus_build_server/
+
 # IDE files
 *.idea/
 *.vscode/

@@ -31,13 +31,18 @@ Currently, we support building and running Theseus on the following host OSes:
 
 If you're on WSL, also do the following:
   * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
-  * Set an X display by running `export DISPLAY=:0`.    
-    You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your `.bashrc` file. You can do that with:    
-    `echo "export DISPLAY=:0" >> ~/.bashrc`.
+  * Setup an X display as follows:
+    * on WSL (version 1), run:     
+      `export DISPLAY=:0`.
+    * on WSL2, run:    
+      `export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0`.    
+      
+    You'll need to do this each time you open up a new WSL terminal, so it's best to add it to the end of your `.bashrc` file.
   * If you get this error:    
-    `Could not initialize SDL(No available video device) - exiting`
-    then make sure that your X Server is running before running `make run`, and that you have set the `DISPLAY` environment variable above.
+    `Could not initialize SDL(No available video device) - exiting`    
+    then make sure that your X Server is running and that you have set the `DISPLAY` environment variable above.
   * Install a C compiler and linker toolchain, such as `gcc`.
+  * **NOTE**: WSL and WSL2 do not currently support using KVM.
 
 ### MacOS
   * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/). 
