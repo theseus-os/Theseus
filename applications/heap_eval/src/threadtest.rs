@@ -29,7 +29,7 @@ const REGULAR_SIZE: usize = 8;
 /// The size allocated when the large allocations option is chosen
 pub const LARGE_SIZE: usize = 8192;
 
-pub fn do_threadtest() -> Result<(f64,f64), &'static str> {
+pub fn do_threadtest() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
     let mut tries = Vec::with_capacity(TRIES as usize);
@@ -46,7 +46,7 @@ pub fn do_threadtest() -> Result<(f64,f64), &'static str> {
         println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    for _try in 0..TRIES {
+    for try in 0..TRIES {
         let mut threads = Vec::with_capacity(nthreads);
 
         let start = hpet.get_counter();
@@ -67,15 +67,14 @@ pub fn do_threadtest() -> Result<(f64,f64), &'static str> {
         }
 
         let diff = hpet_2_us(end - start);
-        println!("[{}] threadtest time: {} us", _try, diff);
+        println!("[{}] threadtest time: {} us", try, diff);
         tries.push(diff);
     }
 
-    // println!("threadtest stats (us)");
-    // println!("{:?}", calculate_stats(&tries));
-    let stats = calculate_stats(&tries).ok_or("Could not calcualte stats")?;
+    println!("threadtest stats (us)");
+    println!("{:?}", calculate_stats(&tries));
 
-    Ok((stats.mean, stats.std_dev))
+    Ok(())
 }
 
 
@@ -107,7 +106,7 @@ fn worker(_:()) {
     }
     let layout = Layout::from_size_align(obj_size, 8).unwrap();
 
-    for j in 0..niterations {
+    for _ in 0..niterations {
         for i in 0..(nobjects/nthreads) {
             let ptr = unsafe{ allocator.alloc(layout) };
             allocations[i] = ptr;
@@ -115,7 +114,6 @@ fn worker(_:()) {
         for i in 0..(nobjects/nthreads) {
             unsafe{ allocator.dealloc(allocations[i], layout); }
         }
-        // error!("iter {}", j);
     }
 }
 

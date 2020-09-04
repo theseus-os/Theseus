@@ -226,15 +226,15 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
 
     let start_vaddr = 0xFFFF_FA00_0000_0000; // the start of the 500th P4 (PML4) entry
 
-    let mut num_mappings = matches.opt_str("n")
+    let num_mappings = matches.opt_str("n")
         .and_then(|i| i.parse::<usize>().ok())
         .unwrap_or(100);
 
     let size_in_pages = matches.opt_str("s")
         .and_then(|i| i.parse::<usize>().ok())
-        .unwrap_or(1);
+        .unwrap_or(2);
 
-    let mut use_spillful = if matches.opt_present("p") {
+    let use_spillful = if matches.opt_present("p") {
         true
     } else {
         false
@@ -247,141 +247,59 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     // calculate overhead of reading hpet counter
     let overhead = hpet_timing_overhead()?;
 
-    let num_tests = 8;
-    let test_sizes = [100,100,1000,1000,10000,10000,100000,100000];
-    let spillful_test = [false,true,false,true,false,true,false,true];
-    let mut map_mean = Vec::with_capacity(num_tests);
-    let mut map_std_dev = Vec::with_capacity(num_tests);
-    let mut remap_mean = Vec::with_capacity(num_tests);
-    let mut remap_std_dev = Vec::with_capacity(num_tests);
-    let mut unmap_mean = Vec::with_capacity(num_tests);
-    let mut unmap_std_dev = Vec::with_capacity(num_tests);
+    for _ in 0..TRIES 
+    {
+        // (1) create mappings
+        let mut result = create_mappings(
+            if use_spillful {
+                MapperType::Spillful(&mut mapper_spillful)
+            } else {
+                MapperType::Normal(&mut mapper_normal)
+            },
+            VirtualAddress::new(start_vaddr)?, 
+            size_in_pages, 
+            num_mappings,
+            overhead
+        )?;
 
-
-    for i in 0..num_tests {
-        let num_mappings = test_sizes[i];
-        let use_spillful = spillful_test[i];
-
-        for _ in 0..TRIES 
-        {
-            // (1) create mappings
-            let mut result = create_mappings(
-                if use_spillful {
-                    MapperType::Spillful(&mut mapper_spillful)
-                } else {
-                    MapperType::Normal(&mut mapper_normal)
-                },
-                VirtualAddress::new(start_vaddr)?, 
-                size_in_pages, 
-                num_mappings,
-                overhead
-            )?;
-
-            // (2) perform remappings
-            match result {
-                (Some(ref mut mapped_pages), time) => {
-                    create_times.push(time);
-                    let remap = remap_normal(&mut mapper_normal, mapped_pages, overhead)?;
-                    remap_times.push(remap);
-                }
-                (None, time) => {
-                    create_times.push(time);
-                    let remap = remap_spillful(&mut mapper_spillful, VirtualAddress::new(start_vaddr)?, size_in_pages, num_mappings, overhead)?;
-                    remap_times.push(remap);
-                }
-            };
-                
-            // (3) perform unmappings
-            match result {
-                (Some(mapped_pages), _time) => {
-                    let unmap = unmap_normal(&mut mapper_normal, mapped_pages, overhead)?;
-                    unmap_times.push(unmap);
-                }
-                (None, _time) => {  
-                    let unmap = unmap_spillful(&mut mapper_spillful, VirtualAddress::new(start_vaddr)?, size_in_pages, num_mappings, overhead)?;
-                    unmap_times.push(unmap);
-                }
-            };
-        }
-
-        // println!("Create Mappings (ns)");
-        let stats_create = calculate_stats(&mut create_times).ok_or("Could not calculate stats for mappings")?;
-        // println!("{:?}", stats_create);
-
-        // println!("Remap Mappings (ns)");
-        let stats_remap = calculate_stats(&mut remap_times).ok_or("Could not calculate stats for remappings")?;
-        // println!("{:?}", stats_remap);
-        
-        // println!("Unmap Mappings (ns)");
-        let stats_unmap = calculate_stats(&mut unmap_times).ok_or("Could not calculate stats for unmappings")?;
-        // println!("{:?}", stats_unmap);
-
-        map_mean.push(stats_create.mean);
-        map_std_dev.push(stats_create.std_dev);
-        remap_mean.push(stats_remap.mean);
-        remap_std_dev.push(stats_remap.std_dev);
-        unmap_mean.push(stats_unmap.mean);
-        unmap_std_dev.push(stats_unmap.std_dev);
-
-        create_times.clear();
-        remap_times.clear();
-        unmap_times.clear();
+        // (2) perform remappings
+        match result {
+            (Some(ref mut mapped_pages), time) => {
+                create_times.push(time);
+                let remap = remap_normal(&mut mapper_normal, mapped_pages, overhead)?;
+                remap_times.push(remap);
+            }
+            (None, time) => {
+                create_times.push(time);
+                let remap = remap_spillful(&mut mapper_spillful, VirtualAddress::new(start_vaddr)?, size_in_pages, num_mappings, overhead)?;
+                remap_times.push(remap);
+            }
+        };
+            
+        // (3) perform unmappings
+        match result {
+            (Some(mapped_pages), _time) => {
+                let unmap = unmap_normal(&mut mapper_normal, mapped_pages, overhead)?;
+                unmap_times.push(unmap);
+            }
+            (None, _time) => {  
+                let unmap = unmap_spillful(&mut mapper_spillful, VirtualAddress::new(start_vaddr)?, size_in_pages, num_mappings, overhead)?;
+                unmap_times.push(unmap);
+            }
+        };
     }
 
-    /// Print Out Table
-    println!("Memory Mapping Benchmark Results (from Fig 3)");
-    println!("");
-    println!("");
+    println!("Create Mappings (ns)");
+    let stats_create = calculate_stats(&mut create_times).ok_or("Could not calculate stats for mappings")?;
+    println!("{:?}", stats_create);
 
-    println!("Mapping Type   Total Mappings   Map Mean (ns)   Map Std Dev (ns)");
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}              {:.3}            {:.3}", test_sizes[0], map_mean[0] / test_sizes[0] as f64, map_std_dev[0] / test_sizes[0] as f64);
-    println!("VMAs            {:.3}              {:.3}            {:.3}", test_sizes[1], map_mean[1] / test_sizes[1] as f64, map_std_dev[1] / test_sizes[1] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}             {:.3}            {:.3}", test_sizes[2], map_mean[2] / test_sizes[2] as f64, map_std_dev[2] / test_sizes[2] as f64);
-    println!("VMAs            {:.3}             {:.3}            {:.3}", test_sizes[3], map_mean[3] / test_sizes[3] as f64, map_std_dev[3] / test_sizes[3] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}            {:.3}            {:.3}", test_sizes[4], map_mean[4] / test_sizes[4] as f64, map_std_dev[4] / test_sizes[4] as f64);
-    println!("VMAs            {:.3}            {:.3}            {:.3}", test_sizes[5], map_mean[5] / test_sizes[5] as f64, map_std_dev[5] / test_sizes[5] as f64);
-    println!("_________________________________________________________________");
-    println!("MappedPages     {:.3}           {:.3}            {:.3}", test_sizes[6], map_mean[6] / test_sizes[6] as f64, map_std_dev[6] / test_sizes[6] as f64);
-    println!("VMAs            {:.3}           {:.3}            {:.3}", test_sizes[7], map_mean[7] / test_sizes[7] as f64, map_std_dev[7] / test_sizes[7] as f64);
-
-
-    println!("");
-    println!("");
-
-
-    println!("Mapping Type   Total Mappings   Remap Mean (ns)   Remap Std Dev (ns)");
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}                {:.3}           {:.3}", test_sizes[0], remap_mean[0] / test_sizes[0] as f64, remap_std_dev[0] / test_sizes[0] as f64);
-    println!("VMAs            {:.3}                {:.3}           {:.3}", test_sizes[1], remap_mean[1] / test_sizes[1] as f64, remap_std_dev[1] / test_sizes[1] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}               {:.3}           {:.3}", test_sizes[2], remap_mean[2] / test_sizes[2] as f64, remap_std_dev[2] / test_sizes[2] as f64);
-    println!("VMAs            {:.3}               {:.3}           {:.3}", test_sizes[3], remap_mean[3] / test_sizes[3] as f64, remap_std_dev[3] / test_sizes[3] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}              {:.3}           {:.3}", test_sizes[4], remap_mean[4] / test_sizes[4] as f64, remap_std_dev[4] / test_sizes[4] as f64);
-    println!("VMAs            {:.3}              {:.3}           {:.3}", test_sizes[5], remap_mean[5] / test_sizes[5] as f64, remap_std_dev[5] / test_sizes[5] as f64);
-    println!("_________________________________________________________________");
-    println!("MappedPages     {:.3}             {:.3}           {:.3}", test_sizes[6], remap_mean[6] / test_sizes[6] as f64, remap_std_dev[6] / test_sizes[6] as f64);
-    println!("VMAs            {:.3}             {:.3}           {:.3}", test_sizes[7], remap_mean[7] / test_sizes[7] as f64, remap_std_dev[7] / test_sizes[7] as f64);
-
-    println!("");
-    println!("");
-
-    println!("Mapping Type   Total Mappings   Unmap Mean (ns)   Unmap Std Dev (ns)");
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}                {:.3}           {:.3}", test_sizes[0], unmap_mean[0] / test_sizes[0] as f64, unmap_std_dev[0] / test_sizes[0] as f64);
-    println!("VMAs            {:.3}                {:.3}           {:.3}", test_sizes[1], unmap_mean[1] / test_sizes[1] as f64, unmap_std_dev[1] / test_sizes[1] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}               {:.3}           {:.3}", test_sizes[2], unmap_mean[2] / test_sizes[2] as f64, unmap_std_dev[2] / test_sizes[2] as f64);
-    println!("VMAs            {:.3}               {:.3}           {:.3}", test_sizes[3], unmap_mean[3] / test_sizes[3] as f64, unmap_std_dev[3] / test_sizes[3] as f64);
-    println!("__________________________________________________________________");
-    println!("MappedPages     {:.3}              {:.3}           {:.3}", test_sizes[4], unmap_mean[4] / test_sizes[4] as f64, unmap_std_dev[4] / test_sizes[4] as f64);
-    println!("VMAs            {:.3}              {:.3}           {:.3}", test_sizes[5], unmap_mean[5] / test_sizes[5] as f64, unmap_std_dev[5] / test_sizes[5] as f64);
-    println!("_________________________________________________________________");
-    println!("MappedPages     {:.3}             {:.3}           {:.3}", test_sizes[6], unmap_mean[6] / test_sizes[6] as f64, unmap_std_dev[6] / test_sizes[6] as f64);
-    println!("VMAs            {:.3}             {:.3}           {:.3}", test_sizes[7], unmap_mean[7] / test_sizes[7] as f64, unmap_std_dev[7] / test_sizes[7] as f64);
+    println!("Remap Mappings (ns)");
+    let stats_remap = calculate_stats(&mut remap_times).ok_or("Could not calculate stats for remappings")?;
+    println!("{:?}", stats_remap);
+    
+    println!("Unmap Mappings (ns)");
+    let stats_unmap = calculate_stats(&mut unmap_times).ok_or("Could not calculate stats for unmappings")?;
+    println!("{:?}", stats_unmap);
 
     Ok(())
 

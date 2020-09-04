@@ -11,7 +11,7 @@
 extern crate task;
 extern crate hpet;
 #[macro_use] extern crate terminal_print;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
 extern crate spawn;
@@ -26,7 +26,6 @@ extern crate async_channel;
 extern crate simple_ipc;
 extern crate getopts;
 extern crate pmu_x86;
-extern crate mod_mgmt;
 
 use core::str;
 use alloc::vec::Vec;
@@ -39,7 +38,6 @@ use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
 use memory::{create_mapping, EntryFlags};
 use getopts::Options;
-use mod_mgmt::crate_name_from_path;
 
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
@@ -61,13 +59,13 @@ const T_UNIT: &str = "nano sec";
 
 
 macro_rules! printlninfo {
-	($fmt:expr) => (if false {println!(concat!("BM-INFO: ", $fmt))});
-	($fmt:expr, $($arg:tt)*) => (if false {println!(concat!("BM-INFO: ", $fmt), $($arg)*)});
+	($fmt:expr) => (println!(concat!("BM-INFO: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-INFO: ", $fmt), $($arg)*));
 }
 
 macro_rules! printlnwarn {
-	($fmt:expr) => (if false {println!(concat!("BM-WARN: ", $fmt))});
-	($fmt:expr, $($arg:tt)*) => (if false{ println!(concat!("BM-WARN: ", $fmt), $($arg)*)});
+	($fmt:expr) => (println!(concat!("BM-WARN: ", $fmt)));
+	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
 }
 
 
@@ -96,11 +94,6 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("c", "cycles", "Measure the IPC times in reference cycles");
 
 
-	if !check_myrq() {
-		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
-		return 0;
-	}
-
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {
@@ -114,6 +107,11 @@ pub fn main(args: Vec<String>) -> isize {
         print_usage(opts);
         return 0;
     }
+
+	if !check_myrq() {
+		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
+		return 0;
+	}
 
 	// store flags for ipc
 	let pinned = if matches.opt_present("p") {
@@ -228,8 +226,6 @@ fn do_null() -> Result<(), &'static str> {
 	printlninfo!("NULL result: ({})", T_UNIT);
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_syscall null` in LMBench");
-
-	error!("BM: null {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 	Ok(())
 }
 
@@ -309,8 +305,6 @@ fn do_spawn() -> Result<(), &'static str>{
 	printlninfo!("SPAWN result: ({})", T_UNIT);
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_proc exec` in LMBench");
-	
-	error!("BM: spawn {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 
 	Ok(())
 }
@@ -324,24 +318,17 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// Get path to application "hello" that we're going to spawn
-	let namespace = task::get_my_current_task()
-		.map(|t| t.get_namespace().clone())
-		.ok_or("could not find the application namespace")?;
 	let namespace_dir = task::get_my_current_task()
 		.map(|t| t.get_namespace().dir().clone())
 		.ok_or("could not find the application namespace")?;
 	let app_path = namespace_dir.get_file_starting_with("hello-")
 		.map(|f| Path::new(f.lock().get_absolute_path()))
 		.ok_or("Could not find the application 'hello'")?;
-    let crate_name = crate_name_from_path(&app_path).to_string();
 
 	// here we are taking the time at every iteration. 
 	// otherwise the crate is not fully unloaded from the namespace before the next iteration starts 
 	// so it cannot be loaded again and we are returned an error.
-	let iterations = 100;
-	for _ in 0..iterations{
-		while namespace.get_crate(&crate_name).is_some() {  }
-
+	for _ in 0..ITERATIONS{
 		start_hpet = hpet.get_counter();
 		let child = spawn::new_application_task_builder(app_path.clone(), None)?
 	        .spawn()?;
@@ -353,7 +340,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	}
 
     let delta_time = hpet_2_time("", delta_hpet);
-    let delta_time_avg = delta_time / iterations as u64;
+    let delta_time_avg = delta_time / ITERATIONS as u64;
 	printlninfo!("spawn_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
 
@@ -380,7 +367,7 @@ fn do_ctx() -> Result<(), &'static str> {
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
 	
-	print_header(TRIES, ITERATIONS*2);
+	print_header(TRIES, ITERATIONS*1000*2);
 
 	for i in 0..TRIES {
 		let lat = do_ctx_inner(i+1, TRIES, child_core)?;
@@ -404,8 +391,6 @@ fn do_ctx() -> Result<(), &'static str> {
 	printlninfo!("Context switch result: ({})", T_UNIT);
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test does not have an equivalent test in LMBench");
-
-	error!("BM: ctx {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
 
 	Ok(())
 }
@@ -467,7 +452,7 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 	let delta_hpet = end_hpet - overhead_end_hpet - delta_overhead;
     let delta_time = hpet_2_time("", delta_hpet);
 	let overhead_time = hpet_2_time("", delta_overhead);
-    let delta_time_avg = delta_time / (ITERATIONS*2) as u64; //*2 because each thread yields ITERATION number of times
+    let delta_time_avg = delta_time / (ITERATIONS*1000*2) as u64; //*2 because each thread yields ITERATION number of times
 	printlninfo!("ctx_switch_test_inner ({}/{}): total_overhead -> {} {} , {} total_time -> {} {}",
 		th, nr, overhead_time, T_UNIT, delta_time, delta_time_avg, T_UNIT);
 
@@ -506,9 +491,6 @@ fn do_memory_map() -> Result<(), &'static str> {
 	printlninfo!("MEMORY MAP result: ({})", T_UNIT);
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_mmap` in LMBench");
-
-	error!("BM: mem_map {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
-
 	Ok(())
 }
 
@@ -555,7 +537,7 @@ fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	// pmu_x86::init()?;
+	pmu_x86::init()?;
 
 	print_header(TRIES, ITERATIONS);
 
@@ -595,14 +577,14 @@ fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 /// Overhead is measured by creating a task that just returns.
 fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>, cycles: bool) -> Result<u64, &'static str> {
 	// ideally we want to intialize only one counter depending on the `cycles` flag, but we get an error that a variable may be uninitialized
-	// let mut counter = start_counting_reference_cycles()?;
+	let mut counter = start_counting_reference_cycles()?;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// we first spawn one task to get the overhead of creating and joining the task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
 
 	let start = if cycles {
-		// counter.start()?;
+		counter.start()?;
 		0
 	} else {
 		hpet.get_counter()
@@ -625,10 +607,9 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>, cycles:
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = if cycles {
-		// let diff = counter.diff();
-		// counter.start()?;
-		// diff
-		0
+		let diff = counter.diff();
+		counter.start()?;
+		diff
 	} else {
 		hpet.get_counter()
 	};
@@ -658,8 +639,7 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>, cycles:
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = if cycles {
-		// counter.end()?
-		0
+		counter.end()?
 	} else {
     	hpet.get_counter()
 	};
@@ -716,7 +696,7 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	// pmu_x86::init()?;
+	pmu_x86::init()?;
 
 	print_header(TRIES, ITERATIONS);
 
@@ -747,8 +727,6 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test is equivalent to `lat_pipe` in LMBench when run with the pinned flag enabled");
 
-	error!("BM: ipc {:.3} {:.3} ", stats.mean / 1000.0, stats.std_dev / 1000.0);
-
 	Ok(())
 }
 
@@ -757,7 +735,7 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 /// Overhead is measured by creating a task that just returns.
 fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bool, cycles: bool) -> Result<u64, &'static str> {
 	// ideally we want to intialize only one counter depending on the `cycles` flag, but we get an error that a variable may be uninitialized
-	// let mut counter = start_counting_reference_cycles()?;
+	let mut counter = start_counting_reference_cycles()?;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
@@ -770,7 +748,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
 
 	let start = if cycles {
-		// counter.start()?;
+		counter.start()?;
 		0
 	} else {
 		hpet.get_counter()
@@ -793,10 +771,9 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = if cycles {
-		// let diff = counter.diff();
-		// counter.start()?;
-		// diff
-		0
+		let diff = counter.diff();
+		counter.start()?;
+		diff
 	} else {
 		hpet.get_counter()
 	};
@@ -829,8 +806,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = if cycles {
-		// counter.end()?
-		0
+		counter.end()?
 	} else {
     	hpet.get_counter()
 	};
@@ -911,7 +887,7 @@ fn do_ipc_simple(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let mut max: u64 = core::u64::MIN;
 	let mut min: u64 = core::u64::MAX;
 	let mut vec = Vec::with_capacity(TRIES);
-	// pmu_x86::init()?;
+	pmu_x86::init()?;
 	
 	print_header(TRIES, ITERATIONS);
 
@@ -943,9 +919,6 @@ fn do_ipc_simple(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	printlninfo!("{:?}", stats);
 	printlninfo!("This test does not have an equivalent test in LMBench");
 
-	error!("BM: simple_ipc {:.3} {:.3} ", stats.mean/1000.0, stats.std_dev/1000.0);
-
-
 	Ok(())
 }
 
@@ -954,14 +927,14 @@ fn do_ipc_simple(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 /// Overhead is measured by creating a tasks that just returns.
 fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>, cycles: bool) -> Result<u64, &'static str> {
 	// ideally we want to intialize only one counter depending on the `cycles` flag, but we get an error that a variable may be uninitialized
-	// let mut counter = start_counting_reference_cycles()?;
+	let mut counter = start_counting_reference_cycles()?;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// we first spawn one task to get the overhead of creating and joining the task
 	// we will subtract this time from the total time so that we are left with the actual time for IPC
 
 	let start = if cycles {
-		// counter.start()?;
+		counter.start()?;
 		0
 	} else {
 		hpet.get_counter()
@@ -984,10 +957,9 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>, cycles: boo
 		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = if cycles {
-		// let diff = counter.diff();
-		// counter.start()?;
-		// diff
-		0
+		let diff = counter.diff();
+		counter.start()?;
+		diff
 	} else {
 		hpet.get_counter()
 	};
@@ -1017,8 +989,7 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>, cycles: boo
 		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = if cycles {
-		// counter.end()?
-		0
+		counter.end()?
 	} else {
     	hpet.get_counter()
 	};
@@ -1617,7 +1588,7 @@ fn print_header(tries: usize, iterations: usize) {
 
 /// Task generated to measure time of context switching
 fn yield_task(_a: u32) -> u32 {
-	let times = ITERATIONS;
+	let times = ITERATIONS*1000;
     for _i in 0..times {
        scheduler::schedule();
     }
