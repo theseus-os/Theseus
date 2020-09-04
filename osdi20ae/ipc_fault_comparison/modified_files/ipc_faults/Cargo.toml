@@ -1,0 +1,30 @@
+[package]
+name = "ipc_faults"
+version = "0.1.0"
+description = "A simple task running an ipc channel to facillitate ipc fault injection"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+getopts = "0.2.21"
+spin = "0.4.10"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.apic]
+path = "../../kernel/apic"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
+[dependencies.rendezvous]
+path = "../../kernel/rendezvous"
+
