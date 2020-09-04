@@ -26,6 +26,7 @@ extern crate async_channel;
 extern crate simple_ipc;
 extern crate getopts;
 extern crate pmu_x86;
+extern crate mod_mgmt;
 
 use core::str;
 use alloc::vec::Vec;
@@ -38,6 +39,7 @@ use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
 use memory::{create_mapping, EntryFlags};
 use getopts::Options;
+use mod_mgmt::crate_name_from_path;
 
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
@@ -318,17 +320,24 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// Get path to application "hello" that we're going to spawn
+	let namespace = task::get_my_current_task()
+		.map(|t| t.get_namespace().clone())
+		.ok_or("could not find the application namespace")?;
 	let namespace_dir = task::get_my_current_task()
 		.map(|t| t.get_namespace().dir().clone())
 		.ok_or("could not find the application namespace")?;
 	let app_path = namespace_dir.get_file_starting_with("hello-")
 		.map(|f| Path::new(f.lock().get_absolute_path()))
 		.ok_or("Could not find the application 'hello'")?;
+	let crate_name = crate_name_from_path(&app_path).to_string();
 
 	// here we are taking the time at every iteration. 
 	// otherwise the crate is not fully unloaded from the namespace before the next iteration starts 
 	// so it cannot be loaded again and we are returned an error.
-	for _ in 0..ITERATIONS{
+	let iterations = 100;
+	for _ in 0..iterations{
+		while namespace.get_crate(&crate_name).is_some() {  }
+
 		start_hpet = hpet.get_counter();
 		let child = spawn::new_application_task_builder(app_path.clone(), None)?
 	        .spawn()?;
@@ -340,7 +349,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	}
 
     let delta_time = hpet_2_time("", delta_hpet);
-    let delta_time_avg = delta_time / ITERATIONS as u64;
+    let delta_time_avg = delta_time / iterations as u64;
 	printlninfo!("spawn_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
 
