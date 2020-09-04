@@ -27,7 +27,7 @@ exclude = [
 	"applications/test_exception",
 	"applications/test_exception2",
 	"applications/test_filerw",
-	"applications/heap_eval",
+	# "applications/heap_eval",
 	"applications/test_mutex_sleep",
 	"applications/test_wait_queue",
 	# "applications/test_panic",

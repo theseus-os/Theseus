@@ -60,6 +60,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("", "threadtest", "run the threadtest heap benchmark");
     opts.optflag("", "shbench", "run the shbench heap benchmark");
     opts.optflag("", "large", "run threadtest or shbench for large allocations");
+    opts.optflag("", "both", "runs both the threadtest and shbench benchmarks and prints out the mean and std_dev for both");
 
 
     
@@ -97,49 +98,56 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn rmain(matches: Matches) -> Result<(), &'static str> {
-    if matches.opt_present("vector") {
-        do_vec();
-    }
-    else if matches.opt_present("hashmap") {
-        do_hashmap();
-    }
-    else if matches.opt_present("btreemap") {
-        do_btreemap();
-    }
-    else if matches.opt_present("btreeset") {
-        do_btreeset();
-    }
-    else if matches.opt_present("qptrie") {
-        do_qptrie();
-    }
-    else if matches.opt_present("threadtest") {
-        if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
-            threadtest::NITERATIONS.store(iterations, Ordering::SeqCst);
-        }
-        if let Some(objects) = matches.opt_str("o").and_then(|i| i.parse::<usize>().ok()) {
-            threadtest::NOBJECTS.store(objects, Ordering::SeqCst);
-        }
-        if matches.opt_present("large") {
-            OBJSIZE.store(LARGE_SIZE, Ordering::SeqCst);
-            threadtest::NITERATIONS.store(100, Ordering::SeqCst);
-            threadtest::NOBJECTS.store(100, Ordering::SeqCst);
-        }
-        do_threadtest()?;
-    }
-    else if matches.opt_present("shbench") {
-        if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
-            shbench::NITERATIONS.store(iterations, Ordering::SeqCst);
-        }
-        if matches.opt_present("large") {
-            MAX_BLOCK_SIZE.store(MAX_LARGE, Ordering::SeqCst);
-            MIN_BLOCK_SIZE.store(MIN_LARGE, Ordering::SeqCst);
-            shbench::NITERATIONS.store(1, Ordering::SeqCst);
-        }
-        do_shbench()?;
-    }
-    else {
-        return Err("Unknown command")
-    }
+
+    // for artifacts automatically run threadtest and shbench
+    let (mean_threadtest, std_dev_threadtest) = do_threadtest()?;
+    let (mean_shbench, std_dev_shbench) = do_shbench()?;
+
+    println!("HEAP_EVAL: threadtest {:.3} {:.3}", mean_threadtest, std_dev_threadtest);
+    println!("HEAP_EVAL: shbench {:.3} {:.3}", mean_shbench, std_dev_shbench);
+
+    // if matches.opt_present("vector") {
+    //     do_vec();
+    // }
+    // else if matches.opt_present("hashmap") {
+    //     do_hashmap();
+    // }
+    // else if matches.opt_present("btreemap") {
+    //     do_btreemap();
+    // }
+    // else if matches.opt_present("btreeset") {
+    //     do_btreeset();
+    // }
+    // else if matches.opt_present("qptrie") {
+    //     do_qptrie();
+    // }
+    // else if matches.opt_present("threadtest") {
+    //     if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
+    //         threadtest::NITERATIONS.store(iterations, Ordering::SeqCst);
+    //     }
+    //     if let Some(objects) = matches.opt_str("o").and_then(|i| i.parse::<usize>().ok()) {
+    //         threadtest::NOBJECTS.store(objects, Ordering::SeqCst);
+    //     }
+    //     if matches.opt_present("large") {
+    //         OBJSIZE.store(LARGE_SIZE, Ordering::SeqCst);
+    //         threadtest::NITERATIONS.store(100, Ordering::SeqCst);
+    //         threadtest::NOBJECTS.store(100, Ordering::SeqCst);
+    //     }
+    //     do_threadtest()?;
+    // }
+    // else if matches.opt_present("shbench") {
+    //     if let Some(iterations) = matches.opt_str("i").and_then(|i| i.parse::<usize>().ok()) {
+    //         shbench::NITERATIONS.store(iterations, Ordering::SeqCst);
+    //     }
+    //     if matches.opt_present("large") {
+    //         MAX_BLOCK_SIZE.store(MAX_LARGE, Ordering::SeqCst);
+    //         MIN_BLOCK_SIZE.store(MIN_LARGE, Ordering::SeqCst);
+    //         shbench::NITERATIONS.store(1, Ordering::SeqCst);
+    //     }
+    //     do_shbench()?;
+    // } else {
+    //     return Err("Unknown command")
+    // }
 
     Ok(())
 }
