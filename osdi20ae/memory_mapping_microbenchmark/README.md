@@ -9,9 +9,10 @@ This benchmark maps, remaps, and then unmaps a given number of 4KiB mappings usi
 We have provided a pre-built image of Theseus on which we ran the benchmark. More information is given below of how to compile and run the benchmark.
 
 ## Running the Benchmarks
-To run Theseus and obtain the results for all test cases, run **script.sh**.  
+To run Theseus and obtain the results for all test cases, run **script.sh**.     
+Note that `sudo` may be required to use KVM; if you do not have KVM, then remove the `-accel kvm` argument from inside of `script.sh`.
 ```
-sudo ./script.sh
+./script.sh
 ```
 A table with the results for each configuration of the benchmark will be printed out at the end.
 
