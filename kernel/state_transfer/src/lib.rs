@@ -22,48 +22,26 @@ use atomic_linked_list::atomic_map::AtomicMap;
 // use task::TaskRef;
 
 
-/// Used for the evolution from a round robin scheduler to a priority scheduler
-pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNamespace) -> Result<(), &'static str> {
+/// This function is used for live evolution from a round robin scheduler to a priority scheduler. 
+/// It first extracts the taskrefs from the round robin Runqueue,
+/// then converts them into priority taskrefs and places them on the priority Runqueue.
+pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNamespace) -> Result<(), &'static str> {
 
+    // just debugging info
     #[cfg(not(loscd_eval))]
-    warn!("prio_sched(): at the top.");
-    /*
-    // Since we don't currently support updating a running application's code with the new object code, 
-    // we just hack together a solution for the terminal, since it's the only long-running app. 
-    // We only need to fix up this dependency:
-    //     runqueue_round_robin::RunQueue::remove_task  -->  runqueue_priority::RunQueue::remove_task
-    let old_section = old_namespace.get_symbol_starting_with("runqueue_round_robin::RunQueue::remove_task::").upgrade()
-        .ok_or_else(|| {
-            error!("prio_sched(): Couldn't find symbol in old namespace: \"runqueue_round_robin::RunQueue::remove_task::\"");
-            "prio_sched(): Couldn't find symbol in old namespace: \"runqueue_round_robin::RunQueue::remove_task::\""
-        })?;
-    let new_section = new_namespace.get_symbol_starting_with("runqueue_priority::RunQueue::remove_task::").upgrade()
-        .ok_or_else(|| {
-            error!("prio_sched(): Couldn't find symbol in old namespace: \"runqueue_priority::RunQueue::remove_task::\"");
-            "prio_sched(): Couldn't find symbol in old namespace: \"runqueue_priority::RunQueue::remove_task::\""
-        })?;
-    
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("couldn't get kernel MMI ref")?;
-    warn!("prio_sched(): calling rewrite_section_dependents...");
-    CrateNamespace::rewrite_section_dependents(&old_section, &new_section, &kernel_mmi_ref)?;
-    warn!("prio_sched(): finished rewrite_section_dependents.");
-    */
-
-    // Extract the taskrefs from the round robin Runqueue, 
-    // then convert them into priority taskrefs and place them on the priority Runqueue.
-    let rq_rr_crate = CrateNamespace::get_crate_starting_with(old_namespace, "runqueue_round_robin")
-        .map(|(_crate_name, crate_ref, _ns)| crate_ref)
-        .ok_or("Couldn't get runqueue_round_robin crate from old namespace")?;
-    
-    let krate = rq_rr_crate.lock_as_ref();
-    for sec in krate.sections.values() {
-        if sec.name.contains("RUNQUEUES") {
-            warn!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.start_address(), sec.size());
+    {
+        warn!("prio_sched(): at the top.");
+        let rq_rr_crate = CrateNamespace::get_crate_starting_with(_old_namespace, "runqueue_round_robin")
+            .map(|(_crate_name, crate_ref, _ns)| crate_ref)
+            .ok_or("Couldn't get runqueue_round_robin crate from old namespace")?;
+        let krate = rq_rr_crate.lock_as_ref();
+        for sec in krate.sections.values() {
+            if sec.name.contains("RUNQUEUES") {
+                debug!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.start_address(), sec.size());
+            }
         }
+        warn!("REPLACING LAZY_STATIC RUNQUEUES...");
     }
-
-    #[cfg(not(loscd_eval))]
-    warn!("REPLACING LAZY_STATIC RUNQUEUES...");
 
     #[cfg(loscd_eval)]
     let hpet = hpet::get_hpet().ok_or("couldn't get HPET timer")?;
@@ -82,7 +60,7 @@ pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNam
     warn!("obtained ownership of runqueues:");
     for (core, rq) in once_rq.iter() {
         #[cfg(not(loscd_eval))]
-        warn!("\t{:?}: {:?}", core, rq);
+        warn!("\tRunqueue on core {:?}: {:?}", core, rq);
         runqueue_priority::RunQueue::init(*core)?;
         for t in rq.read().iter() {
             runqueue_priority::RunQueue::add_task_to_specific_runqueue(*core, t.deref().clone())?;
