@@ -2,6 +2,7 @@
 //! 
 
 #![no_std]
+#![cfg_attr(loscd_eval, allow(unused_assignments, unused_variables))]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -133,9 +134,10 @@ pub fn swap_crates(
 ) -> Result<(), &'static str> {
 
     #[cfg(not(loscd_eval))]
-    debug!("swap_crates()[0]: override dir: {:?}, cache_old_crates: {:?}\n\tswap_requests: {:?}", 
+    debug!("swap_crates()[0]: \n\t-->override dir: {:?}, \n\t-->cache_old_crates: {:?}, \n\t-->state transfer: {:?},\n\t-->swap_requests: {:?}", 
         override_namespace_dir.as_ref().map(|d| d.lock().get_name()), 
         cache_old_crates,
+        state_transfer_functions,
         swap_requests
     );
 
@@ -313,7 +315,7 @@ pub fn swap_crates(
 
             #[cfg(loscd_eval)] {
                 let hpet_end_bss_transfer = hpet.get_counter();
-                hpet_total_bss_transfer += (hpet_end_bss_transfer - hpet_start_bss_transfer);
+                hpet_total_bss_transfer += hpet_end_bss_transfer - hpet_start_bss_transfer;
             }
 
             // We need to find all of the "weak dependents" (sections that depend on the sections in the old crate)
@@ -415,7 +417,7 @@ pub fn swap_crates(
 
                     #[cfg(loscd_eval)] {
                         let end_symbol_finding = hpet.get_counter();
-                        hpet_total_symbol_finding += (end_symbol_finding - start_symbol_finding);
+                        hpet_total_symbol_finding += end_symbol_finding - start_symbol_finding;
                     }
 
                     #[cfg(not(loscd_eval))]
@@ -443,7 +445,7 @@ pub fn swap_crates(
 
                         #[cfg(loscd_eval)] {
                             let end_rewriting_relocations = hpet.get_counter();
-                            hpet_total_rewriting_relocations += (end_rewriting_relocations - start_rewriting_relocations);
+                            hpet_total_rewriting_relocations += end_rewriting_relocations - start_rewriting_relocations;
                         }
 
                         #[cfg(not(loscd_eval))] {
@@ -486,7 +488,7 @@ pub fn swap_crates(
 
                     #[cfg(loscd_eval)] {
                         let end_fixing_dependencies = hpet.get_counter();
-                        hpet_total_fixing_dependencies += (end_fixing_dependencies - start_fixing_dependencies);
+                        hpet_total_fixing_dependencies += end_fixing_dependencies - start_fixing_dependencies;
                     }
                 } // end of loop that iterates over all weak deps in the old_sec
 
@@ -516,7 +518,8 @@ pub fn swap_crates(
             let mapped_pages = state_transfer_fn_sec.mapped_pages.lock();
             mapped_pages.as_func::<StateTransferFunction>(state_transfer_fn_sec.mapped_pages_offset, &mut space)?
         };
-        info!("swap_crates(): invoking the state transfer function {:?} with old_ns: {:?}, new_ns: {:?}", symbol, this_namespace.name(), namespace_of_new_crates.name());
+        #[cfg(not(loscd_eval))]
+        debug!("swap_crates(): invoking the state transfer function {:?} with old_ns: {:?}, new_ns: {:?}", symbol, this_namespace.name(), namespace_of_new_crates.name());
         st_fn(this_namespace, &namespace_of_new_crates)?;
     }
 
@@ -651,10 +654,23 @@ pub fn swap_crates(
             // Note that we don't just want to put the crate in the lowest namespace we can, 
             // because that could result in putting an application crate in a kernel namespace. 
             // 
-            let target_ns = this_namespace;
+            let mut target_ns = this_namespace;
 
-            #[cfg(not(loscd_eval))]
-            warn!("swap_crates(): untested scenario of adding new non-requested (depedency) crate {:?} to namespace {}", new_crate_ref, target_ns.name());
+            // FIXME: currently we use a hack to determine which namespace this freshly-loaded crate should be added to,
+            //        based on which directory its object file 
+            {
+                let objfile_path = Path::new(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
+                if objfile_path.components().skip(1).next() == Some(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
+                    let new_target_ns = this_namespace.recursive_namespace().unwrap_or(this_namespace);
+                    #[cfg(not(loscd_eval))]
+                    warn!("temp fix: changing target_ns from {} to {}, for crate {:?}", this_namespace.name(), new_target_ns.name(), new_crate_ref);
+                    target_ns = new_target_ns;
+                }
+
+            }
+
+            // #[cfg(not(loscd_eval))]
+            // warn!("swap_crates(): untested scenario of adding new non-requested (dependency) crate {:?} to namespace {}", new_crate_ref, target_ns.name());
             target_ns.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
             target_ns.crate_tree().lock().insert_str(new_crate_name, new_crate_ref.clone());
         }
@@ -686,7 +702,7 @@ pub fn swap_crates(
         let dest_dir_ref   = new_namespace.dir().deref();
         // // If the directories are the same (not overridden), we don't need to do anything.
         if Arc::ptr_eq(&source_dir_ref, dest_dir_ref) {
-            #[cfg(not(downtime_eval))]
+            #[cfg(not(any(loscd_eval, downtime_eval)))]
             trace!("swap_crates(): skipping crate file swap for {:?}", req);
             continue;
         }
@@ -695,7 +711,7 @@ pub fn swap_crates(
         if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
             // If we replaced a crate object file, put that replaced file back in the source directory, thus completing the "swap" operation.
             // (Note that the file that we replaced should be the same as the old_crate_file.) 
-            #[cfg(not(downtime_eval))]
+            #[cfg(not(any(loscd_eval, downtime_eval)))]
             trace!("swap_crates(): new_crate_object_file replaced existing (old_crate) object file {:?}", replaced_old_crate_file.get_name());
 
             replaced_old_crate_file.set_parent_dir(Arc::downgrade(&original_source_dir));
@@ -708,7 +724,7 @@ pub fn swap_crates(
             // If inserting the new crate object file didn't end up replacing the existing crate object file (the old_crate's object file), 
             // then we need to remove the old_crate's object file here, if one was specified. 
             if let Some(ocn) = old_crate_name {
-                #[cfg(not(downtime_eval))]
+                #[cfg(not(any(loscd_eval, downtime_eval)))]
                 trace!("swap_crates(): new_crate_object_file did not replace old_crate's object file, so we're removing the old_crate's object file now");
                 let (old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, &*ocn).ok_or_else(|| {
                     error!("BUG: swap_crates(): couldn't find old crate's object file starting with {:?} in old namespace {:?}.", ocn, old_namespace.name());
@@ -742,7 +758,7 @@ pub fn swap_crates(
     #[cfg(all(loscd_eval, not(downtime_eval)))] {
         // done with everything, print out values
 
-        warn!("
+        warn!("Measured time in units of HPET ticks:
             load crates, {}
             find symbols, {}
             rewrite relocations, {}
