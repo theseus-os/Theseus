@@ -8,28 +8,37 @@ In this experiment, we run 2 different microbenchmarks to measure the performanc
 In the subfolders `./unsafe`, `./partially_safe`, and `./safe` we have provided pre-built images of those 3 configurations of Theseus on which we ran these benchmarks. More information is given below of how to compile and run the different versions.
 
 ## Running the Benchmarks
-To run all three versions of Theseus and obtain results for both benchmarks, run the script:  
-`./script.sh`  
+To run all three versions of Theseus and obtain results for both benchmarks, run **script.sh**.
+Note that `sudo` may be required to use KVM; if you do not have KVM, then remove the `-accel kvm` argument from inside of `script.sh`.
+```
+./script.sh
+``` 
 A table with the mean and standard deviation for each benchmark will be printed out at the end.
 
 To manually run these benchmarks, build the images as described in the [Versions section below](#Versions), launch Theseus, and run the following commands in the Theseus terminal:  
+
 `heap_eval --threadtest`    
-`heap_eval --shbench`  
+`heap_eval --shbench`
+
 
 ### Note: QEMU running time
-It will take 2-3 hours to run the benchmarks on all 3 versions of Theseus on QEMU. On real hardware they are much faster.
+It is recommended to run the benchmark with kvm enabled (as the script currently does). Without kvm it will take a 2-3 hours to run the benchmarks on all 3 versions of Theseus on QEMU.
 
 ## Versions
 ### Unsafe Heap
 The version of Theseus using the unsafe heap can be built using the command:
-
-`make run THESEUS_CONFIG+=unsafe_heap`
+```
+make run THESEUS_CONFIG+=unsafe_heap
+```
 
 ### Partially Safe Heap
 The version of Theseus using the partially safe heap can be built using the command:
-
-`make run`
+```
+make run
+```
 
 ### Safe Heap
 The version of Theseus using the safe heap can be built using the command:  
-`make run THESEUS_CONFIG+=safe_heap`
+```
+make run THESEUS_CONFIG+=safe_heap
+```
