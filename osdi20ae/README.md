@@ -20,8 +20,8 @@ When running `make loadable`, one can observe log statements in the serial conso
 Note that entities are termed *cellules* in the paper submission to distinguish the runtime form from the build-time form, but are simply referred to as crates throughout the source code. 
 
 
-The source code of Theseus is well-documented and the documentation is hosted online for easy access.
-We also provide a "book" that explains higher-level concepts in Theseus, though this is a continuous work-in-progress that is less rigorously vetted than Theseus's source-level docs. 
+The source code of Theseus is well-documented and the [documentation is hosted online](https://theseus-os.github.io/Theseus/) for easy access.
+We also provide a ["book"](https://theseus-os.github.io/Theseus/book/index.html) that explains higher-level concepts in Theseus, though this is a continuous work-in-progress that is less complete than Theseus's source-level docs. 
 
 The subfolders in the [osdi20ae](../osdi20ae) directory contain scripts and pre-built images that allow others to verify the experiments described in the paper. 
 
