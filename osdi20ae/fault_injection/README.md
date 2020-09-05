@@ -29,17 +29,17 @@ In addition to the above two workloads, three more workloads were used during ev
 
 This evaluation depends on `xterm` and `rust-os-gdb`, a patched version of GDB that works better with Rust code on QEMU.
 
-1. To install `xterm`
+1. To install `xterm`:
 
    `sudo apt-get install -y xterm`
 
-2. To install `rust-os-gdb`
+2. To install `rust-os-gdb`:
 
    1. First install the following packages:
 
-      `sudo apt-get install texinfo flex bison python-dev ncurses-dev curl`
+      `sudo apt-get install -y texinfo flex bison python-dev ncurses-dev curl`
 
-   2. Install `rust-os-gdb` to the base Theseus directory
+   2. Download the `rust-os-gdb` files to the base Theseus directory:
 
       `cd ../../   #  Go to the Theseus base directory`    
 
