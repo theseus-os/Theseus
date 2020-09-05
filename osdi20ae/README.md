@@ -26,6 +26,18 @@ We also provide a ["book"](https://theseus-os.github.io/Theseus/book/index.html)
 The subfolders in the [osdi20ae](../osdi20ae) directory contain scripts and pre-built images that allow others to verify the experiments described in the paper. 
 
 ## Results Reproducible 
-As mentioned above, each subfolder in [osdi20ae](../osdi20ae) corresponds to an experiment in the paper and includes everything necessary to reproduce that experiment. 
+As mentioned above, each subfolder in [osdi20ae](../osdi20ae) corresponds to an experiment in the paper and includes everything necessary to reproduce that experiment. A brief list is below:
+| Subfolder name                     | Paper submission experiment |
+|------------------------------------|-----------------------------|
+| `evolution_case_studies/`          | Figure 2                    |
+| `fault_injection/`                 | Table 1                     |
+| `heap_microbenchmarks/`            | Table 2                     |
+| `ipc_fault_comparison/`            | Section 6.2: "Agora Recovers from Microkernel-level Faults" <br> Also Table 4 in the appendix |
+| `lmbench_microbenchmarks/`         | Table 3                     |
+| `memory_mapping_microbenchmark/`   | Figure 3                    |
+| `runqueue_state_spill/`            | Figure 5 (in appendix)      |
+|                                    |                             |
+<br>
 
-Note that Figure 4 and Table 5, both in the appendix, will not be part of our final submission, so they are excluded from our artifacts. However, Figure 5 in the appendix will be included, so we included it in the artifacts herein.
+**Note:** Figure 4 and Table 5, both in the appendix, will not be part of our final submission, so they are excluded from our artifacts. However, Figure 5 in the appendix will be included in the main body of camera-ready paper, so we included it in the artifacts herein.
+These decisions were based on instructions given to us by our paper shepherd. 
