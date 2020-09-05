@@ -49,7 +49,7 @@ This evaluation depends on `xterm` and `rust-os-gdb`.
 
       `cp rust-os-gdb/bin/rust-gdb osdi20ae/fault_injection/fs/`
 
-      `cp rust-os-gdb/bin/rust-gdb osdi20ae/fault_injection/ipc/`
+      `cp rust-os-gdb/bin/rust-gdb osdi20ae/fault_injection/itc/`
 
 ## Evaluation Process
 Run [script.sh](./script.sh) in `fs` and `itc` folders to run fault injection on each workload.
