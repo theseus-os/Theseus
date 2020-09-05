@@ -7,7 +7,9 @@ This README contains the instructions necessary to reproduce the three live evol
 
 
 ### Dependencies
-The live evolution experiments are most easily reproduced by  by downloading updated crates from a "build server" which is simply a local webserver based on Python's SimpleHTTP program. This requires `python2.7` and `rhash`. 
+The live evolution experiments are most easily reproduced by downloading updated crates from a "build server" which is simply a local webserver based on Python's SimpleHTTP program.
+This scenario accurately represents an over-the-air live evolution scenario in which evolutionary updates are downloaded from a server.     
+The webserver requires `python2.7` and `rhash`. 
 * Run the following: `sudo apt-get install -y python2.7 rhash`
 
 You will also need an environment for building and running Theseus, as described in the [main Theseus README](../../README.md#Building-Theseus). 
@@ -20,6 +22,28 @@ You will also need an environment for building and running Theseus, as described
 * As mentioned in the [main Theseus README](../../README.md#Using-QEMU), you can press `Ctrl+Alt+G` to release focus of your keyboard and mouse from the QEMU window so that you can do other tasks like open shells on your host OS. 
 
 
+### Calculating Measurements in Figure 2
+The format of Figure 2 graphs each part of the evolutionary procedure on the y-axis with the time taken for that part on the x-axis. The time values  are calculated from Theseus's log printouts at the end of the evolutionary procedure. The printout looks something like this (the state transfer part does not always occur):    
+<img src="./evolution_log.png" width="550" />
+
+The below table describes how the Figure 2 values are calculated from the tables.     
+All measurements are then converted from HPET ticks into time values using the `HPET PERIOD` value (in femtoseconds), as such:
+
+```
+<log printout value> * <HPET_PERIOD> / <femtosec per millisec>
+```
+(There are 10^12 femtoseconds per millisecond)
+
+| Figure 2 Y-axis row    | Theseus log printout            | Sample Value from Above Image <br> (Figure 2 X-axis duration) |
+|------------------------|---------------------------------|-------------------------------|
+| Load new cellules      | `load crates`                   | 27.9416 ms                    |
+| Verify dependencies    | `find symbols`                  | 0.22024 ms  &nbsp; (220 μs)   |
+| Rewrite relocations    | `rewrite relocations`           | 0.28950 ms  &nbsp; (289 μs)   |
+| State transfer         | `state transfer + BSS transfer` | 0.02531 ms  &nbsp; (25.3 μs)  |
+| Update dependencies    | `fix dependencies`              | 0.28206 ms  &nbsp; (282 μs)   |
+| Cellule/symbol cleanup | `symbol cleanup`                | 0.29676 ms  &nbsp; (297 μs)   |
+|                        |                                 |                               |
+<br>
 
 # Scheduler evolution
 This case study evolves Theseus's existing round-robin scheduler (and runqueue) into priority-based ones.
