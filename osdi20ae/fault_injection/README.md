@@ -13,7 +13,7 @@ This folder contain two sub folders, one for each of the two workloads we used d
 
    `make iso THESEUS_CONFIG=" loadable unwind_exceptions use_crate_replacement use_iterative_replacement loscd_eval use_async_itc"`
 
-Each folder contains a [script.sh](./script.sh) file which is the top-level script to inject faults into the workload. These scripts each inject 3 types of faults (memory word corruption, memory bit flip, and instruction pointer skip) while running their workload on QEMU.
+Each folder contains a `script.sh` file which injects faults into the workload described by that folder. These scripts each inject 3 types of faults (memory word corruption, memory bit flip, and instruction pointer skip) while running their workload on QEMU.
 
 In addition to the above two workloads, three more workloads were used during evaluation. They are as follows. 
 
@@ -52,6 +52,16 @@ This evaluation depends on `xterm` and `rust-os-gdb`, a patched version of GDB t
       `cp rust-os-gdb/bin/rust-gdb osdi20ae/fault_injection/itc/`
 
 ## Evaluation Process
-After the above dependency setup is complete, run [script.sh](./script.sh) in both the `fs` and `itc` folders to run the fault injection trials on each workload.
+After the above dependency setup is complete, navigate to each folder -- both `fs` and `itc` -- and run the `./script.sh` within each one. Those scripts will run the fault injection trials on each workload.
+```
+# (from the Theseus base directory)
+cd osdi20ae/fault_injection/fs
+./script.sh
+```
+```
+# (from the Theseus base directory)
+cd osdi20ae/fault_injection/itc
+./script.sh
+```
 
 The original set of faults observed during the fault injection experiments that appear in Table 1 of our submission are listed in [list_of_faults.csv](./list_of_faults.csv).
