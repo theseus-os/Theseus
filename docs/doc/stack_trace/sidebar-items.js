@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["stack_trace","Get a stack trace using the default stack tracer based on DWARF debug info. "]]});

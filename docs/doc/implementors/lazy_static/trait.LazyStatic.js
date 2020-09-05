@@ -1,0 +1,14 @@
+(function() {var implementors = {};
+implementors["framebuffer_compositor"] = [{text:"impl <a class=\"trait\" href=\"https://docs.rs/lazy_static/1.2.0/lazy_static/trait.LazyStatic.html\" title=\"trait lazy_static::LazyStatic\">LazyStatic</a> for <a class=\"struct\" href=\"framebuffer_compositor/struct.FRAME_COMPOSITOR.html\" title=\"struct framebuffer_compositor::FRAME_COMPOSITOR\">FRAME_COMPOSITOR</a>",synthetic:false,types:["framebuffer_compositor::FRAME_COMPOSITOR"]},];
+implementors["network_manager"] = [{text:"impl <a class=\"trait\" href=\"https://docs.rs/lazy_static/1.2.0/lazy_static/trait.LazyStatic.html\" title=\"trait lazy_static::LazyStatic\">LazyStatic</a> for <a class=\"struct\" href=\"network_manager/struct.NETWORK_INTERFACES.html\" title=\"struct network_manager::NETWORK_INTERFACES\">NETWORK_INTERFACES</a>",synthetic:false,types:["network_manager::NETWORK_INTERFACES"]},];
+implementors["root"] = [{text:"impl <a class=\"trait\" href=\"https://docs.rs/lazy_static/1.2.0/lazy_static/trait.LazyStatic.html\" title=\"trait lazy_static::LazyStatic\">LazyStatic</a> for <a class=\"struct\" href=\"root/struct.ROOT.html\" title=\"struct root::ROOT\">ROOT</a>",synthetic:false,types:["root::ROOT"]},];
+implementors["runqueue_round_robin"] = [{text:"impl <a class=\"trait\" href=\"https://docs.rs/lazy_static/1.2.0/lazy_static/trait.LazyStatic.html\" title=\"trait lazy_static::LazyStatic\">LazyStatic</a> for <a class=\"struct\" href=\"runqueue_round_robin/struct.RUNQUEUES.html\" title=\"struct runqueue_round_robin::RUNQUEUES\">RUNQUEUES</a>",synthetic:false,types:["runqueue_round_robin::RUNQUEUES"]},];
+implementors["storage_manager"] = [{text:"impl <a class=\"trait\" href=\"https://docs.rs/lazy_static/1.2.0/lazy_static/trait.LazyStatic.html\" title=\"trait lazy_static::LazyStatic\">LazyStatic</a> for <a class=\"struct\" href=\"storage_manager/struct.STORAGE_CONTROLLERS.html\" title=\"struct storage_manager::STORAGE_CONTROLLERS\">STORAGE_CONTROLLERS</a>",synthetic:false,types:["storage_manager::STORAGE_CONTROLLERS"]},];
+implementors["task"] = [{text:"impl <a class=\"trait\" href=\"https://docs.rs/lazy_static/1.2.0/lazy_static/trait.LazyStatic.html\" title=\"trait lazy_static::LazyStatic\">LazyStatic</a> for <a class=\"struct\" href=\"task/struct.TASKLIST.html\" title=\"struct task::TASKLIST\">TASKLIST</a>",synthetic:false,types:["task::TASKLIST"]},];
+
+            if (window.register_implementors) {
+                window.register_implementors(implementors);
+            } else {
+                window.pending_implementors = implementors;
+            }
+        })()

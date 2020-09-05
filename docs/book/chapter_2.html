@@ -1,0 +1,381 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Development Environment - The Theseus OS Book</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="The book-style documentation of the design and implementation of Theseus, a companion to its source-level documentation.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="favicon.png">
+        
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="ch00-00-introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="idea.html"><strong aria-hidden="true">1.</strong> High-level ideas</a></li><li class="chapter-item expanded "><a href="ch00.html"><strong aria-hidden="true">2.</strong> How Theseus works</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="booting.html"><strong aria-hidden="true">2.1.</strong> Booting process</a></li><li class="chapter-item expanded "><a href="build_process.html"><strong aria-hidden="true">2.2.</strong> Build process</a></li></ol></li><li class="chapter-item expanded "><a href="ch01.html"><strong aria-hidden="true">3.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="git.html"><strong aria-hidden="true">3.1.</strong> git Guidlines</a></li></ol></li><li class="chapter-item expanded "><a href="chapter_2.html" class="active"><strong aria-hidden="true">4.</strong> Development Environment</a></li><li class="chapter-item expanded "><a href="app.html"><strong aria-hidden="true">5.</strong> Developing an Application</a></li><li class="chapter-item expanded "><a href="display.html"><strong aria-hidden="true">6.</strong> Display Subsystem</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="window_manager.html"><strong aria-hidden="true">6.1.</strong> How Window Manager Works</a></li><li class="chapter-item expanded "><a href="window_tutorial.html"><strong aria-hidden="true">6.2.</strong> Tutorial of the display subsystem</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">The Theseus OS Book</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#setting-up-your-development-environment" id="setting-up-your-development-environment">Setting up your Development Environment</a></h1>
+<h2><a class="header" href="#building-theseus" id="building-theseus">Building Theseus</a></h2>
+<p>Currently, we support building and running Theseus on the following host OSes:</p>
+<ul>
+<li>Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04 and 18.04.</li>
+<li>Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version.</li>
+<li>MacOS, tested on version High Sierra (10.13), but likely works on others. </li>
+</ul>
+<h3><a class="header" href="#setting-up-the-build-environment" id="setting-up-the-build-environment">Setting up the build environment</a></h3>
+<p>If on Linux or WSL, do the following:</p>
+<ul>
+<li>Update your system's package list: <code>sudo apt-get update</code>.</li>
+<li>Install the following packages: <code>sudo apt-get install nasm pkg-config grub-pc-bin mtools xorriso qemu</code></li>
+</ul>
+<p>Additionally, If you're on WSL, you'll need to do the following:</p>
+<ul>
+<li>Install an X Server for Windows; we suggest using <a href="https://sourceforge.net/projects/xming/">Xming</a>.</li>
+<li>Set an X display, by running <code>export DISPLAY=:0</code>. You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your .bashrc file. You can do that with <code>echo &quot;export DISPLAY=:0&quot; &gt;&gt; ~/.bashrc</code>.</li>
+<li>If you get this error: <code>Could not initialize SDL(No available video device) - exiting</code>, then make sure that your X Server is running before running <code>make run</code>, and that you have set the <code>DISPLAY</code> environment variable above.</li>
+<li>Install a C compiler and linker toolchain, such as <code>gcc</code>.</li>
+</ul>
+<p>If you're on Mac OS, do the following:</p>
+<ul>
+<li>Install <a href="https://www.macports.org/install.php">MacPorts</a> and <a href="https://brew.sh/">HomeBrew</a>.</li>
+<li>run the MacOS build setup script: <code>./scripts/mac_os_build_setup.sh</code></li>
+</ul>
+<h3><a class="header" href="#installing-rust" id="installing-rust">Installing Rust</a></h3>
+<p>Install the current Rust compiler and toolchain by following the <a href="https://www.rust-lang.org/en-US/install.html">setup instructions here</a>, which is basically just this command:<br />
+<code>curl https://sh.rustup.rs -sSf | sh</code></p>
+<p>We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:<br />
+<code>cargo install --vers 0.3.13 xargo</code></p>
+<h3><a class="header" href="#building-and-running" id="building-and-running">Building and Running</a></h3>
+<p>When you first check out the project, don't forget to checkout all the submodule repositories too:<br />
+<code>git submodule update --init --recursive</code></p>
+<p>To build and run Theseus in QEMU, simply run:<br />
+<code>make run</code></p>
+<p>Run <code>make help</code> to see other make targets. </p>
+<h4><a class="header" href="#note-rust-compiler-versions" id="note-rust-compiler-versions">Note: Rust compiler versions</a></h4>
+<p>Because we use the Rust nightly compiler (not stable), the Theseus Makefile checks to make sure that you're using the same version of Rust that we are. We were inspired to add this safety check when we failed to build other Rust projects put out there on Github because they used an earlier version of the nightly Rust compiler than what we had installed on our systems. To avoid this undiagnosable problem, we force you to use a specific version of <code>rustc</code> that is known to properly build Theseus. This version is upgraded as often as possible to align with the latest Rust nightly, but this is a best-effort policy.</p>
+<p>So, if you see a build error about the improper version of <code>rustc</code>, follow the instructions printed out at the end of the error message.</p>
+<h2><a class="header" href="#using-qemu" id="using-qemu">Using QEMU</a></h2>
+<p>QEMU allows us to run Theseus quickly and easily in its own virtual machine, completely segregated from the host machine and OS. 
+To exit Theseus in QEMU, press <code>Ctrl+Alt</code>, which releases your keyboard focus from the QEMU window. Then press <code>Ctrl+C</code> in the terminal window that you ran <code>make run</code> from originally to kill QEMU. </p>
+<p>To investigate the state of the running QEMU entity, you can switch to the QEMU console by pressing <code>Ctrl+Alt+2</code>. Switch back to the main window with <code>Ctrl+Alt+1</code>.</p>
+<h3><a class="header" href="#kvm-support" id="kvm-support">KVM Support</a></h3>
+<p>While not strictly required, KVM will speed up the execution of QEMU.
+To install KVM, run the following command:<br />
+<code>sudo apt-get install kvm</code>.<br />
+To enable KVM support, add <code>kvm=yes</code> to your make command, e.g., <code>make run kvm=yes</code>.</p>
+<h2><a class="header" href="#loading-theseus-through-pxe" id="loading-theseus-through-pxe">Loading Theseus Through PXE</a></h2>
+<p>The following instructions are a combination of <a href="https://www.ostechnix.com/how-to-install-pxe-server-on-ubuntu-16-04/">this</a> guide on OSTechNix to set up PXE for Ubuntu and <a href="https://wellsie.net/p/286/">this</a> guide by Andrew Wells for using an arbitrary ISO with PXE.</p>
+<p>PXE can be used to load Rust onto a target computer that is connected by LAN to the host machine used for development. To set up the host machine for PXE, first make the Theseus ISO by navigating to the directory Theseus is in and running:<br />
+<code>make iso</code></p>
+<p>Then, you will need to set up a TFTP and DHCP server which the test machine will access.</p>
+<h3><a class="header" href="#setting-up-the-tftp-server" id="setting-up-the-tftp-server">Setting up the TFTP Server</a></h3>
+<p>First, install all necessary packages and dependencies for TFTP:<br />
+<code>sudo apt-get install apache2 tftpd-hpa inetutils-inetd nasm</code><br />
+Edit the tftp-hpa configuration file:<br />
+<code>sudo nano /etc/default/tftpd-hpa</code><br />
+Add the following lines: </p>
+<pre><code>RUN_DAEMON=&quot;yes&quot;
+OPTIONS=&quot;-l -s /var/lib/tftpboot&quot;
+</code></pre>
+<p>Then, edit the inetd configuration file by opening the editor:<br />
+<code>sudo nano /etc/inetd.conf</code><br />
+And adding:<br />
+<code>tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot</code></p>
+<p>Restart the TFTP server and check to see if it's running:<br />
+<code>sudo systemctl restart tftpd-hpa</code><br />
+<code>sudo systemctl status tftpd-hpa</code></p>
+<p>If the TFTP server is unable to start and mentions an in-use socket, reopen the tftp-hpa configuration file,set the line that has <code>TFTP_ADDRESS=&quot;:69&quot;</code> to be equal to <code>6969</code> instead and restart the TFTP server. </p>
+<h3><a class="header" href="#setting-up-the-dhcp-server" id="setting-up-the-dhcp-server">Setting up the DHCP Server</a></h3>
+<p>First, install package for DHCP server:<br />
+<code>sudo apt-get install isc-dhcp-server</code></p>
+<p>Then run <code>ifconfig</code> to view available networking devices and find the network device name, e.g., <code>eth0</code>.</p>
+<p>Edit the <code>/etc/default/isc-dhcp-server</code> configuration file and add the network device name from the step above to &quot;INTERFACES&quot;. For me, this looks like <code>INTERFACES=&quot;eth0&quot;</code>.</p>
+<p>Configure an arbitrary IP address that will be used in the next step:<br />
+<code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code> 
+This command might have to be done each time the computer being used as a server is restarted. </p>
+<p>Edit the <code>/etc/dhcp/dhcpd.conf</code> file by uncommenting the line <code>authoritative;</code> and adding a subnet configuration such as the one below:</p>
+<pre><code>subnet 192.168.1.0 netmask 255.255.255.0 {
+  range 192.168.1.20 192.168.1.30;
+  option routers 192.168.1.1;
+  option broadcast-address 192.168.1.255;
+  default-lease-time 600;
+  max-lease-time 7200;
+}
+
+allow booting;
+allow bootp;
+option option-128 code 128 = string;
+option option-129 code 129 = text;
+next-server 192.168.1.105;
+filename &quot;pxelinux.0&quot;;
+</code></pre>
+<p>Restart the DHCP server and check to see if it's running:<br />
+<code>sudo systemctl restart isc-dhcp-server</code><br />
+<code>sudo systemctl status isc-dhcp-server</code></p>
+<h3><a class="header" href="#loading-the-theseus-iso-into-the-tftp-server" id="loading-the-theseus-iso-into-the-tftp-server">Loading the Theseus ISO Into the TFTP Server</a></h3>
+<p>In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.<br />
+<code>wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz</code><br />
+<code>tar -xzvf syslinux-*.tar.gz</code></p>
+<p>Then navigate to the memdisk folder and compile.<br />
+<code>cd syslinux-*/memdisk</code><br />
+<code>make memdisk</code></p>
+<p>Next, make a TFTP boot folder for Theseus and copy the memdisk binary into it along with the Theseus ISO:<br />
+<code>sudo mkdir /var/lib/tftpboot/theseus</code><br />
+<code>sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/</code><br />
+<code>sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/</code></p>
+<p>Navigate to the PXE configuration file:<br />
+<code>sudo nano /var/lib/tftpboot/pxelinux.cfg/default</code><br />
+And add Theseus as a menu option by adding the following:</p>
+<pre><code>label theseus
+    menu label Theseus
+    root (hd0,0)
+    kernel theseus/memdisk
+    append iso initrd=theseus/theseus-x86_64.iso raw
+</code></pre>
+<p>Finally, restart the DHCP server one more time and make sure it's running:<br />
+<code>sudo systemctl restart isc-dhcp-server</code><br />
+<code>sudo systemctl status isc-dhcp-server</code></p>
+<p>On the target computer, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the target computer is restarted, it should boot into a menu which displays booting into Theseus as an option. </p>
+<h3><a class="header" href="#subsequent-pxe-uses" id="subsequent-pxe-uses">Subsequent PXE Uses</a></h3>
+<p>After setting up PXE the first time, you can run <code>make pxe</code> to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier: 
+<code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code> </p>
+<h2><a class="header" href="#debugging" id="debugging">Debugging</a></h2>
+<p>GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us (<a href="http://os.phil-opp.com/set-up-gdb.html">details here</a>), so we can just quickly set it up with the following commands.</p>
+<p>First, install the following packages:<br />
+<code>sudo apt-get install texinfo flex bison python-dev ncurses-dev</code></p>
+<p>Then, from the base directory of the Theseus project, run this command to easily download and build it from an existing patched repo:<br />
+<code>curl -sf https://raw.githubusercontent.com/phil-opp/binutils-gdb/rust-os/build-rust-os-gdb.sh | sh</code></p>
+<p>After that, you should have a <code>rust-os-gdb</code> directory that contains the <code>gdb</code> executables and scripts. </p>
+<p>Then, simply run <code>make debug</code> to build and run Theseus in QEMU, which will pause the OS's execution until we attach our patched GDB instance.<br />
+To attach the debugger to our paused QEMU instance, run <code>make gdb</code> in another terminal. QEMU will be paused until we move the debugger forward, with <code>n</code> to step through or <code>c</code> to continue running the debugger.<br />
+Try setting a breakpoint at the kernel's entry function using <code>b nano_core::nano_core_start</code> or at a specific file/line, e.g., <code>b scheduler.rs:40</code>.</p>
+<h2><a class="header" href="#documentation" id="documentation">Documentation</a></h2>
+<p>Once your build environment is fully set up, you can generate Theseus's documentation in standard Rust docs.rs format. 
+To do so, simply run:<br />
+<code>make doc</code></p>
+<p>To view the documentation in a browser on your local machine, run:<br />
+<code>make view-doc</code></p>
+<h2><a class="header" href="#ide-setup" id="ide-setup">IDE Setup</a></h2>
+<p>Our personal preference is to use Visual Studio Code (VS Code), which has excellent, official support from the Rust language team. Other options are available <a href="https://areweideyet.com/">here</a>, but we don't recommend them.</p>
+<p>For VS Code, recommended plugins are:</p>
+<ul>
+<li>Rust (rls), by rust-lang</li>
+<li>Better TOML, by bungcip</li>
+<li>x86 and x86_64 Assembly, by 13xforever</li>
+</ul>
+<h2><a class="header" href="#license" id="license">License</a></h2>
+<p>The source code is licensed under the MIT License. See the LICENSE-MIT file for more. </p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="git.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="app.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="git.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="app.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+
+    </body>
+</html>

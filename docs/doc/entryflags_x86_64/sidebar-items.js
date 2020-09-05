@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["EntryFlags","Page table entry flags."]]});

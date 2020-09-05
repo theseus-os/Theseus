@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["write_fmt","Write formatted arguments to the COM1 serial port."],["write_str","Write the given string to the COM1 serial port."]]});

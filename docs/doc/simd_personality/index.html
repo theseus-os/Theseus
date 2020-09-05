@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `simd_personality` crate."><meta name="keywords" content="rust, rustlang, rust-lang, simd_personality"><title>simd_personality - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../simd_personality/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><p class='location'>Crate simd_personality</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all simd_personality's items</p></a><p class='location'></p><script>window.sidebarCurrent = {name: 'simd_personality', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/simd_personality/lib.rs.html#1-212' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>simd_personality</a></span></h1><div class='docblock'><p>Management of two kernel personalities, one for SIMD-enabled code, and one for regular code. </p>
+<p>This crate is responsible for creating and managing multiple <code>CrateNamespace</code>s so that Theseus
+can run two instances of code side-by-side, like library OS-style personalities. 
+This crate itself is part of the regular non-SIMD world, not the SIMD world. </p>
+<p>There are two considerations here to ensure correctness by saving/restoring SIMD registers: 
+how to deal with it for context switching, and also for interrupt handling.
+Both of these policies are determined per-core as follows:</p>
+<h3 id="context-switching" class="section-header"><a href="#context-switching">Context Switching</a></h3>
+<ul>
+<li>If there is one or zero SIMD-enabled <code>Task</code>s running on a given core, 
+then all <code>Task</code>s running on that core can use the standard, 
+non-SIMD-enabled context switching routine. 
+This is because there is no need to save and restore SIMD registers (e.g., xmm),
+as only a single <code>Task</code> will ever use them. </li>
+<li>If there are multiple SIMD-enabled <code>Task</code>s running on a given core,
+then all of the SIMD <code>Task</code>s on that core must use the SIMD-enabled context switching routine,
+which is found in the <code>context_switch_sse</code> crate. </li>
+</ul>
+<p>Note that there is no danger in forcing all SIMD Tasks to always use the SIMD-enabled context switching routine,
+it will always be correct to do so.
+Each Task can have its own Context and context_switch routine, based on whether or not it uses SIMD instructions,
+and that can be determined statically and independently for each task, without considering which other tasks are running. 
+We don't really need personalities for that, since the <code>context_switch</code> routines are self-contained.<br />
+However, that static policy misses out on the performance optimization of 
+not having to save/restore SIMD registers when only a single SIMD Task is running on a given core.</p>
+<h3 id="interrupt-handling" class="section-header"><a href="#interrupt-handling">Interrupt Handling</a></h3>
+<ul>
+<li>
+<p>If interrupt handlers are only ever compiled for the regular world, i.e., 
+no interrupt handlers exist that are compiled to use SIMD instructions,
+then we do not have to save/restore SIMD registers on an interrupt because
+we're guaranteed that no interrupt handling code can ever use (overwrite) SIMD registers. 
+Thus, even if there are some SIMD enabled tasks running on a given core, an interrupt handler need not save
+those SIMD registers if it cannot possibly ever touch them. </p>
+</li>
+<li>
+<p>If interrupt handlers <em>are</em> compiled for the SIMD world and use SIMD instructions in the handler 
+(or any function accessible from the interrupt handler), then they must (and obviously will) save SIMD registers.
+In fact, I don't believe it's possible to compile an interrupt handler that uses SIMD instructions but doesn't save SIMD registers
+(at least while we're stil using the special x86 interrupt calling convention to have LLVM do it for us).</p>
+</li>
+</ul>
+<p>Thus, the best option is just to require that any SIMD-enabled interrupt handlers must save all SIMD registers, 
+which is a rule determined completely independently of which tasks are running on that core. 
+In general, this is a good rule, because it's poor design to have an interrupt handler do a lot of work,
+such as processing data in a way that would need SIMD instructions. 
+Instead, those processing stages should be moved out of the interrupt handler and into a separate Task elsewhere,
+i.e., a classic bottom-half/top-half design.</p>
+</div></section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../";window.currentCrate = "simd_personality";</script><script src="../aliases.js"></script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>

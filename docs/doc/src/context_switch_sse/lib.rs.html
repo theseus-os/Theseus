@@ -1,0 +1,295 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `kernel/context_switch_sse/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../context_switch_sse/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! This crate contains structures and routines for context switching </span>
+<span class="doccomment">//! when SSE extensions are enabled. </span>
+
+<span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>, <span class="ident">naked_functions</span>)]</span>
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">context_switch_regular</span>;
+
+<span class="kw">use</span> <span class="ident">context_switch_regular</span>::<span class="ident">ContextRegular</span>;
+
+
+<span class="doccomment">/// The registers saved before a context switch and restored after a context switch</span>
+<span class="doccomment">/// for SSE-enabled Tasks.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ContextSSE</span> {
+    <span class="comment">// The order of the registers here MUST MATCH the order of </span>
+    <span class="comment">// registers popped in the context_switch() function below. </span>
+    <span class="ident">xmm15</span>: <span class="ident">u128</span>,
+    <span class="ident">xmm14</span>: <span class="ident">u128</span>,   
+    <span class="ident">xmm13</span>: <span class="ident">u128</span>,   
+    <span class="ident">xmm12</span>: <span class="ident">u128</span>,   
+    <span class="ident">xmm11</span>: <span class="ident">u128</span>,   
+    <span class="ident">xmm10</span>: <span class="ident">u128</span>,   
+    <span class="ident">xmm9</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm8</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm7</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm6</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm5</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm4</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm3</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm2</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm1</span>:  <span class="ident">u128</span>,   
+    <span class="ident">xmm0</span>:  <span class="ident">u128</span>, 
+    <span class="ident">regular</span>: <span class="ident">ContextRegular</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">ContextSSE</span> {
+    <span class="doccomment">/// Creates a new ContextSSE struct that will cause the</span>
+    <span class="doccomment">/// SSE-enabled Task containing it to begin its execution at the given `rip`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">rip</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ContextSSE</span> {
+        <span class="ident">ContextSSE</span> {
+            <span class="ident">xmm15</span>: <span class="number">0</span>,
+            <span class="ident">xmm14</span>: <span class="number">0</span>,   
+            <span class="ident">xmm13</span>: <span class="number">0</span>,   
+            <span class="ident">xmm12</span>: <span class="number">0</span>,   
+            <span class="ident">xmm11</span>: <span class="number">0</span>,   
+            <span class="ident">xmm10</span>: <span class="number">0</span>,   
+            <span class="ident">xmm9</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm8</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm7</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm6</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm5</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm4</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm3</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm2</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm1</span>:  <span class="number">0</span>,   
+            <span class="ident">xmm0</span>:  <span class="number">0</span>,   
+            <span class="ident">regular</span>: <span class="ident">ContextRegular</span>::<span class="ident">new</span>(<span class="ident">rip</span>),
+        }
+    }
+}
+
+
+<span class="doccomment">/// An assembly macro for saving regular x86_64 registers.</span>
+<span class="doccomment">/// by pushing them onto the stack.</span>
+<span class="attribute">#[<span class="ident">macro_export</span>]</span>
+<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">save_registers_sse</span> {
+    () <span class="op">=</span><span class="op">&gt;</span> (
+        <span class="macro">asm</span><span class="macro">!</span>(<span class="string">&quot;
+            # save all of the xmm registers (for SSE)
+            # each register is 16 bytes (128 bits), and there are 16 of them
+            lea rsp, [rsp - 16*16]
+            movdqu [rsp + 16*0],  xmm0   # push xmm0
+            movdqu [rsp + 16*1],  xmm1   # push xmm1
+            movdqu [rsp + 16*2],  xmm2   # push xmm2
+            movdqu [rsp + 16*3],  xmm3   # push xmm3
+            movdqu [rsp + 16*4],  xmm4   # push xmm4
+            movdqu [rsp + 16*5],  xmm5   # push xmm5
+            movdqu [rsp + 16*6],  xmm6   # push xmm6
+            movdqu [rsp + 16*7],  xmm7   # push xmm7
+            movdqu [rsp + 16*8],  xmm8   # push xmm8
+            movdqu [rsp + 16*9],  xmm9   # push xmm9
+            movdqu [rsp + 16*10], xmm10  # push xmm10
+            movdqu [rsp + 16*11], xmm11  # push xmm11
+            movdqu [rsp + 16*12], xmm12  # push xmm12
+            movdqu [rsp + 16*13], xmm13  # push xmm13
+            movdqu [rsp + 16*14], xmm14  # push xmm14
+            movdqu [rsp + 16*15], xmm15  # push xmm15
+            &quot;</span>
+            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
+        );
+    );
+}
+
+
+<span class="doccomment">/// An assembly macro for saving regular x86_64 registers.</span>
+<span class="doccomment">/// by pushing them onto the stack.</span>
+<span class="attribute">#[<span class="ident">macro_export</span>]</span>
+<span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">restore_registers_sse</span> {
+    () <span class="op">=</span><span class="op">&gt;</span> (
+        <span class="macro">asm</span><span class="macro">!</span>(<span class="string">&quot;
+            # restore all of the xmm registers
+            movdqu xmm15, [rsp + 16*15]   # pop xmm15
+            movdqu xmm14, [rsp + 16*14]   # pop xmm14
+            movdqu xmm13, [rsp + 16*13]   # pop xmm13
+            movdqu xmm12, [rsp + 16*12]   # pop xmm12
+            movdqu xmm11, [rsp + 16*11]   # pop xmm11
+            movdqu xmm10, [rsp + 16*10]   # pop xmm10
+            movdqu xmm9,  [rsp + 16*9]    # pop xmm9
+            movdqu xmm8,  [rsp + 16*8]    # pop xmm8
+            movdqu xmm7,  [rsp + 16*7]    # pop xmm7
+            movdqu xmm5,  [rsp + 16*5]    # pop xmm5
+            movdqu xmm6,  [rsp + 16*6]    # pop xmm6
+            movdqu xmm4,  [rsp + 16*4]    # pop xmm4
+            movdqu xmm3,  [rsp + 16*3]    # pop xmm3
+            movdqu xmm2,  [rsp + 16*2]    # pop xmm2
+            movdqu xmm1,  [rsp + 16*1]    # pop xmm1
+            movdqu xmm0,  [rsp + 16*0]    # pop xmm0
+            lea rsp, [rsp + 16*16]
+            &quot;</span>
+            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
+        );
+    );
+}
+
+
+<span class="doccomment">/// Switches context from an SSE Task to another SSE Task.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// # Arguments</span>
+<span class="doccomment">/// * First argument  (in `RDI`): mutable pointer to the previous task&#39;s stack pointer</span>
+<span class="doccomment">/// * Second argument (in `RSI`): the value of the next task&#39;s stack pointer</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// # Safety</span>
+<span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
+<span class="attribute">#[<span class="ident">naked</span>]</span>
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+    <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
+    <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
+    <span class="comment">// or at any point before, in between, or after the following macros.</span>
+    <span class="macro">save_registers_regular</span><span class="macro">!</span>();
+    <span class="macro">save_registers_sse</span><span class="macro">!</span>();
+    <span class="macro">switch_stacks</span><span class="macro">!</span>();
+    <span class="macro">restore_registers_sse</span><span class="macro">!</span>();
+    <span class="macro">restore_registers_regular</span><span class="macro">!</span>();
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "context_switch_sse";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>

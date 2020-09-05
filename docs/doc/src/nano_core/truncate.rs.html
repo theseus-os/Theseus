@@ -1,0 +1,250 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `kernel/nano_core/src/truncate.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>truncate.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../nano_core/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! This module is a hack to get around the lack of the </span>
+<span class="doccomment">//! `__truncdfsf2` function in the `compiler_builtins` crate.</span>
+<span class="doccomment">//! See this: &lt;https://github.com/rust-lang-nursery/compiler-builtins/pull/262&gt;</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This code was taken from this commit from above-linked pull request to the compiler_builtins crate:</span>
+<span class="doccomment">//! &lt;https://github.com/rust-lang-nursery/compiler-builtins/commit/baab4fd89cdd945e46fed31166e5dcad7224ed87&gt;</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! Unfortunately, it was later reverted since it caused failures on ARM, so I don&#39;t know</span>
+
+<span class="kw">use</span> <span class="ident">compiler_builtins</span>::<span class="ident">float</span>::<span class="ident">Float</span>;
+<span class="kw">use</span> <span class="ident">compiler_builtins</span>::<span class="ident">int</span>::{<span class="ident">CastInto</span>, <span class="ident">Int</span>};
+
+<span class="doccomment">/// Generic conversion from a wider to a narrower IEEE-754 floating-point type</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
+<span class="kw">fn</span> <span class="ident">truncate</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">Float</span>, <span class="ident">R</span>: <span class="ident">Float</span><span class="op">&gt;</span>(<span class="ident">a</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>
+<span class="kw">where</span>
+    <span class="ident">F</span>::<span class="ident">Int</span>: <span class="ident">CastInto</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
+    <span class="ident">u64</span>: <span class="ident">CastInto</span><span class="op">&lt;</span><span class="ident">F</span>::<span class="ident">Int</span><span class="op">&gt;</span>,
+    <span class="ident">F</span>::<span class="ident">Int</span>: <span class="ident">CastInto</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
+    <span class="ident">u32</span>: <span class="ident">CastInto</span><span class="op">&lt;</span><span class="ident">F</span>::<span class="ident">Int</span><span class="op">&gt;</span>,
+    <span class="ident">u32</span>: <span class="ident">CastInto</span><span class="op">&lt;</span><span class="ident">R</span>::<span class="ident">Int</span><span class="op">&gt;</span>,
+    <span class="ident">R</span>::<span class="ident">Int</span>: <span class="ident">CastInto</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
+    <span class="ident">F</span>::<span class="ident">Int</span>: <span class="ident">CastInto</span><span class="op">&lt;</span><span class="ident">R</span>::<span class="ident">Int</span><span class="op">&gt;</span>,
+{
+    <span class="kw">let</span> <span class="ident">src_one</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">Int</span>::<span class="ident">ONE</span>;
+    <span class="kw">let</span> <span class="ident">src_bits</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">BITS</span>;
+    <span class="kw">let</span> <span class="ident">src_sign_bits</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">SIGNIFICAND_BITS</span>;
+    <span class="kw">let</span> <span class="ident">src_exp_bias</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">EXPONENT_BIAS</span>;
+    <span class="kw">let</span> <span class="ident">src_min_normal</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">IMPLICIT_BIT</span>;
+    <span class="kw">let</span> <span class="ident">src_infinity</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">EXPONENT_MASK</span>;
+    <span class="kw">let</span> <span class="ident">src_sign_mask</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">SIGN_MASK</span> <span class="kw">as</span> <span class="ident">F</span>::<span class="ident">Int</span>;
+    <span class="kw">let</span> <span class="ident">src_abs_mask</span> <span class="op">=</span> <span class="ident">src_sign_mask</span> <span class="op">-</span> <span class="ident">src_one</span>;
+    <span class="kw">let</span> <span class="ident">src_qnan</span> <span class="op">=</span> <span class="ident">F</span>::<span class="ident">SIGNIFICAND_MASK</span>;
+    <span class="kw">let</span> <span class="ident">src_nan_code</span> <span class="op">=</span> <span class="ident">src_qnan</span> <span class="op">-</span> <span class="ident">src_one</span>;
+
+    <span class="kw">let</span> <span class="ident">dst_bits</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">BITS</span>;
+    <span class="kw">let</span> <span class="ident">dst_sign_bits</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">SIGNIFICAND_BITS</span>;
+    <span class="kw">let</span> <span class="ident">dst_inf_exp</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">EXPONENT_MAX</span>;
+    <span class="kw">let</span> <span class="ident">dst_exp_bias</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">EXPONENT_BIAS</span>;
+
+    <span class="kw">let</span> <span class="ident">dst_zero</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">Int</span>::<span class="ident">ZERO</span>;
+    <span class="kw">let</span> <span class="ident">dst_one</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">Int</span>::<span class="ident">ONE</span>;
+    <span class="kw">let</span> <span class="ident">dst_qnan</span> <span class="op">=</span> <span class="ident">R</span>::<span class="ident">SIGNIFICAND_MASK</span>;
+    <span class="kw">let</span> <span class="ident">dst_nan_code</span> <span class="op">=</span> <span class="ident">dst_qnan</span> <span class="op">-</span> <span class="ident">dst_one</span>;
+
+    <span class="kw">let</span> <span class="ident">round_mask</span> <span class="op">=</span> (<span class="ident">src_one</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">src_sign_bits</span> <span class="op">-</span> <span class="ident">dst_sign_bits</span>) <span class="op">-</span> <span class="ident">src_one</span>;
+    <span class="kw">let</span> <span class="ident">half</span> <span class="op">=</span> <span class="ident">src_one</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">src_sign_bits</span> <span class="op">-</span> <span class="ident">dst_sign_bits</span> <span class="op">-</span> <span class="number">1</span>;
+    <span class="kw">let</span> <span class="ident">underflow_exp</span> <span class="op">=</span> <span class="ident">src_exp_bias</span> <span class="op">+</span> <span class="number">1</span> <span class="op">-</span> <span class="ident">dst_exp_bias</span>;
+    <span class="kw">let</span> <span class="ident">overflow_exp</span> <span class="op">=</span> <span class="ident">src_exp_bias</span> <span class="op">+</span> <span class="ident">dst_inf_exp</span> <span class="op">-</span> <span class="ident">dst_exp_bias</span>;
+    <span class="kw">let</span> <span class="ident">underflow</span>: <span class="ident">F</span>::<span class="ident">Int</span> <span class="op">=</span> <span class="ident">underflow_exp</span>.<span class="ident">cast</span>(); <span class="comment">// &lt;&lt; src_sign_bits;</span>
+    <span class="kw">let</span> <span class="ident">overflow</span>: <span class="ident">F</span>::<span class="ident">Int</span> <span class="op">=</span> <span class="ident">overflow_exp</span>.<span class="ident">cast</span>(); <span class="comment">//&lt;&lt; src_sign_bits;</span>
+
+    <span class="kw">let</span> <span class="ident">a_abs</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">repr</span>() <span class="op">&amp;</span> <span class="ident">src_abs_mask</span>;
+    <span class="kw">let</span> <span class="ident">sign</span> <span class="op">=</span> <span class="ident">a</span>.<span class="ident">repr</span>() <span class="op">&amp;</span> <span class="ident">src_sign_mask</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">abs_result</span>: <span class="ident">R</span>::<span class="ident">Int</span>;
+
+    <span class="kw">let</span> <span class="ident">src_underflow</span> <span class="op">=</span> <span class="ident">underflow</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">src_sign_bits</span>;
+    <span class="kw">let</span> <span class="ident">src_overflow</span> <span class="op">=</span> <span class="ident">overflow</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">src_sign_bits</span>;
+
+    <span class="kw">if</span> <span class="ident">a_abs</span>.<span class="ident">wrapping_sub</span>(<span class="ident">src_underflow</span>) <span class="op">&lt;</span> <span class="ident">a_abs</span>.<span class="ident">wrapping_sub</span>(<span class="ident">src_overflow</span>) {
+        <span class="comment">// The exponent of a is within the range of normal numbers</span>
+        <span class="kw">let</span> <span class="ident">bias_delta</span>: <span class="ident">R</span>::<span class="ident">Int</span> <span class="op">=</span> (<span class="ident">src_exp_bias</span> <span class="op">-</span> <span class="ident">dst_exp_bias</span>).<span class="ident">cast</span>();
+        <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">a_abs</span>.<span class="ident">cast</span>();
+        <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">abs_result</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">src_sign_bits</span> <span class="op">-</span> <span class="ident">dst_sign_bits</span>;
+        <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">abs_result</span> <span class="op">-</span> <span class="ident">bias_delta</span>.<span class="ident">wrapping_shl</span>(<span class="ident">dst_sign_bits</span>);
+        <span class="kw">let</span> <span class="ident">round_bits</span>: <span class="ident">F</span>::<span class="ident">Int</span> <span class="op">=</span> <span class="ident">a_abs</span> <span class="op">&amp;</span> <span class="ident">round_mask</span>;
+        <span class="ident">abs_result</span> <span class="op">+</span><span class="op">=</span> <span class="kw">if</span> <span class="ident">round_bits</span> <span class="op">&gt;</span> <span class="ident">half</span> {
+            <span class="ident">dst_one</span>
+        } <span class="kw">else</span> {
+            <span class="ident">abs_result</span> <span class="op">&amp;</span> <span class="ident">dst_one</span>
+        };
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">a_abs</span> <span class="op">&gt;</span> <span class="ident">src_infinity</span> {
+        <span class="comment">// a is NaN.</span>
+        <span class="comment">// Conjure the result by beginning with infinity, setting the qNaN</span>
+        <span class="comment">// bit and inserting the (truncated) trailing NaN field</span>
+        <span class="kw">let</span> <span class="ident">nan_result</span>: <span class="ident">R</span>::<span class="ident">Int</span> <span class="op">=</span> (<span class="ident">a_abs</span> <span class="op">&amp;</span> <span class="ident">src_nan_code</span>).<span class="ident">cast</span>();
+        <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">dst_inf_exp</span>.<span class="ident">cast</span>();
+        <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">abs_result</span>.<span class="ident">wrapping_shl</span>(<span class="ident">dst_sign_bits</span>);
+        <span class="ident">abs_result</span> <span class="op">|</span><span class="op">=</span> <span class="ident">dst_qnan</span>;
+        <span class="ident">abs_result</span> <span class="op">|</span><span class="op">=</span> (<span class="ident">nan_result</span> <span class="op">&gt;</span><span class="op">&gt;</span> (<span class="ident">src_sign_bits</span> <span class="op">-</span> <span class="ident">dst_sign_bits</span>)) <span class="op">&amp;</span> <span class="ident">dst_nan_code</span>;
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">a_abs</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">src_overflow</span> {
+        <span class="comment">// a overflows to infinity.</span>
+        <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">dst_inf_exp</span>.<span class="ident">cast</span>();
+        <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">abs_result</span>.<span class="ident">wrapping_shl</span>(<span class="ident">dst_sign_bits</span>);
+    } <span class="kw">else</span> {
+        <span class="comment">// a underflows on conversion to the destination type or is an exact</span>
+        <span class="comment">// zero. The result may be a denormal or zero. Extract the exponent</span>
+        <span class="comment">// to get the shift amount for the denormalization.</span>
+        <span class="kw">let</span> <span class="ident">a_exp</span> <span class="op">=</span> <span class="ident">a_abs</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">src_sign_bits</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">shift</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">a_exp</span>.<span class="ident">cast</span>();
+        <span class="ident">shift</span> <span class="op">=</span> <span class="ident">src_exp_bias</span> <span class="op">-</span> <span class="ident">dst_exp_bias</span> <span class="op">-</span> <span class="ident">shift</span> <span class="op">+</span> <span class="number">1</span>;
+
+        <span class="kw">let</span> <span class="ident">significand</span> <span class="op">=</span> (<span class="ident">a</span>.<span class="ident">repr</span>() <span class="op">&amp;</span> <span class="ident">src_sign_mask</span>) <span class="op">|</span> <span class="ident">src_min_normal</span>;
+        <span class="kw">if</span> <span class="ident">shift</span> <span class="op">&gt;</span> <span class="ident">src_sign_bits</span> {
+            <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">dst_zero</span>;
+        } <span class="kw">else</span> {
+            <span class="kw">let</span> <span class="ident">sticky</span> <span class="op">=</span> <span class="ident">significand</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">src_bits</span> <span class="op">-</span> <span class="ident">shift</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">denormalized_significand</span>: <span class="ident">R</span>::<span class="ident">Int</span> <span class="op">=</span> <span class="ident">significand</span>.<span class="ident">cast</span>();
+            <span class="kw">let</span> <span class="ident">sticky_shift</span>: <span class="ident">u32</span> <span class="op">=</span> <span class="ident">sticky</span>.<span class="ident">cast</span>();
+            <span class="ident">denormalized_significand</span> <span class="op">=</span> <span class="ident">denormalized_significand</span> <span class="op">&gt;</span><span class="op">&gt;</span> (<span class="ident">shift</span> <span class="op">|</span> <span class="ident">sticky_shift</span>);
+            <span class="ident">abs_result</span> <span class="op">=</span> <span class="ident">denormalized_significand</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">src_sign_bits</span> <span class="op">-</span> <span class="ident">dst_sign_bits</span>;
+            <span class="kw">let</span> <span class="ident">round_bits</span> <span class="op">=</span> <span class="ident">denormalized_significand</span> <span class="op">&amp;</span> <span class="ident">round_mask</span>.<span class="ident">cast</span>();
+            <span class="kw">if</span> <span class="ident">round_bits</span> <span class="op">&gt;</span> <span class="ident">half</span>.<span class="ident">cast</span>() {
+                <span class="ident">abs_result</span> <span class="op">+</span><span class="op">=</span> <span class="ident">dst_one</span>; <span class="comment">// Round to nearest</span>
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">round_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">half</span>.<span class="ident">cast</span>() {
+                <span class="ident">abs_result</span> <span class="op">+</span><span class="op">=</span> <span class="ident">abs_result</span> <span class="op">&amp;</span> <span class="ident">dst_one</span>; <span class="comment">// Ties to even</span>
+            }
+        }
+    }
+    <span class="comment">// Finally apply the sign bit</span>
+    <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="ident">sign</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">src_bits</span> <span class="op">-</span> <span class="ident">dst_bits</span>;
+    <span class="ident">R</span>::<span class="ident">from_repr</span>(<span class="ident">abs_result</span> <span class="op">|</span> <span class="ident">s</span>.<span class="ident">cast</span>())
+}
+
+<span class="attribute">#[<span class="ident">no_mangle</span>]</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>  <span class="ident">__truncdfsf2</span>(<span class="ident">a</span>: <span class="ident">f64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">f32</span> {
+    <span class="ident">truncate</span>(<span class="ident">a</span>)
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;arm&quot;</span>)]</span>
+<span class="attribute">#[<span class="ident">no_mangle</span>]</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>  <span class="ident">__truncdfsf2vfp</span>(<span class="ident">a</span>: <span class="ident">f64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">f32</span> {
+    <span class="ident">a</span> <span class="kw">as</span> <span class="ident">f32</span>
+}</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../";window.currentCrate = "nano_core";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>

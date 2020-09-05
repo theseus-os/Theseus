@@ -1,0 +1,631 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Theseus OS Book</title>
+        
+        <meta name="robots" content="noindex" />
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="The book-style documentation of the design and implementation of Theseus, a companion to its source-level documentation.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="favicon.png">
+        
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="ch00-00-introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="idea.html"><strong aria-hidden="true">1.</strong> High-level ideas</a></li><li class="chapter-item expanded "><a href="ch00.html"><strong aria-hidden="true">2.</strong> How Theseus works</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="booting.html"><strong aria-hidden="true">2.1.</strong> Booting process</a></li><li class="chapter-item expanded "><a href="build_process.html"><strong aria-hidden="true">2.2.</strong> Build process</a></li></ol></li><li class="chapter-item expanded "><a href="ch01.html"><strong aria-hidden="true">3.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="git.html"><strong aria-hidden="true">3.1.</strong> git Guidlines</a></li></ol></li><li class="chapter-item expanded "><a href="chapter_2.html"><strong aria-hidden="true">4.</strong> Development Environment</a></li><li class="chapter-item expanded "><a href="app.html"><strong aria-hidden="true">5.</strong> Developing an Application</a></li><li class="chapter-item expanded "><a href="display.html"><strong aria-hidden="true">6.</strong> Display Subsystem</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="window_manager.html"><strong aria-hidden="true">6.1.</strong> How Window Manager Works</a></li><li class="chapter-item expanded "><a href="window_tutorial.html"><strong aria-hidden="true">6.2.</strong> Tutorial of the display subsystem</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">The Theseus OS Book</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" name="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1><a class="header" href="#overview-of-theseus" id="overview-of-theseus">Overview of Theseus</a></h1>
+<p>Theseus is a new OS written from scratch in Rust, with the goals of runtime composability and state spill freedom.</p>
+<p>The Theseus kernel is composed of many small entities, each contained within a single Rust crate, and built all together as a cargo virtual workspace. 
+All crates in Theseus are listed in the sidebar to the left. Click on a crate name to read more about it, and the functions and types it provides.
+Each crate is its own project with its own &quot;Cargo.toml&quot; manifest file that specifies that crate's dependencies and features.</p>
+<h2><a class="header" href="#basic-overview-of-all-crates" id="basic-overview-of-all-crates">Basic Overview of All Crates</a></h2>
+<p>One-line summaries of what each crate includes (may be incomplete):</p>
+<ul>
+<li><code>acpi</code>: ACPI (Advanced Configuration and Power Interface) support for Theseus, including multicore discovery.</li>
+<li><code>apic</code>: APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic.</li>
+<li><code>ap_start</code>: High-level initialization code that runs on each AP (core) after it has booted up</li>
+<li><code>ata_pio</code>: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.</li>
+<li><code>captain</code>: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.</li>
+<li><code>event_types</code>: The types used for passing input and output events across the system.</li>
+<li><code>device_manager</code>: Code for handling the sequence required to initialize each driver.</li>
+<li><code>e1000</code>: Support for the e1000 NIC and driver.</li>
+<li><code>exceptions_early</code>: Early exception handlers that do nothing but print an error and hang.</li>
+<li><code>exceptions_full</code>: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.</li>
+<li><code>fs_node</code>: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem</li>
+<li><code>gdt</code>: GDT (Global Descriptor Table) support (x86 only) for Theseus.</li>
+<li><code>interrupts</code>: Interrupt configuration and handlers for Theseus. </li>
+<li><code>ioapic</code>: IOAPIC (I/O Advanced Programmable Interrupt Controller) support (x86 only) for Theseus.</li>
+<li><code>keyboard</code>: simple PS2 keyboard driver.</li>
+<li><code>memory</code>: The virtual memory subsystem.</li>
+<li><code>mod_mgmt</code>: Module management, including parsing, loading, linking, unloading, and metadata management.</li>
+<li><code>mouse</code>: simple PS2 mouse driver.</li>
+<li><code>nano-core</code>: a tiny module that is responsible for bootstrapping the OS at startup.</li>
+<li><code>panic_entry</code>: Default entry point for panics and unwinding, as required by the Rust compiler.</li>
+<li><code>panic_wrapper</code>: Wrapper functions for handling and propagating panics.</li>
+<li><code>path</code>: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct </li>
+<li><code>pci</code>: Basic PCI support for Theseus, x86 only.</li>
+<li><code>pic</code>: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.</li>
+<li><code>pit_clock</code>: PIT (Programmable Interval Timer) support for Theseus, x86 only.</li>
+<li><code>ps2</code>: general driver for interfacing with PS2 devices and issuing PS2 commands (for mouse/keyboard).</li>
+<li><code>root</code>: special implementation of the root directory; initializes the root of the filesystem</li>
+<li><code>rtc</code>: simple driver for handling the Real Time Clock chip.</li>
+<li><code>scheduler</code>: The scheduler and runqueue management.</li>
+<li><code>serial_port</code>: simple driver for writing to the serial_port, used mostly for debugging.</li>
+<li><code>spawn</code>: Functions and wrappers for spawning new Tasks.</li>
+<li><code>task</code>: Task types and structure definitions, a Task is a thread of execution.</li>
+<li><code>text_display</code> : Defines a trait for anything that can display text to the screen</li>
+<li><code>tsc</code>: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.</li>
+<li><code>tss</code>: TSS (Task State Segment support (x86 only) for Theseus.</li>
+<li><code>vfs_node</code>: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File</li>
+<li><code>vga_buffer</code>: Simple routines for printing to the screen using the x86 VGA buffer text mode.</li>
+</ul>
+<h2><a class="header" href="#performance-in-hardware-isolation-in-software" id="performance-in-hardware-isolation-in-software">Performance in Hardware, Isolation in Software.</a></h2>
+<p>The PHIS principle is one of the guiding lights in the design of Theseus. 
+It states that hardware should only be responsible for improving performance and efficiency,
+but should have no role (or a minimal role) in providing isolation, safety, and security. 
+Those characteristics should be the responsibility of software, not hardware. </p>
+<p>One of Theseus's goals is to transcend the reliance on hardware to provide isolation,
+mainly by completely foregoing hardware privilege levels, such as x86's Ring 0 - Ring 3 distinctions. 
+Instead, we run all code at Ring 0, including user applications that are written in purely safe Rust,
+because we can guarantee at compile time that a given application or kernel module 
+cannot violate the isolation between modules, rendering hardware privilege levels obsolete. </p>
+<p>Why? Meltdown, Spectre... need I say more?</p>
+<h2><a class="header" href="#performance" id="performance">Performance</a></h2>
+<ul>
+<li>Better support for architectural extensions such as SIMD instructions. (Why Linux is not adequate)</li>
+<li>Singualrity argument: no boundary crossing (single privilege level, single address space). </li>
+</ul>
+<p>// TODO mention TSA precheck analogy? </p>
+<p>TODO: finish this up.</p>
+<h2><a class="header" href="#isolation" id="isolation">Isolation</a></h2>
+<ul>
+<li>Language support through Rust.</li>
+</ul>
+<h1><a class="header" href="#how-theseus-works" id="how-theseus-works">How Theseus works</a></h1>
+<h1><a class="header" href="#booting-process-and-flow-of-execution" id="booting-process-and-flow-of-execution">Booting Process and Flow of Execution</a></h1>
+<p>The kernel takes over from the bootloader (GRUB, or another multiboot2-compatible bootloader) in <code>nano_core/src//arch_x86_64/boot.asm:start</code> and is running in <em>32-bit protected mode</em>. 
+After initializing paging and other things, the assembly file <code>boot.asm</code> jumps to <code>long_mode_start</code>, which runs it code in long mode. 
+Then, it jumps to <code>start_high</code>, so now we're running in the higher half because Theseus is a [higher-half kernel]ps://wiki.osdev.org/Higher_Half_Kernel). 
+We then set up a new Global Descriptor Table (GDT), segmentation registers, and finally call the Rust code entry t <a href="../nano_core/fn.nano_core_start.html"><code>nano_core_start()</code></a> with the address of the multiboot2 boot rmation structure as the first argument (in register RDI).
+After calling <code>nano_core_start</code>, the assembly files are no longer used, and <code>nano_core_start</code> should never rn. </p>
+<h1><a class="header" href="#theseuss-build-process" id="theseuss-build-process">Theseus's Build Process</a></h1>
+<p>Theseus uses the <a href="https://doc.rust-lang.org/cargo/reference/fest.html#the-workspace-section">cargo virtual workspace</a> feature to group all of the crates together into a single meta project, which sigificantly speeds up build times.</p>
+<p>The top-level Makefile basically just invokes the Rust toolchain and compiler, copies the built object files into a top-level build directory, and then generates a bootable .iso image using various bootloader tools.
+We build all of the Rust code using <a href="https://github.com/ric/xargo"><code>xargo</code></a>, a cross-compiler toolchain that wraps the default Rust <code>cargo</code>.
+The only special action it takes is to build the <code>nano_core</code> separately and fully link it against the architecture-specific assembly code in <code>nano_core/boot</code> into a static binary.</p>
+<h2><a class="header" href="#debug-vs-release-mode" id="debug-vs-release-mode">Debug vs. Release Mode</a></h2>
+<p>Theseus can be built in a variety of modes, but offers two presets: <strong>debug</strong> and <strong>release</strong> build modes.
+By default, Theseus is built in release mode for usable performance within an emulator like QEMU.
+To build in debug mode, set the <code>BUILD_MODE</code> environment variable when running <code>make</code>, like so:<br />
+<code>make run BUILD_MODE=debug</code></p>
+<p>There is a special file <code>cfg/Config.mk</code> that contains the build mode options as well as other configuration ons used in the kernel Makefile. 
+As with most languages, release mode in Rust is <em>way</em> faster, but it does take longer to compile and can be difficult to attach a debugger.</p>
+<h2><a class="header" href="#runtime-loading-and-linking-of-crates" id="runtime-loading-and-linking-of-crates">Runtime Loading and Linking of Crates</a></h2>
+<p>By default, Theseus is built into a single kernel binary just like a regular OS, in which all crates are linked  a single static library and then zipped up into a bootable .iso file.
+However, our actual research into runtime composability dictates that all crates (except the <code>nano_core</code>) are ed at runtime, and not linked into a single static kernel binary.
+To enable this, use the <code>make loadable</code> command to enable the <code>loadable</code> feature, which does the following:</p>
+<ul>
+<li>Builds each crate into its own separate object file, which are not all linked together like in other OSes.</li>
+<li>Enables release mode in order to make each module file smaller and faster to load, i.e., sets LD_MODE=release`.</li>
+<li>Copies each crate's object file into the top-level build directory's module subdirectory (<code>build/grub-isofiles/les</code>) such that each module is a separate object file in the final .iso image. 
+That allows the running instance of Theseus to see all the modules currently available just by asking the loader (without needing a filesystem), and to load them individually.</li>
+<li>Sets the <code>loadable</code> config option, which as seen in the <code>nano_core</code>, will enable the <code>#![cfg(loadable)]</code> code ks that dynamically load other crates rather than include them as static dependencies.</li>
+</ul>
+<p>Principles and Guidelines for Theseus Development and Contribution.</p>
+<h1><a class="header" href="#the-golden-rule-of-software-development" id="the-golden-rule-of-software-development">The Golden Rule of Software Development</a></h1>
+<p><em>Code for others how you wish they would code for you.</em></p>
+<p>What does this mean? You should adhere to the following principles. </p>
+<ul>
+<li>
+<p><strong>Good abstractions.</strong> Another developer using your code should never have to study the internals of the code lf,
+but rather be able to fully understand how to use your code simply from its struct/function names and mentation.
+Use intuitive names and try to design an interface that makes sense, is simple, easy to use, and doesn't rise anyone with unnecessary trickery. </p>
+</li>
+<li>
+<p><strong>Be clean.</strong> Write well-crafted, concise code with sufficient features to be useful, but without bloat.
+Adhere to code style conventions, including proper spacing, doc comments, naming conventions, etc.</p>
+</li>
+<li>
+<p><strong>Foolproof code.</strong> Think carefully about how others will use your code, 
+and design it thoughtfully to prevent others from making mistakes when using your code,
+ideally prevented at compile time instead of runtime. </p>
+</li>
+<li>
+<p><strong>Errors are important!</strong>  Handle errors gracefully and thoroughly, 
+and return detailed error messages that clearly describe the issue. <em>Don't ever let something fail silently!</em></p>
+</li>
+</ul>
+<p>Below are some other good practices.</p>
+<ul>
+<li>
+<p><strong>Accurate metadata.</strong>  In addition to good code and documentation, make sure to fill in additional metadata,
+such as the details present in each crate's <code>Cargo.toml</code> file: description, keywords, authors, etc.</p>
+</li>
+<li>
+<p><strong>No &quot;magic&quot; numbers.</strong> Do not use literal number values that have no documentation or explanation of why they t. 
+For example, instead of just writing a value like 4096 in the code, create a <code>const</code> that accurately describes semantic meaning of that value, e.g., <code>const PAGE_SIZE: usize = 4096;</code>. 
+Magic numbers are terrible to maintain and don't help anyone who looks at your code in the future. </p>
+</li>
+<li>
+<p><strong>Minimize global states.</strong> Remove static (global) states as much as possible, and rethink how the same data ing can be done without globals.</p>
+</li>
+</ul>
+<h1><a class="header" href="#rust-specific-guidelines" id="rust-specific-guidelines">Rust-specific Guidelines</a></h1>
+<ul>
+<li>
+<p><strong>Rust style.</strong> Follow proper Rust coding style and naming conventions. Use correct spacing, indentation, and nment that matches the existing style. 
+Make your code visually appealing, with spaces between operators like equal signs, addition, spaces after a a, etc. Punctuation is important for legibility!</p>
+</li>
+<li>
+<p><strong>Rust documentation.</strong> Use proper rustdoc-style documentation <em>for all structs, functions, and types.</em> 
+Make sure all of your documentation links are correct, and that you're using the correct rustdoc formatting doc comments. 
+Triple slashes <code>///</code> should be used above function and struct definitions, double slashes <code>//</code> for C-style ne comments (or block comments like <code>/* */</code>), and <code>//! </code> for crate top-level documentation. 
+Use Markdown formatting to describe function arguments, return values, and include usage examples, in a way istent with Rust's official libraries. </p>
+</li>
+<li>
+<p><strong><code>Option</code>s and <code>Result</code>s.</strong> Use Options and Results properly. Don't use special values that have overloaded ings, e.g., an integer in which <code>0</code> means no value, or something like that.
+<a href="https://blog.burntsushi.net/rust-error-handling/">Here's a good resource</a> for better understanding error ling in Rust.</p>
+<p><code>Option</code>s should be returned when an operation might fail, but that failure condition doesn't affect the rest he system. 
+For example, if you're searching for an element in a list, then an <code>Option</code> is the suitable choice because the er of your getter function would only call it in order to get and use the return value. </p>
+<p><code>Result</code>s should be returned if something can fail or succeed, and the caller needs to know whether it eeded, but potentially need the actual return value, e.g., an init function that returns void. 
+In this case, <code>Result</code> is the best choice because we want to force the caller to acknowledge that the init tion succeeded, or handle its error if it failed. 
+In Theseus, <code>Results</code> are mandatory when a function has some side effect, such as setting a parameter or value  might not exist or be initialized yet. 
+In that case, a result must be used to indicate whether the function succeeded. </p>
+</li>
+</ul>
+<h1><a class="header" href="#theseus-specific-guidelines" id="theseus-specific-guidelines">Theseus-specific Guidelines</a></h1>
+<ul>
+<li>
+<p><strong>Handle <code>Result</code>s properly and fully.</strong> Don't ignore a result error, instead, log that error and then handle f possible. 
+If you cannot handle it, return that error to the caller so they can attempt to handle it. <strong>NEVER SILENCE OR RE ERRORS</strong>.</p>
+<p><strong>Never use panics.</strong>  Avoid code or functions that can panic, such as bracket indexing operations <code>[]</code>, or cking functions like <code>unwrap()</code> or <code>expect()</code>. 
+Instead, handle these error cases explicitly and return a <code>Result</code> to the caller, which is much cleaner than cking. 
+Panicking is dangerous and cannot be easily recovered from. As your code most likely will run in a privileged , panicking will be unrecoverable.</p>
+</li>
+<li>
+<p><strong>Never use unsafe code.</strong> If you absolutely cannot avoid it, then you should review your case on an vidual basis with the maintainer. 
+In 99.99% of cases, unsafe code is not necessary and can be rewritten safely. </p>
+</li>
+</ul>
+<h1><a class="header" href="#adding-new-functionality-to-theseus" id="adding-new-functionality-to-theseus">Adding New Functionality to Theseus</a></h1>
+<p>The easiest way to add new functionality is just to create a new crate by duplicating an existing crate and ging the details in its new <code>Cargo.toml</code> file.
+At the very least, you'll need to change the <code>name</code> entry under the <code>[package]</code> heading at the top of the go.toml<code> file, and you'll need to change the dependencies for your new crate.      If your new crate needs to be initialized, you can invoke it from the [</code>captain::init()<code>](../captain/nit.html) function,  although there may be more appropriate places to do so, such as the [</code>device_manager::init()`](../device_manager/nit.html) function for drivers.</p>
+<h1><a class="header" href="#advice-for-contributing-and-using-git" id="advice-for-contributing-and-using-git">Advice for Contributing and using git</a></h1>
+<ul>
+<li>
+<p>The main Theseus repository, <a href="https://github.com/theseus-os/Theseus"><code>theseus-os/Theseus</code></a> is what we call the tream*. 
+To contribute, you should create your own fork of that repository, and then check out your own fork. 
+That way, your fork will be the <code>origin</code> remote by default, and then you can add the upstream as another te by running:
+<code>git remote add upstream https://github.com/theseus-os/Theseus</code>. </p>
+</li>
+<li>
+<p><strong>Never push to the main branch.</strong> Currently, the main branch on the upstream <code>theseus-os/Theseus/eus_main</code> is protected from a direct push. 
+The only way to contribute to it is by merging a pull request into the main branch, which only authorized s can do.
+Instead, checkout your own fork as above, create a new branch with a descriptive name, e.g., <code>kevin/logging_typo</code>, 
+develop your feature on that branch, and then submit a pull request.
+This is a standard Git workflow that allows people can review your code, check for pitfalls and compatibility lems,
+and make comments and suggestions before the code makes its way into the main branch. 
+<em>You must do this for all changes, even tiny ones that may seem insignificant.</em></p>
+</li>
+<li>
+<p>To submit a pull request (PR), the easiest way is to go to the GitHub page of your forked Theseus repo, 
+select the branch that you created from the drop down menu, and then click &quot;New pull request&quot;. 
+By default, GitHub will create a new PR that wants to merge your branch into the upstream <code>theseus_main</code> ch,
+which is usually what you want to do. 
+Now, give your PR a good title and description, scroll down to review the commits and files changed,
+and if everything looks good, click &quot;Create pull request&quot; to notify the maintainers that you have ributions that they should review.</p>
+</li>
+<li>
+<p><strong>Review yourself.</strong> Perform an initial review of your own code before submitting a pull request. 
+Don't place the whole burden of fixing a bunch of tiny problems on others that must review your code too. 
+This includes building the documentation and reviewing it in HTML form in a browser 
+to make sure everything is formatted correctly and that hyperlinks work correctly. </p>
+</li>
+<li>
+<p><strong>Commit carefully.</strong> When making a commit, review your changes with <code>git status</code> and <code>git diff</code>
+to ensure that you're not committing accidental modifications, or editing files that you shouldn't be.
+This makes the maintainers' lives a lot easier, meaning your PR is more likely to be accepted.</p>
+</li>
+</ul>
+<h1><a class="header" href="#setting-up-your-development-environment" id="setting-up-your-development-environment">Setting up your Development Environment</a></h1>
+<h2><a class="header" href="#building-theseus" id="building-theseus">Building Theseus</a></h2>
+<p>Currently, we support building and running Theseus on the following host OSes:</p>
+<ul>
+<li>Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04 and 18.04.</li>
+<li>Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version.</li>
+<li>MacOS, tested on version High Sierra (10.13), but likely works on others. </li>
+</ul>
+<h3><a class="header" href="#setting-up-the-build-environment" id="setting-up-the-build-environment">Setting up the build environment</a></h3>
+<p>If on Linux or WSL, do the following:</p>
+<ul>
+<li>Update your system's package list: <code>sudo apt-get update</code>.</li>
+<li>Install the following packages: <code>sudo apt-get install nasm pkg-config grub-pc-bin mtools xorriso qemu</code></li>
+</ul>
+<p>Additionally, If you're on WSL, you'll need to do the following:</p>
+<ul>
+<li>Install an X Server for Windows; we suggest using <a href="https://sourceforge.net/projects/xming/">Xming</a>.</li>
+<li>Set an X display, by running <code>export DISPLAY=:0</code>. You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your .bashrc file. You can do that with <code>echo &quot;export DISPLAY=:0&quot; &gt;&gt; ~/.bashrc</code>.</li>
+<li>If you get this error: <code>Could not initialize SDL(No available video device) - exiting</code>, then make sure that your X Server is running before running <code>make run</code>, and that you have set the <code>DISPLAY</code> environment variable above.</li>
+<li>Install a C compiler and linker toolchain, such as <code>gcc</code>.</li>
+</ul>
+<p>If you're on Mac OS, do the following:</p>
+<ul>
+<li>Install <a href="https://www.macports.org/install.php">MacPorts</a> and <a href="https://brew.sh/">HomeBrew</a>.</li>
+<li>run the MacOS build setup script: <code>./scripts/mac_os_build_setup.sh</code></li>
+</ul>
+<h3><a class="header" href="#installing-rust" id="installing-rust">Installing Rust</a></h3>
+<p>Install the current Rust compiler and toolchain by following the <a href="https://www.rust-lang.org/en-US/install.html">setup instructions here</a>, which is basically just this command:<br />
+<code>curl https://sh.rustup.rs -sSf | sh</code></p>
+<p>We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:<br />
+<code>cargo install --vers 0.3.13 xargo</code></p>
+<h3><a class="header" href="#building-and-running" id="building-and-running">Building and Running</a></h3>
+<p>When you first check out the project, don't forget to checkout all the submodule repositories too:<br />
+<code>git submodule update --init --recursive</code></p>
+<p>To build and run Theseus in QEMU, simply run:<br />
+<code>make run</code></p>
+<p>Run <code>make help</code> to see other make targets. </p>
+<h4><a class="header" href="#note-rust-compiler-versions" id="note-rust-compiler-versions">Note: Rust compiler versions</a></h4>
+<p>Because we use the Rust nightly compiler (not stable), the Theseus Makefile checks to make sure that you're using the same version of Rust that we are. We were inspired to add this safety check when we failed to build other Rust projects put out there on Github because they used an earlier version of the nightly Rust compiler than what we had installed on our systems. To avoid this undiagnosable problem, we force you to use a specific version of <code>rustc</code> that is known to properly build Theseus. This version is upgraded as often as possible to align with the latest Rust nightly, but this is a best-effort policy.</p>
+<p>So, if you see a build error about the improper version of <code>rustc</code>, follow the instructions printed out at the end of the error message.</p>
+<h2><a class="header" href="#using-qemu" id="using-qemu">Using QEMU</a></h2>
+<p>QEMU allows us to run Theseus quickly and easily in its own virtual machine, completely segregated from the host machine and OS. 
+To exit Theseus in QEMU, press <code>Ctrl+Alt</code>, which releases your keyboard focus from the QEMU window. Then press <code>Ctrl+C</code> in the terminal window that you ran <code>make run</code> from originally to kill QEMU. </p>
+<p>To investigate the state of the running QEMU entity, you can switch to the QEMU console by pressing <code>Ctrl+Alt+2</code>. Switch back to the main window with <code>Ctrl+Alt+1</code>.</p>
+<h3><a class="header" href="#kvm-support" id="kvm-support">KVM Support</a></h3>
+<p>While not strictly required, KVM will speed up the execution of QEMU.
+To install KVM, run the following command:<br />
+<code>sudo apt-get install kvm</code>.<br />
+To enable KVM support, add <code>kvm=yes</code> to your make command, e.g., <code>make run kvm=yes</code>.</p>
+<h2><a class="header" href="#loading-theseus-through-pxe" id="loading-theseus-through-pxe">Loading Theseus Through PXE</a></h2>
+<p>The following instructions are a combination of <a href="https://www.ostechnix.com/how-to-install-pxe-server-on-ubuntu-16-04/">this</a> guide on OSTechNix to set up PXE for Ubuntu and <a href="https://wellsie.net/p/286/">this</a> guide by Andrew Wells for using an arbitrary ISO with PXE.</p>
+<p>PXE can be used to load Rust onto a target computer that is connected by LAN to the host machine used for development. To set up the host machine for PXE, first make the Theseus ISO by navigating to the directory Theseus is in and running:<br />
+<code>make iso</code></p>
+<p>Then, you will need to set up a TFTP and DHCP server which the test machine will access.</p>
+<h3><a class="header" href="#setting-up-the-tftp-server" id="setting-up-the-tftp-server">Setting up the TFTP Server</a></h3>
+<p>First, install all necessary packages and dependencies for TFTP:<br />
+<code>sudo apt-get install apache2 tftpd-hpa inetutils-inetd nasm</code><br />
+Edit the tftp-hpa configuration file:<br />
+<code>sudo nano /etc/default/tftpd-hpa</code><br />
+Add the following lines: </p>
+<pre><code>RUN_DAEMON=&quot;yes&quot;
+OPTIONS=&quot;-l -s /var/lib/tftpboot&quot;
+</code></pre>
+<p>Then, edit the inetd configuration file by opening the editor:<br />
+<code>sudo nano /etc/inetd.conf</code><br />
+And adding:<br />
+<code>tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot</code></p>
+<p>Restart the TFTP server and check to see if it's running:<br />
+<code>sudo systemctl restart tftpd-hpa</code><br />
+<code>sudo systemctl status tftpd-hpa</code></p>
+<p>If the TFTP server is unable to start and mentions an in-use socket, reopen the tftp-hpa configuration file,set the line that has <code>TFTP_ADDRESS=&quot;:69&quot;</code> to be equal to <code>6969</code> instead and restart the TFTP server. </p>
+<h3><a class="header" href="#setting-up-the-dhcp-server" id="setting-up-the-dhcp-server">Setting up the DHCP Server</a></h3>
+<p>First, install package for DHCP server:<br />
+<code>sudo apt-get install isc-dhcp-server</code></p>
+<p>Then run <code>ifconfig</code> to view available networking devices and find the network device name, e.g., <code>eth0</code>.</p>
+<p>Edit the <code>/etc/default/isc-dhcp-server</code> configuration file and add the network device name from the step above to &quot;INTERFACES&quot;. For me, this looks like <code>INTERFACES=&quot;eth0&quot;</code>.</p>
+<p>Configure an arbitrary IP address that will be used in the next step:<br />
+<code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code> 
+This command might have to be done each time the computer being used as a server is restarted. </p>
+<p>Edit the <code>/etc/dhcp/dhcpd.conf</code> file by uncommenting the line <code>authoritative;</code> and adding a subnet configuration such as the one below:</p>
+<pre><code>subnet 192.168.1.0 netmask 255.255.255.0 {
+  range 192.168.1.20 192.168.1.30;
+  option routers 192.168.1.1;
+  option broadcast-address 192.168.1.255;
+  default-lease-time 600;
+  max-lease-time 7200;
+}
+
+allow booting;
+allow bootp;
+option option-128 code 128 = string;
+option option-129 code 129 = text;
+next-server 192.168.1.105;
+filename &quot;pxelinux.0&quot;;
+</code></pre>
+<p>Restart the DHCP server and check to see if it's running:<br />
+<code>sudo systemctl restart isc-dhcp-server</code><br />
+<code>sudo systemctl status isc-dhcp-server</code></p>
+<h3><a class="header" href="#loading-the-theseus-iso-into-the-tftp-server" id="loading-the-theseus-iso-into-the-tftp-server">Loading the Theseus ISO Into the TFTP Server</a></h3>
+<p>In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.<br />
+<code>wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz</code><br />
+<code>tar -xzvf syslinux-*.tar.gz</code></p>
+<p>Then navigate to the memdisk folder and compile.<br />
+<code>cd syslinux-*/memdisk</code><br />
+<code>make memdisk</code></p>
+<p>Next, make a TFTP boot folder for Theseus and copy the memdisk binary into it along with the Theseus ISO:<br />
+<code>sudo mkdir /var/lib/tftpboot/theseus</code><br />
+<code>sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/</code><br />
+<code>sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/</code></p>
+<p>Navigate to the PXE configuration file:<br />
+<code>sudo nano /var/lib/tftpboot/pxelinux.cfg/default</code><br />
+And add Theseus as a menu option by adding the following:</p>
+<pre><code>label theseus
+    menu label Theseus
+    root (hd0,0)
+    kernel theseus/memdisk
+    append iso initrd=theseus/theseus-x86_64.iso raw
+</code></pre>
+<p>Finally, restart the DHCP server one more time and make sure it's running:<br />
+<code>sudo systemctl restart isc-dhcp-server</code><br />
+<code>sudo systemctl status isc-dhcp-server</code></p>
+<p>On the target computer, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the target computer is restarted, it should boot into a menu which displays booting into Theseus as an option. </p>
+<h3><a class="header" href="#subsequent-pxe-uses" id="subsequent-pxe-uses">Subsequent PXE Uses</a></h3>
+<p>After setting up PXE the first time, you can run <code>make pxe</code> to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier: 
+<code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code> </p>
+<h2><a class="header" href="#debugging" id="debugging">Debugging</a></h2>
+<p>GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us (<a href="http://os.phil-opp.com/set-up-gdb.html">details here</a>), so we can just quickly set it up with the following commands.</p>
+<p>First, install the following packages:<br />
+<code>sudo apt-get install texinfo flex bison python-dev ncurses-dev</code></p>
+<p>Then, from the base directory of the Theseus project, run this command to easily download and build it from an existing patched repo:<br />
+<code>curl -sf https://raw.githubusercontent.com/phil-opp/binutils-gdb/rust-os/build-rust-os-gdb.sh | sh</code></p>
+<p>After that, you should have a <code>rust-os-gdb</code> directory that contains the <code>gdb</code> executables and scripts. </p>
+<p>Then, simply run <code>make debug</code> to build and run Theseus in QEMU, which will pause the OS's execution until we attach our patched GDB instance.<br />
+To attach the debugger to our paused QEMU instance, run <code>make gdb</code> in another terminal. QEMU will be paused until we move the debugger forward, with <code>n</code> to step through or <code>c</code> to continue running the debugger.<br />
+Try setting a breakpoint at the kernel's entry function using <code>b nano_core::nano_core_start</code> or at a specific file/line, e.g., <code>b scheduler.rs:40</code>.</p>
+<h2><a class="header" href="#documentation" id="documentation">Documentation</a></h2>
+<p>Once your build environment is fully set up, you can generate Theseus's documentation in standard Rust docs.rs format. 
+To do so, simply run:<br />
+<code>make doc</code></p>
+<p>To view the documentation in a browser on your local machine, run:<br />
+<code>make view-doc</code></p>
+<h2><a class="header" href="#ide-setup" id="ide-setup">IDE Setup</a></h2>
+<p>Our personal preference is to use Visual Studio Code (VS Code), which has excellent, official support from the Rust language team. Other options are available <a href="https://areweideyet.com/">here</a>, but we don't recommend them.</p>
+<p>For VS Code, recommended plugins are:</p>
+<ul>
+<li>Rust (rls), by rust-lang</li>
+<li>Better TOML, by bungcip</li>
+<li>x86 and x86_64 Assembly, by 13xforever</li>
+</ul>
+<h2><a class="header" href="#license" id="license">License</a></h2>
+<p>The source code is licensed under the MIT License. See the LICENSE-MIT file for more. </p>
+<h1><a class="header" href="#application-support-and-development" id="application-support-and-development">Application Support and Development</a></h1>
+<p>One of the unusual features of Theseus, compared to mainstream operating systems like Linux, is that safe applications can be loaded into the same address space as the kernel and run at the kernel privilege level. Below we provide information about how such apps are supported by Theseus and are developed.</p>
+<h2><a class="header" href="#dynamic-linking-and-loading-of-application-crates" id="dynamic-linking-and-loading-of-application-crates">Dynamic Linking and Loading of Application Crates</a></h2>
+<p>Currently, all applications run directly in kernel space at the same privilege level (Ring 0).
+Applications are simply object files that are loaded into the kernel address space, just like any other kernel crate.
+The only real distinction is that they must use only safe code (unsafe code is forbidden),
+and they must expose a <strong>public</strong> entry point function named <code>main</code>, shown below.
+If the <code>main</code> function is not <code>pub</code>, it will be removed by compiler optimizations and the resulting application crate will not be runnable.</p>
+<pre><pre class="playground"><code class="language-rust">pub fn main(args: Vec&lt;String&gt;) -&gt; isize { ... }
+</code></pre></pre>
+<p>Note that application-level libraries do not need to expose a <code>main</code> function;
+only applications that intend to be run as binary executables do. </p>
+<h1><a class="header" href="#display-subsystem" id="display-subsystem">Display Subsystem</a></h1>
+<h1><a class="header" href="#how-the-window-manager-works" id="how-the-window-manager-works">How the window manager works</a></h1>
+<h2><a class="header" href="#design" id="design">Design</a></h2>
+<p>In most of the cases, both an application and the window manager want to get access to the same window. The application needs to display in the window, and the window manager requires the information and order of windows to render them to the screen. In order to share a window between an application and the window manager, we wrap a window object with <code>Mutex</code>. The application owns a strong reference to the window, while the window manager holds a weak reference since its lifetime is longer than the window.</p>
+<p>However, <code>Mutex</code> introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operate on it and then release it. If an application does not release the locked window, the window manager will be blocked in most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. </p>
+<p>To solve this problem, we define two objects <code>Window</code> and <code>WindowInner</code>. <code>WindowInner</code> only contains the information required by the window manager. A window manager holds a list of reference to <code>WindowInner</code>s. An application owns a <code>Window</code> object which wraps a reference to its <code>WindowInner</code> object together with other states required by the application. </p>
+<h2><a class="header" href="#the-windowinner-structure" id="the-windowinner-structure">The WindowInner structure</a></h2>
+<p>The <code>window_inner</code> crate defines a <code>WindowInner</code> structure. It has states and methods of displaying the window on the screen. </p>
+<p>A <code>WindowInner</code> has a framebuffer to which it can display the content of the window. The framebuffer takes a type parameter of pixels it consists of. When the window is rendered to the screen, a compositor may composite every pixel with different principles according to the type. Currently, we have implemented a normal RGB pixel and a pixel of an alpha channel.</p>
+<p>Both an application's window and the window manager has a reference to the same <code>WindowInner</code> object. The application can configure and draw in the framebuffer and the manager can display and composite the window with others.</p>
+<p>This structure also has an event producer. The window manager gets events from I/O devices such as keyboards and push them to the corresponding producer.</p>
+<h2><a class="header" href="#window" id="window">Window</a></h2>
+<p>A <code>Window</code> object represents a window and is owned by an application. It contains its profile, a title, a consumer and a list of displayables. The consumer can get events pushed to the producer in its profile by the manager.</p>
+<p>A <code>Window</code> provides methods to display the displayables in it and render itself to the screen. The window manager is responsible for compositing it with other windows through a framebuffer compositor.</p>
+<h2><a class="header" href="#displayables" id="displayables">Displayables</a></h2>
+<p>The <code>displayable</code> crate defines a <code>Displayable</code> trait. A <code>Displayable</code> is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a <code>TextDisplay</code> which is a block of text. In the future, we will implement other kinds of displayables.</p>
+<p>An application can own multiple displayables and display any type of <code>Displayable</code> in its window.</p>
+<h2><a class="header" href="#the-windowmanager" id="the-windowmanager">The WindowManager</a></h2>
+<p>The <code>window_manager</code> crate defines a <code>WindowManager</code> structure. This structure consists of the profiles of an active window, a list of shown windows and a list of hidden windows. The hidden ones are totally overlapped by others. The structure implements basic methods to manipulate the list such as adding or deleting a window. </p>
+<p>The <code>WindowManager</code> structure contains a bottom framebuffer which represents the background image and a final framebuffer of a floating window border and a mouse arrow. In refreshing an area, it renders the framebuffers in order background -&gt; hidden list -&gt; shown list -&gt; active -&gt; top. It provides several methods to update a rectangle area or several pixels for better performance.</p>
+<p>The structure defines a loop for generic events, a loop for keyboard events and a loop for mouse events. Theseus will initialize them as tasks to handle inputs. The window manager structure provides methods to operate on the window list as reactions to these inputs. It can move a window when we drag it with mouse or pass other events to the active window. The owner application of the active window can handle these events.</p>
+<p>The <code>window_manager</code> crate owns a <code>WINDOW_MANAGER</code> instance which contains all the existing windows. It invokes the methods of <code>WindowManager</code> to manage these windows.</p>
+<h1><a class="header" href="#tutorial-of-the-display-subsystem" id="tutorial-of-the-display-subsystem">Tutorial of the display subsystem</a></h1>
+<h2><a class="header" href="#create-a-window" id="create-a-window">Create a Window</a></h2>
+<p>An application invokes the <code>Window::new()</code> function in the <code>window</code> crate to create a new window. The function would create a new <code>Window</code> object and add a weak reference of its <code>WindowInner</code> to the <code>WINDOW_MANAGER</code> instance in <code>window_manager</code>. It then returns the window to the application. Once the application terminates, the window it owns would be dropped automatically, and the weak reference in the window manager would be deleted.</p>
+<h2><a class="header" href="#display-in-a-window" id="display-in-a-window">Display in a Window</a></h2>
+<p>An application can create a <code>Displayable</code> and invoke <code>Window.display()</code> to display it. This method is generic and works for all kinds of displayables. </p>
+<p>After display a displayable in its framebuffer, the window would invoke its <code>render()</code> method to render the updates to the screen. A framebuffer compositor will composite a list of framebuffers and forward the result to a final framebuffer which is mapped to the screen.</p>
+<h2><a class="header" href="#handle-key-inputs" id="handle-key-inputs">Handle Key Inputs</a></h2>
+<p>An application invokes <code>Window.handle_event()</code> to handle the events sent to it. For example, an active window will receive all the key input events. An application can invoke <code>Window.handle_event()</code> in a loop to handle these inputs from the keyboard.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+
+        
+        
+        <script type="text/javascript">
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+        
+        
+
+    </body>
+</html>

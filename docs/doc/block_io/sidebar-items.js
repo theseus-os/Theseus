@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["BlockIo","A wrapper around a `StorageDevice` that supports reads and writes of arbitrary byte lengths (down to a single byte) by issuing commands to the underlying storage device. This is needed because most storage devices only allow reads/writes of larger blocks,  e.g., a 512-byte sector or 4KB cluster.  "]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["VFSDirectory","A struct that represents a node in the VFS "],["VFSFile",""]]});

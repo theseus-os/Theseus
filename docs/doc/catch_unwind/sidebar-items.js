@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["catch_unwind_with_arg","Invokes the given closure `f`, catching a panic as it is unwinding the stack."]]});

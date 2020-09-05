@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["RxQueue","A struct that holds all information for one receive queue. There should be one such object per queue."],["TxQueue","A struct that holds all information for a transmit queue.  There should be one such object per queue."]]});

@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `task_fs` crate."><meta name="keywords" content="rust, rustlang, rust-lang, task_fs"><title>task_fs - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../dark.css"><link rel="stylesheet" type="text/css" href="../light.css" id="themeStyle"><script src="../storage.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="shortcut icon" href="../favicon.ico"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../task_fs/index.html'><div class='logo-container'><img src='../rust-logo.png' alt='logo'></div></a><p class='location'>Crate task_fs</p><div class="sidebar-elems"><a id='all-types' href='all.html'><p>See all task_fs's items</p></a><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#constants">Constants</a></li><li><a href="#functions">Functions</a></li></ul></div><p class='location'></p><script>window.sidebarCurrent = {name: 'task_fs', ty: 'mod', relpath: '../'};</script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../src/task_fs/lib.rs.html#1-462' title='goto source code'>[src]</a></span><span class='in-band'>Crate <a class="mod" href=''>task_fs</a></span></h1><div class='docblock'><p>This crate contains the direcotires and files that comprise the taskfs, which is similar
+to the /proc directory in linux. There are four main sections in this code:</p>
+<ol>
+<li>TaskFs: the top level directory that holds the individual TaskDirs</li>
+<li>TaskDir: the lazily computed directory that contains files and directories 
+relevant to that task</li>
+<li>TaskFile: lazily computed file that holds information about the task</li>
+<li>MmiDir: lazily computed directory that holds subdirectories and files
+about the task's memory management information</li>
+<li>MmiFile: lazily computed file that contains information about the task's
+memory management information</li>
+</ol>
+<ul>
+<li>Note that all the structs here are NOT persistent in the filesystem EXCEPT
+for the TaskFs struct, which contains all the individual TaskDirs. This means 
+that when a terminal cd's into a TaskDir or one of the subdirectories, it is the 
+only entity that has a reference to that directory. When the terminal drops that 
+reference (i.e. backs out of the directory), that directory is dropped from scope</li>
+</ul>
+<p>The hierarchy (tree) is as follows:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered">
+        <span class="ident">TaskDir</span>
+    <span class="ident">TaskFile</span>    <span class="ident">MmiDir</span>
+                    <span class="ident">MmiFile</span></pre></div>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.MmiDir.html" title='task_fs::MmiDir struct'>MmiDir</a></td><td class='docblock-short'><p>Lazily computed directory that contains subfiles and directories 
+relevant to the task's memory management information. </p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.MmiFile.html" title='task_fs::MmiFile struct'>MmiFile</a></td><td class='docblock-short'><p>Lazily computed file that contains information 
+about a task's memory management information. </p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.TaskDir.html" title='task_fs::TaskDir struct'>TaskDir</a></td><td class='docblock-short'><p>A lazily computed directory that holds files and subdirectories related
+to information about this Task</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.TaskFile.html" title='task_fs::TaskFile struct'>TaskFile</a></td><td class='docblock-short'><p>Lazily computed file that holds information about this task. This taskfile
+does not exist witin the actual filesystem. </p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.TaskFs.html" title='task_fs::TaskFs struct'>TaskFs</a></td><td class='docblock-short'><p>The top level directory that includes a dynamically-generated list of all <code>Task</code>s,
+each comprising a <code>TaskDir</code>.
+This directory exists in the root directory.</p>
+</td></tr></table><h2 id='constants' class='section-header'><a href="#constants">Constants</a></h2>
+<table><tr class='module-item'><td><a class="constant" href="constant.TASKS_DIRECTORY_NAME.html" title='task_fs::TASKS_DIRECTORY_NAME constant'>TASKS_DIRECTORY_NAME</a></td><td class='docblock-short'><p>The name of the VFS directory that exposes task info in the root. </p>
+</td></tr><tr class='module-item'><td><a class="constant" href="constant.TASKS_DIRECTORY_PATH.html" title='task_fs::TASKS_DIRECTORY_PATH constant'>TASKS_DIRECTORY_PATH</a></td><td class='docblock-short'><p>The absolute path of the tasks directory, which is currently below the root</p>
+</td></tr></table><h2 id='functions' class='section-header'><a href="#functions">Functions</a></h2>
+<table><tr class='module-item'><td><a class="fn" href="fn.init.html" title='task_fs::init fn'>init</a></td><td class='docblock-short'><p>Initializes the tasks virtual filesystem directory within the root directory.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../";window.currentCrate = "task_fs";</script><script src="../aliases.js"></script><script src="../main.js"></script><script defer src="../search-index.js"></script></body></html>
