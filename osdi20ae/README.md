@@ -27,3 +27,5 @@ The subfolders in the [osdi20ae](../osdi20ae) directory contain scripts and pre-
 
 ## Results Reproducible 
 As mentioned above, each subfolder in [osdi20ae](../osdi20ae) corresponds to an experiment in the paper and includes everything necessary to reproduce that experiment. 
+
+Note that Figure 4 and Table 5, both in the appendix, will not be part of our final submission, so they are excluded from our artifacts. However, Figure 5 in the appendix will be included, so we included it in the artifacts herein.
