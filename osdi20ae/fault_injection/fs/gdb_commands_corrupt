@@ -1,0 +1,30 @@
+target remote :1234
+
+# Add required breakpoints
+b *0xffffff80020349e1
+
+# continue operation
+c
+
+# set file to log output
+set logging file logout.txt
+
+# switch on logging
+set logging on
+
+# print the corrupted address
+x $address
+
+#corrupt the address
+set(*$address) = $corrupt
+x $address
+
+# print stack pointer
+x $rsp
+
+# switch off logging
+set logging off
+
+# continue op
+del 1
+c
