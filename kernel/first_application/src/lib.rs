@@ -3,8 +3,7 @@
 //! This should be invoked at or towards the end of the kernel initialization procedure. 
 
 #![no_std]
-
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate spawn;
 extern crate mod_mgmt;
@@ -34,21 +33,6 @@ pub fn start() -> Result<(), &'static str> {
         .name("default_shell".to_string())
         .spawn()?;
 
-    {
-        let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-        let (rq_eval_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "mm_eval-")
-            .ok_or("Couldn't find mm_eval application in default app namespace")?;
-
-        let path = Path::new(rq_eval_file.lock().get_absolute_path());
-        info!("Starting mm_eval application: crate at {:?}", path);
-        // Spawn the default shell
-        // let args = vec!["bm".to_string(), "--null".to_string()];
-        let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-            .name("mm_app".to_string())
-            // .argument(args)
-            .spawn()?;
-        
-    }
 
     Ok(())
 }

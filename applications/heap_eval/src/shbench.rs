@@ -32,7 +32,7 @@ pub const MAX_LARGE: usize = 16384;
 /// The number of allocations that take place in one iteration
 const ALLOCATIONS_PER_ITER: usize = 19_300;
 
-pub fn do_shbench() -> Result<(f64,f64), &'static str> {
+pub fn do_shbench() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
     let niterations = NITERATIONS.load(Ordering::SeqCst);
@@ -50,7 +50,7 @@ pub fn do_shbench() -> Result<(f64,f64), &'static str> {
         println!("Overhead of accessing multiple heaps is: {} ticks, {} ns", overhead, hpet_2_us(overhead));
     }
 
-    for _try in 0..TRIES {
+    for try in 0..TRIES {
 
         let mut threads = Vec::with_capacity(nthreads);
 
@@ -72,15 +72,14 @@ pub fn do_shbench() -> Result<(f64,f64), &'static str> {
         }
 
         let diff = hpet_2_us(end - start);
-        println!("[{}] shbench time: {} us", _try, diff);
+        println!("[{}] shbench time: {} us", try, diff);
         tries.push(diff);
     }
 
-    // println!("shbench stats (us)");
-    // println!("{:?}", calculate_stats(&tries));
+    println!("shbench stats (us)");
+    println!("{:?}", calculate_stats(&tries));
 
-    let stats = calculate_stats(&tries).ok_or("Could not calcualte stats")?;
-    Ok((stats.mean, stats.std_dev))
+    Ok(())
 }
 
 

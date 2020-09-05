@@ -7,7 +7,8 @@ set -e
 
 ### the directory containing this script 
 SCRIPTS_DIR="$(dirname "$(readlink -f "$0")")"
-TOOLS_DIR=$SCRIPTS_DIR/../tools
+THESEUS_BASE_DIR=$SCRIPTS_DIR/..
+TOOLS_DIR=$THESEUS_BASE_DIR/tools
 
 ### This script requires rhash and python
 if ! command -v rhash > /dev/null ; then 
@@ -27,7 +28,7 @@ NEW_MODULES_DIR=$(readlink -m $NEW_MODULES_DIR)
 
 ### optional argument:  directory that is being exposed as the root of the HTTP web server
 if [ -z $HTTP_ROOT ] ; then 
-  HTTP_ROOT=$HOME/.theseus_build_server
+  HTTP_ROOT=$THESEUS_BASE_DIR/.theseus_build_server
 	echo "No HTTP_ROOT directory given, using the default directory \"$HTTP_ROOT\""
 fi
 HTTP_ROOT=$(readlink -m $HTTP_ROOT)
