@@ -30,15 +30,19 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-install-recommends apt-utils gnupg
 
 # Install essential Ubuntu packages
-RUN apt-get install -y build-essential curl
+RUN apt-get install -y build-essential curl git
 
 # Install Theseus's build dependencies
 RUN apt-get install -y make nasm pkg-config grub-pc-bin mtools xorriso
 # Install QEMU and KVM, based on <https://help.ubuntu.com/community/KVM/Installation>
 RUN apt-get install -y qemu qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
 
-# Just for convenience purposes
+# (Optional) Install packages for convenience purposes
 RUN apt-get install -y vim gdb
+
+# (Optional) Install packages used for running our 
+RUN apt-get install -y python2.7 rhash python3.6 python3-pip xterm
+RUN pip3 install PTable
 
 # Undo the noninteractive DEBIAN_FRONTEND from the beginning of this file
 ENV DEBIAN_FRONTEND teletype
