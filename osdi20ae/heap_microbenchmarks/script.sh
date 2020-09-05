@@ -27,7 +27,7 @@ else
 fi
 
 
-qemu-system-x86_64 -cdrom partially_safe/theseus-x86_64.iso -no-reboot -no-shutdown -s -m 512M -serial stdio -smp 4 -net none -cpu Broadwell > ./partially_safe/results.txt &
+qemu-system-x86_64 -cdrom partially_safe/theseus-x86_64.iso -no-reboot -no-shutdown -s -m 512M -serial stdio -smp 4 -net none -cpu host -accel kvm  > ./partially_safe/results.txt &
 qemu_id=$(pidof qemu-system-x86_64)
 
 while sleep 10m
@@ -39,7 +39,7 @@ do
     fi
 done
 
-qemu-system-x86_64 -cdrom unsafe/theseus-x86_64.iso -no-reboot -no-shutdown -s -m 512M -serial stdio -smp 4 -net none -cpu Broadwell  > ./unsafe/results.txt &
+qemu-system-x86_64 -cdrom unsafe/theseus-x86_64.iso -no-reboot -no-shutdown -s -m 512M -serial stdio -smp 4 -net none -cpu host -accel kvm  > ./unsafe/results.txt &
 qemu_id=$(pidof qemu-system-x86_64)
 
 while sleep 10m
@@ -51,7 +51,7 @@ do
     fi
 done
 
-qemu-system-x86_64 -cdrom safe/theseus-x86_64.iso -no-reboot -no-shutdown -s -m 512M -serial stdio -smp 4 -net none -cpu Broadwell  > ./safe/results.txt &
+qemu-system-x86_64 -cdrom safe/theseus-x86_64.iso -no-reboot -no-shutdown -s -m 512M -serial stdio -smp 4 -net none -cpu host -accel kvm  > ./safe/results.txt &
 qemu_id=$(pidof qemu-system-x86_64)
 
 while sleep 10m

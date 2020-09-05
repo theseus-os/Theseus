@@ -1,0 +1,14 @@
+Entered nano_core_start().
+nano_core_start(): initialized logger.
+nano_core_start(): initialized early IDT with exception handlers.
+nano_core_start(): booted via multiboot2.
+nano_core_start(): initialized memory subsystem.
+nano_core_start(): initialized state store.
+nano_core_start(): initialized crate namespace subsystem.
+nano_core_start(): parsing nano_core crate, please wait ...
+nano_core_start(): finished parsing the nano_core crate.
+nano_core_start(): invoking the captain...
+[31m[E] applications/heap_eval/src/lib.rs:107: HEAP_EVAL: threadtest 86681608.200 159424.862 [0m
+[31m[E] applications/heap_eval/src/lib.rs:109: HEAP_EVAL: shbench 16677394.200 12044.912 [0m
+[31m[E] applications/heap_eval/src/lib.rs:110: COMPLETED HEAP EVALUATION [0m
+[31m[E] applications/heap_eval/src/lib.rs:113: UNSAFE HEAP[0m

@@ -17,7 +17,7 @@ Another way is to build the images as given below, launch Theseus, and run the f
 `heap_eval --shbench`  
 
 ### Note: QEMU running time
-It will take a few hours to run the benchmarks on all 3 versions of Theseus on QEMU. On real hardware they are much faster.
+It is recommended to run the benchmark with kvm enabled (as the script currently does). Without kvm it will take a few hours to run the benchmarks on all 3 versions of Theseus on QEMU.
 
 ## Versions
 ### Unsafe Heap
