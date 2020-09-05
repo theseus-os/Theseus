@@ -8,7 +8,7 @@ In this evaluation we run 2 different microbenchmarks to measure the performance
 In the subfolders **/unsafe**, **/partially_safe** and **/safe** we have provided pre-built images of 3 configurations of Theseus on which we ran these benchmarks. More information is given below of how to compile and run the different versions.
 
 ## Running the Benchmarks
-To run all three versions of Theseus and obtain results forboth benchmarks, run **script.sh**.  
+To run all three versions of Theseus and obtain results for both benchmarks, run **script.sh**.  
 `./script.sh`  
 A table with the mean and standard deviation for each benchmark will be printed out at the end.
 
@@ -21,15 +21,15 @@ It will take a few hours to run the benchmarks on all 3 versions of Theseus on Q
 
 ## Versions
 ### Unsafe Heap
-The version of Theseus using the unsafe heap can be built for these benchmarks using the command:
+The version of Theseus using the unsafe heap can be built using the command:
 
 `make run THESEUS_CONFIG+=unsafe_heap`
 
 ### Partially Safe Heap
-The version of Theseus using the partially safe heap can be built for these benchmarks using the command:
+The version of Theseus using the partially safe heap can be built using the command:
 
 `make run`
 
 ### Safe Heap
-The version of Theseus using the safe heap can be built for these benchmarks using the command:  
+The version of Theseus using the safe heap can be built using the command:  
 `make run THESEUS_CONFIG+=safe_heap`

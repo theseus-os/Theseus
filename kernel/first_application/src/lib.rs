@@ -3,6 +3,7 @@
 //! This should be invoked at or towards the end of the kernel initialization procedure. 
 
 #![no_std]
+
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate spawn;
@@ -32,7 +33,6 @@ pub fn start() -> Result<(), &'static str> {
     spawn::new_application_task_builder(path, Some(new_app_ns))?
         .name("default_shell".to_string())
         .spawn()?;
-
 
     Ok(())
 }
