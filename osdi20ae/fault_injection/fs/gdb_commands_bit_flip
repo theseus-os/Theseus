@@ -1,0 +1,37 @@
+# set $address=0xfffffe0000122e44
+# set $address=0xffffffff8010b7f0
+target remote :1234
+
+# Add required breakpoints
+# b kernel/new_bm/src/lib.rs:686
+b *0xffffff80020349e1
+# b *$address
+
+# add sleep for observaion
+# shell sleep 5
+
+# continue operation
+c
+
+# set file to log output
+set logging file logout.txt
+
+# switch on logging
+set logging on
+
+# print the corrupted address
+x $address
+
+#corrupt the address
+# set(*$address) = (*$address)^0x1
+x $address
+
+# print stack pointer
+x $rsp
+
+# switch off logging
+set logging off
+
+# continue op
+del 1
+c
