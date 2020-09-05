@@ -131,11 +131,13 @@ Try setting a breakpoint at the kernel's entry function using `b nano_core::nano
 ## Documentation
 Theseus, like the Rust language itself, includes two forms of documentation: the main source-level documentation within the code itself, and a "book" for high-level overviews of design concepts. The latter is a work in progress but may still be useful, while the former is more useful for developing on Thesues.
 
+[Documentation is currently hosted online here](https://theseus-os.github.io/Theseus/), but may be out of date. It's best to build it yourself, as detailed below.
+
 Once your build environment is fully set up, you can generate Theseus's documentation in standard Rust docs.rs format. 
 To do so, simply run:     
 `make doc`
 
-To view the documentation in a browser on your local machine, run:     
+Or to view the documentation in a browser on your local machine:    
 `make view-doc`
 
 There are similar commands for building the Theseus book:    
