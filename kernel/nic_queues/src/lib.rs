@@ -25,9 +25,11 @@ use nic_buffers::{ReceiveBuffer, ReceivedFrame};
 
 /// A struct that holds all information for one receive queue.
 /// There should be one such object per queue.
-pub struct RxQueue<T: RxDescriptor> {
+pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     /// The number of the queue, stored here for our convenience.
     pub id: u8,
+    /// Registers for this receive queue
+    pub regs: BoxRefMut<MappedPages, S>,
     /// Receive descriptors
     pub rx_descs: BoxRefMut<MappedPages, [T]>,
     /// Current receive descriptor index
@@ -46,13 +48,20 @@ pub struct RxQueue<T: RxDescriptor> {
     pub cpu_id: u8,
 }
 
+/// The register trait that gives access to only those registers required for receiving a packet.
+/// The Rx queue control registers can only be accessed by the NIC.
+pub trait RxQueueRegisters {
+    fn update_rdt(&mut self, tail_value: u32);
+}
 
 
 /// A struct that holds all information for a transmit queue. 
 /// There should be one such object per queue.
-pub struct TxQueue<T: TxDescriptor> {
+pub struct TxQueue<S: TxQueueRegisters, T: TxDescriptor> {
     /// The number of the queue, stored here for our convenience.
     pub id: u8,
+    /// Registers for this transmit queue
+    pub regs: BoxRefMut<MappedPages, S>,
     /// Transmit descriptors 
     pub tx_descs: BoxRefMut<MappedPages, [T]>,
     /// Current transmit descriptor index
@@ -60,4 +69,10 @@ pub struct TxQueue<T: TxDescriptor> {
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
     pub cpu_id : u8,
+}
+
+/// The register trait that gives access to only those registers required for sending a packet.
+/// The Tx queue control registers can only be accessed by the NIC.
+pub trait TxQueueRegisters {
+    fn update_tdt(&mut self, tail_value: u32);
 }

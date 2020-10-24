@@ -1,3 +1,107 @@
+use nic_queues::{RxQueueRegisters, TxQueueRegisters};
+use volatile::{Volatile, ReadOnly};
+use intel_ethernet::types::*;
+
+///struct to hold mapping of registers
+#[repr(C)]
+pub struct E1000Registers {
+    pub ctrl:                       Volatile<u32>,          // 0x0
+    _padding0:                      [u8; 4],                // 0x4 - 0x7
+    pub status:                     ReadOnly<u32>,          // 0x8
+    _padding1:                      [u8; 180],              // 0xC - 0xBF
+    
+    /// Interrupt control registers
+    pub icr:                        ReadOnly<u32>,          // 0xC0   
+    _padding2:                      [u8; 12],               // 0xC4 - 0xCF
+    pub ims:                        Volatile<u32>,          // 0xD0
+    _padding3:                      [u8; 44],               // 0xD4 - 0xFF 
+
+    /// Receive control register
+    pub rctl:                       Volatile<u32>,          // 0x100
+    _padding4:                      [u8; 764],              // 0x104 - 0x3FF
+
+    /// Transmit control register
+    pub tctl:                       Volatile<u32>,          // 0x400
+    _padding5:                      [u8; 7164],             // 0x404 - 0x1FFF
+} // 2 4KiB pages
+
+///struct to hold mapping of registers for the rx queues
+#[repr(C)]
+pub struct E1000RxRegisters {
+    _padding5:                      [u8; 2048],             // 0x2000 - 0x27FF
+
+    pub rx_regs:                    RegistersRx,            // 0x2800    
+    _padding6:                      [u8; 2020],             // 0x281C - 0x2FFF
+} // 1 4KiB page
+
+impl RxQueueRegisters for E1000RxRegisters {
+    fn update_rdt(&mut self, tail_value: u32) {
+        self.rx_regs.rdt.write(tail_value); 
+    }
+} 
+
+///struct to hold mapping of registers for the tx queues
+#[repr(C)]
+pub struct E1000TxRegisters {
+    _padding6:                      [u8; 2048],             // 0x3000 - 0x37FF
+
+    pub tx_regs:                    RegistersTx,            // 0x3800
+    _padding7:                      [u8; 2020],             // 0x381C - 3FFF
+ } // 1 4KiB page
+
+impl TxQueueRegisters for E1000TxRegisters {
+    fn update_tdt(&mut self, tail_value: u32) {
+        self.tx_regs.tdt.write(tail_value); 
+    }
+}
+
+///struct to hold mapping of MAC address registers
+#[repr(C)]
+pub struct E1000MacRegisters {
+    _padding7:                      [u8; 5120],             // 0x4000 - 0x53FF
+    
+    /// The lower (least significant) 32 bits of the NIC's MAC hardware address.
+    pub ral:                        Volatile<u32>,          // 0x5400
+    /// The higher (most significant) 32 bits of the NIC's MAC hardware address.
+    pub rah:                        Volatile<u32>,          // 0x5404
+    _padding8:                      [u8; 109560],           // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
+} // 28 4KiB pages
+
+///struct to hold registers related to one receive queue
+#[repr(C)]
+pub struct RegistersRx {
+    /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
+    pub rdbal:                      Volatile<Rdbal>,        // 0x2800
+    /// The higher (most significant) 32 bits of the physical address of the array of receive descriptors.
+    pub rdbah:                      Volatile<Rdbah>,        // 0x2804
+    /// The length in bytes of the array of receive descriptors.
+    pub rdlen:                      Volatile<Rdlen>,        // 0x2808
+    _padding0:                      [u8; 4],                // 0x280C - 0x280F
+    /// The receive descriptor head index, which points to the next available receive descriptor.
+    pub rdh:                        Volatile<Rdh>,          // 0x2810
+    _padding1:                      [u8; 4],                // 0x2814 - 0x2817
+    /// The receive descriptor tail index, which points to the last available receive descriptor.
+    pub rdt:                        Volatile<Rdt>,          // 0x2818
+}
+
+
+///struct to hold registers related to one transmit queue
+#[repr(C)]
+pub struct RegistersTx {
+    /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.
+    pub tdbal:                      Volatile<Tdbal>,        // 0x3800
+    /// The higher (most significant) 32 bits of the physical address of the array of transmit descriptors.
+    pub tdbah:                      Volatile<Tdbah>,        // 0x3804
+    /// The length in bytes of the array of transmit descriptors.
+    pub tdlen:                      Volatile<Tdlen>,        // 0x3808
+    _padding0:                      [u8; 4],                // 0x380C - 0x380F
+    /// The transmit descriptor head index, which points to the next available transmit descriptor.
+    pub tdh:                        Volatile<Tdh>,          // 0x3810
+    _padding1:                      [u8; 4],                // 0x3814 - 0x3817
+    /// The transmit descriptor tail index, which points to the last available transmit descriptor.
+    pub tdt:                        Volatile<Tdt>,          // 0x3818
+}
+
 pub const REG_CTRL:                 u32 = 0x0000;
 pub const REG_STATUS:               u32 = 0x0008;
 pub const REG_EEPROM:               u32 = 0x0014;
