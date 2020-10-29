@@ -14,7 +14,7 @@ extern crate storage_manager;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
 extern crate mpmc;
-
+extern crate ixgbe;
 
 use mpmc::Queue;
 use event_types::Event;
@@ -24,13 +24,13 @@ use network_manager::add_to_network_interfaces;
 
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
-const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
-// const DEFAULT_LOCAL_IP: &'static str = "192.168.1.252/24"; // home router reserved IP
+// const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
+const DEFAULT_LOCAL_IP: &'static str = "192.168.0.13/24"; // home router reserved IP
 // const DEFAULT_LOCAL_IP: &'static str = "10.42.0.91/24"; // rice net IP
 
 /// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
-const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
-// const DEFAULT_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1]; // the default gateway for our TAP-based bridge
+// const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
+const DEFAULT_GATEWAY_IP: [u8; 4] = [192, 168, 0, 1]; // the default gateway for our TAP-based bridge
 // const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 42, 0, 1]; // rice net gateway ip
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
@@ -86,6 +86,14 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                 add_to_network_interfaces(e1000_interface);
                 continue;
             }
+            if dev.vendor_id == ixgbe::INTEL_VEND && dev.device_id == ixgbe::INTEL_82599 {
+                info!("ixgbe PCI device found at: {:?}", dev.location);
+                let ixgbe_nic_ref = ixgbe::IxgbeNic::init(dev)?;
+                let ixgbe_interface = EthernetNetworkInterface::new_ipv4_interface(ixgbe_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+                add_to_network_interfaces(ixgbe_interface);
+                continue;
+            }
+
             // here: check for and initialize other ethernet cards
         }
 

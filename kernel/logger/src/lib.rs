@@ -13,7 +13,7 @@ use spin::Once;
 static LOGGER: Logger = Logger { };
 
 /// By default, Theseus will log 
-const DEFAULT_LOG_LEVEL: Level = Level::Trace;
+const DEFAULT_LOG_LEVEL: Level = Level::Error;
 
 pub type LogOutputFunc = fn(fmt::Arguments);
 static MIRROR_VGA_FUNC: Once<LogOutputFunc> = Once::new();

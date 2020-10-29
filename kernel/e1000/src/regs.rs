@@ -1,4 +1,3 @@
-use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 use volatile::{Volatile, ReadOnly};
 use intel_ethernet::types::*;
 
@@ -34,11 +33,6 @@ pub struct E1000RxRegisters {
     _padding6:                      [u8; 2020],             // 0x281C - 0x2FFF
 } // 1 4KiB page
 
-impl RxQueueRegisters for E1000RxRegisters {
-    fn update_rdt(&mut self, tail_value: u32) {
-        self.rx_regs.rdt.write(tail_value); 
-    }
-} 
 
 ///struct to hold mapping of registers for the tx queues
 #[repr(C)]
@@ -47,13 +41,8 @@ pub struct E1000TxRegisters {
 
     pub tx_regs:                    RegistersTx,            // 0x3800
     _padding7:                      [u8; 2020],             // 0x381C - 3FFF
- } // 1 4KiB page
+} // 1 4KiB page
 
-impl TxQueueRegisters for E1000TxRegisters {
-    fn update_tdt(&mut self, tail_value: u32) {
-        self.tx_regs.tdt.write(tail_value); 
-    }
-}
 
 ///struct to hold mapping of MAC address registers
 #[repr(C)]

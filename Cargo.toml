@@ -30,6 +30,7 @@ exclude = [
 	"applications/heap_eval",
 	"applications/test_mutex_sleep",
 	"applications/test_wait_queue",
+	# "kernel/ixgbe",
 	# "applications/test_panic",
 	# "applications/unwind_test",
 ]
