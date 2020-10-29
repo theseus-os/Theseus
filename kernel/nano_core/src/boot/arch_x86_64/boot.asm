@@ -401,7 +401,13 @@ kernel_table:
 ; System V ABI standard and de-facto extensions. The compiler will assume the
 ; stack is properly aligned and failure to align the stack will result in
 ; undefined behavior.
-align 16
+; Although x86 only requires 16-byte alignment for its stacks, 
+; we use page alignment (4096B) for convenience and compatibility 
+; with Theseus's stack abstractions in Rust. 
+align 4096 
+global initial_bsp_stack_guard_page
+initial_bsp_stack_guard_page:
+	resb 4096
 global initial_bsp_stack_bottom
 initial_bsp_stack_bottom:
 	resb 4096 * 16

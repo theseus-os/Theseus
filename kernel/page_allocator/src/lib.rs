@@ -80,15 +80,26 @@ impl AllocatedPages {
 		Ok(())
 	}
 
-	// /// Splits this `AllocatedPages` into two separate `AllocatedPages` objects,
-	// /// in which the first `AllocatedPages` object will 
-	// pub fn split(self, starting_at_page: Page) -> Option<(AllocatedPages, AllocatedPages)> {
-	// 	if self.contains(&starting_at_page) {
-	// 		None 
-	// 	} else {
-	// 		None
-	// 	}
-	// }
+	/// Splits this `AllocatedPages` into two separate `AllocatedPages` objects:
+	/// * `[beginning : at_page - 1]`
+	/// * `[at_page : end]`
+	/// 
+	/// Depending on the size of this `AllocatedPages`, either one of the 
+	/// returned `AllocatedPages` objects may be empty. 
+	/// 
+	/// Returns `None` if `at_page` is not within the bounds of this `AllocatedPages`.
+	pub fn split(self, at_page: Page) -> Option<(AllocatedPages, AllocatedPages)> {
+		if self.pages.contains(&at_page) {
+			let first  = PageRange::new(*self.pages.start(), at_page - 1);
+			let second = PageRange::new(at_page, *self.pages.end());
+			Some((
+				AllocatedPages { pages: first }, 
+				AllocatedPages { pages: second },
+			))
+		} else {
+			None
+		}
+	}
 }
 
 // impl Drop for AllocatedPages {
@@ -173,7 +184,8 @@ impl<T> StaticArrayLinkedList<T> {
 
 /// The single, system-wide list of free virtual memory pages.
 /// Currently this list includes both free and allocated chunks of pages together in the same list,
-/// but it may be better 
+/// but it may be better to separate them in the future,
+/// especially when we transition to a RB-tree or a better data structure to track allocated pages. 
 static FREE_PAGE_LIST: Mutex<StaticArrayLinkedList<Chunk>> = Mutex::new(StaticArrayLinkedList::Array([
 	// The list of available pages starts as one big chunk that spans the entire virtual address space. 
 	Some(Chunk { 

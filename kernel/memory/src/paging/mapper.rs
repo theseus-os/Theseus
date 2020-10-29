@@ -331,19 +331,6 @@ impl MappedPages {
         self.flags
     }
 
-    /// Constructs a MappedPages object from an already existing mapping.
-    /// Useful for creating idle task Stacks, for example. 
-    // TODO FIXME: remove this function, it's dangerous!!
-    #[deprecated]
-    pub fn from_existing(already_mapped_pages: PageRange, flags: EntryFlags) -> MappedPages {
-        MappedPages {
-            page_table_p4: get_current_p4(),
-            pages: MaybeAllocatedPages::NotAllocated(already_mapped_pages),
-            flags: flags,
-        }
-    }
-
-
     /// Merges the given `MappedPages` object `mp` into this `MappedPages` object (`self`).
     ///
     /// For example, if you have the following `MappedPages` objects:    

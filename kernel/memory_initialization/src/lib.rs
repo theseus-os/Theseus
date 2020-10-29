@@ -1,14 +1,14 @@
 #![no_std]
 
+extern crate alloc;
+extern crate heap;
+extern crate irq_safety;
+extern crate kernel_config;
 #[macro_use] extern crate log;
 extern crate memory;
-extern crate kernel_config;
-extern crate irq_safety;
-extern crate heap;
 extern crate multiboot2;
-extern crate alloc;
 
-use memory::{MappedPages, MemoryManagementInfo, VirtualAddress, PageRange};
+use memory::{MappedPages, MemoryManagementInfo, VirtualAddress};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use irq_safety::MutexIrqSafe;
 use multiboot2::BootInformation;
@@ -64,7 +64,7 @@ pub fn init_memory_management(boot_info: &BootInformation)
     let heap_initial_size = KERNEL_HEAP_INITIAL_SIZE;
     
     let heap_mapped_pages = {
-        let pages = allocate_pages_by_bytes_at(VirtualAddress::new_canonical(heap_start), heap_initial_size);
+        let pages = memory::allocate_pages_by_bytes_at(VirtualAddress::new_canonical(heap_start), heap_initial_size)?;
         let mut allocator = allocator_mutex.lock();
         let heap_mp = try_forget!(
             page_table.map_allocated_pages(pages, HEAP_FLAGS, allocator.deref_mut())

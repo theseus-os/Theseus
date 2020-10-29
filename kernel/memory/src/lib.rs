@@ -26,7 +26,6 @@ extern crate page_allocator;
 
 
 mod area_frame_allocator;
-mod stack_allocator;
 #[cfg(not(mapper_spillful))]
 mod paging;
 
@@ -36,7 +35,6 @@ pub mod paging;
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
-pub use self::stack_allocator::{StackAllocator, Stack};
 
 pub use memory_structs::*;
 pub use page_allocator::*;
@@ -52,7 +50,7 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
+use kernel_config::memory::KERNEL_OFFSET;
 use core::ops::DerefMut;
 
 /// The memory management info and address space of the kernel
@@ -104,25 +102,6 @@ pub struct MemoryManagementInfo {
     /// a list of additional virtual-mapped Pages that have the same lifetime as this MMI
     /// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).
     pub extra_mapped_pages: Vec<MappedPages>,
-
-    /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
-    stack_allocator: stack_allocator::StackAllocator,
-}
-
-impl MemoryManagementInfo {
-
-    /// Allocates a new stack in the currently-running Task's address space.
-    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    /// Whether this is a kernelspace or userspace stack is determined by how this MMI's stack_allocator was initialized.
-    /// 
-    /// # Important Note
-    /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
-    /// It will only work for allocating a stack in the currently-running MMI.
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        get_frame_allocator_ref().and_then(|fa| 
-            self.stack_allocator.alloc_stack(&mut self.page_table, fa, size_in_pages)
-        )
-    }
 }
 
 
@@ -267,19 +246,10 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
     higher_half_mapped_pages.push(heap_mapped_pages);
     let identity_mapped_pages: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
    
-    // init the kernel stack allocator, a singleton
-    let kernel_stack_allocator = {
-        let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
-        let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
-        let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
-        stack_allocator::StackAllocator::new(stack_alloc_range, false)
-    };
-
     // return the kernel's memory info 
     let kernel_mmi = MemoryManagementInfo {
         page_table: page_table,
         extra_mapped_pages: higher_half_mapped_pages,
-        stack_allocator: kernel_stack_allocator, 
     };
 
     let kernel_mmi_ref = KERNEL_MMI.call_once( || {

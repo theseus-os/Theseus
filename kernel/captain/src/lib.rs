@@ -29,6 +29,7 @@ extern crate dfqueue; // decoupled, fault-tolerant queue
 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
+extern crate stack;
 extern crate apic; 
 extern crate mod_mgmt;
 extern crate spawn;
@@ -93,10 +94,13 @@ pub fn init(
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
+        let frame_allocator_ref = memory::get_frame_allocator_ref().ok_or("frame allocator not initialized")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
-            kernel_mmi.alloc_stack(1).ok_or("could not allocate double fault stack")?,
-            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate privilege stack")?,
+            stack::alloc_stack(1, &mut kernel_mmi.page_table, frame_allocator_ref)
+                .ok_or("could not allocate double fault stack")?,
+            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table, frame_allocator_ref)
+                .ok_or("could not allocate privilege stack")?,
         )
     };
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;

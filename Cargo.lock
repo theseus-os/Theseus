@@ -61,6 +61,7 @@ dependencies = [
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "tlb_shootdown 0.1.0",
 ]
 
@@ -269,6 +270,7 @@ dependencies = [
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
  "spawn 0.1.0",
+ "stack 0.1.0",
  "task 0.1.0",
  "task_fs 0.1.0",
  "tsc 0.1.0",
@@ -1373,6 +1375,7 @@ dependencies = [
  "pause 0.1.0",
  "pit_clock 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2264,6 +2267,18 @@ version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "stack"
+version = "0.1.0"
+dependencies = [
+ "kernel_config 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "memory_structs 0.1.0",
+ "page_allocator 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "stack_trace"
 version = "0.1.0"
 dependencies = [
@@ -2387,6 +2402,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "tss 0.1.0",
  "x86_64 0.1.2",
 ]

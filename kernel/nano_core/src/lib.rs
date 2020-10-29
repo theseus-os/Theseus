@@ -249,6 +249,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 extern {
     static initial_bsp_stack_top: usize;
     static initial_bsp_stack_bottom: usize;
+    static initial_bsp_stack_guard_page: usize;
     static ap_start_realmode: usize;
     static ap_start_realmode_end: usize;
 }

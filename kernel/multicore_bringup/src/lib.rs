@@ -13,6 +13,7 @@ extern crate volatile;
 extern crate irq_safety;
 extern crate memory;
 extern crate pit_clock;
+extern crate stack;
 extern crate kernel_config;
 extern crate apic;
 extern crate acpi;
@@ -32,7 +33,7 @@ use alloc::{
 use spin::Mutex;
 use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref, Stack};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
@@ -79,6 +80,7 @@ pub fn handle_ap_cores(
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress
 ) -> Result<usize, &'static str> {
+    let frame_allocator_ref = get_frame_allocator_ref().ok_or("Couldn't get FRAME ALLOCATOR")?;
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let page_table_phys_addr: PhysicalAddress;
@@ -98,7 +100,7 @@ pub fn handle_ap_cores(
         let ap_startup_page   = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
         let ap_startup_frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
 
-        let mut allocator = get_frame_allocator_ref().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
+        let mut allocator = frame_allocator_ref.lock();
         
         trampoline_mapped_pages = page_table.map_to(
             trampoline_page, 
@@ -161,7 +163,11 @@ pub fn handle_ap_cores(
                     .and_then(|bsp_id| all_lapics.get(&bsp_id))
                     .ok_or("Couldn't get BSP's LocalApic!")?;
                 let mut bsp_lapic = bsp_lapic_ref.write();
-                let ap_stack = kernel_mmi_ref.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate AP stack!")?;
+                let ap_stack = stack::alloc_stack(
+                    KERNEL_STACK_SIZE_IN_PAGES,
+                    &mut kernel_mmi_ref.lock().page_table,
+                    frame_allocator_ref
+                ).ok_or("could not allocate AP stack!")?;
 
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
@@ -246,7 +252,7 @@ fn bring_up_ap(
     new_lapic: &MadtLocalApic, 
     ap_trampoline_data: &mut ApTrampolineData,
     page_table_paddr: PhysicalAddress, 
-    ap_stack: Stack,
+    ap_stack: stack::Stack,
     nmi_lint: u8, 
     nmi_flags: u16
 ) {

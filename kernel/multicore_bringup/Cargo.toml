@@ -18,6 +18,9 @@ git = "https://github.com/kevinaboos/irq_safety"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.stack]
+path = "../stack"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 

@@ -33,6 +33,7 @@
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate memory;
+extern crate stack;
 extern crate tss;
 extern crate mod_mgmt;
 extern crate context_switch;
@@ -55,7 +56,8 @@ use alloc::{
     sync::Arc,
 };
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{Stack, MappedPages, PageRange, EntryFlags, MmiRef, VirtualAddress};
+use memory::{PageRange, MmiRef, VirtualAddress, get_frame_allocator_ref};
+use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 // use tss::tss_set_rsp0;
 use mod_mgmt::{
@@ -300,7 +302,9 @@ impl Task {
         };
 
         let kstack = kstack
-            .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
+            .or_else(|| get_frame_allocator_ref().and_then(|fa_ref| 
+                stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table, fa_ref)
+            ))
             .ok_or("couldn't allocate kernel stack!")?;
 
         Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate, failure_cleanup_function))
@@ -928,14 +932,12 @@ pub fn bootstrap_task(
 ) -> Result<TaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
     // Instead, we generate all of the `Task` states manually, and create an initial task directly.
-    let kstack = Stack::new( 
-        stack_top, 
-        stack_bottom, 
-        MappedPages::from_existing(
-            PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
-            EntryFlags::WRITABLE | EntryFlags::PRESENT
-        ),
-    );
+    let kstack = stack::alloc_stack_at( 
+        stack_bottom,
+        PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()).size_in_pages(),
+        &mut kernel_mmi_ref.lock().page_table,
+        get_frame_allocator_ref().ok_or("frame allocator not initialized")?,
+    ).ok_or("failed to allocate stack for bootstrap task")?;
     let default_namespace = mod_mgmt::get_initial_kernel_namespace()
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
