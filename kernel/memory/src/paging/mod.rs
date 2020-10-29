@@ -7,7 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-mod virtual_address_allocator;
 mod entry;
 mod temporary_page;
 mod mapper;
@@ -20,7 +19,6 @@ pub mod table;
 pub use self::entry::*;
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
-pub use self::virtual_address_allocator::*;
 
 use core::{
     ops::{Deref, DerefMut},

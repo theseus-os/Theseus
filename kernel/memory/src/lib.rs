@@ -12,7 +12,6 @@
 extern crate spin;
 extern crate multiboot2;
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate kernel_config;
@@ -23,6 +22,7 @@ extern crate bit_field;
 extern crate memory_x86_64;
 extern crate x86_64;
 extern crate memory_structs;
+extern crate page_allocator;
 
 
 mod area_frame_allocator;
@@ -39,6 +39,7 @@ pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
 pub use memory_structs::*;
+pub use page_allocator::*;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::*;
@@ -258,6 +259,9 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
     // HERE: heap is initialized! Can now use alloc types.
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
+
+    page_allocator::convert_to_heap_allocated();
+    FRAME_ALLOCATOR.try().ok_or("BUG: FRAME_ALLOCATOR not initialized")?.lock().alloc_ready();
 
     let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     higher_half_mapped_pages.push(heap_mapped_pages);

@@ -525,7 +525,7 @@ impl Step for Page {
 
 
 
-/// A range of `Page`s that are contiguous in virtual memory.
+/// An inclusive range of `Page`s that are contiguous in virtual memory.
 #[derive(Debug, Clone)]
 pub struct PageRange(RangeInclusive<Page>);
 
@@ -534,6 +534,12 @@ impl PageRange {
     /// both inclusive bounds.
     pub const fn new(start: Page, end: Page) -> PageRange {
         PageRange(RangeInclusive::new(start, end))
+    }
+
+    /// Creates a new range of `Page`s that begins at `start` (inclusively)
+    /// and spans the next `num_pages` contiguous pages. 
+    pub fn with_num_pages(start: Page, num_pages: usize) -> PageRange {
+        PageRange(RangeInclusive::new(start, start + num_pages - 1))
     }
 
     /// Creates a PageRange that will always yield `None`.

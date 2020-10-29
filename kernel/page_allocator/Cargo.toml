@@ -1,0 +1,21 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "page_allocator"
+description = "The allocator for virtual memory pages."
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.memory_structs]
+path = "../memory_structs"
+
+[lib]
+crate-type = ["rlib"]
