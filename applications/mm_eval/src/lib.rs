@@ -61,7 +61,6 @@ fn create_mappings(
     if remaining_chunk.size_in_pages() != 0 {
         return Err("failed to split allocated pages into num_mappings even segments");
     }
-    println!("========== ALLOCATED PAGES LIST ============\n{:?}", allocated_pages_list);
 
     let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
@@ -250,6 +249,18 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
         false
     };
 
+    if num_mappings < 1 { 
+        return Err("invalid number of mappings specified.")
+    }
+
+    if size_in_pages < 1 { 
+        return Err("invalid size of each mapping specified.")
+    }
+
+    println!("Running mm_eval with {} {}-page mappings, evaluated {} times. Spillful? {}.",
+        num_mappings, size_in_pages, TRIES, use_spillful
+    );
+
     let mut create_times: Vec<u64> = Vec::with_capacity(TRIES);
     let mut remap_times: Vec<u64> = Vec::with_capacity(TRIES);
     let mut unmap_times: Vec<u64> = Vec::with_capacity(TRIES);
@@ -258,7 +269,7 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     let overhead = hpet_timing_overhead()?;
 
     for _ in 0..TRIES {            
-        let pages = allocate_pages(size_in_pages)
+        let pages = allocate_pages(size_in_pages * num_mappings)
             .ok_or("couldn't allocate sufficient pages")?;
         let start_vaddr = pages.start_address();
 

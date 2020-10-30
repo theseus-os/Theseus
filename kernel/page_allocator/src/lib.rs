@@ -14,7 +14,10 @@ extern crate memory_structs;
 extern crate spin;
 
 use alloc::collections::LinkedList;
-use core::ops::Deref;
+use core::{
+	fmt,
+	ops::Deref,
+};
 use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
@@ -41,16 +44,21 @@ impl Chunk {
 /// This object represents ownership of those pages; if this object falls out of scope,
 /// it will be dropped, and the pages will be de-allocated. 
 /// See `MappedPages` struct for a similar object that unmaps pages when dropped.
-#[derive(Debug)]
 pub struct AllocatedPages {
 	pages: PageRange,
 }
-
 impl Deref for AllocatedPages {
     type Target = PageRange;
     fn deref(&self) -> &PageRange {
         &self.pages
     }
+}
+impl fmt::Debug for AllocatedPages {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("AllocatedPages")
+            .field("", &self.pages)
+            .finish()
+	}
 }
 
 impl AllocatedPages {
@@ -89,7 +97,8 @@ impl AllocatedPages {
 	/// 
 	/// Returns `None` if `at_page` is not within the bounds of this `AllocatedPages`.
 	pub fn split(self, at_page: Page) -> Option<(AllocatedPages, AllocatedPages)> {
-		if self.pages.contains(&at_page) {
+		let end_of_first = at_page - 1;
+		if at_page > *self.pages.start() && end_of_first <= *self.pages.end() {
 			let first  = PageRange::new(*self.pages.start(), at_page - 1);
 			let second = PageRange::new(at_page, *self.pages.end());
 			Some((

@@ -238,7 +238,7 @@ pub struct Frame {
 }
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frame(paddr: {:#X})", self.start_address())
+        write!(f, "Frame(p{:#X})", self.start_address())
     }
 }
 
@@ -417,7 +417,7 @@ pub struct Page {
 }
 impl fmt::Debug for Page {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Page(vaddr: {:#X})", self.start_address())
+        write!(f, "Page(v{:#X})", self.start_address())
     }
 }
 
