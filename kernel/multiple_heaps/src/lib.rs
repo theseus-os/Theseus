@@ -26,6 +26,7 @@
 extern crate irq_safety; 
 #[macro_use] extern crate log;
 extern crate memory;
+extern crate page_allocator;
 extern crate kernel_config;
 extern crate apic;
 extern crate heap;
@@ -45,8 +46,8 @@ use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::boxed::Box;
 use hashbrown::HashMap;
-use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange, create_mapping};
-use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_MAX_SIZE};
+use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, create_mapping};
+use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use core::ops::{Add, Deref, DerefMut};
 use core::ptr;
 use heap::HEAP_FLAGS;
@@ -111,10 +112,6 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
 /// Allocates pages from the given starting address and maps them to frames.
 /// Returns the new mapped pages or an error if the heap memory limit is reached.
 fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -> Result<MappedPages, &'static str> {
-    if (starting_address.value() + size_in_bytes) >  (KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE) {
-        return Err("Heap memory limit has been reached");
-    }
-
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_heap_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
@@ -122,9 +119,9 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
         .ok_or("create_heap_mapping(): couldnt get FRAME_ALLOCATOR")?
         .lock();
 
-    let pages = PageRange::from_virt_addr(starting_address, size_in_bytes);
-    let heap_flags = HEAP_FLAGS;
-    let mp = kernel_mmi.page_table.map_pages(pages, heap_flags, frame_allocator.deref_mut())?;
+    let pages = page_allocator::allocate_pages_by_bytes_at(starting_address, size_in_bytes)
+        .map_err(|_e| "create_heap_mapping(): failed to allocate pages at the starting address")?;
+    let mp = kernel_mmi.page_table.map_allocated_pages(pages, HEAP_FLAGS, frame_allocator.deref_mut())?;
 
     // trace!("Allocated heap pages at: {:#X}", starting_address);
 

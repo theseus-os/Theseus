@@ -1394,6 +1394,7 @@ dependencies = [
  "kernel_config 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "page_allocator 0.1.0",
  "slabmalloc 0.7.0",
  "slabmalloc_safe 0.7.0",
  "slabmalloc_unsafe 0.7.0",
