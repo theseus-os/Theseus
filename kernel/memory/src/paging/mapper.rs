@@ -212,15 +212,6 @@ impl Mapper {
         self.internal_map(PageRange::new(page, page), flags, allocator)
     }
 
-    /// maps the given `Page`s to a randomly selected (newly allocated) Frame
-    pub fn map_pages<A>(&mut self, pages: PageRange, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        self.internal_map(pages, flags, allocator)
-    }
-
-
     /// maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
     pub fn map_frames<A>(&mut self, frames: FrameRange, start_page: Page, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
