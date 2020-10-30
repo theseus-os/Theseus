@@ -394,7 +394,7 @@ kernel_table:
 ; with Theseus's stack abstractions in Rust. 
 ; We place the stack in its own sections for loading/parsing convenience.
 ; Currently, the stack is 16 pages in size, with a guard page beneath the bottom.
-section .stack
+section .stack nobits alloc noexec write  ; give it the same section flags as .bss
 align 4096 
 global initial_bsp_stack_guard_page
 initial_bsp_stack_guard_page:

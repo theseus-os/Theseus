@@ -54,7 +54,7 @@ SECTIONS {
 
 	.stack ALIGN(4K) : AT(ADDR(.stack) - KERNEL_OFFSET)
 	{
-		*(.stack .stack.*)
+		*(.stack)
 	}
 
 	/* .got (Global Offset Table) section and its relocation types are currently unsupported */

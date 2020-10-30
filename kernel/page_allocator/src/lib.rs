@@ -236,7 +236,20 @@ static FREE_PAGE_LIST: Mutex<StaticArrayLinkedList<Chunk>> = Mutex::new(StaticAr
 			Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
 		)
 	}),
-	None, None, None, None, None, None,
+	// It also includes the lower parts of the address space needed for booting up other CPU cores (APs).
+	// See the `multicore_bringup` crate. 
+	Some(Chunk { 
+		allocated: false,
+		pages: PageRange::new(
+			Page::containing_address(VirtualAddress::new_canonical(0xF000)),
+			Page::containing_address(VirtualAddress::new_canonical(0x1_0000)), // inclusive range
+		)
+	}),
+	// In the future, we can add additional items here, e.g., the entire virtual address space.
+	// NOTE: we must never include the range of addresses covered by the 510th entry in the top-level (P4) page table,
+	// since that is used for the recursive page table mapping.
+	// Those forbidden addresses include the range from `0xFFFF_FF00_0000_0000` to `0xFFFF_FF80_0000_0000`.
+	None, None, None, None, None, 
 	None, None, None, None, None, None, None, None,
 	None, None, None, None, None, None, None, None,
 	None, None, None, None, None, None, None, None,
