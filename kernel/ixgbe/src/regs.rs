@@ -416,7 +416,7 @@ pub const RX_DESC_R_RELAX_ORDER_EN:     u32 = 1 << 9;
 pub const RX_DATA_W_RELAX_ORDER_EN:     u32 = 1 << 13;
 pub const RX_SP_HEAD_RELAX_ORDER_EN:    u32 = 1 << 15;
 pub const DCA_CPUID_SHIFT:              u32 = 24;
-pub const DCA_ENABLE:                   u32 = 0;
+pub const DCA_CTRL_ENABLE:                   u32 = 0;
 pub const DCA_MODE_1:                   u32 = 0 << 1;  
 pub const DCA_MODE_2:                   u32 = 1 << 1;
 

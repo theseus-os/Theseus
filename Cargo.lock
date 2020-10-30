@@ -1061,8 +1061,10 @@ dependencies = [
 name = "ixgbe_test"
 version = "0.1.0"
 dependencies = [
+ "hpet",
  "ixgbe",
  "log 0.4.8",
+ "spawn",
  "terminal_print",
 ]
 

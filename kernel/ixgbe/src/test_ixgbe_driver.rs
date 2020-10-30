@@ -21,6 +21,12 @@ pub fn test_nic_ixgbe_driver(_: Option<u64>) {
 //will receive a DHCP messgae from 00:1f:c6:9c:89:4c
 
 pub fn dhcp_request_packet() -> Result<(), &'static str> {
+    let transmit_buffer = create_test_packet()?;
+    let mut ixgbe_nc = IXGBE_NIC.try().ok_or("ixgbe NIC hasn't been initialized yet")?;
+    ixgbe_nc.lock().send_packet(transmit_buffer)
+}
+
+pub fn create_test_packet() -> Result<TransmitBuffer, &'static str> {
     let packet: [u8; 314] = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x1f, 0xc6, 0x9c, 0x89, 0x4c, 0x08, 0x00, 0x45,
         0x00, 0x01, 0x2c, 0xa8, 0x36, 0x00, 0x00, 0xfa, 0x11, 0x17, 0x8b, 0x00, 0x00, 0x00, 0x00,
@@ -49,6 +55,5 @@ pub fn dhcp_request_packet() -> Result<(), &'static str> {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, 314)?;
         buffer.copy_from_slice(&packet);
     }
-    let mut ixgbe_nc = IXGBE_NIC.try().ok_or("ixgbe NIC hasn't been initialized yet")?;
-    ixgbe_nc.lock().send_packet(transmit_buffer)
+    Ok(transmit_buffer)
 }

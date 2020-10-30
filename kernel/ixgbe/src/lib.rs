@@ -49,7 +49,7 @@ use hpet::get_hpet;
 use network_interface_card::NetworkInterfaceCard;
 use nic_initialization::*;
 use intel_ethernet::{
-    descriptors::{AdvancedRxDescriptor, LegacyTxDescriptor, TxDescriptor, RxDescriptor},
+    descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor, TxDescriptor, RxDescriptor},
     types::Rdt,
 };    
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
@@ -85,20 +85,30 @@ const IXGBE_10GB_LINK:                      bool    = false;
 /// If link uses 1GB SFP modules
 const IXGBE_1GB_LINK:                       bool    = !(IXGBE_10GB_LINK);
 /// The number of receive descriptors per queue
-const IXGBE_NUM_RX_DESC:                    u16     = 8;
+const IXGBE_NUM_RX_DESC:                    u16     = 256;
 /// The number of transmit descriptors per queue
 const IXGBE_NUM_TX_DESC:                    u16     = 8;
 /// If receive side scaling (where incoming packets are sent to different queues depending on a hash) is enabled.
 const RSS_ENABLE:                           bool    = false;
+/// Enable Direct Cache Access for the receive queues
+/// TODO: Not working yet because we need to have a separate driver for DCA which enables it for the CPU, chipset and registers devices that can use DCA (I think)
+/// https://github.com/torvalds/linux/blob/master/drivers/dma/ioat/dca.c
+/// https://www.intel.com/content/www/us/en/processors/xeon/xeon-e5-1600-2600-vol-2-datasheet.html
+/// http://timetobleed.com/enabling-bios-options-on-a-live-server-with-no-rebooting/
+/// https://github.com/ice799/dca_force/blob/master/dca_force.c
+/// https://lwn.net/Articles/247493/
+/// https://elixir.bootlin.com/linux/latest/source/drivers/dma/ioat/dca.c
+/// https://chromium.googlesource.com/chromiumos/third_party/coreboot/+/firmware-uboot_v2-1299.B/src/cpu/intel/model_306ax/model_306ax_init.c
+const DCA_ENABLE:                           bool    = false;
 /// The number of receive queues that are enabled.
 /// It can be a a maximum of 16 since we are using only the physical functions.
 /// If RSS or filters are not enabled, this should be 1.
-const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 8;
+const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 1;
 /// The maximum number of rx queues available on this NIC (virtualization has to be enabled)
 const IXGBE_MAX_RX_QUEUES:                  u8      = 128;
 /// The number of transmit queues that are enabled. 
 /// Support for multiple Tx queues hasn't been added so this should remain 1.
-const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 1;
+const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 8;
 /// The maximum number of tx queues available on this NIC (virtualization has to be enabled)
 const IXGBE_MAX_TX_QUEUES:                  u8      = 128;
 /// Size of the Rx packet buffers
@@ -227,7 +237,7 @@ pub struct IxgbeNic {
     /// The number of tx queues enabled
     num_tx_queues: u8,
     /// Vector of all the tx queues
-    tx_queues: Vec<TxQueue<IxgbeTxQueueRegisters,LegacyTxDescriptor>>,
+    tx_queues: Vec<TxQueue<IxgbeTxQueueRegisters,AdvancedTxDescriptor>>,
     /// Registers for the unused queues
     tx_registers_unused: Vec<IxgbeTxQueueRegisters>,
 }
@@ -314,7 +324,7 @@ impl IxgbeNic {
                 rx_bufs_in_use: rx_buffers.remove(0),  
                 rx_buffer_size_bytes: IXGBE_RX_BUFFER_SIZE_IN_BYTES,
                 received_frames: VecDeque::new(),
-                cpu_id : None,
+                cpu_id : Some(8),
                 rx_buffer_pool: &RX_BUFFER_POOL,
                 filter_num: None
             };
@@ -360,6 +370,10 @@ impl IxgbeNic {
         // enable Receive Side Scaling if required
         if RSS_ENABLE {
             Self::setup_mrq(&mut mapped_registers2, &mut mapped_registers3)?;
+        }
+
+        if DCA_ENABLE {
+            Self::enable_dca(&mut mapped_registers3, &mut rx_queues)?;
         }
 
         let ixgbe_nic = IxgbeNic {
@@ -776,7 +790,7 @@ impl IxgbeNic {
         // Enable DCA tagging, which writes the cpu id to the PCIe Transaction Layer Packets (TLP)
         // There are 2 version of DCA that are mentioned, legacy and 1.0
         // We always enable 1.0 since (1) currently haven't found additional info online and (2) the linux driver always enables 1.0 
-        regs.dca_ctrl.write(DCA_MODE_2 | DCA_ENABLE);
+        regs.dca_ctrl.write(DCA_MODE_2 | DCA_CTRL_ENABLE);
         Self::enable_rx_dca(rxq)  
     }
 
@@ -795,7 +809,7 @@ impl IxgbeNic {
             // " We can enable relaxed ordering for reads, but not writes when
             //   DCA is enabled.  This is due to a known issue in some chipsets
             //   which will cause the DCA tag to be cleared."
-            rxq.regs.dca_rxctrl.write(RX_DESC_DCA_ENABLE | RX_DESC_R_RELAX_ORDER_EN | (cpu_id << DCA_CPUID_SHIFT));
+            rxq.regs.dca_rxctrl.write(RX_DESC_DCA_ENABLE | RX_HEADER_DCA_ENABLE | RX_PAYLOAD_DCA_ENABLE | RX_DESC_R_RELAX_ORDER_EN | (cpu_id << DCA_CPUID_SHIFT));
         }
         Ok(())
     }
@@ -853,30 +867,36 @@ impl IxgbeNic {
     }
 
     /// Initialize the array of tramsmit descriptors and return them.
-    fn tx_init(regs: &mut IntelIxgbeRegisters2, tx_regs: &mut Vec<IxgbeTxQueueRegisters>) -> Result<Vec<BoxRefMut<MappedPages, [LegacyTxDescriptor]>>, &'static str>   {
+    fn tx_init(regs: &mut IntelIxgbeRegisters2, tx_regs: &mut Vec<IxgbeTxQueueRegisters>) -> Result<Vec<BoxRefMut<MappedPages, [AdvancedTxDescriptor]>>, &'static str>   {
         //disable transmission
         let val = regs.dmatxctl.read();
         regs.dmatxctl.write(val & !TE); 
 
-        // only initialize 1 queue for now
-        let qid = 0;
-        let txq = &mut tx_regs[qid as usize];
-
-        let tx_descs = init_tx_queue(IXGBE_NUM_TX_DESC as usize, txq)?;
+        let mut tx_descs_all_queues = Vec::new();
         
-        // enable transmit operation
-        let val = regs.dmatxctl.read();
-        regs.dmatxctl.write(val | TE); 
+        for qid in 0..IXGBE_NUM_TX_QUEUES_ENABLED {
+            let txq = &mut tx_regs[qid as usize];
+
+            let tx_descs = init_tx_queue(IXGBE_NUM_TX_DESC as usize, txq)?;
         
-        //enable tx queue
-        let mut val = txq.txdctl.read();
-        val.set_bit(25, TX_Q_ENABLE);
-        txq.txdctl.write(val); 
+            if qid == 0 {
+                // enable transmit operation
+                let val = regs.dmatxctl.read();
+                regs.dmatxctl.write(val | TE); 
+            }
 
-        //make sure queue is enabled
-        while txq.txdctl.read().get_bit(25) != TX_Q_ENABLE {} 
+            //enable tx queue
+            let mut val = txq.txdctl.read();
+            val.set_bit(25, TX_Q_ENABLE);
+            txq.txdctl.write(val); 
 
-        Ok(vec![tx_descs])
+            //make sure queue is enabled
+            while txq.txdctl.read().get_bit(25) != TX_Q_ENABLE {} 
+
+            tx_descs_all_queues.push(tx_descs);
+        }
+
+        Ok(tx_descs_all_queues)
     }  
 
     /// Enable MSI-X interrupts.
@@ -984,10 +1004,22 @@ impl IxgbeNic {
 
 
 /// A helper function to poll the nic receive queues
-pub fn rx_poll_mq(qid: usize) -> Result<(), &'static str> {
+pub fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();      
-    nic.rx_queues[qid as usize].remove_frames_from_queue()
+    nic.rx_queues[qid as usize].remove_frames_from_queue()?;
+    let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
+    Ok(frame)
+}
+
+/// A helper function to poll the nic receive queues
+pub fn tx_send_mq(qid: usize) -> Result<(), &'static str> {
+    let packet = test_ixgbe_driver::create_test_packet()?;
+    let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?;
+    let mut nic = nic_ref.lock();  
+
+    nic.tx_queues[qid].send_on_queue(packet);
+    Ok(())
 }
 
 /// A generic interrupt handler that can be used for packet reception interrupts for any queue.

@@ -17,6 +17,12 @@ path = "../../kernel/terminal_print"
 [dependencies.ixgbe]
 path = "../../kernel/ixgbe"
 
+[dependencies.hpet]
+path = "../../kernel/hpet"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
