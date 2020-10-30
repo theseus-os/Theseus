@@ -2,21 +2,16 @@
 
 extern crate alloc;
 extern crate heap;
-extern crate irq_safety;
 extern crate kernel_config;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate stack;
 extern crate multiboot2;
 
-use memory::{MmiRef, MappedPages, MemoryManagementInfo, VirtualAddress};
+use memory::{MmiRef, MappedPages, VirtualAddress};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
-use irq_safety::MutexIrqSafe;
 use multiboot2::BootInformation;
-use alloc::{ 
-    vec::Vec,
-    sync::Arc
-};
+use alloc::vec::Vec;
 use heap::HEAP_FLAGS;
 use core::ops::DerefMut;
 use stack::Stack;
@@ -70,7 +65,7 @@ pub fn init_memory_management(boot_info: &BootInformation)
     // We use the try_forget!() macro to do so.
     let stack = match Stack::from_pages(stack_guard_page, stack_pages) {
         Ok(s) => s,
-        Err((stack_guard_page, stack_pages)) => try_forget!(
+        Err((_stack_guard_page, stack_pages)) => try_forget!(
             Err("initial Stack was not contiguous in virtual memory"),
             text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack_pages, higher_half_mapped_pages, identity_mapped_pages
         )
@@ -85,7 +80,7 @@ pub fn init_memory_management(boot_info: &BootInformation)
             memory::allocate_pages_by_bytes_at(VirtualAddress::new_canonical(heap_start), heap_initial_size),
             text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, higher_half_mapped_pages, identity_mapped_pages
         );
-        debug!("Heap start: {:#X}: size: {:#X}, pages: {:?}", heap_start, heap_initial_size, pages);
+        debug!("Initial heap starts at: {:#X}, size: {:#X}, pages: {:?}", heap_start, heap_initial_size, pages);
         let mut allocator = frame_allocator_mutex.lock();
         let heap_mp = try_forget!(
             page_table.map_allocated_pages(pages, HEAP_FLAGS, allocator.deref_mut())

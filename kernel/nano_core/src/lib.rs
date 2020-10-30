@@ -29,6 +29,7 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
+extern crate stack;
 extern crate mod_mgmt;
 extern crate exceptions_early;
 #[macro_use] extern crate vga_buffer;
@@ -229,7 +230,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         );
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, Stack, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, stack::Stack, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;
         let func: &CaptainInitFunc = {
             try_exit!(section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space))

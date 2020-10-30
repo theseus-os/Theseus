@@ -1430,6 +1430,7 @@ dependencies = [
  "panic_entry 0.1.0",
  "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "state_store 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",

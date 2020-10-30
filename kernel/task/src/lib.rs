@@ -56,7 +56,7 @@ use alloc::{
     sync::Arc,
 };
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{PageRange, MmiRef, VirtualAddress, get_frame_allocator_ref};
+use memory::{MmiRef, VirtualAddress, get_frame_allocator_ref};
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 // use tss::tss_set_rsp0;
