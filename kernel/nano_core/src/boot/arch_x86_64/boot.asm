@@ -372,9 +372,8 @@ strings:
 	db 'Hello long mode!',0
 
 section .bss
-; This reserves space for an empty page table to be loaded at runtime
-; in set_up_tables we will make the table valid and set it up to map
-; the first gigabyte of our kernel
+; This reserves space for the first page table that we must set up
+; before enabling paging and jumping to long mode.
 align 4096
 p4_table:
 	resb 4096
@@ -390,20 +389,12 @@ kernel_table:
 	resb 4096
 
 
-
-; The multiboot standard does not define the value of the stack pointer register
-; (esp) and it is up to the kernel to provide a stack. This allocates room for a
-; small stack by creating a symbol at the bottom of it, then allocating 64
-; bytes for it, and finally creating a symbol at the top. The stack grows
-; downwards on x86. The stack is in its own section so it can be marked nobits,
-; which means the kernel file is smaller because it does not contain an
-; uninitialized stack. The stack on x86 must be 16-byte aligned according to the
-; System V ABI standard and de-facto extensions. The compiler will assume the
-; stack is properly aligned and failure to align the stack will result in
-; undefined behavior.
 ; Although x86 only requires 16-byte alignment for its stacks, 
 ; we use page alignment (4096B) for convenience and compatibility 
 ; with Theseus's stack abstractions in Rust. 
+; We place the stack in its own sections for loading/parsing convenience.
+; Currently, the stack is 16 pages in size, with a guard page beneath the bottom.
+section .stack
 align 4096 
 global initial_bsp_stack_guard_page
 initial_bsp_stack_guard_page:

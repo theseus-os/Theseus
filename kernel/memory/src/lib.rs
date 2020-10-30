@@ -165,15 +165,25 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * a reference to the Area Frame Allocator to be used by the remaining memory init functions
-///  * the kernel's new PageTable, which is now currently active 
-///  * the MappedPages of the kernel's text section,
-///  * the MappedPages of the kernel's rodata section,
-///  * the MappedPages of the kernel's data section,
+///  * a reference to the Frame Allocator to be used by the remaining memory init functions
+///  * the kernel's new `PageTable`, which is now currently active 
+///  * the `MappedPages` of the kernel's text section,
+///  * the `MappedPages` of the kernel's rodata section,
+///  * the `MappedPages` of the kernel's data section,
+///  * a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
 ///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(boot_info: &BootInformation) 
-    -> Result<(&MutexIrqSafe<AreaFrameAllocator>, PageTable, MappedPages, MappedPages, MappedPages, [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str> 
+    -> Result<(
+        &MutexIrqSafe<AreaFrameAllocator>,
+        PageTable,
+        MappedPages,
+        MappedPages,
+        MappedPages,
+        (AllocatedPages, MappedPages),
+        [Option<MappedPages>; 32],
+        [Option<MappedPages>; 32]
+    ), &'static str> 
 {
     // get the start and end addresses of the kernel.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
@@ -206,28 +216,35 @@ pub fn init(boot_info: &BootInformation)
     // init the frame allocator with the available memory sections and the occupied memory sections
     let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;
     let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new( fa ) 
+        MutexIrqSafe::new(fa) 
     });
 
-    // Initialize paging (create a new page table).
-
+    // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     let (
         page_table,
         text_mapped_pages,
         rodata_mapped_pages,
         data_mapped_pages,
+        (stack_guard_page, stack_pages),
         higher_half_mapped_pages,
         identity_mapped_pages
     ) = paging::init(frame_allocator_mutex, &boot_info)?;
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
-
-    Ok((frame_allocator_mutex, page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages))
-    
+    Ok((
+        frame_allocator_mutex,
+        page_table,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        (stack_guard_page, stack_pages),
+        higher_half_mapped_pages,
+        identity_mapped_pages
+    ))
 }
 
-/// Finishes Initializing the virtual memory management system after the heap is initialized and returns a MemoryManagementInfo instance,
-/// which represents Task zero's (the kernel's) address space. 
+/// Finishes initializing the virtual memory management system after the heap is initialized and returns a MemoryManagementInfo instance,
+/// which represents the initial (the kernel's) address space. 
 /// 
 /// Returns the following tuple, if successful:
 ///  * The kernel's new MemoryManagementInfo

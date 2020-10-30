@@ -15,7 +15,7 @@ extern crate spin;
 
 use alloc::collections::LinkedList;
 use core::ops::Deref;
-use kernel_config::memory::{KERNEL_TEXT_START, KERNEL_TEXT_MAX_SIZE, PAGE_SIZE};
+use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
 
@@ -139,6 +139,29 @@ impl<T> StaticArrayLinkedList<T> {
 		}
 	}
 
+	/// Push the given `value` onto the front end of this collection.
+	/// If the inner collection is an array, then this is an expensive operation
+	/// that requires all successive elements to be right-shifted. 
+	pub fn push_front(&mut self, value: T) -> Result<(), T> {
+		match self {
+			StaticArrayLinkedList::Array(arr) => {
+				// The array must have space for at least one element at the end.
+				if let Some(None) = arr.last() {
+					arr.rotate_right(1);
+					arr[0].replace(value);
+					Ok(())
+				} else {
+					error!("Out of space in array, failed to insert value.");
+					Err(value)
+				}
+			}
+			StaticArrayLinkedList::LinkedList(ll) => {
+				ll.push_front(value);
+				Ok(())
+			}
+		}
+	}
+
 	/// Converts the contained collection from a primitive array into a LinkedList.
 	/// If the contained collection is already using heap allocation, this is a no-op.
 	/// 
@@ -187,15 +210,24 @@ impl<T> StaticArrayLinkedList<T> {
 /// but it may be better to separate them in the future,
 /// especially when we transition to a RB-tree or a better data structure to track allocated pages. 
 static FREE_PAGE_LIST: Mutex<StaticArrayLinkedList<Chunk>> = Mutex::new(StaticArrayLinkedList::Array([
-	// The list of available pages starts as one big chunk that spans the entire virtual address space. 
+	// The list of available pages starts with the kernel text region (we should rename this).
 	Some(Chunk { 
 		allocated: false,
 		pages: PageRange::new(
 			Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START + KERNEL_TEXT_MAX_SIZE)),
+			Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
+			// Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START + KERNEL_TEXT_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
 		)
 	}),
-	None, None, None, None, None, None, None,
+	// It also includes the kernel stack and heap regions. 
+	Some(Chunk { 
+		allocated: false,
+		pages: PageRange::new(
+			Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)),
+			Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
+		)
+	}),
+	None, None, None, None, None, None,
 	None, None, None, None, None, None, None, None,
 	None, None, None, None, None, None, None, None,
 	None, None, None, None, None, None, None, None,
@@ -254,6 +286,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 		break;
 	}
 
+	// NOTE: we don't actually need to keep track of allocated chunks here, it's just for debugging.
 	if let Some(pr) = allocated_page_range {
 		let new_chunk = Chunk {
 			allocated: true,
@@ -301,28 +334,38 @@ pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<Allo
 	let mut locked_list = FREE_PAGE_LIST.lock();
 	for c in locked_list.iter_mut() {
 		// Look for the chunk that contains the desired page
-		if c.pages.contains(&desired_start_page) && c.pages.contains(&(desired_start_page + num_pages)) {
+		if desired_start_page >= *c.pages.start() 
+			&& (desired_start_page + num_pages - 1) <= *c.pages.end()
+		{
 			if c.allocated {
 				return Err("address already allocated");
 			}
+		} else {
+			continue;
 		}
 		
 		// The new allocated chunk might start in the middle of an existing chunk,
 		// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
 		let new_allocation = PageRange::with_num_pages(desired_start_page, num_pages);
+		// If this chunk is exactly the right size, just update it in-place as 'allocated' and return that chunk.
+		if num_pages == c.pages.size_in_pages() {
+			c.allocated = true;
+			return Ok(c.as_allocated_pages());
+		}
+		// Here, we are guaranteed that before and after cannot both be zero-sized, though one of them may be.
 		let before = PageRange::new(*c.pages.start(), *new_allocation.start() - 1);
 		let after  = PageRange::new(*new_allocation.end() + 1, *c.pages.end());
 
-		// Put the larger free chunk in-place here, and the smaller one at the end, ignoring either if they are zero-sized.
-		if before.size_in_pages() > after.size_in_pages() {
-			if before.size_in_pages() > 0 {
-				c.pages = before;
-			}
+		// Put the smaller free chunk in-place here, 
+		// and the larger free chunk at the front of the list (outside of this loop),
+		// unless one is zero-sized, in which we use the other.
+		if before.size_in_pages() > 0 && 
+			(after.size_in_pages() == 0 || before.size_in_pages() < after.size_in_pages())
+		{
+			c.pages = before;
 			extra_free_chunk = Some(after);
 		} else {
-			if after.size_in_pages() > 0 {
-				c.pages = after;
-			}
+			c.pages = after;
 			extra_free_chunk = Some(before);
 		}
 
@@ -332,13 +375,14 @@ pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<Allo
 
 	if let Some(free_pages) = extra_free_chunk {
 		if free_pages.size_in_pages() > 0 {
-			locked_list.push_back(Chunk {
+			locked_list.push_front(Chunk {
 				allocated: false,
 				pages: free_pages,
 			}).unwrap();
 		}
 	}
 
+	// NOTE: we don't actually need to keep track of allocated chunks here, it's just for debugging.
 	if let Some(pr) = allocated_page_range {
 		let new_chunk = Chunk {
 			allocated: true,
@@ -349,8 +393,8 @@ pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<Allo
 		Ok(ret)
 	}
 	else {
-		error!("page_allocator: out of virtual address space."); 
-		Err("out of virtual memory")
+		error!("page_allocator: out of virtual address space, or requested address was not covered by page allocator.");
+		Err("out of virtual address space, or requested virtual address not covered by page allocator.")
 	}
 }
 

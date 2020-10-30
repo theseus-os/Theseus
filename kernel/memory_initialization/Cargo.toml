@@ -10,6 +10,9 @@ multiboot2 = "0.7.1"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.stack]
+path = "../stack"
+
 [dependencies.kernel_config]
 path = "../kernel_config"
 

@@ -17,6 +17,7 @@
 #[macro_use] extern crate debugit;
 extern crate irq_safety;
 extern crate memory;
+extern crate stack;
 extern crate task;
 extern crate runqueue;
 extern crate scheduler;
@@ -42,7 +43,8 @@ use alloc::{
     boxed::Box,
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
-use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
+use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
+use stack::Stack;
 use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
@@ -58,12 +60,11 @@ use task::SimdExt;
 pub fn init(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     apic_id: u8,
-    stack_bottom: VirtualAddress,
-    stack_top: VirtualAddress
+    stack: Stack,
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
     
-    let task_ref = task::bootstrap_task(apic_id, stack_bottom, stack_top, kernel_mmi_ref)?;
+    let task_ref = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(BootstrapTaskRef {
         apic_id, 

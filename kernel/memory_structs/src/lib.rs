@@ -644,12 +644,15 @@ pub struct SectionMemoryBounds {
 
 /// The address bounds and flags of the initial kernel sections that need mapping. 
 /// 
-/// It only contains three items, in which each item includes all sections that have identical flags:
+/// It contains three main items, in which each item includes all sections that have identical flags:
 /// * The `.text` section bounds cover all sections that are executable.
 /// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
 /// * The `.data` section bounds cover those that are writable (.data, .bss).
+/// 
+/// It also contains the stack bounds, which are maintained separately.
 pub struct AggregatedSectionMemoryBounds {
-   pub text: SectionMemoryBounds,
+   pub text:   SectionMemoryBounds,
    pub rodata: SectionMemoryBounds,
-   pub data: SectionMemoryBounds,
+   pub data:   SectionMemoryBounds,
+   pub stack:  SectionMemoryBounds,
 }

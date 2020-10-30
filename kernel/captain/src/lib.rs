@@ -56,6 +56,7 @@ use core::ops::DerefMut;
 use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+use stack::Stack;
 
 
 
@@ -73,8 +74,7 @@ pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
 pub fn init(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
     identity_mapped_pages: Vec<MappedPages>,
-    bsp_stack_bottom: VirtualAddress,
-    bsp_stack_top: VirtualAddress,
+    bsp_initial_stack: Stack,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
 ) -> Result<(), &'static str> {
@@ -113,7 +113,7 @@ pub fn init(
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 
     // create the initial `Task`, which is bootstrapped from this execution context.
-    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
+    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);

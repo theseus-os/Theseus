@@ -26,10 +26,7 @@ use core::{
     ops::DerefMut,
     sync::atomic::Ordering,
 };
-use alloc::{
-    boxed::Box,
-    sync::Arc,
-};
+use alloc::sync::Arc;
 use spin::Mutex;
 use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
@@ -267,8 +264,9 @@ fn bring_up_ap(
     ap_trampoline_data.ap_nmi_flags.write(nmi_flags);
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
-    // put the ap_stack on the heap and "leak" it so it's not dropped and auto-unmapped
-    Box::into_raw(Box::new(ap_stack)); 
+    // Give ownership of the stack we created for this AP to the `ap_start` crate, 
+    // in which the AP will take ownership of it once it boots up.
+    ap_start::insert_ap_stack(new_lapic.apic_id, ap_stack); 
 
     info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
     let new_apic_id = new_lapic.apic_id; 

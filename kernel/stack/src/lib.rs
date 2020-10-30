@@ -37,7 +37,7 @@ pub fn alloc_stack<FA>(
 /// The inner implementation of stack allocation. 
 /// 
 /// `pages` is the combined `AllocatedPages` object that holds
-/// the guard page followed by the actual stack pages.
+/// the guard page followed by the actual stack pages to be mapped.
 fn inner_alloc_stack<FA>(
     pages: AllocatedPages,
     page_table: &mut Mapper, 
@@ -82,6 +82,7 @@ pub fn alloc_stack_at<FA>(
     page_table: &mut Mapper, 
     frame_allocator_ref: &FrameAllocatorRef<FA>, 
 ) -> Option<Stack> where FA: FrameAllocator {
+    debug!("alloc_stack_at bottom: {:#X} of {} pages", bottom, size_in_pages);
     // Allocate enough pages for an additional guard page. 
     let pages = page_allocator::allocate_pages_at(
         (Page::containing_address(bottom) - 1).start_address(),
@@ -133,5 +134,25 @@ impl Stack {
     /// Returns the bottom of this stack, its lowest usable address.
     pub fn bottom(&self) -> VirtualAddress {
         self.pages.start_address()
+    }
+
+    /// Creates a stack from its constituent parts: 
+    /// a guard page and a series of mapped pages. 
+    /// 
+    /// The `guard_page` must be at least one page (which is unmapped) 
+    /// and must contiguously precede the `stack_pages`. 
+    /// In other words, the beginning of `stack_pages` must come 
+    /// right after the end of `guard_page`.
+    /// 
+    /// If not, an `Err` containing the given `guard_page` and `stack_pages` is returned.
+    pub fn from_pages(
+        guard_page: AllocatedPages,
+        stack_pages: MappedPages
+    ) -> Result<Stack, (AllocatedPages, MappedPages)> {
+        if (*guard_page.end() + 1) == *stack_pages.start() {
+            Ok(Stack { guard_page, pages: stack_pages })
+        } else {
+            Err((guard_page, stack_pages))
+        }
     }
 }

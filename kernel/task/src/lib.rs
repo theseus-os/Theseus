@@ -926,28 +926,20 @@ impl Eq for TaskRef { }
 /// This function does not add the new task to any runqueue.
 pub fn bootstrap_task(
     apic_id: u8, 
-    stack_bottom: VirtualAddress, 
-    stack_top: VirtualAddress,
+    stack: Stack,
     kernel_mmi_ref: MmiRef,
 ) -> Result<TaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
     // Instead, we generate all of the `Task` states manually, and create an initial task directly.
-    let kstack = stack::alloc_stack_at( 
-        stack_bottom,
-        PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()).size_in_pages(),
-        &mut kernel_mmi_ref.lock().page_table,
-        get_frame_allocator_ref().ok_or("frame allocator not initialized")?,
-    ).ok_or("failed to allocate stack for bootstrap task")?;
     let default_namespace = mod_mgmt::get_initial_kernel_namespace()
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut bootstrap_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, bootstrap_task_cleanup_failure);
+    let mut bootstrap_task = Task::new_internal(stack, kernel_mmi_ref, default_namespace, default_env, None, bootstrap_task_cleanup_failure);
     bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
     bootstrap_task.runstate = RunState::Runnable;
     bootstrap_task.running_on_cpu = Some(apic_id); 
     bootstrap_task.pinned_core = Some(apic_id); // can only run on this CPU core
-    // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);
 

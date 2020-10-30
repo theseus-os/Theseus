@@ -174,13 +174,23 @@ pub fn get_current_p4() -> Frame {
 ///  * the kernels' text section MappedPages,
 ///  * the kernels' rodata section MappedPages,
 ///  * the kernels' data section MappedPages,
+///  * a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
 ///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 ///
 /// Otherwise, it returns a str error message. 
-pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
-    // -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
-    -> Result<(PageTable, MappedPages, MappedPages, MappedPages, [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str>
+pub fn init(
+    allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>,
+    boot_info: &multiboot2::BootInformation
+) -> Result<(
+        PageTable,
+        MappedPages,
+        MappedPages,
+        MappedPages,
+        (AllocatedPages, MappedPages),
+        [Option<MappedPages>; 32],
+        [Option<MappedPages>; 32]
+    ), &'static str>
 {
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current();
@@ -206,6 +216,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let mut text_mapped_pages: Option<MappedPages> = None;
     let mut rodata_mapped_pages: Option<MappedPages> = None;
     let mut data_mapped_pages: Option<MappedPages> = None;
+    let mut stack_pages: Option<(AllocatedPages, MappedPages)> = None;
     let mut higher_half_mapped_pages: [Option<MappedPages>; 32] = Default::default();
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
 
@@ -226,7 +237,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             
             // Map every section found in the kernel image (given by boot information above) into memory. 
             // To allow the APs to boot up, we identity map those kernel sections too
-            // (lower half virtual addresses mapped to same lower half physical addresses).1
+            // (lower half virtual addresses mapped to same lower half physical addresses).
             // We will unmap these lower-half identity mappings later, before we start running applications.
             let mut index = 0;
             for sec in sections_memory_bounds.iter().filter_map(|s| s.as_ref()).fuse() {
@@ -252,13 +263,15 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             let (_rodata_end_virt,   rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
             let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
             let (_data_end_virt,     data_end_phys)      = aggregated_section_memory_bounds.data.end;
+            let (stack_start_virt,   stack_start_phys)   = aggregated_section_memory_bounds.stack.start;
+            let (stack_end_virt,     stack_end_phys)     = aggregated_section_memory_bounds.stack.end;
 
             let text_flags    = aggregated_section_memory_bounds.text.flags;
             let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
             let data_flags    = aggregated_section_memory_bounds.data.flags;
 
 
-            // Now we map all kernel sections into 3 groups according to flags
+            // Map all the main kernel sections 
             text_mapped_pages = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
                 Page::containing_address(text_start_virt), 
@@ -274,6 +287,20 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 Page::containing_address(data_start_virt), 
                 data_flags, allocator.deref_mut()
             )?);
+            // Handle the stack, which has one guard page followed by the real stack pages.
+            let pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
+            let start_of_stack_pages = *pages.start() + 1; 
+            let (stack_guard_page, stack_allocated_pages) = pages.split(start_of_stack_pages)
+                .ok_or("BUG: initial stack's allocated pages were not split correctly after guard page")?;
+            let stack_mapped_pages = mapper.map_allocated_pages_to(
+                stack_allocated_pages,
+                FrameRange::new(
+                    Frame::containing_address(stack_start_phys) + 1, // skip 1st frame, which corresponds to the guard page
+                    Frame::containing_address(stack_end_phys) - 1, // use previous frame since section length is an exclusive bound
+                ),
+                data_flags, allocator.deref_mut()
+            )?;
+            stack_pages = Some((stack_guard_page, stack_mapped_pages));
 
             // map the VGA display memory as writable
             let (vga_display_phys_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
@@ -303,6 +330,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     // skip pages that are already mapped
                     continue;
                 }
+                debug!("... mapping boot info page {:#X?} to frame {:#X?}", page, frame);
                 higher_half_mapped_pages[index] = Some(mapper.map_to(
                     page, frame.clone(), EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut()
                 )?);
@@ -326,7 +354,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let text_mapped_pages   = text_mapped_pages  .ok_or("Couldn't map .text section")?;
     let rodata_mapped_pages = rodata_mapped_pages.ok_or("Couldn't map .rodata section")?;
     let data_mapped_pages   = data_mapped_pages  .ok_or("Couldn't map .data section")?;
-
+    let stack_pages         = stack_pages        .ok_or("Couldn't map .stack section")?;
 
     debug!("switching to new page table {:?}", new_table);
     let new_page_table = page_table.switch(&new_table); 
@@ -334,6 +362,14 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     debug!("switched to new page table {:?}.", new_page_table); 
 
     // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
-    Ok((new_page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages))
+    Ok((
+        new_page_table,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        stack_pages,
+        higher_half_mapped_pages,
+        identity_mapped_pages
+    ))
 }
 

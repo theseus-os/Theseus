@@ -56,6 +56,7 @@ dependencies = [
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "scheduler 0.1.0",
@@ -1249,6 +1250,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
 ]
 
 [[package]]
@@ -2245,6 +2247,7 @@ dependencies = [
  "pause 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
+ "stack 0.1.0",
  "task 0.1.0",
 ]
 
