@@ -121,6 +121,9 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 
     let pages = page_allocator::allocate_pages_by_bytes_at(starting_address, size_in_bytes)
         .map_err(|_e| "create_heap_mapping(): failed to allocate pages at the starting address")?;
+    if pages.start_address().value() % HEAP_MAPPED_PAGES_SIZE_IN_BYTES != 0 {
+        return Err("multiple_heaps: the allocated pages for the heap wasn't properly aligned");
+    }
     let mp = kernel_mmi.page_table.map_allocated_pages(pages, HEAP_FLAGS, frame_allocator.deref_mut())?;
 
     // trace!("Allocated heap pages at: {:#X}", starting_address);
