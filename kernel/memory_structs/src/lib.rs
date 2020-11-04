@@ -124,11 +124,10 @@ impl From<VirtualAddress> for usize {
 
 /// A physical memory address, which is a `usize` under the hood.
 #[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
     Debug, Display, Binary, Octal, LowerHex, UpperHex, 
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign,
-    Add, Sub, Mul, Div, Rem, Shr, Shl,
-    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign, ShrAssign, ShlAssign,
+    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+    Add, Sub, AddAssign, SubAssign,
     FromBytes,
 )]
 #[repr(transparent)]
