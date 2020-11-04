@@ -4,13 +4,16 @@
 #![no_std]
 #![feature(asm, naked_functions)]
 
+extern crate zerocopy;
 #[macro_use] extern crate context_switch_regular;
 
 use context_switch_regular::ContextRegular;
+use zerocopy::FromBytes;
 
 
 /// The registers saved before a context switch and restored after a context switch
 /// for AVX-enabled Tasks.
+#[derive(FromBytes)]
 #[repr(C, packed)]
 pub struct ContextAVX {
     // The order of the registers here MUST MATCH the order of 

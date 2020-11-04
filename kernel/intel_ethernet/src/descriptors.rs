@@ -5,6 +5,7 @@
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
 use bit_field::BitField;
+use zerocopy::FromBytes;
 
 // Transmit descriptor bits
 /// Tx Command: End of Packet
@@ -36,7 +37,7 @@ pub const RX_STATUS_EOP:                   u8 = 1 << 1;
 /// as well as bits that are updated by the HW once the packet is received.
 /// There is one receive descriptor per receive buffer. 
 /// Receive functions defined in the Network_Interface_Card crate expect a receive descriptor to implement this trait.
-pub trait RxDescriptor {
+pub trait RxDescriptor: FromBytes {
     /// Initializes a receive descriptor by clearing its status 
     /// and setting the descriptor's physical address.
     /// 
@@ -68,7 +69,7 @@ pub trait RxDescriptor {
 /// as well as bits that are updated by the HW once the packet is sent.
 /// There is one transmit descriptor per transmit buffer.
 /// Transmit functions defined in the Network_Interface_Card crate expect a transmit descriptor to implement this trait.
-pub trait TxDescriptor {
+pub trait TxDescriptor: FromBytes {
     /// Initializes a transmit descriptor by clearing all of its values.
     fn init(&mut self);
 
@@ -88,6 +89,7 @@ pub trait TxDescriptor {
 
 /// This struct is a Legacy Transmit Descriptor. 
 /// It's the descriptor type used in older Intel NICs and the E1000 driver.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct LegacyTxDescriptor {
     /// The starting physical address of the transmit buffer
@@ -143,6 +145,7 @@ impl fmt::Debug for LegacyTxDescriptor {
 /// This struct is a Legacy Receive Descriptor. 
 /// The driver writes to the upper 64 bits, and the NIC writes to the lower 64 bits.
 /// It's the descriptor type used in older Intel NICs and the E1000 driver.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct LegacyRxDescriptor {
     /// The starting physical address of the receive buffer
@@ -201,6 +204,7 @@ impl fmt::Debug for LegacyRxDescriptor {
 /// Read contains the addresses that the driver writes.
 /// Write Back contains information the hardware writes on receiving a packet.
 /// More information can be found in the 82599 datasheet.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct AdvancedRxDescriptor {
     /// Starting physcal address of the receive buffer for the packet.

@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate kernel_config;
 extern crate memory;
 extern crate volatile;
+extern crate zerocopy;
 extern crate sdt;
 extern crate acpi_table;
 extern crate spin;
@@ -14,6 +15,7 @@ extern crate owning_ref;
 
 use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly};
+use zerocopy::FromBytes;
 use owning_ref::BoxRefMut;
 use alloc::boxed::Box;
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -48,6 +50,7 @@ pub fn get_hpet_mut() -> Option<RwLockWriteGuard<'static, BoxRefMut<MappedPages,
 
 /// A structure that offers access to HPET through its I/O registers, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct Hpet {
     /// The General Capabilities and ID Register, at offset 0x0.
@@ -118,6 +121,7 @@ impl Hpet {
 /// A structure that wraps HPET I/O register for each timer comparator, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
 /// There are between 3 and 32 of these in an HPET-enabled system.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct HpetTimer {
     /// This timer's Configuration and Capability register.
@@ -144,6 +148,7 @@ pub fn handle(
 }
 
 /// The structure of the HPET ACPI table.
+#[derive(FromBytes)]
 #[repr(packed)]
 pub struct HpetAcpiTable {
     header: Sdt,

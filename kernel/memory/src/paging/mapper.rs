@@ -17,6 +17,7 @@ use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
 use irq_safety::MutexIrqSafe;
 use super::{EntryFlags, tlb_flush_virt_addr};
+use zerocopy::FromBytes;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -257,10 +258,6 @@ impl Mapper {
     }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct PageContent([u8; PAGE_SIZE]);
-
 
 /// An instance of `MappedPages` may be created from virtual pages
 /// that were either obtained from the virtual page allocator
@@ -452,6 +449,7 @@ impl MappedPages {
         // perform the actual copy of in-memory content
         // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
         {
+            type PageContent = [u8; PAGE_SIZE];
             let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
             let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;
             dest.copy_from_slice(source);
@@ -530,8 +528,21 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underlying memory region as a struct of the given type,
+    /// Reinterprets this `MappedPages`'s underlying memory region as a struct of the given type `T`,
     /// i.e., overlays a struct on top of this mapped memory region. 
+    /// 
+    /// # Requirements
+    /// The type `T` must implement the `FromBytes` trait, which is similar to the requirements 
+    /// of a "plain old data" type, in that it cannot contain Rust references (`&` or `&mut`).
+    /// This makes sense because there is no valid way to reinterpret a region of untyped memory 
+    /// as a Rust reference. 
+    /// In addition, if we did permit that, a Rust reference created from unchecked memory contents
+    /// could never be valid, safe, or sound, as it could allow random memory access 
+    /// (just like with an arbitrary pointer dereference) that could break isolation.
+    /// 
+    /// To satisfy this condition, you can use `#[derive(FromBytes)]` on your struct type `T`,
+    /// which will only compile correctly if the struct can be validly constructed 
+    /// from "untyped" memory, i.e., an array of bytes.
     /// 
     /// # Arguments
     /// `offset`: the offset into the memory region at which the struct is located (where it should start).
@@ -540,7 +551,7 @@ impl MappedPages {
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned struct reference 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
-    pub fn as_type<T>(&self, offset: usize) -> Result<&T, &'static str> {
+    pub fn as_type<T: FromBytes>(&self, offset: usize) -> Result<&T, &'static str> {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!",
@@ -571,7 +582,7 @@ impl MappedPages {
     /// Same as [`as_type()`](#method.as_type), but returns a *mutable* reference to the type `T`.
     /// 
     /// Thus, it checks to make sure that the underlying mapping is writable.
-    pub fn as_type_mut<T>(&mut self, offset: usize) -> Result<&mut T, &'static str> {
+    pub fn as_type_mut<T: FromBytes>(&mut self, offset: usize) -> Result<&mut T, &'static str> {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
@@ -610,6 +621,8 @@ impl MappedPages {
 
     /// Reinterprets this `MappedPages`'s underlying memory region as a slice of any type.
     /// 
+    /// It has similar type requirements as the [`as_type()`](#method.as_type) method.
+    /// 
     /// # Arguments
     /// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.
     /// * `length`: the length of the slice, i.e., the number of `T` elements in the slice. 
@@ -619,7 +632,7 @@ impl MappedPages {
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned slice 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
-    pub fn as_slice<T>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
+    pub fn as_slice<T: FromBytes>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
@@ -650,7 +663,7 @@ impl MappedPages {
     /// Same as [`as_slice()`](#method.as_slice), but returns a *mutable* slice. 
     /// 
     /// Thus, it checks to make sure that the underlying mapping is writable.
-    pub fn as_slice_mut<T>(&mut self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
+    pub fn as_slice_mut<T: FromBytes>(&mut self, byte_offset: usize, length: usize) -> Result<&mut [T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
@@ -696,7 +709,8 @@ impl MappedPages {
     /// Returns a reference to the function that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of the given `space` object. 
     ///
-    /// TODO FIXME: ideally, we'd have an integrated function that checks with the mod_mgmt crate 
+    /// TODO FIXME: this isn't really safe as it stands now. 
+    /// Ideally, we need to have an integrated function that checks with the mod_mgmt crate 
     /// to see if the size of the function can fit (not just the size of the function POINTER, which will basically always fit)
     /// within the bounds of this `MappedPages` object;
     /// this integrated function would be based on the given string name of the function, like "task::this::foo",
@@ -722,6 +736,7 @@ impl MappedPages {
     /// Because Rust has lexical lifetimes, the `space` variable must have a lifetime at least as long as the  `print_func` variable,
     /// meaning that `space` must still be in scope in order for `print_func` to be invoked.
     /// 
+    #[doc(hidden)]
     pub fn as_func<'a, F>(&self, offset: usize, space: &'a mut usize) -> Result<&'a F, &'static str> {
         let size = mem::size_of::<F>();
         if true {

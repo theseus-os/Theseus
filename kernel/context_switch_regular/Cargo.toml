@@ -5,5 +5,8 @@ description = "Context switching routines and structs for regular (non-SSE) regi
 version = "0.1.0"
 build = "../../build.rs"
 
+[dependencies]
+zerocopy = "0.3.0"
+
 [lib]
 crate-type = ["rlib"]

@@ -16,6 +16,7 @@ extern crate log;
 extern crate memory;
 extern crate volatile;
 extern crate bit_field;
+extern crate zerocopy;
 
 pub mod descriptors;
 pub mod types;

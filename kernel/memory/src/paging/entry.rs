@@ -11,10 +11,11 @@ use super::super::{Frame, EntryFlags};
 use PhysicalAddress;
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;
-
+use zerocopy::FromBytes;
 
 /// A page table entry, which is a `u64` value under the hood.
 /// It contains a physical frame address and entry flag access bits.
+#[derive(FromBytes)]
 #[repr(transparent)]
 pub struct Entry(u64);
 
