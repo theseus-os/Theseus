@@ -77,6 +77,12 @@ path = "../nic_buffers"
 [dependencies.nic_queues]
 path = "../nic_queues"
 
+[dependencies.physical_nic]
+path = "../physical_nic"
+
+[dependencies.virtual_nic]
+path = "../virtual_nic"
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 

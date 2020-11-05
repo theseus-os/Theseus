@@ -1048,11 +1048,13 @@ dependencies = [
  "nic_queues",
  "owning_ref",
  "pci",
+ "physical_nic",
  "pic",
  "pit_clock",
  "rand",
  "runqueue",
  "spin",
+ "virtual_nic",
  "volatile",
  "x86_64",
 ]
@@ -1700,6 +1702,15 @@ dependencies = [
 [[package]]
 name = "percent-encoding"
 version = "1.0.2"
+
+[[package]]
+name = "physical_nic"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet",
+ "nic_buffers",
+ "nic_queues",
+]
 
 [[package]]
 name = "pic"
@@ -2738,6 +2749,18 @@ dependencies = [
  "serial_port",
  "spin",
  "volatile",
+]
+
+[[package]]
+name = "virtual_nic"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet",
+ "irq_safety",
+ "network_interface_card",
+ "nic_buffers",
+ "nic_queues",
+ "physical_nic",
 ]
 
 [[package]]

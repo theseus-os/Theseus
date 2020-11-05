@@ -30,10 +30,13 @@ extern crate nic_initialization;
 extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
+extern crate physical_nic;
+extern crate virtual_nic;
 
 pub mod test_ixgbe_driver;
 mod regs;
 use regs::*;
+pub mod virtual_function;
 
 use spin::Once;
 use alloc::vec::Vec;
@@ -133,7 +136,7 @@ lazy_static! {
     static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE * 2);
 }
 
-struct IxgbeRxQueueRegisters {
+pub struct IxgbeRxQueueRegisters {
     /// We prevent the drop handler from dropping the `regs` because the backing memory is not on the heap, but in the stored mapped pages.
     /// The memory will be deallocated when the `backing_pages` are dropped.
     regs: ManuallyDrop<Box<RegistersRx>>,
@@ -169,7 +172,7 @@ impl DerefMut for IxgbeRxQueueRegisters {
 }
 
 
-struct IxgbeTxQueueRegisters {
+pub struct IxgbeTxQueueRegisters {
     /// We prevent the drop handler from dropping the `regs` because the backing memory is not on the heap, but in the stored mapped pages.
     /// The memory will be deallocated when the `backing_pages` are dropped.
     regs: ManuallyDrop<Box<RegistersTx>>,
@@ -240,6 +243,8 @@ pub struct IxgbeNic {
     tx_queues: Vec<TxQueue<IxgbeTxQueueRegisters,AdvancedTxDescriptor>>,
     /// Registers for the unused queues
     tx_registers_unused: Vec<IxgbeTxQueueRegisters>,
+    /// wakelock to keep track of the number of applications using the NIC
+    wakelock: Arc<u8>
 }
 
 // A trait which contains common functionalities for a NIC
@@ -394,6 +399,7 @@ impl IxgbeNic {
             num_tx_queues: IXGBE_NUM_TX_QUEUES_ENABLED,
             tx_queues: tx_queues,
             tx_registers_unused: tx_mapped_registers,
+            wakelock: Arc::new(0)
         };
 
         let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
@@ -843,6 +849,39 @@ impl IxgbeNic {
         // set up the parameters of the filter
         let filter_protocol = protocol as u32 & FTQF_PROTOCOL;
         let filter_priority = (priority as u32 & FTQF_PRIORITY) << FTQF_PRIORITY_SHIFT;
+        let filter_mask = 0; //FTQF_DEST_PORT_MASK | FTQF_SOURCE_PORT_MASK | FTQF_SOURCE_ADDRESS_MASK;
+        self.regs3.ftqf.reg[filter_num].write(filter_protocol | filter_priority | filter_mask | FTQF_Q_ENABLE);
+
+        //set the rx queue that the packets for this filter should be sent to
+        self.regs3.l34timir.reg[filter_num].write(L34TIMIR_BYPASS_SIZE_CHECK | L34TIMIR_RESERVED | ((qid as u32) << L34TIMIR_RX_Q_SHIFT));
+
+        //mark the filter as used
+        enabled_filters[filter_num] = true;
+        error!("set filter {}", filter_num);
+        Ok(filter_num as u8)
+    }
+
+    /// Sets the L3/L4 5-tuple filter to do an exact match of the packet's dest ip address and send to chosen rx queue (7.1.2.5).
+    /// There are up to 128 such filters. If more are needed, will have to enable Flow Director filters.
+    /// 
+    /// # Argument
+    /// * `dest_ip`: ipv4 destination address
+    /// * `protocol`: tcp = 0, udp = 1, sctp = 2, other = 3
+    /// * `priority`: priority relative to other filters, can be from 0 (lowest) to 7 (highest)
+    /// * `qid`: number of the queue to forward packet to
+    pub fn set_ip_dest_address_filter(&mut self, dest_ip: [u8;4], protocol: u8, priority: u8, qid: u8) -> Result<u8, &'static str> {
+        let enabled_filters = &mut self.l34_5_tuple_filters;
+
+        // find a free filter
+        let filter_num = enabled_filters.iter().position(|&r| r == false).ok_or("Ixgbe: No filter available")?;
+
+        // IP addresses are written to the registers in big endian form (LSB is first on wire)
+        // set the destination ip address for the filter        
+        self.regs3.daqf.reg[filter_num].write(((dest_ip[3] as u32) << 24) | ((dest_ip[2] as u32) << 16) | ((dest_ip[1] as u32) << 8) | (dest_ip[0] as u32));
+
+        // set up the parameters of the filter
+        let filter_protocol = protocol as u32 & FTQF_PROTOCOL;
+        let filter_priority = (priority as u32 & FTQF_PRIORITY) << FTQF_PRIORITY_SHIFT;
         let filter_mask = FTQF_DEST_PORT_MASK | FTQF_SOURCE_PORT_MASK | FTQF_SOURCE_ADDRESS_MASK;
         self.regs3.ftqf.reg[filter_num].write(filter_protocol | filter_priority | filter_mask | FTQF_Q_ENABLE);
 
@@ -997,6 +1036,30 @@ impl IxgbeNic {
         if let Err(e) = self.rx_queues[qid as usize].remove_frames_from_queue() {
             error!("handle_rx_interrupt(): error handling interrupt: {:?}", e);
         }    
+    }
+
+    fn remove_rx_queues(&mut self, num_queues: usize) -> Result<Vec<RxQueue<IxgbeRxQueueRegisters, AdvancedRxDescriptor>>, &'static str> {
+        if self.rx_queues.len() - num_queues <=1  {
+            return Err("Not enough rx queues for the NIC to remove any");
+        }
+
+        let mut queues = Vec::with_capacity(num_queues);
+        for _ in 0..num_queues {
+            queues.push(self.rx_queues.pop().unwrap());
+        }
+        Ok(queues)
+    }
+
+    fn remove_tx_queues(&mut self, num_queues: usize) -> Result<Vec<TxQueue<IxgbeTxQueueRegisters, AdvancedTxDescriptor>>, &'static str> {
+        if self.tx_queues.len() - num_queues <= 1  {
+            return Err("Not enough tx queues for the NIC to remove any");
+        }
+
+        let mut queues = Vec::with_capacity(num_queues);
+        for _ in 0..num_queues {
+            queues.push(self.tx_queues.pop().unwrap());
+        }
+        Ok(queues)
     }
 
 }

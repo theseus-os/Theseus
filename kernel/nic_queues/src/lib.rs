@@ -76,7 +76,7 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     /// This in itself doesn't guarantee anything, but we use this value when setting the cpu id for interrupts and DCA.
     pub cpu_id: Option<u8>,
     pub rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>,
-    pub filter_num: Option<usize>
+    pub filter_num: Option<u8>
 }
 
 impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
