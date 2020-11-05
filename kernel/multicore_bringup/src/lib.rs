@@ -10,6 +10,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate spin;
 extern crate volatile;
+extern crate zerocopy;
 extern crate irq_safety;
 extern crate memory;
 extern crate pit_clock;
@@ -29,6 +30,7 @@ use core::{
 use alloc::sync::Arc;
 use spin::Mutex;
 use volatile::Volatile;
+use zerocopy::FromBytes;
 use irq_safety::MutexIrqSafe;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
@@ -59,10 +61,11 @@ pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
 /// that was discovered and populated in the AP's real-mode 
 /// initialization seqeunce.
 /// TODO FIXME: remove this struct, find another way to obtain framebuffer info.
+#[derive(FromBytes)]
 pub struct GraphicInfo{
-    pub width:u64,
-    pub height:u64,
-    pub physical_address:u64,
+    pub width: u64,
+    pub height: u64,
+    pub physical_address: u64,
 }
 
 /// Starts up and sets up AP cores based on system information from ACPI
@@ -216,6 +219,7 @@ pub fn handle_ap_cores(
 /// # Important Layout Note
 /// The order of the members in this struct must exactly match how they are used
 /// in the AP bootup code (at the top of `ap_boot.asm`).
+#[derive(FromBytes)]
 #[repr(C)]
 struct ApTrampolineData {
     /// A flag that indicates whether the new AP is ready. 

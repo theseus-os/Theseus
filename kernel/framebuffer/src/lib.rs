@@ -9,6 +9,7 @@ extern crate multicore_bringup;
 extern crate owning_ref;
 extern crate shapes;
 extern crate color;
+extern crate zerocopy;
 
 pub mod pixel;
 use alloc::boxed::Box;

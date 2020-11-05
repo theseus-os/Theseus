@@ -7,7 +7,9 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate static_assertions;
 extern crate volatile;
+extern crate zerocopy;
 extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
@@ -35,6 +37,7 @@ use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
+use zerocopy::FromBytes;
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
@@ -86,13 +89,19 @@ lazy_static! {
     static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
 }
 
-///struct to hold mapping of registers
+/// The layout in memory of e1000 registers. 
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its trais for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct E1000Registers {
     pub ctrl:                       Volatile<u32>,          // 0x0
     _padding0:                      [u8; 4],                // 0x4 - 0x7
     pub status:                     ReadOnly<u32>,          // 0x8
-    _padding1:                      [u8; 180],              // 0xC - 0xBF
+    _padding1a:                     [u8; 128],              // 0xC - 0xBF,  180 bytes
+    _padding1b:                     [u8;  52],
     
     /// Interrupt control registers
     pub icr:                        ReadOnly<u32>,          // 0xC0   
@@ -102,26 +111,56 @@ pub struct E1000Registers {
 
     /// Receive control register
     pub rctl:                       Volatile<u32>,          // 0x100
-    _padding4:                      [u8; 764],              // 0x104 - 0x3FF
+    _padding4a:                     [u8; 512],              // 0x104 - 0x3FF,  764 bytes
+    _padding4b:                     [u8; 236],
+    _padding4c:                     [u8;  16],
 
     /// Transmit control register
     pub tctl:                       Volatile<u32>,          // 0x400
-    _padding5:                      [u8; 9212],             // 0x404 - 0x27FF
+    _padding5a:                     [u8; 8192],             // 0x404 - 0x27FF,  9212 bytes
+    _padding5b:                     [u8;  512],
+    _padding5c:                     [u8;  256],
+    _padding5d:                     [u8;  236],
+    _padding5e:                     [u8;   16],
 
     pub rx_regs:                    RegistersRx,            // 0x2800    
-    _padding6:                      [u8; 4068],             // 0x281C - 0x37FF
+    _padding6a:                     [u8; 2048],             // 0x281C - 0x37FF,  4068 bytes
+    _padding6b:                     [u8; 1024],
+    _padding6c:                     [u8;  512],
+    _padding6d:                     [u8;  256],
+    _padding6e:                     [u8;  128],
+    _padding6f:                     [u8;   64],
+    _padding6g:                     [u8;   36],
 
     pub tx_regs:                    RegistersTx,            // 0x3800
-    _padding7:                      [u8; 7140],             // 0x381C - 0x53FF
+    _padding7a:                     [u8; 4096],             // 0x381C - 0x53FF,  7140 bytes
+    _padding7b:                     [u8; 2048],
+    _padding7c:                     [u8;  512],
+    _padding7d:                     [u8;  256],
+    _padding7e:                     [u8;  128],
+    _padding7f:                     [u8;   64],
+    _padding7g:                     [u8;   36],
     
     /// The lower (least significant) 32 bits of the NIC's MAC hardware address.
     pub ral:                        Volatile<u32>,          // 0x5400
     /// The higher (most significant) 32 bits of the NIC's MAC hardware address.
     pub rah:                        Volatile<u32>,          // 0x5404
-    _padding8:                      [u8; 109560],           // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
+    _padding8a:                     [u8; 65536],            // 0x5408 - 0x1FFFF,  109560 bytes
+    _padding8b:                     [u8; 32768],
+    _padding8c:                     [u8;  8192],
+    _padding8d:                     [u8;  2048],
+    _padding8e:                     [u8;   512],
+    _padding8f:                     [u8;   256],
+    _padding8g:                     [u8;   236],
+    _padding8h:                     [u8;    12],
+
+    // End of struct should be at offset 0x20000 (128 KiB in total size).
 }
+const_assert_eq!(core::mem::size_of::<E1000Registers>(), 0x20000);
+
 
 ///struct to hold registers related to one receive queue
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersRx {
     /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
@@ -140,6 +179,7 @@ pub struct RegistersRx {
 
 
 ///struct to hold registers related to one transmit queue
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersTx {
     /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.

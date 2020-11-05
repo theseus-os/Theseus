@@ -5,7 +5,9 @@
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
+#[macro_use] extern crate static_assertions;
 extern crate volatile;
+extern crate zerocopy;
 extern crate owning_ref;
 extern crate irq_safety;
 extern crate atomic_linked_list;
@@ -21,6 +23,7 @@ extern crate bit_field;
 use core::ops::DerefMut;
 use core::sync::atomic::Ordering;
 use volatile::{Volatile, ReadOnly, WriteOnly};
+use zerocopy::FromBytes;
 use alloc::boxed::Box;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::Once;
@@ -186,6 +189,7 @@ const APIC_NMI: u32 = 4 << 8;
 /// A structure that offers access to APIC/xAPIC through its I/O registers.
 /// Definitions are based on [Intel's x86 Manual Vol 3a, Table 10-1]
 /// (https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.pdf). 
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct ApicRegisters {
     _padding0:                        [u32; 8],
@@ -242,7 +246,10 @@ pub struct ApicRegisters {
     _padding23:                       [u32; 3 + 1*4],
     // ends at 0x400
 }
+const_assert_eq!(core::mem::size_of::<ApicRegisters>(), 0x400);
 
+
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct RegisterArray {
     reg0:                             ReadOnly<u32>,
@@ -262,6 +269,7 @@ pub struct RegisterArray {
     reg7:                             ReadOnly<u32>,
     _padding7:                        [u32; 3],
 }
+const_assert_eq!(core::mem::size_of::<RegisterArray>(), 8 * (4 + 12));
 
 
 /// This structure represents a single APIC in the system, there is one per core. 

@@ -12,6 +12,7 @@ extern crate xmas_elf;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate entryflags_x86_64;
+extern crate zerocopy;
 
 use bit_field::BitField;
 use core::{
@@ -23,13 +24,15 @@ use core::{
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
 use entryflags_x86_64::EntryFlags;
+use zerocopy::FromBytes;
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
     Debug, Display, Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, AddAssign, SubAssign
+    Add, Sub, AddAssign, SubAssign,
+    FromBytes,
 )]
 #[repr(transparent)]
 pub struct VirtualAddress(usize);
@@ -121,11 +124,11 @@ impl From<VirtualAddress> for usize {
 
 /// A physical memory address, which is a `usize` under the hood.
 #[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
     Debug, Display, Binary, Octal, LowerHex, UpperHex, 
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign,
-    Add, Sub, Mul, Div, Rem, Shr, Shl,
-    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign, ShrAssign, ShlAssign,
+    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+    Add, Sub, AddAssign, SubAssign,
+    FromBytes,
 )]
 #[repr(transparent)]
 pub struct PhysicalAddress(usize);

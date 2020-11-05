@@ -4,8 +4,12 @@
 #![no_std]
 #![feature(asm, naked_functions)]
 
+extern crate zerocopy;
+
+use zerocopy::FromBytes;
 
 /// The registers saved before a context switch and restored after a context switch.
+#[derive(FromBytes)]
 #[repr(C, packed)]
 pub struct ContextRegular {
     // The order of the registers here MUST MATCH the order of 
