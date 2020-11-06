@@ -32,6 +32,7 @@ extern crate nic_buffers;
 extern crate nic_queues;
 extern crate physical_nic;
 extern crate virtual_nic;
+extern crate wakelock;
 
 pub mod test_ixgbe_driver;
 mod regs;
@@ -68,6 +69,7 @@ use runqueue::get_least_busy_core;
 use alloc::sync::Arc;
 use core::ops::{Deref, DerefMut};
 use core::mem::ManuallyDrop;
+use wakelock::{Wakelock, PowerDownFn};
 
 /// Vendor ID for Intel
 pub const INTEL_VEND:                   u16 = 0x8086;  
@@ -106,7 +108,7 @@ const DCA_ENABLE:                           bool    = false;
 /// The number of receive queues that are enabled.
 /// It can be a a maximum of 16 since we are using only the physical functions.
 /// If RSS or filters are not enabled, this should be 1.
-const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 1;
+const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 8;
 /// The maximum number of rx queues available on this NIC (virtualization has to be enabled)
 const IXGBE_MAX_RX_QUEUES:                  u8      = 128;
 /// The number of transmit queues that are enabled. 
@@ -244,8 +246,7 @@ pub struct IxgbeNic {
     /// Registers for the unused queues
     tx_registers_unused: Vec<IxgbeTxQueueRegisters>,
     /// wakelock to keep track of the number of applications using the NIC
-    wakelock: Arc<u8>
-}
+    wakelock: Wakelock}
 
 // A trait which contains common functionalities for a NIC
 impl NetworkInterfaceCard for IxgbeNic {
@@ -381,6 +382,7 @@ impl IxgbeNic {
             Self::enable_dca(&mut mapped_registers3, &mut rx_queues)?;
         }
 
+        let wakelock = Wakelock::create_wakelock(2, power_down_device);
         let ixgbe_nic = IxgbeNic {
             bar_type: bar_type,
             mem_base: mem_base,
@@ -399,7 +401,7 @@ impl IxgbeNic {
             num_tx_queues: IXGBE_NUM_TX_QUEUES_ENABLED,
             tx_queues: tx_queues,
             tx_registers_unused: tx_mapped_registers,
-            wakelock: Arc::new(0)
+            wakelock: wakelock
         };
 
         let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
@@ -1062,8 +1064,14 @@ impl IxgbeNic {
         Ok(queues)
     }
 
+    fn power_down(&mut self){ error!("Powering down ixgbe");}
+
 }
 
+pub fn power_down_device() {
+    let mut nic = get_ixgbe_nic().unwrap().lock();
+    nic.power_down()
+}
 
 
 /// A helper function to poll the nic receive queues

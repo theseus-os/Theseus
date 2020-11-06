@@ -1056,6 +1056,7 @@ dependencies = [
  "spin",
  "virtual_nic",
  "volatile",
+ "wakelock",
  "x86_64",
 ]
 
@@ -2761,6 +2762,7 @@ dependencies = [
  "nic_buffers",
  "nic_queues",
  "physical_nic",
+ "wakelock",
 ]
 
 [[package]]
@@ -2792,6 +2794,10 @@ dependencies = [
  "scheduler",
  "task",
 ]
+
+[[package]]
+name = "wakelock"
+version = "0.1.0"
 
 [[package]]
 name = "window"

@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "virtual_nic"
 description = "A structure that allows a physical NIC to partition its resources"
 version = "0.1.0"
@@ -25,6 +25,8 @@ path = "../intel_ethernet"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
+[dependencies.wakelock]
+path = "../wakelock"
 
 [lib]
 crate-type = ["rlib"]

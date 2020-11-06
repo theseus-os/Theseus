@@ -1,0 +1,11 @@
+[package]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "wakelock"
+description = "A structure that shifts power management to the compiler"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+[lib]
+crate-type = ["rlib"]

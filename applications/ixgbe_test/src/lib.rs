@@ -7,7 +7,7 @@
 // #![plugin(application_main_fn)]
 
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
 extern crate ixgbe;
@@ -17,6 +17,7 @@ extern crate spawn;
 use alloc::vec::Vec;
 use alloc::string::String;
 use hpet::get_hpet;
+use ixgbe::virtual_function;
 
 pub fn main(_args: Vec<String>) -> isize {
     // info!("Hello, world! (from hello application)");
@@ -32,15 +33,15 @@ pub fn main(_args: Vec<String>) -> isize {
     //     nic.set_5_tuple_filter([192,168,0,12],[192,168,0,19],0,0,1,7,6).expect("couldn't set filter");
     //     nic.set_5_tuple_filter([192,168,0,12],[192,168,0,20],0,0,1,7,7).expect("couldn't set filter");
     // }
-    ixgbe::test_ixgbe_driver::test_nic_ixgbe_driver(None);
-    ixgbe::tx_send_mq(0).expect("couldn't send");
-    ixgbe::tx_send_mq(1).expect("couldn't send");
-    ixgbe::tx_send_mq(2).expect("couldn't send");
-    ixgbe::tx_send_mq(3).expect("couldn't send");
-    ixgbe::tx_send_mq(4).expect("couldn't send");
-    ixgbe::tx_send_mq(5).expect("couldn't send");
-    ixgbe::tx_send_mq(6).expect("couldn't send");
-    ixgbe::tx_send_mq(7).expect("couldn't send");
+    // ixgbe::test_ixgbe_driver::test_nic_ixgbe_driver(None);
+    // ixgbe::tx_send_mq(0).expect("couldn't send");
+    // ixgbe::tx_send_mq(1).expect("couldn't send");
+    // ixgbe::tx_send_mq(2).expect("couldn't send");
+    // ixgbe::tx_send_mq(3).expect("couldn't send");
+    // ixgbe::tx_send_mq(4).expect("couldn't send");
+    // ixgbe::tx_send_mq(5).expect("couldn't send");
+    // ixgbe::tx_send_mq(6).expect("couldn't send");
+    // ixgbe::tx_send_mq(7).expect("couldn't send");
 
 
     // let taskref = spawn::new_task_builder(measure_dca_time, ())
@@ -50,7 +51,13 @@ pub fn main(_args: Vec<String>) -> isize {
     //     .expect("couldn't create task");
 
     // let _ = taskref.join();
+    {
+        let a = virtual_function::create_virtual_nic(1,vec!([192,168,0,1]),1);
+        if a.is_err() {println!("can't create nic");}
+        let b = virtual_function::create_virtual_nic(1,vec!([192,168,0,1]),1);
+        if b.is_err() {println!("can't create nic");}
 
+    }
     0
 }
 
