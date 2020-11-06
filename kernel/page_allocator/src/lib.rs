@@ -1,9 +1,13 @@
-//! Provides a (currently mediocre) allocator for virtual memory pages.
+//! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
-//! This also supports early allocation of pages (up to 32 chunks) before heap allocation is available,
-//! and does so behind the scenes using the same single interface. 
+//! This also supports early allocation of pages (up to 32 individual chunks)
+//! before heap allocation is available, and does so behind the scenes using the same single interface. 
+//! 
 //! Once heap allocation is available, it uses a dynamically-allocated list of page chunks to track allocations.
+//! 
+//! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html), 
+//! but there are several convenience functions that offer simpler interfaces for general usage. 
 
 #![no_std]
 
@@ -22,7 +26,50 @@ use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
 
-/// A group of contiguous pages, much like a hole in other allocators. 
+
+/// The single, system-wide list of free virtual memory pages.
+/// Currently this list includes both free and allocated chunks of pages together in the same list,
+/// but it may be better to separate them in the future,
+/// especially when we transition to a RB-tree or a better data structure to track allocated pages. 
+static FREE_PAGE_LIST: Mutex<StaticArrayLinkedList<Chunk>> = Mutex::new(StaticArrayLinkedList::Array([
+	// The list of available pages starts with the kernel text region (we should rename this).
+	Some(Chunk { 
+		allocated: false,
+		pages: PageRange::new(
+			Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
+			Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
+			// Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START + KERNEL_TEXT_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
+		)
+	}),
+	// It also includes the kernel stack and heap regions. 
+	Some(Chunk { 
+		allocated: false,
+		pages: PageRange::new(
+			Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)),
+			Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
+		)
+	}),
+	// It also includes the lower parts of the address space needed for booting up other CPU cores (APs).
+	// See the `multicore_bringup` crate. 
+	Some(Chunk { 
+		allocated: false,
+		pages: PageRange::new(
+			Page::containing_address(VirtualAddress::new_canonical(0xF000)),
+			Page::containing_address(VirtualAddress::new_canonical(0x1_0000)), // inclusive range
+		)
+	}),
+	// In the future, we can add additional items here, e.g., the entire virtual address space.
+	// NOTE: we must never include the range of addresses covered by the 510th entry in the top-level (P4) page table,
+	// since that is used for the recursive page table mapping.
+	// Those forbidden addresses include the range from `0xFFFF_FF00_0000_0000` to `0xFFFF_FF80_0000_0000`.
+	None, None, None, None, None, 
+	None, None, None, None, None, None, None, None,
+	None, None, None, None, None, None, None, None,
+	None, None, None, None, None, None, None, None,
+]));
+
+
+/// A range of contiguous pages and whether they're allocated or free.
 #[derive(Debug, Clone)]
 struct Chunk {
 	/// Whether or not this Chunk is currently allocated. If false, it is free.
@@ -54,11 +101,15 @@ impl Deref for Chunk {
 
 
 
-/// Represents an allocated range of virtual addresses, specified in pages. 
-/// These pages are not initially mapped to any physical memory frames, you must do that separately.
-/// This object represents ownership of those pages; if this object falls out of scope,
-/// it will be dropped, and the pages will be de-allocated. 
-/// See `MappedPages` struct for a similar object that unmaps pages when dropped.
+/// Represents a range of allocated `VirtualAddress`es, specified in `Page`s. 
+/// 
+/// These pages are not initially mapped to any physical memory frames, you must do that separately
+/// in order to actually use their memory; see the `MappedPages` type for more. 
+/// 
+/// This object represents ownership of the allocated virtual pages;
+/// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop. 
+/// 
+/// TODO: implement proper deallocation for `AllocatedPages` upon drop.
 pub struct AllocatedPages {
 	pages: PageRange,
 }
@@ -135,9 +186,12 @@ impl AllocatedPages {
 // }
 
 
-/// A convenience wrapper around a LinkedList and a primitive array
-/// that allows the caller to create one statically in a const context, 
-/// and then abstract over both when using it. 
+/// A convenience wrapper that abstracts either a `LinkedList<T>` or a primitive array `[T; N]`.
+/// 
+/// This allows the caller to create an array statically in a const context, 
+/// and then abstract over both that and the inner `LinkedList` when using it. 
+/// 
+/// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.
 pub enum StaticArrayLinkedList<T> {
 	Array([Option<T>; 32]),
 	LinkedList(LinkedList<T>),
@@ -207,7 +261,7 @@ impl<T> StaticArrayLinkedList<T> {
 		*self = StaticArrayLinkedList::LinkedList(new_ll);
 	}
 
-	/// Returns an iterator over references to items in this collection.
+	/// Returns a forward iterator over references to items in this collection.
 	pub fn iter(&self) -> impl Iterator<Item = &T> {
 		let mut iter_a = None;
 		let mut iter_b = None;
@@ -218,7 +272,7 @@ impl<T> StaticArrayLinkedList<T> {
 		iter_a.into_iter().flatten().chain(iter_b.into_iter().flatten())
 	}
 
-	/// Returns an iterator over mutable references to items in this collection.
+	/// Returns a forward iterator over mutable references to items in this collection.
 	pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
 		let mut iter_a = None;
 		let mut iter_b = None;
@@ -230,125 +284,15 @@ impl<T> StaticArrayLinkedList<T> {
 	}
 }
 
-/// The single, system-wide list of free virtual memory pages.
-/// Currently this list includes both free and allocated chunks of pages together in the same list,
-/// but it may be better to separate them in the future,
-/// especially when we transition to a RB-tree or a better data structure to track allocated pages. 
-static FREE_PAGE_LIST: Mutex<StaticArrayLinkedList<Chunk>> = Mutex::new(StaticArrayLinkedList::Array([
-	// The list of available pages starts with the kernel text region (we should rename this).
-	Some(Chunk { 
-		allocated: false,
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
-			Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
-			// Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START + KERNEL_TEXT_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
-		)
-	}),
-	// It also includes the kernel stack and heap regions. 
-	Some(Chunk { 
-		allocated: false,
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)),
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
-		)
-	}),
-	// It also includes the lower parts of the address space needed for booting up other CPU cores (APs).
-	// See the `multicore_bringup` crate. 
-	Some(Chunk { 
-		allocated: false,
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::new_canonical(0xF000)),
-			Page::containing_address(VirtualAddress::new_canonical(0x1_0000)), // inclusive range
-		)
-	}),
-	// In the future, we can add additional items here, e.g., the entire virtual address space.
-	// NOTE: we must never include the range of addresses covered by the 510th entry in the top-level (P4) page table,
-	// since that is used for the recursive page table mapping.
-	// Those forbidden addresses include the range from `0xFFFF_FF00_0000_0000` to `0xFFFF_FF80_0000_0000`.
-	None, None, None, None, None, 
-	None, None, None, None, None, None, None, None,
-	None, None, None, None, None, None, None, None,
-	None, None, None, None, None, None, None, None,
-]));
 
-
-/// Convenience function for allocating pages by giving the number of bytes
-/// rather than the number of pages. 
-/// This function still allocates whole pages by rounding up the number of bytes. 
-/// See [`allocate_pages()`](fn.allocate_pages.html)
-pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
-	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
-	allocate_pages(num_pages)
-}
-
-
-/// Allocates the given number of pages, but simply reserves the virtual addresses; 
-/// it does not allocate actual physical memory frames nor do any mapping. 
-/// Thus these pages aren't directly usable until they are mapped to physical frames. 
-/// Allocation is quick, technically O(n) but generally will allocate immediately
-/// because the largest free chunks are stored at the front of the list.
-/// Fragmentation isn't cleaned up until we're out of address space, but not really a big deal.
-pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
-
-	if num_pages == 0 {
-		warn!("allocate_pages(): requested an allocation of 0 pages... stupid!");
-		return None;
-	}
-
-	// the Pages holding the chunk to be allocated, if we can find one.
-	let mut allocated_page_range: Option<PageRange> = None;
-
-	let mut locked_list = FREE_PAGE_LIST.lock();
-	for mut c in locked_list.iter_mut() {
-		// skip already-allocated chunks and chunks that are too small
-		if c.allocated || c.pages.size_in_pages() < num_pages {
-			continue;
-		}
-
-		// Here: we have found a suitable chunk.
-		// If the chunk is exactly the right size, just update it in-place as 'allocated' and return that chunk.
-		if c.pages.size_in_pages() == num_pages {
-			c.allocated = true;
-			return Some(c.as_allocated_pages())
-		}
-		
-		// Here: we have a suitable chunk, we need to split it up into two chunks: an allocated one and a free one. 
-		let new_allocation = PageRange::with_num_pages(*c.pages.start(), num_pages);
-		// First, update in-place the original free (unallocated) chunk to be smaller, 
-		// since we're removing pages from the beginning of it.
-		c.pages = PageRange::new(*new_allocation.end() + 1, *c.pages.end());
-
-		// Second, create a new chunk that has the pages we've peeled off of the beginning of the original chunk.
-		// (or rather, we create the chunk below outside of the iterator loop, so here we just tell it where to start)
-		allocated_page_range = Some(new_allocation);
-		break;
-	}
-
-	// NOTE: we don't actually need to keep track of allocated chunks here, it's just for debugging.
-	if let Some(pr) = allocated_page_range {
-		let new_chunk = Chunk {
-			allocated: true,
-			pages: pr
-		};
-		let ret = new_chunk.as_allocated_pages();
-		locked_list.push_back(new_chunk).unwrap();
-		Some(ret)
-	}
-	else {
-		error!("page_allocator: out of virtual address space."); 
-		return None;
-	}
-}
-
-
-/// This struct represents a series of page allocator-related bookkeeping actions
-/// that may result in heap allocation, e.g., adding free or allocated chunks
-/// to the list of free pages or pages in use. 
-/// This struct can be returned from `allocate_pages()` and its family of functions 
-/// in order to allow the caller to precisely control when those actions 
-/// that may result in heap allocation should occur. 
+/// A series of pending actions related to page allocator bookkeeping,
+/// which may result in heap allocation. 
 /// 
 /// The actions are triggered upon dropping this struct. 
+/// This struct can be returned from the `allocate_pages()` family of functions 
+/// in order to allow the caller to precisely control when those actions 
+/// that may result in heap allocation should occur. 
+/// Such actions include adding free or allocated chunks to the list of free pages or pages in use. 
 /// 
 /// If you don't care about precise control, simply drop this struct at any time, 
 /// or ignore it with a `let _ = ...` binding to instantly drop it. 
@@ -408,15 +352,29 @@ impl<'list> Drop for DeferredAllocAction<'list> {
 }
 
 
-pub fn allocate_pages_by_bytes_deferred(
-	requested_vaddr: Option<VirtualAddress>,
-	num_bytes: usize,
-) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
-	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
-	allocate_pages_deferred(requested_vaddr, num_pages)
-}
-
-
+/// The core page allocation routine that allocates the given number of virtual pages,
+/// optionally at the requested starting `VirtualAddress`.
+/// 
+/// This simply reserves a range of virtual addresses, it does not allocate 
+/// actual physical memory frames nor do any memory mapping. 
+/// Thus, the returned `AllocatedPages` aren't directly usable until they are mapped to physical frames. 
+/// 
+/// Allocation is quick, technically `O(n)` but generally will allocate immediately
+/// because the largest free chunks are stored at the front of the list.
+/// Fragmentation isn't cleaned up until we're out of address space, but that's not really a big deal.
+/// 
+/// # Arguments
+/// * `requested_vaddr`: if `Some`, the returned `AllocatedPages` will start at the `Page`
+///   containing this `VirtualAddress`. 
+///   If `None`, the first available `Page` range will be used, starting at any random virtual address.
+/// * `num_pages`: the number of `Page`s to be allocated. 
+/// 
+/// # Return
+/// If successful, returns a tuple of two items:
+/// * the pages that were allocated, and
+/// * an opaque struct representing details of bookkeeping-related actions that may cause heap allocation. 
+///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, 
+///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.
 pub fn allocate_pages_deferred(
 	requested_vaddr: Option<VirtualAddress>,
 	num_pages: usize,
@@ -495,110 +453,71 @@ pub fn allocate_pages_deferred(
 }
 
 
-
-/// Convenience function for allocating pages at the given virtual address by 
-/// giving the number of bytes rather than the number of pages. 
+/// Similar to [`allocated_pages_deferred()`](fn.allocate_pages_deferred.html),
+/// but accepts a size value for the allocated pages in number of bytes instead of number of pages. 
+/// 
 /// This function still allocates whole pages by rounding up the number of bytes. 
-/// See [`allocate_pages_at()`](fn.allocate_pages_at.html)
-pub fn allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -> Result<AllocatedPages, &'static str> {
+pub fn allocate_pages_by_bytes_deferred(
+	requested_vaddr: Option<VirtualAddress>,
+	num_bytes: usize,
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
-	allocate_pages_at(vaddr, num_pages)
+	allocate_pages_deferred(requested_vaddr, num_pages)
+}
+
+
+/// Allocates the given number of pages with no constraints on the starting virtual address.
+/// 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
+	allocate_pages_deferred(None, num_pages)
+		.map(|(ap, _action)| ap)
+		.ok()
+}
+
+
+/// Allocates pages with no constraints on the starting virtual address, 
+/// with a size given by the number of bytes. 
+/// 
+/// This function still allocates whole pages by rounding up the number of bytes. 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
+	allocate_pages_by_bytes_deferred(None, num_bytes)
+		.map(|(ap, _action)| ap)
+		.ok()
+}
+
+
+/// Allocates pages starting at the given `VirtualAddress` with a size given in number of bytes. 
+/// 
+/// This function still allocates whole pages by rounding up the number of bytes. 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+pub fn allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -> Result<AllocatedPages, &'static str> {
+	allocate_pages_by_bytes_deferred(Some(vaddr), num_bytes)
+		.map(|(ap, _action)| ap)
 }
 
 
 /// Allocates the given number of pages starting at the page containing the given `VirtualAddress`.
-/// This simply reserves the virtual addresses, but does not allocate actual physical memory frames nor do any mapping. 
-/// Thus these pages aren't directly usable until they are mapped to physical frames. 
 /// 
-/// Returns an error is out of virtual address space, or if the specified virtual address is already allocated.
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<AllocatedPages, &'static str> {
-	if num_pages == 0 {
-		warn!("allocate_pages(): requested an allocation of 0 pages... stupid!");
-		return Err("cannot allocate zero pages");
-	}
-
-	let desired_start_page = Page::containing_address(vaddr);
-
-	// the Pages holding the chunk to be allocated, if we can find one.
-	let mut allocated_page_range: Option<PageRange> = None;
-	// the extra unallocated pages to be added to the list.
-	let mut extra_free_chunk: Option<PageRange> = None;
-
-	let mut locked_list = FREE_PAGE_LIST.lock();
-	for c in locked_list.iter_mut() {
-		// Look for the chunk that contains the desired page
-		if desired_start_page >= *c.pages.start() 
-			&& (desired_start_page + num_pages - 1) <= *c.pages.end()
-		{
-			if c.allocated {
-				return Err("address already allocated");
-			}
-		} else {
-			continue;
-		}
-		
-		// The new allocated chunk might start in the middle of an existing chunk,
-		// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
-		let new_allocation = PageRange::with_num_pages(desired_start_page, num_pages);
-		// If this chunk is exactly the right size, just update it in-place as 'allocated' and return that chunk.
-		if num_pages == c.pages.size_in_pages() {
-			c.allocated = true;
-			return Ok(c.as_allocated_pages());
-		}
-		// Here, we are guaranteed that before and after cannot both be zero-sized, though one of them may be.
-		let before = PageRange::new(*c.pages.start(), *new_allocation.start() - 1);
-		let after  = PageRange::new(*new_allocation.end() + 1, *c.pages.end());
-
-		// Put the smaller free chunk in-place here, 
-		// and the larger free chunk at the front of the list (outside of this loop),
-		// unless one is zero-sized, in which we use the other.
-		if before.size_in_pages() > 0 && 
-			(after.size_in_pages() == 0 || before.size_in_pages() < after.size_in_pages())
-		{
-			c.pages = before;
-			extra_free_chunk = Some(after);
-		} else {
-			c.pages = after;
-			extra_free_chunk = Some(before);
-		}
-
-		allocated_page_range = Some(new_allocation);
-		break;
-	}
-
-	if let Some(free_pages) = extra_free_chunk {
-		if free_pages.size_in_pages() > 0 {
-			locked_list.push_front(Chunk {
-				allocated: false,
-				pages: free_pages,
-			}).unwrap();
-		}
-	}
-
-	// NOTE: we don't actually need to keep track of allocated chunks here, it's just for debugging.
-	if let Some(pr) = allocated_page_range {
-		let new_chunk = Chunk {
-			allocated: true,
-			pages: pr,
-		};
-		let ret = new_chunk.as_allocated_pages();
-		locked_list.push_back(new_chunk).unwrap();
-		Ok(ret)
-	}
-	else {
-		error!("page_allocator: out of virtual address space, or requested address was not covered by page allocator.");
-		Err("out of virtual address space, or requested virtual address not covered by page allocator.")
-	}
+	allocate_pages_deferred(Some(vaddr), num_pages)
+		.map(|(ap, _action)| ap)
 }
+
 
 /// Converts the page allocator from using static memory (a primitive array) to dynamically-allocated memory.
 /// 
 /// Call this function once heap allocation is available. 
+/// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
+#[doc(hidden)] 
 pub fn convert_to_heap_allocated() {
 	FREE_PAGE_LIST.lock().convert_to_heap_allocated();
 }
 
 /// A debugging function used to dump the full internal state of the page allocator. 
+#[doc(hidden)] 
 pub fn dump_page_allocator_state() {
 	debug!("--------------- PAGE ALLOCATOR LIST ---------------");
 	for c in FREE_PAGE_LIST.lock().iter() {
