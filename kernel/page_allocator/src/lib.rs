@@ -23,7 +23,7 @@ use memory_structs::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
 
 /// A group of contiguous pages, much like a hole in other allocators. 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Chunk {
 	/// Whether or not this Chunk is currently allocated. If false, it is free.
 	allocated: bool,
@@ -36,7 +36,22 @@ impl Chunk {
 			pages: self.pages.clone(),
 		}
 	}
+
+	/// Returns a new `Chunk` with an empty range of pages. 
+	fn empty() -> Chunk {
+		Chunk {
+			allocated: false,
+			pages: PageRange::empty(),
+		}
+	}
 }
+impl Deref for Chunk {
+    type Target = PageRange;
+    fn deref(&self) -> &PageRange {
+        &self.pages
+    }
+}
+
 
 
 /// Represents an allocated range of virtual addresses, specified in pages. 
@@ -150,7 +165,8 @@ impl<T> StaticArrayLinkedList<T> {
 
 	/// Push the given `value` onto the front end of this collection.
 	/// If the inner collection is an array, then this is an expensive operation
-	/// that requires all successive elements to be right-shifted. 
+	/// with linear time complexity (on the size of the array) 
+	/// because it requires all successive elements to be right-shifted. 
 	pub fn push_front(&mut self, value: T) -> Result<(), T> {
 		match self {
 			StaticArrayLinkedList::Array(arr) => {
@@ -323,6 +339,161 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 		return None;
 	}
 }
+
+
+/// This struct represents a series of page allocator-related bookkeeping actions
+/// that may result in heap allocation, e.g., adding free or allocated chunks
+/// to the list of free pages or pages in use. 
+/// This struct can be returned from `allocate_pages()` and its family of functions 
+/// in order to allow the caller to precisely control when those actions 
+/// that may result in heap allocation should occur. 
+/// 
+/// The actions are triggered upon dropping this struct. 
+/// 
+/// If you don't care about precise control, simply drop this struct at any time, 
+/// or ignore it with a `let _ = ...` binding to instantly drop it. 
+pub struct DeferredAllocAction<'list> {
+	/// A reference to the list into which we will insert the free `Chunk`s.
+	free_list: &'list Mutex<StaticArrayLinkedList<Chunk>>,
+	/// A reference to the list into which we will insert the allocated `Chunk`s.
+	allocated_list: &'list Mutex<StaticArrayLinkedList<Chunk>>,
+	/// The chunk that was marked as allocated during the page allocation. 
+	/// NOTE: we don't actually need to keep track of the list of allocated chunks, 
+	/// but it's handy for debugging purposes.
+	allocated: Chunk,
+	/// A free chunk that needs to be added back to the free list.
+	free1: Chunk,
+	/// Another free chunk that needs to be added back to the free list.
+	free2: Chunk,
+}
+impl<'list> DeferredAllocAction<'list> {
+	fn new<A, F1, F2>(allocated: A, free1: F1, free2: F2) -> DeferredAllocAction<'list> 
+		where A:  Into<Option<Chunk>>,
+			  F1: Into<Option<Chunk>>,
+			  F2: Into<Option<Chunk>>,
+	{
+		let free_list = &FREE_PAGE_LIST;
+		let allocated_list = &FREE_PAGE_LIST;
+		let allocated = allocated.into().unwrap_or(Chunk::empty());
+		let free1 = free1.into().unwrap_or(Chunk::empty());
+		let free2 = free2.into().unwrap_or(Chunk::empty());
+		DeferredAllocAction { free_list, allocated_list, allocated, free1, free2 }
+	}
+}
+impl<'list> Drop for DeferredAllocAction<'list> {
+	fn drop(&mut self) {
+		// Insert the free chunks into the list, putting the larger one before the smaller one
+		// and ignoring either one if it is zero-sized. 
+		let size1 = self.free1.size_in_pages();
+		let size2 = self.free2.size_in_pages();
+		let (first, second) = if size1 > size2 {
+			(&self.free1, &self.free2)
+		} else {
+			(&self.free2, &self.free1)
+		};
+
+		if size1 > 0 || size2 > 0 {
+			let mut ll = self.free_list.lock();
+			if size1 > 0 {
+				ll.push_front(first.clone()).unwrap();
+			}
+			if size2 > 0 {
+				ll.push_front(second.clone()).unwrap();
+			}
+		}
+		if self.allocated.size_in_pages() > 0 {
+			self.allocated_list.lock().push_back(self.allocated.clone()).unwrap();
+		}
+	}
+}
+
+
+pub fn allocate_pages_by_bytes_deferred(
+	requested_vaddr: Option<VirtualAddress>,
+	num_bytes: usize,
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
+	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
+	allocate_pages_deferred(requested_vaddr, num_pages)
+}
+
+
+pub fn allocate_pages_deferred(
+	requested_vaddr: Option<VirtualAddress>,
+	num_pages: usize,
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
+	if num_pages == 0 {
+		warn!("PageAllocator: requested an allocation of 0 pages... stupid!");
+		return Err("cannot allocate zero pages");
+	}
+
+	let desired_start_page = requested_vaddr.map(|vaddr| Page::containing_address(vaddr));
+
+	let mut locked_list = FREE_PAGE_LIST.lock();
+	for c in locked_list.iter_mut() {
+		// Look for the chunk that contains the desired address, 
+		// or any chunk that is large enough (if no desired address was requested).
+		let potential_start_page = desired_start_page.unwrap_or(*c.pages.start());
+		let potential_end_page   = potential_start_page + num_pages - 1; // inclusive bound
+		if potential_start_page >= *c.pages.start() && potential_end_page <= *c.pages.end() {
+			if c.allocated {
+				return Err("address already allocated");
+			}
+			// We've found a suitable chunk, so fall through to the rest of the loop.
+		} else {
+			continue;
+		}
+		
+		// If this chunk is exactly the right size, just update it in-place as 'allocated' and return that chunk.
+		if num_pages == c.pages.size_in_pages() {
+			c.allocated = true;
+			return Ok((
+				c.as_allocated_pages(),
+				DeferredAllocAction::new(None, None, None),
+			));
+		}
+
+		// The new allocated chunk might start in the middle of an existing chunk,
+		// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
+		let new_allocation = PageRange::new(potential_start_page, potential_end_page);
+		let before = PageRange::new(*c.pages.start(), *new_allocation.start() - 1);
+		let after = PageRange::new(*new_allocation.end() + 1, *c.pages.end());
+
+		// Adjust the current chunk in place here, such that it now holds the smaller of the two free chunks;
+		// the larger free chunk will be inserted into the front of the list later -- see the drop handler
+		// of the `DeferredAllocAction` struct for more details.
+		// However, if either chunk is zero-sized, we use the other one here.
+		// At this point, both cannot be zero-sized due to the exact-sized chunk condition above.
+		let extra_free_pages: PageRange; 
+		if before.size_in_pages() > 0 && 
+			(after.size_in_pages() == 0 || before.size_in_pages() < after.size_in_pages())
+		{
+			c.pages = before;
+			extra_free_pages = after;
+		} else {
+			c.pages = after;
+			extra_free_pages = before;
+		}
+
+		let allocated_chunk = Chunk {
+			allocated: true,
+			pages: new_allocation,
+		};
+		let extra_free_chunk = Chunk {
+			allocated: false,
+			pages: extra_free_pages,
+		};
+		return Ok((
+			allocated_chunk.as_allocated_pages(),
+			DeferredAllocAction::new(allocated_chunk, extra_free_chunk, None),
+		));
+	}
+
+	error!("PageAllocator: out of virtual address space, or requested address {:#X?} ({} pages) was not covered by page allocator.",
+		requested_vaddr, num_pages
+	);
+	Err("out of virtual address space, or requested virtual address not covered by page allocator.")
+}
+
 
 
 /// Convenience function for allocating pages at the given virtual address by 
