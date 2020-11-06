@@ -196,6 +196,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
+    opts.optflag("v", "verbose", "enable verbose output");
     opts.optflag("p", "spillful", "run the state spillful memory mapping evaluation");
     opts.optopt("n", "", "create 'N' mappings ", "NUM");
     opts.optopt("s", "--size", "specify the size (in pages) for each mapping", "SIZE");
@@ -243,11 +244,8 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
         .and_then(|i| i.parse::<usize>().ok())
         .unwrap_or(2);
 
-    let use_spillful = if matches.opt_present("p") {
-        true
-    } else {
-        false
-    };
+    let use_spillful = matches.opt_present("p");
+    let verbose = matches.opt_present("v");
 
     if num_mappings < 1 { 
         return Err("invalid number of mappings specified.")
@@ -268,12 +266,13 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     // calculate overhead of reading hpet counter
     let overhead = hpet_timing_overhead()?;
 
-    for _ in 0..TRIES {            
+    for _trial in 0..TRIES {
         let pages = allocate_pages(size_in_pages * num_mappings)
             .ok_or("couldn't allocate sufficient pages")?;
         let start_vaddr = pages.start_address();
-
+        
         // (1) create mappings
+        if verbose { println!("*** Iteration {}: creating mappings.", _trial); }         
         let mut result = create_mappings(
             if use_spillful {
                 MapperType::Spillful(&mut mapper_spillful)
@@ -287,6 +286,7 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
         )?;
 
         // (2) perform remappings
+        if verbose { println!("*** Iteration {}: performing remappings.", _trial); }         
         match result {
             (Some(ref mut mapped_pages), None, time) => {
                 create_times.push(time);
@@ -302,6 +302,7 @@ pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
         };
             
         // (3) perform unmappings
+        if verbose { println!("*** Iteration {}: performing unmappings.", _trial); }         
         match result {
             (Some(mapped_pages), None, _time) => {
                 let unmap = unmap_normal(&mut mapper_normal, mapped_pages, overhead)?;
