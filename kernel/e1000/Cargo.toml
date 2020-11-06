@@ -7,10 +7,12 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-volatile = "0.2.5"
+volatile = "0.2.7"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+zerocopy = "0.3.0"
+static_assertions = "1.1.0"
 
 
 [dependencies.log]

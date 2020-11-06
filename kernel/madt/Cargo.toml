@@ -5,6 +5,9 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for ACPI MADT"
 build = "../../build.rs"
 
+[dependencies]
+zerocopy = "0.3.0"
+
 [dependencies.log]
 version = "0.4.8"
 

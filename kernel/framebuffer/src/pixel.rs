@@ -2,9 +2,10 @@
 
 use core::hash::Hash;
 use color::Color;
+use zerocopy::FromBytes;
 
 /// A pixel provides methods to blend with others.
-pub trait Pixel: Copy + Hash {
+pub trait Pixel: Copy + Hash + FromBytes {
     /// Composites the `src` pixel slice to the `dest` pixel slice.
     fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
@@ -16,7 +17,7 @@ pub trait Pixel: Copy + Hash {
 }
 
 
-#[derive(Hash, Debug, Clone, Copy)]
+#[derive(Hash, Debug, Clone, Copy, FromBytes)]
 /// An RGB Pixel is a pixel with no extra channel.
 pub struct RGBPixel {
     pub blue: u8,
@@ -25,7 +26,7 @@ pub struct RGBPixel {
     _channel: u8,
 }
 
-#[derive(Hash, Debug, Clone, Copy)]
+#[derive(Hash, Debug, Clone, Copy, FromBytes)]
 /// An Alpha Pixel is a pixel with an alpha channel
 pub struct AlphaPixel {
     pub blue: u8,

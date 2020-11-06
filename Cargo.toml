@@ -36,6 +36,8 @@ exclude = [
 
 
 [patch.crates-io]
+### use our own version of volatile which supports zerocopy
+volatile = { git = "https://github.com/theseus-os/volatile" }
 ### use our own no_std-compatilbe getopts
 getopts = { git = "https://github.com/kevinaboos/getopts" }
 ### use our own no_std-compatible qp trie

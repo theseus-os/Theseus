@@ -293,12 +293,13 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
         // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
         {
-            let bottom_of_stack = new_task.kstack.as_type_mut::<*mut TaskFuncArg<F, A, R>>(0)?;
-            *bottom_of_stack = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
+            let bottom_of_stack: &mut usize = new_task.kstack.as_type_mut(0)?;
+            let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
                 arg:  self.argument,
                 func: self.func,
                 _rettype: PhantomData,
             }));
+            *bottom_of_stack = box_ptr as usize;
         }
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
@@ -482,10 +483,10 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = {
             let t = curr_task_ref.lock();
-            let tfa_box_raw_ptr = t.kstack.as_type::<*mut TaskFuncArg<F, A, R>>(0)
+            let tfa_box_raw_ptr: &usize = t.kstack.as_type(0)
                 .expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
             // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
-            let tfa_boxed = unsafe { Box::from_raw(*tfa_box_raw_ptr) };
+            let tfa_boxed = unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
             *tfa_boxed // un-box it
         };
         let (func, arg) = (task_func_arg.func, task_func_arg.arg);

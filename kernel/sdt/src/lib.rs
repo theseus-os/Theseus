@@ -2,12 +2,16 @@
 
 #![no_std]
 
+extern crate zerocopy;
+
+use zerocopy::FromBytes;
+
 /// The size in bytes of the ACPI SDT Header (`Sdt` struct).
 pub const SDT_SIZE_IN_BYTES: usize = core::mem::size_of::<Sdt>();
 
 /// An ACPI System Descriptor Table.
 /// This is the header (the first part) of every ACPI table.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct Sdt {
   pub signature: [u8; 4],
@@ -23,7 +27,7 @@ pub struct Sdt {
 
 /// A struct used to describe the position and layout of registers
 /// related to ACPI tables.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
 pub struct GenericAddressStructure {
     pub address_space: u8,

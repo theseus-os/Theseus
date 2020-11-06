@@ -23,6 +23,7 @@ extern crate bit_field;
 extern crate memory_x86_64;
 extern crate x86_64;
 extern crate memory_structs;
+extern crate zerocopy;
 
 
 mod area_frame_allocator;

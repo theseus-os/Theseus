@@ -12,6 +12,7 @@ extern crate apic;
 extern crate pic;
 extern crate sdt;
 extern crate acpi_table;
+extern crate zerocopy;
 
 use core::mem::size_of;
 use memory::{MappedPages, PageTable, PhysicalAddress}; 
@@ -19,6 +20,7 @@ use apic::{LocalApic, get_my_apic_id, get_lapics, get_bsp_id};
 use irq_safety::RwLockIrqSafe;
 use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
+use zerocopy::FromBytes;
 
 pub const MADT_SIGNATURE: &'static [u8; 4] = b"APIC";
 
@@ -42,7 +44,7 @@ pub fn handle(
 /// Note that this is only the fixed-size part of the MADT table.
 /// At the end, there is an unknown number of table entries, each of variable size. 
 /// Thus, we cannot pre-define them here, but only discover/define them in the iterator.
-#[derive(Debug)]
+#[derive(Debug, FromBytes)]
 #[repr(C)]
 struct MadtAcpiTable {
     header: Sdt,
@@ -186,7 +188,7 @@ impl<'t> Iterator for MadtIter<'t> {
 
 /// A MADT entry record, which precedes each actual MADT entry
 /// and describes its type and size.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
 struct EntryRecord {
     /// The type identifier of a MADT entry.
@@ -226,7 +228,7 @@ pub enum MadtEntry<'t> {
 }
 
 /// MADT Local APIC
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtLocalApic {
     header: EntryRecord,
@@ -239,7 +241,7 @@ pub struct MadtLocalApic {
 }
 
 /// MADT I/O APIC
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtIoApic {
     header: EntryRecord,
@@ -253,7 +255,7 @@ pub struct MadtIoApic {
 }
 
 /// MADT Interrupt Source Override
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtIntSrcOverride {
     header: EntryRecord,
@@ -270,7 +272,7 @@ pub struct MadtIntSrcOverride {
 /// MADT Non-maskable Interrupt.
 /// Use these to configure the LINT0 and LINT1 entries in the Local vector table
 /// of the relevant processor's (or processors') local APIC.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtNonMaskableInterrupt {
     header: EntryRecord,
@@ -286,7 +288,7 @@ pub struct MadtNonMaskableInterrupt {
 /// If this struct exists, the contained physical address
 /// should be used in place of the local APIC physical address
 /// specified in the MADT ACPI table itself.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtLocalApicAddressOverride {
     header: EntryRecord,

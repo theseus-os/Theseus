@@ -185,13 +185,13 @@ build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel prefix.
 ## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
 	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
-		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
+		cp -f  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 	@for app in $(APP_CRATE_NAMES) ; do  \
 		OLD_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o ; \
 		NEW_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/`basename $${OLD_FILE_PATH} | sed -n -e 's/$(KERNEL_PREFIX)\(.*\)/$(APP_PREFIX)\1/p'` ; \
-		mv  $${OLD_FILE_PATH}  $${NEW_FILE_PATH} ; \
+		test -e $${OLD_FILE_PATH}  &&  mv -f  $${OLD_FILE_PATH}  $${NEW_FILE_PATH} ; \
 	done
 
 ## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
@@ -502,9 +502,9 @@ help:
 # @echo -e "   kvm=yes:"
 # @echo -e "\t Enable KVM acceleration (the host computer must support it)."
 	@echo -e "   host=yes:"
-	@echo -e "\t Use the host CPU model, which is required for using certain x86 hardware, e.g., PMU, AVX. This also enables KVM."
+	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
 	@echo -e "   int=yes:"
-	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
+	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
 
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"

@@ -62,3 +62,6 @@ path = "../../kernel/simple_ipc"
 
 [dependencies.pmu_x86]
 path = "../../kernel/pmu_x86"
+
+[dependencies.mod_mgmt]
+path = "../../kernel/mod_mgmt"

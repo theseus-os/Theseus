@@ -41,7 +41,6 @@ extern crate slabmalloc_unsafe;
 #[cfg(safe_heap)]
 extern crate slabmalloc_safe;
 
-
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::boxed::Box;
@@ -142,23 +141,9 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 cfg_if! {
 if #[cfg(unsafe_heap)] {
     #[macro_use] extern crate alloc;
+    extern crate spin;
 
-    /// Merge mapped pages `mp` with the heap mapped pages stored in the kernel memory management information.
-    /// 
-    /// # Warning
-    /// The new mapped pages must start from the virtual address that the current heap mapped pages end at.
-    fn extend_heap_mp(mp: MappedPages) -> Result<(), &'static str> {
-        let heap_start_addr = KERNEL_HEAP_START;
-        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("extend_heap_mp(): KERNEL_MMI was not yet initialized!")?;
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        let heap_mp = kernel_mmi.extra_mapped_pages.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
-
-        if let Err((e,_mp)) = heap_mp.merge(mp){
-            error!("Could not merge MappedPages: {:?}", e);
-            return Err(e);
-        }
-        Ok(())
-    }
+    use spin::Once;
 
     /// Initializes the heap given by `key`.
     /// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].
@@ -188,7 +173,7 @@ if #[cfg(unsafe_heap)] {
                 if start_addr % ObjectPage8k::SIZE != 0 {
                     return Err("MappedPages allocated for heap are not aligned on an 8k boundary");
                 }
-                extend_heap_mp(mp)?;
+                multiple_heaps.extend_heap_mp(mp)?;
                 let page = unsafe{ core::mem::transmute(start_addr) };
                 zone_allocator.refill(layout, page)?;
 
@@ -308,6 +293,9 @@ pub struct MultipleHeaps{
     /// and extra memory for the heap is always allocated from the end.
     /// The Mutex also serves the purpose of helping to synchronize new allocations.
     end: MutexIrqSafe<VirtualAddress>, 
+    /// The mapped pages for the unsafe heap are stored here so that they are not dropped and unmapped.
+    #[cfg(unsafe_heap)]    
+    mp: Once<MutexIrqSafe<MappedPages>>
 }
 
 // The grow_heap() function for the MultipleHeaps changes depending on the slabmalloc version used.
@@ -326,7 +314,9 @@ if #[cfg(unsafe_heap)] {
                 #[cfg(not(unsafe_large_allocations))]
                 large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
 
-                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
+                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE)),
+
+                mp: Once::new()
             }
         }
 
@@ -351,12 +341,25 @@ if #[cfg(unsafe_heap)] {
             let mut heap_end = self.end.lock();
             let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
             let start_addr = mp.start_address().value();
-            extend_heap_mp(mp)?;
+            self.extend_heap_mp(mp)?;
             let page = unsafe{ core::mem::transmute(start_addr) };
             info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
             *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
             heap.refill(layout, page)
         } 
+
+        /// Merge mapped pages `mp` with the heap mapped pages.
+        /// 
+        /// # Warning
+        /// The new mapped pages must start from the virtual address that the current heap mapped pages end at.
+        fn extend_heap_mp(&self, mp: MappedPages) -> Result<(), &'static str> {
+            if let Some(heap_mp) = self.mp.try() {
+                heap_mp.lock().merge(mp).map_err(|(e,_mp)| e)?;
+            } else {
+                self.mp.call_once(|| MutexIrqSafe::new(mp));
+            }
+            Ok(())
+        }
     }
 } else if #[cfg(safe_heap)] {
     impl MultipleHeaps {
