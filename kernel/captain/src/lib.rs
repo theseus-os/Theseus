@@ -139,13 +139,6 @@ pub fn init(
     // which although we currently don't use since we don't have a userspace, but it is still a good idea. 
     // Note that we cannot do this until we have booted up all the APs.
     drop(identity_mapped_pages);
-    {
-        // for i in 0 .. 512 { 
-        //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
-        // }
-        // clear the 0th P4 entry, which covers any existing identity mappings
-        kernel_mmi_ref.lock().page_table.p4_mut().clear_entry(0); 
-    }
     
     // create a SIMD personality
     #[cfg(simd_personality)]

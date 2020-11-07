@@ -54,8 +54,8 @@ static FREE_PAGE_LIST: Mutex<StaticArrayLinkedList<Chunk>> = Mutex::new(StaticAr
 	Some(Chunk { 
 		allocated: false,
 		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::new_canonical(0xF000)),
-			Page::containing_address(VirtualAddress::new_canonical(0x1_0000)), // inclusive range
+			Page::containing_address(VirtualAddress::zero()),
+			Page::containing_address(VirtualAddress::new_canonical(0x100_0000 - 1)), // inclusive range
 		)
 	}),
 	// In the future, we can add additional items here, e.g., the entire virtual address space.
@@ -121,9 +121,7 @@ impl Deref for AllocatedPages {
 }
 impl fmt::Debug for AllocatedPages {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("AllocatedPages")
-            .field("", &self.pages)
-            .finish()
+		write!(f, "AllocatedPages({:?})", self.pages)
 	}
 }
 
@@ -389,15 +387,26 @@ pub fn allocate_pages_deferred(
 	let mut locked_list = FREE_PAGE_LIST.lock();
 	for c in locked_list.iter_mut() {
 		// Look for the chunk that contains the desired address, 
-		// or any chunk that is large enough (if no desired address was requested).
+		// or any chunk that is large enough, if no desired address was requested.
+		// Obviously, we cannot use any chunk that is already allocated. 
 		let potential_start_page = desired_start_page.unwrap_or(*c.pages.start());
 		let potential_end_page   = potential_start_page + num_pages - 1; // inclusive bound
 		if potential_start_page >= *c.pages.start() && potential_end_page <= *c.pages.end() {
+			// Here: chunk `c` was big enough and did contain the requested address.
+			// If it's not allocated, we can use it. 
 			if c.allocated {
-				return Err("address already allocated");
+				if desired_start_page.is_some() {
+					error!("Page allocator: requested {}-page allocation at address {:?}, but address was already allocated.",
+						num_pages, requested_vaddr
+					);
+					return Err("requested address already allocated");
+				} else {
+					continue;
+				}
 			}
-			// We've found a suitable chunk, so fall through to the rest of the loop.
+			// Here: we've found a suitable chunk, so fall through to the rest of the loop.
 		} else {
+			// Chunk `c` isn't big enough, or doesn't contain the requested address.
 			continue;
 		}
 		
@@ -446,7 +455,7 @@ pub fn allocate_pages_deferred(
 		));
 	}
 
-	error!("PageAllocator: out of virtual address space, or requested address {:#X?} ({} pages) was not covered by page allocator.",
+	error!("PageAllocator: out of virtual address space, or requested address {:?} ({} pages) was not covered by page allocator.",
 		requested_vaddr, num_pages
 	);
 	Err("out of virtual address space, or requested virtual address not covered by page allocator.")

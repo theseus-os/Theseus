@@ -29,7 +29,7 @@ use zerocopy::FromBytes;
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
     Add, Sub, AddAssign, SubAssign,
     FromBytes,
@@ -79,10 +79,19 @@ impl VirtualAddress {
         self.0 & (PAGE_SIZE - 1)
     }
 }
-
+impl fmt::Debug for VirtualAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "v{:#X}", self.0)
+    }
+}
+impl fmt::Display for VirtualAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 impl fmt::Pointer for VirtualAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:p}", self.0 as *const usize)
+        write!(f, "{:?}", self)
     }
 }
 
@@ -125,7 +134,7 @@ impl From<VirtualAddress> for usize {
 /// A physical memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
     Add, Sub, AddAssign, SubAssign,
     FromBytes,
@@ -169,7 +178,21 @@ impl PhysicalAddress {
         self.0 & (PAGE_SIZE - 1)
     }
 }
-
+impl fmt::Debug for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "p{:#X}", self.0)
+    }
+}
+impl fmt::Display for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl fmt::Pointer for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 
 impl Add<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
@@ -326,7 +349,7 @@ impl Step for Frame {
 
 
 /// A range of `Frame`s that are contiguous in physical memory.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FrameRange(RangeInclusive<Frame>);
 
 impl FrameRange {
@@ -390,7 +413,11 @@ impl FrameRange {
         FrameRange::new(start.clone(), end.clone())
     }
 }
-
+impl fmt::Debug for FrameRange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
 impl Deref for FrameRange {
     type Target = RangeInclusive<Frame>;
     fn deref(&self) -> &RangeInclusive<Frame> {
@@ -529,7 +556,7 @@ impl Step for Page {
 
 
 /// An inclusive range of `Page`s that are contiguous in virtual memory.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PageRange(RangeInclusive<Page>);
 
 impl PageRange {
@@ -612,7 +639,11 @@ impl PageRange {
         }
     }
 }
-
+impl fmt::Debug for PageRange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
 impl Deref for PageRange {
     type Target = RangeInclusive<Page>;
     fn deref(&self) -> &RangeInclusive<Page> {
@@ -636,6 +667,7 @@ impl IntoIterator for PageRange {
 
 
 /// The address bounds and mapping flags of a section's memory region.
+#[derive(Debug)]
 pub struct SectionMemoryBounds {
     /// The starting virtual address and physical address.
     pub start: (VirtualAddress, PhysicalAddress),
@@ -653,6 +685,7 @@ pub struct SectionMemoryBounds {
 /// * The `.data` section bounds cover those that are writable (.data, .bss).
 /// 
 /// It also contains the stack bounds, which are maintained separately.
+#[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
    pub text:   SectionMemoryBounds,
    pub rodata: SectionMemoryBounds,

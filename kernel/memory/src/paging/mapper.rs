@@ -205,15 +205,6 @@ impl Mapper {
         self.internal_map_to(PageRange::new(page, page), FrameRange::new(frame.clone(), frame), flags, allocator)
     }
 
-    /// maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
-    pub fn map_frames<A>(&mut self, frames: FrameRange, start_page: Page, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        let end_page = start_page - 1 + frames.size_in_frames(); // -1 because it's an inclusive range
-        self.internal_map_to(PageRange::new(start_page, end_page), frames, flags, allocator)
-    }
-
 
     /// maps the given `AllocatedPages` to the given actual frames.
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains that `AllocatedPages` object.
@@ -755,7 +746,7 @@ pub fn mapped_pages_unmap<A: FrameAllocator>(
 impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
-        // trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
+        // trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
 
         let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {
