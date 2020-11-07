@@ -148,20 +148,9 @@ There are similar commands for building the Theseus book:
 Our personal preference is to use Visual Studio Code (VS Code), which has excellent, official support from the Rust language team. Other options are available [here](https://areweideyet.com/), but we don't recommend them.
 
 For VS Code, recommended plugins are:
- * Rust (rls), by rust-lang
- * Better TOML, by bungcip
- * x86 and x86_64 Assembly, by 13xforever
-
-### Fixing RLS Problems
-Sometimes RLS just doesn't want to behave, especially if the latest Rust nightly version had build errors. In that case, try the following steps to fix it:
- * Set your default Rust toolchain to the one version in the `rust-toolchain` file, for example:     
- `rustup default nightly-2019-07-09`.
- * With your newly-set default toolchain, add the necessary components:    
- `rustup component add rls rust-analysis rust-src`.
- * In VS Code (or whatever IDE you're using), uninstall and reinstall the RLS extension, reloading the IDE each time.
- * Check your IDE's settings to make sure that no weird rust or RLS settings have been set; building Theseus doesn't require any special RLS settings. 
- * If you're still having lots of issues, remove all other toolchains besides the default one and try again.     
- You can see other installed toolchains with `rustup toolchain list`.
+ * [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=matklad.rust-analyzer), by matklad
+ * [Better TOML](https://marketplace.visualstudio.com/items?itemName=bungcip.better-toml), by bungcip
+ * [x86 and x86_64 Assembly](https://marketplace.visualstudio.com/items?itemName=13xforever.language-x86-64-assembly), by 13xforever
 
 
 # Other
