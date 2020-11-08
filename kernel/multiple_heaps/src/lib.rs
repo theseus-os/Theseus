@@ -87,6 +87,10 @@ pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE
 /// It should be at least 2, to ensure that there's an empty page for the requested allocation 
 /// and there's an empty page for the deferred allocations. 
 /// This is also equal to the number of DeferredAllocActions that are created when the heap is grown.
+/// # Warning
+/// The total number of chunks created by the deferred allocations have to be able to fit into one heap page.
+/// As each DeferredAllocAction creates 3 chunks, (3 * HEAP_MAPPED_PAGES_TO_ADD) allocations of sizeof(Chunk) bytes
+/// have to be allocated from 1 heap page.
 const HEAP_MAPPED_PAGES_TO_ADD: usize = 2;
 
 /// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
