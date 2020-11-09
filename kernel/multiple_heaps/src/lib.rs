@@ -64,13 +64,12 @@ use slabmalloc_unsafe::{ZoneAllocator, ObjectPage8k, AllocablePage};
 #[cfg(safe_heap)]
 use slabmalloc_safe::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};
 
-/// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
-/// We curently work with 8KiB, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
+/// The size in bytes of each "group" or "set" of MappedPages objects that is allocated for each heap's slab.
+/// We curently work with 8KiB sets, such that the per-core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
 const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
 
-/// The size of each MappedPages Object that is allocated for the per-core heaps, in pages.
-/// We curently work with 2 pages, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.   
-const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
+/// The size in pages of each heap's page set, see `HEAP_MAPPED_PAGES_SIZE_IN_BYTES`.
+const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = HEAP_MAPPED_PAGES_SIZE_IN_BYTES / PAGE_SIZE;
 
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
@@ -83,15 +82,17 @@ const PAGES_PER_SIZE_CLASS: usize = 24;
 /// Starting size of each per-core heap. 
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
 
-/// The number of mapped pages that are requested from the OS whenever the heap is grown.
-/// It should be at least 2, to ensure that there's an empty page for the requested allocation 
-/// and there's an empty page for the deferred allocations. 
-/// This is also equal to the number of DeferredAllocActions that are created when the heap is grown.
-/// # Warning
-/// The total number of chunks created by the deferred allocations have to be able to fit into one heap page.
-/// As each DeferredAllocAction creates 3 chunks, (3 * HEAP_MAPPED_PAGES_TO_ADD) allocations of sizeof(Chunk) bytes
-/// have to be allocated from 1 heap page.
-const HEAP_MAPPED_PAGES_TO_ADD: usize = 2;
+/// The number of heap page sets that are requested from the OS whenever the heap is grown.
+/// This should be minimum `2` in order to ensure that there is at least:
+/// * one empty page for the requested allocation, and
+/// * one empty page for the deferred allocations to occur. 
+/// 
+/// # Important Note
+/// The total size of heap objects allocated during/by the deferred alloc actions must be able to fit 
+/// into the additional page(s) here, which is currently just one extra heap page set (currently 8KiB). 
+/// Currently, each `DeferredAllocAction` creates 3 chunks, so that means that the current calculation is:
+/// `(3 * HEAP_GROWTH_AMOUNT * sizeof(Chunk)` bytes must fit within one 8KiB heap page set.
+const HEAP_GROWTH_AMOUNT: usize = 2;
 
 /// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
 /// If we want to change the value the heap id is based on, we would substitute 
@@ -352,20 +353,22 @@ if #[cfg(unsafe_heap)] {
                 }
             }
             // (2) Allocate page from the OS
-            let mut deferred_alloc_action = [None; HEAP_MAPPED_PAGES_TO_ADD];
+            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            for i in 0..HEAP_MAPPED_PAGES_TO_ADD {
+            for saved_action in &mut deferred_alloc_actions {
                 let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
                 let start_addr = mp.start_address().value();
                 self.extend_heap_mp(mp)?;
                 let page = unsafe{ core::mem::transmute(start_addr) };
-                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap_to_grow.lock().heap_id, layout.size(), *heap_end);
+                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}",
+                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                );
                 *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                 heap_to_grow.lock().refill(layout, page)?;
-                deferred_alloc_action[i] = Some(action);
+                *saved_action = Some(action);
             }
             Ok(())
-            // deferred_alloc_action is dropped here, only after the heap has been refilled.
+            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         } 
 
         /// Merge mapped pages `mp` with the heap mapped pages.
@@ -412,18 +415,20 @@ if #[cfg(unsafe_heap)] {
                 }
             }
             // (2) Allocate page from the OS
-            let mut deferred_alloc_action = [None; HEAP_MAPPED_PAGES_TO_ADD];
+            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            for i in 0..HEAP_MAPPED_PAGES_TO_ADD {
+            for saved_action in &mut deferred_alloc_actions {
                 let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
                 let mp = MappedPages8k::new(mp)?;
-                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap_to_grow.lock().heap_id, layout.size(), *heap_end);
+                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", 
+                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                );
                 *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                 heap_to_grow.lock().refill(layout, mp)?;
-                deferred_alloc_action[i] = Some(action);
+                *saved_action = Some(action);
             }
             Ok(())
-            // deferred_alloc_action is dropped here, only after the heap has been refilled.
+            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         }  
     }
 
@@ -459,18 +464,20 @@ if #[cfg(unsafe_heap)] {
             }
 
             // (2) Allocate page from the OS
-            let mut deferred_alloc_action = [None; HEAP_MAPPED_PAGES_TO_ADD];
+            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            for i in 0..HEAP_MAPPED_PAGES_TO_ADD {
+            for saved_action in &mut deferred_alloc_actions {
                 let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
                 let mp = MappedPages8k::new(mp)?;
-                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap_to_grow.lock().heap_id, layout.size(), *heap_end);
+                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", 
+                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                );
                 *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                 heap_to_grow.lock().refill(layout, mp)?;
-                deferred_alloc_action[i] = Some(action);
+                *saved_action = Some(action);
             }
             Ok(())
-            // deferred_alloc_action is dropped here, only after the heap has been refilled.
+            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         }  
     }
 }
