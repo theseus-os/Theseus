@@ -134,10 +134,9 @@ pub fn init(
     task_fs::init()?;
 
 
-    // Before we start running applications, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0].
-    // Unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings, 
-    // which although we currently don't use since we don't have a userspace, but it is still a good idea. 
-    // Note that we cannot do this until we have booted up all the APs.
+    // We can drop and unmap the identity mappings (e.g., for the multiboot2 boot_info) 
+    // after the initial bootstrap is complete, 
+    // We could probably do this earlier, but we definitely can't do it until after the APs boot.
     drop(identity_mapped_pages);
     
     // create a SIMD personality
