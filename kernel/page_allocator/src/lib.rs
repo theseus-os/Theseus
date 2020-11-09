@@ -470,7 +470,12 @@ pub fn allocate_pages_by_bytes_deferred(
 	requested_vaddr: Option<VirtualAddress>,
 	num_bytes: usize,
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
-	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
+	let actual_num_bytes = if let Some(vaddr) = requested_vaddr {
+		num_bytes + (vaddr.value() % PAGE_SIZE)
+	} else {
+		num_bytes
+	};
+	let num_pages = (actual_num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages_deferred(requested_vaddr, num_pages)
 }
 
@@ -507,7 +512,7 @@ pub fn allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -> Re
 }
 
 
-/// Allocates the given number of pages starting at the page containing the given `VirtualAddress`.
+/// Allocates the given number of pages starting at (inclusive of) the page containing the given `VirtualAddress`.
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<AllocatedPages, &'static str> {
