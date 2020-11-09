@@ -29,6 +29,7 @@ extern crate dfqueue; // decoupled, fault-tolerant queue
 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
+extern crate stack;
 extern crate apic; 
 extern crate mod_mgmt;
 extern crate spawn;
@@ -55,6 +56,7 @@ use core::ops::DerefMut;
 use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+use stack::Stack;
 
 
 
@@ -72,8 +74,7 @@ pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
 pub fn init(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
     identity_mapped_pages: Vec<MappedPages>,
-    bsp_stack_bottom: VirtualAddress,
-    bsp_stack_top: VirtualAddress,
+    bsp_initial_stack: Stack,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
 ) -> Result<(), &'static str> {
@@ -93,10 +94,13 @@ pub fn init(
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
+        let frame_allocator_ref = memory::get_frame_allocator_ref().ok_or("frame allocator not initialized")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
-            kernel_mmi.alloc_stack(1).ok_or("could not allocate double fault stack")?,
-            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate privilege stack")?,
+            stack::alloc_stack(1, &mut kernel_mmi.page_table, frame_allocator_ref)
+                .ok_or("could not allocate double fault stack")?,
+            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table, frame_allocator_ref)
+                .ok_or("could not allocate privilege stack")?,
         )
     };
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
@@ -109,7 +113,7 @@ pub fn init(
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 
     // create the initial `Task`, which is bootstrapped from this execution context.
-    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
+    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
@@ -135,13 +139,6 @@ pub fn init(
     // which although we currently don't use since we don't have a userspace, but it is still a good idea. 
     // Note that we cannot do this until we have booted up all the APs.
     drop(identity_mapped_pages);
-    {
-        // for i in 0 .. 512 { 
-        //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
-        // }
-        // clear the 0th P4 entry, which covers any existing identity mappings
-        kernel_mmi_ref.lock().page_table.p4_mut().clear_entry(0); 
-    }
     
     // create a SIMD personality
     #[cfg(simd_personality)]

@@ -57,11 +57,13 @@ dependencies = [
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "tlb_shootdown 0.1.0",
 ]
 
@@ -272,6 +274,7 @@ dependencies = [
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
  "spawn 0.1.0",
+ "stack 0.1.0",
  "task 0.1.0",
  "task_fs 0.1.0",
  "tsc 0.1.0",
@@ -1247,6 +1250,7 @@ dependencies = [
  "memory_structs 0.1.0",
  "memory_x86_64 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "page_allocator 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
  "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
@@ -1263,6 +1267,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
 ]
 
 [[package]]
@@ -1390,6 +1395,7 @@ dependencies = [
  "pause 0.1.0",
  "pit_clock 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "volatile 0.2.7 (git+https://github.com/theseus-os/volatile)",
  "zerocopy 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1407,6 +1413,7 @@ dependencies = [
  "kernel_config 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "page_allocator 0.1.0",
  "slabmalloc 0.7.0",
  "slabmalloc_safe 0.7.0",
  "slabmalloc_unsafe 0.7.0",
@@ -1443,6 +1450,7 @@ dependencies = [
  "panic_entry 0.1.0",
  "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "state_store 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
@@ -1567,6 +1575,16 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "page_allocator"
+version = "0.1.0"
+dependencies = [
+ "kernel_config 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory_structs 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2270,6 +2288,7 @@ dependencies = [
  "pause 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
+ "stack 0.1.0",
  "task 0.1.0",
 ]
 
@@ -2290,6 +2309,18 @@ dependencies = [
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "stack"
+version = "0.1.0"
+dependencies = [
+ "kernel_config 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "memory_structs 0.1.0",
+ "page_allocator 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "stack_trace"
@@ -2436,6 +2467,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stack 0.1.0",
  "tss 0.1.0",
  "x86_64 0.1.2",
 ]

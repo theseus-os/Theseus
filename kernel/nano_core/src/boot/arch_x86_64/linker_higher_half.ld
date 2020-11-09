@@ -52,6 +52,11 @@ SECTIONS {
 		*(.bss .bss.*)
 	}
 
+	.stack ALIGN(4K) : AT(ADDR(.stack) - KERNEL_OFFSET)
+	{
+		*(.stack)
+	}
+
 	/* .got (Global Offset Table) section and its relocation types are currently unsupported */
 	.got (NOLOAD) :
 	{

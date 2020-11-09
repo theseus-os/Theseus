@@ -37,5 +37,8 @@ path = "../memory_x86_64"
 [dependencies.memory_structs]
 path = "../memory_structs"
 
+[dependencies.page_allocator]
+path = "../page_allocator"
+
 [lib]
 crate-type = ["rlib"]

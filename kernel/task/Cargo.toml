@@ -29,6 +29,9 @@ path = "../kernel_config"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.stack]
+path = "../stack"
+
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 

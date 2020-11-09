@@ -12,7 +12,6 @@
 extern crate spin;
 extern crate multiboot2;
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate kernel_config;
@@ -23,11 +22,11 @@ extern crate bit_field;
 extern crate memory_x86_64;
 extern crate x86_64;
 extern crate memory_structs;
+extern crate page_allocator;
 extern crate zerocopy;
 
 
 mod area_frame_allocator;
-mod stack_allocator;
 #[cfg(not(mapper_spillful))]
 mod paging;
 
@@ -37,9 +36,9 @@ pub mod paging;
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
-pub use self::stack_allocator::{StackAllocator, Stack};
 
 pub use memory_structs::*;
+pub use page_allocator::*;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::*;
@@ -52,7 +51,7 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
+use kernel_config::memory::KERNEL_OFFSET;
 use core::ops::DerefMut;
 
 /// The memory management info and address space of the kernel
@@ -104,25 +103,6 @@ pub struct MemoryManagementInfo {
     /// a list of additional virtual-mapped Pages that have the same lifetime as this MMI
     /// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).
     pub extra_mapped_pages: Vec<MappedPages>,
-
-    /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
-    stack_allocator: stack_allocator::StackAllocator,
-}
-
-impl MemoryManagementInfo {
-
-    /// Allocates a new stack in the currently-running Task's address space.
-    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
-    /// Whether this is a kernelspace or userspace stack is determined by how this MMI's stack_allocator was initialized.
-    /// 
-    /// # Important Note
-    /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
-    /// It will only work for allocating a stack in the currently-running MMI.
-    pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        get_frame_allocator_ref().and_then(|fa| 
-            self.stack_allocator.alloc_stack(&mut self.page_table, fa, size_in_pages)
-        )
-    }
 }
 
 
@@ -186,15 +166,25 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * a reference to the Area Frame Allocator to be used by the remaining memory init functions
-///  * the kernel's new PageTable, which is now currently active 
-///  * the MappedPages of the kernel's text section,
-///  * the MappedPages of the kernel's rodata section,
-///  * the MappedPages of the kernel's data section,
+///  * a reference to the Frame Allocator to be used by the remaining memory init functions
+///  * the kernel's new `PageTable`, which is now currently active 
+///  * the `MappedPages` of the kernel's text section,
+///  * the `MappedPages` of the kernel's rodata section,
+///  * the `MappedPages` of the kernel's data section,
+///  * a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
 ///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(boot_info: &BootInformation) 
-    -> Result<(&MutexIrqSafe<AreaFrameAllocator>, PageTable, MappedPages, MappedPages, MappedPages, [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str> 
+    -> Result<(
+        &MutexIrqSafe<AreaFrameAllocator>,
+        PageTable,
+        MappedPages,
+        MappedPages,
+        MappedPages,
+        (AllocatedPages, MappedPages),
+        [Option<MappedPages>; 32],
+        [Option<MappedPages>; 32]
+    ), &'static str> 
 {
     // get the start and end addresses of the kernel.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
@@ -227,28 +217,35 @@ pub fn init(boot_info: &BootInformation)
     // init the frame allocator with the available memory sections and the occupied memory sections
     let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;
     let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new( fa ) 
+        MutexIrqSafe::new(fa) 
     });
 
-    // Initialize paging (create a new page table).
-
+    // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     let (
         page_table,
         text_mapped_pages,
         rodata_mapped_pages,
         data_mapped_pages,
+        (stack_guard_page, stack_pages),
         higher_half_mapped_pages,
         identity_mapped_pages
     ) = paging::init(frame_allocator_mutex, &boot_info)?;
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
-
-    Ok((frame_allocator_mutex, page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages))
-    
+    Ok((
+        frame_allocator_mutex,
+        page_table,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        (stack_guard_page, stack_pages),
+        higher_half_mapped_pages,
+        identity_mapped_pages
+    ))
 }
 
-/// Finishes Initializing the virtual memory management system after the heap is initialized and returns a MemoryManagementInfo instance,
-/// which represents Task zero's (the kernel's) address space. 
+/// Finishes initializing the virtual memory management system after the heap is initialized and returns a MemoryManagementInfo instance,
+/// which represents the initial (the kernel's) address space. 
 /// 
 /// Returns the following tuple, if successful:
 ///  * The kernel's new MemoryManagementInfo
@@ -260,23 +257,17 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
 
+    page_allocator::convert_to_heap_allocated();
+    FRAME_ALLOCATOR.try().ok_or("BUG: FRAME_ALLOCATOR not initialized")?.lock().alloc_ready();
+
     let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     higher_half_mapped_pages.push(heap_mapped_pages);
     let identity_mapped_pages: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
    
-    // init the kernel stack allocator, a singleton
-    let kernel_stack_allocator = {
-        let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
-        let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
-        let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
-        stack_allocator::StackAllocator::new(stack_alloc_range, false)
-    };
-
     // return the kernel's memory info 
     let kernel_mmi = MemoryManagementInfo {
         page_table: page_table,
         extra_mapped_pages: higher_half_mapped_pages,
-        stack_allocator: kernel_stack_allocator, 
     };
 
     let kernel_mmi_ref = KERNEL_MMI.call_once( || {

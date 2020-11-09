@@ -205,32 +205,6 @@ impl Mapper {
         self.internal_map_to(PageRange::new(page, page), FrameRange::new(frame.clone(), frame), flags, allocator)
     }
 
-    /// maps the given Page to a randomly selected (newly allocated) Frame
-    pub fn map<A>(&mut self, page: Page, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        self.internal_map(PageRange::new(page, page), flags, allocator)
-    }
-
-    /// maps the given `Page`s to a randomly selected (newly allocated) Frame
-    pub fn map_pages<A>(&mut self, pages: PageRange, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        self.internal_map(pages, flags, allocator)
-    }
-
-
-    /// maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
-    pub fn map_frames<A>(&mut self, frames: FrameRange, start_page: Page, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        let end_page = start_page - 1 + frames.size_in_frames(); // -1 because it's an inclusive range
-        self.internal_map_to(PageRange::new(start_page, end_page), frames, flags, allocator)
-    }
-
 
     /// maps the given `AllocatedPages` to the given actual frames.
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains that `AllocatedPages` object.
@@ -238,7 +212,7 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        self.internal_map_to(allocated_pages.pages.clone(), frames, flags, allocator).map(|mut mp| {
+        self.internal_map_to(allocated_pages.deref().clone(), frames, flags, allocator).map(|mut mp| {
             mp.pages = MaybeAllocatedPages::Allocated(allocated_pages);
             mp
         })
@@ -251,7 +225,7 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        self.internal_map(allocated_pages.pages.clone(), flags, allocator).map(|mut mp| {
+        self.internal_map(allocated_pages.deref().clone(), flags, allocator).map(|mut mp| {
             mp.pages = MaybeAllocatedPages::Allocated(allocated_pages);
             mp
         })
@@ -274,14 +248,6 @@ enum MaybeAllocatedPages {
     /// The page range was manually created independently from the virtual page allocator. 
     /// The pages will not be deallocated once the owner (a `MappedPages` instnace) of this object is dropped. 
     NotAllocated(PageRange),
-}
-impl MaybeAllocatedPages {
-    fn is_allocated(&self) -> bool {
-        match self {
-            Self::Allocated(_) => true,
-            Self::NotAllocated(_) => false,
-        }
-    }
 }
 impl Deref for MaybeAllocatedPages {
     type Target = PageRange;
@@ -336,20 +302,7 @@ impl MappedPages {
         self.flags
     }
 
-    /// Constructs a MappedPages object from an already existing mapping.
-    /// Useful for creating idle task Stacks, for example. 
-    // TODO FIXME: remove this function, it's dangerous!!
-    #[deprecated]
-    pub fn from_existing(already_mapped_pages: PageRange, flags: EntryFlags) -> MappedPages {
-        MappedPages {
-            page_table_p4: get_current_p4(),
-            pages: MaybeAllocatedPages::NotAllocated(already_mapped_pages),
-            flags: flags,
-        }
-    }
-
-
-    /// Merges the given `MappedPages` object into this `MappedPages` object.
+    /// Merges the given `MappedPages` object `mp` into this `MappedPages` object (`self`).
     ///
     /// For example, if you have the following `MappedPages` objects:    
     /// * this mapping, with a page range including one page at 0x2000
@@ -368,10 +321,7 @@ impl MappedPages {
     /// 
     /// # Note
     /// No remapping actions or page reallocations will occur on either a failure or a success.
-    pub fn merge(&mut self, mp: MappedPages) -> Result<(), (&'static str, MappedPages)> {
-
-        let mut previous_end: Page = *self.pages.end(); // start at the end of this mapping
-
+    pub fn merge(&mut self, mut mp: MappedPages) -> Result<(), (&'static str, MappedPages)> {
         // first, we need to double check that everything is contiguous and the flags and p4 Frame are the same.
         let mut err: Option<&'static str> = None;
 
@@ -385,37 +335,39 @@ impl MappedPages {
                 mp.flags, self.flags);
             err = Some("mappings were mapped with different flags");
         }
-        else if *mp.pages.start() != previous_end + 1 {
+        else if *mp.pages.start() != *self.pages.end() + 1 {
             error!("MappedPages::merge(): mappings weren't contiguous in virtual memory: one ends at {:?} and the next starts at {:?}",
-                previous_end, mp.pages.start());
+                self.pages.end(), mp.pages.start());
             err = Some("mappings were not contiguous in virtual memory");
         } 
-        else if mp.pages.is_allocated() != self.pages.is_allocated() {
-            error!("MappedPages::merge(): some mapping were mapped to AllocatedPages, while others were not.");
-            err = Some("some mappings were mapped to AllocatedPages, while others were not");
+
+        // Preconditions were met, so attempt to merge the page ranges together.
+        match (&mut self.pages, &mut mp.pages) {
+            // If both were AllocatedPages, then we merge them together. 
+            (MaybeAllocatedPages::Allocated(first_alloc_pgs), MaybeAllocatedPages::Allocated(second_alloc_pgs)) => {
+                // take ownership of the AllocatedPages inside of the `mp` argument.
+                let second_alloc_pgs_owned = core::mem::replace(second_alloc_pgs, AllocatedPages::empty()); 
+                if let Err(orig) = first_alloc_pgs.merge(second_alloc_pgs_owned) {
+                    *second_alloc_pgs = orig;
+                    err = Some("failed to merge AllocatedPages");
+                }
+            }
+            // If both were *not* AllocatedPages, then we create a new merged PageRange.
+            (MaybeAllocatedPages::NotAllocated(first_pgs), MaybeAllocatedPages::NotAllocated(second_pgs)) => {
+                *first_pgs = PageRange::new(*first_pgs.start(), *second_pgs.end());
+            }
+            // If there's a mix, that's not permitted.
+            _ => {
+                err = Some("MappedPages::merge(): one mapping uses AllocatedPages, while the other does not.");
+            }
         }
-        previous_end = *mp.pages.end();
-        
+
         if let Some(e) = err {
-            return Err((e,mp));
+            return Err((e, mp));
         }
-
-        // Here, all of our conditions were met, so we can merge the MappedPages object into this one so 
-        // that it goes from the first start page to the last end page.
-
-        // to ensure the existing mapping doesn't run its drop handler and unmap those pages
+        
+        // ensure the existing mapping doesn't run its drop handler and unmap its pages.
         mem::forget(mp); 
-        
-        let new_page_range = PageRange::new(*self.pages.start(), previous_end);
-        let new_pages = if self.pages.is_allocated(){
-            MaybeAllocatedPages::Allocated(AllocatedPages{
-                pages: new_page_range,
-            })
-        } else {
-            MaybeAllocatedPages::NotAllocated(new_page_range)
-        };
-        
-        self.pages = new_pages;
         Ok(())
     }
 
@@ -794,7 +746,7 @@ pub fn mapped_pages_unmap<A: FrameAllocator>(
 impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
-        // trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
+        // trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
 
         let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {
