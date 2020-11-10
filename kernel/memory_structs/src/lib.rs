@@ -368,8 +368,10 @@ impl FrameRange {
     /// that spans all `Frame`s from the given physical address
     /// to an end bound based on the given size.
     pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
+        assert!(size_in_bytes > 0);
         let start_frame = Frame::containing_address(starting_virt_addr);
-        let end_frame = Frame::containing_address(starting_virt_addr + size_in_bytes - 1);
+		// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+        let end_frame = Frame::containing_address(starting_virt_addr + (size_in_bytes - 1));
         FrameRange::new(start_frame, end_frame)
     }
 
@@ -566,12 +568,6 @@ impl PageRange {
         PageRange(RangeInclusive::new(start, end))
     }
 
-    /// Creates a new range of `Page`s that begins at `start` (inclusively)
-    /// and spans the next `num_pages` contiguous pages. 
-    pub fn with_num_pages(start: Page, num_pages: usize) -> PageRange {
-        PageRange(RangeInclusive::new(start, start + num_pages - 1))
-    }
-
     /// Creates a PageRange that will always yield `None`.
     pub const fn empty() -> PageRange {
         PageRange::new(Page { number: 1 }, Page { number: 0 })
@@ -581,8 +577,10 @@ impl PageRange {
     /// that spans all `Page`s from the given virtual address
     /// to an end bound based on the given size.
     pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
+        assert!(size_in_bytes > 0);
         let start_page = Page::containing_address(starting_virt_addr);
-        let end_page = Page::containing_address(starting_virt_addr + size_in_bytes - 1);
+		// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+        let end_page = Page::containing_address(starting_virt_addr + (size_in_bytes - 1));
         PageRange::new(start_page, end_page)
     }
 

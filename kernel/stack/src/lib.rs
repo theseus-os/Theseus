@@ -12,7 +12,7 @@ extern crate page_allocator;
 
 use core::ops::{Deref, DerefMut};
 use kernel_config::memory::PAGE_SIZE;
-use memory_structs::{VirtualAddress, Page};
+use memory_structs::VirtualAddress;
 use memory::{FrameAllocator, FrameAllocatorRef, EntryFlags, Mapper, MappedPages};
 use page_allocator::AllocatedPages;
 
@@ -67,31 +67,6 @@ fn inner_alloc_stack<FA>(
 }
 
 
-
-/// Allocates a new stack with a stack bottom that starts
-/// at the given `bottom` virtual address. 
-/// 
-/// # Important Note
-/// The page directly beneath the `bottom` must also be available,
-/// i.e., free, not allocated, because it will be used as a guard page.
-/// 
-/// See `alloc_stack()` for more. 
-pub fn alloc_stack_at<FA>(
-    bottom: VirtualAddress,
-    size_in_pages: usize,
-    page_table: &mut Mapper, 
-    frame_allocator_ref: &FrameAllocatorRef<FA>, 
-) -> Option<Stack> where FA: FrameAllocator {
-    debug!("alloc_stack_at bottom: {:#X} of {} pages", bottom, size_in_pages);
-    // Allocate enough pages for an additional guard page. 
-    let pages = page_allocator::allocate_pages_at(
-        (Page::containing_address(bottom) - 1).start_address(),
-        size_in_pages + 1
-    ).ok()?;
-    inner_alloc_stack(pages, page_table, frame_allocator_ref)
-}
-
-
 /// A range of mapped memory designated for use as a task's stack.
 /// 
 /// There is an unmapped guard page beneath the stack,
@@ -139,17 +114,22 @@ impl Stack {
     /// Creates a stack from its constituent parts: 
     /// a guard page and a series of mapped pages. 
     /// 
-    /// The `guard_page` must be at least one page (which is unmapped) 
-    /// and must contiguously precede the `stack_pages`. 
-    /// In other words, the beginning of `stack_pages` must come 
-    /// right after the end of `guard_page`.
+    /// # Conditions
+    /// * The `guard_page` must be at least one page (which is unmapped) 
+    ///   and must contiguously precede the `stack_pages`. 
+    ///   In other words, the beginning of `stack_pages` must come 
+    ///   right after the end of `guard_page`.
+    /// * The `stack_pages` must be mapped as writable. 
     /// 
-    /// If not, an `Err` containing the given `guard_page` and `stack_pages` is returned.
+    /// If the conditions are not met, 
+    /// an `Err` containing the given `guard_page` and `stack_pages` is returned.
     pub fn from_pages(
         guard_page: AllocatedPages,
         stack_pages: MappedPages
     ) -> Result<Stack, (AllocatedPages, MappedPages)> {
-        if (*guard_page.end() + 1) == *stack_pages.start() {
+        if (*guard_page.end() + 1) == *stack_pages.start() 
+            && stack_pages.flags().is_writable()
+        {
             Ok(Stack { guard_page, pages: stack_pages })
         } else {
             Err((guard_page, stack_pages))

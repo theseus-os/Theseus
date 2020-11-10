@@ -163,7 +163,7 @@ impl AllocatedPages {
 	pub fn split(self, at_page: Page) -> Option<(AllocatedPages, AllocatedPages)> {
 		let end_of_first = at_page - 1;
 		if at_page > *self.pages.start() && end_of_first <= *self.pages.end() {
-			let first  = PageRange::new(*self.pages.start(), at_page - 1);
+			let first  = PageRange::new(*self.pages.start(), end_of_first);
 			let second = PageRange::new(at_page, *self.pages.end());
 			Some((
 				AllocatedPages { pages: first }, 
@@ -390,7 +390,8 @@ pub fn allocate_pages_deferred(
 		// or any chunk that is large enough, if no desired address was requested.
 		// Obviously, we cannot use any chunk that is already allocated. 
 		let potential_start_page = desired_start_page.unwrap_or(*c.pages.start());
-		let potential_end_page   = potential_start_page + num_pages - 1; // inclusive bound
+		// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+		let potential_end_page   = potential_start_page + (num_pages - 1); 
 		if potential_start_page >= *c.pages.start() && potential_end_page <= *c.pages.end() {
 			// Here: chunk `c` was big enough and did contain the requested address.
 			// If it's not allocated, we can use it. 
