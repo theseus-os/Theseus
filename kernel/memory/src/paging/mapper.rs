@@ -124,40 +124,10 @@ impl Mapper {
     }
 
 
-    /// the internal function that actually does the mapping, if frames were NOT provided.
-    fn internal_map<A>(&mut self, pages: PageRange, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        let mut top_level_flags = flags.clone();
-        top_level_flags.set(EntryFlags::NO_EXECUTE, false);
-        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
-
-        for page in pages.clone() {
-            let frame = allocator.allocate_frame().ok_or("Mapper::internal_map(): couldn't allocate new frame, out of memory!")?;
-
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
-
-            if !p1[page.p1_index()].is_unused() {
-                error!("Mapper::internal_map(): page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
-                return Err("page was already in use");
-            } 
-
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
-        }
-
-        Ok(MappedPages {
-            page_table_p4: self.target_p4.clone(),
-            pages: MaybeAllocatedPages::NotAllocated(pages),
-            flags: flags,
-        })
-    }
-
-    /// the internal function that actually does all of the mapping from pages to frames.
-    fn internal_map_to<A>(&mut self, pages: PageRange, frames: FrameRange, flags: EntryFlags, allocator: &mut A)
+    /// Maps the given `AllocatedPages` to the given physical frames.
+    /// 
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    pub fn map_allocated_pages_to<A>(&mut self, pages: AllocatedPages, frames: FrameRange, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
@@ -169,21 +139,21 @@ impl Mapper {
         let pages_count = pages.size_in_pages();
         let frames_count = frames.size_in_frames();
         if pages_count != frames_count {
-            error!("map_to_internal(): page count {} must equal frame count {}!", pages_count, frames_count);
-            return Err("map_to_internal(): page count must equal frame count");
+            error!("map_allocated_pages_to(): pages {:?} count {} must equal frames {:?} count {}!", 
+                pages, pages_count, frames, frames_count
+            );
+            return Err("map_allocated_pages_to(): page count must equal frame count");
         }
-            
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.clone().into_iter().zip(frames) {
-
+        for (page, frame) in pages.deref().clone().into_iter().zip(frames) {
             let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
             let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
-                error!("map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
-                return Err("page was already in use");
+                error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+                return Err("map_allocated_pages_to(): page was already in use");
             } 
 
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
@@ -191,71 +161,47 @@ impl Mapper {
 
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
-            pages: MaybeAllocatedPages::NotAllocated(pages),
-            flags: flags,
+            pages,
+            flags,
         })
     }
 
 
-    /// creates a mapping for a specific page -> specific frame
-    pub fn map_to<A>(&mut self, page: Page, frame: Frame, flags: EntryFlags, allocator: &mut A)
+    /// Maps the given `AllocatedPages` to randomly chosen (allocated) physical frames.
+    /// 
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    pub fn map_allocated_pages<A>(&mut self, pages: AllocatedPages, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        self.internal_map_to(PageRange::new(page, page), FrameRange::new(frame.clone(), frame), flags, allocator)
-    }
+        // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
+        let mut top_level_flags = flags.clone();
+        top_level_flags.set(EntryFlags::NO_EXECUTE, false);
+        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
+        for page in pages.deref().clone() {
+            let frame = allocator.allocate_frame()
+                .ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory!")?;
 
-    /// maps the given `AllocatedPages` to the given actual frames.
-    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains that `AllocatedPages` object.
-    pub fn map_allocated_pages_to<A>(&mut self, allocated_pages: AllocatedPages, frames: FrameRange, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        self.internal_map_to(allocated_pages.deref().clone(), frames, flags, allocator).map(|mut mp| {
-            mp.pages = MaybeAllocatedPages::Allocated(allocated_pages);
-            mp
-        })
-    }
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
+            if !p1[page.p1_index()].is_unused() {
+                error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
+                    page.start_address(), frame.start_address()
+                );
+                return Err("map_allocated_pages(): page was already in use");
+            } 
 
-    /// maps the given `AllocatedPages` to randomly chosen (allocated) frames
-    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains that `AllocatedPages` object.
-    pub fn map_allocated_pages<A>(&mut self, allocated_pages: AllocatedPages, flags: EntryFlags, allocator: &mut A)
-        -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
-    {
-        self.internal_map(allocated_pages.deref().clone(), flags, allocator).map(|mut mp| {
-            mp.pages = MaybeAllocatedPages::Allocated(allocated_pages);
-            mp
-        })
-    }
-}
-
-
-/// An instance of `MappedPages` may be created from virtual pages
-/// that were either obtained from the virtual page allocator
-/// or that were manually created from a predetermined virtual address and passed in. 
-/// 
-/// The latter option is only used for early initialization procedures 
-/// before the virtual page allocator is available,
-/// and should eventually be phased out when the virtual page allocator 
-/// supports the ability to specify which pages we want to be allocated.
-#[derive(Debug)]
-enum MaybeAllocatedPages {
-    /// The page range was obtained from the virtual page allocator.
-    Allocated(AllocatedPages),
-    /// The page range was manually created independently from the virtual page allocator. 
-    /// The pages will not be deallocated once the owner (a `MappedPages` instnace) of this object is dropped. 
-    NotAllocated(PageRange),
-}
-impl Deref for MaybeAllocatedPages {
-    type Target = PageRange;
-    fn deref(&self) -> &PageRange {
-        match self {
-            Self::Allocated(ap) => ap.deref(),
-            Self::NotAllocated(pr) => pr,
+            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
         }
+
+        Ok(MappedPages {
+            page_table_p4: self.target_p4.clone(),
+            pages,
+            flags,
+        })
     }
 }
 
@@ -265,17 +211,15 @@ impl Deref for MaybeAllocatedPages {
 /// This does not guarantee that its pages are mapped to frames that are contiguous in physical memory.
 /// 
 /// This object also represents ownership of those pages; if this object falls out of scope,
-/// it will be dropped, and the pages will be unmapped, and if they were allocated, then also de-allocated. 
+/// it will be dropped, and the pages will be unmapped and then also de-allocated. 
 /// Thus, it ensures memory safety by guaranteeing that this object must be held 
-/// in order to access data stored in these mapped pages, 
-/// just like a MutexGuard guarantees that data protected by a Mutex can only be accessed
-/// while that Mutex's lock is held. 
+/// in order to access data stored in these mapped pages, much like a guard type.
 #[derive(Debug)]
 pub struct MappedPages {
     /// The Frame containing the top-level P4 page table that this MappedPages was originally mapped into. 
     page_table_p4: Frame,
-    /// The range of virtual pages contained by this mapping.
-    pages: MaybeAllocatedPages,
+    /// The range of allocated virtual pages contained by this mapping.
+    pages: AllocatedPages,
     // The EntryFlags that define the page permissions of this mapping
     flags: EntryFlags,
 }
@@ -292,7 +236,7 @@ impl MappedPages {
     pub fn empty() -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
-            pages: MaybeAllocatedPages::NotAllocated(PageRange::empty()),
+            pages: AllocatedPages::empty(),
             flags: Default::default(),
         }
     }
@@ -312,9 +256,6 @@ impl MappedPages {
     /// In addition, the `MappedPages` objects must have the same flags and page table root frame
     /// (i.e., they must have all been mapped using the same set of page tables).
     /// 
-    /// In addition, the `MappedPages` objects must either all have AllocatedPages or all have no AllocatedPages.
-    /// `MappedPages` that were mapped to allocated virtual pages cannot be merged with those that weren't mapped to allocated pages.
-    /// 
     /// If an error occurs, such as the `mappings` not being contiguous or having different flags, 
     /// then a tuple including an error message and the original `mp` will be returned,
     /// which prevents the `mp` from being dropped. 
@@ -322,51 +263,30 @@ impl MappedPages {
     /// # Note
     /// No remapping actions or page reallocations will occur on either a failure or a success.
     pub fn merge(&mut self, mut mp: MappedPages) -> Result<(), (&'static str, MappedPages)> {
-        // first, we need to double check that everything is contiguous and the flags and p4 Frame are the same.
-        let mut err: Option<&'static str> = None;
-
         if mp.page_table_p4 != self.page_table_p4 {
             error!("MappedPages::merge(): mappings weren't mapped using the same page table: {:?} vs. {:?}",
-                mp.page_table_p4, self.page_table_p4);
-            err = Some("mappings were mapped with different page tables");
+                self.page_table_p4, mp.page_table_p4);
+            return Err(("failed to merge MappedPages that were mapped into different page tables", mp));
         }
-        else if mp.flags != self.flags {
+        if mp.flags != self.flags {
             error!("MappedPages::merge(): mappings had different flags: {:?} vs. {:?}",
-                mp.flags, self.flags);
-            err = Some("mappings were mapped with different flags");
-        }
-        else if *mp.pages.start() != *self.pages.end() + 1 {
-            error!("MappedPages::merge(): mappings weren't contiguous in virtual memory: one ends at {:?} and the next starts at {:?}",
-                self.pages.end(), mp.pages.start());
-            err = Some("mappings were not contiguous in virtual memory");
-        } 
-
-        // Preconditions were met, so attempt to merge the page ranges together.
-        match (&mut self.pages, &mut mp.pages) {
-            // If both were AllocatedPages, then we merge them together. 
-            (MaybeAllocatedPages::Allocated(first_alloc_pgs), MaybeAllocatedPages::Allocated(second_alloc_pgs)) => {
-                // take ownership of the AllocatedPages inside of the `mp` argument.
-                let second_alloc_pgs_owned = core::mem::replace(second_alloc_pgs, AllocatedPages::empty()); 
-                if let Err(orig) = first_alloc_pgs.merge(second_alloc_pgs_owned) {
-                    *second_alloc_pgs = orig;
-                    err = Some("failed to merge AllocatedPages");
-                }
-            }
-            // If both were *not* AllocatedPages, then we create a new merged PageRange.
-            (MaybeAllocatedPages::NotAllocated(first_pgs), MaybeAllocatedPages::NotAllocated(second_pgs)) => {
-                *first_pgs = PageRange::new(*first_pgs.start(), *second_pgs.end());
-            }
-            // If there's a mix, that's not permitted.
-            _ => {
-                err = Some("MappedPages::merge(): one mapping uses AllocatedPages, while the other does not.");
-            }
+                self.flags, mp.flags);
+            return Err(("failed to merge MappedPages that were mapped with different flags", mp));
         }
 
-        if let Some(e) = err {
-            return Err((e, mp));
+        // Attempt to merge the page ranges together, which will fail if they're not contiguous.
+        // First, take ownership of the AllocatedPages inside of the `mp` argument.
+        let second_alloc_pages_owned = core::mem::replace(&mut mp.pages, AllocatedPages::empty());
+        if let Err(orig) = self.pages.merge(second_alloc_pages_owned) {
+            // Upon error, restore the `mp.pages` AllocatedPages that we took ownership of.
+            mp.pages = orig;
+            error!("MappedPages::merge(): mappings not virtually contiguous: first ends at {:?}, second starts at {:?}",
+                self.pages.end(), mp.pages.start()
+            );
+            return Err(("failed to merge MappedPages that weren't virtually contiguous", mp));
         }
-        
-        // ensure the existing mapping doesn't run its drop handler and unmap its pages.
+
+        // Ensure the existing mapping doesn't run its drop handler and unmap its pages.
         mem::forget(mp); 
         Ok(())
     }
