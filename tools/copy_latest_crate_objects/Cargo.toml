@@ -1,0 +1,11 @@
+[package]
+name = "copy_latest_crate_objects"
+version = "0.1.0"
+authors = [
+    "Kevin Boos <kevinaboos@gmail.com>",
+]
+description = "Copies the latest object file for each first-party Theseus crate into the OS image"
+
+[dependencies]
+getopts = "0.2"
+walkdir = "2.2.7"
