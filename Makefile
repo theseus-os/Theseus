@@ -128,7 +128,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
-		check_rustc check_xargo check_captain \
+		check_rustc check_xargo \
 		clean run run_pause iso build cargo \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -143,18 +143,8 @@ $(eval CFLAGS += -DENABLE_AVX)
 endif
 
 
-### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
-NUM_CAPTAINS = $(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l)
-check_captain:
-	@if [ 1  !=  ${NUM_CAPTAINS} ]; then \
-		echo -e "\nError: there are multiple 'captain' modules in the OS image, which will cause problems after bootup."; \
-		echo -e "       Run \"make clean\" and then try rebuilding again.\n"; \
-		exit 1; \
-	fi;
-
-
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): build check_captain
+$(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
