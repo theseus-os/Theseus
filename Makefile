@@ -104,14 +104,15 @@ assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
 
 
-# get all the subdirectories in kernel/, i.e., the list of all kernel crates
-KERNEL_CRATE_NAMES := $(notdir $(wildcard kernel/*))
-# exclude the build directory 
-KERNEL_CRATE_NAMES := $(filter-out build/. target/., $(KERNEL_CRATE_NAMES))
-# exclude hidden directories starting with a "."
-KERNEL_CRATE_NAMES := $(filter-out .*/, $(KERNEL_CRATE_NAMES))
-# remove the trailing /. on each name
-KERNEL_CRATE_NAMES := $(patsubst %/., %, $(KERNEL_CRATE_NAMES))
+## Specify which crates should be considered as application-level libraries. 
+## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
+## they will only be multiply instantiated if they have data/bss sections.
+## Ideally we would do this with a script that analyzes dependencies to see if a crate is only used by application crates,
+## but I haven't had time yet to develop that script. It would be fairly straightforward using a tool like `cargo deps`. 
+## So, for now, we just do it manually.
+## You can execute this to view dependencies to help you out:
+## `cd kernel/nano_core && cargo deps --include-orphans --no-transitive-deps | dot -Tpdf > /tmp/graph.pdf && xdg-open /tmp/graph.pdf`
+EXTRA_APP_CRATE_NAMES += getopts unicode_width
 
 # get all the subdirectories in applications/, i.e., the list of application crates
 APP_CRATE_NAMES := $(notdir $(wildcard applications/*))
@@ -121,22 +122,13 @@ APP_CRATE_NAMES := $(filter-out build/. target/., $(APP_CRATE_NAMES))
 APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
 APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
-
-## Specify which crates are app libraries. 
-## These crates can be instantiated multiply (per-task) rather than once (system-wide);
-## they will only be multiply instantiated if they have data/bss sections
-## Ideally we would do this with a script that analyzes dependencies to see if a crate is only used by application crates,
-## but I haven't had time yet to develop that script. It would be fairly straightforward using a tool like `cargo deps`. 
-## So, for now, we just do it manually.
-## You can execute this to view dependencies to help you out:
-## `cd kernel/nano_core && cargo deps --include-orphans --no-transitive-deps | dot -Tpdf > /tmp/graph.pdf && xdg-open /tmp/graph.pdf`
-APP_CRATE_NAMES += getopts unicode_width
+APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
-		check_rustc check_xargo check_captain \
+		check_rustc check_xargo \
 		clean run run_pause iso build cargo \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -151,18 +143,8 @@ $(eval CFLAGS += -DENABLE_AVX)
 endif
 
 
-### After the compilation process, check that we have exactly one captain module, which is needed for loadable mode.
-NUM_CAPTAINS = $(shell ls $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)captain-* | wc -l)
-check_captain:
-	@if [ 1  !=  ${NUM_CAPTAINS} ]; then \
-		echo -e "\nError: there are multiple 'captain' modules in the OS image, which will cause problems after bootup."; \
-		echo -e "       Run \"make clean\" and then try rebuilding again.\n"; \
-		exit 1; \
-	fi;
-
-
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): build check_captain
+$(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
@@ -182,17 +164,16 @@ iso: $(iso)
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy all object files into the main build directory and prepend the kernel prefix.
-## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
-		cp -f  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
-	done
-## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
-	@for app in $(APP_CRATE_NAMES) ; do  \
-		OLD_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o ; \
-		NEW_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/`basename $${OLD_FILE_PATH} | sed -n -e 's/$(KERNEL_PREFIX)\(.*\)/$(APP_PREFIX)\1/p'` ; \
-		test -e $${OLD_FILE_PATH}  &&  mv -f  $${OLD_FILE_PATH}  $${NEW_FILE_PATH} ; \
-	done
+## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
+	@cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
+		-o $(OBJECT_FILES_BUILD_DIR) \
+		-k ./kernel \
+		-a ./applications \
+		--kernel-prefix $(KERNEL_PREFIX) \
+		--app-prefix $(APP_PREFIX) \
+		-e "$(EXTRA_APP_CRATE_NAMES)" \
+		-c "`echo "$(HOME)"/.xargo/lib/rustlib/x86_64-theseus/lib/*.o`"
 
 ## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
 	@mkdir -p $(DEBUG_SYMBOLS_DIR)
@@ -258,6 +239,7 @@ cargo: check_rustc check_xargo
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
+	@rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove irrelevant LOCAL or WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
@@ -318,7 +300,7 @@ simd_personality_sse: build_sse build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
