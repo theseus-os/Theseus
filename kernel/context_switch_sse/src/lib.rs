@@ -69,7 +69,7 @@ impl ContextSSE {
 #[macro_export]
 macro_rules! save_registers_sse {
     () => (
-        asm!("
+        llvm_asm!("
             # save all of the xmm registers (for SSE)
             # each register is 16 bytes (128 bits), and there are 16 of them
             lea rsp, [rsp - 16*16]
@@ -101,7 +101,7 @@ macro_rules! save_registers_sse {
 #[macro_export]
 macro_rules! restore_registers_sse {
     () => (
-        asm!("
+        llvm_asm!("
             # restore all of the xmm registers
             movdqu xmm15, [rsp + 16*15]   # pop xmm15
             movdqu xmm14, [rsp + 16*14]   # pop xmm14

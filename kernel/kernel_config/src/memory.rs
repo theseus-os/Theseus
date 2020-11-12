@@ -18,7 +18,7 @@ pub const BYTES_PER_ADDR: usize = core::mem::size_of::<usize>();
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
 pub const PAGE_SHIFT: usize = 12;
 /// Page size is 4096 bytes, 4KiB pages.
-pub const PAGE_SIZE: usize = (1 << PAGE_SHIFT);
+pub const PAGE_SIZE: usize = 1 << PAGE_SHIFT;
 
 /// Value: 0. Shift the Page number (not the address!) by this to get the P1 index.
 pub const P1_INDEX_SHIFT: usize = 0;
@@ -30,7 +30,7 @@ pub const P3_INDEX_SHIFT: usize = P2_INDEX_SHIFT + 9;
 pub const P4_INDEX_SHIFT: usize = P3_INDEX_SHIFT + 9;
 
 /// Value: 512 GiB.
-pub const ADDRESSABILITY_PER_P4_ENTRY: usize = (1 << (PAGE_SHIFT + P4_INDEX_SHIFT));
+pub const ADDRESSABILITY_PER_P4_ENTRY: usize = 1 << (PAGE_SHIFT + P4_INDEX_SHIFT);
 
 pub const MAX_VIRTUAL_ADDRESS: usize = 0xFFFF_FFFF_FFFF_FFFF;
 
