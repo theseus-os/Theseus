@@ -23,6 +23,8 @@ path = "../../kernel/hpet"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
+[dependencies.network_interface_card]
+path = "../../kernel/network_interface_card"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

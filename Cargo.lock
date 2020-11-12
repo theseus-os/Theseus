@@ -1067,6 +1067,7 @@ dependencies = [
  "hpet",
  "ixgbe",
  "log 0.4.8",
+ "network_interface_card",
  "spawn",
  "terminal_print",
 ]

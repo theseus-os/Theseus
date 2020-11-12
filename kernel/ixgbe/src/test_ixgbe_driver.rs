@@ -57,3 +57,47 @@ pub fn create_test_packet() -> Result<TransmitBuffer, &'static str> {
     }
     Ok(transmit_buffer)
 }
+
+pub fn create_raw_packet(dest_mac_address: &[u8], source_mac_address: &[u8], message: &[u8]) -> Result<TransmitBuffer, &'static str> {
+    let len = message.len() as u16;
+
+    if len > 1500 {
+        return Err("Too long for a raw packet");
+    }
+
+    const ETHERNET_HEADER_LEN: u16 = 6 + 6 + 2;
+    let ether_type: [u8; 2] = [(len >> 8) as u8, len as u8];
+
+    // let mut packet = dest_mac_address.to_vec();
+    // for i in 0..6 {
+    //     packet.push(source_mac_address[i])
+    // }
+
+    // let len: u16 = message.len();
+    // packet.push((len >> 8) as u8);
+    // packet.push(len as u8);
+
+    // for i in 0..message.len() {
+    //     packet.push(message[i]);
+    // }
+
+    let mut transmit_buffer = TransmitBuffer::new(ETHERNET_HEADER_LEN + message.len() as u16)?;
+    { 
+        let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, 6)?;
+        buffer.copy_from_slice(&dest_mac_address);
+    }
+    { 
+        let buffer: &mut [u8] = transmit_buffer.as_slice_mut(6, 6)?;
+        buffer.copy_from_slice(&source_mac_address);
+    }
+    { 
+        let buffer: &mut [u8] = transmit_buffer.as_slice_mut(12, 2)?;
+        buffer.copy_from_slice(&ether_type);
+    }
+    { 
+        let buffer: &mut [u8] = transmit_buffer.as_slice_mut(14, len as usize)?;
+        buffer.copy_from_slice(&message);
+    }
+
+    Ok(transmit_buffer)
+}

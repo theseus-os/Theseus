@@ -39,16 +39,16 @@ use alloc::sync::Arc;
 //     }
 // }
 
-pub trait PowerDownFn = Fn();
+pub type PowerDownFn = fn();
 
 pub struct Wakelock {
     ref_count: Arc<()>,
     refcount_threshold: usize,
-    power_down_fn: fn()
+    power_down_fn: PowerDownFn,
 }
 
 impl Wakelock {
-    pub fn create_wakelock(refcount_threshold: usize, power_down_fn: fn()) -> Wakelock {
+    pub fn create_wakelock(refcount_threshold: usize, power_down_fn: PowerDownFn) -> Wakelock {
         Wakelock {
             ref_count: Arc::new(()),
             refcount_threshold: refcount_threshold,
