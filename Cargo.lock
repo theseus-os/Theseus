@@ -1027,7 +1027,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/kevinaboos/irq_safety#6a8c008994273603829bf83d30b41b315b5bb387"
+source = "git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed"
 dependencies = [
  "owning_ref",
  "spin",
