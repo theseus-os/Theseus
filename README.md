@@ -15,7 +15,8 @@ When you first check out the project, don't forget to checkout all the submodule
 `git submodule update --init --recursive`
 
 Currently, we support building and running Theseus on the following host OSes:
- * Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04, 18.04, 20.04.
+ * Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04, 18.04, 20.04. 
+   - Arch Linux has also been reported to work correctly. 
  * Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version of WSL and WSL2.
  * MacOS, tested on versions High Sierra (10.13) and Catalina (10.15.2).
  * Docker, atop any host OS that can run a Docker container.
@@ -27,7 +28,9 @@ Currently, we support building and running Theseus on the following host OSes:
   * Update your system's package list:    
     `sudo apt-get update`.    
   * Install the following packages:    
-    `sudo apt-get install nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm`     
+    `sudo apt-get install nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm`    
+    - Or on Arch Linux:    
+      `sudo pacman -S nasm pkg-config grub mtools xorriso qemu`    
 
 If you're on WSL, also do the following:
   * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).

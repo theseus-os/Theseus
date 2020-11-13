@@ -403,7 +403,7 @@ BOOK_ROOT := $(ROOT_DIR)/book/book/index.html
 book: $(wildcard book/src/*)
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
-	@echo -e "  cargo install mdbook"
+	@echo -e "  cargo +stable install mdbook"
 	@exit 1
 endif
 	@cd book && mdbook build
