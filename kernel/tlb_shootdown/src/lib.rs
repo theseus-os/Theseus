@@ -1,7 +1,6 @@
 //! Support for broadcasting and handling TLB shootdown IPIs. 
 
 #![no_std]
-#![feature(asm)]
 
 // #[macro_use] extern crate log;
 extern crate irq_safety;

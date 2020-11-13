@@ -34,7 +34,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(asm, naked_functions)]
+#![feature(llvm_asm, naked_functions)]
 #![feature(unwind_attributes)]
 #![feature(trait_alias)]
 
@@ -474,7 +474,7 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
         // This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.
         // This is because we rely on the value of registers to stay the same as whatever the caller set them to.
         // DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.
-        asm!("
+        llvm_asm!("
             # copy the stack pointer to RSI
             movq %rsp, %rsi
             pushq %rbp
@@ -580,7 +580,7 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
     #[naked]
     #[inline(never)]
     unsafe extern fn unwind_lander(_regs: *const LandingRegisters) -> !{
-        asm!("
+        llvm_asm!("
             movq %rdi, %rsp
             popq %rax
             popq %rbx

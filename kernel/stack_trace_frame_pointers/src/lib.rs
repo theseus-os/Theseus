@@ -15,7 +15,7 @@
 //! which in Rust is achieved via the `-C force-frame-pointers=yes` rust flags option.
 
 #![no_std]
-#![feature(asm)]
+#![feature(llvm_asm)]
 
 // This entire crate depends upon the `frame_pointers` config option.
 #[macro_use] extern crate cfg_if;
@@ -56,7 +56,7 @@ pub fn stack_trace_using_frame_pointers(
     let mut rbp: usize;
     // SAFE: just reading current register value
     unsafe {
-        asm!("" : "={rbp}"(rbp) : : "memory" : "intel", "volatile");
+        llvm_asm!("" : "={rbp}"(rbp) : : "memory" : "intel", "volatile");
     }
 
     for _i in 0 .. max_recursion.unwrap_or(64) {
@@ -99,7 +99,7 @@ pub fn stack_trace_using_frame_pointers(
 // unsafe {
 //     // On x86 you cannot directly read the value of the instruction pointer (RIP),
 //     // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)
-//     asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+//     llvm_asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
 // }
 // debug!("register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
 // let _curr_instruction_pointer = VirtualAddress::new_canonical(rip);

@@ -12,6 +12,7 @@
 
 #![feature(const_fn)]
 #![feature(const_in_array_repeat_expressions)]
+#![feature(const_mut_refs)]
 #![no_std]
 
 extern crate alloc;

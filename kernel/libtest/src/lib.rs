@@ -1,6 +1,4 @@
 #![no_std]
-#![feature(asm)]
-#![feature(no_more_cas)]
 
 extern crate alloc;
 extern crate task;

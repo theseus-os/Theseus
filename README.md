@@ -80,8 +80,8 @@ Install the current Rust compiler and toolchain by following the [setup instruct
 `curl https://sh.rustup.rs -sSf | sh`
 
 We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:    
-`cargo install --vers 0.3.17 xargo`
-
+`rustup toolchain install stable`    
+`cargo +stable install --vers 0.3.22 xargo`    
 
 
 ## Building and Running
@@ -129,7 +129,7 @@ Try setting a breakpoint at the kernel's entry function using `b nano_core::nano
 
 
 ## Documentation
-Theseus, like the Rust language itself, includes two forms of documentation: the main source-level documentation within the code itself, and a "book" for high-level overviews of design concepts. The latter is a work in progress but may still be useful, while the former is more useful for developing on Thesues.
+Theseus, like the Rust language itself, includes two forms of documentation: the main source-level documentation within the code itself, and a "book" for high-level overviews of design concepts. The latter is a work in progress but may still be useful, while the former is more useful for developing on Theseus.
 
 [Documentation is currently hosted online here](https://theseus-os.github.io/Theseus/), but may be out of date. It's best to build it yourself, as detailed below.
 
@@ -152,10 +152,11 @@ For VS Code, recommended plugins are:
  * Better TOML, by bungcip
  * x86 and x86_64 Assembly, by 13xforever
 
-### Fixing RLS Problems
-Sometimes RLS just doesn't want to behave, especially if the latest Rust nightly version had build errors. In that case, try the following steps to fix it:
+### Fixing Rustup, Rust Toolchain, or RLS Problems
+Sometimes things just don't want to behave, especially if there were issues with the currently-chosen Rust nightly version.
+In that case, try the following steps to fix it:
  * Set your default Rust toolchain to the one version in the `rust-toolchain` file, for example:     
- `rustup default nightly-2019-07-09`.
+ `rustup default $(cat rust-toolchain)`.
  * With your newly-set default toolchain, add the necessary components:    
  `rustup component add rls rust-analysis rust-src`.
  * In VS Code (or whatever IDE you're using), uninstall and reinstall the RLS extension, reloading the IDE each time.
@@ -170,7 +171,7 @@ Sometimes RLS just doesn't want to behave, especially if the latest Rust nightly
 We have tested Theseus on a variety of real machines, including Intel NUC devices, various Thinkpad laptops, and Supermicro servers. 
 Currently, the only limiting factor is that the device support booting via USB or PXE using traditional BIOS rather than UEFI; support for UEFI is a work-in-progress. 
 
-To boot over USB, simply run `make boot usb=sdc`, in which `sdc` is the device node for the USB disk itself (*not a partition like sdc2*) to which you want to write the OS image.
+To boot over USB, simply run `make boot usb=sdc`, in which `sdc` is the device node for the USB disk itself *(**not a partition** like sdc2)* to which you want to write the OS image.
 On WSL or other host environments where `/dev` device nodes don't exist, you can simply run `make iso` and burn the `.iso` file in the `build/` directory to a USB, e.g., using [Rufus](https://rufus.ie/) on Windows.
 
 To boot Theseus over PXE (network boot), see [this set of separate instructions](book/src/pxe.md).

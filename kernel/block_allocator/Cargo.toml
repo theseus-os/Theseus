@@ -4,5 +4,5 @@ name = "block_allocator"
 version = "0.1.0"
 
 [dependencies.linked_list_allocator]
-version = "0.6.3"
+version = "0.8.6"
 default-features = false

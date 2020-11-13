@@ -16,7 +16,6 @@
 //! 
 
 #![no_std]
-#![feature(compiler_builtins_lib)]
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -36,19 +35,6 @@ extern crate exceptions_early;
 extern crate panic_entry; // contains required panic-related lang items
 #[cfg(not(loadable))] extern crate captain;
 extern crate memory_initialization;
-
-
-/// This module is a hack to get around the lack of the 
-/// `__truncdfsf2` function in the `compiler_builtins` crate.
-/// See this: <https://github.com/rust-lang-nursery/compiler-builtins/pull/262>
-mod truncate;
-
-
-#[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
-#[doc(hidden)]
-pub fn nano_core_public_func(val: u8) {
-    error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
-}
 
 
 use core::ops::DerefMut;
@@ -259,3 +245,8 @@ extern {
     static ap_start_realmode: usize;
     static ap_start_realmode_end: usize;
 }
+
+
+/// This module is a hack to get around the lack of the 
+/// `__truncdfsf2` function in the `compiler_builtins` crate.
+mod truncate;

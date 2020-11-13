@@ -155,7 +155,7 @@ fn create_heap_mapping(
 // For the default and safe versions, MappedPages8k objects are created from the new heap mapping and passed to the ZoneAllocator.
 cfg_if! {
 if #[cfg(unsafe_heap)] {
-    #[macro_use] extern crate alloc;
+    extern crate alloc;
     extern crate spin;
 
     use spin::Once;

@@ -2,7 +2,7 @@
 //! when SSE/SIMD extensions are not active. 
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(llvm_asm, naked_functions)]
 
 extern crate zerocopy;
 
@@ -45,7 +45,7 @@ impl ContextRegular {
 #[macro_export]
 macro_rules! save_registers_regular {
     () => (
-        asm!("
+        llvm_asm!("
             # save all general purpose registers into the previous task
             push rbx
             push rbp
@@ -68,7 +68,7 @@ macro_rules! save_registers_regular {
 #[macro_export]
 macro_rules! switch_stacks {
     () => (
-        asm!("
+        llvm_asm!("
             # switch the stack pointers
             mov [rdi], rsp
             mov rsp, rsi
@@ -84,7 +84,7 @@ macro_rules! switch_stacks {
 #[macro_export]
 macro_rules! restore_registers_regular {
     () => (
-        asm!("
+        llvm_asm!("
             # restore the next task's general purpose registers
             pop r15
             pop r14
