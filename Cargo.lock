@@ -344,9 +344,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-if"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"
+checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "channel_app"
@@ -1123,6 +1123,12 @@ dependencies = [
 
 [[package]]
 name = "libm"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
+
+[[package]]
+name = "libm"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
@@ -1159,7 +1165,7 @@ dependencies = [
  "bit_field 0.10.0",
  "hashbrown",
  "hpet",
- "libm",
+ "libm 0.2.1",
  "log",
  "memory",
  "pmu_x86",
@@ -1350,7 +1356,7 @@ dependencies = [
  "getopts",
  "hpet",
  "kernel_config",
- "libm",
+ "libm 0.2.1",
  "libtest",
  "log",
  "mapper_spillful",
@@ -1609,12 +1615,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "packed_simd"
-version = "0.3.1"
+name = "packed_simd_2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25d36de864f7218ec5633572a800109bbe5a1cc8d9d95a967f3daf93ea7e6ddc"
+checksum = "3278e0492f961fd4ae70909f56b2723a7e8d01a228427294e19cdfdebda89a17"
 dependencies = [
  "cfg-if",
+ "libm 0.1.4",
 ]
 
 [[package]]
@@ -2251,7 +2258,7 @@ version = "0.1.0"
 dependencies = [
  "cfg-if",
  "log",
- "packed_simd",
+ "packed_simd_2",
  "pit_clock",
 ]
 

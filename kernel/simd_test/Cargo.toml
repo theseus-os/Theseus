@@ -10,7 +10,8 @@ cfg-if = "0.1.6"
 
 ## Only include the SIMD crates when any SIMD extensions are enabled
 [target.'cfg(target_feature = "sse2")'.dependencies.packed_simd]
-version = "0.3.1"
+version = "0.3.4"
+package = "packed_simd_2"
 
 [dependencies.pit_clock]
 path = "../pit_clock"

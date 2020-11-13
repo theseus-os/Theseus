@@ -2,9 +2,6 @@
 
 #![no_std]
 
-#[cfg(test)]
-#[macro_use] extern crate std;
-
 // #[macro_use] extern crate log;
 extern crate alloc;
 extern crate spin;

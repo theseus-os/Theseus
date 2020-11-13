@@ -145,12 +145,14 @@ There are similar commands for building the Theseus book:
 
 
 ## IDE Setup  
-Our personal preference is to use Visual Studio Code (VS Code), which has excellent, official support from the Rust language team. Other options are available [here](https://areweideyet.com/), but we don't recommend them.
+Our personal preference is to use Visual Studio Code (VS Code), which has excellent cross-platform support for Rust. Other options are available [here](https://areweideyet.com/), but we don't recommend them.
 
 For VS Code, recommended plugins are:
- * Rust (rls), by rust-lang
- * Better TOML, by bungcip
- * x86 and x86_64 Assembly, by 13xforever
+ * One of the following Rust language plugins. Disable the "all targets" option in either plugin's settings, such that the `test` target isn't used.
+   - **rust-analyzer**, by matklad
+   - **Rust** (RLS), by rust-lang
+ * **Better TOML**, by bungcip
+ * **x86 and x86_64 Assembly**, by 13xforever
 
 ### Fixing Rustup, Rust Toolchain, or RLS Problems
 Sometimes things just don't want to behave, especially if there were issues with the currently-chosen Rust nightly version.
