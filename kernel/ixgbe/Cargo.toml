@@ -83,9 +83,6 @@ path = "../physical_nic"
 [dependencies.virtual_nic]
 path = "../virtual_nic"
 
-[dependencies.wakelock]
-path = "../wakelock"
-
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 

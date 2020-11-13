@@ -62,7 +62,6 @@ pub fn main(_args: Vec<String>) -> isize {
     //     if b.is_err() {println!("can't create nic");}
 
     // }
-    ixgbe::power_down_device();
 {
     let mut a = virtual_function::create_virtual_nic(1,vec!([192,168,0,13]),1).expect("can't create nic");
     let mut b = virtual_function::create_virtual_nic(1,vec!([192,168,0,14]),1).expect("can't create nic");
@@ -87,9 +86,6 @@ pub fn main(_args: Vec<String>) -> isize {
     // let buffer_b = create_raw_packet(&[0x0, 0x1F, 0xC6, 0x9C, 0xB2, 0x07], &mac_address, &[1;46]).expect("couldnt create raw packet");
     // b.send_packet(buffer_b).expect("Couldn't send packet");
 }
-    // ixgbe::power_down_device();
-    ixgbe::power_up_device();
-    println!("powered up device");
 
 {
     let mut a = virtual_function::create_virtual_nic(1,vec!([192,168,0,13]),1).expect("can't create nic");

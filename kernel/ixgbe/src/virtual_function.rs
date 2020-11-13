@@ -32,7 +32,7 @@ impl PhysicalNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegist
     }
 }
 
-pub fn create_virtual_nic(num_queues: usize, ip_addresses: Vec<[u8;4]>, filter_protocol: u8) -> Result<VirtualNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor,>, &'static str> {
+pub fn create_virtual_nic(num_queues: usize, ip_addresses: Vec<[u8;4]>, filter_protocol: u8) -> Result<VirtualNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor>, &'static str> {
     if num_queues == 0 {return Err("need to request >0 number of queues");}
     if num_queues != ip_addresses.len() { return Err("The number of queues requested does not match the number of ip_addresses");}
     
@@ -52,7 +52,6 @@ pub fn create_virtual_nic(num_queues: usize, ip_addresses: Vec<[u8;4]>, filter_p
     let rx_queues = nic.remove_rx_queues(num_queues)?;
     let tx_queues = nic.remove_tx_queues(num_queues)?;
 
-    error!("wakelock refcount {}", nic.wakelock.ref_count());
 
     Ok(VirtualNic::new(
         rx_queues,
@@ -60,7 +59,6 @@ pub fn create_virtual_nic(num_queues: usize, ip_addresses: Vec<[u8;4]>, filter_p
         tx_queues,
         0,
         nic.mac_address(),
-        nic.wakelock.clone_wakelock(),
         get_ixgbe_nic().ok_or("Ixgbe nic isn't initialized")?
     ))
 }

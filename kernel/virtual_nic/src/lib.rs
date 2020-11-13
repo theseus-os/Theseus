@@ -7,9 +7,8 @@ extern crate physical_nic;
 extern crate intel_ethernet;
 extern crate alloc;
 extern crate irq_safety;
-extern crate wakelock;
 
-use nic_buffers::{TransmitBuffer, ReceivedFrame};
+use nic_buffers::{TransmitBuffer, ReceivedFrame, ReceiveBuffer};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
 use network_interface_card::{NetworkInterfaceCard};
 use intel_ethernet::descriptors::{TxDescriptor, RxDescriptor};
@@ -17,7 +16,6 @@ use physical_nic::PhysicalNic;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
-use wakelock::{Wakelock, PowerDownFn};
 
 pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, U: TxQueueRegisters + 'static, V: TxDescriptor + 'static> {
     rx_queues: Vec<RxQueue<S,T>>,
@@ -25,7 +23,6 @@ pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, 
     tx_queues: Vec<TxQueue<U,V>>,
     default_tx_queue: usize,
     mac_address: [u8; 6],
-    wakelock: Wakelock,
     physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>
 }
 
@@ -35,7 +32,6 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     tx_queues: Vec<TxQueue<U,V>>,
     default_tx_queue: usize,
     mac_address: [u8; 6],
-    wakelock: Wakelock,
     physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>) 
         -> VirtualNic<S,T,U,V> 
     {
@@ -45,10 +41,19 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
             tx_queues,
             default_tx_queue,
             mac_address,
-            wakelock,
             physical_nic_ref
         }
 
+    }
+
+    pub fn send_batch(&mut self, packets: &Vec<TransmitBuffer>) -> Result<(), &'static str> {
+        self.tx_queues[self.default_tx_queue].send_batch_on_queue(packets);
+        Ok(())
+    }
+
+    pub fn receive_batch(&mut self, batch_size: usize, buffers:&mut Vec<ReceiveBuffer>) -> Result<(), &'static str> {
+        self.rx_queues[self.default_rx_queue].remove_batch_from_queue(batch_size, buffers)?;
+        Ok(())
     }
 }
 impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> NetworkInterfaceCard for VirtualNic<S,T,U,V> {

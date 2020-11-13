@@ -1,0 +1,30 @@
+[package]
+name = "raw_packet_io"
+version = "0.1.0"
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.ixgbe]
+path = "../../kernel/ixgbe"
+
+[dependencies.hpet]
+path = "../../kernel/hpet"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.network_interface_card]
+path = "../../kernel/network_interface_card"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"

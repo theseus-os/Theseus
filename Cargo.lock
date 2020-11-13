@@ -1056,7 +1056,6 @@ dependencies = [
  "spin",
  "virtual_nic",
  "volatile",
- "wakelock",
  "x86_64",
 ]
 
@@ -1952,6 +1951,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw_packet_io"
+version = "0.1.0"
+dependencies = [
+ "hpet",
+ "ixgbe",
+ "log 0.4.8",
+ "network_interface_card",
+ "spawn",
+ "terminal_print",
+]
+
+[[package]]
 name = "rbtree"
 version = "0.1.5"
 source = "git+https://github.com/theseus-os/rbtree-rs.git#45aa9e94f7e7cf08d560498c314efb3e5f4ba198"
@@ -2763,7 +2774,6 @@ dependencies = [
  "nic_buffers",
  "nic_queues",
  "physical_nic",
- "wakelock",
 ]
 
 [[package]]
@@ -2795,10 +2805,6 @@ dependencies = [
  "scheduler",
  "task",
 ]
-
-[[package]]
-name = "wakelock"
-version = "0.1.0"
 
 [[package]]
 name = "window"

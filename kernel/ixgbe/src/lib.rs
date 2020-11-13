@@ -32,7 +32,6 @@ extern crate nic_buffers;
 extern crate nic_queues;
 extern crate physical_nic;
 extern crate virtual_nic;
-extern crate wakelock;
 
 pub mod test_ixgbe_driver;
 mod regs;
@@ -69,7 +68,7 @@ use runqueue::get_least_busy_core;
 use alloc::sync::Arc;
 use core::ops::{Deref, DerefMut};
 use core::mem::ManuallyDrop;
-use wakelock::{Wakelock, PowerDownFn};
+use virtual_nic::VirtualNic;
 
 /// Vendor ID for Intel
 pub const INTEL_VEND:                   u16 = 0x8086;  
@@ -92,7 +91,7 @@ const IXGBE_1GB_LINK:                       bool    = !(IXGBE_10GB_LINK);
 /// The number of receive descriptors per queue
 const IXGBE_NUM_RX_DESC:                    u16     = 256;
 /// The number of transmit descriptors per queue
-const IXGBE_NUM_TX_DESC:                    u16     = 8;
+const IXGBE_NUM_TX_DESC:                    u16     = 256;
 /// If receive side scaling (where incoming packets are sent to different queues depending on a hash) is enabled.
 const RSS_ENABLE:                           bool    = false;
 /// Enable Direct Cache Access for the receive queues
@@ -246,8 +245,6 @@ pub struct IxgbeNic {
     tx_queues: Vec<TxQueue<IxgbeTxQueueRegisters,AdvancedTxDescriptor>>,
     /// Registers for the unused queues
     tx_registers_unused: Vec<IxgbeTxQueueRegisters>,
-    /// wakelock to keep track of the number of applications using the NIC
-    wakelock: Wakelock    
 }
 
 // A trait which contains common functionalities for a NIC
@@ -383,7 +380,6 @@ impl IxgbeNic {
             Self::enable_dca(&mut mapped_registers3, &mut rx_queues)?;
         }
 
-        let wakelock = Wakelock::create_wakelock(2, power_down_device);
         let ixgbe_nic = IxgbeNic {
             pci_device: ixgbe_pci_dev.clone(),
             bar_type: bar_type,
@@ -403,7 +399,6 @@ impl IxgbeNic {
             num_tx_queues: IXGBE_NUM_TX_QUEUES_ENABLED,
             tx_queues: tx_queues,
             tx_registers_unused: tx_mapped_registers,
-            wakelock: wakelock
         };
 
         let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
@@ -1140,48 +1135,20 @@ impl IxgbeNic {
         Ok(queues)
     }
 
-    fn power_down(&mut self){ 
-        // self.pci_device.pci_set_power_state(PowerState::D0).expect("Couldn'power down device");
-        error!("Powering down ixgbe");
+    /// Creates a virtual nic qith the Rx/Tx queue with id 0.
+    /// This is only enabled for the raw_apcket_io test since we can't use a filter to send those packets
+    /// to a specific queue. They will be sent to queue 0 by default.
+    pub fn create_virtual_nic_0(&mut self) -> Result<VirtualNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor>, &'static str>{
+        Ok(VirtualNic::new(
+            vec!(self.rx_queues.remove(0)),
+            0,
+            vec!(self.tx_queues.remove(0)),
+            0,
+            self.mac_address(),
+            get_ixgbe_nic().ok_or("Ixgbe nic isn't initialized")?
+        ))
     }
-
-    fn power_up(&mut self) -> Result<(), &'static str> { 
-        // self.pci_device.pci_set_power_state(PowerState::D0)?;
-        // self.pci_device.pci_set_memory_access_enable_bit();
-        
-        Self::start_link(&mut self.regs1, &mut self.regs2, &mut self.regs3, &mut self.regs_mac)?;
-        for rxq in &mut self.rx_queues {
-            let (descs, buffers) = Self::init_ixgbe_rx_queue(&mut rxq.regs)?;
-            rxq.rx_descs = descs;
-            rxq.rx_cur = 0;
-            rxq.rx_bufs_in_use = buffers;
-        }
-        Self::enable_rx_function(&mut self.regs2);
-
-        Self::disable_transmission(&mut self.regs2);
-        for txq in &mut self.tx_queues {
-            let descs = Self::init_ixgbe_tx_queue(&mut self.regs2, &mut txq.regs, txq.id == 0)?;
-            txq.tx_descs = descs;
-            txq.tx_cur = 0;
-        }
-
-        error!("Powering up ixgbe");
-
-        Ok(())
-    }
-
 }
-
-pub fn power_down_device() {
-    let mut nic = get_ixgbe_nic().unwrap().lock();
-    nic.power_down()
-}
-
-pub fn power_up_device() {
-    let mut nic = get_ixgbe_nic().unwrap().lock();
-    nic.power_up().expect("could not power up nic");
-}
-
 
 /// A helper function to poll the nic receive queues
 pub fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {

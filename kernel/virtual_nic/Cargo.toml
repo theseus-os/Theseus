@@ -25,8 +25,5 @@ path = "../intel_ethernet"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.wakelock]
-path = "../wakelock"
-
 [lib]
 crate-type = ["rlib"]

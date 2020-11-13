@@ -137,6 +137,44 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
     pub fn return_frame(&mut self) -> Option<ReceivedFrame> {
         self.received_frames.pop_front()
     }
+
+    pub fn remove_batch_from_queue(&mut self, batch_size: usize, buffers: &mut Vec<ReceiveBuffer>) -> Result<(), &'static str> {
+        let mut cur = self.rx_cur as usize;
+        for i in 0..batch_size {
+            if self.rx_descs[cur].descriptor_done() {
+                // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
+                // (because we're saving it for higher layers to use),
+                // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.
+                let new_receive_buf = match self.rx_buffer_pool.pop() {
+                    Some(rx_buf) => rx_buf,
+                    None => {
+                        warn!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
+                        // if the pool was empty, then we allocate a new receive buffer
+                        let len = self.rx_buffer_size_bytes;
+                        let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
+                        ReceiveBuffer::new(mp, phys_addr, len, self.rx_buffer_pool)
+                    }
+                };
+
+                // actually tell the NIC about the new receive buffer, and that it's ready for use now
+                self.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
+                self.rx_descs[cur].reset_status();
+
+                // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
+                // getting back the receive buffer that is part of the received ethernet frame
+                self.rx_bufs_in_use.push(new_receive_buf);
+                let mut current_rx_buf = self.rx_bufs_in_use.swap_remove(cur); 
+                // current_rx_buf.length = length as u16; // set the ReceiveBuffer's length to the size of the actual packet received
+                buffers.push(current_rx_buf);
+
+                // move on to the next receive buffer to see if it's ready for us to take
+                self.rx_cur = (cur as u16 + 1) % self.num_rx_descs;
+                cur = self.rx_cur as usize;
+            }
+        }
+        self.regs.update_rdt(cur as u32); 
+        Ok(())
+    }
 }
 
 
@@ -168,6 +206,27 @@ impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
         let old_cur = self.tx_cur;
         self.tx_cur = (self.tx_cur + 1) % self.num_tx_descs;
         // update the tdt register by 1 so that it knows the previous descriptor has been used
+        // and has a packet to be sent
+        self.regs.update_tdt(self.tx_cur as u32);
+        // Wait for the packet to be sent
+        self.tx_descs[old_cur as usize].wait_for_packet_tx();
+        error!("packet sent on queue {}", self.id);
+    }
+
+    /// Sends multiple packets on the specified transmit queue
+    /// 
+    /// # Arguments:
+    /// * `transmit_buffer`: buffer containing the packet to be sent
+    pub fn send_batch_on_queue(&mut self, transmit_buffers: &Vec<TransmitBuffer>) {
+        let mut old_cur = self.tx_cur;
+        for buffer in transmit_buffers {
+            self.tx_descs[self.tx_cur as usize].send(buffer.phys_addr, buffer.length);  
+            // update the tx_cur value to hold the next free descriptor
+            old_cur = self.tx_cur;
+            self.tx_cur = (self.tx_cur + 1) % self.num_tx_descs;
+        }
+
+        // update the tdt register by the number of packets so that it knows the previous descriptor has been used
         // and has a packet to be sent
         self.regs.update_tdt(self.tx_cur as u32);
         // Wait for the packet to be sent
