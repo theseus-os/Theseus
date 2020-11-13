@@ -2,8 +2,7 @@
 
 #![no_std]
 #![feature(const_fn)]
-#![feature(range_is_empty)]
-#![feature(step_trait)]
+#![feature(step_trait, step_trait_ext)]
 
 extern crate kernel_config;
 extern crate multiboot2;
@@ -18,7 +17,6 @@ use bit_field::BitField;
 use core::{
     fmt,
     iter::Step,
-    mem,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
@@ -320,30 +318,18 @@ impl SubAssign<usize> for Frame {
 }
 
 // Implementing these functions allow `Frame` to be in an `Iterator`.
-impl Step for Frame {
+unsafe impl Step for Frame {
     #[inline]
     fn steps_between(start: &Frame, end: &Frame) -> Option<usize> {
         Step::steps_between(&start.number, &end.number)
     }
     #[inline]
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Frame { number: 1 })
+    fn forward_checked(start: Frame, count: usize) -> Option<Frame> {
+        Step::forward_checked(start.number, count).map(|n| Frame { number: n })
     }
     #[inline]
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Frame { number: 0 })
-    }
-    #[inline]
-    fn add_one(&self) -> Self {
-        Add::add(*self, 1)
-    }
-    #[inline]
-    fn sub_one(&self) -> Self {
-        Sub::sub(*self, 1)
-    }
-    #[inline]
-    fn add_usize(&self, n: usize) -> Option<Frame> {
-        Some(*self + n)
+    fn backward_checked(start: Frame, count: usize) -> Option<Frame> {
+        Step::backward_checked(start.number, count).map(|n| Frame { number: n })
     }
 }
 
@@ -528,30 +514,18 @@ impl SubAssign<usize> for Page {
 }
 
 // Implementing these functions allow `Page` to be in an `Iterator`.
-impl Step for Page {
+unsafe impl Step for Page {
     #[inline]
     fn steps_between(start: &Page, end: &Page) -> Option<usize> {
         Step::steps_between(&start.number, &end.number)
     }
     #[inline]
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Page { number: 1 })
+    fn forward_checked(start: Page, count: usize) -> Option<Page> {
+        Step::forward_checked(start.number, count).map(|n| Page { number: n })
     }
     #[inline]
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Page { number: 0 })
-    }
-    #[inline]
-    fn add_one(&self) -> Self {
-        Add::add(*self, 1)
-    }
-    #[inline]
-    fn sub_one(&self) -> Self {
-        Sub::sub(*self, 1)
-    }
-    #[inline]
-    fn add_usize(&self, n: usize) -> Option<Page> {
-        Some(*self + n)
+    fn backward_checked(start: Page, count: usize) -> Option<Page> {
+        Step::backward_checked(start.number, count).map(|n| Page { number: n })
     }
 }
 

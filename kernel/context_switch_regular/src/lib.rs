@@ -2,7 +2,7 @@
 //! when SSE/SIMD extensions are not active. 
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(llvm_asm, naked_functions)]
 
 extern crate zerocopy;
 

@@ -9,19 +9,19 @@ use zerocopy::FromBytes;
 
 // Transmit descriptor bits
 /// Tx Command: End of Packet
-pub const TX_CMD_EOP:                      u8 = (1 << 0);     
+pub const TX_CMD_EOP:                      u8 = 1 << 0;     
 /// Tx Command: Insert FCS
-pub const TX_CMD_IFCS:                     u8 = (1 << 1);     
+pub const TX_CMD_IFCS:                     u8 = 1 << 1;     
 /// Tx Command: Insert Checksum
-pub const TX_CMD_IC:                       u8 = (1 << 2);     
+pub const TX_CMD_IC:                       u8 = 1 << 2;     
 /// Tx Command: Report Status
-pub const TX_CMD_RS:                       u8 = (1 << 3);     
+pub const TX_CMD_RS:                       u8 = 1 << 3;     
 /// Tx Command: Report Packet Sent
-pub const TX_CMD_RPS:                      u8 = (1 << 4);     
+pub const TX_CMD_RPS:                      u8 = 1 << 4;     
 /// Tx Command: VLAN Packet Enable
-pub const TX_CMD_VLE:                      u8 = (1 << 6);     
+pub const TX_CMD_VLE:                      u8 = 1 << 6;     
 /// Tx Command: Interrupt Delay Enable
-pub const TX_CMD_IDE:                      u8 = (1 << 7);     
+pub const TX_CMD_IDE:                      u8 = 1 << 7;     
 /// Tx Status: descriptor Done
 pub const TX_STATUS_DD:                    u8 = 1 << 0;
 

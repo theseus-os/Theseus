@@ -6,7 +6,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-core_io = "0.1"
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
 
 [dependencies.keycodes_ascii]
 path = "../keycodes_ascii"

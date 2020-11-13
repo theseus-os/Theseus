@@ -60,7 +60,7 @@ pub fn do_self_swap(
     state_transfer_functions: Vec<String>,
     namespace: Arc<CrateNamespace>,
     verbose_log: bool
-) -> Result<(SwapRanges), String> {
+) -> Result<SwapRanges, String> {
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
 
@@ -303,7 +303,7 @@ pub fn constant_offset_fix(
 /// 2) Change the calues in the stack to the reloaded crate
 /// 3) Change any other references in the heap to the reloaded crate
 /// This function handles 1 and 2 operations and 3 is handled in the call site depending on necessity
-pub fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
+pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 
     let taskref = task::get_my_current_task()
         .ok_or_else(|| format!("failed to get current task"))?;

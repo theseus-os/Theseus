@@ -21,6 +21,7 @@
 //! and contains allocated objects and associated meta-data
 
 #![cfg_attr(feature = "unstable", feature(const_fn))]
+#![feature(const_mut_refs)]
 #![no_std]
 
 #[macro_use] extern crate log;

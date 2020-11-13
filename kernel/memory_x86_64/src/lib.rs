@@ -5,10 +5,8 @@
 //! All arch-specific definitions for memory system are exported from this crate.
 
 #![no_std]
-#![feature(asm)]
 #![feature(ptr_internals)]
 #![feature(unboxed_closures)]
-#![feature(step_trait, range_is_empty)]
 
 extern crate multiboot2;
 #[macro_use] extern crate log;

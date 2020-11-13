@@ -435,7 +435,7 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
             // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
             let mp_offset = new_task.kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
             let new_context_destination: &mut $ContextType = new_task.kstack.as_type_mut(mp_offset)?;
-            *new_context_destination = <($ContextType)>::new(entry_point_function as usize);
+            *new_context_destination = <$ContextType>::new(entry_point_function as usize);
             new_task.saved_sp = new_context_destination as *const _ as usize; 
         );
     }

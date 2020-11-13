@@ -2,7 +2,7 @@
 //! when SSE extensions are enabled. 
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(llvm_asm, naked_functions)]
 
 extern crate zerocopy;
 #[macro_use] extern crate context_switch_regular;

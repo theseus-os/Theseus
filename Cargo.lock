@@ -93,7 +93,7 @@ dependencies = [
 name = "app_io"
 version = "0.1.0"
 dependencies = [
- "core_io",
+ "bare-io",
  "event_types",
  "keycodes_ascii",
  "lazy_static",
@@ -158,6 +158,15 @@ name = "autocfg"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
+
+[[package]]
+name = "bare-io"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dec6ec4815d7aacd0be4ec053ef9e2883b22f79b29f9bd2ef3f79003e3ee7c9d"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "bit_field"
@@ -297,7 +306,7 @@ name = "cat"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core_io",
+ "bare-io",
  "fs_node",
  "getopts",
  "log",
@@ -395,14 +404,6 @@ version = "0.1.0"
 dependencies = [
  "context_switch_regular",
  "zerocopy",
-]
-
-[[package]]
-name = "core_io"
-version = "0.1.20191017"
-source = "git+https://github.com/theseus-os/rust-core_io#b9c5a9b7513770a523f3e271c62c516a446fef72"
-dependencies = [
- "rustc_version 0.1.7",
 ]
 
 [[package]]
@@ -534,7 +535,7 @@ checksum = "fbe9f11be34f800b3ecaaed0ec9ec2e015d1d0ba0c8644c1310f73d6e8994615"
 dependencies = [
  "proc-macro2 0.4.29",
  "quote 0.6.12",
- "rustc_version 0.2.3",
+ "rustc_version",
  "syn 0.15.33",
 ]
 
@@ -949,7 +950,7 @@ name = "immediate_input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core_io",
+ "bare-io",
  "log",
  "stdio",
 ]
@@ -959,7 +960,7 @@ name = "input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core_io",
+ "bare-io",
  "log",
 ]
 
@@ -1070,7 +1071,7 @@ name = "keyboard_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core_io",
+ "bare-io",
  "keycodes_ascii",
  "log",
  "scheduler",
@@ -1108,7 +1109,7 @@ name = "less"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core_io",
+ "bare-io",
  "fs_node",
  "getopts",
  "keycodes_ascii",
@@ -1872,7 +1873,7 @@ dependencies = [
  "rand_isaac",
  "rand_pcg",
  "rand_xorshift",
- "rustc_version 0.2.3",
+ "rustc_version",
 ]
 
 [[package]]
@@ -1882,7 +1883,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771b009e3a508cb67e8823dda454aaa5368c7bc1c16829fb77d3e980440dd34a"
 dependencies = [
  "rand_core",
- "rustc_version 0.2.3",
+ "rustc_version",
 ]
 
 [[package]]
@@ -1916,7 +1917,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "086bd09a33c7044e56bb44d5bdde5a60e7f119a9e95b0775f545de759a32fe05"
 dependencies = [
  "rand_core",
- "rustc_version 0.2.3",
+ "rustc_version",
 ]
 
 [[package]]
@@ -1936,7 +1937,7 @@ checksum = "b4a349ca83373cfa5d6dbb66fd76e58b2cca08da71a5f6400de0a0a6a9bceeaf"
 dependencies = [
  "bitflags",
  "cc",
- "rustc_version 0.2.3",
+ "rustc_version",
 ]
 
 [[package]]
@@ -2084,20 +2085,11 @@ checksum = "ccc78bfd5acd7bf3e89cffcf899e5cb1a52d6fafa8dec2739ad70c9577a57288"
 
 [[package]]
 name = "rustc_version"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"
-dependencies = [
- "semver 0.1.20",
-]
-
-[[package]]
-name = "rustc_version"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
- "semver 0.9.0",
+ "semver",
 ]
 
 [[package]]
@@ -2159,7 +2151,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f84d114ef17fd144153d608fba7c446b0145d038985e7a8cc5d08bb0ce20383"
 dependencies = [
- "rustc_version 0.2.3",
+ "rustc_version",
 ]
 
 [[package]]
@@ -2168,12 +2160,6 @@ version = "0.1.0"
 dependencies = [
  "zerocopy",
 ]
-
-[[package]]
-name = "semver"
-version = "0.1.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4f410fedcf71af0345d7607d246e7ad15faaadd49d240ee3b24e5dc21a820ac"
 
 [[package]]
 name = "semver"
@@ -2220,7 +2206,7 @@ name = "shell"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core_io",
+ "bare-io",
  "dfqueue",
  "environment",
  "event_types",
@@ -2440,7 +2426,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "stdio"
 version = "0.1.0"
 dependencies = [
- "core_io",
+ "bare-io",
  "keycodes_ascii",
  "spin",
 ]

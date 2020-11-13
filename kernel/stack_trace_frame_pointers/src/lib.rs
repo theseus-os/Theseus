@@ -15,7 +15,7 @@
 //! which in Rust is achieved via the `-C force-frame-pointers=yes` rust flags option.
 
 #![no_std]
-#![feature(asm)]
+#![feature(llvm_asm)]
 
 // This entire crate depends upon the `frame_pointers` config option.
 #[macro_use] extern crate cfg_if;

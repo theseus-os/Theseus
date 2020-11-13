@@ -4,10 +4,8 @@
 //! Originally based on Phil Opp's blog_os. 
 
 #![no_std]
-#![feature(asm)]
 #![feature(ptr_internals)]
 #![feature(unboxed_closures)]
-#![feature(step_trait, range_is_empty)]
 
 extern crate spin;
 extern crate multiboot2;

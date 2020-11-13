@@ -2,7 +2,6 @@
 //! of graceful exit, panic and exceptions.
 
 #![no_std]
-#![feature(asm)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;

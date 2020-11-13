@@ -2,7 +2,7 @@
 //! that helps to manage the complex configuration options involving SIMD and personalities.
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(naked_functions)]
 
 #[macro_use] extern crate cfg_if;
 

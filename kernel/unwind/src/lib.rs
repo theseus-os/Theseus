@@ -34,7 +34,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(asm, naked_functions)]
+#![feature(llvm_asm, naked_functions)]
 #![feature(unwind_attributes)]
 #![feature(trait_alias)]
 
