@@ -1264,8 +1264,9 @@ dependencies = [
 
 [[package]]
 name = "memoffset"
-version = "0.5.4"
-source = "git+https://github.com/Ramla-I/memoffset.git#12625e4c436d98e7c73fbbce0f75e967373ee341"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
 dependencies = [
  "autocfg",
 ]
