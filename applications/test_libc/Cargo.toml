@@ -1,0 +1,20 @@
+[package]
+name = "test_libc"
+version = "0.1.0"
+description = "A testbed that runs tests for libc."
+authors = ["Arav Singhal <singhal.arav@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.cstr_core]
+version = "0.1.2"
+features = ["alloc"]
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.libc]
+path = "../../posix/libc"

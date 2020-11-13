@@ -23,7 +23,7 @@ RUSTC_VERSION=$(cat ${THESEUS_BASE_DIR}/rust-toolchain)
 ### Build the docker image
 docker build \
     --build-arg RUSTC_VERSION=${RUSTC_VERSION} \
-    --build-arg USER=$(logname) \
+    --build-arg USER=$(id -un) \
     --build-arg UID=$(id -u) \
     --build-arg GID=$(id -g) \
     -t ${DOCKER_TAG}  ./

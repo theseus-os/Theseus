@@ -29,7 +29,7 @@ use zerocopy::FromBytes;
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
     Add, Sub, AddAssign, SubAssign,
     FromBytes,
@@ -79,10 +79,19 @@ impl VirtualAddress {
         self.0 & (PAGE_SIZE - 1)
     }
 }
-
+impl fmt::Debug for VirtualAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "v{:#X}", self.0)
+    }
+}
+impl fmt::Display for VirtualAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 impl fmt::Pointer for VirtualAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:p}", self.0 as *const usize)
+        write!(f, "{:?}", self)
     }
 }
 
@@ -125,7 +134,7 @@ impl From<VirtualAddress> for usize {
 /// A physical memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
     Add, Sub, AddAssign, SubAssign,
     FromBytes,
@@ -169,7 +178,21 @@ impl PhysicalAddress {
         self.0 & (PAGE_SIZE - 1)
     }
 }
-
+impl fmt::Debug for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "p{:#X}", self.0)
+    }
+}
+impl fmt::Display for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl fmt::Pointer for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 
 impl Add<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
@@ -241,7 +264,7 @@ pub struct Frame {
 }
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frame(paddr: {:#X})", self.start_address())
+        write!(f, "Frame(p{:#X})", self.start_address())
     }
 }
 
@@ -326,7 +349,7 @@ impl Step for Frame {
 
 
 /// A range of `Frame`s that are contiguous in physical memory.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FrameRange(RangeInclusive<Frame>);
 
 impl FrameRange {
@@ -345,8 +368,10 @@ impl FrameRange {
     /// that spans all `Frame`s from the given physical address
     /// to an end bound based on the given size.
     pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
+        assert!(size_in_bytes > 0);
         let start_frame = Frame::containing_address(starting_virt_addr);
-        let end_frame = Frame::containing_address(starting_virt_addr + size_in_bytes - 1);
+		// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+        let end_frame = Frame::containing_address(starting_virt_addr + (size_in_bytes - 1));
         FrameRange::new(start_frame, end_frame)
     }
 
@@ -390,7 +415,11 @@ impl FrameRange {
         FrameRange::new(start.clone(), end.clone())
     }
 }
-
+impl fmt::Debug for FrameRange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
 impl Deref for FrameRange {
     type Target = RangeInclusive<Frame>;
     fn deref(&self) -> &RangeInclusive<Frame> {
@@ -420,7 +449,7 @@ pub struct Page {
 }
 impl fmt::Debug for Page {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Page(vaddr: {:#X})", self.start_address())
+        write!(f, "Page(v{:#X})", self.start_address())
     }
 }
 
@@ -528,8 +557,8 @@ impl Step for Page {
 
 
 
-/// A range of `Page`s that are contiguous in virtual memory.
-#[derive(Debug, Clone)]
+/// An inclusive range of `Page`s that are contiguous in virtual memory.
+#[derive(Clone)]
 pub struct PageRange(RangeInclusive<Page>);
 
 impl PageRange {
@@ -548,8 +577,10 @@ impl PageRange {
     /// that spans all `Page`s from the given virtual address
     /// to an end bound based on the given size.
     pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
+        assert!(size_in_bytes > 0);
         let start_page = Page::containing_address(starting_virt_addr);
-        let end_page = Page::containing_address(starting_virt_addr + size_in_bytes - 1);
+		// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+        let end_page = Page::containing_address(starting_virt_addr + (size_in_bytes - 1));
         PageRange::new(start_page, end_page)
     }
 
@@ -606,7 +637,11 @@ impl PageRange {
         }
     }
 }
-
+impl fmt::Debug for PageRange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
 impl Deref for PageRange {
     type Target = RangeInclusive<Page>;
     fn deref(&self) -> &RangeInclusive<Page> {
@@ -630,6 +665,7 @@ impl IntoIterator for PageRange {
 
 
 /// The address bounds and mapping flags of a section's memory region.
+#[derive(Debug)]
 pub struct SectionMemoryBounds {
     /// The starting virtual address and physical address.
     pub start: (VirtualAddress, PhysicalAddress),
@@ -641,12 +677,16 @@ pub struct SectionMemoryBounds {
 
 /// The address bounds and flags of the initial kernel sections that need mapping. 
 /// 
-/// It only contains three items, in which each item includes all sections that have identical flags:
+/// It contains three main items, in which each item includes all sections that have identical flags:
 /// * The `.text` section bounds cover all sections that are executable.
 /// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
 /// * The `.data` section bounds cover those that are writable (.data, .bss).
+/// 
+/// It also contains the stack bounds, which are maintained separately.
+#[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
-   pub text: SectionMemoryBounds,
+   pub text:   SectionMemoryBounds,
    pub rodata: SectionMemoryBounds,
-   pub data: SectionMemoryBounds,
+   pub data:   SectionMemoryBounds,
+   pub stack:  SectionMemoryBounds,
 }

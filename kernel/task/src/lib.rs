@@ -33,6 +33,7 @@
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate memory;
+extern crate stack;
 extern crate tss;
 extern crate mod_mgmt;
 extern crate context_switch;
@@ -55,7 +56,8 @@ use alloc::{
     sync::Arc,
 };
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{Stack, MappedPages, PageRange, EntryFlags, MmiRef, VirtualAddress};
+use memory::{MmiRef, VirtualAddress, get_frame_allocator_ref};
+use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 // use tss::tss_set_rsp0;
 use mod_mgmt::{
@@ -300,7 +302,9 @@ impl Task {
         };
 
         let kstack = kstack
-            .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
+            .or_else(|| get_frame_allocator_ref().and_then(|fa_ref| 
+                stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table, fa_ref)
+            ))
             .ok_or("couldn't allocate kernel stack!")?;
 
         Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate, failure_cleanup_function))
@@ -922,30 +926,20 @@ impl Eq for TaskRef { }
 /// This function does not add the new task to any runqueue.
 pub fn bootstrap_task(
     apic_id: u8, 
-    stack_bottom: VirtualAddress, 
-    stack_top: VirtualAddress,
+    stack: Stack,
     kernel_mmi_ref: MmiRef,
 ) -> Result<TaskRef, &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
     // Instead, we generate all of the `Task` states manually, and create an initial task directly.
-    let kstack = Stack::new( 
-        stack_top, 
-        stack_bottom, 
-        MappedPages::from_existing(
-            PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
-            EntryFlags::WRITABLE | EntryFlags::PRESENT
-        ),
-    );
     let default_namespace = mod_mgmt::get_initial_kernel_namespace()
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut bootstrap_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, bootstrap_task_cleanup_failure);
+    let mut bootstrap_task = Task::new_internal(stack, kernel_mmi_ref, default_namespace, default_env, None, bootstrap_task_cleanup_failure);
     bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
     bootstrap_task.runstate = RunState::Runnable;
     bootstrap_task.running_on_cpu = Some(apic_id); 
     bootstrap_task.pinned_core = Some(apic_id); // can only run on this CPU core
-    // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);
 
@@ -977,9 +971,8 @@ pub fn bootstrap_task(
 /// 
 /// Therefore there's not much we can actually do.
 fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
-    loop {
-        error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
-    }
+    error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    loop { }
 }
 
 

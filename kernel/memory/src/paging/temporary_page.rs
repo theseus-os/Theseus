@@ -10,7 +10,7 @@
 use {FrameRange};
 use paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
-use super::{Page, Frame, FrameAllocator, VirtualAddress};
+use super::{Frame, FrameAllocator, VirtualAddress};
 use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
 
 
@@ -41,33 +41,25 @@ impl TemporaryPage {
 
     /// Maps the temporary page to the given page table frame in the active table.
     /// Returns a reference to the now mapped table.
-    /// # Arguments
     /// 
+    /// # Arguments
     /// * `frame`: the [`Frame`] containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].     
     /// * `page_table`: the currently active [`PageTable`]. 
     /// 
-    pub fn map_table_frame(&mut self, frame: Frame, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str>
-    {
-        use super::EntryFlags;
-
-        // Find a free page that is not already mapped, starting from the top of the kernel heap region.
-        // It'd be nice to use the virtual address allocator (allocate_pages), but we CANNOT use it
-        // because this code is needed before those functions are available (cuz they require heap memory)
-        let mut page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR));
-        while page_table.translate_page(page).is_some() {
-            // this never happens
-            warn!("temporary page {:?} is already mapped, trying the next lowest Page", page);
-            page -= 1;
+    pub fn map_table_frame(&mut self, frame: Frame, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str> {
+        if self.mapped_page.is_none() {
+            let page = page_allocator::allocate_pages_at(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR), 1)
+                .or_else(|_err| page_allocator::allocate_pages(1)
+                    .ok_or("Couldn't allocate a new Page for the temporary P4 table frame")
+                )?;
+            self.mapped_page = Some(page_table.map_allocated_pages_to(
+                page,
+                FrameRange::new(frame, frame),
+                super::EntryFlags::WRITABLE,
+                &mut self.allocator
+            )?);
         }
-        
-        self.mapped_page = Some( 
-            page_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator)?
-        );
-        
-        let table: &mut Table<Level1> = self.mapped_page.as_mut()
-            .ok_or("mapped page error")?
-            .as_type_mut(0)?;  // no offset
-        Ok(table)
+        self.mapped_page.as_mut().unwrap().as_type_mut(0)
     }
 }
 

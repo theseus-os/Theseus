@@ -29,6 +29,7 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
+extern crate stack;
 extern crate mod_mgmt;
 extern crate exceptions_early;
 #[macro_use] extern crate vga_buffer;
@@ -75,6 +76,7 @@ macro_rules! try_exit {
 
 /// Shuts down Theseus and prints the given formatted arguuments.
 fn shutdown(msg: core::fmt::Arguments) -> ! {
+    println_raw!("Theseus is shutting down, msg: {}", msg); 
     warn!("Theseus is shutting down, msg: {}", msg);
 
     // TODO: handle shutdowns properly with ACPI commands
@@ -127,7 +129,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): booted via multiboot2."); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory_initialization::init_memory_management(&boot_info));
+    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, identity_mapped_pages) = 
+        try_exit!(memory_initialization::init_memory_management(&boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped upon a returned error, causing all execution to stop. 
@@ -145,6 +148,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             core::mem::forget(text_mapped_pages);
             core::mem::forget(rodata_mapped_pages);
             core::mem::forget(data_mapped_pages);
+            core::mem::forget(stack);
             core::mem::forget(identity_mapped_pages);
             shutdown(format_args!("{}", err));
         }
@@ -153,24 +157,32 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-    let (nano_core_crate_ref, bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end) = {
-        match mod_mgmt::parse_nano_core::parse_nano_core(default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
-            Ok((nano_core_crate_ref, init_symbols, _num_new_syms)) => {
-                // Get symbols from the boot assembly code that defines where the BSP stack and the ap_start code are.
-                // The symbols in the ".init" section will be in init_symbols, all others will be in the regular namespace symbol tree.
-                let bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).start_address();
-                let bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).start_address();
-                let ap_realmode_begin = try_exit!(init_symbols.get("ap_start_realmode").ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
-                let ap_realmode_end   = try_exit!(init_symbols.get("ap_start_realmode_end").ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
-                // debug!("bsp_stack_top: {:#X}, bsp_stack_bottom: {:#X}, ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end);
-                (nano_core_crate_ref, bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end)
-            }
-            Err((msg, mapped_pages_array)) => {
-                // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
-                // we have to make sure these mapped_pages aren't dropped.
-                core::mem::forget(mapped_pages_array);
-                shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
-            }
+    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::parse_nano_core::parse_nano_core(
+        default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false
+    ) {
+        Ok((nano_core_crate_ref, init_symbols, _num_new_syms)) => {
+            // Get symbols from the boot assembly code that defines where the ap_start code are.
+            // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
+            let ap_realmode_begin = try_exit!(
+                init_symbols.get("ap_start_realmode")
+                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"")
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
+                )
+            );
+            let ap_realmode_end   = try_exit!(
+                init_symbols.get("ap_start_realmode_end")
+                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"")
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
+                )
+            );
+            // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
+            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end)
+        }
+        Err((msg, mapped_pages_array)) => {
+            // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
+            // we have to make sure these mapped_pages aren't dropped.
+            core::mem::forget(mapped_pages_array);
+            shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
         }
     };
     println_raw!("nano_core_start(): finished parsing the nano_core crate."); 
@@ -203,10 +215,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(not(loadable))]
     {
         try_exit!(
-            captain::init(kernel_mmi_ref, identity_mapped_pages, 
-                bsp_stack_bottom, bsp_stack_top,
-                ap_realmode_begin, ap_realmode_end
-            )
+            captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
         );
     }
     #[cfg(loadable)]
@@ -221,17 +230,14 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         );
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, stack::Stack, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;
         let func: &CaptainInitFunc = {
             try_exit!(section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space))
         };
 
         try_exit!(
-            func(kernel_mmi_ref, identity_mapped_pages, 
-                bsp_stack_bottom, bsp_stack_top,
-                ap_realmode_begin, ap_realmode_end
-            )
+            func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
         );
     }
 
@@ -247,8 +253,9 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 // We don't actually use them, and they should not be accessed or dereferenced, because they are merely values, not addresses. 
 #[allow(dead_code)]
 extern {
-    static initial_bsp_stack_top: usize;
+    static initial_bsp_stack_guard_page: usize;
     static initial_bsp_stack_bottom: usize;
+    static initial_bsp_stack_top: usize;
     static ap_start_realmode: usize;
     static ap_start_realmode_end: usize;
 }

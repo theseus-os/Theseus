@@ -13,7 +13,7 @@
 
 
 /// 64-bit architecture results in 8 bytes per address.
-pub const BYTES_PER_ADDR: usize = 8;
+pub const BYTES_PER_ADDR: usize = core::mem::size_of::<usize>();
 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
 pub const PAGE_SHIFT: usize = 12;

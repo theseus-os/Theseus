@@ -14,7 +14,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "madt",
  "memory",
  "pause",
@@ -30,7 +30,7 @@ dependencies = [
 name = "acpi_table"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "memory",
  "sdt",
  "zerocopy",
@@ -43,7 +43,7 @@ dependencies = [
  "acpi_table",
  "fadt",
  "hpet",
- "log",
+ "log 0.4.8",
  "madt",
  "memory",
  "rsdt",
@@ -57,11 +57,13 @@ dependencies = [
  "interrupts",
  "irq_safety",
  "kernel_config",
- "log",
+ "lazy_static",
+ "log 0.4.8",
  "memory",
  "scheduler",
  "spawn",
  "spin",
+ "stack",
  "tlb_shootdown",
 ]
 
@@ -75,7 +77,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "owning_ref",
  "pit_clock",
@@ -96,7 +98,7 @@ dependencies = [
  "keycodes_ascii",
  "lazy_static",
  "libterm",
- "log",
+ "log 0.4.8",
  "print",
  "serial_port",
  "spin",
@@ -122,7 +124,7 @@ dependencies = [
  "atomic",
  "debugit",
  "hpet",
- "log",
+ "log 0.4.8",
  "mpmc",
  "spin",
  "task",
@@ -134,7 +136,7 @@ name = "ata"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "log",
+ "log 0.4.8",
  "pci",
  "port_io",
  "spin",
@@ -209,7 +211,7 @@ version = "0.1.0"
 dependencies = [
  "hashbrown",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "storage_device",
 ]
 
@@ -224,7 +226,7 @@ dependencies = [
  "heapfile",
  "hpet",
  "libtest",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "path",
@@ -271,7 +273,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "keycodes_ascii",
- "log",
+ "log 0.4.8",
  "logger",
  "memory",
  "mod_mgmt",
@@ -283,6 +285,7 @@ dependencies = [
  "scheduler",
  "simd_personality",
  "spawn",
+ "stack",
  "task",
  "task_fs",
  "tsc",
@@ -297,7 +300,7 @@ dependencies = [
  "core_io",
  "fs_node",
  "getopts",
- "log",
+ "log 0.4.8",
  "path",
  "task",
 ]
@@ -306,9 +309,18 @@ dependencies = [
 name = "catch_unwind"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "task",
  "unwind",
+]
+
+[[package]]
+name = "cbitset"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a9afa72f63942dd7e7f01c67b863ce9df35c523ae10e3dddd3eec8f1e07eac"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -323,7 +335,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node",
  "getopts",
- "log",
+ "log 0.4.8",
  "path",
  "root",
  "task",
@@ -342,7 +354,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "getopts",
- "log",
+ "log 0.4.8",
  "spawn",
  "task",
  "terminal_print",
@@ -429,7 +441,7 @@ dependencies = [
  "fs_node",
  "goblin",
  "hashbrown",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
  "xmas-elf",
@@ -453,7 +465,7 @@ dependencies = [
  "hashbrown",
  "hpet",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "path",
@@ -495,7 +507,7 @@ dependencies = [
  "gimli",
  "goblin",
  "hashbrown",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "owning_ref",
@@ -515,7 +527,7 @@ dependencies = [
  "crate_name_utils",
  "getopts",
  "itertools",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "spin",
@@ -545,7 +557,7 @@ dependencies = [
  "ethernet_smoltcp_device",
  "event_types",
  "keyboard",
- "log",
+ "log 0.4.8",
  "memory",
  "mouse",
  "mpmc",
@@ -595,7 +607,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "mpmc",
  "network_interface_card",
@@ -641,7 +653,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "network_interface_card",
  "network_manager",
@@ -685,7 +697,7 @@ dependencies = [
  "debug_info",
  "fault_log",
  "gimli",
- "log",
+ "log 0.4.8",
  "memory",
  "pmu_x86",
  "print",
@@ -721,7 +733,7 @@ dependencies = [
  "crate_swap",
  "fault_log",
  "fs_node",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "path",
@@ -735,7 +747,7 @@ dependencies = [
  "apic",
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "print",
  "task",
@@ -746,7 +758,7 @@ dependencies = [
 name = "first_application"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "mod_mgmt",
  "path",
  "spawn",
@@ -805,7 +817,7 @@ name = "fs_node"
 version = "0.1.0"
 dependencies = [
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
  "x86_64",
@@ -819,7 +831,7 @@ dependencies = [
  "bit_field 0.7.0",
  "bitflags",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
  "tss",
@@ -882,7 +894,7 @@ dependencies = [
  "block_allocator",
  "irq_safety",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
 ]
@@ -893,7 +905,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node",
  "irq_safety",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
  "x86_64",
@@ -903,7 +915,7 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "terminal_print",
 ]
 
@@ -913,7 +925,7 @@ version = "0.1.0"
 dependencies = [
  "acpi_table",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "memory",
  "owning_ref",
  "sdt",
@@ -928,7 +940,7 @@ version = "0.1.0"
 dependencies = [
  "hpet",
  "httparse",
- "log",
+ "log 0.4.8",
  "network_manager",
  "percent-encoding",
  "smoltcp",
@@ -947,7 +959,7 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "core_io",
- "log",
+ "log 0.4.8",
  "stdio",
 ]
 
@@ -957,7 +969,7 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "core_io",
- "log",
+ "log 0.4.8",
 ]
 
 [[package]]
@@ -965,7 +977,7 @@ name = "intel_ethernet"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
- "log",
+ "log 0.4.8",
  "memory",
  "volatile",
  "zerocopy",
@@ -982,7 +994,7 @@ dependencies = [
  "kernel_config",
  "keyboard",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "mouse",
  "pic",
@@ -1013,7 +1025,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "owning_ref",
  "spin",
@@ -1056,7 +1068,7 @@ version = "0.1.0"
 dependencies = [
  "event_types",
  "keycodes_ascii",
- "log",
+ "log 0.4.8",
  "mpmc",
  "ps2",
  "spin",
@@ -1069,7 +1081,7 @@ dependencies = [
  "app_io",
  "core_io",
  "keycodes_ascii",
- "log",
+ "log 0.4.8",
  "scheduler",
 ]
 
@@ -1110,12 +1122,45 @@ dependencies = [
  "getopts",
  "keycodes_ascii",
  "libterm",
- "log",
+ "log 0.4.8",
  "path",
  "spin",
  "stdio",
  "task",
 ]
+
+[[package]]
+name = "libc"
+version = "0.1.0"
+dependencies = [
+ "cbitset",
+ "cstr_core",
+ "fs_node",
+ "hashbrown",
+ "kernel_config",
+ "lazy_static",
+ "libc 0.2.48",
+ "libm 0.1.4",
+ "log 0.3.9",
+ "memfs",
+ "memory",
+ "rand 0.5.6",
+ "root",
+ "spin",
+ "task",
+ "vfs_node",
+]
+
+[[package]]
+name = "libc"
+version = "0.2.48"
+source = "git+https://github.com/Ramla-I/libc.git#7220eedd097f1ddad78e6e7c9911d691f8b6b6e0"
+
+[[package]]
+name = "libm"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
 
 [[package]]
 name = "libm"
@@ -1136,7 +1181,7 @@ dependencies = [
  "framebuffer",
  "framebuffer_drawer",
  "framebuffer_printer",
- "log",
+ "log 0.4.8",
  "print",
  "root",
  "shapes",
@@ -1155,8 +1200,8 @@ dependencies = [
  "bit_field 0.10.0",
  "hashbrown",
  "hpet",
- "libm",
- "log",
+ "libm 0.2.1",
+ "log 0.4.8",
  "memory",
  "pmu_x86",
  "runqueue",
@@ -1173,6 +1218,15 @@ checksum = "655d57c71827fe0891ce72231b6aa5e14033dae3f604609e6a6f807267c1678d"
 
 [[package]]
 name = "log"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
+dependencies = [
+ "log 0.4.8",
+]
+
+[[package]]
+name = "log"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
@@ -1184,7 +1238,7 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "serial_port",
  "spin",
 ]
@@ -1195,7 +1249,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node",
  "getopts",
- "log",
+ "log 0.4.8",
  "path",
  "task",
  "terminal_print",
@@ -1209,7 +1263,7 @@ dependencies = [
  "apic",
  "ioapic",
  "irq_safety",
- "log",
+ "log 0.4.8",
  "memory",
  "pic",
  "sdt",
@@ -1230,7 +1284,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "memory_structs",
  "memory_x86_64",
@@ -1252,7 +1306,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node",
  "irq_safety",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
  "x86_64",
@@ -1276,10 +1330,11 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory_structs",
  "memory_x86_64",
  "multiboot2",
+ "page_allocator",
  "spin",
  "x86_64",
  "xmas-elf",
@@ -1293,9 +1348,10 @@ dependencies = [
  "heap",
  "irq_safety",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "memory",
  "multiboot2",
+ "stack",
 ]
 
 [[package]]
@@ -1317,7 +1373,7 @@ version = "0.1.0"
 dependencies = [
  "entryflags_x86_64",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "memory_structs",
  "multiboot2",
  "x86_64",
@@ -1343,9 +1399,9 @@ dependencies = [
  "getopts",
  "hpet",
  "kernel_config",
- "libm",
+ "libm 0.2.1",
  "libtest",
- "log",
+ "log 0.4.8",
  "mapper_spillful",
  "memory",
  "memory_structs",
@@ -1365,7 +1421,7 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "memfs",
  "memory",
  "multiboot2",
@@ -1384,7 +1440,7 @@ name = "mouse"
 version = "0.1.0"
 dependencies = [
  "event_types",
- "log",
+ "log 0.4.8",
  "mouse_data",
  "mpmc",
  "ps2",
@@ -1417,13 +1473,14 @@ dependencies = [
  "apic",
  "irq_safety",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "madt",
  "memory",
  "mod_mgmt",
  "pause",
  "pit_clock",
  "spin",
+ "stack",
  "volatile",
  "zerocopy",
 ]
@@ -1439,8 +1496,9 @@ dependencies = [
  "intrusive-collections",
  "irq_safety",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "memory",
+ "page_allocator",
  "slabmalloc",
  "slabmalloc_safe",
  "slabmalloc_unsafe",
@@ -1452,7 +1510,7 @@ dependencies = [
 name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "owning_ref",
  "spin",
  "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
@@ -1468,7 +1526,7 @@ dependencies = [
  "exceptions_early",
  "irq_safety",
  "kernel_config",
- "log",
+ "log 0.4.8",
  "logger",
  "memory",
  "memory_initialization",
@@ -1477,6 +1535,7 @@ dependencies = [
  "panic_entry",
  "rlibc",
  "spin",
+ "stack",
  "state_store",
  "vga_buffer",
  "x86_64",
@@ -1495,7 +1554,7 @@ version = "0.1.0"
 dependencies = [
  "e1000",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "owning_ref",
  "smoltcp",
  "spin",
@@ -1514,7 +1573,7 @@ dependencies = [
 name = "nic_buffers"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "memory",
  "mpmc",
  "owning_ref",
@@ -1525,7 +1584,7 @@ name = "nic_initialization"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "log",
+ "log 0.4.8",
  "memory",
  "mpmc",
  "nic_buffers",
@@ -1539,7 +1598,7 @@ name = "nic_queues"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "log",
+ "log 0.4.8",
  "memory",
  "nic_buffers",
  "owning_ref",
@@ -1563,6 +1622,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-traits"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "opaque-debug"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1577,11 +1645,11 @@ dependencies = [
  "httparse",
  "irq_safety",
  "itertools",
- "log",
+ "log 0.4.8",
  "network_manager",
  "owning_ref",
  "percent-encoding",
- "rand",
+ "rand 0.6.1",
  "sha3",
  "smoltcp",
  "smoltcp_helper",
@@ -1608,10 +1676,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "page_allocator"
+version = "0.1.0"
+dependencies = [
+ "kernel_config",
+ "log 0.4.8",
+ "memory_structs",
+ "spin",
+]
+
+[[package]]
 name = "panic_entry"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "panic_wrapper",
@@ -1624,7 +1702,7 @@ name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
  "fault_log",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "runqueue",
@@ -1640,7 +1718,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "root",
  "spin",
  "vfs_node",
@@ -1656,7 +1734,7 @@ name = "pci"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
- "log",
+ "log 0.4.8",
  "memory",
  "port_io",
  "spin",
@@ -1670,7 +1748,7 @@ version = "1.0.2"
 name = "pic"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "memory",
  "port_io",
  "x86_64",
@@ -1684,7 +1762,7 @@ dependencies = [
  "getopts",
  "hashbrown",
  "hpet",
- "log",
+ "log 0.4.8",
  "network_manager",
  "ota_update_client",
  "smoltcp",
@@ -1697,7 +1775,7 @@ dependencies = [
 name = "pit_clock"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "port_io",
  "spin",
  "x86_64",
@@ -1737,7 +1815,7 @@ dependencies = [
  "bit_field 0.10.0",
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "pit_clock",
@@ -1758,7 +1836,7 @@ version = "0.1.0"
 dependencies = [
  "dfqueue",
  "event_types",
- "log",
+ "log 0.4.8",
  "spin",
 ]
 
@@ -1801,7 +1879,7 @@ dependencies = [
 name = "ps2"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "port_io",
  "spin",
 ]
@@ -1840,6 +1918,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
  "proc-macro2 1.0.24",
+]
+
+[[package]]
+name = "rand"
+version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c618c47cd3ebd209790115ab837de41425723956ad3ce2e6a7f09890947cacb9"
+dependencies = [
+ "rand_core",
 ]
 
 [[package]]
@@ -1926,7 +2013,7 @@ name = "rbtree"
 version = "0.1.5"
 source = "git+https://github.com/theseus-os/rbtree-rs.git#45aa9e94f7e7cf08d560498c314efb3e5f4ba198"
 dependencies = [
- "log",
+ "log 0.4.8",
 ]
 
 [[package]]
@@ -1936,7 +2023,7 @@ dependencies = [
  "debugit",
  "hpet",
  "irq_safety",
- "log",
+ "log 0.4.8",
  "scheduler",
  "spin",
  "task",
@@ -1955,7 +2042,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node",
  "getopts",
- "log",
+ "log 0.4.8",
  "path",
  "root",
  "task",
@@ -1968,7 +2055,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "spin",
  "x86_64",
 ]
@@ -1981,7 +2068,7 @@ dependencies = [
  "getopts",
  "hpet",
  "libtest",
- "log",
+ "log 0.4.8",
  "runqueue",
  "spawn",
  "task",
@@ -2013,7 +2100,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "port_io",
  "spin",
  "state_store",
@@ -2027,7 +2114,7 @@ dependencies = [
  "atomic_linked_list",
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "runqueue_priority",
  "runqueue_round_robin",
  "single_simd_task_optimization",
@@ -2041,7 +2128,7 @@ dependencies = [
  "atomic_linked_list",
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "single_simd_task_optimization",
  "task",
 ]
@@ -2053,7 +2140,7 @@ dependencies = [
  "atomic_linked_list",
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "single_simd_task_optimization",
  "task",
 ]
@@ -2088,7 +2175,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "irq_safety",
- "log",
+ "log 0.4.8",
  "runqueue",
  "scheduler_priority",
  "scheduler_round_robin",
@@ -2100,7 +2187,7 @@ dependencies = [
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "logger",
  "scheduler",
  "spawn",
@@ -2111,7 +2198,7 @@ dependencies = [
 name = "scheduler_priority"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "runqueue",
  "runqueue_priority",
  "spin",
@@ -2122,7 +2209,7 @@ dependencies = [
 name = "scheduler_round_robin"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "runqueue",
  "runqueue_round_robin",
  "spin",
@@ -2210,7 +2297,7 @@ dependencies = [
  "keycodes_ascii",
  "lazy_static",
  "libterm",
- "log",
+ "log 0.4.8",
  "path",
  "print",
  "root",
@@ -2232,7 +2319,7 @@ dependencies = [
  "apic",
  "cfg-if",
  "fs_node",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "pit_clock",
@@ -2245,7 +2332,7 @@ name = "simd_test"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
- "log",
+ "log 0.4.8",
  "packed_simd",
  "pit_clock",
 ]
@@ -2255,7 +2342,7 @@ name = "simple_ipc"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
- "log",
+ "log 0.4.8",
 ]
 
 [[package]]
@@ -2263,7 +2350,7 @@ name = "single_simd_task_optimization"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
- "log",
+ "log 0.4.8",
  "task",
 ]
 
@@ -2271,7 +2358,7 @@ dependencies = [
 name = "slabmalloc"
 version = "0.7.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "memory",
 ]
 
@@ -2279,7 +2366,7 @@ dependencies = [
 name = "slabmalloc_safe"
 version = "0.7.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "memory",
 ]
 
@@ -2287,7 +2374,7 @@ dependencies = [
 name = "slabmalloc_unsafe"
 version = "0.7.0"
 dependencies = [
- "log",
+ "log 0.4.8",
 ]
 
 [[package]]
@@ -2305,7 +2392,7 @@ name = "smoltcp_helper"
 version = "0.1.0"
 dependencies = [
  "hpet",
- "log",
+ "log 0.4.8",
  "network_manager",
  "smoltcp",
  "spin",
@@ -2324,13 +2411,14 @@ dependencies = [
  "fs_node",
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "path",
  "pause",
  "runqueue",
  "scheduler",
+ "stack",
  "task",
 ]
 
@@ -2355,11 +2443,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "stack"
+version = "0.1.0"
+dependencies = [
+ "kernel_config",
+ "log 0.4.8",
+ "memory",
+ "memory_structs",
+ "page_allocator",
+ "spin",
+]
+
+[[package]]
 name = "stack_trace"
 version = "0.1.0"
 dependencies = [
  "fallible-iterator",
- "log",
+ "log 0.4.8",
  "mod_mgmt",
  "task",
  "unwind",
@@ -2390,7 +2490,7 @@ dependencies = [
  "hpet",
  "irq_safety",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "runqueue_priority",
@@ -2420,7 +2520,7 @@ version = "0.1.0"
 dependencies = [
  "downcast-rs",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "owning_ref",
  "pci",
  "spin",
@@ -2432,7 +2532,7 @@ version = "0.1.0"
 dependencies = [
  "ata",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "owning_ref",
  "pci",
  "spin",
@@ -2498,11 +2598,12 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "root",
  "spin",
+ "stack",
  "tss",
  "x86_64",
 ]
@@ -2512,7 +2613,7 @@ name = "task_fs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "log",
+ "log 0.4.8",
  "memory",
  "path",
  "root",
@@ -2541,7 +2642,7 @@ dependencies = [
  "apic",
  "async_channel",
  "getopts",
- "log",
+ "log 0.4.8",
  "rendezvous",
  "scheduler",
  "spawn",
@@ -2562,7 +2663,7 @@ dependencies = [
  "getopts",
  "hpet",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "rendezvous",
  "runqueue",
  "scheduler",
@@ -2576,10 +2677,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_libc"
+version = "0.1.0"
+dependencies = [
+ "cstr_core",
+ "libc 0.1.0",
+ "log 0.3.9",
+ "terminal_print",
+]
+
+[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "task",
  "terminal_print",
 ]
@@ -2590,7 +2701,7 @@ version = "0.1.0"
 dependencies = [
  "getopts",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "spawn",
  "spin",
  "terminal_print",
@@ -2615,7 +2726,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "irq_safety",
- "log",
+ "log 0.4.8",
  "memory",
  "pause",
  "x86_64",
@@ -2625,7 +2736,7 @@ dependencies = [
 name = "tsc"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "pit_clock",
  "x86_64",
 ]
@@ -2637,7 +2748,7 @@ dependencies = [
  "apic",
  "atomic_linked_list",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
  "x86_64",
@@ -2693,7 +2804,7 @@ dependencies = [
  "fallible-iterator",
  "gimli",
  "interrupts",
- "log",
+ "log 0.4.8",
  "memory",
  "mod_mgmt",
  "runqueue",
@@ -2705,7 +2816,7 @@ dependencies = [
 name = "unwind_test"
 version = "0.1.0"
 dependencies = [
- "log",
+ "log 0.4.8",
  "task",
  "terminal_print",
 ]
@@ -2740,7 +2851,7 @@ name = "vfs_node"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "log",
+ "log 0.4.8",
  "memory",
  "spin",
  "x86_64",
@@ -2783,7 +2894,7 @@ name = "wait_queue"
 version = "0.1.0"
 dependencies = [
  "irq_safety",
- "log",
+ "log 0.4.8",
  "scheduler",
  "task",
 ]
@@ -2796,7 +2907,7 @@ dependencies = [
  "event_types",
  "framebuffer",
  "framebuffer_drawer",
- "log",
+ "log 0.4.8",
  "mouse",
  "mpmc",
  "owning_ref",
@@ -2831,7 +2942,7 @@ dependencies = [
  "framebuffer_drawer",
  "keycodes_ascii",
  "lazy_static",
- "log",
+ "log 0.4.8",
  "mod_mgmt",
  "mouse_data",
  "mpmc",
