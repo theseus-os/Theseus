@@ -16,7 +16,7 @@ Why? Meltdown, Spectre... need I say more?
 ## Performance
 
 * Better support for architectural extensions such as SIMD instructions. (Why Linux is not adequate)
-* Singualrity argument: no boundary crossing (single privilege level, single address space). 
+* Singularity argument: no boundary crossing (single privilege level, single address space). 
 
 // TODO mention TSA precheck analogy? 
 
