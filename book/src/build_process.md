@@ -10,10 +10,10 @@ The only special action it takes is to build the `nano_core` separately and full
 
 Theseus can be built in a variety of modes, but offers two presets: **debug** and **release** build modes.
 By default, Theseus is built in release mode for usable performance within an emulator like QEMU.
-To build in debug mode, set the `BUILD_MODE` environment variable when running `make`, like so:  
+To build in debug mode, set the `BUILD_MODE` environment variable when running `make`, like so:
 `make run BUILD_MODE=debug`
 
-There is a special file `cfg/Config.mk` that contains the build mode options as well as other configuration options used in the kernel Makefile. 
+There is a special file `cfg/Config.mk` that contains the build mode options as well as other configuration options used in the kernel Makefile.
 As with most languages, release mode in Rust is *way* faster, but it does take longer to compile and can be difficult to attach a debugger.
 
 ## Runtime Loading and Linking of Crates
@@ -24,6 +24,6 @@ To enable this, use the `make loadable` command to enable the `loadable` feature
 
 * Builds each crate into its own separate object file, which are not all linked together like in other OSes.
 * Enables release mode in order to make each module file smaller and faster to load, i.e., sets LD_MODE=release`.
-* Copies each crate's object file into the top-level build directory's module subdirectory (`build/grub-isofiles/modules`) such that each module is a separate object file in the final .iso image. 
+* Copies each crate's object file into the top-level build directory's module subdirectory (`build/grub-isofiles/modules`) such that each module is a separate object file in the final .iso image.
   That allows the running instance of Theseus to see all the modules currently available just by asking the loader (without needing a filesystem), and to load them individually.
 * Sets the `loadable` config option, which as seen in the `nano_core`, will enable the `#![cfg(loadable)]` code blocks that dynamically load other crates rather than include them as static dependencies.
