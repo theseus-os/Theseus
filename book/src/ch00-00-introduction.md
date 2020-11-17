@@ -2,7 +2,7 @@
 
 Theseus is a new OS written from scratch in Rust, with the goals of runtime composability and state spill freedom.
 
-The Theseus kernel is composed of many small entities, each contained within a single Rust crate, and built all together as a cargo virtual workspace. 
+The Theseus kernel is composed of many small entities, each contained within a single Rust crate, and built all together as a cargo virtual workspace.
 All crates in Theseus are listed in the sidebar to the left. Click on a crate name to read more about it, and the functions and types it provides.
 Each crate is its own project with its own "Cargo.toml" manifest file that specifies that crate's dependencies and features.
 
@@ -22,7 +22,7 @@ One-line summaries of what each crate includes (may be incomplete):
 * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
 * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
-* `interrupts`: Interrupt configuration and handlers for Theseus. 
+* `interrupts`: Interrupt configuration and handlers for Theseus.
 * `ioapic`: IOAPIC (I/O Advanced Programmable Interrupt Controller) support (x86 only) for Theseus.
 * `keyboard`: simple PS2 keyboard driver.
 * `memory`: The virtual memory subsystem.
@@ -31,7 +31,7 @@ One-line summaries of what each crate includes (may be incomplete):
 * `nano-core`: a tiny module that is responsible for bootstrapping the OS at startup.
 * `panic_entry`: Default entry point for panics and unwinding, as required by the Rust compiler.
 * `panic_wrapper`: Wrapper functions for handling and propagating panics.
-* `path`: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct 
+* `path`: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct.
 * `pci`: Basic PCI support for Theseus, x86 only.
 * `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
 * `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.
