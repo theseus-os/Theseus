@@ -12,7 +12,7 @@
 
 #![no_std]
 
-extern crate log;
+#[macro_use]extern crate log;
 extern crate memory;
 extern crate volatile;
 extern crate bit_field;

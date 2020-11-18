@@ -101,3 +101,4 @@ pub fn create_raw_packet(dest_mac_address: &[u8], source_mac_address: &[u8], mes
 
     Ok(transmit_buffer)
 }
+

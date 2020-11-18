@@ -25,7 +25,7 @@ use network_interface_card::NetworkInterfaceCard;
 
 pub fn main(_args: Vec<String>) -> isize {
     // info!("Hello, world! (from hello application)");
-    // println!("Ixgbe test application");
+    println!("Ixgbe test application");
     // {
     //     let mut nic = ixgbe::get_ixgbe_nic().unwrap().lock();
     //     nic.set_5_tuple_filter([192,168,0,12],[192,168,0,13],0,0,1,7,0).expect("couldn't set filter");
@@ -37,7 +37,10 @@ pub fn main(_args: Vec<String>) -> isize {
     //     nic.set_5_tuple_filter([192,168,0,12],[192,168,0,19],0,0,1,7,6).expect("couldn't set filter");
     //     nic.set_5_tuple_filter([192,168,0,12],[192,168,0,20],0,0,1,7,7).expect("couldn't set filter");
     // }
-    // ixgbe::test_ixgbe_driver::test_nic_ixgbe_driver(None);
+    ixgbe::test_ixgbe_driver::test_nic_ixgbe_driver(None);
+        let mut nic = ixgbe::get_ixgbe_nic().unwrap().lock();
+let (a,b) = nic.link_status();
+println!("{:#X}, {:#X}", a,b);
     // ixgbe::tx_send_mq(0).expect("couldn't send");
     // ixgbe::tx_send_mq(1).expect("couldn't send");
     // ixgbe::tx_send_mq(2).expect("couldn't send");

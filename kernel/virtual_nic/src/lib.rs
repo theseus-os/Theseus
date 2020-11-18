@@ -46,8 +46,9 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
 
     }
 
-    pub fn send_batch(&mut self, packets: &Vec<TransmitBuffer>) -> Result<(), &'static str> {
-        self.tx_queues[self.default_tx_queue].send_batch_on_queue(packets);
+    // #[inline(always)]
+    pub fn send_batch(&mut self, packets: &Vec<TransmitBuffer>, num_times: usize) -> Result<(), &'static str> {
+        self.tx_queues[self.default_tx_queue].send_batch_on_queue(packets, num_times);
         Ok(())
     }
 

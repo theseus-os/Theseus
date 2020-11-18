@@ -91,7 +91,28 @@ pub struct IntelIxgbeRegisters2 {
 
     /// Flow Control Configuration
     pub fccfg:                          Volatile<u32>,          // 0x3D00;
-    _padding18:                         [u8; 1340],             // 0x3D04 - 0x423F
+    _padding18:                         [u8; 880],              // 0x3D04 - 0x4073
+
+    /// Good Packets Received Count
+    pub gprc:                           Volatile<u32>,          // 0x4074
+    _padding18a:                        [u8; 8],                // 0x4078 - 0x407F
+
+    /// Good Packets Transmitted Count
+    pub gptc:                           Volatile<u32>,          // 0x4080
+    _padding18b:                        [u8; 4],                // 0x4084 - 0x4087 
+
+    /// Good Octets Received Count Low
+    pub gorcl:                          Volatile<u32>,          // 0x4088
+
+    /// Good Octets Received Count High
+    pub gorch:                          Volatile<u32>,          // 0x408C
+    
+    /// Good Octets Transmitted Count Low
+    pub gotcl:                          Volatile<u32>,          // 0x4090
+
+    /// Good Octets Transmitted Count High
+    pub gotch:                          Volatile<u32>,          // 0x4094
+    _padding18c:                        [u8;424],               // 0x4098 - 0x423F
 
     /// MAC Core Control 0 Register 
     pub hlreg0:                         Volatile<u32>,          // 0x4240;
@@ -105,7 +126,10 @@ pub struct IntelIxgbeRegisters2 {
 
     /// Auto-Negotiation Control 2 Register    
     pub autoc2:                         Volatile<u32>,          // 0x42A8;
-    _padding20:                         [u8; 1620],             // 0x42AC - 0x48FF
+    _padding20a:                        [u8; 120],              // 0x42AC - 0x4323
+
+    pub links2:                         Volatile<u32>,          // 0x4324
+    _padding20b:                        [u8; 1496],             // 0x4328 - 0x48FF
 
     /// DCB Transmit Descriptor Plane Control and Status
     pub rttdcs:                         Volatile<u32>,          // 0x4900;
@@ -143,14 +167,20 @@ pub struct IntelIxgbeTxRegisters {
 
 #[repr(C)]
 pub struct IntelIxgbeMacRegisters {
-    _padding27:                         [u8; 8704],             // 0x8000 - 0xA1FF
+    _padding27a:                        [u8; 256],              // 0x8000 - 0x80FF
+    /// DMA Tx TCP Max Allow Size Requests
+    pub dtxmxszrq:                      Volatile<u32>,          // 0X8100
+    _padding27b:                        [u8; 8444],             // 0x8104 - 0xA1FF
     
     /// Receive Address Low
     pub ral:                            Volatile<u32>,          // 0xA200;
     
     /// Receive Address High
     pub rah:                            Volatile<u32>,          // 0xA204;
-    _padding28:                         [u8; 11768],            // 0xA208 - 0xCFFF
+    _padding28a:                        [u8; 10744],            // 0xA208 - 0xCBFF
+
+    pub txpbsize:                       RegisterArray8,         // 0xCC00
+    _padding28b:                        [u8; 992],              // 0xCC20 - 0xCFFF
 } // 5 4KiB page
 
 #[repr(C)]
@@ -191,7 +221,10 @@ pub struct IntelIxgbeRegisters3 {
 
     /// Multiple Receive Queues Command Register
     pub mrqc:                           Volatile<u32>,          // 0xEC80;
-    _padding32:                         [u8; 5008],             // 0xEC84 - 0x10013
+    _padding32:                         [u8; 5004],             // 0xEC84 - 0x1000F
+
+    /// EEPROM/ Flash Control Register
+    pub eec:                            Volatile<u32>,          // 0x10010
 
     /// EEPROM Read Register
     pub eerd:                           Volatile<u32>,          // 0x10014;
@@ -360,11 +393,12 @@ pub const AUTOC_LMS_CLEAR:              u32 = 0x0000_E000;
 pub const AUTOC_LMS_1_GB:               u32 = 0x0000_E000;
 pub const AUTOC_LMS_10_GBE_P:           u32 = 1 << 13;
 pub const AUTOC_LMS_10_GBE_S:           u32 = 3 << 13;
+pub const AUTOC_LMS_KX_KX4_AUTONEG:     u32 = 6<<13; //KX/KX4//KR
 pub const AUTOC_FLU:                    u32 = 1;
-pub const AUTOC_LMS:                    u32 = 6<<13; //KX/KX4//KR
 pub const AUTOC_RESTART_AN:             u32 = 1<<12;
 pub const AUTOC_1G_PMA_PMD:             u32 = 0x0000_0200; //clear bit 9
-pub const AUTOC_10G_PMA_PMD_P:          u32 = 1 << 7; 
+pub const AUTOC_10G_PMA_PMD_CLEAR:      u32 = 0x0000_0180; 
+pub const AUTOC_10G_PMA_PMD_XAUI:       u32 = 0 << 7; 
 pub const AUTOC2_10G_PMA_PMD_S_CLEAR:   u32 = 0x0003_0000; //clear bits 16 and 17 
 pub const AUTOC2_10G_PMA_PMD_S_SFI:     u32 = 1 << 17;
 
@@ -381,6 +415,25 @@ pub const SW_FW_SYNC_SMBITS_FW:         u32 = 0x3E0;
 pub const SW_FW_SYNC_SW_MAC:            u32 = 1 << 3;
 pub const SW_FW_SYNC_FW_MAC:            u32 = 1 << 8;
 
+// EEPROM Commands
+/// Bit which indicates that auto-read by hardware from EEPROM is done
+pub const EEC_AUTO_RD:                  u32 = 9;
+
+// Link Commands
+pub const LINKS_SPEED_MASK:             u32 = 0x3 << 28;
+
+// MAC Control Commands
+/// Tx CRC Enable by HW (bit 0)
+pub const HLREG0_TXCRCEN:               u32 = 1;
+/// Tx Pad Frame Enable (bit 10)
+pub const HLREG0_TXPADEN:               u32 = 1 << 10;
+
+/// DCB Arbiters Disable
+pub const RTTDCS_ARBDIS:                u32 = 1 << 6;
+
+/// For DCB and VT disabled, set TXPBSIZE.SIZE to 160KB
+pub const TXPBSIZE_160KB:                u32 = 0xA0 << 10;
+
 // RCTL commands
 pub const BSIZEPACKET_8K:               u32 = 8;
 pub const BSIZEHEADER_256B:             u32 = 4;
@@ -391,7 +444,7 @@ pub const RX_Q_ENABLE:                  bool = true;
 pub const STORE_BAD_PACKETS:            u32 = 1 << 1;
 pub const MULTICAST_PROMISCUOUS_ENABLE: u32 = 1 << 8;
 pub const UNICAST_PROMISCUOUS_ENABLE:   u32 = 1 << 9;
-pub const BROADCAST_ACCEPT_MODE:        u32 = 1 << 20;
+pub const BROADCAST_ACCEPT_MODE:        u32 = 1 << 10;
 pub const RECEIVE_ENABLE:               u32 = 1;
 
 // RSS commands

@@ -85,13 +85,13 @@ const INTERRUPT_ENABLE:                     bool    = false;
 const NUM_MSI_VEC_ENABLED:                  u8      = 1; //IXGBE_NUM_RX_QUEUES_ENABLED;
 /// We do not access the PHY module for link information yet,
 /// so this variable is set by the user depending of if the attached module is 10GB or 1GB.
-const IXGBE_10GB_LINK:                      bool    = false;
+const IXGBE_10GB_LINK:                      bool    = true;
 /// If link uses 1GB SFP modules
 const IXGBE_1GB_LINK:                       bool    = !(IXGBE_10GB_LINK);
 /// The number of receive descriptors per queue
 const IXGBE_NUM_RX_DESC:                    u16     = 256;
 /// The number of transmit descriptors per queue
-const IXGBE_NUM_TX_DESC:                    u16     = 256;
+const IXGBE_NUM_TX_DESC:                    u16     = 512;
 /// If receive side scaling (where incoming packets are sent to different queues depending on a hash) is enabled.
 const RSS_ENABLE:                           bool    = false;
 /// Enable Direct Cache Access for the receive queues
@@ -180,18 +180,23 @@ pub struct IxgbeTxQueueRegisters {
     backing_pages: Arc<MappedPages>
 }
 impl TxQueueRegisters for IxgbeTxQueueRegisters {
+    #[inline(always)]    
     fn update_tdbal(&mut self, value: u32) {
         self.regs.tdbal.write(value)
-    }    
+    }  
+    #[inline(always)]
     fn update_tdbah(&mut self, value: u32) {
         self.regs.tdbah.write(value)
     }
+    #[inline(always)]
     fn update_tdlen(&mut self, value: u32) {
         self.regs.tdlen.write(value)
     }
+    #[inline(always)]
     fn update_tdh(&mut self, value: u32) {
         self.regs.tdh.write(value)
     }
+    #[inline(always)]
     fn update_tdt(&mut self, value: u32) {
         self.regs.tdt.write(value)
     }
@@ -304,6 +309,9 @@ impl IxgbeNic {
         // link initialization
         Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac)?;
 
+        // clear stats registers
+        Self::clear_stats(&mapped_registers2);
+
         // store the mac address of this device
         let mac_addr_hardware = Self::read_mac_address_from_nic(&mut mapped_registers_mac);
 
@@ -338,7 +346,7 @@ impl IxgbeNic {
 
 
         // create the tx descriptor queues
-        let mut tx_descs = Self::tx_init(&mut mapped_registers2, &mut tx_mapped_registers)?;
+        let mut tx_descs = Self::tx_init(&mut mapped_registers2, &mut mapped_registers_mac, &mut tx_mapped_registers)?;
         // create the vec of tx queues
         let mut tx_queues = Vec::new();
         let mut id = 0;
@@ -350,6 +358,7 @@ impl IxgbeNic {
                 tx_descs: tx_descs.remove(0),
                 num_tx_descs: IXGBE_NUM_TX_DESC,
                 tx_cur: 0,
+                tx_clean: 0,
                 cpu_id : None,
             };
             tx_queues.push(tx_queue);
@@ -380,6 +389,12 @@ impl IxgbeNic {
             Self::enable_dca(&mut mapped_registers3, &mut rx_queues)?;
         }
 
+        // set rx parameters of which type of packets are accepted by the nic
+        // right now we allow the nic to receive all types of packets, even incorrectly formed ones
+        mapped_registers2.fctrl.write(STORE_BAD_PACKETS | MULTICAST_PROMISCUOUS_ENABLE | UNICAST_PROMISCUOUS_ENABLE | BROADCAST_ACCEPT_MODE); 
+
+        Self::wait_for_link(&mapped_registers2);
+
         let ixgbe_nic = IxgbeNic {
             pci_device: ixgbe_pci_dev.clone(),
             bar_type: bar_type,
@@ -400,6 +415,8 @@ impl IxgbeNic {
             tx_queues: tx_queues,
             tx_registers_unused: tx_mapped_registers,
         };
+
+        info!("Link is up with speed: {} Mb/s", ixgbe_nic.link_speed());
 
         let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
         Ok(nic_ref)
@@ -662,7 +679,8 @@ impl IxgbeNic {
         //disable interrupts
         regs1.eims.write(DISABLE_INTERRUPTS);
 
-        //wait for eeprom auto read completion?
+        //wait for eeprom auto read completion
+        while !regs3.eec.read().get_bit(EEC_AUTO_RD as u8){}
 
         //read MAC address
         debug!("Ixgbe: MAC address low: {:#X}", regs_mac.ral.read());
@@ -682,11 +700,14 @@ impl IxgbeNic {
 
         //setup PHY and the link 
         if IXGBE_10GB_LINK {
-            let val = regs2.autoc.read();
+            let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
             regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004
 
-            let val = regs2.autoc2.read();
-            regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000
+            let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
+            regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004
+
+            // let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
+            // regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000
         }
         else {
             let mut val = regs2.autoc.read();
@@ -706,6 +727,56 @@ impl IxgbeNic {
         // debug!("AUTOC2: {:#X}", regs.autoc2.read()); 
 
         Ok(())
+    }
+
+    pub fn link_status(&self) -> (u32, u32) {
+        (self.regs2.links.read(), self.regs2.links2.read())
+    }
+
+    /// Returns link speed in Mb/s
+    pub fn link_speed(&self) -> u32 {
+        let speed = self.regs2.links.read() & LINKS_SPEED_MASK; 
+        if speed == 0x1 << 28 {
+            100
+        } else if speed == 0x2 << 28 {
+            1000
+        } else if speed == 0x3 << 28 {
+            10_000
+        } else {
+            0
+        }
+    }
+
+    fn wait_for_link(regs2: &IntelIxgbeRegisters2) {
+        // wait 10 ms between tries
+        let wait_time = 10_000;
+        // wait for a total of 10 s
+        let total_tries = 10_000_000 / wait_time;
+        let mut tries = 0;
+
+        while (regs2.links.read() & LINKS_SPEED_MASK == 0) && (tries < total_tries) {
+            let _ = pit_clock::pit_wait(wait_time);
+            tries += 1;
+        }
+    }
+
+    /// Clears the statistic registers by reading from them
+    fn clear_stats(regs: &IntelIxgbeRegisters2) {
+        regs.gprc.read();
+        regs.gptc.read();
+        regs.gorcl.read();
+        regs.gorch.read();
+        regs.gotcl.read();
+        regs.gotch.read();
+    }
+
+    /// Returns the Rx and Tx statistics in the form:  (Good Rx packets, Good Rx bytes, Good Tx packets, Good Tx bytes).
+    /// a good packet is one that is >= 64 bytes including ethernet header and CRC
+    pub fn get_stats(&self) -> (u32,u64,u32,u64){
+        let rx_bytes =  ((self.regs2.gorch.read() as u64 & 0xF) << 32) | self.regs2.gorcl.read() as u64;
+        let tx_bytes =  ((self.regs2.gotch.read() as u64 & 0xF) << 32) | self.regs2.gotcl.read() as u64;
+
+        (self.regs2.gprc.read(), rx_bytes, self.regs2.gptc.read(), tx_bytes)
     }
 
     /// Initializes the array of receive descriptors and their corresponding receive buffers,
@@ -746,10 +817,6 @@ impl IxgbeNic {
             rx_descs_all_queues.push(rx_descs);
             rx_bufs_in_use_all_queues.push(rx_bufs_in_use);
         }
-        
-        // // set rx parameters of which type of packets are accepted by the nic
-        // // right now we allow the nic to receive all types of packets, even incorrectly formed ones
-        // regs.fctrl.write(STORE_BAD_PACKETS | MULTICAST_PROMISCUOUS_ENABLE | UNICAST_PROMISCUOUS_ENABLE | BROADCAST_ACCEPT_MODE); 
         
         // // enable receive functionality
         // let val = regs.rxctrl.read();
@@ -946,13 +1013,28 @@ impl IxgbeNic {
     }
 
     /// Initialize the array of tramsmit descriptors and return them.
-    fn tx_init(regs: &mut IntelIxgbeRegisters2, tx_regs: &mut Vec<IxgbeTxQueueRegisters>) 
+    fn tx_init(regs: &mut IntelIxgbeRegisters2, regs_mac: &mut IntelIxgbeMacRegisters, tx_regs: &mut Vec<IxgbeTxQueueRegisters>) 
         -> Result<Vec<BoxRefMut<MappedPages, [AdvancedTxDescriptor]>>, &'static str>   
     {
-        // //disable transmission
-        // let val = regs.dmatxctl.read();
-        // regs.dmatxctl.write(val & !TE); 
+        // disable transmission
         Self::disable_transmission(regs);
+
+        // CRC offload and small packet padding enable
+        regs.hlreg0.write(regs.hlreg0.read() | HLREG0_TXCRCEN | HLREG0_TXPADEN);
+
+        // Set RTTFCS.ARBDIS to 1
+        regs.rttdcs.write(regs.rttdcs.read() | RTTDCS_ARBDIS);
+
+        // program DTXMXSZRQ and TXPBSIZE according to DCB and virtualization modes (both off)
+        regs_mac.txpbsize.reg[0].write(TXPBSIZE_160KB);
+        for i in 1..8 {
+            regs_mac.txpbsize.reg[i].write(0);
+        }
+
+        regs_mac.dtxmxszrq.write(0xFFF); // 0xfff or 1 MB
+
+        // Clear RTTFCS.ARBDIS
+        regs.rttdcs.write(regs.rttdcs.read() & !RTTDCS_ARBDIS);
 
         let mut tx_descs_all_queues = Vec::new();
         
@@ -975,6 +1057,7 @@ impl IxgbeNic {
 
             // //make sure queue is enabled
             // while txq.txdctl.read().get_bit(25) != TX_Q_ENABLE {} 
+
 
             tx_descs_all_queues.push(tx_descs);
         }
@@ -1000,10 +1083,14 @@ impl IxgbeNic {
             Self::enable_transmission(regs);
         }
 
-        //enable tx queue
-        let mut val = txq.txdctl.read();
-        val.set_bit(25, TX_Q_ENABLE);
-        txq.txdctl.write(val); 
+        // Set descriptor thresholds
+        txq.txdctl.write(36 | 8 << 8 | 4 << 16 | 1 << 25); 
+
+        // //enable tx queue
+        // let mut val = txq.txdctl.read();
+        // val.set_bit(25, TX_Q_ENABLE);
+        // txq.txdctl.write(val); 
+
 
         //make sure queue is enabled
         while txq.txdctl.read().get_bit(25) != TX_Q_ENABLE {} 

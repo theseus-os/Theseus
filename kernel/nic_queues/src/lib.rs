@@ -177,6 +177,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
     }
 }
 
+const TX_CLEAN_BATCH: u16 = 32;
 
 /// A struct that holds all information for a transmit queue. 
 /// There should be one such object per queue.
@@ -190,6 +191,7 @@ pub struct TxQueue<S: TxQueueRegisters, T: TxDescriptor> {
     pub num_tx_descs: u16,
     /// Current transmit descriptor index
     pub tx_cur: u16,
+    pub tx_clean: u16,
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
     pub cpu_id : Option<u8>
@@ -217,20 +219,58 @@ impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
     /// 
     /// # Arguments:
     /// * `transmit_buffer`: buffer containing the packet to be sent
-    pub fn send_batch_on_queue(&mut self, transmit_buffers: &Vec<TransmitBuffer>) {
-        let mut old_cur = self.tx_cur;
-        for buffer in transmit_buffers {
-            self.tx_descs[self.tx_cur as usize].send(buffer.phys_addr, buffer.length);  
-            // update the tx_cur value to hold the next free descriptor
-            old_cur = self.tx_cur;
-            self.tx_cur = (self.tx_cur + 1) % self.num_tx_descs;
+    // #[inline(always)]    
+    pub fn send_batch_on_queue(&mut self, transmit_buffers: &Vec<TransmitBuffer>, num_times: usize) {
+        for _ in 0..num_times{
+            // self.clean_queue();
+            let mut old_cur = self.tx_cur;
+            for buffer in transmit_buffers {
+                // if self.tx_cur == self.tx_clean {return;}
+                // error!("old cur old {}", old_cur);
+                self.tx_descs[self.tx_cur as usize].send(buffer.phys_addr, buffer.length);  
+                // update the tx_cur value to hold the next free descriptor
+                old_cur = self.tx_cur;
+                self.tx_cur = wrap_ring(self.tx_cur, self.num_tx_descs);//(self.tx_cur + 1) % self.num_tx_descs;
+                // error!("old cur new {}", old_cur);
+                // error!("tx cur {}", self.tx_cur);
+            }
+
+            // update the tdt register by the number of packets so that it knows the previous descriptor has been used
+            // and has a packet to be sent
+            self.regs.update_tdt(self.tx_cur as u32);
+            // Wait for the packet to be sent
+            // self.tx_descs[old_cur as usize].wait_for_packet_tx();
+            // error!("packet sent on queue {}", self.id);
+        }
+    }
+
+    /// Ideally we should be removing tx buffers but right now we just check that descriptors can be used
+    fn clean_queue(&mut self) {
+        let clean_idx = self.tx_clean;
+        let cur_idx = self.tx_cur;
+
+        // check that the next batch of descriptors is available
+        let mut cleanable = cur_idx as i32 - clean_idx as i32;
+        if cleanable < 0 {
+            cleanable += self.num_tx_descs as i32;
         }
 
-        // update the tdt register by the number of packets so that it knows the previous descriptor has been used
-        // and has a packet to be sent
-        self.regs.update_tdt(self.tx_cur as u32);
-        // Wait for the packet to be sent
-        self.tx_descs[old_cur as usize].wait_for_packet_tx();
-        error!("packet sent on queue {}", self.id);
+        if cleanable < TX_CLEAN_BATCH as i32  {
+            return;
+        }
+
+        let mut cleanup_to = clean_idx + TX_CLEAN_BATCH - 1;
+
+        if cleanup_to >= self.num_tx_descs {
+            cleanup_to -= self.num_tx_descs;
+        }
+
+        self.tx_descs[cleanup_to as usize].wait_for_packet_tx();
+
+        self.tx_clean = wrap_ring(cleanup_to, self.num_tx_descs);//(cleanup_to + 1) % self.num_tx_descs;
     }
+}
+
+fn wrap_ring(index: u16, ring_size: u16) -> u16 {
+    (index + 1) & (ring_size - 1)
 }

@@ -1955,7 +1955,9 @@ name = "raw_packet_io"
 version = "0.1.0"
 dependencies = [
  "hpet",
+ "irq_safety",
  "ixgbe",
+ "libtest",
  "log 0.4.8",
  "network_interface_card",
  "spawn",

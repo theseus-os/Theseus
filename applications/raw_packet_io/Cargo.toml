@@ -20,11 +20,18 @@ path = "../../kernel/ixgbe"
 [dependencies.hpet]
 path = "../../kernel/hpet"
 
+[dependencies.libtest]
+path = "../../kernel/libtest"
+
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
 [dependencies.network_interface_card]
 path = "../../kernel/network_interface_card"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
