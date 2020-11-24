@@ -16,6 +16,7 @@ extern crate hpet;
 extern crate spawn;
 extern crate libtest;
 extern crate irq_safety;
+extern crate pmu_x86;
 
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -24,6 +25,7 @@ use ixgbe::virtual_function;
 use ixgbe::test_ixgbe_driver::create_raw_packet;
 use libtest::{hpet_timing_overhead, hpet_2_us, hpet_2_ns};
 use network_interface_card::NetworkInterfaceCard;
+use pmu_x86::{Counter,EventType};
 
 pub fn main(_args: Vec<String>) -> isize {
     println!("Ixgbe raw packet io application");
@@ -43,7 +45,7 @@ fn rmain() -> Result<(), &'static str> {
 
     // nic.link_status();
 
-    let batch_size = 32;
+    let batch_size = 128;
     let mut buffers = Vec::with_capacity(batch_size);
 
     for _ in 0..batch_size {
@@ -59,10 +61,44 @@ fn rmain() -> Result<(), &'static str> {
     let mut counter = 0;
     let mut start_time = hpet.get_counter();
 
+    // loop {
+    //     // for _ in 0..total_packets/batch_size {
+    //         let _ = vnic.send_batch(&buffers, 1);
+    //     // }
+
+    //     if counter & 0xFFF == 0 {
+    //         let elapsed_time = hpet.get_counter();
+    //         let ns = hpet_2_ns(elapsed_time - start_time - overhead);
+
+    //         // every second
+    //         if ns > 1_000_000_000 {
+    //             let (rx_pkts, rx_bytes, tx_pkts, tx_bytes) = nic.get_stats();
+    //             println!("Tx Pkts: {}, Tx bytes: {}, {} ns, {:.3} Mpps", tx_pkts, tx_bytes, ns, tx_pkts as f64 * 1000.0 / ns as f64);
+
+    //             start_time = hpet.get_counter();
+    //         }
+    //     }
+
+    //     counter += 1;
+    // }
+    let mut received = Vec::with_capacity(batch_size);
+    let mac_address = vnic.mac_address();
+    let mut total_packets = 0;
+    println!("{:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}", mac_address[0], mac_address[1], mac_address[2], mac_address[3], mac_address[4], mac_address[5]);
+
+    pmu_x86::init()?;
+
+    let mut counter_ref = Counter::new(EventType::UnhaltedReferenceCycles)?;
+    let mut counter_core = Counter::new(EventType::UnhaltedCoreCycles)?;
+    counter_ref.start()?;
+    counter_core.start()?;
+
     loop {
         // for _ in 0..total_packets/batch_size {
-            let _ = vnic.send_batch(&buffers, 1);
+            total_packets += vnic.receive_batch(batch_size, &mut received)?;
+            vnic.send_batch(&received, 1)?;
         // }
+            // total_packets += batch_size;
 
         if counter & 0xFFF == 0 {
             let elapsed_time = hpet.get_counter();
@@ -71,12 +107,20 @@ fn rmain() -> Result<(), &'static str> {
             // every second
             if ns > 1_000_000_000 {
                 let (rx_pkts, rx_bytes, tx_pkts, tx_bytes) = nic.get_stats();
-                println!("Tx Pkts: {}, Tx bytes: {}, {} ns, {:.3} Mpps", tx_pkts, tx_bytes, ns, tx_pkts as f64 * 1000.0 / ns as f64);
+                println!("SW Stats: Rx Pkts: {}, {} ns, {:.3} Mpps",total_packets, ns, total_packets as f64 * 1000.0 / ns as f64);
+                println!("HW Stats: Rx Pkts: {}, Rx bytes: {}, {} ns, {:.3} Mpps",rx_pkts, rx_bytes, ns, rx_pkts as f64 * 1000.0 / ns as f64);
+                println!("HW Stats: Tx Pkts: {}, Tx bytes: {}, {} ns, {:.3} Mpps", tx_pkts, tx_bytes, ns, tx_pkts as f64 * 1000.0 / ns as f64);
+                println!("{:.2} Hz, {:.2} Hz",counter_core.get_count_since_start()? as f64/ ns as f64, counter_ref.get_count_since_start()? as f64/ ns as f64 );
 
+                counter_core.start()?;
+                counter_ref.start()?;
+
+                total_packets = 0;
                 start_time = hpet.get_counter();
             }
         }
 
+        received.clear();
         counter += 1;
     }
 

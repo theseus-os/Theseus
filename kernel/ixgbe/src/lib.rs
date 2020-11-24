@@ -89,7 +89,7 @@ const IXGBE_10GB_LINK:                      bool    = true;
 /// If link uses 1GB SFP modules
 const IXGBE_1GB_LINK:                       bool    = !(IXGBE_10GB_LINK);
 /// The number of receive descriptors per queue
-const IXGBE_NUM_RX_DESC:                    u16     = 256;
+const IXGBE_NUM_RX_DESC:                    u16     = 512;
 /// The number of transmit descriptors per queue
 const IXGBE_NUM_TX_DESC:                    u16     = 512;
 /// If receive side scaling (where incoming packets are sent to different queues depending on a hash) is enabled.
@@ -107,7 +107,7 @@ const DCA_ENABLE:                           bool    = false;
 /// The number of receive queues that are enabled.
 /// It can be a a maximum of 16 since we are using only the physical functions.
 /// If RSS or filters are not enabled, this should be 1.
-const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 8;
+const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 1;
 /// The maximum number of rx queues available on this NIC (virtualization has to be enabled)
 const IXGBE_MAX_RX_QUEUES:                  u8      = 128;
 /// The number of transmit queues that are enabled. 
@@ -321,7 +321,7 @@ impl IxgbeNic {
         }
 
         // create the rx desc queues and their packet buffers
-        let (mut rx_descs, mut rx_buffers) = Self::rx_init(&mut mapped_registers2, &mut rx_mapped_registers)?;
+        let (mut rx_descs, mut rx_buffers) = Self::rx_init(&mut mapped_registers1, &mut mapped_registers2, &mut rx_mapped_registers)?;
         // create the vec of rx queues
         let mut rx_queues = Vec::new();
         let mut id = 0;
@@ -388,10 +388,6 @@ impl IxgbeNic {
         if DCA_ENABLE {
             Self::enable_dca(&mut mapped_registers3, &mut rx_queues)?;
         }
-
-        // set rx parameters of which type of packets are accepted by the nic
-        // right now we allow the nic to receive all types of packets, even incorrectly formed ones
-        mapped_registers2.fctrl.write(STORE_BAD_PACKETS | MULTICAST_PROMISCUOUS_ENABLE | UNICAST_PROMISCUOUS_ENABLE | BROADCAST_ACCEPT_MODE); 
 
         Self::wait_for_link(&mapped_registers2);
 
@@ -781,11 +777,25 @@ impl IxgbeNic {
 
     /// Initializes the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them for all rx queues in use.
-    fn rx_init(regs: &mut IntelIxgbeRegisters2, rx_regs: &mut Vec<IxgbeRxQueueRegisters>) -> Result<(Vec<BoxRefMut<MappedPages, [AdvancedRxDescriptor]>>, Vec<Vec<ReceiveBuffer>>), &'static str>  {
+    fn rx_init(regs1: &mut IntelIxgbeRegisters1, regs: &mut IntelIxgbeRegisters2, rx_regs: &mut Vec<IxgbeRxQueueRegisters>) -> Result<(Vec<BoxRefMut<MappedPages, [AdvancedRxDescriptor]>>, Vec<Vec<ReceiveBuffer>>), &'static str>  {
 
         let mut rx_descs_all_queues = Vec::new();
         let mut rx_bufs_in_use_all_queues = Vec::new();
+
+        Self::disable_rx_function(regs);
         
+        // regs.rxpbsize.reg[0].write(0x200 << 10); //?
+        regs.rxpbsize.reg[0].write(0x20000); //?
+        for i in 1..8 {
+            regs.rxpbsize.reg[i].write(0);
+        }
+
+        //CRC offloading
+        regs.hlreg0.write(regs.hlreg0.read() | (1 << 1));
+        regs.rdrxctl.write(regs.rdrxctl.read() | 1);
+
+        regs.rdrxctl.write(regs.rdrxctl.read() & !(0x1F << 17));
+
         for qid in 0..IXGBE_NUM_RX_QUEUES_ENABLED {
             let rxq = &mut rx_regs[qid as usize];
 
@@ -821,7 +831,7 @@ impl IxgbeNic {
         // // enable receive functionality
         // let val = regs.rxctrl.read();
         // regs.rxctrl.write(val | RECEIVE_ENABLE); 
-        Self::enable_rx_function(regs);
+        Self::enable_rx_function(regs1,regs);
 
         Ok((rx_descs_all_queues, rx_bufs_in_use_all_queues))
     }
@@ -832,9 +842,11 @@ impl IxgbeNic {
         
         //set the size of the packet buffers and the descriptor format used
         let mut val = rxq.srrctl.read();
-        val.set_bits(0..4, BSIZEPACKET_8K);
-        val.set_bits(8..13, BSIZEHEADER_256B);
+        // val.set_bits(0..4, BSIZEPACKET_8K);
+        val.set_bits(0..4, 2);
+        val.set_bits(8..13, 0);
         val.set_bits(25..27, DESCTYPE_ADV_1BUFFER);
+        val.set_bit(28,true);//drop enable
         rxq.srrctl.write(val);
 
         //enable the rx queue
@@ -845,6 +857,10 @@ impl IxgbeNic {
         //make sure queue is enabled
         while rxq.rxdctl.read().get_bit(25) != RX_Q_ENABLE {}
         
+        // set bit 12 to 0
+        let val = rxq.dca_rxctrl.read();
+        rxq.dca_rxctrl.write(val & !(0x1000));
+
         // Write the tail index.
         // Note that the 82599 datasheet (section 8.2.3.8.5) states that we should set the RDT (tail index) to the index *beyond* the last receive descriptor, 
         // but we set it to the last receive descriptor for the same reason as the e1000 driver
@@ -853,11 +869,21 @@ impl IxgbeNic {
         Ok((rx_descs, rx_bufs_in_use))
     }
 
-    fn enable_rx_function(regs: &mut IntelIxgbeRegisters2) {
+
+    fn disable_rx_function(regs: &mut IntelIxgbeRegisters2) {        
+        // disable receive functionality
+        let val = regs.rxctrl.read();
+        regs.rxctrl.write(val & !RECEIVE_ENABLE); 
+    }
+
+    fn enable_rx_function(regs1: &mut IntelIxgbeRegisters1,regs: &mut IntelIxgbeRegisters2) {
         // set rx parameters of which type of packets are accepted by the nic
         // right now we allow the nic to receive all types of packets, even incorrectly formed ones
         regs.fctrl.write(STORE_BAD_PACKETS | MULTICAST_PROMISCUOUS_ENABLE | UNICAST_PROMISCUOUS_ENABLE | BROADCAST_ACCEPT_MODE); 
         
+        // some magic numbers
+        regs1.ctrl_ext.write(regs1.ctrl_ext.read() | (1 << 16));
+
         // enable receive functionality
         let val = regs.rxctrl.read();
         regs.rxctrl.write(val | RECEIVE_ENABLE); 

@@ -1960,6 +1960,7 @@ dependencies = [
  "libtest",
  "log 0.4.8",
  "network_interface_card",
+ "pmu_x86",
  "spawn",
  "terminal_print",
 ]

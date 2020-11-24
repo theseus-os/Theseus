@@ -138,17 +138,20 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
         self.received_frames.pop_front()
     }
 
-    pub fn remove_batch_from_queue(&mut self, batch_size: usize, buffers: &mut Vec<ReceiveBuffer>) -> Result<(), &'static str> {
+    pub fn remove_batch_from_queue(&mut self, batch_size: usize, buffers: &mut Vec<ReceiveBuffer>) -> Result<usize, &'static str> {
         let mut cur = self.rx_cur as usize;
+        let mut packets = 0;
         for i in 0..batch_size {
             if self.rx_descs[cur].descriptor_done() {
+                packets += 1;
+                let length = self.rx_descs[cur].length();
                 // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
                 // (because we're saving it for higher layers to use),
                 // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.
                 let new_receive_buf = match self.rx_buffer_pool.pop() {
                     Some(rx_buf) => rx_buf,
                     None => {
-                        warn!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
+                        error!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                         // if the pool was empty, then we allocate a new receive buffer
                         let len = self.rx_buffer_size_bytes;
                         let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
@@ -159,12 +162,12 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
                 // actually tell the NIC about the new receive buffer, and that it's ready for use now
                 self.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
                 self.rx_descs[cur].reset_status();
-
+                // error!("received packet");
                 // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
                 // getting back the receive buffer that is part of the received ethernet frame
                 self.rx_bufs_in_use.push(new_receive_buf);
                 let mut current_rx_buf = self.rx_bufs_in_use.swap_remove(cur); 
-                // current_rx_buf.length = length as u16; // set the ReceiveBuffer's length to the size of the actual packet received
+                current_rx_buf.length = length as u16; // set the ReceiveBuffer's length to the size of the actual packet received
                 buffers.push(current_rx_buf);
 
                 // move on to the next receive buffer to see if it's ready for us to take
@@ -172,8 +175,11 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
                 cur = self.rx_cur as usize;
             }
         }
+        // if packets != batch_size {
+        //     error!("packets: {}", packets);
+        // }
         self.regs.update_rdt(cur as u32); 
-        Ok(())
+        Ok(packets)
     }
 }
 
@@ -220,9 +226,10 @@ impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
     /// # Arguments:
     /// * `transmit_buffer`: buffer containing the packet to be sent
     // #[inline(always)]    
-    pub fn send_batch_on_queue(&mut self, transmit_buffers: &Vec<TransmitBuffer>, num_times: usize) {
+    pub fn send_batch_on_queue(&mut self, transmit_buffers: &Vec<ReceiveBuffer>, num_times: usize) {
         for _ in 0..num_times{
             // self.clean_queue();
+
             let mut old_cur = self.tx_cur;
             for buffer in transmit_buffers {
                 // if self.tx_cur == self.tx_clean {return;}
@@ -239,7 +246,7 @@ impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
             // and has a packet to be sent
             self.regs.update_tdt(self.tx_cur as u32);
             // Wait for the packet to be sent
-            // self.tx_descs[old_cur as usize].wait_for_packet_tx();
+            self.tx_descs[old_cur as usize].wait_for_packet_tx();
             // error!("packet sent on queue {}", self.id);
         }
     }

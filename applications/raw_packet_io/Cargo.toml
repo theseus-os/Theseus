@@ -32,6 +32,9 @@ path = "../../kernel/network_interface_card"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
+[dependencies.pmu_x86]
+path = "../../kernel/pmu_x86"
+
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

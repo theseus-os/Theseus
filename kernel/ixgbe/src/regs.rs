@@ -12,7 +12,11 @@ pub struct IntelIxgbeRegisters1 {
     
     /// Device Status Register
     pub status:                         ReadOnly<u32>,          // 0x8
-    _padding1:                          [u8; 28],               // 0xC - 0x27
+    _padding1:                          [u8; 12],               // 0xC - 0x17
+
+    /// Extended Device Control Register
+    pub ctrl_ext:                           Volatile<u32>,          // 0x18
+    _padding1a:                         [u8; 12],               // 0x1C - 0x27
 
     /// I2C Control
     pub i2cctl:                         Volatile<u32>,          // 0x28
@@ -87,7 +91,11 @@ pub struct IntelIxgbeRegisters2 {
 
     /// Flow Control Refresh Threshold Value
     pub fcrtv:                          Volatile<u32>,          // 0x32A0;
-    _padding17:                         [u8; 2652],             // 0x32A4 - 0x3CFF
+    _padding17:                         [u8; 2396],             // 0x32A4 - 0x3CFF
+
+    ///Receive Packet Buffer Size
+    pub rxpbsize:                       RegisterArray8,         // 0x3C00   
+    _padding17b:                        [u8; 224],              // 0x3C20 - 0x3CFF          
 
     /// Flow Control Configuration
     pub fccfg:                          Volatile<u32>,          // 0x3D00;
