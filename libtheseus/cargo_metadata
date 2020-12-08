@@ -1,0 +1,733 @@
+{
+    "packages": [
+        {
+            "name": "irq_safety",
+            "version": "0.1.1",
+            "id": "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed)",
+            "license": "MIT",
+            "license_file": null,
+            "description": "A series of utilities that can be used to safely protect objects used within an interrupt handler or other IRQ context.",
+            "source": "git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed",
+            "dependencies": [
+                {
+                    "name": "owning_ref",
+                    "source": "git+https://github.com/kevinaboos/owning-ref-rs.git",
+                    "req": "*",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "spin",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.4.5",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "stable_deref_trait",
+                    "source": "git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin",
+                    "req": "*",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": false,
+                    "features": [
+                        "alloc",
+                        "spin"
+                    ],
+                    "target": null,
+                    "registry": null
+                }
+            ],
+            "targets": [
+                {
+                    "kind": [
+                        "lib"
+                    ],
+                    "crate_types": [
+                        "lib"
+                    ],
+                    "name": "irq_safety",
+                    "src_path": "/home/kevin/.cargo/git/checkouts/irq_safety-7285e2e64e511cba/b80ccd4/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                }
+            ],
+            "features": {
+                "const_fn": [],
+                "default": [
+                    "const_fn"
+                ]
+            },
+            "manifest_path": "/home/kevin/.cargo/git/checkouts/irq_safety-7285e2e64e511cba/b80ccd4/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "Kevin Boos <kevinaboos@gmail.com>"
+            ],
+            "categories": [],
+            "keywords": [
+                "no_std",
+                "kernel",
+                "interrupts",
+                "irq",
+                "x86",
+                "x86_64",
+                "amd64",
+                "lock",
+                "mutex"
+            ],
+            "readme": "README.md",
+            "repository": null,
+            "homepage": null,
+            "documentation": null,
+            "edition": "2015",
+            "links": null
+        },
+        {
+            "name": "libtheseus",
+            "version": "0.1.0",
+            "id": "libtheseus 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/libtheseus)",
+            "license": null,
+            "license_file": null,
+            "description": "The application-facing library that exposes Theseus OS features, similar to a standard library.",
+            "source": null,
+            "dependencies": [
+                {
+                    "name": "rlibc",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^1.0.0",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "serial_port",
+                    "source": null,
+                    "req": "*",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                }
+            ],
+            "targets": [
+                {
+                    "kind": [
+                        "rlib",
+                        "staticlib"
+                    ],
+                    "crate_types": [
+                        "rlib",
+                        "staticlib"
+                    ],
+                    "name": "libtheseus",
+                    "src_path": "/home/kevin/Dropbox/Theseus/libtheseus/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                },
+                {
+                    "kind": [
+                        "custom-build"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "build-script-build",
+                    "src_path": "/home/kevin/Dropbox/Theseus/libtheseus/../build.rs",
+                    "edition": "2015",
+                    "doctest": false,
+                    "test": false
+                }
+            ],
+            "features": {},
+            "manifest_path": "/home/kevin/Dropbox/Theseus/libtheseus/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "Kevin Boos <kevinaboos@gmail.com>"
+            ],
+            "categories": [],
+            "keywords": [],
+            "readme": null,
+            "repository": null,
+            "homepage": null,
+            "documentation": null,
+            "edition": "2015",
+            "links": "serial_port"
+        },
+        {
+            "name": "owning_ref",
+            "version": "0.4.0",
+            "id": "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs.git#03db99a3707a5d7c9e376800498c94c88a877d15)",
+            "license": "MIT",
+            "license_file": null,
+            "description": "A library for creating references that carry their owner with them.",
+            "source": "git+https://github.com/kevinaboos/owning-ref-rs.git#03db99a3707a5d7c9e376800498c94c88a877d15",
+            "dependencies": [
+                {
+                    "name": "spin",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.4.5",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "stable_deref_trait",
+                    "source": "git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin",
+                    "req": "*",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": false,
+                    "features": [
+                        "alloc",
+                        "spin"
+                    ],
+                    "target": null,
+                    "registry": null
+                }
+            ],
+            "targets": [
+                {
+                    "kind": [
+                        "lib"
+                    ],
+                    "crate_types": [
+                        "lib"
+                    ],
+                    "name": "owning_ref",
+                    "src_path": "/home/kevin/.cargo/git/checkouts/owning-ref-rs-86e16165397a172a/03db99a/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                }
+            ],
+            "features": {},
+            "manifest_path": "/home/kevin/.cargo/git/checkouts/owning-ref-rs-86e16165397a172a/03db99a/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "Marvin Löbel <loebel.marvin@gmail.com>"
+            ],
+            "categories": [],
+            "keywords": [
+                "reference",
+                "sibling",
+                "field",
+                "owning"
+            ],
+            "readme": "README.md",
+            "repository": "https://github.com/Kimundi/owning-ref-rs",
+            "homepage": null,
+            "documentation": "http://kimundi.github.io/owning-ref-rs/owning_ref/index.html",
+            "edition": "2015",
+            "links": null
+        },
+        {
+            "name": "port_io",
+            "version": "0.2.1",
+            "id": "port_io 0.2.1 (path+file:///home/kevin/Dropbox/Theseus/libs/port_io)",
+            "license": "MIT",
+            "license_file": null,
+            "description": "Bare metal (no_std) inb, outb, inw, outw, inl, outw instructions with Rust-like API",
+            "source": null,
+            "dependencies": [],
+            "targets": [
+                {
+                    "kind": [
+                        "lib"
+                    ],
+                    "crate_types": [
+                        "lib"
+                    ],
+                    "name": "port_io",
+                    "src_path": "/home/kevin/Dropbox/Theseus/libs/port_io/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                }
+            ],
+            "features": {},
+            "manifest_path": "/home/kevin/Dropbox/Theseus/libs/port_io/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "Kevin Boos <kevinaboos@gmail.com>",
+                "Eric Kidd <git@randomhacks.net>"
+            ],
+            "categories": [],
+            "keywords": [
+                "no_std",
+                "kernel",
+                "io"
+            ],
+            "readme": "README.md",
+            "repository": "https://github.com/emk/toyos.rs",
+            "homepage": "https://github.com/emk/toyos.rs/tree/master/crates/cpuio",
+            "documentation": null,
+            "edition": "2015",
+            "links": null
+        },
+        {
+            "name": "rlibc",
+            "version": "1.0.0",
+            "id": "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+            "license": "MIT/Apache-2.0",
+            "license_file": null,
+            "description": "A bare-metal library supplying certain libc functions like memcpy,\nmemmove, memset and memcmp. This is designed for use in freestanding\nenvironments where another libc does not exist, since rustc may\nimplicitly insert calls to such functions.\n",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "dependencies": [],
+            "targets": [
+                {
+                    "kind": [
+                        "lib"
+                    ],
+                    "crate_types": [
+                        "lib"
+                    ],
+                    "name": "rlibc",
+                    "src_path": "/home/kevin/.cargo/registry/src/github.com-1ecc6299db9ec823/rlibc-1.0.0/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                }
+            ],
+            "features": {},
+            "manifest_path": "/home/kevin/.cargo/registry/src/github.com-1ecc6299db9ec823/rlibc-1.0.0/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "The Rust Project Developers"
+            ],
+            "categories": [],
+            "keywords": [],
+            "readme": "README.md",
+            "repository": "https://github.com/rust-lang/rlibc",
+            "homepage": "https://github.com/rust-lang/rlibc",
+            "documentation": null,
+            "edition": "2015",
+            "links": null
+        },
+        {
+            "name": "serial_port",
+            "version": "0.1.0",
+            "id": "serial_port 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/kernel/serial_port)",
+            "license": null,
+            "license_file": null,
+            "description": "Basic driver for the serial port, e.g., COM1, COM2",
+            "source": null,
+            "dependencies": [
+                {
+                    "name": "irq_safety",
+                    "source": "git+https://github.com/kevinaboos/irq_safety",
+                    "req": "*",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                },
+                {
+                    "name": "port_io",
+                    "source": null,
+                    "req": "*",
+                    "kind": null,
+                    "rename": null,
+                    "optional": false,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                }
+            ],
+            "targets": [
+                {
+                    "kind": [
+                        "rlib"
+                    ],
+                    "crate_types": [
+                        "rlib"
+                    ],
+                    "name": "serial_port",
+                    "src_path": "/home/kevin/Dropbox/Theseus/kernel/serial_port/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                },
+                {
+                    "kind": [
+                        "custom-build"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "build-script-build",
+                    "src_path": "/home/kevin/Dropbox/Theseus/kernel/serial_port/../../build.rs",
+                    "edition": "2015",
+                    "doctest": false,
+                    "test": false
+                }
+            ],
+            "features": {},
+            "manifest_path": "/home/kevin/Dropbox/Theseus/kernel/serial_port/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "Kevin Boos <kevinaboos@gmail.com>"
+            ],
+            "categories": [],
+            "keywords": [],
+            "readme": null,
+            "repository": null,
+            "homepage": null,
+            "documentation": null,
+            "edition": "2015",
+            "links": null
+        },
+        {
+            "name": "spin",
+            "version": "0.4.10",
+            "id": "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+            "license": "MIT",
+            "license_file": null,
+            "description": "Synchronization primitives based on spinning.\nThey may contain data,\nThey are usable without `std`\nand static initializers are available.\n",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "dependencies": [],
+            "targets": [
+                {
+                    "kind": [
+                        "lib"
+                    ],
+                    "crate_types": [
+                        "lib"
+                    ],
+                    "name": "spin",
+                    "src_path": "/home/kevin/.cargo/registry/src/github.com-1ecc6299db9ec823/spin-0.4.10/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                },
+                {
+                    "kind": [
+                        "example"
+                    ],
+                    "crate_types": [
+                        "bin"
+                    ],
+                    "name": "debug",
+                    "src_path": "/home/kevin/.cargo/registry/src/github.com-1ecc6299db9ec823/spin-0.4.10/examples/debug.rs",
+                    "edition": "2015",
+                    "doctest": false,
+                    "test": false
+                }
+            ],
+            "features": {
+                "const_fn": [],
+                "default": [
+                    "unstable"
+                ],
+                "once": [],
+                "unstable": [
+                    "const_fn",
+                    "once"
+                ]
+            },
+            "manifest_path": "/home/kevin/.cargo/registry/src/github.com-1ecc6299db9ec823/spin-0.4.10/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "Mathijs van de Nes <git@mathijs.vd-nes.nl>",
+                "John Ericson <John_Ericson@Yahoo.com>"
+            ],
+            "categories": [],
+            "keywords": [
+                "spinlock",
+                "mutex",
+                "rwlock"
+            ],
+            "readme": "README.md",
+            "repository": "https://github.com/mvdnes/spin-rs.git",
+            "homepage": null,
+            "documentation": "https://mvdnes.github.io/rust-docs/spin-rs/spin/index.html",
+            "edition": "2015",
+            "links": null
+        },
+        {
+            "name": "stable_deref_trait",
+            "version": "1.1.1",
+            "id": "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b)",
+            "license": "MIT/Apache-2.0",
+            "license_file": null,
+            "description": "An unsafe marker trait for types like Box and Rc that dereference to a stable address even when moved, and hence can be used with libraries such as owning_ref and rental.\n",
+            "source": "git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b",
+            "dependencies": [
+                {
+                    "name": "spin",
+                    "source": "registry+https://github.com/rust-lang/crates.io-index",
+                    "req": "^0.4.10",
+                    "kind": null,
+                    "rename": null,
+                    "optional": true,
+                    "uses_default_features": true,
+                    "features": [],
+                    "target": null,
+                    "registry": null
+                }
+            ],
+            "targets": [
+                {
+                    "kind": [
+                        "lib"
+                    ],
+                    "crate_types": [
+                        "lib"
+                    ],
+                    "name": "stable_deref_trait",
+                    "src_path": "/home/kevin/.cargo/git/checkouts/stable_deref_trait-7041f2f69378a2dd/8247894/src/lib.rs",
+                    "edition": "2015",
+                    "doctest": true,
+                    "test": true
+                }
+            ],
+            "features": {
+                "alloc": [],
+                "std": []
+            },
+            "manifest_path": "/home/kevin/.cargo/git/checkouts/stable_deref_trait-7041f2f69378a2dd/8247894/Cargo.toml",
+            "metadata": null,
+            "publish": null,
+            "authors": [
+                "Robert Grosse <n210241048576@gmail.com>"
+            ],
+            "categories": [
+                "memory-management",
+                "no-std"
+            ],
+            "keywords": [],
+            "readme": "README.md",
+            "repository": "https://github.com/storyyeller/stable_deref_trait",
+            "homepage": null,
+            "documentation": "https://docs.rs/stable_deref_trait/1.1.1/stable_deref_trait",
+            "edition": "2015",
+            "links": null
+        }
+    ],
+    "workspace_members": [
+        "libtheseus 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/libtheseus)"
+    ],
+    "resolve": {
+        "nodes": [
+            {
+                "id": "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed)",
+                "dependencies": [
+                    "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs.git#03db99a3707a5d7c9e376800498c94c88a877d15)",
+                    "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+                    "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b)"
+                ],
+                "deps": [
+                    {
+                        "name": "owning_ref",
+                        "pkg": "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs.git#03db99a3707a5d7c9e376800498c94c88a877d15)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "spin",
+                        "pkg": "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "stable_deref_trait",
+                        "pkg": "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    }
+                ],
+                "features": [
+                    "const_fn",
+                    "default"
+                ]
+            },
+            {
+                "id": "libtheseus 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/libtheseus)",
+                "dependencies": [
+                    "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+                    "serial_port 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/kernel/serial_port)"
+                ],
+                "deps": [
+                    {
+                        "name": "rlibc",
+                        "pkg": "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "serial_port",
+                        "pkg": "serial_port 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/kernel/serial_port)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    }
+                ],
+                "features": []
+            },
+            {
+                "id": "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs.git#03db99a3707a5d7c9e376800498c94c88a877d15)",
+                "dependencies": [
+                    "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+                    "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b)"
+                ],
+                "deps": [
+                    {
+                        "name": "spin",
+                        "pkg": "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "stable_deref_trait",
+                        "pkg": "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    }
+                ],
+                "features": []
+            },
+            {
+                "id": "port_io 0.2.1 (path+file:///home/kevin/Dropbox/Theseus/libs/port_io)",
+                "dependencies": [],
+                "deps": [],
+                "features": []
+            },
+            {
+                "id": "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+                "dependencies": [],
+                "deps": [],
+                "features": []
+            },
+            {
+                "id": "serial_port 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/kernel/serial_port)",
+                "dependencies": [
+                    "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed)",
+                    "port_io 0.2.1 (path+file:///home/kevin/Dropbox/Theseus/libs/port_io)"
+                ],
+                "deps": [
+                    {
+                        "name": "irq_safety",
+                        "pkg": "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "port_io",
+                        "pkg": "port_io 0.2.1 (path+file:///home/kevin/Dropbox/Theseus/libs/port_io)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    }
+                ],
+                "features": []
+            },
+            {
+                "id": "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+                "dependencies": [],
+                "deps": [],
+                "features": [
+                    "const_fn",
+                    "default",
+                    "once",
+                    "unstable"
+                ]
+            },
+            {
+                "id": "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b)",
+                "dependencies": [
+                    "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)"
+                ],
+                "deps": [
+                    {
+                        "name": "spin",
+                        "pkg": "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+                        "dep_kinds": [
+                            {
+                                "kind": null,
+                                "target": null
+                            }
+                        ]
+                    }
+                ],
+                "features": [
+                    "alloc",
+                    "spin"
+                ]
+            }
+        ],
+        "root": "libtheseus 0.1.0 (path+file:///home/kevin/Dropbox/Theseus/libtheseus)"
+    },
+    "target_directory": "/home/kevin/Dropbox/Theseus/libtheseus/target",
+    "version": 1,
+    "workspace_root": "/home/kevin/Dropbox/Theseus/libtheseus",
+    "metadata": null
+}

@@ -1,7 +1,9 @@
 {
   "_" : "check this out: https://github.com/tsgates/rust.ko/blob/master/x86_64-unknown-none-gnu.json",
 
-  "llvm-target": "x86_64-unknown-none-gnu",
+  "llvm-target": "x86_64-unknown-none-eabi",
+  "_llvm-target": "x86_64-unknown-none-elf",
+  "__llvm-target": "x86_64-unknown-none-gnu",
   "data-layout": "e-m:e-i64:64-f80:128-n8:16:32:64-S128",
   "linker-flavor": "gcc",
   "target-endian": "little",
@@ -9,6 +11,7 @@
   "target-c-int-width": "32",
   "arch": "x86_64",
   "os": "none",
+  "executables": true,
   "features": "-mmx,-sse,+soft-float",
   "disable-redzone": true,
   "panic": "unwind"

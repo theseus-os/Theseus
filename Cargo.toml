@@ -32,6 +32,9 @@ exclude = [
 	"applications/test_wait_queue",
 	# "applications/test_panic",
 	# "applications/unwind_test",
+
+	"libtheseus",
+	"test_libtheseus",
 ]
 
 

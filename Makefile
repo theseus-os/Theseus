@@ -90,6 +90,7 @@ iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
+DEPS_DIR := $(BUILD_DIR)/deps
 
 
 ## This is the output path of the xargo command, defined by cargo (not our choice).
@@ -131,6 +132,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 .PHONY: all \
 		check_rustc check_xargo \
 		clean run run_pause iso build cargo \
+		test_libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs
@@ -144,13 +146,28 @@ $(eval CFLAGS += -DENABLE_AVX)
 endif
 
 
+
+### Quick target for building our test application that uses libtheseus
+test_libtheseus: test_libtheseus/src/*
+	( \
+		cd test_libtheseus; \
+		cargo clean; \
+		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --target $(TARGET)  \
+	)
+	@for f in test_libtheseus/target/$(TARGET)/$(BUILD_MODE)/deps/test_libtheseus*.o ; do  \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'` ; \
+		strip --strip-debug $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'` ; \
+	done
+
+
 ### This target builds an .iso OS image from all of the compiled crates.
+# $(iso): build test_libtheseus
 $(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
-	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
@@ -166,14 +183,15 @@ iso: $(iso)
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	@cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
-		-o $(OBJECT_FILES_BUILD_DIR) \
+		--output-objects $(OBJECT_FILES_BUILD_DIR) \
+		--output-deps $(OBJECT_FILES_BUILD_DIR) \
 		-k ./kernel \
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
 		--app-prefix $(APP_PREFIX) \
-		-e "$(EXTRA_APP_CRATE_NAMES)" \
+		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus" \
 		-c "`echo "$(HOME)"/.xargo/lib/rustlib/x86_64-theseus/lib/*.o`"
 
 ## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
@@ -240,11 +258,13 @@ cargo: check_rustc check_xargo
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	@rm -rf $(OBJECT_FILES_BUILD_DIR)
+	# @rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@mkdir -p $(DEPS_DIR)
+
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove irrelevant LOCAL or WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
-	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
@@ -301,7 +321,7 @@ simd_personality_sse: build_sse build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	@cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
@@ -322,7 +342,7 @@ simd_personality_avx: build_avx build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
