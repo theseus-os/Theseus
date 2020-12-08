@@ -185,14 +185,14 @@ build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
+		--sysroot "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/ \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
-		--output-deps $(OBJECT_FILES_BUILD_DIR) \
+		--output-deps $(DEPS_DIR) \
 		-k ./kernel \
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
 		--app-prefix $(APP_PREFIX) \
 		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus" \
-		-c "`echo "$(HOME)"/.xargo/lib/rustlib/x86_64-theseus/lib/*.o`"
 
 ## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
 	@mkdir -p $(DEBUG_SYMBOLS_DIR)
