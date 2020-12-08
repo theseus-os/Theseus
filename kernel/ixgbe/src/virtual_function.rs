@@ -8,12 +8,10 @@ use super::{IxgbeNic, get_ixgbe_nic,IxgbeRxQueueRegisters, IxgbeTxQueueRegisters
 use physical_nic::PhysicalNic;
 use virtual_nic::VirtualNic;
 use intel_ethernet::{
-    descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor, TxDescriptor, RxDescriptor},
-    types::Rdt,
+    descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor},
 };  
-use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
+use nic_queues::{RxQueue, TxQueue};
 use alloc::vec::Vec;
-use alloc::sync::Arc;
 use network_interface_card::NetworkInterfaceCard;
 
 
@@ -29,7 +27,7 @@ pub fn create_virtual_nic(num_queues: usize, ip_addresses: Vec<[u8;4]>)
         return Err("Not enough rx queues to create a vNIC");
     }
 
-    /// update the filter numbers in place so that queues are only removed when there's no failure.
+    // update the filter numbers in place so that queues are only removed when there's no failure.
     for i in 0..num_queues {
         let qid = nic.rx_queues[num_available_queues - 1 - i].id;
         let filter_num = nic.set_5_tuple_filter(None, Some(ip_addresses[i]), None, None, None, 7 /*highest priority*/, qid)?;

@@ -23,12 +23,8 @@ use alloc::{
     boxed::Box,
 };
 use owning_ref::BoxRefMut;
-use intel_ethernet::{
-    descriptors::{RxDescriptor, TxDescriptor},
-    types::*
-};
+use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::ReceiveBuffer;
-use volatile::Volatile;
 use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 
 /// The mapping flags used for pages that the NIC will map.

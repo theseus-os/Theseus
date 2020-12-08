@@ -12,7 +12,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
 extern crate kernel_config;
@@ -54,20 +54,17 @@ use alloc::{
     boxed::Box
 };
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, VirtualAddress, MappedPages};
-use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PowerState};
+use memory::{PhysicalAddress, MappedPages};
+use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism};
 use bit_field::BitField;
 use interrupts::{eoi,register_msi_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame, HandlerFunc};
 use hpet::get_hpet;
 use network_interface_card::NetworkInterfaceCard;
 use nic_initialization::*;
-use intel_ethernet::{
-    descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor, TxDescriptor, RxDescriptor},
-    types::Rdt,
-};    
+use intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};    
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
+use nic_queues::{RxQueue, TxQueue};
 
 use owning_ref::BoxRefMut;
 use rand::{
@@ -75,9 +72,7 @@ use rand::{
     RngCore,
     rngs::SmallRng
 };
-use runqueue::get_least_busy_core;
-use virtual_nic::VirtualNic;
-use core::ops::{Deref, DerefMut};
+// use core::ops::{Deref, DerefMut};
 use core::mem::ManuallyDrop;
 
 
@@ -212,7 +207,7 @@ impl NetworkInterfaceCard for IxgbeNic {
         // by default, when using the physical NIC interface, we receive on queue 0.
         let qid = 0;
         // return one frame from the queue's received frames
-        self.rx_queues[0].received_frames.pop_front()
+        self.rx_queues[qid].received_frames.pop_front()
     }
 
     fn poll_receive(&mut self) -> Result<(), &'static str> {
@@ -247,7 +242,7 @@ impl IxgbeNic {
 
         // map the IntelIxgbeRegisters structs to the address found from the pci space
         let (mut mapped_registers1, mut mapped_registers2, mut mapped_registers3, mut mapped_registers_mac, 
-            mut rx_mapped_registers, mut tx_mapped_registers) = Self::mapped_reg(ixgbe_pci_dev, mem_base)?;
+            mut rx_mapped_registers, mut tx_mapped_registers) = Self::mapped_reg(mem_base)?;
 
         // map the msi-x vector table to an address found from the pci space
         let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
@@ -362,7 +357,7 @@ impl IxgbeNic {
     }
 
     /// Returns the memory-mapped control registers of the nic and the rx/tx queue registers.
-    fn mapped_reg (dev: &PciDevice, mem_base: PhysicalAddress) 
+    fn mapped_reg(mem_base: PhysicalAddress) 
         -> Result<(BoxRefMut<MappedPages, IntelIxgbeRegisters1>, 
                     BoxRefMut<MappedPages, IntelIxgbeRegisters2>, 
                     BoxRefMut<MappedPages, IntelIxgbeRegisters3>, 
@@ -601,7 +596,7 @@ impl IxgbeNic {
     }
 
     /// Software reset of NIC to get it running
-    fn start_link (mut regs1: &mut IntelIxgbeRegisters1, mut regs2: &mut IntelIxgbeRegisters2, mut regs3: &mut IntelIxgbeRegisters3, mut regs_mac: &mut IntelIxgbeMacRegisters) 
+    fn start_link (regs1: &mut IntelIxgbeRegisters1, regs2: &mut IntelIxgbeRegisters2, regs3: &mut IntelIxgbeRegisters3, regs_mac: &mut IntelIxgbeMacRegisters) 
         -> Result<(), &'static str>
     {
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
@@ -649,7 +644,7 @@ impl IxgbeNic {
             val = regs2.rdrxctl.read();
         }
 
-        while Self::acquire_semaphore(&mut regs3)? {
+        while Self::acquire_semaphore(regs3)? {
             //wait 10 ms
             let _ =pit_clock::pit_wait(wait_time);
         }
@@ -674,7 +669,7 @@ impl IxgbeNic {
         let val = regs2.autoc.read();
         regs2.autoc.write(val|AUTOC_RESTART_AN); 
 
-        Self::release_semaphore(&mut regs3);        
+        Self::release_semaphore(regs3);        
 
         // debug!("STATUS: {:#X}", regs.status.read()); 
         // debug!("CTRL: {:#X}", regs.ctrl.read());
@@ -1052,14 +1047,14 @@ impl IxgbeNic {
 
         // set the source port for the filter    
         if let Some(port) = source_port {
-            self.regs3.sdpqf.reg[filter_num].write(((port as u32) << SPDQF_SOURCE_SHIFT));
+            self.regs3.sdpqf.reg[filter_num].write((port as u32) << SPDQF_SOURCE_SHIFT);
             filter_mask = filter_mask & !FTQF_SOURCE_PORT_MASK;
         };   
 
         // set the destination port for the filter    
         if let Some(port) = dest_port {
             let port_val = self.regs3.sdpqf.reg[filter_num].read();
-            self.regs3.sdpqf.reg[filter_num].write(port_val | ((port as u32) << SPDQF_DEST_SHIFT));
+            self.regs3.sdpqf.reg[filter_num].write(port_val | (port as u32) << SPDQF_DEST_SHIFT);
             filter_mask = filter_mask & !FTQF_DEST_PORT_MASK;
         };
 

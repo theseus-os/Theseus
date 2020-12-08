@@ -1,5 +1,4 @@
 use volatile::{Volatile, ReadOnly};
-use intel_ethernet::types::*;
 
 ///struct to hold mapping of registers
 #[repr(C)]
@@ -60,17 +59,17 @@ pub struct E1000MacRegisters {
 #[repr(C)]
 pub struct RegistersRx {
     /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
-    pub rdbal:                      Volatile<Rdbal>,        // 0x2800
+    pub rdbal:                      Volatile<u32>,        // 0x2800
     /// The higher (most significant) 32 bits of the physical address of the array of receive descriptors.
-    pub rdbah:                      Volatile<Rdbah>,        // 0x2804
+    pub rdbah:                      Volatile<u32>,        // 0x2804
     /// The length in bytes of the array of receive descriptors.
-    pub rdlen:                      Volatile<Rdlen>,        // 0x2808
+    pub rdlen:                      Volatile<u32>,        // 0x2808
     _padding0:                      [u8; 4],                // 0x280C - 0x280F
     /// The receive descriptor head index, which points to the next available receive descriptor.
-    pub rdh:                        Volatile<Rdh>,          // 0x2810
+    pub rdh:                        Volatile<u32>,          // 0x2810
     _padding1:                      [u8; 4],                // 0x2814 - 0x2817
     /// The receive descriptor tail index, which points to the last available receive descriptor.
-    pub rdt:                        Volatile<Rdt>,          // 0x2818
+    pub rdt:                        Volatile<u32>,          // 0x2818
 }
 
 
@@ -78,17 +77,17 @@ pub struct RegistersRx {
 #[repr(C)]
 pub struct RegistersTx {
     /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.
-    pub tdbal:                      Volatile<Tdbal>,        // 0x3800
+    pub tdbal:                      Volatile<u32>,        // 0x3800
     /// The higher (most significant) 32 bits of the physical address of the array of transmit descriptors.
-    pub tdbah:                      Volatile<Tdbah>,        // 0x3804
+    pub tdbah:                      Volatile<u32>,        // 0x3804
     /// The length in bytes of the array of transmit descriptors.
-    pub tdlen:                      Volatile<Tdlen>,        // 0x3808
+    pub tdlen:                      Volatile<u32>,        // 0x3808
     _padding0:                      [u8; 4],                // 0x380C - 0x380F
     /// The transmit descriptor head index, which points to the next available transmit descriptor.
-    pub tdh:                        Volatile<Tdh>,          // 0x3810
+    pub tdh:                        Volatile<u32>,          // 0x3810
     _padding1:                      [u8; 4],                // 0x3814 - 0x3817
     /// The transmit descriptor tail index, which points to the last available transmit descriptor.
-    pub tdt:                        Volatile<Tdt>,          // 0x3818
+    pub tdt:                        Volatile<u32>,          // 0x3818
 }
 
 pub const REG_CTRL:                 u32 = 0x0000;

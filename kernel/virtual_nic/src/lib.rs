@@ -8,13 +8,12 @@ extern crate intel_ethernet;
 extern crate alloc;
 extern crate irq_safety;
 
-use nic_buffers::{TransmitBuffer, ReceivedFrame, ReceiveBuffer};
+use nic_buffers::{TransmitBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
 use network_interface_card::{NetworkInterfaceCard};
 use intel_ethernet::descriptors::{TxDescriptor, RxDescriptor};
 use physical_nic::PhysicalNic;
 use alloc::vec::Vec;
-use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
 
 pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, U: TxQueueRegisters + 'static, V: TxDescriptor + 'static> {

@@ -45,7 +45,6 @@ use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use intel_ethernet::{
     descriptors::{TxDescriptor, RxDescriptor, LegacyRxDescriptor, LegacyTxDescriptor},
-    types::*
 };
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
@@ -260,7 +259,7 @@ impl E1000Nic {
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         e1000_pci_dev.pci_set_command_bus_master_bit();
 
-        let (mut mapped_registers, mut rx_registers, mut tx_registers, mut mac_registers)  = Self::map_e1000_regs(e1000_pci_dev, mem_base)?;
+        let (mut mapped_registers, rx_registers, tx_registers, mut mac_registers)  = Self::map_e1000_regs(e1000_pci_dev, mem_base)?;
         let mut rx_registers =  E1000RxQueueRegisters(rx_registers);
         let mut tx_registers =  E1000TxQueueRegisters(tx_registers);
 

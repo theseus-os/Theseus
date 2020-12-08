@@ -11,8 +11,6 @@
 //! * `IntelIxgbeRegisters3`
 
 use volatile::{Volatile, ReadOnly, WriteOnly};
-use intel_ethernet::types::*;
-use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 
 /// The first set of general memory-mapped registers of the 82599 device
 #[repr(C)]
@@ -324,23 +322,23 @@ pub struct RegisterArray128 {
 #[repr(C)]
 pub struct RegistersTx {
     /// Transmit Descriptor Base Address Low
-    pub tdbal:                          Volatile<Tdbal>,        // 0x6000
+    pub tdbal:                          Volatile<u32>,        // 0x6000
 
     /// Transmit Descriptor Base Address High
-    pub tdbah:                          Volatile<Tdbah>,        // 0x6004
+    pub tdbah:                          Volatile<u32>,        // 0x6004
     
     /// Transmit Descriptor Length    
-    pub tdlen:                          Volatile<Tdlen>,        // 0x6008
+    pub tdlen:                          Volatile<u32>,        // 0x6008
 
     /// Tx DCA Control Register
     pub dca_txctrl:                     Volatile<u32>,          // 0x600C
 
     /// Transmit Descriptor Head
-    pub tdh:                            Volatile<Tdh>,          // 0x6010
+    pub tdh:                            Volatile<u32>,          // 0x6010
     _padding0:                          [u8; 4],                // 0x6014 - 0x6017
 
     /// Transmit Descriptor Tail
-    pub tdt:                            Volatile<Tdt>,          // 0x6018
+    pub tdt:                            Volatile<u32>,          // 0x6018
     _padding1:                          [u8; 12],               // 0x601C - 0x6027
 
     /// Transmit Descriptor Control
@@ -358,25 +356,25 @@ pub struct RegistersTx {
 #[repr(C)]
 pub struct RegistersRx {
     /// Receive Descriptor Base Address Low
-    pub rdbal:                          Volatile<Rdbal>,        // 0x1000
+    pub rdbal:                          Volatile<u32>,        // 0x1000
 
     /// Recive Descriptor Base Address High
-    pub rdbah:                          Volatile<Rdbah>,        // 0x1004
+    pub rdbah:                          Volatile<u32>,        // 0x1004
 
     /// Recive Descriptor Length
-    pub rdlen:                          Volatile<Rdlen>,        // 0x1008
+    pub rdlen:                          Volatile<u32>,        // 0x1008
 
     /// Rx DCA Control Register
     pub dca_rxctrl:                     Volatile<u32>,          // 0x100C
 
     /// Recive Descriptor Head
-    pub rdh:                            Volatile<Rdh>,          // 0x1010
+    pub rdh:                            Volatile<u32>,          // 0x1010
 
     /// Split Receive Control Registers
     pub srrctl:                         Volatile<u32>,          // 0x1014 //specify descriptor type
 
     /// Receive Descriptor Tail
-    pub rdt:                            Volatile<Rdt>,          // 0x1018
+    pub rdt:                            Volatile<u32>,          // 0x1018
     _padding1:                          [u8;12],                // 0x101C - 0x1027
 
     /// Receive Descriptor Control

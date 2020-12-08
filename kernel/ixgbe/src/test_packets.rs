@@ -22,7 +22,7 @@ pub fn test_nic_ixgbe_driver(_: Option<u64>) {
 
 pub fn dhcp_request_packet() -> Result<(), &'static str> {
     let transmit_buffer = create_test_packet()?;
-    let mut ixgbe_nc = IXGBE_NIC.try().ok_or("ixgbe NIC hasn't been initialized yet")?;
+    let ixgbe_nc = IXGBE_NIC.try().ok_or("ixgbe NIC hasn't been initialized yet")?;
     ixgbe_nc.lock().send_packet(transmit_buffer)
 }
 

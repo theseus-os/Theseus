@@ -18,4 +18,3 @@ extern crate volatile;
 extern crate bit_field;
 
 pub mod descriptors;
-pub mod types;

@@ -88,7 +88,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             }
             if dev.vendor_id == ixgbe::INTEL_VEND && dev.device_id == ixgbe::INTEL_82599 {
                 info!("ixgbe PCI device found at: {:?}", dev.location);
-                let ixgbe_nic_ref = ixgbe::IxgbeNic::init(dev)?;
+                let _ixgbe_nic_ref = ixgbe::IxgbeNic::init(dev)?;
                 // let ixgbe_interface = EthernetNetworkInterface::new_ipv4_interface(ixgbe_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
                 // add_to_network_interfaces(ixgbe_interface);
                 continue;
