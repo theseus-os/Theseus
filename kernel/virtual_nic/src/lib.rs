@@ -45,17 +45,8 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
         }
 
     }
-
-    // #[inline(always)]
-    pub fn send_batch(&mut self, packets: &Vec<ReceiveBuffer>, num_times: usize) -> Result<(), &'static str> {
-        self.tx_queues[self.default_tx_queue].send_batch_on_queue(packets, num_times);
-        Ok(())
-    }
-
-    pub fn receive_batch(&mut self, batch_size: usize, buffers:&mut Vec<ReceiveBuffer>) -> Result<usize, &'static str> {
-        self.rx_queues[self.default_rx_queue].remove_batch_from_queue(batch_size, buffers)
-    }
 }
+
 impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> NetworkInterfaceCard for VirtualNic<S,T,U,V> {
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
         self.tx_queues[self.default_tx_queue].send_on_queue(transmit_buffer);

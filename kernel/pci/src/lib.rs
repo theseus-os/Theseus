@@ -484,14 +484,14 @@ impl PciDevice {
         
         // Power Management Control / Status Register
         const PMCSR_REGISTER_OFFSET: u16 = 4;
-        let mut pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
+        let pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
         error!("current power: {:#X}", pmcsr);
 
         // Bit 8 is set to enable Wakeup
         const PME_EN: u32 = 1 << 8;
 
         self.pci_write(cap_addr + PMCSR_REGISTER_OFFSET, pmcsr | PME_EN);
-        let mut pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
+        let pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
         error!("new power: {:#X}", pmcsr);
 
         Ok(())
@@ -510,7 +510,7 @@ impl PciDevice {
         pmcsr = pmcsr & !POWER_STATE_BITS;
 
         self.pci_write(cap_addr + PMCSR_REGISTER_OFFSET, pmcsr | state as u32);
-        let mut pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
+        let pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
         error!("new power: {:#X}", pmcsr);
 
         Ok(())

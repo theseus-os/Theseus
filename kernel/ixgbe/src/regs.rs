@@ -1,9 +1,20 @@
+//! This file contains the structs that are used to access device registers.
+//! The registers are divided into multiple structs because we need to separate out the 
+//! receive and transmit queue registers and store them separately for virtualization. 
+//! The 7 structs which cover the registers of the entire memory-mapped region are:
+//! * `IntelIxgbeRegisters1`
+//! * `IntelIxgbeRxRegisters1`
+//! * `IntelIxgbeRegisters2`
+//! * `IntelIxgbeTxRegisters`
+//! * `IntelIxgbeMacRegisters`
+//! * `IntelIxgbeRxRegisters2`
+//! * `IntelIxgbeRegisters3`
+
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use intel_ethernet::types::*;
 use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 
-
-/// The memory mapped registers of the 82599ES device
+/// The first set of general memory-mapped registers of the 82599 device
 #[repr(C)]
 pub struct IntelIxgbeRegisters1 {
     /// Device Control Register
@@ -15,7 +26,7 @@ pub struct IntelIxgbeRegisters1 {
     _padding1:                          [u8; 12],               // 0xC - 0x17
 
     /// Extended Device Control Register
-    pub ctrl_ext:                           Volatile<u32>,          // 0x18
+    pub ctrl_ext:                           Volatile<u32>,      // 0x18
     _padding1a:                         [u8; 12],               // 0x1C - 0x27
 
     /// I2C Control
@@ -59,13 +70,15 @@ pub struct IntelIxgbeRegisters1 {
 } // 1 4KiB page
 
 #[repr(C)]
+/// The first set of memory-mapped receive queue registers of the 82599 device.
 pub struct IntelIxgbeRxRegisters1 {
     /// First set of Rx Registers for 64 Rx Queues
-    pub rx_regs1:                       RegisterArrayRx,        // 0x1000 - 0x1FFF
+    pub rx_regs1:                       [RegistersRx; 64],      // 0x1000 - 0x1FFF
 
 } // 1 4KiB page
 
 #[repr(C)]
+/// The second set of general memory-mapped registers of the 82599 device.
 pub struct IntelIxgbeRegisters2 {
     _padding11:                         [u8; 3840],             // 0x2000 - 0x2EFF
     
@@ -168,12 +181,14 @@ pub struct IntelIxgbeRegisters2 {
 } // 4 4KiB page
 
 #[repr(C)]
+/// The first set of memory-mapped transmit queue registers of the 82599 device.
 pub struct IntelIxgbeTxRegisters {
     /// Set of registers for 128 transmit descriptor queues
-    pub tx_regs:                        RegisterArrayTx,        // 0x6000 - 0x7FFF
+    pub tx_regs:                        [RegistersTx; 128],     // 0x6000 - 0x7FFF
 } // 2 4KiB page
 
 #[repr(C)]
+/// The set of memory-mapped registers of the 82599 device that contain the MAC address.
 pub struct IntelIxgbeMacRegisters {
     _padding27a:                        [u8; 256],              // 0x8000 - 0x80FF
     /// DMA Tx TCP Max Allow Size Requests
@@ -192,12 +207,14 @@ pub struct IntelIxgbeMacRegisters {
 } // 5 4KiB page
 
 #[repr(C)]
+/// The second set of memory-mapped receive queue registers of the 82599 device.
 pub struct IntelIxgbeRxRegisters2 {
     /// Second set of Rx Registers for 64 Rx Queues
-    pub rx_regs2:                       RegisterArrayRx,        // 0xD000 - 0xDFFF, for 64 queues
+    pub rx_regs2:                       [RegistersRx; 64],      // 0xD000 - 0xDFFF, for 64 queues
 } // 1 4KiB page
 
 #[repr(C)]
+/// The third set of general memory-mapped registers of the 82599 device.
 pub struct IntelIxgbeRegisters3 {
     /// Source Address Queue Filter
     pub saqf:                           RegisterArray128,       // 0xE000 - 0xE1FF
@@ -337,12 +354,6 @@ pub struct RegistersTx {
     pub tdwbah:                         Volatile<u32>,          // 0x603C
 } // 64B
 
-/// Set of registers for 128 transmit descriptor queues
-#[repr(C)]
-pub struct RegisterArrayTx {
-    pub tx_queue:                       [RegistersTx; 128],
-} // 8KiB
-
 /// Set of registers associated with one receive descriptor queue
 #[repr(C)]
 pub struct RegistersRx {
@@ -372,17 +383,6 @@ pub struct RegistersRx {
     pub rxdctl:                         Volatile<u32>,          // 0x1028
     _padding2:                          [u8;20],                // 0x102C - 0x103F                                            
 } // 64B
-
-
-/// Set of registers for 64 receive descriptor queues
-#[repr(C)]
-pub struct RegisterArrayRx {
-    pub rx_queue:                       [RegistersRx; 64],
-} // 4KiB
-
-
-
-
 
 
 /// Offset where the RDT register starts for the first 64 rx queues

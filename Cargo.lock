@@ -1060,18 +1060,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ixgbe_test"
-version = "0.1.0"
-dependencies = [
- "hpet",
- "ixgbe",
- "log 0.4.8",
- "network_interface_card",
- "spawn",
- "terminal_print",
-]
-
-[[package]]
 name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1951,21 +1939,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "raw_packet_io"
-version = "0.1.0"
-dependencies = [
- "hpet",
- "irq_safety",
- "ixgbe",
- "libtest",
- "log 0.4.8",
- "network_interface_card",
- "pmu_x86",
- "spawn",
- "terminal_print",
-]
-
-[[package]]
 name = "rbtree"
 version = "0.1.5"
 source = "git+https://github.com/theseus-os/rbtree-rs.git#45aa9e94f7e7cf08d560498c314efb3e5f4ba198"
@@ -2590,6 +2563,17 @@ dependencies = [
  "terminal_print",
  "unified_channel",
  "window",
+]
+
+[[package]]
+name = "test_ixgbe"
+version = "0.1.0"
+dependencies = [
+ "ixgbe",
+ "log 0.4.8",
+ "network_interface_card",
+ "spawn",
+ "terminal_print",
 ]
 
 [[package]]
