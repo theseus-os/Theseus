@@ -17,6 +17,7 @@
 #[macro_use] extern crate debugit;
 extern crate irq_safety;
 extern crate memory;
+extern crate stack;
 extern crate task;
 extern crate runqueue;
 extern crate scheduler;
@@ -42,7 +43,8 @@ use alloc::{
     boxed::Box,
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
-use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
+use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
+use stack::Stack;
 use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
@@ -58,12 +60,11 @@ use task::SimdExt;
 pub fn init(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     apic_id: u8,
-    stack_bottom: VirtualAddress,
-    stack_top: VirtualAddress
+    stack: Stack,
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
     
-    let task_ref = task::bootstrap_task(apic_id, stack_bottom, stack_top, kernel_mmi_ref)?;
+    let task_ref = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(BootstrapTaskRef {
         apic_id, 
@@ -293,12 +294,13 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
         // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
         {
-            let bottom_of_stack = new_task.kstack.as_type_mut::<*mut TaskFuncArg<F, A, R>>(0)?;
-            *bottom_of_stack = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
+            let bottom_of_stack: &mut usize = new_task.kstack.as_type_mut(0)?;
+            let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
                 arg:  self.argument,
                 func: self.func,
                 _rettype: PhantomData,
             }));
+            *bottom_of_stack = box_ptr as usize;
         }
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
@@ -433,7 +435,7 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
             // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
             let mp_offset = new_task.kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
             let new_context_destination: &mut $ContextType = new_task.kstack.as_type_mut(mp_offset)?;
-            *new_context_destination = <($ContextType)>::new(entry_point_function as usize);
+            *new_context_destination = <$ContextType>::new(entry_point_function as usize);
             new_task.saved_sp = new_context_destination as *const _ as usize; 
         );
     }
@@ -482,10 +484,10 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = {
             let t = curr_task_ref.lock();
-            let tfa_box_raw_ptr = t.kstack.as_type::<*mut TaskFuncArg<F, A, R>>(0)
+            let tfa_box_raw_ptr: &usize = t.kstack.as_type(0)
                 .expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
             // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
-            let tfa_boxed = unsafe { Box::from_raw(*tfa_box_raw_ptr) };
+            let tfa_boxed = unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
             *tfa_boxed // un-box it
         };
         let (func, arg) = (task_func_arg.func, task_func_arg.arg);

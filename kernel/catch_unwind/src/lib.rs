@@ -2,13 +2,13 @@
 //! 
 #![no_std]
 #![feature(core_intrinsics)]
-#![feature(manually_drop_take)]
 
 extern crate alloc; 
 extern crate task;
 
 use core::mem::ManuallyDrop;
 use alloc::boxed::Box;
+use task::KillReason;
 
 /// Invokes the given closure `f`, catching a panic as it is unwinding the stack.
 /// 
@@ -17,41 +17,49 @@ use alloc::boxed::Box;
 ///  
 /// This function behaves similarly to the libstd version, 
 /// so please see its documentation here: <https://doc.rust-lang.org/std/panic/fn.catch_unwind.html>.
-pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, task::KillReason>
+pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, KillReason>
     where F: FnOnce(A) -> R,
 {
-    // The `try()` intrinsic accepts this as its only argument 
+    // The `try()` intrinsic accepts only one "data" pointer as its only argument.
     let mut ti_arg = TryIntrinsicArg {
         func: ManuallyDrop::new(f),
         arg:  ManuallyDrop::new(arg),
-        ret:  unsafe { core::mem::MaybeUninit::uninit().assume_init() },
+        // The initial value of `ret` doesn't matter. It will get replaced in all code paths. 
+        ret:  ManuallyDrop::new(Err(KillReason::Exception(0))),
     };
 
-    // The `try` intrinsic will set this to the pointer passed around in unwind routines,
-    // which in Theseus is the pointer to the uwninding context.
-    let mut unwind_context_ptr_out: usize = 0;
-
     // Invoke the actual try() intrinsic, which will jump to `call_func_with_arg`
-    let try_val = unsafe { 
+    let _try_val = unsafe { 
         core::intrinsics::r#try(
             try_intrinsic_trampoline::<F, A, R>,
             &mut ti_arg as *mut _ as *mut u8,
-            &mut unwind_context_ptr_out as *mut _ as *mut u8,
+            panic_callback::<F, A, R>,
         )
     };
-    match try_val {
-        // When `try` returns zero, it means the function ran successfully without panicking.
-        0 => Ok(ManuallyDrop::into_inner(ti_arg.ret)),
-        // When `try` returns non-zero, it means the function panicked.
-        _ => {
-            let unwinding_context_boxed = unsafe { Box::from_raw(unwind_context_ptr_out as *mut unwind::UnwindingContext) };
-            let unwinding_context = *unwinding_context_boxed;
-            let (_stack_frame_iter, cause, _taskref) = unwinding_context.into();
-            Err(cause)
-        }
-    }
+
+    // When `try` returns zero, it means the function ran successfully without panicking.
+    // The `Ok(R)` value was assigned to `ret` at the end of `try_intrinsic_trampoline()` below.
+    // When `try` returns non-zero, it means the function panicked.
+    // The `panic_callback()` would have already been invoked, and it would have set `ret` to `Err(KillReason)`.
+    //
+    // In both cases, we can just return the value `ret` field, which has been assigned the proper value.
+    ManuallyDrop::into_inner(ti_arg.ret)
 }
 
+
+/// This function will be automatically invoked by the `try` intrinsic above
+/// upon catching a panic. 
+/// # Arguments
+/// * a pointer to the 
+/// * a pointer to the arbitrary object passed around during the unwinding process,
+///   which in Theseus is a pointer to the `UnwindingContext`. 
+fn panic_callback<F, A, R>(data_ptr: *mut u8, exception_object: *mut u8) where F: FnOnce(A) -> R {
+    let data = unsafe { &mut *(data_ptr as *mut TryIntrinsicArg<F, A, R>) };
+    let unwinding_context_boxed = unsafe { Box::from_raw(exception_object as *mut unwind::UnwindingContext) };
+    let unwinding_context = *unwinding_context_boxed;
+    let (_stack_frame_iter, cause, _taskref) = unwinding_context.into();
+    data.ret = ManuallyDrop::new(Err(cause));
+}
 
 
 /// A struct to accommodate the weird signature of `core::intrinsics::try`, 
@@ -64,7 +72,7 @@ struct TryIntrinsicArg<F, A, R> where F: FnOnce(A) -> R {
     arg:  ManuallyDrop<A>,
     /// The return value of the above function, which is an output parameter. 
     /// Note that this is only filled in by the `try()` intrinsic if the function returns successfully.
-    ret:  ManuallyDrop<R>,
+    ret:  ManuallyDrop<Result<R, KillReason>>,
 }
 
 /// This is the function that the `try()` intrinsic will jump to. 
@@ -78,7 +86,7 @@ fn try_intrinsic_trampoline<F, A, R>(try_intrinsic_arg: *mut u8) where F: FnOnce
         let f = ManuallyDrop::take(&mut data.func);
         let a = ManuallyDrop::take(&mut data.arg);
         data.ret = ManuallyDrop::new(
-            f(a) // actually invoke the function
+            Ok(f(a)) // actually invoke the function
         );
     }
 }

@@ -7,7 +7,7 @@ extern crate task;
 extern crate getopts;
 extern crate path;
 extern crate fs_node;
-extern crate core_io;
+extern crate bare_io;
 
 use core::str;
 use alloc::{
@@ -18,7 +18,7 @@ use alloc::{
 use getopts::Options;
 use path::Path;
 use fs_node::FileOrDir;
-use core_io::{Read, Write};
+use bare_io::{Read, Write};
 
 
 pub fn main(args: Vec<String>) -> isize {

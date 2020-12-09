@@ -7,7 +7,7 @@ LABEL author=kevinaboos@gmail.com
 
 
 # These build args are required.
-# RUSTC_VERSION is the Rust version and build date: "nightly-2019-10-17"
+# RUSTC_VERSION is the Rust version and build date, e.g., "nightly-2019-10-17"
 # USER is the current user's name: "kevin"
 # UID is that same user's id: "1000"
 # GID is that same user's group id: "1000"
@@ -65,4 +65,4 @@ ENV PATH="$HOME/.cargo/bin:${PATH}"
 RUN rustup toolchain install ${RUSTC_VERSION} && rustup component add rust-src
 
 # Install xargo (for cross compilation)
-RUN cargo install --vers 0.3.17 xargo
+RUN cargo install --vers 0.3.22 xargo

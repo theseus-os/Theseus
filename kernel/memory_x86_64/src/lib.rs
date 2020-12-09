@@ -5,10 +5,8 @@
 //! All arch-specific definitions for memory system are exported from this crate.
 
 #![no_std]
-#![feature(asm)]
 #![feature(ptr_internals)]
 #![feature(unboxed_closures)]
-#![feature(step_trait, range_is_empty)]
 
 extern crate multiboot2;
 #[macro_use] extern crate log;
@@ -150,19 +148,22 @@ pub fn get_boot_info_mem_area(
 /// Finds the addresses in memory of the main kernel sections, as specified by the given boot information. 
 /// 
 /// Returns the following tuple, if successful:
-///  * The combined size and address bounds of specifically .text, .rodata, and .data. 
-///    Each of the three section bounds is aggregated to cover the bounds and sizes of *all* sections that share the same flags.
+///  * The combined size and address bounds of specifically .text, .rodata, .data, and the stack.
+///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections that share the same flags,
+///    except for the stack which is kept separate.
 ///  * The list of individual sections found. 
 pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str> {
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
     let mut index = 0;
-    let mut text_start: Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut text_end: Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut rodata_start: Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut rodata_end: Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_start: Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_end: Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut rodata_end:   Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut stack_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut stack_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
     let mut text_flags: Option<EntryFlags> = None;
     let mut rodata_flags: Option<EntryFlags> = None;
@@ -219,6 +220,7 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         // (5) .gcc_except_table (end of read-only pages)
         // (6) .data (start of read-write pages)
         // (7) .bss (end of read-write pages)
+        // (8) .stack
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
             ".init" => {
@@ -251,6 +253,11 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 data_end = Some((end_virt_addr, end_phys_addr));
                 "nano_core .bss"
             }
+            ".stack" => {
+                stack_start = Some((start_virt_addr, start_phys_addr));
+                stack_end   = Some((end_virt_addr, end_phys_addr));
+                "initial stack"
+            }
             _ =>  {
                 error!("Section {} at {:#X}, size {:#X} was not an expected section (.init, .text, .data, .bss, .rodata)", 
                         section.name(), section.start_address(), section.size());
@@ -274,6 +281,8 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
     let rodata_end    = rodata_end  .ok_or("Couldn't find end of .rodata section")?;
     let data_start    = data_start  .ok_or("Couldn't find start of .data section")?;
     let data_end      = data_end    .ok_or("Couldn't find start of .data section")?;
+    let stack_start   = stack_start .ok_or("Couldn't find start of .stack section")?;
+    let stack_end     = stack_end   .ok_or("Couldn't find start of .stack section")?;
 
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
@@ -294,13 +303,18 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         end: data_end,
         flags: data_flags,
     };
+    let stack = SectionMemoryBounds {
+        start: stack_start,
+        end: stack_end,
+        flags: data_flags, // same flags as data sections
+    };
 
     let aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
         text,
         rodata,
         data,
+        stack,
     };
-
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))
 }
 

@@ -1,6 +1,7 @@
 //! This file contains the structs that are used to access device registers.
 //! The registers are divided into multiple structs because we need to separate out the 
 //! receive and transmit queue registers and store them separately for virtualization. 
+//! 
 //! The 7 structs which cover the registers of the entire memory-mapped region are:
 //! * `IntelIxgbeRegisters1`
 //! * `IntelIxgbeRxRegisters1`
@@ -11,8 +12,14 @@
 //! * `IntelIxgbeRegisters3`
 
 use volatile::{Volatile, ReadOnly, WriteOnly};
+use zerocopy::FromBytes;
 
-/// The first set of general memory-mapped registers of the 82599 device
+/// The layout in memory of the first set of general registers of the 82599 device.
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct IntelIxgbeRegisters1 {
     /// Device Control Register
@@ -24,101 +31,137 @@ pub struct IntelIxgbeRegisters1 {
     _padding1:                          [u8; 12],               // 0xC - 0x17
 
     /// Extended Device Control Register
-    pub ctrl_ext:                           Volatile<u32>,      // 0x18
-    _padding1a:                         [u8; 12],               // 0x1C - 0x27
+    pub ctrl_ext:                       Volatile<u32>,          // 0x18
+    _padding2:                          [u8; 12],               // 0x1C - 0x27
 
     /// I2C Control
     pub i2cctl:                         Volatile<u32>,          // 0x28
-    _padding2:                          [u8; 2004],             // 0x2C - 0x7FF
+    _padding3a:                         [u8; 1024],             // 0x2C - 0x7FF
+    _padding3b:                         [u8; 512],
+    _padding3c:                         [u8; 256],
+    _padding3d:                         [u8; 128],
+    _padding3e:                         [u8; 64],
+    _padding3f:                         [u8; 20],
 
     /// Extended Interrupt Cause Register
     pub eicr:                           Volatile<u32>,          // 0x800
-    _padding3:                          [u8; 4],                // 0x804 - 0x807
+    _padding4:                          [u8; 4],                // 0x804 - 0x807
 
     /// Extended Interrupt Cause Set Register
     pub eics:                           WriteOnly<u32>,         // 0x808
-    _padding4:                          [u8; 4],                // 0x80C - 0x80F
+    _padding5:                          [u8; 4],                // 0x80C - 0x80F
 
     /// Extended Interrupt Auto Clear Register
     pub eiac:                           Volatile<u32>,          // 0x810; 
-    _padding5:                          [u8; 12],               // 0x814 - 0x81F 
+    _padding6:                          [u8; 12],               // 0x814 - 0x81F 
     
     /// Extended Interrupt Throttle Registers
-    pub eitr:                           RegisterArray24,        // 0x820 - 0x87F; 
+    pub eitr:                           [Volatile<u32>;24],     // 0x820 - 0x87F; 
 
     /// Extended Interrupt Mask Set/ Read Register
     pub eims:                           Volatile<u32>,          // 0x880; 
-    _padding6:                          [u8; 4],                // 0x884 - 0x887
+    _padding7:                          [u8; 4],                // 0x884 - 0x887
 
     /// Extended Interrupt Mask Clear Register
     pub eimc:                           WriteOnly<u32>,         // 0x888; 
-    _padding7:                          [u8; 4],                // 0x88C - 0x88F     
+    _padding8:                          [u8; 4],                // 0x88C - 0x88F     
 
     /// Extended Interrupt Auto Mask Enable Register
     pub eiam:                           Volatile<u32>,          // 0x890; 
-    _padding8:                          [u8; 4],                // 0x894 - 0x897
+    _padding9:                          [u8; 4],                // 0x894 - 0x897
 
     /// General Purpose Interrupt Enable
     pub gpie:                           Volatile<u32>,          // 0x898; 
-    _padding9:                          [u8; 100],              // 0x89C - 0x8FF
+    _padding10a:                        [u8; 98],               // 0x89C - 0x8FF
+    _padding10b:                        [u8; 2],
 
     /// Interrupt Vector Allocation Registers
-    pub ivar:                           RegisterArray64,        // 0x900 - 0x9FF  
-    _padding10:                         [u8; 1536],             // 0xA00 - 0xFFF
+    pub ivar:                           [Volatile<u32>;64],      // 0x900 - 0x9FF  
+    _padding11a:                        [u8; 1024],              // 0xA00 - 0xFFF
+    _padding11b:                        [u8; 512],
+
 } // 1 4KiB page
 
+const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters1>(), 4096);
+
+/// The layout in memory of the first set of receive queue registers of the 82599 device.
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
-/// The first set of memory-mapped receive queue registers of the 82599 device.
 pub struct IntelIxgbeRxRegisters1 {
     /// First set of Rx Registers for 64 Rx Queues
     pub rx_regs1:                       [RegistersRx; 64],      // 0x1000 - 0x1FFF
 
 } // 1 4KiB page
 
+const_assert_eq!(core::mem::size_of::<IntelIxgbeRxRegisters1>(), 4096);
+
+/// The layout in memory of the second set of general registers of the 82599 device.
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
-/// The second set of general memory-mapped registers of the 82599 device.
 pub struct IntelIxgbeRegisters2 {
-    _padding11:                         [u8; 3840],             // 0x2000 - 0x2EFF
+    _padding1a:                         [u8; 2048],             // 0x2000 - 0x2EFF
+    _padding1b:                         [u8; 1024],
+    _padding1c:                         [u8; 512],
+    _padding1d:                         [u8; 256],
     
     /// Receive DMA Control Register
     pub rdrxctl:                        Volatile<u32>,          // 0x2F00;
-    _padding12:                         [u8; 252],              // 0x2F04 - 0x2FFF
+    _padding2a:                         [u8; 236],              // 0x2F04 - 0x2FFF
+    _padding2b:                         [u8; 16],
 
     /// Receive Control Register
     pub rxctrl:                         Volatile<u32>,          // 0x3000;
-    _padding13:                         [u8; 508],              // 0x3004 - 0x31FF
+    _padding3a:                         [u8; 256],              // 0x3004 - 0x31FF
+    _padding3b:                         [u8; 236],
+    _padding3c:                         [u8; 16],
 
     /// Flow Control Transmit Timer Value
-    pub fcttv:                          RegisterArray4,         // 0x3200 - 0x320F
-    _padding14:                         [u8; 16],               // 0x3210 - 0x321F
+    pub fcttv:                          [Volatile<u32>;4],      // 0x3200 - 0x320F
+    _padding4:                          [u8; 16],               // 0x3210 - 0x321F
 
     /// Flow Control Receive Threshold Low
-    pub fcrtl:                          RegisterArray8,         // 0x3220 - 0x323F
-    _padding15:                         [u8; 32],               // 0x3240 - 0x325F 
+    pub fcrtl:                          [Volatile<u32>;8],      // 0x3220 - 0x323F
+    _padding5:                          [u8; 32],               // 0x3240 - 0x325F 
 
     /// Flow Control Receive Threshold High
-    pub fcrth:                          RegisterArray8,         // 0x3260 - 0x327F
-    _padding16:                         [u8; 32],               // 0x3280 - 0x329F
+    pub fcrth:                          [Volatile<u32>;8],      // 0x3260 - 0x327F
+    _padding6:                          [u8; 32],               // 0x3280 - 0x329F
 
     /// Flow Control Refresh Threshold Value
     pub fcrtv:                          Volatile<u32>,          // 0x32A0;
-    _padding17:                         [u8; 2396],             // 0x32A4 - 0x3CFF
+    _padding7a:                         [u8; 2048],             // 0x32A4 - 0x3CFF
+    _padding7b:                         [u8; 256],
+    _padding7c:                         [u8; 64],
+    _padding7d:                         [u8; 28],
 
     ///Receive Packet Buffer Size
-    pub rxpbsize:                       RegisterArray8,         // 0x3C00   
-    _padding17b:                        [u8; 224],              // 0x3C20 - 0x3CFF          
+    pub rxpbsize:                       [Volatile<u32>;8],      // 0x3C00   
+    _padding8a:                         [u8; 128],              // 0x3C20 - 0x3CFF        
+    _padding8b:                         [u8; 64],       
+    _padding8c:                         [u8; 32],     
 
     /// Flow Control Configuration
     pub fccfg:                          Volatile<u32>,          // 0x3D00;
-    _padding18:                         [u8; 880],              // 0x3D04 - 0x4073
+    _padding9a:                         [u8; 512],              // 0x3D04 - 0x4073
+    _padding9b:                         [u8; 256],
+    _padding9c:                         [u8; 98],
+    _padding9d:                         [u8; 14],
 
     /// Good Packets Received Count
     pub gprc:                           Volatile<u32>,          // 0x4074
-    _padding18a:                        [u8; 8],                // 0x4078 - 0x407F
+    _padding10:                         [u8; 8],                // 0x4078 - 0x407F
 
     /// Good Packets Transmitted Count
     pub gptc:                           Volatile<u32>,          // 0x4080
-    _padding18b:                        [u8; 4],                // 0x4084 - 0x4087 
+    _padding11:                         [u8; 4],                // 0x4084 - 0x4087 
 
     /// Good Octets Received Count Low
     pub gorcl:                          Volatile<u32>,          // 0x4088
@@ -131,11 +174,14 @@ pub struct IntelIxgbeRegisters2 {
 
     /// Good Octets Transmitted Count High
     pub gotch:                          Volatile<u32>,          // 0x4094
-    _padding18c:                        [u8;424],               // 0x4098 - 0x423F
+    _padding12a:                        [u8;256],               // 0x4098 - 0x423F
+    _padding12b:                        [u8;128],
+    _padding12c:                        [u8;40],
 
     /// MAC Core Control 0 Register 
     pub hlreg0:                         Volatile<u32>,          // 0x4240;
-    _padding19:                         [u8; 92],               // 0x4244 - 0x429F
+    _padding13a:                        [u8; 64],               // 0x4244 - 0x429F
+    _padding13b:                        [u8; 28],
 
     /// Auto-Negotiation Control Register
     pub autoc:                          Volatile<u32>,          // 0x42A0;
@@ -145,180 +191,260 @@ pub struct IntelIxgbeRegisters2 {
 
     /// Auto-Negotiation Control 2 Register    
     pub autoc2:                         Volatile<u32>,          // 0x42A8;
-    _padding20a:                        [u8; 120],              // 0x42AC - 0x4323
+    _padding14a:                        [u8; 98],               // 0x42AC - 0x4323
+    _padding14b:                        [u8; 22],
 
     pub links2:                         Volatile<u32>,          // 0x4324
-    _padding20b:                        [u8; 1496],             // 0x4328 - 0x48FF
+    _padding15a:                        [u8; 1024],             // 0x4328 - 0x48FF
+    _padding15b:                        [u8; 256],
+    _padding15c:                        [u8; 128],
+    _padding15d:                        [u8; 64],
+    _padding15e:                        [u8; 24],
 
     /// DCB Transmit Descriptor Plane Control and Status
     pub rttdcs:                         Volatile<u32>,          // 0x4900;
-    _padding21:                         [u8; 380],              // 0x4904 - 0x4A7F
+    _padding16a:                        [u8; 256],              // 0x4904 - 0x4A7F
+    _padding16b:                        [u8; 98],
+    _padding16c:                        [u8; 26],
 
     /// DMA Tx Control
     pub dmatxctl:                       Volatile<u32>,          // 0x4A80;
-    _padding22:                         [u8; 4],                // 0x4A84 - 0x4A87
+    _padding17:                         [u8; 4],                // 0x4A84 - 0x4A87
     
     /// DMA Tx TCP Flags Control Low
     pub dtxtcpflgl:                     Volatile<u32>,          // 0x4A88;
     
     /// DMA Tx TCP Flags Control High
     pub dtxtcpflgh:                     Volatile<u32>,          // 0x4A8C;
-    _padding23:                         [u8; 1392],             // 0x4A90 - 0x4FFF
+    _padding18a:                        [u8; 1024],             // 0x4A90 - 0x4FFF
+    _padding18b:                        [u8; 256],
+    _padding18c:                        [u8; 98],
+    _padding18d:                        [u8; 14],
 
     /// Receive Checksum Control
     pub rxcsum:                         Volatile<u32>,          // 0x5000
-    _padding24:                         [u8; 124],              // 0x5004 - 0x507F
+    _padding19a:                        [u8; 98],               // 0x5004 - 0x507F
+    _padding19b:                        [u8; 26],
 
     /// Filter Control Register
     pub fctrl:                          Volatile<u32>,          // 0x5080;
-    _padding25:                         [u8; 164],              // 0x5084 - 0x5127
+    _padding20a:                        [u8; 128],              // 0x5084 - 0x5127
+    _padding20b:                        [u8; 36],
 
     /// EType Queue Filter
-    pub etqf:                           RegisterArray8,         // 0x5128 - 0x5147;
-    _padding26:                         [u8; 3768],             // 0x5148 - 0x5FFF
+    pub etqf:                           [Volatile<u32>;8],      // 0x5128 - 0x5147;
+    _padding21a:                        [u8; 2048],             // 0x5148 - 0x5FFF
+    _padding21b:                        [u8; 1024],
+    _padding21c:                        [u8; 512],
+    _padding21d:                        [u8; 128],
+    _padding21e:                        [u8; 56],
 } // 4 4KiB page
 
+const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters2>(), 4 * 4096);
+
+/// The layout in memory of the transmit queue registers of the 82599 device.
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
-/// The first set of memory-mapped transmit queue registers of the 82599 device.
 pub struct IntelIxgbeTxRegisters {
     /// Set of registers for 128 transmit descriptor queues
     pub tx_regs:                        [RegistersTx; 128],     // 0x6000 - 0x7FFF
 } // 2 4KiB page
 
+const_assert_eq!(core::mem::size_of::<IntelIxgbeTxRegisters>(), 2 * 4096);
+
+/// The layout in memory of the set of registers containing the MAC address of the 82599 device.
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
-/// The set of memory-mapped registers of the 82599 device that contain the MAC address.
 pub struct IntelIxgbeMacRegisters {
-    _padding27a:                        [u8; 256],              // 0x8000 - 0x80FF
+    _padding1:                          [u8; 256],              // 0x8000 - 0x80FF
     /// DMA Tx TCP Max Allow Size Requests
     pub dtxmxszrq:                      Volatile<u32>,          // 0X8100
-    _padding27b:                        [u8; 8444],             // 0x8104 - 0xA1FF
+    _padding2a:                         [u8; 8192],             // 0x8104 - 0xA1FF
+    _padding2b:                         [u8; 236],
+    _padding2c:                         [u8; 16],
     
     /// Receive Address Low
     pub ral:                            Volatile<u32>,          // 0xA200;
     
     /// Receive Address High
     pub rah:                            Volatile<u32>,          // 0xA204;
-    _padding28a:                        [u8; 10744],            // 0xA208 - 0xCBFF
+    _padding3a:                         [u8; 8192],             // 0xA208 - 0xCBFF
+    _padding3b:                         [u8; 2048],
+    _padding3c:                         [u8; 256],
+    _padding3d:                         [u8; 236],
+    _padding3e:                         [u8; 12],
 
-    pub txpbsize:                       RegisterArray8,         // 0xCC00
-    _padding28b:                        [u8; 992],              // 0xCC20 - 0xCFFF
+    pub txpbsize:                       [Volatile<u32>;8],      // 0xCC00
+    _padding4a:                         [u8; 512],              // 0xCC20 - 0xCFFF
+    _padding4b:                         [u8; 256],
+    _padding4c:                         [u8; 128],
+    _padding4d:                         [u8; 64],
+    _padding4e:                         [u8; 32],
 } // 5 4KiB page
 
+const_assert_eq!(core::mem::size_of::<IntelIxgbeMacRegisters>(), 5 * 4096);
+
+/// The layout in memory of the second set of receive queue registers of the 82599 device.
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
-/// The second set of memory-mapped receive queue registers of the 82599 device.
 pub struct IntelIxgbeRxRegisters2 {
     /// Second set of Rx Registers for 64 Rx Queues
     pub rx_regs2:                       [RegistersRx; 64],      // 0xD000 - 0xDFFF, for 64 queues
 } // 1 4KiB page
 
+const_assert_eq!(core::mem::size_of::<IntelIxgbeRxRegisters2>(), 4096);
+
+/// The layout in memory of the third set of general registers of the 82599 device.
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
 #[repr(C)]
-/// The third set of general memory-mapped registers of the 82599 device.
 pub struct IntelIxgbeRegisters3 {
     /// Source Address Queue Filter
-    pub saqf:                           RegisterArray128,       // 0xE000 - 0xE1FF
+    pub saqf:                           [Volatile<u32>;128],    // 0xE000 - 0xE1FF
     
     /// Destination Address Queue Filter
-    pub daqf:                           RegisterArray128,       // 0xE200 - 0xE3FF
+    pub daqf:                           [Volatile<u32>;128],    // 0xE200 - 0xE3FF
     
     /// Source Destination Port Queue Filter
-    pub sdpqf:                          RegisterArray128,       // 0xE400 - 0xE5FF
+    pub sdpqf:                          [Volatile<u32>;128],    // 0xE400 - 0xE5FF
     
     /// Five Tuple Queue Filter
-    pub ftqf:                           RegisterArray128,       // 0xE600 - 0xE7FF
+    pub ftqf:                           [Volatile<u32>;128],    // 0xE600 - 0xE7FF
     
     /// L3 L4 Tuples Immediate Interrupt Rx 
-    pub l34timir:                       RegisterArray128,       // 0xE800 - 0xE9FF
+    pub l34timir:                       [Volatile<u32>;128],    // 0xE800 - 0xE9FF
 
-    _padding29:                         [u8; 256],              // 0xEA00 - 0xEAFF
+    _padding1:                          [u8; 256],              // 0xEA00 - 0xEAFF
 
     /// Redirection Table
-    pub reta:                           RegisterArray32,        // 0xEB00 - 0xEB7F
+    pub reta:                           [Volatile<u32>;32],     // 0xEB00 - 0xEB7F
 
     /// RSS Random Key Register
-    pub rssrk:                          RegisterArray10,        // 0xEB80 - 0xEBA7
-    _padding30:                         [u8; 88],               // 0xEBA8 - 0xEBFF
+    pub rssrk:                          [Volatile<u32>;10],     // 0xEB80 - 0xEBA7
+    _padding2a:                         [u8; 64],               // 0xEBA8 - 0xEBFF
+    _padding2b:                         [u8; 24],
 
     /// EType Queue Select
-    pub etqs:                           RegisterArray8,         // 0xEC00 - 0xEC1F;
-    _padding31:                         [u8; 96],               // 0xEC20 - 0xEC7F
+    pub etqs:                           [Volatile<u32>;8],      // 0xEC00 - 0xEC1F;
+    _padding3a:                         [u8; 64],               // 0xEC20 - 0xEC7F
+    _padding3b:                         [u8; 32],
 
     /// Multiple Receive Queues Command Register
     pub mrqc:                           Volatile<u32>,          // 0xEC80;
-    _padding32:                         [u8; 5004],             // 0xEC84 - 0x1000F
+    _padding4a:                         [u8; 4096],             // 0xEC84 - 0x1000F
+    _padding4b:                         [u8; 512],
+    _padding4c:                         [u8; 256],
+    _padding4d:                         [u8; 128],
+    _padding4e:                         [u8; 12],
 
     /// EEPROM/ Flash Control Register
     pub eec:                            Volatile<u32>,          // 0x10010
 
     /// EEPROM Read Register
     pub eerd:                           Volatile<u32>,          // 0x10014;
-    _padding33:                         [u8; 296],              // 0x10018 - 0x1013F
+    _padding5a:                         [u8; 256],              // 0x10018 - 0x1013F
+    _padding5b:                         [u8; 40],
 
     /// Software Semaphore Register
     pub swsm:                           Volatile<u32>,          // 0x10140
-    _padding34:                         [u8; 28],               // 0x10144 - 0x1015F
+    _padding6:                          [u8; 28],               // 0x10144 - 0x1015F
 
     /// Software Firmware Synchronization
     pub sw_fw_sync:                     Volatile<u32>,          // 0x10160 
-    _padding35:                         [u8; 3852],             // 0x10164 - 0x1106F
+    _padding7a:                         [u8; 2048],             // 0x10164 - 0x1106F
+    _padding7b:                         [u8; 1024],
+    _padding7c:                         [u8; 512],
+    _padding7d:                         [u8; 256], 
+    _padding7e:                         [u8; 12],
 
     /// DCA Requester ID Information Register
     pub dca_id:                         ReadOnly<u32>,          // 0x11070
 
     /// DCA Control Register
     pub dca_ctrl:                       Volatile<u32>,          // 0x11074
-    _padding36:                         [u8; 61320],            // 0x11078 - 0x1FFFF
+    _padding8a:                         [u8; 32768],            // 0x11078 - 0x1FFFF
+    _padding8b:                         [u8; 16384],
+    _padding8c:                         [u8; 8192],
+    _padding8d:                         [u8; 2048],
+    _padding8e:                         [u8; 1024],
+    _padding8f:                         [u8; 512],
+    _padding8g:                         [u8; 256],
+    _padding8h:                         [u8; 128],
+    _padding8i:                         [u8; 8],
+
 } // 18 4KiB page (total NIC mem = 128 KB)
 
+const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters3>(), 18 * 4096);
 
-/// Set of 4 32-bit registers
-#[repr(C)]
-pub struct RegisterArray4 {
-    pub reg:                            [Volatile<u32>;4],
-}
+// /// Set of 4 32-bit registers
+// #[derive(FromBytes)]
+// #[repr(C)]
+// pub struct RegisterArray4 {
+//     pub reg:                            [Volatile<u32>;4],
+// }
 
-/// Set of 8 32-bit registers
-#[repr(C)]
-pub struct RegisterArray8 {
-    pub reg:                            [Volatile<u32>;8],
-}
+// /// Set of 8 32-bit registers
+// #[derive(FromBytes)]
+// #[repr(C)]
+// pub struct RegisterArray8 {
+//     pub reg:                            [Volatile<u32>;8],
+// }
 
-/// Set of 10 32-bit registers
-#[repr(C)]
-pub struct RegisterArray10 {
-    pub reg:                            [Volatile<u32>;10],
-}
+// /// Set of 10 32-bit registers
+// #[derive(FromBytes)]
+// #[repr(C)]
+// pub struct RegisterArray10 {
+//     pub reg:                            [Volatile<u32>;10],
+// }
 
-/// Set of 24 32-bit registers
-#[repr(C)]
-pub struct RegisterArray24 {
-    pub reg:                           [Volatile<u32>;24],
-}
+// /// Set of 24 32-bit registers
+// #[derive(FromBytes)]
+// #[repr(C)]
+// pub struct RegisterArray24 {
+//     pub reg:                           [Volatile<u32>;24],
+// }
 
-/// Set of 32 32-bit registers
-#[repr(C)]
-pub struct RegisterArray32 {
-    pub reg:                            [Volatile<u32>;32],
-}
+// /// Set of 32 32-bit registers
+// #[repr(C)]
+// pub struct RegisterArray32 {
+//     pub reg:                            [Volatile<u32>;32],
+// }
 
-/// Set of 64 32-bit registers
-#[repr(C)]
-pub struct RegisterArray64 {
-    pub reg:                            [Volatile<u32>;64],
-}
+// /// Set of 64 32-bit registers
+// #[repr(C)]
+// pub struct RegisterArray64 {
+//     pub reg:                            [Volatile<u32>;64],
+// }
 
-/// Set of 104 32-bit registers
-#[repr(C)]
-pub struct RegisterArray104 {
-    pub reg:                           [Volatile<u32>;104],
-}
+// /// Set of 104 32-bit registers
+// #[repr(C)]
+// pub struct RegisterArray104 {
+//     pub reg:                           [Volatile<u32>;104],
+// }
 
-/// Set of 128 32-bit registers
-#[repr(C)]
-pub struct RegisterArray128 {
-    pub reg:                           [Volatile<u32>;128],
-}
+// /// Set of 128 32-bit registers
+// #[repr(C)]
+// pub struct RegisterArray128 {
+//     pub reg:                           [Volatile<u32>;128],
+// }
 
 /// Set of registers associated with one transmit descriptor queue
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersTx {
     /// Transmit Descriptor Base Address Low
@@ -353,6 +479,7 @@ pub struct RegistersTx {
 } // 64B
 
 /// Set of registers associated with one receive descriptor queue
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersRx {
     /// Receive Descriptor Base Address Low
@@ -409,8 +536,8 @@ pub const AUTOC2_10G_PMA_PMD_S_CLEAR:   u32 = 0x0003_0000; //clear bits 16 and 1
 pub const AUTOC2_10G_PMA_PMD_S_SFI:     u32 = 1 << 17;
 
 // CTRL commands
-pub const CTRL_LRST:                    u32 = (1<<3); 
-pub const CTRL_RST:                     u32 = (1<<26);
+pub const CTRL_LRST:                    u32 = 1<<3; 
+pub const CTRL_RST:                     u32 = 1<<26;
 
 // semaphore commands
 pub const SWSM_SMBI:                    u32 = 1 << 0;
@@ -502,13 +629,13 @@ pub const L34TIMIR_RX_Q_SHIFT:          u32 = 21;
 
  
 // Buffer Sizes
-pub const RCTL_BSIZE_256:               u32 = (3 << 16);
-pub const RCTL_BSIZE_512:               u32 = (2 << 16);
-pub const RCTL_BSIZE_1024:              u32 = (1 << 16);
-pub const RCTL_BSIZE_2048:              u32 = (0 << 16);
-pub const RCTL_BSIZE_4096:              u32 = ((3 << 16) | (1 << 25));
-pub const RCTL_BSIZE_8192:              u32 = ((2 << 16) | (1 << 25));
-pub const RCTL_BSIZE_16384:             u32 = ((1 << 16) | (1 << 25));
+pub const RCTL_BSIZE_256:               u32 = 3 << 16;
+pub const RCTL_BSIZE_512:               u32 = 2 << 16;
+pub const RCTL_BSIZE_1024:              u32 = 1 << 16;
+pub const RCTL_BSIZE_2048:              u32 = 0 << 16;
+pub const RCTL_BSIZE_4096:              u32 = (3 << 16) | (1 << 25);
+pub const RCTL_BSIZE_8192:              u32 = (2 << 16) | (1 << 25);
+pub const RCTL_BSIZE_16384:             u32 = (1 << 16) | (1 << 25);
   
  
 /// Enable a transmit queue
@@ -538,6 +665,7 @@ pub const IXGBE_MAX_MSIX_VECTORS:     usize = 64;
 
 /// Table that contains msi-x vector entries. 
 /// It is mapped to a physical memory region specified by the BAR from the PCI space.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct MsixVectorTable {
     pub msi_vector:     [MsixVectorEntry; IXGBE_MAX_MSIX_VECTORS],
@@ -545,6 +673,7 @@ pub struct MsixVectorTable {
 
 /// A single Message Signaled Interrupt entry.
 /// It contains the interrupt number for this vector and the core this interrupt is redirected to.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct MsixVectorEntry {
     /// The lower portion of the address for the memory write transaction.

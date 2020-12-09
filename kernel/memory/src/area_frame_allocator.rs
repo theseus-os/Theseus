@@ -182,6 +182,8 @@ impl AreaFrameAllocator {
 impl FrameAllocator for AreaFrameAllocator {
 
     fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange> {
+        if num_frames == 0 { return None; }
+
         // this is just a shitty way to get contiguous frames, since right now it's really easy to get them
         // it wastes the frames that are allocated 
 
@@ -208,7 +210,7 @@ impl FrameAllocator for AreaFrameAllocator {
             }
 
             // here, we have allocated enough frames, and checked that they're all contiguous
-            let last_frame = first_frame.clone() + num_frames - 1; // -1 because FrameRange is inclusive
+            let last_frame = first_frame + (num_frames - 1); // -1 for inclusive bound. Parenthesis needed to avoid overflow.
             return Some(FrameRange::new(first_frame, last_frame));
         }
 

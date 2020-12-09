@@ -11,12 +11,14 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate sdt;
+extern crate zerocopy;
 
 use core::ops::DerefMut;
 use alloc::collections::BTreeMap;
 use memory::{MappedPages, allocate_pages, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, get_frame_allocator_ref, PhysicalMemoryArea};
 use sdt::Sdt;
 use core::ops::Add;
+use zerocopy::FromBytes;
 
 /// All ACPI tables are identified by a 4-byte signature,
 /// typically an ASCII string like "APIC" or "RSDT".
@@ -195,13 +197,13 @@ impl AcpiTables {
     }
 
     /// Returns a reference to the table that matches the specified ACPI `signature`.
-    pub fn table<T>(&self, signature: &AcpiSignature) -> Result<&T, &'static str> {
+    pub fn table<T: FromBytes>(&self, signature: &AcpiSignature) -> Result<&T, &'static str> {
         let loc = self.tables.get(signature).ok_or("couldn't find ACPI table with matching signature")?;
         self.mapped_pages.as_type(loc.offset)
     }
 
     /// Returns a mutable reference to the table that matches the specified ACPI `signature`.
-    pub fn table_mut<T>(&mut self, signature: &AcpiSignature) -> Result<&mut T, &'static str> {
+    pub fn table_mut<T: FromBytes>(&mut self, signature: &AcpiSignature) -> Result<&mut T, &'static str> {
         let loc = self.tables.get(signature).ok_or("couldn't find ACPI table with matching signature")?;
         self.mapped_pages.as_type_mut(loc.offset)
     }
@@ -209,7 +211,7 @@ impl AcpiTables {
     /// Returns a reference to the dynamically-sized part at the end of the table that matches the specified ACPI `signature`,
     /// if it exists.
     /// For example, this returns the array of SDT physical addresses at the end of the [`RSDT`](../) table.
-    pub fn table_slice<S>(&self, signature: &AcpiSignature) -> Result<&[S], &'static str> {
+    pub fn table_slice<S: FromBytes>(&self, signature: &AcpiSignature) -> Result<&[S], &'static str> {
         let loc = self.tables.get(signature).ok_or("couldn't find ACPI table with matching signature")?;
         let (offset, len) = loc.slice_offset_and_length.ok_or("specified ACPI table has no dynamically-sized part")?;
         self.mapped_pages.as_slice(offset, len)
@@ -218,7 +220,7 @@ impl AcpiTables {
     /// Returns a mutable reference to the dynamically-sized part at the end of the table that matches the specified ACPI `signature`,
     /// if it exists.
     /// For example, this returns the array of SDT physical addresses at the end of the [`RSDT`](../) table.
-    pub fn table_slice_mut<S>(&mut self, signature: &AcpiSignature) -> Result<&mut [S], &'static str> {
+    pub fn table_slice_mut<S: FromBytes>(&mut self, signature: &AcpiSignature) -> Result<&mut [S], &'static str> {
         let loc = self.tables.get(signature).ok_or("couldn't find ACPI table with matching signature")?;
         let (offset, len) = loc.slice_offset_and_length.ok_or("specified ACPI table has no dynamically-sized part")?;
         self.mapped_pages.as_slice_mut(offset, len)

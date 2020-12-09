@@ -5,24 +5,25 @@
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
 use bit_field::BitField;
+use zerocopy::FromBytes;
 
 // Transmit descriptor bits
 /// Tx Command: End of Packet
-pub const TX_CMD_EOP:                      u8 = (1 << 0);     
+pub const TX_CMD_EOP:                      u8 = 1 << 0;     
 /// Tx Command: Insert MAC FCS
-pub const TX_CMD_IFCS:                     u8 = (1 << 1);     
+pub const TX_CMD_IFCS:                     u8 = 1 << 1;     
 /// Tx Command: Insert Checksum
-pub const TX_CMD_IC:                       u8 = (1 << 2);     
+pub const TX_CMD_IC:                       u8 = 1 << 2;     
 /// Tx Command: Report Status
-pub const TX_CMD_RS:                       u8 = (1 << 3);     
+pub const TX_CMD_RS:                       u8 = 1 << 3;     
 /// Tx Command: Report Packet Sent
-pub const TX_CMD_RPS:                      u8 = (1 << 4);     
+pub const TX_CMD_RPS:                      u8 = 1 << 4;     
 /// Tx Command: VLAN Packet Enable
-pub const TX_CMD_VLE:                      u8 = (1 << 6);     
+pub const TX_CMD_VLE:                      u8 = 1 << 6;     
 /// Tx Command: Descriptor Extension (Advanced format)
-pub const TX_CMD_DEXT:                     u8 = (1 << 5);  
+pub const TX_CMD_DEXT:                     u8 = 1 << 5;  
 /// Tx Command: Interrupt Delay Enable
-pub const TX_CMD_IDE:                      u8 = (1 << 7);     
+pub const TX_CMD_IDE:                      u8 = 1 << 7;     
 /// Tx Status: descriptor Done
 pub const TX_STATUS_DD:                    u8 = 1 << 0;
 /// Tx Descriptor Type: advanced
@@ -42,7 +43,7 @@ pub const RX_STATUS_EOP:                   u8 = 1 << 1;
 /// as well as bits that are updated by the HW once the packet is received.
 /// There is one receive descriptor per receive buffer. 
 /// Receive functions defined in the Network_Interface_Card crate expect a receive descriptor to implement this trait.
-pub trait RxDescriptor {
+pub trait RxDescriptor: FromBytes {
     /// Initializes a receive descriptor by clearing its status 
     /// and setting the descriptor's physical address.
     /// 
@@ -74,7 +75,7 @@ pub trait RxDescriptor {
 /// as well as bits that are updated by the HW once the packet is sent.
 /// There is one transmit descriptor per transmit buffer.
 /// Transmit functions defined in the Network_Interface_Card crate expect a transmit descriptor to implement this trait.
-pub trait TxDescriptor {
+pub trait TxDescriptor: FromBytes {
     /// Initializes a transmit descriptor by clearing all of its values.
     fn init(&mut self);
 
@@ -94,6 +95,7 @@ pub trait TxDescriptor {
 
 /// This struct is a Legacy Transmit Descriptor. 
 /// It's the descriptor type used in older Intel NICs and the E1000 driver.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct LegacyTxDescriptor {
     /// The starting physical address of the transmit buffer
@@ -151,6 +153,7 @@ impl fmt::Debug for LegacyTxDescriptor {
 /// This struct is a Legacy Receive Descriptor. 
 /// The driver writes to the upper 64 bits, and the NIC writes to the lower 64 bits.
 /// It's the descriptor type used in older Intel NICs and the E1000 driver.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct LegacyRxDescriptor {
     /// The starting physical address of the receive buffer
@@ -209,6 +212,7 @@ impl fmt::Debug for LegacyRxDescriptor {
 /// Read contains the addresses that the driver writes.
 /// Write Back contains information the hardware writes on receiving a packet.
 /// More information can be found in the 82599 datasheet.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct AdvancedRxDescriptor {
     /// Starting physcal address of the receive buffer for the packet.
@@ -330,71 +334,43 @@ impl fmt::Debug for AdvancedRxDescriptor {
 /// Read contains the addresses that the driver writes.
 /// Write Back contains information the hardware writes on receiving a packet.
 /// More information can be found in the 82599 datasheet.
+#[derive(FromBytes)]
 #[repr(C)]
 pub struct AdvancedTxDescriptor {
-    // /// Starting physcal address of the receive buffer for the packet.
-    // pub packet_buffer_address:  Volatile<u64>,
-    // /// Length of data buffer
-    // pub data_len: Volatile<u16>,
-    // /// dtyp = Descriptor Type
-    // /// mac = option to apply LinkSec and time stamp
-    // pub dtyp_mac_rsv : Volatile<u8>,
-    // /// Command bits
-    // pub dcmd:  Volatile<u8>,
-    // /// paylen = size in bytes of the data buffer in host memory (not including the fields that the hardware adds)
-    // /// popts = options to offload checksum calculation
-    // /// sta = status of the descriptor, if it's in use or not
-    // pub paylen_popts_cc_idx_sta: Volatile<u32>,
-    
-    pub desc: Volatile<u128>,
-
-    // pub addr: Volatile<u64>,
-    // pub cmd: Volatile<u32>,
-    // pub paylen: Volatile<u32>
+    /// Starting physcal address of the receive buffer for the packet.
+    pub packet_buffer_address:  Volatile<u64>,
+    /// Length of data buffer
+    pub data_len: Volatile<u16>,
+    /// dtyp = Descriptor Type
+    /// mac = option to apply LinkSec and time stamp
+    pub dtyp_mac_rsv : Volatile<u8>,
+    /// Command bits
+    pub dcmd:  Volatile<u8>,
+    /// paylen = size in bytes of the data buffer in host memory (not including the fields that the hardware adds)
+    /// popts = options to offload checksum calculation
+    /// sta = status of the descriptor, if it's in use or not
+    pub paylen_popts_cc_idx_sta: Volatile<u32>,
 }
 
 impl TxDescriptor for AdvancedTxDescriptor {
     fn init(&mut self) {
-        // self.packet_buffer_address.write(0);
-        // self.paylen_popts_cc_idx_sta.write(0);
-        // self.dcmd.write(0);
-        // self.dtyp_mac_rsv.write(0);
-        // self.data_len.write(0);
-
-        self.desc.write(0);
-
-        // self.addr.write(0);
-        // self.cmd.write(0);
-        // self.paylen.write(0);
+        self.packet_buffer_address.write(0);
+        self.paylen_popts_cc_idx_sta.write(0);
+        self.dcmd.write(0);
+        self.dtyp_mac_rsv.write(0);
+        self.data_len.write(0);
     }
 
-    // #[inline(always)]
     fn send(&mut self, transmit_buffer_addr: PhysicalAddress, transmit_buffer_length: u16) {
-        // self.packet_buffer_address.write(transmit_buffer_addr.value() as u64);
-        // self.data_len.write(transmit_buffer_length);
-        // self.dtyp_mac_rsv.write(TX_DTYP_ADV);
-        // self.paylen_popts_cc_idx_sta.write((transmit_buffer_length as u32) << TX_PAYLEN_SHIFT);
-        // self.dcmd.write(TX_CMD_DEXT | TX_CMD_RS | TX_CMD_IFCS | TX_CMD_EOP);
-
-        let val =  ((TX_CMD_DEXT | TX_CMD_RS | TX_CMD_IFCS | TX_CMD_EOP) as u128) << 88
-            | (transmit_buffer_length as u128) << 110
-            | (TX_DTYP_ADV as u128) << 80 
-            | (transmit_buffer_length as u128) << 64 
-            | (transmit_buffer_addr.value() as u128);
-        
-        // error!("{:#X}", val);
-        self.desc.write(val);
-
-        // self.addr.write(transmit_buffer_addr.value() as u64);
-        // self.cmd.write(transmit_buffer_length as u32 | 0x300000 | 0x2B000000);
-        // self.paylen.write((transmit_buffer_length as u32) << 14);
+        self.packet_buffer_address.write(transmit_buffer_addr.value() as u64);
+        self.data_len.write(transmit_buffer_length);
+        self.dtyp_mac_rsv.write(TX_DTYP_ADV);
+        self.paylen_popts_cc_idx_sta.write((transmit_buffer_length as u32) << TX_PAYLEN_SHIFT);
+        self.dcmd.write(TX_CMD_DEXT | TX_CMD_RS | TX_CMD_IFCS | TX_CMD_EOP);
     }
 
-    // #[inline(always)]
     fn wait_for_packet_tx(&self) {
-        // while (self.paylen_popts_cc_idx_sta.read() as u8 & TX_STATUS_DD) == 0 {
-        while ((self.desc.read() >> 96) as u8 & TX_STATUS_DD) == 0 {
-        // while (self.paylen.read() as u8 & TX_STATUS_DD) == 0 {
+        while (self.paylen_popts_cc_idx_sta.read() as u8 & TX_STATUS_DD) == 0 {
             // error!("tx desc status: {:#X}", self.desc.read());
         } 
     }

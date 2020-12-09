@@ -2,6 +2,7 @@
 //! find the right impl anyway).
 
 #![no_std]
+#![allow(incomplete_features)]
 #![feature(specialization)]
 
 #[cfg(test)]

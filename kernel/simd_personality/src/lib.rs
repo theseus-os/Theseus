@@ -49,7 +49,6 @@
 
 
 #![no_std]
-#![feature(compiler_builtins_lib)]
 
 // NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
 #[macro_use] extern crate cfg_if;

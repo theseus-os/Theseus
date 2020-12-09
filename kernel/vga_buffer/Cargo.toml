@@ -9,7 +9,7 @@ build = "../../build.rs"
 spin = "0.4.10"
 
 [dependencies.volatile]
-version = "0.2.5"
+version = "0.2.7"
 features = ["const_fn"]
 
 [dependencies.serial_port]

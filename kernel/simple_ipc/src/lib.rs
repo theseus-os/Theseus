@@ -2,7 +2,6 @@
 //! We still need to make the channel generic to use atomics upto AtomicU64
 
 #![no_std]
-#![feature(no_more_cas)]
 
 extern crate alloc;
 // #[macro_use] extern crate log;
@@ -34,14 +33,18 @@ impl Sender{
 
     /// Tries to send a message once. If the buffer is full, then returns an Err.
     pub fn try_send(&self, msg: u8) -> Result<(), &'static str> {
-        self.0.buffer.fetch_update( |val| {
-            if !val.get_bit(0) {
-                let msg: u16 = ((msg as u16) << 8) | 0x1;
-                Some(msg)
-            } else {
-                None
+        self.0.buffer.fetch_update(
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+            |val| {
+                if !val.get_bit(0) {
+                    let msg: u16 = ((msg as u16) << 8) | 0x1;
+                    Some(msg)
+                } else {
+                    None
+                }
             }
-        }, Ordering::SeqCst, Ordering::SeqCst)
+        )
         .map(|_prev_val| ())
         .map_err(|_e| "Buffer has reached its capacity")
     }
@@ -63,13 +66,17 @@ impl Receiver {
 
     /// Tries to receive a message once. If the buffer is empty, then returns an Err.
     pub fn try_receive(&self) -> Result<u8, &'static str> {
-        self.0.buffer.fetch_update( |val| {
-            if val.get_bit(0) {
-                Some(0)
-            } else {
-                None
+        self.0.buffer.fetch_update(
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+            |val| {
+                if val.get_bit(0) {
+                    Some(0)
+                } else {
+                    None
+                }
             }
-        }, Ordering::SeqCst, Ordering::SeqCst)
+        )
         .map(|msg| (msg >> 8) as u8 & 0xFF)
         .map_err(|_e| "There was no message in the buffer.")
     }

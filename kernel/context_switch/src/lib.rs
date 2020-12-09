@@ -2,7 +2,7 @@
 //! that helps to manage the complex configuration options involving SIMD and personalities.
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(llvm_asm, naked_functions)]
 
 #[macro_use] extern crate cfg_if;
 
@@ -12,8 +12,11 @@
 // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
 cfg_if! {
     if #[cfg(simd_personality)] {
-        #[macro_use] extern crate context_switch_sse;
-        #[macro_use] extern crate context_switch_regular;
+        #[macro_use(save_registers_regular, switch_stacks, restore_registers_regular)]
+        extern crate context_switch_regular;
+        #[macro_use(save_registers_sse, restore_registers_sse)] 
+        extern crate context_switch_sse;
+        #[macro_use(save_registers_avx, restore_registers_avx)] 
         #[macro_use] extern crate context_switch_avx;
 
         pub use context_switch_sse::*;

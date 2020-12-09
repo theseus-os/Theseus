@@ -2,13 +2,13 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-extern crate core_io;
+extern crate bare_io;
 extern crate app_io;
 #[macro_use] extern crate log;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use core_io::Write;
+use bare_io::Write;
 
 pub fn main(_args: Vec<String>) -> isize {
     if let Err(e) = run() {

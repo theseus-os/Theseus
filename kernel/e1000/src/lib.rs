@@ -7,7 +7,9 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate static_assertions;
 extern crate volatile;
+extern crate zerocopy;
 extern crate alloc;
 extern crate spin;
 extern crate irq_safety;

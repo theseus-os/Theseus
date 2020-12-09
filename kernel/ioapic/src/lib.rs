@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate spin;
 extern crate memory;
 extern crate volatile;
+extern crate zerocopy;
 extern crate atomic_linked_list;
 extern crate owning_ref;
 
@@ -15,6 +16,7 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
+use zerocopy::FromBytes;
 use memory::{get_frame_allocator_ref, Frame, FrameRange, PageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
 use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
@@ -46,6 +48,7 @@ pub fn get_first_ioapic() -> Option<MutexGuard<'static, IoApic>> {
 
 
 
+#[derive(FromBytes)]
 #[repr(C)]
 struct IoApicRegisters {
     /// Chooses which IoApic register the following access will write to or read from.

@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-volatile = "0.2.5"
+volatile = "0.2.7"
 
 [dependencies.log]
 version = "0.4.8"

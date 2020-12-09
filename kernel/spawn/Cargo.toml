@@ -22,6 +22,9 @@ path = "../../libs/debugit"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.stack]
+path = "../stack"
+
 [dependencies.apic]
 path = "../apic"
 

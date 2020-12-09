@@ -59,8 +59,6 @@
 //! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.
 
 #![no_std]
-#![feature(asm)]
-#![feature(no_more_cas)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
@@ -132,11 +130,11 @@ static RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU
 
 lazy_static!{
     /// PMU version supported by the current hardware. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref PMU_VERSION: u8 = { CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.version_id())).unwrap_or(0) };
+    static ref PMU_VERSION: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.version_id())).unwrap_or(0);
     /// The number of general purpose PMCs that can be used. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_PMC: u8 = { CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.number_of_counters())).unwrap_or(0) };
+    static ref NUM_PMC: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.number_of_counters())).unwrap_or(0);
     /// The number of fixed function counters. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_FIXED_FUNC_COUNTERS: u8 = { CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.fixed_function_counters())).unwrap_or(0) };
+    static ref NUM_FIXED_FUNC_COUNTERS: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.fixed_function_counters())).unwrap_or(0);
     /// Set to store the cores that the PMU has already been initialized on
     static ref CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
     /// The sampling information for each core
@@ -391,7 +389,10 @@ fn counter_is_available(core_id: u8, counter: u8) -> Result<bool, &'static str> 
 fn free_counter(core_id: u8, counter: u8) {
     let pmcs = get_pmcs_available_for_core(core_id).expect("Trying to free a PMU counter when the PMU is not initialized");
 
-    pmcs.fetch_update(|mut x|{
+    pmcs.fetch_update(
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+        |mut x| {
             if !x.get_bit(counter as usize) {
                 x.set_bit(counter as usize, true);
                 Some(x)
@@ -399,22 +400,30 @@ fn free_counter(core_id: u8, counter: u8) {
             else {
                 None
             }
-        }, Ordering::SeqCst, Ordering::SeqCst).unwrap_or_else(|x| {warn!("The counter you are trying to free has been previously freed"); x});
+        }
+    ).unwrap_or_else(|x| { 
+        warn!("The counter you are trying to free has been previously freed"); 
+        x
+    });
 }
 
 /// Clears the counter bit to show it's in use
 fn claim_counter(core_id: u8, counter: u8) -> Result<(), &'static str> {
     let pmcs = get_pmcs_available_for_core(core_id)?;
 
-    pmcs.fetch_update(|mut x|{
-        if x.get_bit(counter as usize) {
-            x.set_bit(counter as usize, false);
-            Some(x)
+    pmcs.fetch_update(
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+        |mut x| {
+            if x.get_bit(counter as usize) {
+                x.set_bit(counter as usize, false);
+                Some(x)
+            }
+            else {
+                None
+            }
         }
-        else {
-            None
-        }
-    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: Could not claim counter because it is already in use")?;
+    ).map_err(|_e| "pmu_x86: Could not claim counter because it is already in use")?;
 
     Ok(())
 }
@@ -450,15 +459,19 @@ fn find_word_and_offset_from_bit(bit_num: u8) -> (usize, usize) {
 fn add_core_to_sampling_list(core_id: u8) -> Result<(), &'static str> {
     let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
 
-    CORES_SAMPLING[word_num].fetch_update(|mut x|{
-        if !x.get_bit(bit_in_word) {
-            x.set_bit(bit_in_word, true);
-            Some(x)
+    CORES_SAMPLING[word_num].fetch_update(
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+        |mut x| {
+            if !x.get_bit(bit_in_word) {
+                x.set_bit(bit_in_word, true);
+                Some(x)
+            }
+            else{
+                None
+            }
         }
-        else{
-            None
-        }
-    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not add core to sampling list since sampling is already started on this core")?;
+    ).map_err(|_e| "pmu_x86: could not add core to sampling list since sampling is already started on this core")?;
 
     Ok(())
 }
@@ -468,15 +481,19 @@ fn add_core_to_sampling_list(core_id: u8) -> Result<(), &'static str> {
 fn remove_core_from_sampling_list(core_id: u8) -> Result<(), &'static str> {
     let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
 
-    CORES_SAMPLING[word_num].fetch_update(|mut x|{
-        if x.get_bit(bit_in_word) {
-            x.set_bit(bit_in_word, false);
-            Some(x)
+    CORES_SAMPLING[word_num].fetch_update(
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+        |mut x| {
+            if x.get_bit(bit_in_word) {
+                x.set_bit(bit_in_word, false);
+                Some(x)
+            }
+            else {
+                None
+            }
         }
-        else {
-            None
-        }
-    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not remove core from sampling list since sampling has already finished on this core")?;
+    ).map_err(|_e| "pmu_x86: could not remove core from sampling list since sampling has already finished on this core")?;
 
     Ok(())
 }
@@ -490,15 +507,19 @@ fn core_is_currently_sampling(core_id: u8) -> bool {
 fn notify_sampling_results_are_ready(core_id: u8) -> Result<(), &'static str> {
     let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
 
-    RESULTS_READY[word_num].fetch_update(|mut x|{
-        if !x.get_bit(bit_in_word) {
-            x.set_bit(bit_in_word, true);
-            Some(x)
+    RESULTS_READY[word_num].fetch_update(
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+        |mut x| {
+            if !x.get_bit(bit_in_word) {
+                x.set_bit(bit_in_word, true);
+                Some(x)
+            }
+            else {
+                None
+            }
         }
-        else {
-            None
-        }
-    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not add core to results ready list as sampling results have already been added")?;
+    ).map_err(|_e|"pmu_x86: could not add core to results ready list as sampling results have already been added")?;
 
     Ok(())
 }
@@ -507,15 +528,19 @@ fn notify_sampling_results_are_ready(core_id: u8) -> Result<(), &'static str> {
 fn sampling_results_have_been_retrieved(core_id: u8) -> Result<(), &'static str> {
     let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
 
-    RESULTS_READY[word_num].fetch_update(|mut x|{
-        if x.get_bit(bit_in_word) {
-            x.set_bit(bit_in_word, false);
-            Some(x)
+    RESULTS_READY[word_num].fetch_update(
+        Ordering::SeqCst,
+        Ordering::SeqCst,
+        |mut x| {
+            if x.get_bit(bit_in_word) {
+                x.set_bit(bit_in_word, false);
+                Some(x)
+            }
+            else {
+                None
+            }
         }
-        else {
-            None
-        }
-    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not remove core from results ready list as sampling results have already been retrieved")?;
+    ).map_err(|_e| "pmu_x86: could not remove core from results ready list as sampling results have already been retrieved")?;
 
     Ok(())
 }

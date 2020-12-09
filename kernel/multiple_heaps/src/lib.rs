@@ -21,11 +21,13 @@
 
 #![feature(const_fn)]
 #![feature(allocator_api)]
+#![feature(const_in_array_repeat_expressions)]
 #![no_std]
 
 extern crate irq_safety; 
 #[macro_use] extern crate log;
 extern crate memory;
+extern crate page_allocator;
 extern crate kernel_config;
 extern crate apic;
 extern crate heap;
@@ -45,12 +47,13 @@ use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::boxed::Box;
 use hashbrown::HashMap;
-use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange, create_mapping};
-use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_MAX_SIZE};
-use core::ops::{Add, Deref, DerefMut};
+use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, create_mapping};
+use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
+use core::ops::{Deref, DerefMut};
 use core::ptr;
 use heap::HEAP_FLAGS;
 use irq_safety::MutexIrqSafe;
+use page_allocator::{DeferredAllocAction, allocate_pages_by_bytes_deferred};
 
 #[cfg(all(not(unsafe_heap), not(safe_heap)))]
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};
@@ -61,13 +64,12 @@ use slabmalloc_unsafe::{ZoneAllocator, ObjectPage8k, AllocablePage};
 #[cfg(safe_heap)]
 use slabmalloc_safe::{ZoneAllocator, ObjectPage8k, AllocablePage, MappedPages8k};
 
-/// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
-/// We curently work with 8KiB, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
+/// The size in bytes of each "group" or "set" of MappedPages objects that is allocated for each heap's slab.
+/// We curently work with 8KiB sets, such that the per-core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
 const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
 
-/// The size of each MappedPages Object that is allocated for the per-core heaps, in pages.
-/// We curently work with 2 pages, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.   
-const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
+/// The size in pages of each heap's page set, see `HEAP_MAPPED_PAGES_SIZE_IN_BYTES`.
+const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = HEAP_MAPPED_PAGES_SIZE_IN_BYTES / PAGE_SIZE;
 
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
@@ -80,6 +82,17 @@ const PAGES_PER_SIZE_CLASS: usize = 24;
 /// Starting size of each per-core heap. 
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
 
+/// The number of heap page sets that are requested from the OS whenever the heap is grown.
+/// This should be minimum `2` in order to ensure that there is at least:
+/// * one empty page for the requested allocation, and
+/// * one empty page for the deferred allocations to occur. 
+/// 
+/// # Important Note
+/// The total size of heap objects allocated during/by the deferred alloc actions must be able to fit 
+/// into the additional page(s) here, which is currently just one extra heap page set (currently 8KiB). 
+/// Currently, each `DeferredAllocAction` creates 3 chunks, so that means that the current calculation is:
+/// `(3 * HEAP_GROWTH_AMOUNT * sizeof(Chunk)` bytes must fit within one 8KiB heap page set.
+const HEAP_GROWTH_AMOUNT: usize = 2;
 
 /// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
 /// If we want to change the value the heap id is based on, we would substitute 
@@ -110,11 +123,10 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
 
 /// Allocates pages from the given starting address and maps them to frames.
 /// Returns the new mapped pages or an error if the heap memory limit is reached.
-fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -> Result<MappedPages, &'static str> {
-    if (starting_address.value() + size_in_bytes) >  (KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE) {
-        return Err("Heap memory limit has been reached");
-    }
-
+fn create_heap_mapping(
+    starting_address: VirtualAddress, 
+    size_in_bytes: usize
+) -> Result<(MappedPages, DeferredAllocAction<'static>), &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_heap_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
@@ -122,13 +134,16 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
         .ok_or("create_heap_mapping(): couldnt get FRAME_ALLOCATOR")?
         .lock();
 
-    let pages = PageRange::from_virt_addr(starting_address, size_in_bytes);
-    let heap_flags = HEAP_FLAGS;
-    let mp = kernel_mmi.page_table.map_pages(pages, heap_flags, frame_allocator.deref_mut())?;
+    let (pages, action) = allocate_pages_by_bytes_deferred(Some(starting_address), size_in_bytes)
+        .map_err(|_e| "create_heap_mapping(): failed to allocate pages at the starting address")?;
+    if pages.start_address().value() % HEAP_MAPPED_PAGES_SIZE_IN_BYTES != 0 {
+        return Err("multiple_heaps: the allocated pages for the heap wasn't properly aligned");
+    }
+    let mp = kernel_mmi.page_table.map_allocated_pages(pages, HEAP_FLAGS, frame_allocator.deref_mut())?;
 
     // trace!("Allocated heap pages at: {:#X}", starting_address);
 
-    Ok(mp)
+    Ok((mp, action))
 }
 
 
@@ -140,7 +155,7 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 // For the default and safe versions, MappedPages8k objects are created from the new heap mapping and passed to the ZoneAllocator.
 cfg_if! {
 if #[cfg(unsafe_heap)] {
-    #[macro_use] extern crate alloc;
+    extern crate alloc;
     extern crate spin;
 
     use spin::Once;
@@ -167,7 +182,7 @@ if #[cfg(unsafe_heap)] {
                 let layout = Layout::from_size_align(*size, alignment).map_err(|_e| "Incorrect layout")?;
 
                 // create the mapped pages starting from the previous end of the heap
-                let mp = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+                let (mp, _action) = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
 
                 let start_addr = mp.start_address().value();
                 if start_addr % ObjectPage8k::SIZE != 0 {
@@ -178,7 +193,7 @@ if #[cfg(unsafe_heap)] {
                 zone_allocator.refill(layout, page)?;
 
                 // update the end address of the heap
-                heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
+                heap_end_addr += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                 // trace!("Added an object page {:#X} to slab of size {}", addr, sizes[slab]);
             }
         }
@@ -220,14 +235,14 @@ if #[cfg(unsafe_heap)] {
                 let layout = Layout::from_size_align(*size, alignment).map_err(|_e| "Incorrect layout")?;
 
                 // create the mapped pages starting from the previous end of the heap
-                let mp = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+                let (mp, _action) = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
                 let mapping = MappedPages8k::new(mp)?;
                 // add page to the allocator
                 zone_allocator.refill(layout, mapping)?;
 
                 // update the end address of the heap
                 // trace!("Added an object page {:#X} to slab of size {}", heap_end_addr, size);
-                heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
+                heap_end_addr += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
             }
         }
 
@@ -328,24 +343,32 @@ if #[cfg(unsafe_heap)] {
         /// 
         /// # Arguments
         /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
-        /// * `heap`: heap that needs to grow.
-        fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
+        /// * `heap_to_grow`: heap that needs to grow.
+        fn grow_heap(&self, layout: Layout, heap_to_grow: &LockedHeap) -> Result<(), &'static str> {
             // (1) Try to retrieve a page from the another heap
-            for locked_heap in self.heaps.values() {
-                if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                    info!("Added page from another heap to heap: {}", heap.heap_id);
-                    return heap.refill(layout, mp);
+            for heap_ref in self.heaps.values() {
+                if let Some(mp) = heap_ref.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
+                    info!("Added page from another heap to heap: {}", heap_to_grow.lock().heap_id);
+                    return heap_to_grow.lock().refill(layout, mp);
                 }
             }
             // (2) Allocate page from the OS
+            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
-            let start_addr = mp.start_address().value();
-            self.extend_heap_mp(mp)?;
-            let page = unsafe{ core::mem::transmute(start_addr) };
-            info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
-            *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
-            heap.refill(layout, page)
+            for saved_action in &mut deferred_alloc_actions {
+                let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+                let start_addr = mp.start_address().value();
+                self.extend_heap_mp(mp)?;
+                let page = unsafe{ core::mem::transmute(start_addr) };
+                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}",
+                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                );
+                *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+                heap_to_grow.lock().refill(layout, page)?;
+                *saved_action = Some(action);
+            }
+            Ok(())
+            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         } 
 
         /// Merge mapped pages `mp` with the heap mapped pages.
@@ -354,7 +377,7 @@ if #[cfg(unsafe_heap)] {
         /// The new mapped pages must start from the virtual address that the current heap mapped pages end at.
         fn extend_heap_mp(&self, mp: MappedPages) -> Result<(), &'static str> {
             if let Some(heap_mp) = self.mp.try() {
-                heap_mp.lock().merge(mp).map_err(|(e,_mp)| e)?;
+                heap_mp.lock().merge(mp).map_err(|(e, _mp)| e)?;
             } else {
                 self.mp.call_once(|| MutexIrqSafe::new(mp));
             }
@@ -382,21 +405,30 @@ if #[cfg(unsafe_heap)] {
         /// 
         /// # Arguments
         /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
-        /// * `heap`: heap that needs to grow.
-        fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator) -> Result<(), &'static str> {
+        /// * `heap_to_grow`: heap that needs to grow.
+        fn grow_heap(&self, layout: Layout, heap_to_grow: &LockedHeap) -> Result<(), &'static str> {
             // (1) Try to retrieve a page from the another heap
-            for locked_heap in self.heaps.values() {
-                if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                    info!("Added page from another heap to heap: {}", heap.heap_id);
-                    return heap.refill(layout, mp);
+            for heap_ref in self.heaps.values() {
+                if let Some(mp) = heap_ref.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
+                    info!("Added page from another heap to heap: {}", heap_to_grow.lock().heap_id);
+                    return heap_to_grow.lock().refill(layout, mp);
                 }
             }
             // (2) Allocate page from the OS
+            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            let mp = MappedPages8k::new(create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?)?;
-            info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
-            *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
-            heap.refill(layout, mp)
+            for saved_action in &mut deferred_alloc_actions {
+                let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+                let mp = MappedPages8k::new(mp)?;
+                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", 
+                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                );
+                *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+                heap_to_grow.lock().refill(layout, mp)?;
+                *saved_action = Some(action);
+            }
+            Ok(())
+            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         }  
     }
 
@@ -421,21 +453,31 @@ if #[cfg(unsafe_heap)] {
         /// 
         /// # Arguments
         /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
-        /// * `heap`: heap that needs to grow.
-        fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
+        /// * `heap_to_grow`: heap that needs to grow.
+        fn grow_heap(&self, layout: Layout, heap_to_grow: &LockedHeap) -> Result<(), &'static str> {
             // (1) Try to retrieve a page from the another heap
-            for locked_heap in self.heaps.values() {
-                if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                    info!("Added page from another heap to heap: {}", heap.heap_id);
-                    return heap.refill(layout, mp);
+            for heap_ref in self.heaps.values() {
+                if let Some(mp) = heap_ref.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
+                    info!("Added page from another heap to heap: {}", heap_to_grow.lock().heap_id);
+                    return heap_to_grow.lock().refill(layout, mp);
                 }
             }
+
             // (2) Allocate page from the OS
+            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            let mp = MappedPages8k::new(create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?)?;
-            info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
-            *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
-            heap.refill(layout, mp)
+            for saved_action in &mut deferred_alloc_actions {
+                let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+                let mp = MappedPages8k::new(mp)?;
+                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", 
+                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                );
+                *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+                heap_to_grow.lock().refill(layout, mp)?;
+                *saved_action = Some(action);
+            }
+            Ok(())
+            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         }  
     }
 }
@@ -460,12 +502,19 @@ unsafe impl GlobalAlloc for MultipleHeaps {
             return allocate_large_object(layout);
         }
 
-        let id = get_key();
-        let mut heap = self.heaps.get(&id).expect("Multiple Heaps: heap is not initialized!").lock();
-
-        heap.allocate(layout)
-            .or_else(|_e| self.grow_heap(layout, &mut heap).and_then(|_| heap.allocate(layout)))
-            .map(|allocation| allocation.as_ptr()).unwrap_or(ptr::null_mut())
+        // For regular-sized allocations, we first try to allocated from "our" heap, 
+        // which is currently the per-core heap for the current CPU core. 
+        let our_heap = self.heaps.get(&get_key()).expect("Multiple Heaps: heap is not initialized!");
+        if let Ok(ptr) = { our_heap.lock().allocate(layout) } {
+            return ptr.as_ptr();
+        };
+        // If it fails the first time, we try to grow the heap and then try again. 
+        // We must not hold any heap locks while doing so, since growing the heap may result in
+        // additional heap allocation by virtue of allocating more pages. 
+        self.grow_heap(layout, our_heap)
+            .and_then(|_| our_heap.lock().allocate(layout))    // try again
+            .map(|nn| nn.as_ptr())                             // convert to raw ptr
+            .unwrap_or(ptr::null_mut())
     }
 
     /// Deallocates the memory at the address given by `ptr`.

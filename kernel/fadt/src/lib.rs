@@ -10,10 +10,12 @@
 extern crate memory;
 extern crate sdt;
 extern crate acpi_table;
+extern crate zerocopy;
 
 use memory::PhysicalAddress;
 use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
+use zerocopy::FromBytes;
 
 
 pub const FADT_SIGNATURE: &'static [u8; 4] = b"FACP";
@@ -31,7 +33,7 @@ pub fn handle(
 
 
 #[repr(packed)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromBytes)]
 pub struct Fadt {
     pub header: Sdt,
     pub firmware_ctrl: u32,

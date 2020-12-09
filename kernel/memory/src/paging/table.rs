@@ -12,6 +12,7 @@ use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
 use super::super::{VirtualAddress, FrameAllocator, EntryFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
+use zerocopy::FromBytes;
 
 
 // Now that we're using the 511th entry of the P4 table for mapping the higher-half kernel, 
@@ -23,6 +24,7 @@ pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _;
                                          // ^p4 ^p3 ^p2 ^p1 ^offset  
                                          // ^ 0o776 means that we're always looking at the 510th entry recursively
 
+#[derive(FromBytes)]
 pub struct Table<L: TableLevel> {
     entries: [Entry; ENTRIES_PER_PAGE_TABLE],
     level: PhantomData<L>,

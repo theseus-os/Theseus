@@ -2,15 +2,18 @@
 //! when AVX extensions are enabled. 
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(llvm_asm, naked_functions)]
 
+extern crate zerocopy;
 #[macro_use] extern crate context_switch_regular;
 
 use context_switch_regular::ContextRegular;
+use zerocopy::FromBytes;
 
 
 /// The registers saved before a context switch and restored after a context switch
 /// for AVX-enabled Tasks.
+#[derive(FromBytes)]
 #[repr(C, packed)]
 pub struct ContextAVX {
     // The order of the registers here MUST MATCH the order of 
@@ -66,7 +69,7 @@ impl ContextAVX {
 #[macro_export]
 macro_rules! save_registers_avx {
     () => (
-        asm!("
+        llvm_asm!("
             # save all of the ymm registers (for AVX)
             # each register is 32 bytes (256 bits), and there are 16 of them
             lea rsp, [rsp - 32*16]
@@ -98,7 +101,7 @@ macro_rules! save_registers_avx {
 #[macro_export]
 macro_rules! restore_registers_avx {
     () => (
-        asm!("
+        llvm_asm!("
             # restore all of the ymm registers
             vmovups ymm15, [rsp + 32*15]   # pop ymm15
             vmovups ymm14, [rsp + 32*14]   # pop ymm14

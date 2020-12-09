@@ -12,6 +12,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate static_assertions;
 extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
@@ -38,6 +39,7 @@ extern crate nic_buffers;
 extern crate nic_queues;
 extern crate physical_nic;
 extern crate virtual_nic;
+extern crate zerocopy;
 
 mod regs;
 mod queue_registers;
@@ -612,15 +614,15 @@ impl IxgbeNic {
         let _ =pit_clock::pit_wait(wait_time);
 
         //disable flow control.. write 0 TO FCTTV, FCRTL, FCRTH, FCRTV and FCCFG
-        for fcttv in regs2.fcttv.reg.iter_mut() {
+        for fcttv in regs2.fcttv.iter_mut() {
             fcttv.write(0);
         }
 
-        for fcrtl in regs2.fcrtl.reg.iter_mut() {
+        for fcrtl in regs2.fcrtl.iter_mut() {
             fcrtl.write(0);
         }
 
-        for fcrth in regs2.fcrth.reg.iter_mut() {
+        for fcrth in regs2.fcrth.iter_mut() {
             fcrth.write(0);
         }
 
@@ -747,9 +749,9 @@ impl IxgbeNic {
         Self::disable_rx_function(regs);
         
         // regs.rxpbsize.reg[0].write(0x200 << 10); //?
-        regs.rxpbsize.reg[0].write(0x20000); //?
+        regs.rxpbsize[0].write(0x20000); //?
         for i in 1..8 {
-            regs.rxpbsize.reg[i].write(0);
+            regs.rxpbsize[i].write(0);
         }
 
         //CRC offloading
@@ -865,9 +867,9 @@ impl IxgbeNic {
         regs.rttdcs.write(regs.rttdcs.read() | RTTDCS_ARBDIS);
 
         // program DTXMXSZRQ and TXPBSIZE according to DCB and virtualization modes (both off)
-        regs_mac.txpbsize.reg[0].write(TXPBSIZE_160KB);
+        regs_mac.txpbsize[0].write(TXPBSIZE_160KB);
         for i in 1..8 {
-            regs_mac.txpbsize.reg[i].write(0);
+            regs_mac.txpbsize[i].write(0);
         }
 
         regs_mac.dtxmxszrq.write(0xFFF); // 0xfff or 1 MB
@@ -950,7 +952,7 @@ impl IxgbeNic {
         //set the random keys for the hash function
         let seed = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
         let mut rng = SmallRng::seed_from_u64(seed);
-        for rssrk in regs3.rssrk.reg.iter_mut() {
+        for rssrk in regs3.rssrk.iter_mut() {
             rssrk.write(rng.next_u32());
         }
 
@@ -958,7 +960,7 @@ impl IxgbeNic {
         // each reta register has 4 redirection entries
         // since mapping to queues is random and based on a hash, we randomly assign 1 queue to each reta register
         let mut qid = 0;
-        for reta in regs3.reta.reg.iter_mut() {
+        for reta in regs3.reta.iter_mut() {
             //set 4 entries to the same queue number
             let val = qid << RETA_ENTRY_0_OFFSET | qid << RETA_ENTRY_1_OFFSET | qid << RETA_ENTRY_2_OFFSET | qid << RETA_ENTRY_3_OFFSET;
             reta.write(val);
@@ -1035,26 +1037,26 @@ impl IxgbeNic {
         // IP addresses are written to the registers in big endian form (LSB is first on wire)
         // set the source ip address for the filter
         if let Some (addr) = source_ip {
-            self.regs3.saqf.reg[filter_num].write(((addr[3] as u32) << 24) | ((addr[2] as u32) << 16) | ((addr[1] as u32) << 8) | (addr[0] as u32));
+            self.regs3.saqf[filter_num].write(((addr[3] as u32) << 24) | ((addr[2] as u32) << 16) | ((addr[1] as u32) << 8) | (addr[0] as u32));
             filter_mask = filter_mask & !FTQF_SOURCE_ADDRESS_MASK;
         };
 
         // set the destination ip address for the filter
         if let Some(addr) = dest_ip {
-            self.regs3.daqf.reg[filter_num].write(((addr[3] as u32) << 24) | ((addr[2] as u32) << 16) | ((addr[1] as u32) << 8) | (addr[0] as u32));
+            self.regs3.daqf[filter_num].write(((addr[3] as u32) << 24) | ((addr[2] as u32) << 16) | ((addr[1] as u32) << 8) | (addr[0] as u32));
             filter_mask = filter_mask & !FTQF_DEST_ADDRESS_MASK;
         };        
 
         // set the source port for the filter    
         if let Some(port) = source_port {
-            self.regs3.sdpqf.reg[filter_num].write((port as u32) << SPDQF_SOURCE_SHIFT);
+            self.regs3.sdpqf[filter_num].write((port as u32) << SPDQF_SOURCE_SHIFT);
             filter_mask = filter_mask & !FTQF_SOURCE_PORT_MASK;
         };   
 
         // set the destination port for the filter    
         if let Some(port) = dest_port {
-            let port_val = self.regs3.sdpqf.reg[filter_num].read();
-            self.regs3.sdpqf.reg[filter_num].write(port_val | (port as u32) << SPDQF_DEST_SHIFT);
+            let port_val = self.regs3.sdpqf[filter_num].read();
+            self.regs3.sdpqf[filter_num].write(port_val | (port as u32) << SPDQF_DEST_SHIFT);
             filter_mask = filter_mask & !FTQF_DEST_PORT_MASK;
         };
 
@@ -1067,10 +1069,10 @@ impl IxgbeNic {
 
         // write the parameters of the filter
         let filter_priority = (priority as u32 & FTQF_PRIORITY) << FTQF_PRIORITY_SHIFT;
-        self.regs3.ftqf.reg[filter_num].write(filter_protocol as u32 | filter_priority | filter_mask | FTQF_Q_ENABLE);
+        self.regs3.ftqf[filter_num].write(filter_protocol as u32 | filter_priority | filter_mask | FTQF_Q_ENABLE);
 
         //set the rx queue that the packets for this filter should be sent to
-        self.regs3.l34timir.reg[filter_num].write(L34TIMIR_BYPASS_SIZE_CHECK | L34TIMIR_RESERVED | ((qid as u32) << L34TIMIR_RX_Q_SHIFT));
+        self.regs3.l34timir[filter_num].write(L34TIMIR_BYPASS_SIZE_CHECK | L34TIMIR_RESERVED | ((qid as u32) << L34TIMIR_RX_Q_SHIFT));
 
         //mark the filter as used
         enabled_filters[filter_num] = true;
@@ -1081,8 +1083,8 @@ impl IxgbeNic {
     /// but keeps the values stored in the filter registers.
     fn disable_5_tuple_filter(&mut self, filter_num: u8) {
         // disables filter by setting enable bit to 0
-        let val = self.regs3.ftqf.reg[filter_num as usize].read();
-        self.regs3.ftqf.reg[filter_num as usize].write(val | !FTQF_Q_ENABLE);
+        let val = self.regs3.ftqf[filter_num as usize].read();
+        self.regs3.ftqf[filter_num as usize].write(val | !FTQF_Q_ENABLE);
 
         // sets the record in the nic struct to false
         self.l34_5_tuple_filters[filter_num as usize] = false;
@@ -1105,9 +1107,9 @@ impl IxgbeNic {
                 // otherwise we'll write to the upper 16 bits
                 // need to OR with previous value so that we don't write over a previous queue that's been enabled
                 else {
-                    ((enable_interrupt_rx | queue) << 16) as u32 | regs.ivar.reg[queue / queues_per_ivar_reg].read()
+                    ((enable_interrupt_rx | queue) << 16) as u32 | regs.ivar[queue / queues_per_ivar_reg].read()
                 };
-            regs.ivar.reg[queue / queues_per_ivar_reg].write(int_enable); 
+            regs.ivar[queue / queues_per_ivar_reg].write(int_enable); 
             // debug!("IVAR: {:#X}", regs.ivar.reg[queue / queues_per_ivar_reg].read());
         }
         
@@ -1136,7 +1138,7 @@ impl IxgbeNic {
         // minimum interrupt interval specified in 2us units
         let interrupt_interval = 1; // 2us
         for i in 0..NUM_MSI_VEC_ENABLED as usize {
-            regs.eitr.reg[i].write(interrupt_interval << EITR_ITR_INTERVAL_SHIFT);
+            regs.eitr[i].write(interrupt_interval << EITR_ITR_INTERVAL_SHIFT);
         }
 
         let mut interrupt_nums = [0; NUM_MSI_VEC_ENABLED as usize];

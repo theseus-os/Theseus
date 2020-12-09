@@ -5,12 +5,14 @@
 extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
+extern crate zerocopy;
 
 use core::ops::DerefMut;
 use core::mem;
 use memory::{PageTable, MappedPages, Frame, FrameRange, get_frame_allocator_ref, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
 use owning_ref::BoxRef;
 use alloc::boxed::Box;
+use zerocopy::FromBytes;
 
 /// The starting physical address of the region of memory where the RSDP table exists.
 const RSDP_SEARCH_START: usize = 0xE_0000;
@@ -25,7 +27,7 @@ const RSDP_SIGNATURE_ALIGNMENT: usize = 16;
 /// The Root System Descriptor Pointer, 
 /// which contains the address of the RSDT (or XSDT),
 /// among other items.  
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct Rsdp {
     signature: [u8; 8],
