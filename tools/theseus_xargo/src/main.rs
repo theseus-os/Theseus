@@ -56,7 +56,7 @@ fn main() -> Result<(), String> {
     opts.reqopt(
         "", 
         "input",  
-        "(required) path to the directory of pre-built crates files (.rmeta/.rlib), 
+        "(required) path to the directory of pre-built crates dependency files (.rmeta/.rlib), 
          typically the `target`, e.g., \"/path/to/target/$TARGET/release/deps\"", 
         "INPUT_DIR"
     );
@@ -67,13 +67,6 @@ fn main() -> Result<(), String> {
     //      or a file listing each kernel crate name, one per line",
     //     "KERNEL_CRATES"
     // );
-    opts.optopt(
-        "",
-        "core-deps",
-        "path to directory of core dependencies (libcore, libcompiler_builtins, liballoc, etc).
-         This is typically \"$HOME/.xargo/lib/rustlib/$TARGET/lib\"",
-        "CORE_DEPS_DIR"
-    );
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -97,15 +90,6 @@ fn main() -> Result<(), String> {
     } else {
         return Err(format!("Couldn't access --input argument {:?} as a directory", input_dir_path));
     };
-
-    if let Some(core_deps_arg) = matches.opt_str("core-deps") {
-        let core_deps_path = fs::canonicalize(core_deps_arg)
-            .map_err(|e| format!("--core-deps arg was invalid path, error: {:?}", e))?;
-        if core_deps_path.is_dir() {
-            // TODO: do something with the core deps, use them for linking and as dependencies. 
-            //
-        }
-    }
 
     let cargo_cmd_string = matches.free.join(" ");
 
@@ -160,10 +144,8 @@ fn run_initial_xargo(_env_vars: HashMap<String, String>, full_args: String, verb
         .stderr(Stdio::piped())
         .stdout(Stdio::piped());
     
-    // Ensure that we run the xargo command with at least one --verbose option.
-    if verbose_count < 1 {
-        cmd.arg("--verbose");
-    }
+    // Ensure that we run the xargo command with the maximum verbosity level, which is -vv.
+    cmd.arg("-vv");
 
     // Run the actual xargo command.
     let mut child_process = cmd.spawn()
@@ -190,37 +172,30 @@ fn run_initial_xargo(_env_vars: HashMap<String, String>, full_args: String, verb
     let stderr_reader = BufReader::new(stderr);
     let mut stderr_logs: Vec<String> = Vec::new();
 
-    // Use regex to strip out the ANSI color codes
+    // Use regex to strip out the ANSI color codes emitted by the cargo command
     let ansi_escape_regex = regex::Regex::new(r"[\x1B\x9B]\[[^m]+m").unwrap();
     
     let mut pending_multiline_cmd = false;
+    let mut original_multiline = String::new();
 
     stderr_reader.lines()
         .filter_map(|line| line.ok())
         .for_each(|original_line| {
             let replaced = ansi_escape_regex.replace_all(&original_line, "");
             let line_stripped = replaced.trim_start();
-            // eprintln!("FULL LINE: {:?}", line);
-            // eprintln!("STRIPPED : {:?}\n", line_stripped);
 
             let is_final_line = 
                 (line_stripped.contains("--crate-name") && line_stripped.contains("--crate-type"))
                 || line_stripped.ends_with("build-script-build`");
 
-            // In the above xargo command, we added a verbose argument to capture the commands issued from xargo/cargo to rustc. 
-            // But if the user didn't ask for that, then we shouldn't print that verbose output here. 
-            // Verbose output lines start with "Running" or with "+ ".
-            let should_print = verbose_count > 0 
-                || (verbose_count == 0 && !line_stripped.starts_with("+ ") && !line_stripped.starts_with("Running `"));
-            if should_print {
-                eprintln!("{}", original_line);
-            }
-
             if line_stripped.starts_with("Running `") {
                 // Here, we've reached the beginning of a rustc command, which we actually do care about. 
                 stderr_logs.push(line_stripped.to_string());
                 pending_multiline_cmd = !is_final_line;
-                return;
+                original_multiline = String::from(&original_line);
+                if !is_final_line {
+                    return; // continue to the next line
+                }
             } else {
                 // Here, we've reached another line, which *may* be the continuation of a previous rustc command,
                 // or it may just be a completely irrelevant line of output.
@@ -229,10 +204,38 @@ fn run_initial_xargo(_env_vars: HashMap<String, String>, full_args: String, verb
                     let last = stderr_logs.last_mut().expect("BUG: stderr_logs had no last element");
                     last.push(' ');
                     last.push_str(line_stripped);
+                    original_multiline.push('\n');
+                    original_multiline.push_str(&original_line);
                     pending_multiline_cmd = !is_final_line;
+                    if !is_final_line {
+                        return; // continue to the next line
+                    }
                 } else {
                     // do nothing: this is an unrelated line of output that we don't care about.
+                    original_multiline.clear(); // = String::from(&original_line);
                 }
+            }
+
+            // In the above xargo command, we added a verbose argument to capture the commands issued from xargo/cargo to rustc. 
+            // But if the user didn't ask for that, then we shouldn't print that verbose output here. 
+            // Verbose output lines start with "Running `", "+ ", or "[".
+            let should_print = |stripped_line: &str| {
+                verbose_count > 0 ||  // print everything if verbose
+                (
+                    // print only "Compiling" and warning/error lines if not verbose
+                    !stripped_line.starts_with("+ ")
+                    && !stripped_line.starts_with("[")
+                    && !stripped_line.starts_with("Running `")
+                )
+            };
+            if !original_multiline.is_empty() && is_final_line {
+                let original_multiline_replaced = ansi_escape_regex.replace_all(&original_multiline, "");
+                let original_multiline_stripped = original_multiline_replaced.trim_start();
+                if should_print(original_multiline_stripped) {
+                    eprintln!("{}", original_multiline)
+                }
+            } else if should_print(line_stripped) {
+                eprintln!("{}", original_line);
             }
         });
     
