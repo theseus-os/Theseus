@@ -2659,17 +2659,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_ixgbe"
-version = "0.1.0"
-dependencies = [
- "ixgbe",
- "log 0.4.8",
- "network_interface_card",
- "spawn",
- "terminal_print",
-]
-
-[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [

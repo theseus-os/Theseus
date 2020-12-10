@@ -125,7 +125,6 @@ impl TxDescriptor for LegacyTxDescriptor {
         self.vlan.write(0);
     }
 
-    #[inline(always)]
     fn send(&mut self, transmit_buffer_addr: PhysicalAddress, transmit_buffer_length: u16) {
         self.phys_addr.write(transmit_buffer_addr.value() as u64);
         self.length.write(transmit_buffer_length);
@@ -133,7 +132,6 @@ impl TxDescriptor for LegacyTxDescriptor {
         self.status.write(0);
     }
 
-    #[inline(always)]
     fn wait_for_packet_tx(&self) {
         while (self.status.read() & TX_STATUS_DD) == 0 {
             // debug!("tx desc status: {}", self.status.read());

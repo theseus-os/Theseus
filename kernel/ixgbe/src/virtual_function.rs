@@ -10,7 +10,14 @@ use nic_queues::{RxQueue, TxQueue};
 use alloc::vec::Vec;
 use network_interface_card::NetworkInterfaceCard;
 
-
+/// Create a virtual NIC from the ixgbe device.
+/// 
+/// # Arguments
+/// * `ip_addresses`: set of ip addresses that will be assigned to the allocated receive queues.
+/// The number of ip addresses is equal to the number of queue pairs that will be assigned to the vNIC.
+/// Packets with destination ip addresses specified here will be routed to the vNIC's queues. 
+/// * `default_rx_queue`: the queue that will be polled for packets when no other queue is specified.
+/// * `default_tx_queue`: the queue that packets will be sent on when no other queue is specified.
 pub fn create_virtual_nic(ip_addresses: Vec<[u8;4]>, default_rx_queue: usize, default_tx_queue: usize) 
     -> Result<VirtualNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor>, &'static str> 
 {

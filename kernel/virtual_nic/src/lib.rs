@@ -115,6 +115,8 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
 }
 
 impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> Drop for VirtualNic<S,T,U,V> {
+    // Right now we assume that a `virtualNIC` is only dropped when all packets have been removed from queues.
+    // TODO: check that queues are empty before returning to the NIC.
     fn drop(&mut self) {
         // get access to the physical NIC
         let mut nic = self.physical_nic_ref.lock();
