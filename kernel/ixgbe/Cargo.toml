@@ -14,6 +14,10 @@ owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 zerocopy = "0.3.0"
 static_assertions = "1.1.0"
 
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"

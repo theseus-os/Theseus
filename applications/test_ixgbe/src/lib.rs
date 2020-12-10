@@ -39,17 +39,27 @@ pub fn main(_args: Vec<String>) -> isize {
 }
 
 fn rmain() -> Result<(), &'static str> {
-    let mut nic1 = virtual_function::create_virtual_nic(1,vec!([192,168,0,13]))?;
-    let mut nic2 = virtual_function::create_virtual_nic(1,vec!([192,168,0,14]))?;
+    let num_nics = 15;
+    let mut nics = Vec::with_capacity(num_nics);
 
-    let mac_address1 = nic1.mac_address();
-    let mac_address2 = nic2.mac_address();
+    for i in 0..num_nics {
+        nics.push(virtual_function::create_virtual_nic(vec!([192,168,0,i as u8 + 14]),0,0)?);
+    }
 
-    let buffer_a = create_raw_packet(&[0x0, 0x1F, 0xC6, 0x9C, 0xB2, 0x07], &mac_address1, &[1;46])?;
-    nic1.send_packet(buffer_a)?;
+    for nic in &mut nics {
+        let mac_address = nic.mac_address();
+        let buffer = create_raw_packet(&[0x0, 0x1F, 0xC6, 0x9C, 0xB2, 0x07], &mac_address, &[1;46])?;
+        nic.send_packet(buffer)?;
+    }
 
-    let buffer_b = create_raw_packet(&[0x0, 0x1F, 0xC6, 0x9C, 0xB2, 0x07], &mac_address2, &[1;46])?;
-    nic2.send_packet(buffer_b)?;
+    loop {
+        for nic in &mut nics {
+            nic.poll_receive()?;
+            if let Some(_buffer) = nic.get_received_frame() {
+                println!("Received packet on vnic {}", nic.id());
+            }
+        }
+    }
 
     Ok(())
 }

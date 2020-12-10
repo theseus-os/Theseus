@@ -1,8 +1,10 @@
 //! Defines the receive and transmit queues that store a ring of DMA descriptors and related information.
 //! 
 //! Receive and transmit queues are used across all NICs to keep track of incoming and outgoing packets.
-//! HW queues used by the NIC only consist of the ring of DMA descriptors. The SW queues defined here hold the ring of DMA descriptors that it shares with the HW,
-//! as well as other information such as the buffers received from the queues, the tail register for each queue and the cpu the queue is mapped to.
+//! HW queues used by the NIC only consist of the ring of DMA descriptors.
+//! The SW queues defined here hold the ring of DMA descriptors that it shares with the HW,
+//! as well as other information such as the buffers received from the queues,
+//! the tail register for each queue and the cpu the queue is mapped to.
 
 #![no_std]
 
@@ -31,7 +33,7 @@ pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
 );
 
 /// The register trait that gives access to only those registers required for receiving a packet.
-/// The Rx queue control registers can only be accessed by the NIC.
+/// The Rx queue control registers can only be accessed by the physical NIC.
 pub trait RxQueueRegisters {
     fn update_rdbal(&mut self, value: u32);
     fn update_rdbah(&mut self, value: u32);
@@ -41,7 +43,7 @@ pub trait RxQueueRegisters {
 }
 
 /// The register trait that gives access to only those registers required for sending a packet.
-/// The Tx queue control registers can only be accessed by the NIC.
+/// The Tx queue control registers can only be accessed by the physical NIC.
 pub trait TxQueueRegisters {
     fn update_tdbal(&mut self, value: u32);
     fn update_tdbah(&mut self, value: u32);
@@ -59,6 +61,7 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     pub regs: S,
     /// Receive descriptors
     pub rx_descs: BoxRefMut<MappedPages, [T]>,
+    /// The number of receive descriptors in the descriptor ring
     pub num_rx_descs: u16,
     /// Current receive descriptor index
     pub rx_cur: u16,
@@ -75,7 +78,9 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything, but we use this value when setting the cpu id for interrupts and DCA.
     pub cpu_id: Option<u8>,
+    /// Pool where `ReceiveBuffer`s are stored.
     pub rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>,
+    /// The filter id for the physical NIC filter that is set for this queue
     pub filter_num: Option<u8>
 }
 
@@ -148,17 +153,17 @@ pub struct TxQueue<S: TxQueueRegisters, T: TxDescriptor> {
     pub regs: S,
     /// Transmit descriptors 
     pub tx_descs: BoxRefMut<MappedPages, [T]>,
+    /// The number of transmit descriptors in the descriptor ring
     pub num_tx_descs: u16,
     /// Current transmit descriptor index
     pub tx_cur: u16,
-    pub tx_clean: u16,
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
     pub cpu_id : Option<u8>
 }
 
 impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
-    /// Sends a packet on the specified transmit queue
+    /// Sends a packet on the transmit queue
     /// 
     /// # Arguments:
     /// * `transmit_buffer`: buffer containing the packet to be sent

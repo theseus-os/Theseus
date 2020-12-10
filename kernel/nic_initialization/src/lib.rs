@@ -102,14 +102,10 @@ pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool:
 /// * `num_desc`: number of descriptors in the queue
 /// * `rx_buffer_pool`: pool from which to take receive buffers
 /// * `buffer_size`: size of each buffer in the pool
-/// * `rdbal`: register to store the lower (least significant) 32 bits of the physical address of the array of receive descriptors
-/// * `rdbah`: register to store the higher (most significant) 32 bits of the physical address of the array of receive descriptors
-/// * `rdlen`: register to store the length in bytes of the array of receive descriptors
-/// * `rdh`: register to store the receive descriptor head index
-/// * `rdt`: register to store the receive descriptor tail index
+/// * `rxq_regs`: registers needed to set up a receive queue 
 pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize, rxq_regs: &mut S)
-                -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> {
-    
+    -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> 
+{    
     let size_in_bytes_of_all_rx_descs_per_queue = num_desc * core::mem::size_of::<T>();
     
     // Rx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
@@ -160,14 +156,10 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
 /// 
 /// # Arguments
 /// * `num_desc`: number of descriptors in the queue
-/// * `tdbal`: register to store the lower (least significant) 32 bits of the physical address of the array of transmit descriptors
-/// * `tdbah`: register to store the higher (most significant) 32 bits of the physical address of the array of transmit descriptors
-/// * `tdlen`: register to store the length in bytes of the array of transmit descriptors
-/// * `tdh`: register to store the transmit descriptor head index
-/// * `tdt`: register to store the transmit descriptor tail index
+/// * `txq_regs`: registers needed to set up a transmit queue
 pub fn init_tx_queue<T: TxDescriptor, S: TxQueueRegisters>(num_desc: usize, txq_regs: &mut S) 
-                -> Result<BoxRefMut<MappedPages, [T]>, &'static str> {
-
+    -> Result<BoxRefMut<MappedPages, [T]>, &'static str> 
+{
     let size_in_bytes_of_all_tx_descs = num_desc * core::mem::size_of::<T>();
     
     // Tx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.

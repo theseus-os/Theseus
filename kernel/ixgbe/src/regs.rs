@@ -560,25 +560,37 @@ pub const LINKS_SPEED_MASK:             u32 = 0x3 << 28;
 pub const HLREG0_TXCRCEN:               u32 = 1;
 /// Tx Pad Frame Enable (bit 10)
 pub const HLREG0_TXPADEN:               u32 = 1 << 10;
+/// Enable CRC strip by HW
+pub const HLREG0_CRC_STRIP:             u32 = 1 << 1;
+/// Enable CRC strip by HW
+pub const RDRXCTL_CRC_STRIP:            u32 = 1;
+/// These 5 bits have to be cleared by software
+pub const RDRXCTL_RSCFRSTSIZE:          u32 = 0x1F << 17;
 
 /// DCB Arbiters Disable
 pub const RTTDCS_ARBDIS:                u32 = 1 << 6;
 
 /// For DCB and VT disabled, set TXPBSIZE.SIZE to 160KB
 pub const TXPBSIZE_160KB:                u32 = 0xA0 << 10;
+/// For DCB and VT disabled, set RXPBSIZE.SIZE to 512KB
+pub const RXPBSIZE_512KB:                u32 = 0x200 << 10;
 
 // RCTL commands
 pub const BSIZEPACKET_8K:               u32 = 8;
 pub const BSIZEHEADER_256B:             u32 = 4;
+pub const BSIZEHEADER_0B:               u32 = 0;
 pub const DESCTYPE_LEG:                 u32 = 0;
 pub const DESCTYPE_ADV_1BUFFER:         u32 = 1;
 pub const DESCTYPE_ADV_HS:              u32 = 2;
-pub const RX_Q_ENABLE:                  bool = true;
+pub const RX_Q_ENABLE:                  u32 = 1 << 25;
 pub const STORE_BAD_PACKETS:            u32 = 1 << 1;
 pub const MULTICAST_PROMISCUOUS_ENABLE: u32 = 1 << 8;
 pub const UNICAST_PROMISCUOUS_ENABLE:   u32 = 1 << 9;
 pub const BROADCAST_ACCEPT_MODE:        u32 = 1 << 10;
 pub const RECEIVE_ENABLE:               u32 = 1;
+pub const DROP_ENABLE:                  u32 = 1 << 28;
+pub const DCA_RXCTRL_CLEAR_BIT_12:      u32 = 1 << 12;
+pub const CTRL_EXT_NO_SNOOP_DIS:        u32 = 1 << 16;
 
 // RSS commands
 pub const RXCSUM_PCSD:                  u32 = 1 << 13; 
@@ -639,10 +651,17 @@ pub const RCTL_BSIZE_16384:             u32 = (1 << 16) | (1 << 25);
   
  
 /// Enable a transmit queue
-pub const TX_Q_ENABLE:                  bool = true;
+pub const TX_Q_ENABLE:                  u32 = 1 << 25;
 /// Transmit Enable
 pub const TE:                           u32  = 1;           
+pub const DTXMXSZRQ_MAX_BYTES:          u32 = 0xFFF;
 
+/// Tx descriptor pre-fetch threshold (value taken from DPDK)
+pub const TXDCTL_PTHRESH:               u32 = 36; 
+/// Tx descriptor host threshold (value taken from DPDK)
+pub const TXDCTL_HTHRESH:               u32 = 8 << 8; 
+/// Tx descriptor write-back threshold (value taken from DPDK)
+pub const TXDCTL_WTHRESH:               u32 = 4 << 16; 
 
 // Interrupt Register Commands 
 pub const DISABLE_INTERRUPTS:           u32 = 0x7FFFFFFF; 

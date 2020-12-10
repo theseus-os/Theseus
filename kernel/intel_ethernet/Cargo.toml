@@ -1,6 +1,6 @@
 [package]
 name = "intel_ethernet"
-description = "defines structs and traits for DMA descriptors and register type aliases unique to Intel NICs"
+description = "defines structs and traits for DMA descriptors unique to Intel NICs"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
 build = "../../build.rs"

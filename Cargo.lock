@@ -1052,6 +1052,7 @@ dependencies = [
  "acpi",
  "apic",
  "bit_field 0.7.0",
+ "hashbrown",
  "hpet",
  "intel_ethernet",
  "interrupts",
