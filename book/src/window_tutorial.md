@@ -6,7 +6,7 @@ An application invokes the `Window::new()` function in the `window` crate to cre
 
 ## Display in a Window
 
-An application can create a `Displayable` and invoke `Window.display()` to display it. This method is generic and works for all kinds of displayables. 
+An application can create a `Displayable` and invoke `Window.display()` to display it. This method is generic and works for all kinds of displayables.
 
 After display a displayable in its framebuffer, the window would invoke its `render()` method to render the updates to the screen. A framebuffer compositor will composite a list of framebuffers and forward the result to a final framebuffer which is mapped to the screen.
 

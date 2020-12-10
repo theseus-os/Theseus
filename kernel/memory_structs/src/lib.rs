@@ -2,8 +2,7 @@
 
 #![no_std]
 #![feature(const_fn)]
-#![feature(range_is_empty)]
-#![feature(step_trait)]
+#![feature(step_trait, step_trait_ext)]
 
 extern crate kernel_config;
 extern crate multiboot2;
@@ -18,7 +17,6 @@ use bit_field::BitField;
 use core::{
     fmt,
     iter::Step,
-    mem,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
@@ -29,7 +27,7 @@ use zerocopy::FromBytes;
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
     Add, Sub, AddAssign, SubAssign,
     FromBytes,
@@ -79,10 +77,19 @@ impl VirtualAddress {
         self.0 & (PAGE_SIZE - 1)
     }
 }
-
+impl fmt::Debug for VirtualAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "v{:#X}", self.0)
+    }
+}
+impl fmt::Display for VirtualAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 impl fmt::Pointer for VirtualAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:p}", self.0 as *const usize)
+        write!(f, "{:?}", self)
     }
 }
 
@@ -125,7 +132,7 @@ impl From<VirtualAddress> for usize {
 /// A physical memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
     Add, Sub, AddAssign, SubAssign,
     FromBytes,
@@ -169,7 +176,21 @@ impl PhysicalAddress {
         self.0 & (PAGE_SIZE - 1)
     }
 }
-
+impl fmt::Debug for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "p{:#X}", self.0)
+    }
+}
+impl fmt::Display for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+impl fmt::Pointer for PhysicalAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 
 impl Add<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
@@ -241,7 +262,7 @@ pub struct Frame {
 }
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frame(paddr: {:#X})", self.start_address())
+        write!(f, "Frame(p{:#X})", self.start_address())
     }
 }
 
@@ -297,36 +318,24 @@ impl SubAssign<usize> for Frame {
 }
 
 // Implementing these functions allow `Frame` to be in an `Iterator`.
-impl Step for Frame {
+unsafe impl Step for Frame {
     #[inline]
     fn steps_between(start: &Frame, end: &Frame) -> Option<usize> {
         Step::steps_between(&start.number, &end.number)
     }
     #[inline]
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Frame { number: 1 })
+    fn forward_checked(start: Frame, count: usize) -> Option<Frame> {
+        Step::forward_checked(start.number, count).map(|n| Frame { number: n })
     }
     #[inline]
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Frame { number: 0 })
-    }
-    #[inline]
-    fn add_one(&self) -> Self {
-        Add::add(*self, 1)
-    }
-    #[inline]
-    fn sub_one(&self) -> Self {
-        Sub::sub(*self, 1)
-    }
-    #[inline]
-    fn add_usize(&self, n: usize) -> Option<Frame> {
-        Some(*self + n)
+    fn backward_checked(start: Frame, count: usize) -> Option<Frame> {
+        Step::backward_checked(start.number, count).map(|n| Frame { number: n })
     }
 }
 
 
 /// A range of `Frame`s that are contiguous in physical memory.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FrameRange(RangeInclusive<Frame>);
 
 impl FrameRange {
@@ -345,8 +354,10 @@ impl FrameRange {
     /// that spans all `Frame`s from the given physical address
     /// to an end bound based on the given size.
     pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
+        assert!(size_in_bytes > 0);
         let start_frame = Frame::containing_address(starting_virt_addr);
-        let end_frame = Frame::containing_address(starting_virt_addr + size_in_bytes - 1);
+		// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+        let end_frame = Frame::containing_address(starting_virt_addr + (size_in_bytes - 1));
         FrameRange::new(start_frame, end_frame)
     }
 
@@ -390,7 +401,11 @@ impl FrameRange {
         FrameRange::new(start.clone(), end.clone())
     }
 }
-
+impl fmt::Debug for FrameRange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
 impl Deref for FrameRange {
     type Target = RangeInclusive<Frame>;
     fn deref(&self) -> &RangeInclusive<Frame> {
@@ -420,7 +435,7 @@ pub struct Page {
 }
 impl fmt::Debug for Page {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Page(vaddr: {:#X})", self.start_address())
+        write!(f, "Page(v{:#X})", self.start_address())
     }
 }
 
@@ -499,37 +514,25 @@ impl SubAssign<usize> for Page {
 }
 
 // Implementing these functions allow `Page` to be in an `Iterator`.
-impl Step for Page {
+unsafe impl Step for Page {
     #[inline]
     fn steps_between(start: &Page, end: &Page) -> Option<usize> {
         Step::steps_between(&start.number, &end.number)
     }
     #[inline]
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Page { number: 1 })
+    fn forward_checked(start: Page, count: usize) -> Option<Page> {
+        Step::forward_checked(start.number, count).map(|n| Page { number: n })
     }
     #[inline]
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Page { number: 0 })
-    }
-    #[inline]
-    fn add_one(&self) -> Self {
-        Add::add(*self, 1)
-    }
-    #[inline]
-    fn sub_one(&self) -> Self {
-        Sub::sub(*self, 1)
-    }
-    #[inline]
-    fn add_usize(&self, n: usize) -> Option<Page> {
-        Some(*self + n)
+    fn backward_checked(start: Page, count: usize) -> Option<Page> {
+        Step::backward_checked(start.number, count).map(|n| Page { number: n })
     }
 }
 
 
 
-/// A range of `Page`s that are contiguous in virtual memory.
-#[derive(Debug, Clone)]
+/// An inclusive range of `Page`s that are contiguous in virtual memory.
+#[derive(Clone)]
 pub struct PageRange(RangeInclusive<Page>);
 
 impl PageRange {
@@ -548,8 +551,10 @@ impl PageRange {
     /// that spans all `Page`s from the given virtual address
     /// to an end bound based on the given size.
     pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
+        assert!(size_in_bytes > 0);
         let start_page = Page::containing_address(starting_virt_addr);
-        let end_page = Page::containing_address(starting_virt_addr + size_in_bytes - 1);
+		// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+        let end_page = Page::containing_address(starting_virt_addr + (size_in_bytes - 1));
         PageRange::new(start_page, end_page)
     }
 
@@ -606,7 +611,11 @@ impl PageRange {
         }
     }
 }
-
+impl fmt::Debug for PageRange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{:?}", self.0)
+	}
+}
 impl Deref for PageRange {
     type Target = RangeInclusive<Page>;
     fn deref(&self) -> &RangeInclusive<Page> {
@@ -630,6 +639,7 @@ impl IntoIterator for PageRange {
 
 
 /// The address bounds and mapping flags of a section's memory region.
+#[derive(Debug)]
 pub struct SectionMemoryBounds {
     /// The starting virtual address and physical address.
     pub start: (VirtualAddress, PhysicalAddress),
@@ -641,12 +651,16 @@ pub struct SectionMemoryBounds {
 
 /// The address bounds and flags of the initial kernel sections that need mapping. 
 /// 
-/// It only contains three items, in which each item includes all sections that have identical flags:
+/// It contains three main items, in which each item includes all sections that have identical flags:
 /// * The `.text` section bounds cover all sections that are executable.
 /// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
 /// * The `.data` section bounds cover those that are writable (.data, .bss).
+/// 
+/// It also contains the stack bounds, which are maintained separately.
+#[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
-   pub text: SectionMemoryBounds,
+   pub text:   SectionMemoryBounds,
    pub rodata: SectionMemoryBounds,
-   pub data: SectionMemoryBounds,
+   pub data:   SectionMemoryBounds,
+   pub stack:  SectionMemoryBounds,
 }

@@ -44,13 +44,8 @@ getopts = { git = "https://github.com/kevinaboos/getopts" }
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
 ### use our own no_std-compatible downcast-rs
 downcast-rs = { git = "https://github.com/theseus-os/downcast-rs" }
-### use the latest version of core_io that supports the latest nightly Rust compiler
-core_io = { git = "https://github.com/theseus-os/rust-core_io" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
-### use a version of memoffset where doctest is not a stable feature. The patch can be removed when
-### we update our rustc verstion to 1.42. Then we can just use the version available on crates.io
-memoffset = {git ="https://github.com/Ramla-I/memoffset.git"}
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!

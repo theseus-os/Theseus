@@ -4,7 +4,6 @@
 
 #![feature(const_fn)]
 #![feature(allocator_api)]
-#![feature(cfg_doctest)]
 #![no_std]
 
 extern crate alloc;

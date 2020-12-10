@@ -6,7 +6,7 @@ build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"
-core_io = "0.1"
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
 
 
 [dependencies.log]

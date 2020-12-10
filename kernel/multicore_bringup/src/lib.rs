@@ -14,6 +14,7 @@ extern crate zerocopy;
 extern crate irq_safety;
 extern crate memory;
 extern crate pit_clock;
+extern crate stack;
 extern crate kernel_config;
 extern crate apic;
 extern crate acpi;
@@ -26,15 +27,12 @@ use core::{
     ops::DerefMut,
     sync::atomic::Ordering,
 };
-use alloc::{
-    boxed::Box,
-    sync::Arc,
-};
+use alloc::sync::Arc;
 use spin::Mutex;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use irq_safety::MutexIrqSafe;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref, Stack};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
@@ -82,6 +80,7 @@ pub fn handle_ap_cores(
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress
 ) -> Result<usize, &'static str> {
+    let frame_allocator_ref = get_frame_allocator_ref().ok_or("Couldn't get FRAME ALLOCATOR")?;
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let page_table_phys_addr: PhysicalAddress;
@@ -96,22 +95,23 @@ pub fn handle_ap_cores(
         // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
         // These frames MUST be identity mapped because they're accessed in AP boot up code,
         // which has no page tables because it operates in 16-bit real mode.
-        let trampoline_page   = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE));
-        let trampoline_frame  = Frame::containing_address(PhysicalAddress::new_canonical(TRAMPOLINE));
-        let ap_startup_page   = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
+        let trampoline_frame  = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(TRAMPOLINE), 1);
+        let trampoline_page   = memory::allocate_pages_at(VirtualAddress::new_canonical(TRAMPOLINE), trampoline_frame.size_in_frames())
+            .map_err(|_e| "handle_ap_cores(): failed to allocate trampoline page")?;
         let ap_startup_frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
-
-        let mut allocator = get_frame_allocator_ref().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
+        let ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(AP_STARTUP), ap_startup_frames.size_in_frames())
+            .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup pages")?;
+        let mut allocator = frame_allocator_ref.lock();
         
-        trampoline_mapped_pages = page_table.map_to(
+        trampoline_mapped_pages = page_table.map_allocated_pages_to(
             trampoline_page, 
-            trampoline_frame.clone(), 
+            trampoline_frame, 
             EntryFlags::PRESENT | EntryFlags::WRITABLE, 
             allocator.deref_mut()
         )?;
-        ap_startup_mapped_pages = page_table.map_frames(
-            ap_startup_frames.clone(),
-            ap_startup_page,
+        ap_startup_mapped_pages = page_table.map_allocated_pages_to(
+            ap_startup_pages,
+            ap_startup_frames,
             EntryFlags::PRESENT | EntryFlags::WRITABLE,
             allocator.deref_mut()
         )?;
@@ -164,7 +164,11 @@ pub fn handle_ap_cores(
                     .and_then(|bsp_id| all_lapics.get(&bsp_id))
                     .ok_or("Couldn't get BSP's LocalApic!")?;
                 let mut bsp_lapic = bsp_lapic_ref.write();
-                let ap_stack = kernel_mmi_ref.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate AP stack!")?;
+                let ap_stack = stack::alloc_stack(
+                    KERNEL_STACK_SIZE_IN_PAGES,
+                    &mut kernel_mmi_ref.lock().page_table,
+                    frame_allocator_ref
+                ).ok_or("could not allocate AP stack!")?;
 
                 let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
@@ -250,7 +254,7 @@ fn bring_up_ap(
     new_lapic: &MadtLocalApic, 
     ap_trampoline_data: &mut ApTrampolineData,
     page_table_paddr: PhysicalAddress, 
-    ap_stack: Stack,
+    ap_stack: stack::Stack,
     nmi_lint: u8, 
     nmi_flags: u16
 ) {
@@ -265,8 +269,9 @@ fn bring_up_ap(
     ap_trampoline_data.ap_nmi_flags.write(nmi_flags);
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
-    // put the ap_stack on the heap and "leak" it so it's not dropped and auto-unmapped
-    Box::into_raw(Box::new(ap_stack)); 
+    // Give ownership of the stack we created for this AP to the `ap_start` crate, 
+    // in which the AP will take ownership of it once it boots up.
+    ap_start::insert_ap_stack(new_lapic.apic_id, ap_stack); 
 
     info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
     let new_apic_id = new_lapic.apic_id; 
