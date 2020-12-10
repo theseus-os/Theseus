@@ -51,7 +51,6 @@ pub const PCI_MAX_LATENCY:           u16 = 0x3F;
 // PCI Capability IDs
 pub const MSI_CAPABILITY:           u16 = 0x05;
 pub const MSIX_CAPABILITY:          u16 = 0x11;
-pub const POWER_MANAGEMENT_CAPABILITY: u16 = 0x01;
 
 /// The maximum number of PCI buses.
 const MAX_NUM_PCI_BUSES: u16 = 256;
@@ -269,24 +268,6 @@ impl PciLocation {
             self, PCI_CONFIG_DATA_PORT.lock().read());
     }
 
-    /// Sets the PCI device's command bit 1 to enable memory access
-    pub fn pci_set_memory_access_enable_bit(&self) {
-        unsafe { 
-            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(PCI_COMMAND));
-        }
-        let command = PCI_CONFIG_DATA_PORT.lock().read(); 
-        trace!("pci_set_memory_access_enable_bit: PciDevice: {}, read value: {:#x}", self, command);
-
-        const MEMORY_ACCESS_ENABLE: u32 = 1 << 1;
-        unsafe {
-            PCI_CONFIG_DATA_PORT.lock().write(command | MEMORY_ACCESS_ENABLE);
-        }
-        trace!("pci_set_memory_access_enable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
-            self, PCI_CONFIG_DATA_PORT.lock().read());
-    }
-
-
-
     /// Explores the PCI config space and returns address of requested capability, if present. 
     /// PCI capabilities are stored as a linked list in the PCI config space, 
     /// with each capability storing the pointer to the next capability right after its ID.
@@ -345,7 +326,7 @@ impl fmt::Debug for PciLocation {
 
 /// Contains information common to every type of PCI Device,
 /// and offers functions for reading/writing to the PCI configuration space.
-#[derive(Debug,Copy,Clone)]
+#[derive(Debug)]
 pub struct PciDevice {
     /// the bus, slot, and function number that locates this PCI device in the bus tree.
     pub location: PciLocation,
@@ -478,50 +459,6 @@ impl PciDevice {
 
         Ok(())  
     }
-
-    pub fn pci_enable_wakeup(&self) -> Result<(), &'static str> {
-        let cap_addr = self.find_pci_capability(POWER_MANAGEMENT_CAPABILITY).ok_or("Could not fnd power management capability")?;
-        
-        // Power Management Control / Status Register
-        const PMCSR_REGISTER_OFFSET: u16 = 4;
-        let pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
-        error!("current power: {:#X}", pmcsr);
-
-        // Bit 8 is set to enable Wakeup
-        const PME_EN: u32 = 1 << 8;
-
-        self.pci_write(cap_addr + PMCSR_REGISTER_OFFSET, pmcsr | PME_EN);
-        let pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
-        error!("new power: {:#X}", pmcsr);
-
-        Ok(())
-    }
-
-    pub fn pci_set_power_state(&self, state: PowerState) -> Result<(), &'static str> {
-        let cap_addr = self.find_pci_capability(POWER_MANAGEMENT_CAPABILITY).ok_or("Could not fnd power management capability")?;
-        
-        // Power Management Control / Status Register
-        const PMCSR_REGISTER_OFFSET: u16 = 4;
-        let mut pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
-        error!("current power: {:#X}", pmcsr);
-
-        // Bits 1:0 are used to set the power states D0 = 00b, D1 = 01b, D2 = 10b, D3 = 11b.
-        const POWER_STATE_BITS: u32 = 0x3;
-        pmcsr = pmcsr & !POWER_STATE_BITS;
-
-        self.pci_write(cap_addr + PMCSR_REGISTER_OFFSET, pmcsr | state as u32);
-        let pmcsr = self.pci_read_32(cap_addr + PMCSR_REGISTER_OFFSET);
-        error!("new power: {:#X}", pmcsr);
-
-        Ok(())
-    }
-}
-
-pub enum PowerState {
-    D0 = 0,
-    D1 = 1,
-    D2 = 2,
-    D3 = 3,
 }
 
 impl Deref for PciDevice {

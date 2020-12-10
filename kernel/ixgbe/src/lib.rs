@@ -157,8 +157,6 @@ lazy_static! {
 
 /// A struct representing an ixgbe network interface card
 pub struct IxgbeNic {
-    /// PCI information of this device
-    pci_device: PciDevice,
     /// Type of Base Address Register 0,
     /// if it's memory mapped or I/O.
     bar_type: u8,
@@ -334,7 +332,6 @@ impl IxgbeNic {
         Self::wait_for_link(&mapped_registers2);
 
         let ixgbe_nic = IxgbeNic {
-            pci_device: ixgbe_pci_dev.clone(),
             bar_type: bar_type,
             mem_base: mem_base,
             interrupt_num: interrupt_num,
