@@ -1151,8 +1151,8 @@ pub enum FilterProtocol {
     Other = 3
 }
 
-/// A helper function to poll the nic receive queues
-pub fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {
+/// A helper function to poll the nic receive queues (only for testing purposes).
+fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();      
     nic.rx_queues[qid as usize].remove_frames_from_queue()?;
@@ -1160,8 +1160,8 @@ pub fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {
     Ok(frame)
 }
 
-/// A helper function to send a test packet on a nic transmit queue
-pub fn tx_send_mq(qid: usize) -> Result<(), &'static str> {
+/// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
+fn tx_send_mq(qid: usize) -> Result<(), &'static str> {
     let packet = test_packets::create_test_packet()?;
     let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();  
