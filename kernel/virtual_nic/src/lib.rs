@@ -88,7 +88,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     #[allow(dead_code)]
     fn poll_receive_queue(&mut self, qid: usize) -> Result<(), &'static str> {
         if qid >= self.rx_queues.len() {return Err("Invalid qid");}
-        self.rx_queues[qid].remove_frames_from_queue()?;
+        self.rx_queues[qid].poll_queue_and_store_received_packets()?;
         Ok(())
     }
 }
@@ -105,7 +105,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     }
 
     fn poll_receive(&mut self) -> Result<(), &'static str> {
-        self.rx_queues[self.default_rx_queue].remove_frames_from_queue()?;
+        self.rx_queues[self.default_rx_queue].poll_queue_and_store_received_packets()?;
         Ok(())
     }
 

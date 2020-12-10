@@ -18,10 +18,10 @@ pub const TX_CMD_IC:                       u8 = 1 << 2;
 pub const TX_CMD_RS:                       u8 = 1 << 3;     
 /// Tx Command: Report Packet Sent
 pub const TX_CMD_RPS:                      u8 = 1 << 4;     
-/// Tx Command: VLAN Packet Enable
-pub const TX_CMD_VLE:                      u8 = 1 << 6;     
 /// Tx Command: Descriptor Extension (Advanced format)
 pub const TX_CMD_DEXT:                     u8 = 1 << 5;  
+/// Tx Command: VLAN Packet Enable
+pub const TX_CMD_VLE:                      u8 = 1 << 6;     
 /// Tx Command: Interrupt Delay Enable
 pub const TX_CMD_IDE:                      u8 = 1 << 7;     
 /// Tx Status: descriptor Done
@@ -29,6 +29,9 @@ pub const TX_STATUS_DD:                    u8 = 1 << 0;
 /// Tx Descriptor Type: advanced
 pub const TX_DTYP_ADV:                     u8 = 0x3 << 4;
 /// Tx Descriptor paylen shift
+/// The paylen is located at bit 46 in the upper 64 bits of the advanced Tx descriptor.
+/// Since we have divided the upper 64 bits into 4 parts (u16,u8,u8,u32),
+/// the paylen is then located at bit 14 of the upper 32 bits of the descriptor.
 pub const TX_PAYLEN_SHIFT:                 u8 = 46 - 32; //(actual offset - offset of variable) 
 
 // Receive descriptor bits 
@@ -335,18 +338,18 @@ impl fmt::Debug for AdvancedRxDescriptor {
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct AdvancedTxDescriptor {
-    /// Starting physcal address of the receive buffer for the packet.
+    /// Starting physical address of the receive buffer for the packet.
     pub packet_buffer_address:  Volatile<u64>,
     /// Length of data buffer
     pub data_len: Volatile<u16>,
-    /// dtyp = Descriptor Type
-    /// mac = option to apply LinkSec and time stamp
+    /// dtyp (Descriptor Type) occupies bits [7:4],
+    /// mac (option to apply LinkSec and time stamp) occupies bits [3:2]
     pub dtyp_mac_rsv : Volatile<u8>,
     /// Command bits
     pub dcmd:  Volatile<u8>,
-    /// paylen = size in bytes of the data buffer in host memory (not including the fields that the hardware adds)
-    /// popts = options to offload checksum calculation
-    /// sta = status of the descriptor, if it's in use or not
+    /// paylen (size in bytes of the data buffer in host memory, not including the fields that the hardware adds) occupies bits [31:14],
+    /// popts (options to offload checksum calculation) occupies bits [13:8],
+    /// sta (status of the descriptor, if it's in use or not) occupies bits [3:0]
     pub paylen_popts_cc_idx_sta: Volatile<u32>,
 }
 

@@ -35,21 +35,21 @@ pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
 /// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.
 pub trait RxQueueRegisters {
-    fn update_rdbal(&mut self, value: u32);
-    fn update_rdbah(&mut self, value: u32);
-    fn update_rdlen(&mut self, value: u32);
-    fn update_rdh(&mut self, value: u32);
-    fn update_rdt(&mut self, value: u32);
+    fn set_rdbal(&mut self, value: u32);
+    fn set_rdbah(&mut self, value: u32);
+    fn set_rdlen(&mut self, value: u32);
+    fn set_rdh(&mut self, value: u32);
+    fn set_rdt(&mut self, value: u32);
 }
 
 /// The register trait that gives access to only those registers required for sending a packet.
 /// The Tx queue control registers can only be accessed by the physical NIC.
 pub trait TxQueueRegisters {
-    fn update_tdbal(&mut self, value: u32);
-    fn update_tdbah(&mut self, value: u32);
-    fn update_tdlen(&mut self, value: u32);
-    fn update_tdh(&mut self, value: u32);
-    fn update_tdt(&mut self, value: u32);
+    fn set_tdbal(&mut self, value: u32);
+    fn set_tdbah(&mut self, value: u32);
+    fn set_tdlen(&mut self, value: u32);
+    fn set_tdh(&mut self, value: u32);
+    fn set_tdt(&mut self, value: u32);
 }
 
 /// A struct that holds all information for one receive queue.
@@ -85,8 +85,9 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
 }
 
 impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
-    /// Retrieves the ethernet frames from one queue
-    pub fn remove_frames_from_queue(&mut self) -> Result<(), &'static str> {
+    /// Polls the queue and removes all received packets from it.
+    /// The received packets are stored in the receive queue's `received_frames` FIFO queue.
+    pub fn poll_queue_and_store_received_packets(&mut self) -> Result<(), &'static str> {
         let mut cur = self.rx_cur as usize;
        
         let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
@@ -96,7 +97,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
             // get information about the current receive buffer
             let length = self.rx_descs[cur].length();
             _total_packet_length += length as u16;
-            // error!("remove_frames_from_queue {}: received descriptor of length {}", self.id, length);
+            // error!("poll_queue_and_store_received_packets {}: received descriptor of length {}", self.id, length);
             
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
             // (because we're saving it for higher layers to use),
@@ -124,13 +125,13 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
 
             // move on to the next receive buffer to see if it's ready for us to take
             self.rx_cur = (cur as u16 + 1) % self.num_rx_descs;
-            self.regs.update_rdt(cur as u32); 
+            self.regs.set_rdt(cur as u32); 
 
             if self.rx_descs[cur].end_of_packet() {
                 let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
                 self.received_frames.push_back(ReceivedFrame(buffers));
             } else {
-                warn!("NIC::remove_frames_from_queue(): Received multi-rxbuffer frame, this scenario not fully tested!");
+                warn!("NIC::poll_queue_and_store_received_packets(): Received multi-rxbuffer frame, this scenario not fully tested!");
             }
             self.rx_descs[cur].reset_status();
             cur = self.rx_cur as usize;
@@ -139,6 +140,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
         Ok(())
     }
 
+    /// Returns the earliest received ethernet frame.
     pub fn return_frame(&mut self) -> Option<ReceivedFrame> {
         self.received_frames.pop_front()
     }
@@ -174,7 +176,7 @@ impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
         self.tx_cur = (self.tx_cur + 1) % self.num_tx_descs;
         // update the tdt register by 1 so that it knows the previous descriptor has been used
         // and has a packet to be sent
-        self.regs.update_tdt(self.tx_cur as u32);
+        self.regs.set_tdt(self.tx_cur as u32);
         // Wait for the packet to be sent
         self.tx_descs[old_cur as usize].wait_for_packet_tx();
     }

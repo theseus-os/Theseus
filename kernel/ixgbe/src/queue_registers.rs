@@ -23,19 +23,19 @@ pub struct IxgbeRxQueueRegisters {
 }
 
 impl RxQueueRegisters for IxgbeRxQueueRegisters {
-    fn update_rdbal(&mut self, value: u32) {
+    fn set_rdbal(&mut self, value: u32) {
         self.regs.rdbal.write(value)
     }    
-    fn update_rdbah(&mut self, value: u32) {
+    fn set_rdbah(&mut self, value: u32) {
         self.regs.rdbah.write(value)
     }
-    fn update_rdlen(&mut self, value: u32) {
+    fn set_rdlen(&mut self, value: u32) {
         self.regs.rdlen.write(value)
     }
-    fn update_rdh(&mut self, value: u32) {
+    fn set_rdh(&mut self, value: u32) {
         self.regs.rdh.write(value)
     }
-    fn update_rdt(&mut self, value: u32) {
+    fn set_rdt(&mut self, value: u32) {
         self.regs.rdt.write(value)
     }
 }
@@ -60,19 +60,19 @@ pub struct IxgbeTxQueueRegisters {
     pub backing_pages: Arc<MappedPages>
 }
 impl TxQueueRegisters for IxgbeTxQueueRegisters {
-    fn update_tdbal(&mut self, value: u32) {
+    fn set_tdbal(&mut self, value: u32) {
         self.regs.tdbal.write(value)
     }  
-    fn update_tdbah(&mut self, value: u32) {
+    fn set_tdbah(&mut self, value: u32) {
         self.regs.tdbah.write(value)
     }
-    fn update_tdlen(&mut self, value: u32) {
+    fn set_tdlen(&mut self, value: u32) {
         self.regs.tdlen.write(value)
     }
-    fn update_tdh(&mut self, value: u32) {
+    fn set_tdh(&mut self, value: u32) {
         self.regs.tdh.write(value)
     }
-    fn update_tdt(&mut self, value: u32) {
+    fn set_tdt(&mut self, value: u32) {
         self.regs.tdt.write(value)
     }
 }

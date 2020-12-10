@@ -29,7 +29,7 @@ extern crate nic_queues;
 extern crate nic_initialization;
 
 pub mod test_e1000_driver;
-mod regs;
+pub mod regs;
 use regs::*;
 
 use spin::Once; 
@@ -86,49 +86,49 @@ lazy_static! {
 
 /// A struct which contains the receive queue registers and implements the `RxQueueRegisters` trait,
 /// which is required to store the registers in an `RxQueue` object.
-struct E1000RxQueueRegisters(BoxRefMut<MappedPages,E1000RxRegisters>);
+struct E1000RxQueueRegisters(BoxRefMut<MappedPages, E1000RxRegisters>);
 
 impl RxQueueRegisters for E1000RxQueueRegisters {
-    fn update_rdbal(&mut self, value: u32) {
+    fn set_rdbal(&mut self, value: u32) {
         self.0.rx_regs.rdbal.write(value); 
     }    
-    fn update_rdbah(&mut self, value: u32) {
+    fn set_rdbah(&mut self, value: u32) {
         self.0.rx_regs.rdbah.write(value); 
     }
-    fn update_rdlen(&mut self, value: u32) {
+    fn set_rdlen(&mut self, value: u32) {
         self.0.rx_regs.rdlen.write(value); 
     }
-    fn update_rdh(&mut self, value: u32) {
+    fn set_rdh(&mut self, value: u32) {
         self.0.rx_regs.rdh.write(value); 
     }
-    fn update_rdt(&mut self, value: u32) {
+    fn set_rdt(&mut self, value: u32) {
         self.0.rx_regs.rdt.write(value); 
     }
 } 
 
 /// A struct which contains the transmit queue registers and implements the `TxQueueRegisters` trait,
 /// which is required to store the registers in a `TxQueue` object.
-struct E1000TxQueueRegisters(BoxRefMut<MappedPages,E1000TxRegisters>);
+struct E1000TxQueueRegisters(BoxRefMut<MappedPages, E1000TxRegisters>);
 
 impl TxQueueRegisters for E1000TxQueueRegisters {
-    fn update_tdbal(&mut self, value: u32) {
+    fn set_tdbal(&mut self, value: u32) {
         self.0.tx_regs.tdbal.write(value); 
     }    
-    fn update_tdbah(&mut self, value: u32) {
+    fn set_tdbah(&mut self, value: u32) {
         self.0.tx_regs.tdbah.write(value); 
     }
-    fn update_tdlen(&mut self, value: u32) {
+    fn set_tdlen(&mut self, value: u32) {
         self.0.tx_regs.tdlen.write(value); 
     }
-    fn update_tdh(&mut self, value: u32) {
+    fn set_tdh(&mut self, value: u32) {
         self.0.tx_regs.tdh.write(value); 
     }
-    fn update_tdt(&mut self, value: u32) {
+    fn set_tdt(&mut self, value: u32) {
         self.0.tx_regs.tdt.write(value); 
     }
 }
 
-/// struct representing an e1000 network interface card.
+/// Struct representing an e1000 network interface card.
 pub struct E1000Nic {
     /// Type of BAR0
     bar_type: u8,
@@ -163,7 +163,7 @@ impl NetworkInterfaceCard for E1000Nic {
     }
 
     fn poll_receive(&mut self) -> Result<(), &'static str> {
-        self.rx_queue.remove_frames_from_queue()  
+        self.rx_queue.poll_queue_and_store_received_packets()  
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -173,7 +173,7 @@ impl NetworkInterfaceCard for E1000Nic {
 
 
 
-/// functions that setup the NIC struct and handle the sending and receiving of packets
+/// Functions that setup the NIC struct and handle the sending and receiving of packets.
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
     pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
@@ -265,9 +265,18 @@ impl E1000Nic {
     /// # Arguments
     /// * `device`: reference to the nic device
     /// * `mem_base`: the physical address where the NIC's memory starts.
-    fn map_e1000_regs(_device: &PciDevice, mem_base: PhysicalAddress) 
-        -> Result<(BoxRefMut<MappedPages, E1000Registers>, BoxRefMut<MappedPages, E1000RxRegisters>, BoxRefMut<MappedPages, E1000TxRegisters>, 
-            BoxRefMut<MappedPages, E1000MacRegisters>), &'static str> {
+    fn map_e1000_regs(
+        _device: &PciDevice, 
+        mem_base: PhysicalAddress
+    ) -> Result<
+        (
+            BoxRefMut<MappedPages, E1000Registers>, 
+            BoxRefMut<MappedPages, E1000RxRegisters>, 
+            BoxRefMut<MappedPages, E1000TxRegisters>, 
+            BoxRefMut<MappedPages, E1000MacRegisters>
+        ), 
+        &'static str> 
+    {
         const GENERAL_REGISTERS_SIZE_BYTES: usize = 8192;
         const RX_REGISTERS_SIZE_BYTES: usize = 4096;
         const TX_REGISTERS_SIZE_BYTES: usize = 4096;
@@ -336,8 +345,10 @@ impl E1000Nic {
 
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
-    fn rx_init(regs: &mut E1000Registers, rx_regs: &mut E1000RxQueueRegisters) -> Result<(BoxRefMut<MappedPages, [LegacyRxDescriptor]>, Vec<ReceiveBuffer>), &'static str> {
-
+    fn rx_init(
+        regs: &mut E1000Registers, 
+        rx_regs: &mut E1000RxQueueRegisters
+    ) -> Result<(BoxRefMut<MappedPages, [LegacyRxDescriptor]>, Vec<ReceiveBuffer>), &'static str> {
 
         // get the queue of rx descriptors and its corresponding rx buffers
         // let (rx_descs, rx_bufs_in_use) = Self::init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rdbal, 
@@ -352,7 +363,7 @@ impl E1000Nic {
         // because the `rx_cur` counter won't be able to catch up with the head index properly. 
         // Thus, we set it to one less than that in order to prevent such bugs. 
         // This doesn't prevent all of the rx buffers from being used, they will still all be used fully.
-        rx_regs.update_rdt((E1000_NUM_RX_DESC - 1) as u32); 
+        rx_regs.set_rdt((E1000_NUM_RX_DESC - 1) as u32); 
         // TODO: document these various e1000 flags and why we're setting them
         regs.rctl.write(regs::RCTL_EN| regs::RCTL_SBP | regs::RCTL_LBM_NONE | regs::RTCL_RDMTS_HALF | regs::RCTL_BAM | regs::RCTL_SECRC  | regs::RCTL_BSIZE_2048);
 
@@ -360,7 +371,10 @@ impl E1000Nic {
     }           
     
     /// Initialize the array of tramsmit descriptors and return them.
-    fn tx_init(regs: &mut E1000Registers, tx_regs: &mut E1000TxQueueRegisters) -> Result<BoxRefMut<MappedPages, [LegacyTxDescriptor]>, &'static str> {
+    fn tx_init(
+        regs: &mut E1000Registers, 
+        tx_regs: &mut E1000TxQueueRegisters
+    ) -> Result<BoxRefMut<MappedPages, [LegacyTxDescriptor]>, &'static str> {
 
         let tx_descs = init_tx_queue(E1000_NUM_TX_DESC as usize, tx_regs)?;
         

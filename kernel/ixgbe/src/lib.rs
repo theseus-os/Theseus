@@ -217,7 +217,7 @@ impl NetworkInterfaceCard for IxgbeNic {
     fn poll_receive(&mut self) -> Result<(), &'static str> {
         // by default, when using the physical NIC interface, we receive on queue 0.
         let qid = 0;
-        self.rx_queues[qid].remove_frames_from_queue()
+        self.rx_queues[qid].poll_queue_and_store_received_packets()
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -1155,7 +1155,7 @@ pub enum FilterProtocol {
 fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();      
-    nic.rx_queues[qid as usize].remove_frames_from_queue()?;
+    nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
     let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
     Ok(frame)
 }
@@ -1176,7 +1176,7 @@ fn rx_interrupt_handler(qid: u8) -> Option<u8> {
     let interrupt_num = 
         if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
-            let _ = ixgbe_nic.rx_queues[qid as usize].remove_frames_from_queue();
+            let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
             ixgbe_nic.interrupt_num.get(&qid).and_then(|int| Some(*int))
         } else {
             error!("BUG: ixgbe_handler_{}(): IXGBE NIC hasn't yet been initialized!", qid);

@@ -39,7 +39,7 @@ pub fn main(_args: Vec<String>) -> isize {
 }
 
 fn rmain() -> Result<(), &'static str> {
-    let num_nics = 15;
+    let num_nics = 1;
     let mut nics = Vec::with_capacity(num_nics);
 
     for i in 0..num_nics {

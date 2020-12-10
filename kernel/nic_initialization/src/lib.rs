@@ -139,15 +139,15 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
     let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
     
     // write the physical address of the rx descs ring
-    rxq_regs.update_rdbal(rx_desc_phys_addr_lower);
-    rxq_regs.update_rdbah(rx_desc_phys_addr_higher);
+    rxq_regs.set_rdbal(rx_desc_phys_addr_lower);
+    rxq_regs.set_rdbah(rx_desc_phys_addr_higher);
 
     // write the length (in total bytes) of the rx descs array
-    rxq_regs.update_rdlen(size_in_bytes_of_all_rx_descs_per_queue as u32); // should be 128 byte aligned, minimum 8 descriptors
+    rxq_regs.set_rdlen(size_in_bytes_of_all_rx_descs_per_queue as u32); // should be 128 byte aligned, minimum 8 descriptors
     
     // Write the head index (the first receive descriptor)
-    rxq_regs.update_rdh(0);
-    rxq_regs.update_rdt(0);   
+    rxq_regs.set_rdh(0);
+    rxq_regs.set_rdt(0);   
 
     Ok((rx_descs, rx_bufs_in_use))        
 }
@@ -179,15 +179,15 @@ pub fn init_tx_queue<T: TxDescriptor, S: TxQueueRegisters>(num_desc: usize, txq_
     let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
 
     // write the physical address of the tx descs array
-    txq_regs.update_tdbal(tx_desc_phys_addr_lower); 
-    txq_regs.update_tdbah(tx_desc_phys_addr_higher); 
+    txq_regs.set_tdbal(tx_desc_phys_addr_lower); 
+    txq_regs.set_tdbah(tx_desc_phys_addr_higher); 
 
     // write the length (in total bytes) of the tx descs array
-    txq_regs.update_tdlen(size_in_bytes_of_all_tx_descs as u32);               
+    txq_regs.set_tdlen(size_in_bytes_of_all_tx_descs as u32);               
     
     // write the head index and the tail index (both 0 initially because there are no tx requests yet)
-    txq_regs.update_tdh(0);
-    txq_regs.update_tdt(0);
+    txq_regs.set_tdh(0);
+    txq_regs.set_tdt(0);
 
     Ok(tx_descs)
 }

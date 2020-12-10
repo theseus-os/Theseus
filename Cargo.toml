@@ -32,7 +32,7 @@ exclude = [
 	"applications/test_wait_queue",
 	# "applications/test_panic",
 	# "applications/unwind_test",
-	"applications/test_ixgbe",
+	# "applications/test_ixgbe",
 ]
 
 

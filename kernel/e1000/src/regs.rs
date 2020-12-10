@@ -1,6 +1,7 @@
-//! This file contains the structs that are used to access device registers.
-//! The registers are divided into multiple structs because we need to separate out the 
-//! receive and transmit queue registers and store them separately in a per-queue struct. 
+//! This file contains the structs that are used to access device registers and conatins configuration values to write to registers.
+//! 
+//! The registers are divided into multiple structs because we need to separate out the
+//! receive and transmit queue registers and store them separately in a per-queue struct.
 //! Though the e1000 device only has 1 pair of receive and transmit queues, we still structure
 //! the design this way to be able to use code shared by all network drivers.
 //! 
@@ -127,7 +128,12 @@ pub struct E1000MacRegisters {
 
 const_assert_eq!(core::mem::size_of::<E1000MacRegisters>(), 28 * 4096);
 
-///struct to hold registers related to one receive queue
+// check that the sum of all the register structs is equal to the memory of the e1000 device (128 KiB).
+const_assert_eq!(core::mem::size_of::<E1000Registers>() + core::mem::size_of::<E1000RxRegisters>() +   
+    core::mem::size_of::<E1000TxRegisters>() + core::mem::size_of::<E1000MacRegisters>(), 0x20000);
+
+
+/// Struct that holds registers related to one receive queue.
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersRx {
@@ -146,7 +152,7 @@ pub struct RegistersRx {
 }
 
 
-///struct to hold registers related to one transmit queue
+/// Struct that holds registers related to one transmit queue.
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersTx {
