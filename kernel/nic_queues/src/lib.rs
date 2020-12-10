@@ -177,7 +177,6 @@ impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
         self.regs.update_tdt(self.tx_cur as u32);
         // Wait for the packet to be sent
         self.tx_descs[old_cur as usize].wait_for_packet_tx();
-        error!("packet sent on queue {}", self.id);
     }
 }
 

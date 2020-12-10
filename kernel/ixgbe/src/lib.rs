@@ -219,8 +219,7 @@ impl NetworkInterfaceCard for IxgbeNic {
     fn poll_receive(&mut self) -> Result<(), &'static str> {
         // by default, when using the physical NIC interface, we receive on queue 0.
         let qid = 0;
-        self.rx_queues[qid].remove_frames_from_queue()?;
-        Ok(())
+        self.rx_queues[qid].remove_frames_from_queue()
     }
 
     fn mac_address(&self) -> [u8; 6] {

@@ -52,14 +52,14 @@ fn rmain() -> Result<(), &'static str> {
         nic.send_packet(buffer)?;
     }
 
-    loop {
-        for nic in &mut nics {
-            nic.poll_receive()?;
-            if let Some(_buffer) = nic.get_received_frame() {
-                println!("Received packet on vnic {}", nic.id());
-            }
-        }
-    }
+    // loop {
+    //     for nic in &mut nics {
+    //         nic.poll_receive()?;
+    //         if let Some(_buffer) = nic.get_received_frame() {
+    //             println!("Received packet on vnic {}", nic.id());
+    //         }
+    //     }
+    // }
 
     Ok(())
 }

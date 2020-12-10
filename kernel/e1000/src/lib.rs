@@ -37,17 +37,15 @@ use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
+use memory::{PhysicalAddress, MappedPages};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card:: NetworkInterfaceCard;
-use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
-use intel_ethernet::{
-    descriptors::{TxDescriptor, RxDescriptor, LegacyRxDescriptor, LegacyTxDescriptor},
-};
+use nic_initialization::{allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
+use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
 
@@ -85,6 +83,9 @@ lazy_static! {
     static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
 }
 
+
+/// A struct which contains the receive queue registers and implements the `RxQueueRegisters` trait,
+/// which is required to store the registers in an `RxQueue` object.
 struct E1000RxQueueRegisters(BoxRefMut<MappedPages,E1000RxRegisters>);
 
 impl RxQueueRegisters for E1000RxQueueRegisters {
@@ -105,6 +106,8 @@ impl RxQueueRegisters for E1000RxQueueRegisters {
     }
 } 
 
+/// A struct which contains the transmit queue registers and implements the `TxQueueRegisters` trait,
+/// which is required to store the registers in a `TxQueue` object.
 struct E1000TxQueueRegisters(BoxRefMut<MappedPages,E1000TxRegisters>);
 
 impl TxQueueRegisters for E1000TxQueueRegisters {
@@ -151,17 +154,7 @@ pub struct E1000Nic {
 impl NetworkInterfaceCard for E1000Nic {
 
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        let txq = &mut self.tx_queue;
-        let max_tx_desc = E1000_NUM_TX_DESC as u16;
-        txq.tx_descs[txq.tx_cur as usize].send(transmit_buffer.phys_addr, transmit_buffer.length);  
-        // update the tx_cur value to hold the next free descriptor
-        let old_cur = txq.tx_cur;
-        txq.tx_cur = (txq.tx_cur + 1) % max_tx_desc;
-        // update the tdt register by 1 so that it knows the previous descriptor has been used
-        // and has a packet to be sent
-        txq.regs.0.tx_regs.tdt.write(txq.tx_cur as u32);
-        // Wait for the packet to be sent
-        txq.tx_descs[old_cur as usize].wait_for_packet_tx();
+        self.tx_queue.send_on_queue(transmit_buffer);
         Ok(())
     }
 
@@ -170,60 +163,7 @@ impl NetworkInterfaceCard for E1000Nic {
     }
 
     fn poll_receive(&mut self) -> Result<(), &'static str> {
-        let rxq = &mut self.rx_queue;
-        let rx_buffer_size = E1000_RX_BUFFER_SIZE_IN_BYTES;
-        let num_descs = E1000_NUM_RX_DESC as u16;
-        
-        let mut cur = rxq.rx_cur as usize;
-       
-        let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
-        let mut _total_packet_length: u16 = 0;
-
-        while rxq.rx_descs[cur].descriptor_done() {
-            // get information about the current receive buffer
-            let length = rxq.rx_descs[cur].length();
-            _total_packet_length += length as u16;
-            // debug!("remove_frames_from_queue: received descriptor of length {}", length);
-            
-            // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
-            // (because we're saving it for higher layers to use),
-            // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.
-            let new_receive_buf = match RX_BUFFER_POOL.pop() {
-                Some(rx_buf) => rx_buf,
-                None => {
-                    warn!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
-                    // if the pool was empty, then we allocate a new receive buffer
-                    let len = rx_buffer_size;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
-                    ReceiveBuffer::new(mp, phys_addr, len, &RX_BUFFER_POOL)
-                }
-            };
-
-            // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            rxq.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
-
-            // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
-            // getting back the receive buffer that is part of the received ethernet frame
-            rxq.rx_bufs_in_use.push(new_receive_buf);
-            let mut current_rx_buf = rxq.rx_bufs_in_use.swap_remove(cur); 
-            current_rx_buf.length = length as u16; // set the ReceiveBuffer's length to the size of the actual packet received
-            receive_buffers_in_frame.push(current_rx_buf);
-
-            // move on to the next receive buffer to see if it's ready for us to take
-            rxq.rx_cur = (cur as u16 + 1) % num_descs;
-            rxq.regs.0.rx_regs.rdt.write(cur as u32); 
-
-            if rxq.rx_descs[cur].end_of_packet() {
-                let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
-                rxq.received_frames.push_back(ReceivedFrame(buffers));
-            } else {
-                warn!("NIC::remove_frames_from_queue(): Received multi-rxbuffer frame, this scenario not fully tested!");
-            }
-            rxq.rx_descs[cur].reset_status();
-            cur = rxq.rx_cur as usize;
-        }
-
-        Ok(())     
+        self.rx_queue.remove_frames_from_queue()  
     }
 
     fn mac_address(&self) -> [u8; 6] {
