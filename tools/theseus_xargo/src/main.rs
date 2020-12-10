@@ -31,10 +31,7 @@ extern crate itertools;
 
 use getopts::Options;
 use std::{
-    collections::{
-        HashSet,
-        HashMap,
-    },
+    collections::HashMap,
     env,
     fs,
     io::{self, BufRead, BufReader},
@@ -84,12 +81,12 @@ fn main() -> Result<(), String> {
 
     let input_dir_arg  = matches.opt_str("input").expect("required --input arg was not provided");
     let input_dir_path = fs::canonicalize(&input_dir_arg)
-        .map_err(|e| format!("--input arg {:?} was invalid path, error: {:?}", input_dir_arg, e))?;
+        .map_err(|e| format!("--input arg '{}' was invalid path, error: {}", input_dir_arg, e))?;
     let prebuilt_crates_set = if input_dir_path.is_dir() {
         populate_crates_from_dir(&input_dir_path)
-            .map_err(|e| format!("Error parsing --input arg as directory: {:?}", e))?
+            .map_err(|e| format!("Error parsing --input arg as directory: {}", e))?
     } else {
-        return Err(format!("Couldn't access --input argument {:?} as a directory", input_dir_path));
+        return Err(format!("Couldn't access --input argument '{}' as a directory", input_dir_path.display()));
     };
 
     let cargo_cmd_string = matches.free.join(" ");
@@ -108,9 +105,9 @@ fn main() -> Result<(), String> {
 
     // re-execute the rustc commands that we captured from the original xargo/cargo verbose output. 
     for original_cmd in &stderr_captured {
+        // This function will only re-run rustc for crates that don't already exist in the set of prebuilt crates.
         run_rustc_command(original_cmd, &prebuilt_crates_set, input_dir_path.as_path())?;
     }
-
 
     Ok(())
 }
@@ -135,10 +132,15 @@ fn print_usage(opts: Options) {
 }
 
 // The commands we care about capturing starting with "Running `" and end with "`".
-const COMMAND_START: &str = "Running `";
-const COMMAND_END:   &str = "`";
-const RUSTC_START:   &str = "rustc --crate-name";
-const BUILD_SCRIPT:  &str = "build-script-build";
+const COMMAND_START:              &str = "Running `";
+const COMMAND_END:                &str = "`";
+const RUSTC_CMD_START:            &str = "rustc --crate-name";
+const BUILD_SCRIPT_CRATE_NAME:    &str = "build_script_build";
+
+// The format of rmeta file names. 
+const RMETA_FILE_PREFIX:          &str = "lib";
+const RMETA_FILE_EXTENSION:       &str = "rmeta";
+const PREFIX_END: usize = RMETA_FILE_PREFIX.len();
 
 
 /// Runs the actual xargo command, e.g., xargo build, 
@@ -268,18 +270,30 @@ fn run_initial_xargo(_env_vars: HashMap<String, String>, full_args: String, verb
 }
 
 
+/// Returns true if the given `arg` should be ignored in our rustc invocation. 
+fn ignore_arg(arg: &str) -> bool {
+    arg == "--error-format" ||
+    arg == "--json"
+}
+
+
 /// Takes the given `original_cmd` that was captured from the verbose output of cargo/xargo,
 /// and parses/modifies it to link against (depend on) the corresponding crate of the same name
 /// from the list of prebuilt crates. 
 ///
 /// The actual dependency files (.rmeta/.rlib) for the prebuilt crates should be located in the `prebuilt_dir`. 
 ///
-/// Returns an error if the command fails. 
+/// # Return
+/// * Returns `Ok(true` if everything works and the modified rustc command executes properly. 
+/// * Returns `Ok(false)` if no action needs to be taken. 
+///   This occurs if `original_cmd` is for building a build script (currently ignored), 
+///   or if `original_cmd` is for building a crate that already exists in the set of `prebuilt_crates`.
+/// * Returns an error if the command fails. 
 fn run_rustc_command(
     original_cmd: &str,
-    prebuilt_crates: &HashSet<String>,
+    prebuilt_crates: &HashMap<String, String>,
     prebuilt_dir: &Path
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let command = if original_cmd.starts_with(COMMAND_START) && original_cmd.ends_with(COMMAND_END) {
         let end_index = original_cmd.len() - COMMAND_END.len();
         &original_cmd[COMMAND_START.len() .. end_index]
@@ -289,15 +303,18 @@ fn run_rustc_command(
         ));
     };
 
-    // Skip build script invocations, as I don't think we need to re-run those. 
-    if command.ends_with(BUILD_SCRIPT) {
-        return Ok(());
+    // Skip invocations of build scripts, as I don't think we need to re-run those. 
+    // If this turns out to be wrong and we do need to run them, we need to change this logic to simply re-run it
+    // and skip pretty much the rest of this entire function.
+    if command.ends_with("build-script-build") {
+        return Ok(false);
     }
     
     println!("\n\nLooking at original command:\n{}", command);
-    let start_of_rustc_cmd = command.find(RUSTC_START).ok_or_else(|| 
-        format!("Couldn't find {:?} in command:\n{:?}", RUSTC_START, command)
+    let start_of_rustc_cmd = command.find(RUSTC_CMD_START).ok_or_else(|| 
+        format!("Couldn't find {:?} in command:\n{:?}", RUSTC_CMD_START, command)
     )?;
+    let environment         = &command[.. start_of_rustc_cmd];
     let command_without_env = &command[start_of_rustc_cmd ..];
 
     // The arguments in the command that we care about are:
@@ -310,13 +327,13 @@ fn run_rustc_command(
     // "rustc --crate-name <crate_name> <crate_source_file> <all_other_args>"
     let top_level_matches = clap::App::new("rustc")
         // The first argument that we want to see, --crate-name.
-        .arg(clap::Arg::with_name("crate-name")
+        .arg(clap::Arg::with_name("--crate-name")
             .long("crate-name")
             .takes_value(true)
             .required(true)
         )
         .setting(clap::AppSettings::DisableHelpFlags)
-        .setting(clap::AppSettings::DisableHelpFlags)
+        .setting(clap::AppSettings::DisableHelpSubcommand)
         .setting(clap::AppSettings::AllowExternalSubcommands)
         .setting(clap::AppSettings::ColorNever)
         .get_matches_from_safe(command_without_env.split_whitespace());
@@ -331,111 +348,113 @@ fn run_rustc_command(
     // * the path to the crate's main file will be the first subcommand
     // * that subcommand's arguments will include ALL OTHER arguments that we care about, specified below.
 
-    let crate_name = top_level_matches.value_of("crate-name").unwrap();
+    let crate_name = top_level_matches.value_of("--crate-name").unwrap();
     let (crate_source_file, additional_args) = top_level_matches.subcommand();
     let additional_args = additional_args.unwrap();
 
-    println!("\nGot match info:\ncrate-name: {:?}\ncrate_source_file: {:?}\nadditional_args: {:#?}", crate_name, crate_source_file, additional_args);
+    // Skip build script invocations, as I don't think we need to re-run those. 
+    if crate_name == BUILD_SCRIPT_CRATE_NAME {
+        println!("\n### Skipping build script build");
+        return Ok(false);
+    }
+
+    // Skip crates that have already been built. (Not sure if this is always 100% correct)
+    if prebuilt_crates.contains_key(crate_name) {
+        println!("\n### Skipping already-built crate {:?}", crate_name);
+        return Ok(false);
+    }
+
+    // println!("\nGot match info:\ncrate-name: {:?}\ncrate_source_file: {:?}\nadditional_args: {:#?}", crate_name, crate_source_file, additional_args);
     let args_after_source_file = additional_args.values_of("").unwrap();
 
     // Second, we parse all other args in the command that followed the crate source file. 
-    let matches = clap::App::new("")
-        // The -L linker arg we care about
-        .arg(clap::Arg::with_name("L")
-            .short("L")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // The --extern crate arg we care about
-        .arg(clap::Arg::with_name("extern")
-            .long("extern")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // We don't care about -C arguments
-        .arg(clap::Arg::with_name("C")
-            .short("C")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // We don't care about -D arguments
-        .arg(clap::Arg::with_name("DZ")
-            .short("D")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // We don't care about -Z arguments
-        .arg(clap::Arg::with_name("")
-            .short("Z")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // We don't care about the --crate-type argument
-        .arg(clap::Arg::with_name("crate-type")
-            .long("crate-type")
-            .takes_value(true)
-        )
-        // We don't care about the --emit arguments
-        .arg(clap::Arg::with_name("emit")
-            .long("emit")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // We don't care about the --out-dir argument
-        .arg(clap::Arg::with_name("out-dir")
-            .long("out-dir")
-            .takes_value(true)
-        )
-        // We don't care about the --error-format argument
-        .arg(clap::Arg::with_name("error-format")
-            .long("error-format")
-            .takes_value(true)
-        )
-        // We don't care about the --json argument
-        .arg(clap::Arg::with_name("json")
-            .long("json")
-            .takes_value(true)
-        )
-        // We don't care about the --target argument
-        .arg(clap::Arg::with_name("target")
-            .long("target")
-            .takes_value(true)
-        )
-        // We don't care about the --sysroot argument
-        .arg(clap::Arg::with_name("sysroot")
-            .long("sysroot")
-            .takes_value(true)
-        )
-        // We don't care about the --cfg arguments
-        .arg(clap::Arg::with_name("cfg")
-            .long("cfg")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // We don't care about the --cap-lints arguments
-        .arg(clap::Arg::with_name("cap-lints")
-            .long("cap-lints")
-            .takes_value(true)
-            .multiple(true)
-        )
-        // Note: add any other arguments that you encounter in a rustc invocation here.
+    // Note that the arg name, the parameter in with_name(), in each arg below MUST BE exactly how it is invoked by cargo.
+    let matches = rustc_clap_options()
         .setting(clap::AppSettings::DisableHelpFlags)
-        .setting(clap::AppSettings::DisableHelpFlags)
-        .setting(clap::AppSettings::AllowExternalSubcommands)
+        .setting(clap::AppSettings::DisableHelpSubcommand)
         .setting(clap::AppSettings::ColorNever)
+        .setting(clap::AppSettings::NoBinaryName)
         .get_matches_from_safe(args_after_source_file);
     
     let matches = matches.map_err(|e| 
         format!("Missing support for argument found in captured rustc command: {}", e)
     )?;
-
     println!("\n\nMatches: {:#?}", matches);
 
 
+    // Now, re-create the rustc command invocation with the proper arguments.
+    let mut recreated_cmd = Command::new("rustc");
+    recreated_cmd
+        .arg("--crate-name")
+        .arg(crate_name)
+        .arg(crate_source_file);
 
-    let env = &command[.. start_of_rustc_cmd];
+    // After adding the initial stuff: rustc command, crate name, and crate source file, 
+    // the other arguments are added in the loop below. 
+    for (&arg, values) in matches.args.iter() {
+        println!("Arg {:?} has values:\n\t {:?}", arg, values.vals);
+        if ignore_arg(arg) { continue; }
 
-    Ok(())
+        for value in &values.vals {
+            let value = value.to_string_lossy();
+            if arg == "--extern" {
+                let (extern_crate_name, crate_rmeta_path) = value
+                    .find('=')
+                    .map(|idx| value.split_at(idx))
+                    .map(|(name, path)| (name, &path[1..])) // ignore the '=' delimiter
+                    .ok_or_else(|| format!("Failed to parse value of --extern arg as CRATENAME=PATH: {:?}", value))?;
+                println!("Found --extern arg, {:?} --> {:?}", extern_crate_name, crate_rmeta_path);
+                if let Some(extern_crate_name_with_hash) = prebuilt_crates.get(extern_crate_name) {
+                    let mut new_crate_path = prebuilt_dir.to_path_buf();
+                    new_crate_path.push(format!("{}{}.{}", RMETA_FILE_PREFIX, extern_crate_name_with_hash, RMETA_FILE_EXTENSION));
+                    println!("#### Replacing crate {:?} with prebuilt crate at {}", extern_crate_name, new_crate_path.display())
+                }
+            } else if arg == "-L" {
+                let (kind, path) = value.as_ref()
+                    .find('=')
+                    .map(|idx| value.split_at(idx))
+                    .map(|(kind, path)| (kind, &path[1..])) // ignore the '=' delimiter
+                    .ok_or_else(|| format!("Failed to parse value of -L arg as KIND=PATH: {:?}", value))?;
+                println!("Found -L arg, {:?} --> {:?}", kind, path);
+                if kind != "dependency" {
+                    return Err(format!("Unsupported -L arg value {:?}. We only support 'dependency=PATH'.", value));
+                }
+
+            }
+            recreated_cmd.arg(arg);
+            recreated_cmd.arg(value.as_ref());
+        }
+    }
+
+    // Add our directory of prebuilt crates as a library search path, for dependency resolution. 
+    // Note that I'm not sure if this is required, or if it hurts, or if we need to remove existing -L arguments first. 
+    recreated_cmd.arg("-L").arg(prebuilt_dir);
+
+    println!("About to execute recreated_cmd:\n{:?}", recreated_cmd);
+    // println!("Press enter to run the above command ...");
+    // let mut buf = String::new();
+    // io::stdin().read_line(&mut buf).expect("failed to read stdin");
+
+
+    // TODO: do we need to modify the environment variable `LD_LIBRARY_PATH`? 
+    //       It includes a target/deps/ directory, but I'm not sure if it's used by rustc.
+
+    // Run the recreated rustc command.
+    let mut rustc_process = recreated_cmd.spawn().map_err(|io_err| 
+        format!("Failed to run xargo command: {:?}", io_err)
+    )?;
+    let exit_status = rustc_process.wait().map_err(|io_err| 
+        format!("Error running rustc: {}", io_err)
+    )?;
+
+    match exit_status.code() {
+        Some(0) => {
+            println!("Ran rustc command successfully.");
+            Ok(true)
+        }
+        Some(code) => Err(format!("rustc command exited with failure code {}", code)),
+        _ => Err(format!("rustc command failed and was killed.")),
+    }
 }
 
 
@@ -448,13 +467,12 @@ fn run_rustc_command(
 /// 
 /// This function only looks at the `.rmeta` files in the given directory 
 /// and extracts from that file name the name of the crate name as a String.
-/// That String consists of `"<crate_name>-<hash>", and the set of unique crate names is returned.
-fn populate_crates_from_dir<P: AsRef<Path>>(dir_path: P) -> Result<HashSet<String>, io::Error> {
-    const RMETA_FILE_EXTENSION: &str = "rmeta";
-    const RMETA_FILE_PREFIX:    &str = "lib";
-    const PREFIX_END: usize = RMETA_FILE_PREFIX.len();
-
-    let mut crates: HashSet<String> = HashSet::new();
+/// 
+/// Returns the set of discovered crates as a map, in which the key is the simple crate name 
+/// ("my_crate") and the value is the full crate name with the hash included ("my_crate-43462c60d48a531a").
+/// The value can be used to define the path to crate's actual .rmeta/.rlib file.
+fn populate_crates_from_dir<P: AsRef<Path>>(dir_path: P) -> Result<HashMap<String, String>, io::Error> {
+    let mut crates: HashMap<String, String> = HashMap::new();
     
     let dir_iter = WalkDir::new(dir_path)
         .into_iter()
@@ -466,7 +484,9 @@ fn populate_crates_from_dir<P: AsRef<Path>>(dir_path: P) -> Result<HashSet<Strin
         if path.extension().and_then(|p| p.to_str()) == Some(RMETA_FILE_EXTENSION) {
             let filestem = path.file_stem().expect("no valid file stem").to_string_lossy();
             if filestem.starts_with("lib") {
-                crates.insert(filestem[PREFIX_END ..].to_string());
+                let crate_name_with_hash = &filestem[PREFIX_END ..];
+                let crate_name_without_hash = crate_name_with_hash.split('-').next().unwrap();
+                crates.insert(crate_name_without_hash.to_string(), crate_name_with_hash.to_string());
             } else {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -478,3 +498,119 @@ fn populate_crates_from_dir<P: AsRef<Path>>(dir_path: P) -> Result<HashSet<Strin
     Ok(crates)
 }
 
+
+
+
+/// Creates a `Clap::App` instance that handles all (most) of the command-line arguments
+/// accepted by the `rustc` executable. 
+///
+/// I obtained this by looking at the output of `rustc --help --verbose`. 
+fn rustc_clap_options<'a, 'b>() -> clap::App<'a, 'b> {
+    clap::App::new("")
+        .arg(clap::Arg::with_name("-L")
+            .short("L")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("--extern")
+            .long("extern")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("-C")
+            .short("C")
+            .long("codegen")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("-W")
+            .short("W")
+            .long("warn")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("-A")
+            .short("A")
+            .long("allow")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("-D")
+            .short("D")
+            .long("deny")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("-F")
+            .short("F")
+            .long("forbid")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("--cap-lints")
+            .long("cap-lints")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("-Z")
+            .short("Z")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("--crate-type")
+            .long("crate-type")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("--emit")
+            .long("emit")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("--edition")
+            .long("edition")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("-g")
+            .short("g")
+        )
+        .arg(clap::Arg::with_name("-O")
+            .short("O")
+        )
+        .arg(clap::Arg::with_name("--out-dir")
+            .long("out-dir")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("--error-format")
+            .long("error-format")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("--json")
+            .long("json")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("--target")
+            .long("target")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("--sysroot")
+            .long("sysroot")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("--cfg")
+            .long("cfg")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("--verbose")
+            .short("v")
+            .long("verbose")
+            .takes_value(false)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("--remap-path-prefix")
+            .long("remap-path-prefix")
+            .takes_value(false)
+            .multiple(true)
+        )
+        // Note: add any other arguments that you encounter in a rustc invocation here.
+}
