@@ -22,6 +22,7 @@
 
 // we may wish to use the rustc_metadata crate to parse .rmeta files to get the exact version/hash of each dependency.
 // #![feature(rustc_private)] 
+#![feature(command_access)]
 
 extern crate getopts;
 extern crate clap;
@@ -35,7 +36,7 @@ use std::{
     env,
     fs,
     io::{self, BufRead, BufReader},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
 };
@@ -95,13 +96,66 @@ fn main() -> Result<(), String> {
     println!("VERBOSE_LEVEL: {:?}", verbose_count);
 
     let stderr_captured = run_initial_xargo(env_vars, cargo_cmd_string.clone(), verbose_count)?;
-    // println!("\n\n------------------- STDERR --------------------- \n{}", stderr_captured.join("\n\n"));
+    println!("\n\n------------------- STDERR --------------------- \n{}", stderr_captured.join("\n\n"));
 
     if cargo_cmd_string.split_whitespace().next() != Some("build") {
         println!("Exiting after completing non-'build' xargo command.");
         return Ok(());
     }
 
+    let last_cmd = stderr_captured.last()
+        .ok_or_else(|| format!("No commands captured from stderr during the initial xargo command"))?;
+    let out_dir = PathBuf::from(get_out_dir_arg(last_cmd)?);
+
+    // Now that we have run the initial xargo build, it has created many redundant dependency artifacts 
+    // in the local crate's target/ directory, namely the locally re-built versions of Theseus kernel crates,
+    // specifically all the crates that are in the set of prebuilt crates.
+    // We need to remove those redundant files from the local target/ directory (the "out-dir")
+    // such that when we re-issue the rustc commands below, it won't fail with an error about 
+    // multiple "potentially newer" versions of a given crate dependency. 
+    for dir_entry in fs::read_dir(&out_dir).unwrap() {
+        let dir_entry = dir_entry.unwrap();
+        let path = dir_entry.path();
+        if !dir_entry.file_type().unwrap().is_file() {
+            return Err(format!("Found unexpected non-file entry in out_dir: {}", path.display()));
+        }
+
+        // We should remove all potential redundant files, including:
+        // * <crate_name>-<hash>.d
+        // * <crate_name>-<hash>.o
+        // * lib<crate_name>-<hash>.rmeta
+        // * lib<crate_name>-<hash>.rlib
+        //
+        // We do not know the exact hash value appended to each crate, we only know the plain crate name.
+        // Here, extract the plain crate_name from the file name.
+        let crate_name = match path.extension().and_then(|os_str| os_str.to_str()) {
+            Some("d") | Some("o") => {
+                get_plain_crate_name_from_path(&path)?
+            }
+            Some("rmeta") | Some("rlib") => {
+                let libcrate_name = get_plain_crate_name_from_path(&path)?;
+                if libcrate_name.starts_with(RMETA_FILE_PREFIX) {
+                    &libcrate_name[PREFIX_END ..]
+                } else {
+                    return Err(format!("Found .rlib or .rmeta file in out_dir that didn't start with 'lib' prefix: {}", path.display()));
+                }
+            }
+            _ => {
+                return Err(format!("Found file with unexpected extension: {}", path.display()));
+            }
+        };
+
+        // See if that crate already exists in our set of prebuilt crates.
+        if prebuilt_crates_set.contains_key(crate_name) {
+            // remove the redundant file
+            println!("### Removing redundant crate file from out_dir {}", path.display());
+            fs::remove_file(&path).map_err(|e| 
+                format!("Failed to remove redundant crate file in out_dir: {}. Error: {}", path.display(), e)
+            )?;
+        } else {
+            // do nothing: keep the non-redundant file
+        }
+    }
 
     // re-execute the rustc commands that we captured from the original xargo/cargo verbose output. 
     for original_cmd in &stderr_captured {
@@ -110,6 +164,16 @@ fn main() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+
+/// Parses the given `path` to obtain the part of the filename before the crate name delimiter '-'. 
+fn get_plain_crate_name_from_path<'p>(path: &'p Path) -> Result<&'p str, String> {
+    path.file_stem()
+        .and_then(|os_str| os_str.to_str())
+        .ok_or_else(|| format!("Couldn't get file name of file in out_dir: {}", path.display()))?
+        .split('-').next()
+        .ok_or_else(|| format!("File in out_dir missing delimiter '-' between crate name and hash. {}", path.display()))
 }
 
 
@@ -146,9 +210,12 @@ const PREFIX_END: usize = RMETA_FILE_PREFIX.len();
 /// Runs the actual xargo command, e.g., xargo build, 
 /// with all of the arguments specified on the command line. 
 ///
-/// Returns the captured content of content written to `stderr` by the xargo command,
-/// as a list of lines.
-fn run_initial_xargo(_env_vars: HashMap<String, String>, full_args: String, verbose_level: usize) -> Result<Vec<String>, String> {
+/// Returns the captured content of content written to `stderr` by the xargo command, as a list of lines.
+fn run_initial_xargo(
+    _env_vars: HashMap<String, String>,
+    full_args: String,
+    verbose_level: usize
+) -> Result<Vec<String>, String> {
     println!("FULL ARGS: {}", full_args);
 
     let mut cmd = Command::new("xargo");
@@ -389,6 +456,8 @@ fn run_rustc_command(
         .arg(crate_name)
         .arg(crate_source_file);
 
+    let mut args_changed = false;
+
     // After adding the initial stuff: rustc command, crate name, and crate source file, 
     // the other arguments are added in the loop below. 
     for (&arg, values) in matches.args.iter() {
@@ -397,6 +466,8 @@ fn run_rustc_command(
 
         for value in &values.vals {
             let value = value.to_string_lossy();
+            let mut new_value = value.to_string();
+
             if arg == "--extern" {
                 let (extern_crate_name, crate_rmeta_path) = value
                     .find('=')
@@ -407,7 +478,8 @@ fn run_rustc_command(
                 if let Some(extern_crate_name_with_hash) = prebuilt_crates.get(extern_crate_name) {
                     let mut new_crate_path = prebuilt_dir.to_path_buf();
                     new_crate_path.push(format!("{}{}.{}", RMETA_FILE_PREFIX, extern_crate_name_with_hash, RMETA_FILE_EXTENSION));
-                    println!("#### Replacing crate {:?} with prebuilt crate at {}", extern_crate_name, new_crate_path.display())
+                    println!("#### Replacing crate {:?} with prebuilt crate at {}", extern_crate_name, new_crate_path.display());
+                    new_value = format!("{}={}", extern_crate_name, new_crate_path.display());
                 }
             } else if arg == "-L" {
                 let (kind, path) = value.as_ref()
@@ -419,18 +491,34 @@ fn run_rustc_command(
                 if kind != "dependency" {
                     return Err(format!("Unsupported -L arg value {:?}. We only support 'dependency=PATH'.", value));
                 }
-
+                // TODO: if we need to actually modify any -L argument values, then set `new_value` accordingly here. 
             }
+
+            if value != new_value {
+                args_changed = true;
+            } 
             recreated_cmd.arg(arg);
-            recreated_cmd.arg(value.as_ref());
+            recreated_cmd.arg(new_value);
         }
     }
 
     // Add our directory of prebuilt crates as a library search path, for dependency resolution. 
-    // Note that I'm not sure if this is required, or if it hurts, or if we need to remove existing -L arguments first. 
+    // This is okay because we removed all of the potentially conflicting crates from the local target/ directory,
+    // which ensures that adding in the directory of prebuilt crate .rmeta/.rlib files won't cause rustc to complain
+    // about multiple "potentially newer" versions of a given crate.
     recreated_cmd.arg("-L").arg(prebuilt_dir);
 
-    println!("About to execute recreated_cmd:\n{:?}", recreated_cmd);
+    // If any args actually changed, we need to run the re-created command. 
+    if args_changed {
+        // println!("\n\n--------------- Inherited Environment Variables ----------------\n");
+        // let _env_cmd = Command::new("env").spawn().unwrap().wait().unwrap();
+        println!("About to execute recreated_cmd that had changed arguments:\n{:?}", recreated_cmd);
+    } else {
+        println!("### Args did not change, skipping recreated_cmd:\n{:?}", recreated_cmd);
+        return Ok(false);
+    }
+
+    recreated_cmd.get_envs().for_each(|(k, v)| println!("Re-created command has env: {:?} -> {:?}", k, v)); 
     // println!("Press enter to run the above command ...");
     // let mut buf = String::new();
     // io::stdin().read_line(&mut buf).expect("failed to read stdin");
@@ -457,6 +545,26 @@ fn run_rustc_command(
     }
 }
 
+
+/// Parse the given verbose rustc command string and return the value of the "--out-dir" argument.
+fn get_out_dir_arg(cmd_str: &str) -> Result<String, String> {
+    let out_dir_str_start = cmd_str.find(" --out-dir")
+        .map(|idx| &cmd_str[idx..])
+        .ok_or_else(|| format!("Captured rustc command did not have an --out-dir argument"))?;
+    let out_dir_parse = rustc_clap_options()
+        .setting(clap::AppSettings::DisableHelpFlags)
+        .setting(clap::AppSettings::DisableHelpSubcommand)
+        .setting(clap::AppSettings::AllowExternalSubcommands)
+        .setting(clap::AppSettings::NoBinaryName)
+        .setting(clap::AppSettings::ColorNever)
+        .get_matches_from_safe(out_dir_str_start.split_whitespace());
+    let matches = out_dir_parse.map_err(|e| 
+        format!("Could not parse --out-dir argument in captured rustc command.\nError {}", e)
+    )?;
+    matches.value_of("--out-dir")
+        .map(String::from)
+        .ok_or_else(|| format!("--out-dir argument did not have a value"))
+}
 
 
 /// Iterates over the contents of the given directory to find crates within it. 

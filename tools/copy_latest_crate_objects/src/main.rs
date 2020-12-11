@@ -246,6 +246,7 @@ fn main() -> Result<(), String> {
         kernel_objects_and_deps_files.values().flat_map(|(_, deps)| deps.iter()),
         "",
     ).unwrap();
+    // Currently we also copy non-kernel dependency files just for efficiency in future out-of-tree builds.
     copy_files(
         &output_deps_dir,
         other_objects_and_deps_files.values().flat_map(|(_, deps)| deps.iter()),

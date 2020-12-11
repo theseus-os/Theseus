@@ -13,7 +13,7 @@ cargo install --force --path=$THESEUS_XARGO_PATH --root=$THESEUS_XARGO_PATH
 
 RUST_TARGET_PATH="/home/kevin/Dropbox/Theseus/cfg"  \
 	RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no" \
-	$THESEUS_XARGO_PATH/bin/theseus_xargo --input ../target/x86_64-theseus/release/deps \
+	$THESEUS_XARGO_PATH/bin/theseus_xargo --input ../build/deps \
 	build --color=always --release \
 	--target x86_64-theseus
 	
