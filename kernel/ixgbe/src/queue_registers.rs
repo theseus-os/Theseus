@@ -1,4 +1,5 @@
 //! Structs which provide access to the ixgbe device queue registers and store their backing memory pages.
+//! 
 //! They implement the `RxQueueRegisters` and `TxQueueRegisters` traits which allows 
 //! the registers to be accessed through virtual NICs
 
@@ -13,11 +14,11 @@ use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 use memory::MappedPages;
 
 
-/// Struct that stores a pointer to registers for one ixgbe receive queue 
-/// as well as a shared reference to the backing MappedPages where these registers are located.
+/// Struct that stores a pointer to registers for one ixgbe receive queue
+/// as well as a shared reference to the backing `MappedPages` where these registers are located.
 pub struct IxgbeRxQueueRegisters {
-    /// We prevent the drop handler from dropping the `regs` because the backing memory is not on the heap, but in the stored mapped pages.
-    /// The memory will be deallocated when the `backing_pages` are dropped.
+    /// We prevent the drop handler from dropping the `regs` because the backing memory is not in the heap,
+    /// but in the stored mapped pages. The memory will be deallocated when the `backing_pages` are dropped.
     pub regs: ManuallyDrop<Box<RegistersRx>>,
     pub backing_pages: Arc<MappedPages>
 }
@@ -51,11 +52,11 @@ impl DerefMut for IxgbeRxQueueRegisters {
     }
 }
 
-/// Struct that stores a pointer to registers for one ixgbe transmit queue 
-/// as well as a shared reference to the backing MappedPages where these registers are located.
+/// Struct that stores a pointer to registers for one ixgbe transmit queue
+/// as well as a shared reference to the backing `MappedPages` where these registers are located.
 pub struct IxgbeTxQueueRegisters {
-    /// We prevent the drop handler from dropping the `regs` because the backing memory is not on the heap, but in the stored mapped pages.
-    /// The memory will be deallocated when the `backing_pages` are dropped.
+    /// We prevent the drop handler from dropping the `regs` because the backing memory is not in the heap,
+    /// but in the stored mapped pages. The memory will be deallocated when the `backing_pages` are dropped.
     pub regs: ManuallyDrop<Box<RegistersTx>>,
     pub backing_pages: Arc<MappedPages>
 }

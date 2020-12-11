@@ -29,7 +29,7 @@ extern crate nic_queues;
 extern crate nic_initialization;
 
 pub mod test_e1000_driver;
-pub mod regs;
+mod regs;
 use regs::*;
 
 use spin::Once; 
@@ -268,15 +268,13 @@ impl E1000Nic {
     fn map_e1000_regs(
         _device: &PciDevice, 
         mem_base: PhysicalAddress
-    ) -> Result<
-        (
-            BoxRefMut<MappedPages, E1000Registers>, 
-            BoxRefMut<MappedPages, E1000RxRegisters>, 
-            BoxRefMut<MappedPages, E1000TxRegisters>, 
-            BoxRefMut<MappedPages, E1000MacRegisters>
-        ), 
-        &'static str> 
-    {
+    ) -> Result<(
+        BoxRefMut<MappedPages, E1000Registers>, 
+        BoxRefMut<MappedPages, E1000RxRegisters>, 
+        BoxRefMut<MappedPages, E1000TxRegisters>, 
+        BoxRefMut<MappedPages, E1000MacRegisters>
+    ), &'static str> {
+
         const GENERAL_REGISTERS_SIZE_BYTES: usize = 8192;
         const RX_REGISTERS_SIZE_BYTES: usize = 4096;
         const TX_REGISTERS_SIZE_BYTES: usize = 4096;
@@ -348,12 +346,11 @@ impl E1000Nic {
     fn rx_init(
         regs: &mut E1000Registers, 
         rx_regs: &mut E1000RxQueueRegisters
-    ) -> Result<(BoxRefMut<MappedPages, [LegacyRxDescriptor]>, Vec<ReceiveBuffer>), &'static str> {
-
-        // get the queue of rx descriptors and its corresponding rx buffers
-        // let (rx_descs, rx_bufs_in_use) = Self::init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rdbal, 
-        //                                 &mut regs.rdbah, &mut regs.rdlen, &mut regs.rdh, &mut regs.rdt)?;          
-        
+    ) -> Result<(
+        BoxRefMut<MappedPages, [LegacyRxDescriptor]>, 
+        Vec<ReceiveBuffer>
+    ), &'static str> {
+        // get the queue of rx descriptors and its corresponding rx buffers     
         let (rx_descs, rx_bufs_in_use) = init_rx_queue(E1000_NUM_RX_DESC as usize, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, rx_regs)?;          
             
         // Write the tail index.
@@ -375,11 +372,9 @@ impl E1000Nic {
         regs: &mut E1000Registers, 
         tx_regs: &mut E1000TxQueueRegisters
     ) -> Result<BoxRefMut<MappedPages, [LegacyTxDescriptor]>, &'static str> {
-
+        // get the queue of tx descriptors     
         let tx_descs = init_tx_queue(E1000_NUM_TX_DESC as usize, tx_regs)?;
-        
         regs.tctl.write(regs::TCTL_EN | regs::TCTL_PSP);
-
         Ok(tx_descs)
     }       
     

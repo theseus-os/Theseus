@@ -1,32 +1,16 @@
+//! A set of functions to create packets for testing the NIC transmission functionality.
+
 use super::{IXGBE_NIC, NetworkInterfaceCard, TransmitBuffer};
 
-//TODO: should probably have one testing suite for both drivers
-pub fn test_nic_ixgbe_driver(_: Option<u64>) {
-    match dhcp_request_packet() {
-        Ok(_) => debug!("test_ixgbe_nic_driver(): sent DHCP request packet successfully!"),
-        Err(e) => error!("test_ixgbe_nic_driver(): failed to send DHCP request packet: error {:?}", e),
-    };
-}
-
-//should test packet transmission and reception as QEMU DHCP server will respond
-
-//will only b able to see this Tx message in netdump.pcap if user is not mentioned in QEMU flags of Makefile
-//QEMU_FLAGS += -net nic,vlan=0,model=e1000,macaddr=00:0b:82:01:fc:42 -net dump,file=netdump.pcap
-
-//will only receive a response if user is mentioned in qemu flags
-//QEMU_FLAGS += -net nic,vlan=1,model=e1000,macaddr=00:0b:82:01:fc:42 -net user,vlan=1 -net dump,file=netdump.pcap
-
-//or else use a tap interface (default)
-//QEMU_FLAGS += -device e1000,netdev=network0,mac=52:55:00:d1:55:01 -netdev tap,id=network0,ifname=tap0,script=no,downscript=no
-//will receive a DHCP messgae from 00:1f:c6:9c:89:4c
-
+/// Sends a dhcp request packet on the ixgbe NIC.
 pub fn dhcp_request_packet() -> Result<(), &'static str> {
-    let transmit_buffer = create_test_packet()?;
+    let transmit_buffer = create_dhcp_test_packet()?;
     let ixgbe_nc = IXGBE_NIC.try().ok_or("ixgbe NIC hasn't been initialized yet")?;
     ixgbe_nc.lock().send_packet(transmit_buffer)
 }
 
-pub fn create_test_packet() -> Result<TransmitBuffer, &'static str> {
+/// Creates a `TransmitBuffer` containing a dhcp packet.
+pub fn create_dhcp_test_packet() -> Result<TransmitBuffer, &'static str> {
     let packet: [u8; 314] = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x1f, 0xc6, 0x9c, 0x89, 0x4c, 0x08, 0x00, 0x45,
         0x00, 0x01, 0x2c, 0xa8, 0x36, 0x00, 0x00, 0xfa, 0x11, 0x17, 0x8b, 0x00, 0x00, 0x00, 0x00,
@@ -58,10 +42,13 @@ pub fn create_test_packet() -> Result<TransmitBuffer, &'static str> {
     Ok(transmit_buffer)
 }
 
-/// Create a TransmitBuffer that contains a packet with only the ethernet header.
-pub fn create_raw_packet(dest_mac_address: &[u8], source_mac_address: &[u8], message: &[u8]) 
-    -> Result<TransmitBuffer, &'static str> 
-{
+/// Creates a `TransmitBuffer` that contains a packet with only the ethernet header.
+pub fn create_raw_packet(
+    dest_mac_address: &[u8], 
+    source_mac_address: &[u8], 
+    message: &[u8]
+) -> Result<TransmitBuffer, &'static str> {
+    
     const ETHER_TYPE_LEN: usize = 2;
     const MAC_ADDR_LEN: usize = 6;
     const ETHERNET_HEADER_LEN: usize = MAC_ADDR_LEN * 2 + ETHER_TYPE_LEN;

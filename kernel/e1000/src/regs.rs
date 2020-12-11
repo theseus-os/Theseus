@@ -1,4 +1,4 @@
-//! This file contains the structs that are used to access device registers and conatins configuration values to write to registers.
+//! This file contains the structs that are used to access device registers and contains configuration values to write to registers.
 //! 
 //! The registers are divided into multiple structs because we need to separate out the
 //! receive and transmit queue registers and store them separately in a per-queue struct.

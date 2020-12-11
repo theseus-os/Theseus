@@ -1,4 +1,5 @@
-//! This file contains the structs that are used to access device registers.
+//! This file contains the structs that are used to access device registers and contains configuration values to write to registers.
+//! 
 //! The registers are divided into multiple structs because we need to separate out the 
 //! receive and transmit queue registers and store them separately for virtualization. 
 //! 
@@ -391,59 +392,13 @@ pub struct IntelIxgbeRegisters3 {
 
 const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters3>(), 18 * 4096);
 
-// /// Set of 4 32-bit registers
-// #[derive(FromBytes)]
-// #[repr(C)]
-// pub struct RegisterArray4 {
-//     pub reg:                            [Volatile<u32>;4],
-// }
+// check that the sum of all the register structs is equal to the memory of the ixgbe device (128 KiB).
+const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters1>() + core::mem::size_of::<IntelIxgbeRxRegisters1>() +
+    core::mem::size_of::<IntelIxgbeRegisters2>() + core::mem::size_of::<IntelIxgbeTxRegisters>() + 
+    core::mem::size_of::<IntelIxgbeMacRegisters>() + core::mem::size_of::<IntelIxgbeRxRegisters2>() +
+    core::mem::size_of::<IntelIxgbeRegisters3>(), 0x20000);
 
-// /// Set of 8 32-bit registers
-// #[derive(FromBytes)]
-// #[repr(C)]
-// pub struct RegisterArray8 {
-//     pub reg:                            [Volatile<u32>;8],
-// }
-
-// /// Set of 10 32-bit registers
-// #[derive(FromBytes)]
-// #[repr(C)]
-// pub struct RegisterArray10 {
-//     pub reg:                            [Volatile<u32>;10],
-// }
-
-// /// Set of 24 32-bit registers
-// #[derive(FromBytes)]
-// #[repr(C)]
-// pub struct RegisterArray24 {
-//     pub reg:                           [Volatile<u32>;24],
-// }
-
-// /// Set of 32 32-bit registers
-// #[repr(C)]
-// pub struct RegisterArray32 {
-//     pub reg:                            [Volatile<u32>;32],
-// }
-
-// /// Set of 64 32-bit registers
-// #[repr(C)]
-// pub struct RegisterArray64 {
-//     pub reg:                            [Volatile<u32>;64],
-// }
-
-// /// Set of 104 32-bit registers
-// #[repr(C)]
-// pub struct RegisterArray104 {
-//     pub reg:                           [Volatile<u32>;104],
-// }
-
-// /// Set of 128 32-bit registers
-// #[repr(C)]
-// pub struct RegisterArray128 {
-//     pub reg:                           [Volatile<u32>;128],
-// }
-
-/// Set of registers associated with one transmit descriptor queue
+/// Set of registers associated with one transmit descriptor queue.
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersTx {
@@ -478,7 +433,7 @@ pub struct RegistersTx {
     pub tdwbah:                         Volatile<u32>,          // 0x603C
 } // 64B
 
-/// Set of registers associated with one receive descriptor queue
+/// Set of registers associated with one receive descriptor queue.
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct RegistersRx {
@@ -516,7 +471,7 @@ pub const RDT_1:                        usize = 0x1018;
 pub const RDT_2:                        usize = 0xD018;
 /// Number of bytes between consecutive RDT registers
 pub const RDT_DIST:                     usize = 0x40;
-/// Offset where the RDT register starts for the first 64 queues
+/// Offset where the TDT register starts for the first 64 queues
 pub const TDT:                          usize = 0x6018;
 /// Number of bytes between consecutive TDT registers
 pub const TDT_DIST:                     usize = 0x40;
@@ -614,7 +569,7 @@ pub const RX_DESC_R_RELAX_ORDER_EN:     u32 = 1 << 9;
 pub const RX_DATA_W_RELAX_ORDER_EN:     u32 = 1 << 13;
 pub const RX_SP_HEAD_RELAX_ORDER_EN:    u32 = 1 << 15;
 pub const DCA_CPUID_SHIFT:              u32 = 24;
-pub const DCA_CTRL_ENABLE:                   u32 = 0;
+pub const DCA_CTRL_ENABLE:              u32 = 0;
 pub const DCA_MODE_1:                   u32 = 0 << 1;  
 pub const DCA_MODE_2:                   u32 = 1 << 1;
 

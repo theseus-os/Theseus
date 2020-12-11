@@ -1,5 +1,6 @@
 //! Interface for an application to request a `VirtualNIC` from the ixgbe device,
 //! and implementation of the `PhysicalNic` trait for the ixgbe device.
+//! 
 //! The `PhysicalNic` trait is required for returning virtual NIC resources to the ixgbe device when dropped.
 
 use super::{IxgbeNic, get_ixgbe_nic, IxgbeRxQueueRegisters, IxgbeTxQueueRegisters};
@@ -18,9 +19,14 @@ use network_interface_card::NetworkInterfaceCard;
 /// Packets with the destination ip addresses specified here will be routed to the vNIC's queues. 
 /// * `default_rx_queue`: the queue that will be polled for packets when no other queue is specified.
 /// * `default_tx_queue`: the queue that packets will be sent on when no other queue is specified.
-pub fn create_virtual_nic(ip_addresses: Vec<[u8;4]>, default_rx_queue: usize, default_tx_queue: usize) 
-    -> Result<VirtualNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor>, &'static str> 
-{
+pub fn create_virtual_nic(
+    ip_addresses: Vec<[u8;4]>, 
+    default_rx_queue: usize, 
+    default_tx_queue: usize
+) -> Result<
+    VirtualNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor>, 
+&'static str> {
+
     let num_queues = ip_addresses.len();
     if num_queues == 0 {return Err("need to request >0 number of queues");}
     if (default_rx_queue >= num_queues) | (default_tx_queue >= num_queues) {
@@ -48,7 +54,8 @@ pub fn create_virtual_nic(ip_addresses: Vec<[u8;4]>, default_rx_queue: usize, de
 }
 
 
-impl PhysicalNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor> for IxgbeNic {
+impl PhysicalNic<IxgbeRxQueueRegisters, AdvancedRxDescriptor, IxgbeTxQueueRegisters, AdvancedTxDescriptor> for IxgbeNic 
+{
     fn return_rx_queues(&mut self, mut queues: Vec<RxQueue<IxgbeRxQueueRegisters, AdvancedRxDescriptor>>) {
         // disable filters for all queues
         for queue in &queues {
