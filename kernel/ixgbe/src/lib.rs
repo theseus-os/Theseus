@@ -271,7 +271,7 @@ impl IxgbeNic {
         let (mut rx_descs, mut rx_buffers) = Self::rx_init(&mut mapped_registers1, &mut mapped_registers2, &mut rx_mapped_registers)?;
         
         // create the vec of rx queues
-        let mut rx_queues = Vec::new();
+        let mut rx_queues = Vec::with_capacity(rx_descs.len());
         let mut id = 0;
         while !rx_descs.is_empty() {
             let rx_queue = RxQueue {
@@ -296,7 +296,7 @@ impl IxgbeNic {
         let mut tx_descs = Self::tx_init(&mut mapped_registers2, &mut mapped_registers_mac, &mut tx_mapped_registers)?;
         
         // create the vec of tx queues
-        let mut tx_queues = Vec::new();
+        let mut tx_queues = Vec::with_capacity(tx_descs.len());
         let mut id = 0;
         while !tx_descs.is_empty() {
             let tx_queue = TxQueue {
@@ -334,7 +334,8 @@ impl IxgbeNic {
             Self::enable_dca(&mut mapped_registers3, &mut rx_queues)?;
         }
 
-        Self::wait_for_link(&mapped_registers2);
+        // wait 10 seconds for the link to come up, as seen in other ixgbe drivers
+        Self::wait_for_link(&mapped_registers2, 10_000_000);
 
         let ixgbe_nic = IxgbeNic {
             bar_type: bar_type,
@@ -383,13 +384,26 @@ impl IxgbeNic {
         const GENERAL_REGISTERS_3_SIZE_BYTES:   usize = 18 * 4096;
 
         // Allocate memory for the registers, making sure each successive memory region begins where the previous region ended.
-        let nic_regs1_mapped_page = allocate_memory(mem_base, GENERAL_REGISTERS_1_SIZE_BYTES)?;
-        let nic_rx_regs1_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_1_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;
-        let nic_regs2_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_1_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, GENERAL_REGISTERS_2_SIZE_BYTES)?;        
-        let nic_tx_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_1_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + GENERAL_REGISTERS_2_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)?;
-        let nic_mac_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_1_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + GENERAL_REGISTERS_2_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES, MAC_REGISTERS_SIZE_BYTES)?;
-        let nic_rx_regs2_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_1_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + GENERAL_REGISTERS_2_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES + MAC_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;        
-        let nic_regs3_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_1_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + GENERAL_REGISTERS_2_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES + MAC_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, GENERAL_REGISTERS_3_SIZE_BYTES)?;
+        let mut offset = mem_base;
+        let nic_regs1_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_1_SIZE_BYTES)?;
+
+        offset += GENERAL_REGISTERS_1_SIZE_BYTES;
+        let nic_rx_regs1_mapped_page = allocate_memory(offset, RX_REGISTERS_SIZE_BYTES)?;
+
+        offset += RX_REGISTERS_SIZE_BYTES;
+        let nic_regs2_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_2_SIZE_BYTES)?;  
+
+        offset += GENERAL_REGISTERS_2_SIZE_BYTES;
+        let nic_tx_regs_mapped_page = allocate_memory(offset, TX_REGISTERS_SIZE_BYTES)?;
+
+        offset += TX_REGISTERS_SIZE_BYTES;
+        let nic_mac_regs_mapped_page = allocate_memory(offset, MAC_REGISTERS_SIZE_BYTES)?;
+
+        offset += MAC_REGISTERS_SIZE_BYTES;
+        let nic_rx_regs2_mapped_page = allocate_memory(offset, RX_REGISTERS_SIZE_BYTES)?;   
+
+        offset += RX_REGISTERS_SIZE_BYTES;
+        let nic_regs3_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_3_SIZE_BYTES)?;
 
         // Map the memory as the register struct and tie the lifetime of the struct with its backing mapped pages
         let regs1 = BoxRefMut::new(Box::new(nic_regs1_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelIxgbeRegisters1>(0))?;
@@ -702,15 +716,12 @@ impl IxgbeNic {
     /// Returns link speed in Mb/s
     pub fn link_speed(&self) -> u32 {
         let speed = self.regs2.links.read() & LINKS_SPEED_MASK; 
-        const LS_100: u32 = 0x1 << 28;
-        const LS_1000: u32 = 0x2 << 28;
-        const LS_10000: u32 = 0x3 << 28;
 
-        if speed == LS_100 {
+        if speed ==  LinkSpeedMbps::LS100 as u32{
             100
-        } else if speed == LS_1000 {
-            1000
-        } else if speed == LS_10000 {
+        } else if speed == LinkSpeedMbps::LS1000 as u32 {
+            1_000
+        } else if speed == LinkSpeedMbps::LS10000 as u32 {
             10_000
         } else {
             0
@@ -718,11 +729,11 @@ impl IxgbeNic {
     }
 
     /// Wait for link to be up for upto 10 seconds.
-    fn wait_for_link(regs2: &IntelIxgbeRegisters2) {
+    fn wait_for_link(regs2: &IntelIxgbeRegisters2, total_wait_time_in_us: u32) {
         // wait 10 ms between tries
         let wait_time = 10_000;
         // wait for a total of 10 s
-        let total_tries = 10_000_000 / wait_time;
+        let total_tries = total_wait_time_in_us / wait_time;
         let mut tries = 0;
 
         while (regs2.links.read() & LINKS_SPEED_MASK == 0) && (tries < total_tries) {
@@ -1157,7 +1168,7 @@ impl IxgbeNic {
 
     /// Removes `num_queues` Rx queues from this "physical" NIC device and gives up ownership of them.
     /// This function is used when creating a virtual NIC that will own the returned queues.
-    fn remove_rx_queues(
+    fn take_rx_queues_from_physical_nic(
         &mut self, 
         num_queues: usize
     ) -> Result<Vec<RxQueue<IxgbeRxQueueRegisters, AdvancedRxDescriptor>>, &'static str> {
@@ -1172,7 +1183,7 @@ impl IxgbeNic {
 
     /// Removes `num_queues` Tx queues from this "physical" NIC device and gives up ownership of them.
     /// This function is when creating a virtual NIC that will own the returned queues.
-    fn remove_tx_queues(
+    fn take_tx_queues_from_physical_nic(
         &mut self, 
         num_queues: usize
     ) -> Result<Vec<TxQueue<IxgbeTxQueueRegisters, AdvancedTxDescriptor>>, &'static str> {
@@ -1184,6 +1195,13 @@ impl IxgbeNic {
         let queues = self.tx_queues.drain(start_remove_index..).collect(); 
         Ok(queues)
     }
+}
+
+/// Possible link speeds of the 82599 NIC
+enum LinkSpeedMbps {
+    LS100 = 0x1 << 28,
+    LS1000 = 0x2 << 28,
+    LS10000 = 0x3 << 28
 }
 
 /// Options for the filter protocol used in the 5-tuple filters.

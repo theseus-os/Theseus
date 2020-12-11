@@ -71,7 +71,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     /// Send a packet on the specified queue.
     #[allow(dead_code)]
     pub fn send_packet_on_queue(&mut self, qid: usize, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        if qid >= self.tx_queues.len() {return Err("Invalid qid");}
+        if qid >= self.tx_queues.len() { return Err("Invalid qid"); }
         self.tx_queues[qid].send_on_queue(transmit_buffer);
         Ok(())
     }
@@ -79,7 +79,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     /// Retrieve a received frame from the specified queue.
     #[allow(dead_code)]
     fn get_received_frame_from_queue(&mut self, qid: usize) -> Result<ReceivedFrame, &'static str> {
-        if qid >= self.rx_queues.len() {return Err("Invalid qid");}
+        if qid >= self.rx_queues.len() { return Err("Invalid qid"); }
         // return one frame from the queue's received frames
         self.rx_queues[qid].received_frames.pop_front().ok_or("No frames received")
     }
@@ -87,7 +87,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     /// Poll the specified queue to check if any packets have been received.
     #[allow(dead_code)]
     fn poll_receive_queue(&mut self, qid: usize) -> Result<(), &'static str> {
-        if qid >= self.rx_queues.len() {return Err("Invalid qid");}
+        if qid >= self.rx_queues.len() { return Err("Invalid qid"); }
         self.rx_queues[qid].poll_queue_and_store_received_packets()?;
         Ok(())
     }

@@ -15,12 +15,12 @@ use network_interface_card::NetworkInterfaceCard;
 /// 
 /// # Arguments
 /// * `ip_addresses`: set of ip addresses that will be assigned to the allocated receive queues.
-/// The number of ip addresses is equal to the number of queue pairs that will be assigned to the vNIC.
-/// Packets with the destination ip addresses specified here will be routed to the vNIC's queues. 
+///    The number of ip addresses is equal to the number of queue pairs that will be assigned to the vNIC.
+///    Packets with the destination ip addresses specified here will be routed to the vNIC's queues. 
 /// * `default_rx_queue`: the queue that will be polled for packets when no other queue is specified.
 /// * `default_tx_queue`: the queue that packets will be sent on when no other queue is specified.
 pub fn create_virtual_nic(
-    ip_addresses: Vec<[u8;4]>, 
+    ip_addresses: Vec<[u8; 4]>, 
     default_rx_queue: usize, 
     default_tx_queue: usize
 ) -> Result<
@@ -28,15 +28,15 @@ pub fn create_virtual_nic(
 &'static str> {
 
     let num_queues = ip_addresses.len();
-    if num_queues == 0 {return Err("need to request >0 number of queues");}
+    if num_queues == 0 { return Err("need to request >0 number of queues"); }
     if (default_rx_queue >= num_queues) | (default_tx_queue >= num_queues) {
         return Err("default queue value is out of bounds");
     }
     
     let mut nic = get_ixgbe_nic().ok_or("Ixgbe nic not initialized")?.lock();
     // Allocate queues from the physical NIC
-    let mut rx_queues = nic.remove_rx_queues(num_queues)?;
-    let tx_queues = nic.remove_tx_queues(num_queues)?;
+    let mut rx_queues = nic.take_rx_queues_from_physical_nic(num_queues)?;
+    let tx_queues = nic.take_tx_queues_from_physical_nic(num_queues)?;
     // Set up the filters so that packets sent to `ip_addresses` are forwarded to these queues.
     for (queue, ip_address) in rx_queues.iter_mut().zip(ip_addresses.iter()) {
         let filter_num = nic.set_5_tuple_filter(None, Some(*ip_address), None, None, None, 7 /*highest priority*/, queue.id)?;

@@ -195,6 +195,7 @@ pub struct IntelIxgbeRegisters2 {
     _padding14a:                        [u8; 98],               // 0x42AC - 0x4323
     _padding14b:                        [u8; 22],
 
+    /// Link Status Register 2
     pub links2:                         Volatile<u32>,          // 0x4324
     _padding15a:                        [u8; 1024],             // 0x4328 - 0x48FF
     _padding15b:                        [u8; 256],
@@ -283,6 +284,7 @@ pub struct IntelIxgbeMacRegisters {
     _padding3d:                         [u8; 236],
     _padding3e:                         [u8; 12],
 
+    /// Transmit Packet Buffer Size
     pub txpbsize:                       [Volatile<u32>;8],      // 0xCC00
     _padding4a:                         [u8; 512],              // 0xCC20 - 0xCFFF
     _padding4b:                         [u8; 256],
@@ -433,6 +435,8 @@ pub struct RegistersTx {
     pub tdwbah:                         Volatile<u32>,          // 0x603C
 } // 64B
 
+const_assert_eq!(core::mem::size_of::<RegistersTx>(), 64);
+
 /// Set of registers associated with one receive descriptor queue.
 #[derive(FromBytes)]
 #[repr(C)]
@@ -464,6 +468,7 @@ pub struct RegistersRx {
     _padding2:                          [u8;20],                // 0x102C - 0x103F                                            
 } // 64B
 
+const_assert_eq!(core::mem::size_of::<RegistersRx>(), 64);
 
 /// Offset where the RDT register starts for the first 64 rx queues
 pub const RDT_1:                        usize = 0x1018;

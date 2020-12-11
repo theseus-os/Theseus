@@ -1,7 +1,7 @@
 [package]
 name = "ixgbe"
 version = "0.1.0"
-description = "Support for the 10 GbE devices and driver"
+description = "Driver for the 10 GbE Intel 82599 NIC"
 authors = ["Ramla <ijazramla@gmail.com>"]
 
 [dependencies]
