@@ -91,6 +91,7 @@ GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
 DEPS_DIR := $(BUILD_DIR)/deps
+THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
 
 
 ## This is the output path of the xargo command, defined by cargo (not our choice).
@@ -192,7 +193,20 @@ build: $(nano_core_binary)
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
 		--app-prefix $(APP_PREFIX) \
-		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus" \
+		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
+
+## Create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
+## This includes the target file, sysroot directory contents, and a file to describe other config env variables.
+	@rm -rf $(THESEUS_BUILD_TOML)
+	@cp -vf $(CFG_DIR)/$(TARGET).json  $(DEPS_DIR)/
+	@cp -vf $(ROOT_DIR)/Xargo.toml  $(DEPS_DIR)/
+	@mkdir -p $(DEPS_DIR)/sysroot/lib/rustlib/$(TARGET)/lib/
+	@cp -r "$(HOME)"/.xargo/lib/rustlib/$(TARGET)  $(DEPS_DIR)/sysroot/lib/rustlib/
+	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'sysroot = "sysroot"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'rustflags = "$(RUSTFLAGS)"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'cargoflags = "$(CARGOFLAGS)"' >> $(THESEUS_BUILD_TOML)
+
 
 ## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
 	@mkdir -p $(DEBUG_SYMBOLS_DIR)

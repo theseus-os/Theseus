@@ -11,14 +11,27 @@ export RUST_BACKTRACE=1
 ### Note: the "theseus_xargo" tool must be installed locally instead of invoked via `cargo run` 
 cargo install --force --path=$THESEUS_XARGO_PATH --root=$THESEUS_XARGO_PATH
 
-RUST_TARGET_PATH="/home/kevin/Dropbox/Theseus/cfg"  \
-	RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no" \
-	$THESEUS_XARGO_PATH/bin/theseus_xargo --input ../build/deps \
-	build --color=always --release \
-	--target x86_64-theseus
-	
+
+### This is our initial fully-manual invocation of xargo
+# RUST_TARGET_PATH="/home/kevin/Dropbox/Theseus/cfg"  \
+# 	RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no" \
+# 	$THESEUS_XARGO_PATH/bin/theseus_xargo --input ../build/deps \
+# 	build --color=always --release \
+# 	--target x86_64-theseus
 
 
+### This is our new auto-config'd 
+$THESEUS_XARGO_PATH/bin/theseus_xargo --input ../build/deps build
+
+
+## The "newer" raw cargo command that works without xargo at all. This is good because we can use a pre-built/distributed sysroot directory.
+# RUST_TARGET_PATH="/home/kevin/Dropbox/Theseus/build/deps"   \
+# 	RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no --sysroot /home/kevin/Dropbox/Theseus/build/deps/sysroot"  \
+# 	cargo build --release --verbose -vv \
+# 	--target x86_64-theseus
+
+
+## The initial normal command that uses `xargo`
 # RUST_TARGET_PATH="/home/kevin/Dropbox/Theseus/cfg"  \
 # 	RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no" \
 # 	xargo build  --release  --verbose -vv \

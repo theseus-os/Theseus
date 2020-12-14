@@ -5,8 +5,8 @@
 //! that crate to depend upon and link against a set of pre-built crates. 
 //! This requires a set of prebuilt dependencies, specified as the `.rmeta` and `.rlib` files.
 //! 
-//! This program works by invoking the `xargo` program (which itself is a wrapper around Rust's `cargo`) 
-//! and watching its output 
+//! This program works by invoking Rust's `cargo` build tool and capturing its verbose output
+//! such that we can modify and re-run the commands that cargo issued to rustc. 
 //!
 //! It also performs a special form of linking, which I've dubbed "partially-static" linking. 
 //!
@@ -29,6 +29,8 @@ extern crate clap;
 extern crate walkdir;
 extern crate regex;
 extern crate itertools;
+extern crate toml;
+extern crate serde;
 
 use getopts::Options;
 use std::{
@@ -46,9 +48,7 @@ use walkdir::WalkDir;
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    let env_vars: HashMap<String, String> = env::vars().collect();
-    // println!("----------- Command-line Arguments ----------\n{:#?}", args);
-    // println!("----------- Environment Variables -----------\n{:#?}", env_vars);
+    let _env_vars: HashMap<String, String> = env::vars().collect();
 
     let mut opts = Options::new();
     opts.parsing_style(getopts::ParsingStyle::StopAtFirstFree);
@@ -90,24 +90,30 @@ fn main() -> Result<(), String> {
         return Err(format!("Couldn't access --input argument '{}' as a directory", input_dir_path.display()));
     };
 
+    let build_config = BuildConfig::populate_from_dir(&input_dir_path)?;
+    let verbose_count = count_verbose_arg(&matches.free);
+
     let cargo_cmd_string = matches.free.join(" ");
 
-    let verbose_count = count_verbose_arg(&matches.free);
-    println!("VERBOSE_LEVEL: {:?}", verbose_count);
-
-    let stderr_captured = run_initial_xargo(env_vars, cargo_cmd_string.clone(), verbose_count)?;
-    println!("\n\n------------------- STDERR --------------------- \n{}", stderr_captured.join("\n\n"));
+    let stderr_captured = run_initial_cargo(
+        _env_vars,
+        cargo_cmd_string.clone(),
+        &build_config,
+        &input_dir_path,
+        verbose_count
+    )?;
+    // println!("\n\n------------------- STDERR --------------------- \n{}", stderr_captured.join("\n\n"));
 
     if cargo_cmd_string.split_whitespace().next() != Some("build") {
-        println!("Exiting after completing non-'build' xargo command.");
+        println!("Exiting after completing non-'build' cargo command.");
         return Ok(());
     }
 
     let last_cmd = stderr_captured.last()
-        .ok_or_else(|| format!("No commands captured from stderr during the initial xargo command"))?;
+        .ok_or_else(|| format!("No commands captured from stderr during the initial cargo command"))?;
     let out_dir = PathBuf::from(get_out_dir_arg(last_cmd)?);
 
-    // Now that we have run the initial xargo build, it has created many redundant dependency artifacts 
+    // Now that we have run the initial cargo build, it has created many redundant dependency artifacts 
     // in the local crate's target/ directory, namely the locally re-built versions of Theseus kernel crates,
     // specifically all the crates that are in the set of prebuilt crates.
     // We need to remove those redundant files from the local target/ directory (the "out-dir")
@@ -148,7 +154,7 @@ fn main() -> Result<(), String> {
         // See if that crate already exists in our set of prebuilt crates.
         if prebuilt_crates_set.contains_key(crate_name) {
             // remove the redundant file
-            println!("### Removing redundant crate file from out_dir {}", path.display());
+            println!("### Removing redundant crate file {}", path.display());
             fs::remove_file(&path).map_err(|e| 
                 format!("Failed to remove redundant crate file in out_dir: {}. Error: {}", path.display(), e)
             )?;
@@ -157,10 +163,15 @@ fn main() -> Result<(), String> {
         }
     }
 
-    // re-execute the rustc commands that we captured from the original xargo/cargo verbose output. 
+    // re-execute the rustc commands that we captured from the original cargo verbose output. 
     for original_cmd in &stderr_captured {
         // This function will only re-run rustc for crates that don't already exist in the set of prebuilt crates.
-        run_rustc_command(original_cmd, &prebuilt_crates_set, input_dir_path.as_path())?;
+        run_rustc_command(
+            original_cmd, 
+            &prebuilt_crates_set, 
+            &input_dir_path, 
+            &input_dir_path
+        )?;
     }
 
     Ok(())
@@ -191,7 +202,11 @@ fn count_verbose_arg<'i, S: AsRef<str> + 'i, I: IntoIterator<Item = &'i S>>(args
 }
 
 fn print_usage(opts: Options) {
-    let brief = format!("Usage: theseus_xargo --input INPUT_DIR [OPTIONS] CARGO_COMMAND [CARGO OPTIONS]");
+    let brief = format!(
+        "Usage: theseus_cargo --input INPUT_DIR [OTHER_OPTIONS] CARGO_COMMAND [CARGO OPTIONS]\n\n \
+           *** Note: the  --input argument and other options must come before the cargo command. \
+           *** Note: generic CARGO_OPTIONS are currently ignored, except for verbose levels."
+    ); 
     print!("{}", opts.usage(&brief));
 }
 
@@ -207,28 +222,60 @@ const RMETA_FILE_EXTENSION:       &str = "rmeta";
 const PREFIX_END: usize = RMETA_FILE_PREFIX.len();
 
 
-/// Runs the actual xargo command, e.g., xargo build, 
-/// with all of the arguments specified on the command line. 
+/// Runs the actual cargo build command.
 ///
-/// Returns the captured content of content written to `stderr` by the xargo command, as a list of lines.
-fn run_initial_xargo(
+/// Returns the captured content of content written to `stderr` by the cargo command, as a list of lines.
+fn run_initial_cargo<P: AsRef<Path>>(
     _env_vars: HashMap<String, String>,
     full_args: String,
+    build_config: &BuildConfig,
+    input_dir_path: P,
     verbose_level: usize
 ) -> Result<Vec<String>, String> {
-    println!("FULL ARGS: {}", full_args);
+    let input_dir_path = input_dir_path.as_ref();
+    // println!("FULL ARGS: {}", full_args);
 
-    let mut cmd = Command::new("xargo");
-    cmd.args(full_args.split_whitespace())
+    let subcommand = full_args.split_whitespace()
+        .next()
+        .ok_or_else(|| format!("Missing subcommand argument to `theseus_cargo` (e.g., `build`)"))?;
+    
+    if subcommand != "build" {
+        return Err(
+            format!("cargo commands other than `build` are not supported. You tried to run subcommand {:?}.", subcommand)
+        );
+    }
+
+    let mut cmd = Command::new("cargo");
+    cmd.arg(subcommand)
         .stderr(Stdio::piped())
         .stdout(Stdio::piped());
     
-    // Ensure that we run the xargo command with the maximum verbosity level, which is -vv.
+    // Ensure that we use only the arguments specifed by the Theseus build config.
+    cmd.arg(&build_config.cargoflags)
+        .arg("--target").arg(&build_config.target);
+
+    // Ensure that we run the cargo command with the maximum verbosity level, which is -vv.
     cmd.arg("-vv");
 
-    // Run the actual xargo command.
+    // Use full color output to get a regular terminal-esque display from cargo. 
+    cmd.arg("--color=always");
+
+    // Add the requisite environment variables to configure cargo such that rustc builds with the proper config
+    // and it can locate our special target json file. 
+    cmd.env("RUST_TARGET_PATH", input_dir_path);
+    // Add the sysroot argument to our rustflags so cargo will use our pre-built cross-compiled (for Theseus) core dependencies. 
+    let mut sysroot_path = PathBuf::from(input_dir_path);
+    sysroot_path.push(&build_config.sysroot);
+    let rustflags = format!("{} --sysroot {}", build_config.rustflags, sysroot_path.display());
+    cmd.env("RUSTFLAGS", rustflags);
+
+
+    println!("\nRunning initial cargo command:\n{:?}", cmd);
+    cmd.get_envs().for_each(|(k, v)|println!("\t### env {:?} = {:?}", k, v));
+
+    // Run the actual cargo command.
     let mut child_process = cmd.spawn()
-        .map_err(|io_err| format!("Failed to run xargo command: {:?}", io_err))?;
+        .map_err(|io_err| format!("Failed to run cargo command: {:?}", io_err))?;
     
     // We read the stderr output in this thread and create a new thread to read the stdout output.
     let stdout = child_process.stdout.take().ok_or_else(|| format!("Could not capture stdout."))?;
@@ -300,7 +347,7 @@ fn run_initial_xargo(
                 }
             }
 
-            // In the above xargo command, we added a verbose argument to capture the commands issued from xargo/cargo to rustc. 
+            // In the above cargo command, we added a verbose argument to capture the commands issued from cargo to rustc. 
             // But if the user didn't ask for that, then we shouldn't print that verbose output here. 
             // Verbose output lines start with "Running `", "+ ", or "[".
             let should_print = |stripped_line: &str| {
@@ -326,11 +373,11 @@ fn run_initial_xargo(
     let _stdout_logs = t.join().unwrap();
 
     let exit_status = child_process.wait()
-        .map_err(|io_err| format!("Failed to wait for xargo process to finish. Error: {:?}", io_err))?;
+        .map_err(|io_err| format!("Failed to wait for cargo process to finish. Error: {:?}", io_err))?;
     match exit_status.code() {
         Some(0) => { }
-        Some(code) => return Err(format!("xargo command completed with failed exit code {}", code)),
-        _ => return Err(format!("xargo command was killed")),
+        Some(code) => return Err(format!("cargo command completed with failed exit code {}", code)),
+        _ => return Err(format!("cargo command was killed")),
     }
 
     Ok(stderr_logs)
@@ -344,11 +391,13 @@ fn ignore_arg(arg: &str) -> bool {
 }
 
 
-/// Takes the given `original_cmd` that was captured from the verbose output of cargo/xargo,
+/// Takes the given `original_cmd` that was captured from the verbose output of cargo,
 /// and parses/modifies it to link against (depend on) the corresponding crate of the same name
 /// from the list of prebuilt crates. 
 ///
 /// The actual dependency files (.rmeta/.rlib) for the prebuilt crates should be located in the `prebuilt_dir`. 
+/// The target specification JSON file should be found in the `target_dir_path`. 
+/// These two directories are usually the same directory.
 ///
 /// # Return
 /// * Returns `Ok(true` if everything works and the modified rustc command executes properly. 
@@ -356,11 +405,15 @@ fn ignore_arg(arg: &str) -> bool {
 ///   This occurs if `original_cmd` is for building a build script (currently ignored), 
 ///   or if `original_cmd` is for building a crate that already exists in the set of `prebuilt_crates`.
 /// * Returns an error if the command fails. 
-fn run_rustc_command(
+fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
     original_cmd: &str,
     prebuilt_crates: &HashMap<String, String>,
-    prebuilt_dir: &Path
+    prebuilt_dir: P,
+    target_dir_path: T,
 ) -> Result<bool, String> {
+    let prebuilt_dir = prebuilt_dir.as_ref();
+    let target_dir_path = target_dir_path.as_ref();
+
     let command = if original_cmd.starts_with(COMMAND_START) && original_cmd.ends_with(COMMAND_END) {
         let end_index = original_cmd.len() - COMMAND_END.len();
         &original_cmd[COMMAND_START.len() .. end_index]
@@ -381,7 +434,7 @@ fn run_rustc_command(
     let start_of_rustc_cmd = command.find(RUSTC_CMD_START).ok_or_else(|| 
         format!("Couldn't find {:?} in command:\n{:?}", RUSTC_CMD_START, command)
     )?;
-    let environment         = &command[.. start_of_rustc_cmd];
+    let _rustc_env_vars     = &command[.. start_of_rustc_cmd];
     let command_without_env = &command[start_of_rustc_cmd ..];
 
     // The arguments in the command that we care about are:
@@ -408,7 +461,6 @@ fn run_rustc_command(
     let top_level_matches = top_level_matches.map_err(|e| 
         format!("Missing support for argument found in captured rustc command: {}", e)
     )?;
-    // println!("\nTop-level Matches: {:#?}", top_level_matches);
 
     // Clap will parse the args as such:
     // * the --crate-name will be the first argument
@@ -431,7 +483,6 @@ fn run_rustc_command(
         return Ok(false);
     }
 
-    // println!("\nGot match info:\ncrate-name: {:?}\ncrate_source_file: {:?}\nadditional_args: {:#?}", crate_name, crate_source_file, additional_args);
     let args_after_source_file = additional_args.values_of("").unwrap();
 
     // Second, we parse all other args in the command that followed the crate source file. 
@@ -446,7 +497,6 @@ fn run_rustc_command(
     let matches = matches.map_err(|e| 
         format!("Missing support for argument found in captured rustc command: {}", e)
     )?;
-    println!("\n\nMatches: {:#?}", matches);
 
 
     // Now, re-create the rustc command invocation with the proper arguments.
@@ -461,7 +511,7 @@ fn run_rustc_command(
     // After adding the initial stuff: rustc command, crate name, and crate source file, 
     // the other arguments are added in the loop below. 
     for (&arg, values) in matches.args.iter() {
-        println!("Arg {:?} has values:\n\t {:?}", arg, values.vals);
+        // println!("Arg {:?} has values:\n\t {:?}", arg, values.vals);
         if ignore_arg(arg) { continue; }
 
         for value in &values.vals {
@@ -482,12 +532,12 @@ fn run_rustc_command(
                     new_value = format!("{}={}", extern_crate_name, new_crate_path.display());
                 }
             } else if arg == "-L" {
-                let (kind, path) = value.as_ref()
+                let (kind, _path) = value.as_ref()
                     .find('=')
                     .map(|idx| value.split_at(idx))
                     .map(|(kind, path)| (kind, &path[1..])) // ignore the '=' delimiter
                     .ok_or_else(|| format!("Failed to parse value of -L arg as KIND=PATH: {:?}", value))?;
-                println!("Found -L arg, {:?} --> {:?}", kind, path);
+                // println!("Found -L arg, {:?} --> {:?}", kind, _path);
                 if kind != "dependency" {
                     return Err(format!("Unsupported -L arg value {:?}. We only support 'dependency=PATH'.", value));
                 }
@@ -518,7 +568,6 @@ fn run_rustc_command(
         return Ok(false);
     }
 
-    recreated_cmd.get_envs().for_each(|(k, v)| println!("Re-created command has env: {:?} -> {:?}", k, v)); 
     // println!("Press enter to run the above command ...");
     // let mut buf = String::new();
     // io::stdin().read_line(&mut buf).expect("failed to read stdin");
@@ -527,9 +576,12 @@ fn run_rustc_command(
     // TODO: do we need to modify the environment variable `LD_LIBRARY_PATH`? 
     //       It includes a target/deps/ directory, but I'm not sure if it's used by rustc.
 
+    // Ensure we have the RUST_TARGET_PATH env var so that rustc can find our target spec JSON file. 
+    recreated_cmd.env("RUST_TARGET_PATH", target_dir_path);
+
     // Run the recreated rustc command.
     let mut rustc_process = recreated_cmd.spawn().map_err(|io_err| 
-        format!("Failed to run xargo command: {:?}", io_err)
+        format!("Failed to run cargo command: {:?}", io_err)
     )?;
     let exit_status = rustc_process.wait().map_err(|io_err| 
         format!("Error running rustc: {}", io_err)
@@ -537,7 +589,7 @@ fn run_rustc_command(
 
     match exit_status.code() {
         Some(0) => {
-            println!("Ran rustc command successfully.");
+            println!("Ran rustc command (modified for Theseus) successfully.");
             Ok(true)
         }
         Some(code) => Err(format!("rustc command exited with failure code {}", code)),
@@ -606,6 +658,27 @@ fn populate_crates_from_dir<P: AsRef<Path>>(dir_path: P) -> Result<HashMap<Strin
     Ok(crates)
 }
 
+
+use serde::Deserialize;
+#[derive(Deserialize, Debug)]
+struct BuildConfig {
+    target:        String,
+    // xargo_toml:    Option<PathBuf>,
+    sysroot:       PathBuf,
+    rustflags:     String,
+    cargoflags:    String,
+}
+impl BuildConfig {
+    fn populate_from_dir<P: Into<PathBuf>>(dir_path: P) -> Result<BuildConfig, String> {
+        let mut pathbuf = dir_path.into();
+        pathbuf.push("TheseusBuild.toml");
+        let theseus_build_toml = fs::read_to_string(&pathbuf)
+            .map_err(|e| format!("Error reading {}: {}", pathbuf.display(), e))?;
+        let build_config: BuildConfig = toml::from_str(&theseus_build_toml)
+            .map_err(|e| format!("Error parsing TheseusBuild.toml: {}", e))?;
+        Ok(build_config)
+    }
+}
 
 
 

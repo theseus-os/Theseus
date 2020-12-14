@@ -254,6 +254,7 @@ fn main() -> Result<(), String> {
     ).unwrap();
     // Here we *could* optionally copy over the .rmeta/.rlib files from the sysroot, 
     // but we choose not to because they are very large (tens of MBs) and aren't needed for future build steps.
+    // Also, this is debatably easier to do in the main Theseus Makefile.
 
     Ok(())
 }

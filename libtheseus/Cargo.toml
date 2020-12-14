@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "The application-facing 'library' that exposes Theseus OS features, similar to a standard library."
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../build.rs"
-links = "serial_port"
+# links = "serial_port"
 
 [dependencies]
 rlibc = "1.0.0"
