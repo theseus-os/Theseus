@@ -190,7 +190,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "theseus_xargo"
+name = "theseus_cargo"
 version = "0.1.0"
 dependencies = [
  "clap",

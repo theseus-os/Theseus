@@ -4,24 +4,16 @@ set -e
 # capture all output to a file
 # script -e .script_output
 
-THESEUS_XARGO_PATH="../tools/theseus_xargo"
+THESEUS_CARGO_PATH="../tools/theseus_cargo"
 
 export RUST_BACKTRACE=1
 
-### Note: the "theseus_xargo" tool must be installed locally instead of invoked via `cargo run` 
-cargo install --force --path=$THESEUS_XARGO_PATH --root=$THESEUS_XARGO_PATH
+### Note: the "theseus_cargo" tool must be installed locally instead of invoked via `cargo run` 
+cargo install --force --path=$THESEUS_CARGO_PATH --root=$THESEUS_CARGO_PATH
 
 
-### This is our initial fully-manual invocation of xargo
-# RUST_TARGET_PATH="/home/kevin/Dropbox/Theseus/cfg"  \
-# 	RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no" \
-# 	$THESEUS_XARGO_PATH/bin/theseus_xargo --input ../build/deps \
-# 	build --color=always --release \
-# 	--target x86_64-theseus
-
-
-### This is our new auto-config'd 
-$THESEUS_XARGO_PATH/bin/theseus_xargo --input ../build/deps build
+### This is our new auto-config'd cargo command
+$THESEUS_CARGO_PATH/bin/theseus_cargo --input ../build/deps build
 
 
 ## The "newer" raw cargo command that works without xargo at all. This is good because we can use a pre-built/distributed sysroot directory.
@@ -37,13 +29,6 @@ $THESEUS_XARGO_PATH/bin/theseus_xargo --input ../build/deps build
 # 	xargo build  --release  --verbose -vv \
 # 	--target x86_64-theseus	
 
-
-	# \
-	# | tee .build_output \
-	# 2> >(grep -vw 'Running\|^+') \
-
-	## We cannot use "--build-plan", because it's getting removed soon. 
-	# --build-plan -Z unstable-options > build_plan_xargo
 
 
 # RUST_TARGET_PATH="/home/kevin/Dropbox/Theseus/cfg" \
