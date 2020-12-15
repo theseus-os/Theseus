@@ -357,7 +357,7 @@ impl IxgbeNic {
             tx_registers_disabled: tx_mapped_registers,
         };
 
-        info!("Link is up with speed: {} Mb/s", ixgbe_nic.link_speed());
+        info!("Link is up with speed: {} Mb/s", ixgbe_nic.link_speed() as u32);
 
         let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
         Ok(nic_ref)
@@ -714,18 +714,9 @@ impl IxgbeNic {
     }
 
     /// Returns link speed in Mb/s
-    pub fn link_speed(&self) -> u32 {
+    pub fn link_speed(&self) -> LinkSpeedMbps {
         let speed = self.regs2.links.read() & LINKS_SPEED_MASK; 
-
-        if speed ==  LinkSpeedMbps::LS100 as u32{
-            100
-        } else if speed == LinkSpeedMbps::LS1000 as u32 {
-            1_000
-        } else if speed == LinkSpeedMbps::LS10000 as u32 {
-            10_000
-        } else {
-            0
-        }
+        speed.into()
     }
 
     /// Wait for link to be up for upto 10 seconds.
@@ -1198,10 +1189,27 @@ impl IxgbeNic {
 }
 
 /// Possible link speeds of the 82599 NIC
-enum LinkSpeedMbps {
-    LS100 = 0x1 << 28,
-    LS1000 = 0x2 << 28,
-    LS10000 = 0x3 << 28
+pub enum LinkSpeedMbps {
+    LS100 = 100,
+    LS1000 = 1000,
+    LS10000 = 10000, 
+    LSUnknown = 0,
+}
+
+/// Converts between a LinkSpeedMbps enum and a u32 number.
+/// The u32 number is the value in the links register that represents the link speed.
+impl From<u32> for LinkSpeedMbps {
+    fn from(item: u32) -> Self {
+        if item == (0x1 << 28) {
+            Self::LS100
+        } else if item == (0x2 << 28) {
+            Self::LS1000
+        } else if item == (0x3 << 28) {
+            Self::LS10000
+        } else {
+            Self::LSUnknown
+        }
+    }
 }
 
 /// Options for the filter protocol used in the 5-tuple filters.
