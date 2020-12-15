@@ -92,6 +92,8 @@ OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
 DEPS_DIR := $(BUILD_DIR)/deps
 THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
+THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
+THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
 
 
 ## This is the output path of the xargo command, defined by cargo (not our choice).
@@ -133,7 +135,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 .PHONY: all \
 		check_rustc check_xargo \
 		clean run run_pause iso build cargo \
-		test_libtheseus \
+		libtheseus test_libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs
@@ -161,6 +163,19 @@ test_libtheseus: test_libtheseus/src/*
 	done
 
 
+libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
+	@( \
+		cd $(ROOT_DIR)/libtheseus && \
+		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
+	)
+
+
+### This target builds the `theseus_cargo` tool as a dedicated binary.
+$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
+	@echo -e "\n=================== Building the theseus_cargo tool ==================="
+	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+
+
 ### This target builds an .iso OS image from all of the compiled crates.
 # $(iso): build test_libtheseus
 $(iso): build
@@ -182,7 +197,7 @@ iso: $(iso)
 ## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used 
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
-build: $(nano_core_binary)
+build: $(nano_core_binary) $(THESEUS_CARGO_BIN)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
@@ -207,7 +222,6 @@ build: $(nano_core_binary)
 	@echo -e 'rustflags = "$(RUSTFLAGS)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'cargoflags = "$(CARGOFLAGS)"' >> $(THESEUS_BUILD_TOML)
 
-
 ## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
 	@mkdir -p $(DEBUG_SYMBOLS_DIR)
 ifeq ($(debug),full)
@@ -231,6 +245,11 @@ else ifeq ($(debug),base)
 else
 $(error Error: unsupported option "debug=$(debug)")
 endif
+
+#############################
+### end of "build" target ###
+#############################
+
 
 
 ## This target invokes the actual Rust build process
@@ -272,7 +291,7 @@ cargo: check_rustc check_xargo
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	# @rm -rf $(OBJECT_FILES_BUILD_DIR)
+	@rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(DEPS_DIR)
 

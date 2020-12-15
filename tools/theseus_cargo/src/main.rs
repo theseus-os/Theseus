@@ -82,7 +82,7 @@ fn main() -> Result<(), String> {
 
     let input_dir_arg  = matches.opt_str("input").expect("required --input arg was not provided");
     let input_dir_path = fs::canonicalize(&input_dir_arg)
-        .map_err(|e| format!("--input arg '{}' was invalid path, error: {}", input_dir_arg, e))?;
+        .map_err(|e| format!("--input arg '{}' was invalid path. Error: {}", input_dir_arg, e))?;
     let prebuilt_crates_set = if input_dir_path.is_dir() {
         populate_crates_from_dir(&input_dir_path)
             .map_err(|e| format!("Error parsing --input arg as directory: {}", e))?

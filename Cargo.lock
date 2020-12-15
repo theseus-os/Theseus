@@ -1571,9 +1571,11 @@ checksum = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
 name = "ns"
 version = "0.1.0"
 dependencies = [
+ "fs_node",
  "getopts",
  "memory",
  "mod_mgmt",
+ "path",
  "task",
  "terminal_print",
 ]
