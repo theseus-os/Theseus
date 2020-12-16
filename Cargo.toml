@@ -34,7 +34,6 @@ exclude = [
 	# "applications/unwind_test",
 
 	"libtheseus",
-	"test_libtheseus",
 ]
 
 

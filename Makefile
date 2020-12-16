@@ -136,7 +136,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 .PHONY: all \
 		check_rustc check_xargo \
 		clean run run_pause iso build cargo \
-		libtheseus test_libtheseus \
+		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs
@@ -151,19 +151,7 @@ endif
 
 
 
-### Quick target for building our test application that uses libtheseus
-test_libtheseus: test_libtheseus/src/*
-	( \
-		cd test_libtheseus; \
-		cargo clean; \
-		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --target $(TARGET)  \
-	)
-	@for f in test_libtheseus/target/$(TARGET)/$(BUILD_MODE)/deps/test_libtheseus*.o ; do  \
-		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'` ; \
-		strip --strip-debug $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'` ; \
-	done
-
-
+### Demo/test target for building libtheseus
 libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
 	@( \
 		cd $(ROOT_DIR)/libtheseus && \
@@ -178,7 +166,6 @@ $(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
-# $(iso): build test_libtheseus
 $(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
