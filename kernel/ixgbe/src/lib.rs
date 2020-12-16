@@ -4,9 +4,6 @@
 //! We also support language-level virtualization of the NIC so that applications can directly access their assigned transmit and receive queues.
 //! When using virtualization, we disable RSS since we use 5-tuple filters to ensure packets are routed to the correct queues.
 //! We also disable interrupts, since we do not yet have support for allowing applications to register their own interrupt handlers.
-//! 
-//! Before using the driver, make sure to set the link type as either 1GB or 10GB by setting the `IXGBE_10GB_LINK` variable.
-//! It is set to a 10 GB link by default.
 
 #![no_std]
 #![feature(untagged_unions)]
@@ -88,54 +85,34 @@ pub const INTEL_VEND:                   u16 = 0x8086;
 pub const INTEL_82599:                  u16 = 0x10FB;  
 
 
-/*** Default configuration at time of initialization of NIC ***/
+/*** Hardware Device Parameters of the Intel 82599 NIC (taken from the datasheet) ***/
 
-/// If the ixgbe driver allows applications to request virtual NICs.
-/// Currently, if this is true then interrupts and RSS need to be disabled because
-/// these features should be enabled on a per-queue basis when the virtual NIC is created.
-/// We do not support that currently.
-const VIRTUALIZATION_ENABLED:               bool    = true;
-/// If interrupts are enabled for packet reception
-const INTERRUPT_ENABLE:                     bool    = false & !VIRTUALIZATION_ENABLED;
-/// We do not access the PHY module for link information yet,
-/// so this variable is set by the user depending on if the attached module is 10GB or 1GB.
-const IXGBE_10GB_LINK:                      bool    = true;
-/// If link uses 1GB SFP modules
-const IXGBE_1GB_LINK:                       bool    = !(IXGBE_10GB_LINK);
-/// The number of receive descriptors per queue
-const IXGBE_NUM_RX_DESC:                    u16     = 8;
-/// The number of transmit descriptors per queue
-const IXGBE_NUM_TX_DESC:                    u16     = 8;
+/// The maximum number of receive descriptors per queue.
+/// This is the maximum value that has been tested for the 82599 device.
+const IXGBE_MAX_RX_DESC:                    u16     = 8192;
+/// The maximum number of transmit descriptors per queue.
+/// This is the maximum value that has been tested for the 82599 device.
+const IXGBE_MAX_TX_DESC:                    u16     = 8192;
+/// The maximum number of rx queues available on this NIC. 
+const IXGBE_MAX_RX_QUEUES:                  u8      = 128;
+/// The maximum number of tx queues available on this NIC.
+const IXGBE_MAX_TX_QUEUES:                  u8      = 128;
+/// The number of l34 5-tuple filters.
+const NUM_L34_5_TUPLE_FILTERS:              usize   = 128; 
+
+
+
+/*** Developer Device Parameters of the Intel 82599 NIC ***/
+
 /// The number of receive queues that are enabled. 
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
 /// most likely because they need additional configuration.
 const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 64;
-/// The maximum number of rx queues available on this NIC 
-const IXGBE_MAX_RX_QUEUES:                  u8      = 128;
 /// The number of transmit queues that are enabled. 
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
 /// most likely because they need additional configuration.
 const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
-/// The maximum number of tx queues available on this NIC
-const IXGBE_MAX_TX_QUEUES:                  u8      = 128;
-/// Size of the Rx packet buffers
-const IXGBE_RX_BUFFER_SIZE_IN_BYTES:        u16     = 8192;
-/// The number of l34 5-tuple filters
-const NUM_L34_5_TUPLE_FILTERS:              usize   = 128; 
-/// If receive side scaling (where incoming packets are sent to different queues depending on a hash) is enabled.
-const RSS_ENABLE:                           bool    = false & !VIRTUALIZATION_ENABLED;
-/// Enable Direct Cache Access for the receive queues
-/// TODO: Not working yet because we need to have a separate driver for DCA
-/// which enables it for the CPU and chipset, and registers devices that can use DCA (I think)
-const DCA_ENABLE:                           bool    = false;
-/// The number of MSI vectors enabled for the NIC, with the maximum for the 82599 being 64.
-/// This number is only relevant if interrupts are enabled.
-/// If we increase the number to >1, then we also have to add the interrupt handlers in
-/// the NIC initialization function.
-/// Currently we have only tested for 16 interrupts.
-const NUM_MSI_VEC_ENABLED:                  u8      = 1; //IXGBE_NUM_RX_QUEUES_ENABLED;
 
-/***********************************************************/
 
 
 /// The single instance of the 82599 NIC.
@@ -148,7 +125,7 @@ pub fn get_ixgbe_nic() -> Option<&'static MutexIrqSafe<IxgbeNic>> {
 }
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
-const RX_BUFFER_POOL_SIZE: usize = IXGBE_NUM_RX_QUEUES_ENABLED as usize * IXGBE_NUM_RX_DESC as usize * 2; 
+const RX_BUFFER_POOL_SIZE: usize = IXGBE_NUM_RX_QUEUES_ENABLED as usize * IXGBE_MAX_RX_DESC as usize * 2; 
 
 lazy_static! {
     /// The pool of pre-allocated receive buffers that are used by the IXGBE NIC
@@ -234,7 +211,66 @@ impl NetworkInterfaceCard for IxgbeNic {
 impl IxgbeNic {
     /// Store required values from the device's PCI config space,
     /// and initialize different features of the nic.
-    pub fn init(ixgbe_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
+    /// 
+    /// # Arguments
+    /// * `ixgbe_pci_dev`: Contains the pci device information for this NIC
+    /// * `link_speed`: The link speed of the ethernet connection which depends on the SFI module attached to the cable.
+    ///     We do not access the PHY module for link information yet, and currently only support 1 Gbps and 10 Gbps links.
+    /// * `virtualization_enabled`: True if language-level virtualization is enabled.
+    ///     Currently, if this is true then interrupts and RSS need to be disabled.
+    ///     When the virtual NIC is created, these features should be enabled on a per-queue basis.
+    ///     We do not support that as of yet.
+    /// * `interrupts`: A vector of packet reception interrupt handlers where the length of the vector is the number of
+    ///     receive queues for which interrupts are enabled. We have currently tested for 16 receive queues.
+    ///     The interrupt handler at index i is for receive queue i.
+    ///     The number of handlers must be less than or equal to `IXGBE_NUM_RX_QUEUES_ENABLED`.
+    ///     If interrupts are disabled, this should be set to None.
+    /// * `rss_enabled`: true if receive side scaling is enabled.
+    /// * `rx_buffer_size_kbytes`: The size of receive buffers. 
+    /// * `num_rx_descriptors`: The number of descriptors in each receive queue.
+    /// * `num_tx_descriptors`: The number of descriptors in each transmit queue.
+    pub fn init(
+        ixgbe_pci_dev: &PciDevice,
+        link_speed: LinkSpeedMbps,
+        virtualization_enabled: bool,
+        interrupts: Option<Vec<HandlerFunc>>,
+        rss_enabled: bool,
+        rx_buffer_size_kbytes: RxBufferSizeKiB,
+        num_rx_descriptors: u16,
+        num_tx_descriptors: u16
+    ) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
+        // Series of checks to determine if starting parameters are acceptable
+        if (link_speed == LinkSpeedMbps::LSUnknown) | (link_speed == LinkSpeedMbps::LS100) {
+            return Err("Ixgbe driver can only be configured for 1 Gbps or 10 Gbps link speeds");
+        }
+        if (virtualization_enabled & interrupts.is_some()) | (virtualization_enabled & rss_enabled) {
+            return Err("Cannot enable virtualization when interrupts or RSS are enabled");
+        }
+
+        if let Some(ref ints) = interrupts {
+            if ints.len() > IXGBE_NUM_RX_QUEUES_ENABLED as usize {
+                return Err("The number of interrupts must be less than or equal to the number of Rx queues enabled");
+            }
+        }
+
+        if num_rx_descriptors > IXGBE_MAX_RX_DESC {
+            return Err("We can have a maximum of 8K receive descriptors per queue");
+        }
+
+        if (num_rx_descriptors as usize * core::mem::size_of::<AdvancedRxDescriptor>()) % 128 != 0 {
+            return Err("The total length in bytes of the Rx descriptor ring must be 128-byte aligned");
+        }
+
+        if num_tx_descriptors > IXGBE_MAX_TX_DESC {
+            return Err("We can have a maximum of 8K transmit descriptors per queue");
+        }
+
+        if (num_tx_descriptors as usize * core::mem::size_of::<AdvancedTxDescriptor>()) % 128 != 0 {
+            return Err("The total length in bytes of the Tx descriptor ring must be 128-byte aligned");
+        }
+
+        // Start the initialization procedure
+
         let bar0 = ixgbe_pci_dev.bars[0];
         // Determine the type from the base address register
         let bar_type = (bar0 as u8) & 0x01;    
@@ -256,7 +292,7 @@ impl IxgbeNic {
         let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
 
         // link initialization
-        Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac)?;
+        Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac, link_speed)?;
 
         // clear stats registers
         Self::clear_stats(&mapped_registers2);
@@ -265,10 +301,10 @@ impl IxgbeNic {
         let mac_addr_hardware = Self::read_mac_address_from_nic(&mut mapped_registers_mac);
 
         // initialize the buffer pool
-        init_rx_buf_pool(RX_BUFFER_POOL_SIZE, IXGBE_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
+        init_rx_buf_pool(RX_BUFFER_POOL_SIZE, rx_buffer_size_kbytes as u16 * 1024, &RX_BUFFER_POOL)?;
 
         // create the rx desc queues and their packet buffers
-        let (mut rx_descs, mut rx_buffers) = Self::rx_init(&mut mapped_registers1, &mut mapped_registers2, &mut rx_mapped_registers)?;
+        let (mut rx_descs, mut rx_buffers) = Self::rx_init(&mut mapped_registers1, &mut mapped_registers2, &mut rx_mapped_registers, num_rx_descriptors, rx_buffer_size_kbytes)?;
         
         // create the vec of rx queues
         let mut rx_queues = Vec::with_capacity(rx_descs.len());
@@ -278,10 +314,10 @@ impl IxgbeNic {
                 id: id,
                 regs: rx_mapped_registers.remove(0),
                 rx_descs: rx_descs.remove(0),
-                num_rx_descs: IXGBE_NUM_RX_DESC,
+                num_rx_descs: num_rx_descriptors,
                 rx_cur: 0,
                 rx_bufs_in_use: rx_buffers.remove(0),  
-                rx_buffer_size_bytes: IXGBE_RX_BUFFER_SIZE_IN_BYTES,
+                rx_buffer_size_bytes: rx_buffer_size_kbytes as u16 * 1024,
                 received_frames: VecDeque::new(),
                 cpu_id : None,
                 rx_buffer_pool: &RX_BUFFER_POOL,
@@ -293,7 +329,7 @@ impl IxgbeNic {
 
 
         // create the tx descriptor queues
-        let mut tx_descs = Self::tx_init(&mut mapped_registers2, &mut mapped_registers_mac, &mut tx_mapped_registers)?;
+        let mut tx_descs = Self::tx_init(&mut mapped_registers2, &mut mapped_registers_mac, &mut tx_mapped_registers, num_tx_descriptors)?;
         
         // create the vec of tx queues
         let mut tx_queues = Vec::with_capacity(tx_descs.len());
@@ -303,7 +339,7 @@ impl IxgbeNic {
                 id: id,
                 regs: tx_mapped_registers.remove(0),
                 tx_descs: tx_descs.remove(0),
-                num_tx_descs: IXGBE_NUM_TX_DESC,
+                num_tx_descs: num_tx_descriptors,
                 tx_cur: 0,
                 cpu_id : None,
             };
@@ -313,10 +349,7 @@ impl IxgbeNic {
 
         // enable msi-x interrupts if required and return the assigned interrupt numbers
         let interrupt_num =
-            if INTERRUPT_ENABLE {
-                // the collection of interrupt handlers for the receive queues. There might be a better way to do this 
-                // but right now we have to explicitly create each interrupt handler and add it here.
-                let interrupt_handlers: [HandlerFunc; NUM_MSI_VEC_ENABLED as usize] = [ixgbe_handler_0];
+            if let Some(interrupt_handlers) = interrupts {
                 ixgbe_pci_dev.pci_enable_msix()?;
                 ixgbe_pci_dev.pci_set_interrupt_disable_bit();
                 Self::enable_msix_interrupts(&mut mapped_registers1, &mut rx_queues, &mut vector_table, &interrupt_handlers)?
@@ -326,12 +359,8 @@ impl IxgbeNic {
             };
 
         // enable Receive Side Scaling if required
-        if RSS_ENABLE {
+        if rss_enabled {
             Self::enable_rss(&mut mapped_registers2, &mut mapped_registers3)?;
-        }
-
-        if DCA_ENABLE {
-            Self::enable_dca(&mut mapped_registers3, &mut rx_queues)?;
         }
 
         // wait 10 seconds for the link to come up, as seen in other ixgbe drivers
@@ -625,7 +654,8 @@ impl IxgbeNic {
         regs1: &mut IntelIxgbeRegisters1, 
         regs2: &mut IntelIxgbeRegisters2, 
         regs3: &mut IntelIxgbeRegisters3, 
-        regs_mac: &mut IntelIxgbeMacRegisters
+        regs_mac: &mut IntelIxgbeMacRegisters,
+        link_speed: LinkSpeedMbps
     ) -> Result<(), &'static str> {
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
         regs1.eimc.write(DISABLE_INTERRUPTS);
@@ -678,20 +708,25 @@ impl IxgbeNic {
         }
 
         //setup PHY and the link 
-        if IXGBE_10GB_LINK {
-            let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
-            regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004
-
-            let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
-            regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004
-
-            // let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
-            // regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000
-        }
-        else {
-            let mut val = regs2.autoc.read();
-            val = (val & !(AUTOC_LMS_1_GB) & !(AUTOC_1G_PMA_PMD)) | AUTOC_FLU;
-            regs2.autoc.write(val);
+        match link_speed {
+            LinkSpeedMbps::LS1000 => {
+                let mut val = regs2.autoc.read();
+                val = (val & !(AUTOC_LMS_1_GB) & !(AUTOC_1G_PMA_PMD)) | AUTOC_FLU;
+                regs2.autoc.write(val);
+            },
+            LinkSpeedMbps::LS10000 => {
+                let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
+                regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004
+    
+                let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
+                regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004
+    
+                // let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
+                // regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000
+            }
+            _ => {
+                return Err("Invalid link speed");
+            }
         }
 
         let val = regs2.autoc.read();
@@ -758,7 +793,9 @@ impl IxgbeNic {
     fn rx_init(
         regs1: &mut IntelIxgbeRegisters1, 
         regs: &mut IntelIxgbeRegisters2, 
-        rx_regs: &mut Vec<IxgbeRxQueueRegisters>
+        rx_regs: &mut Vec<IxgbeRxQueueRegisters>,
+        num_rx_descs: u16,
+        rx_buffer_size_kbytes: RxBufferSizeKiB
     ) -> Result<(
         Vec<BoxRefMut<MappedPages, [AdvancedRxDescriptor]>>, 
         Vec<Vec<ReceiveBuffer>>
@@ -783,11 +820,11 @@ impl IxgbeNic {
             let rxq = &mut rx_regs[qid as usize];        
 
             // get the queue of rx descriptors and their corresponding rx buffers
-            let (rx_descs, rx_bufs_in_use) = init_rx_queue(IXGBE_NUM_RX_DESC as usize, &RX_BUFFER_POOL, IXGBE_RX_BUFFER_SIZE_IN_BYTES as usize, rxq)?;          
+            let (rx_descs, rx_bufs_in_use) = init_rx_queue(num_rx_descs as usize, &RX_BUFFER_POOL, rx_buffer_size_kbytes as usize * 1024, rxq)?;          
             
             //set the size of the packet buffers and the descriptor format used
             let mut val = rxq.srrctl.read();
-            val.set_bits(0..4, BSIZEPACKET_8K);
+            val.set_bits(0..4, rx_buffer_size_kbytes as u32);
             val.set_bits(8..13, BSIZEHEADER_0B);
             val.set_bits(25..27, DESCTYPE_ADV_1BUFFER);
             val = val | DROP_ENABLE;
@@ -807,7 +844,7 @@ impl IxgbeNic {
             // Write the tail index.
             // Note that the 82599 datasheet (section 8.2.3.8.5) states that we should set the RDT (tail index) to the index *beyond* the last receive descriptor, 
             // but we set it to the last receive descriptor for the same reason as the e1000 driver
-            rxq.rdt.write((IXGBE_NUM_RX_DESC - 1) as u32);
+            rxq.rdt.write((num_rx_descs - 1) as u32);
             
             rx_descs_all_queues.push(rx_descs);
             rx_bufs_in_use_all_queues.push(rx_bufs_in_use);
@@ -842,7 +879,8 @@ impl IxgbeNic {
     fn tx_init(
         regs: &mut IntelIxgbeRegisters2, 
         regs_mac: &mut IntelIxgbeMacRegisters, 
-        tx_regs: &mut Vec<IxgbeTxQueueRegisters>
+        tx_regs: &mut Vec<IxgbeTxQueueRegisters>,
+        num_tx_descs: u16
     ) -> Result<Vec<BoxRefMut<MappedPages, [AdvancedTxDescriptor]>>, &'static str> {
         // disable transmission
         Self::disable_transmission(regs);
@@ -868,7 +906,7 @@ impl IxgbeNic {
         for qid in 0..IXGBE_NUM_TX_QUEUES_ENABLED {
             let txq = &mut tx_regs[qid as usize];
 
-            let tx_descs = init_tx_queue(IXGBE_NUM_TX_DESC as usize, txq)?;
+            let tx_descs = init_tx_queue(num_tx_descs as usize, txq)?;
         
             if qid == 0 {
                 // enable transmit operation, only have to do this for the first queue
@@ -941,6 +979,8 @@ impl IxgbeNic {
     }
 
     /// Enables Direct Cache Access for the device.
+    /// TODO: Not working yet because we need to have a separate driver for DCA
+    /// which enables it for the CPU and chipset, and registers devices that can use DCA (I think).
     fn enable_dca(
         regs: &mut IntelIxgbeRegisters3, 
         rxq: &mut Vec<RxQueue<IxgbeRxQueueRegisters,AdvancedRxDescriptor>>
@@ -1069,8 +1109,8 @@ impl IxgbeNic {
 
     /// Enable MSI-X interrupts.
     /// Currently all the msi vectors are for packet reception, one msi vector per receive queue.
-    /// The assumption here is that we will enable interrupts starting from the first queue in `rxq`
-    /// uptil the `NUM_MSI_VEC_ENABLED` queue, and that we are being passed all rx queues starting from queue id 0.
+    /// The assumption here is that the interrupt handler at index i will be used for receive queue i.
+    /// The number of interrupt handlers is the number of msi vectors enabled.
     fn enable_msix_interrupts(
         regs: &mut IntelIxgbeRegisters1, 
         rxq: &mut Vec<RxQueue<IxgbeRxQueueRegisters,AdvancedRxDescriptor>>, 
@@ -1078,10 +1118,11 @@ impl IxgbeNic {
         interrupt_handlers: &[HandlerFunc]
     ) -> Result<HashMap<u8,u8>, &'static str> {
 
-        if rxq.len() < NUM_MSI_VEC_ENABLED as usize { return Err("Not enough rx queues for the interrupts requested"); }
+        let num_msi_vec_enabled = interrupt_handlers.len();
+        if rxq.len() < num_msi_vec_enabled { return Err("Not enough rx queues for the interrupts requested"); }
         // set IVAR reg to enable interrupts for different queues
         // each IVAR register controls 2 RX and 2 TX queues
-        let num_queues = NUM_MSI_VEC_ENABLED as usize;
+        let num_queues = num_msi_vec_enabled;
         let queues_per_ivar_reg = 2;
         let enable_interrupt_rx = 0x0080;
         for queue in 0..num_queues {
@@ -1107,7 +1148,7 @@ impl IxgbeNic {
         // set eims bits to enable required interrupt
         // the lower 16 bits are for the 16 receive queue interrupts
         let mut val = 0;
-        for i in 0..NUM_MSI_VEC_ENABLED {
+        for i in 0..num_msi_vec_enabled {
             val = val | (EIMS_INTERRUPT_ENABLE << i);
         }
         regs.eims.write(val); 
@@ -1123,14 +1164,14 @@ impl IxgbeNic {
         // set the throttling time for each interrupt
         // minimum interrupt interval specified in 2us units
         let interrupt_interval = 1; // 2us
-        for i in 0..NUM_MSI_VEC_ENABLED as usize {
+        for i in 0..num_msi_vec_enabled {
             regs.eitr[i].write(interrupt_interval << EITR_ITR_INTERVAL_SHIFT);
         }
 
-        let mut interrupt_nums = HashMap::with_capacity(NUM_MSI_VEC_ENABLED as usize);
+        let mut interrupt_nums = HashMap::with_capacity(num_msi_vec_enabled);
 
         // Initialize msi vectors
-        for i in 0..NUM_MSI_VEC_ENABLED as usize{ 
+        for i in 0..num_msi_vec_enabled { 
             // register an interrupt handler and get an interrupt number that can be used for the msix vector
             let msi_int_num = register_msi_interrupt(interrupt_handlers[i])?;
             interrupt_nums.insert(rxq[i].id, msi_int_num);
@@ -1189,6 +1230,7 @@ impl IxgbeNic {
 }
 
 /// Possible link speeds of the 82599 NIC
+#[derive(PartialEq)]
 pub enum LinkSpeedMbps {
     LS100 = 100,
     LS1000 = 1000,
@@ -1210,6 +1252,27 @@ impl From<u32> for LinkSpeedMbps {
             Self::LSUnknown
         }
     }
+}
+
+/// The set of receive buffer sizes that are accepted by the 82599 device.
+#[derive(Copy, Clone)]
+pub enum RxBufferSizeKiB {
+    Buffer1KiB = 1,
+    Buffer2KiB = 2,
+    Buffer3KiB = 3,
+    Buffer4KiB = 4,
+    Buffer5KiB = 5,
+    Buffer6KiB = 6,
+    Buffer7KiB = 7,
+    Buffer8KiB = 8,
+    Buffer9KiB = 9,
+    Buffer10KiB = 10,
+    Buffer11KiB = 11,
+    Buffer12KiB = 12,
+    Buffer13KiB = 13,
+    Buffer14KiB = 14,
+    Buffer15KiB = 15,
+    Buffer16KiB = 16
 }
 
 /// Options for the filter protocol used in the 5-tuple filters.

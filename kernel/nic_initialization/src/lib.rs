@@ -101,7 +101,7 @@ pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool:
 /// # Arguments
 /// * `num_desc`: number of descriptors in the queue
 /// * `rx_buffer_pool`: pool from which to take receive buffers
-/// * `buffer_size`: size of each buffer in the pool
+/// * `buffer_size`: size of each buffer in the pool in bytes
 /// * `rxq_regs`: registers needed to set up a receive queue 
 pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize, rxq_regs: &mut S)
     -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> 
