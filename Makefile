@@ -185,7 +185,7 @@ iso: $(iso)
 ## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used 
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
-build: $(nano_core_binary) $(THESEUS_CARGO_BIN)
+build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
