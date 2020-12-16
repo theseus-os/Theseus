@@ -59,13 +59,6 @@ fn main() -> Result<(), String> {
          typically the `target`, e.g., \"/path/to/target/$TARGET/release/deps\"", 
         "INPUT_DIR"
     );
-    // opts.reqopt(
-    //     "k", 
-    //     "kernel",  
-    //     "(required) path to either the directory of kernel crates,
-    //      or a file listing each kernel crate name, one per line",
-    //     "KERNEL_CRATES"
-    // );
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -138,7 +131,7 @@ fn main() -> Result<(), String> {
             Some("d") | Some("o") => {
                 get_plain_crate_name_from_path(&path)?
             }
-            Some("rmeta") | Some("rlib") => {
+            Some(RMETA_FILE_EXTENSION) | Some(RLIB_FILE_EXTENSION) => {
                 let libcrate_name = get_plain_crate_name_from_path(&path)?;
                 if libcrate_name.starts_with(RMETA_FILE_PREFIX) {
                     &libcrate_name[PREFIX_END ..]
@@ -163,6 +156,10 @@ fn main() -> Result<(), String> {
         }
     }
 
+    // Obtain the directory for the host system dependencies
+    let mut host_deps_dir_path = PathBuf::from(&input_dir_path);
+    host_deps_dir_path.push(&build_config.host_deps);
+
     // re-execute the rustc commands that we captured from the original cargo verbose output. 
     for original_cmd in &stderr_captured {
         // This function will only re-run rustc for crates that don't already exist in the set of prebuilt crates.
@@ -170,7 +167,8 @@ fn main() -> Result<(), String> {
             original_cmd, 
             &prebuilt_crates_set, 
             &input_dir_path, 
-            &input_dir_path
+            &input_dir_path,
+            &host_deps_dir_path,
         )?;
     }
 
@@ -219,6 +217,7 @@ const BUILD_SCRIPT_CRATE_NAME:    &str = "build_script_build";
 // The format of rmeta file names. 
 const RMETA_FILE_PREFIX:          &str = "lib";
 const RMETA_FILE_EXTENSION:       &str = "rmeta";
+const RLIB_FILE_EXTENSION:        &str = "rlib";
 const PREFIX_END: usize = RMETA_FILE_PREFIX.len();
 
 
@@ -405,14 +404,16 @@ fn ignore_arg(arg: &str) -> bool {
 ///   This occurs if `original_cmd` is for building a build script (currently ignored), 
 ///   or if `original_cmd` is for building a crate that already exists in the set of `prebuilt_crates`.
 /// * Returns an error if the command fails. 
-fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
+fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>, H: AsRef<Path>>(
     original_cmd: &str,
     prebuilt_crates: &HashMap<String, String>,
     prebuilt_dir: P,
     target_dir_path: T,
+    host_deps_dir_path: H,
 ) -> Result<bool, String> {
     let prebuilt_dir = prebuilt_dir.as_ref();
     let target_dir_path = target_dir_path.as_ref();
+    let host_deps_dir_path = host_deps_dir_path.as_ref();
 
     let command = if original_cmd.starts_with(COMMAND_START) && original_cmd.ends_with(COMMAND_END) {
         let end_index = original_cmd.len() - COMMAND_END.len();
@@ -445,13 +446,7 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
     //
     // First, we parse the following part:
     // "rustc --crate-name <crate_name> <crate_source_file> <all_other_args>"
-    let top_level_matches = clap::App::new("rustc")
-        // The first argument that we want to see, --crate-name.
-        .arg(clap::Arg::with_name("--crate-name")
-            .long("crate-name")
-            .takes_value(true)
-            .required(true)
-        )
+    let top_level_matches = rustc_clap_options("rustc")
         .setting(clap::AppSettings::DisableHelpFlags)
         .setting(clap::AppSettings::DisableHelpSubcommand)
         .setting(clap::AppSettings::AllowExternalSubcommands)
@@ -467,7 +462,7 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
     // * the path to the crate's main file will be the first subcommand
     // * that subcommand's arguments will include ALL OTHER arguments that we care about, specified below.
 
-    let crate_name = top_level_matches.value_of("--crate-name").unwrap();
+    let crate_name = top_level_matches.value_of("--crate-name").expect("rustc command did not have required --crate-name argument");
     let (crate_source_file, additional_args) = top_level_matches.subcommand();
     let additional_args = additional_args.unwrap();
 
@@ -487,7 +482,7 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
 
     // Second, we parse all other args in the command that followed the crate source file. 
     // Note that the arg name, the parameter in with_name(), in each arg below MUST BE exactly how it is invoked by cargo.
-    let matches = rustc_clap_options()
+    let matches = rustc_clap_options("")
         .setting(clap::AppSettings::DisableHelpFlags)
         .setting(clap::AppSettings::DisableHelpSubcommand)
         .setting(clap::AppSettings::ColorNever)
@@ -500,15 +495,17 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
 
 
     // Now, re-create the rustc command invocation with the proper arguments.
+    // First, we handle the --crate-name and --edition arguments, which may come before the crate source file path. 
     let mut recreated_cmd = Command::new("rustc");
-    recreated_cmd
-        .arg("--crate-name")
-        .arg(crate_name)
-        .arg(crate_source_file);
+    recreated_cmd.arg("--crate-name").arg(crate_name);
+    if let Some(edition) = top_level_matches.value_of("--edition") {
+        recreated_cmd.arg("--edition").arg(edition);
+    }
+    recreated_cmd.arg(crate_source_file);
 
     let mut args_changed = false;
 
-    // After adding the initial stuff: rustc command, crate name, and crate source file, 
+    // After adding the initial stuff: rustc command, crate name, (optional --edition), and crate source file, 
     // the other arguments are added in the loop below. 
     for (&arg, values) in matches.args.iter() {
         // println!("Arg {:?} has values:\n\t {:?}", arg, values.vals);
@@ -519,17 +516,21 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
             let mut new_value = value.to_string();
 
             if arg == "--extern" {
-                let (extern_crate_name, crate_rmeta_path) = value
-                    .find('=')
-                    .map(|idx| value.split_at(idx))
-                    .map(|(name, path)| (name, &path[1..])) // ignore the '=' delimiter
-                    .ok_or_else(|| format!("Failed to parse value of --extern arg as CRATENAME=PATH: {:?}", value))?;
-                println!("Found --extern arg, {:?} --> {:?}", extern_crate_name, crate_rmeta_path);
-                if let Some(extern_crate_name_with_hash) = prebuilt_crates.get(extern_crate_name) {
-                    let mut new_crate_path = prebuilt_dir.to_path_buf();
-                    new_crate_path.push(format!("{}{}.{}", RMETA_FILE_PREFIX, extern_crate_name_with_hash, RMETA_FILE_EXTENSION));
-                    println!("#### Replacing crate {:?} with prebuilt crate at {}", extern_crate_name, new_crate_path.display());
-                    new_value = format!("{}={}", extern_crate_name, new_crate_path.display());
+                if value.ends_with(RMETA_FILE_EXTENSION) {
+                    let (extern_crate_name, crate_rmeta_path) = value
+                        .find('=')
+                        .map(|idx| value.split_at(idx))
+                        .map(|(name, path)| (name, &path[1..])) // ignore the '=' delimiter
+                        .ok_or_else(|| format!("Failed to parse value of --extern arg as CRATENAME=PATH: {:?}", value))?;
+                    println!("Found --extern arg, {:?} --> {:?}", extern_crate_name, crate_rmeta_path);
+                    if let Some(extern_crate_name_with_hash) = prebuilt_crates.get(extern_crate_name) {
+                        let mut new_crate_path = prebuilt_dir.to_path_buf();
+                        new_crate_path.push(format!("{}{}.{}", RMETA_FILE_PREFIX, extern_crate_name_with_hash, RMETA_FILE_EXTENSION));
+                        println!("#### Replacing crate {:?} with prebuilt crate at {}", extern_crate_name, new_crate_path.display());
+                        new_value = format!("{}={}", extern_crate_name, new_crate_path.display());
+                    }
+                } else {
+                    // println!("Skipping non-rlib --extern value: {:?}", value);
                 }
             } else if arg == "-L" {
                 let (kind, _path) = value.as_ref()
@@ -557,6 +558,8 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
     // which ensures that adding in the directory of prebuilt crate .rmeta/.rlib files won't cause rustc to complain
     // about multiple "potentially newer" versions of a given crate.
     recreated_cmd.arg("-L").arg(prebuilt_dir);
+    // We also need to add the directory of host dependencies, e.g., proc macro crates and such. 
+    recreated_cmd.arg("-L").arg(host_deps_dir_path);
 
     // If any args actually changed, we need to run the re-created command. 
     if args_changed {
@@ -572,14 +575,13 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>>(
     // let mut buf = String::new();
     // io::stdin().read_line(&mut buf).expect("failed to read stdin");
 
-
-    // TODO: do we need to modify the environment variable `LD_LIBRARY_PATH`? 
-    //       It includes a target/deps/ directory, but I'm not sure if it's used by rustc.
-
     // Ensure we have the RUST_TARGET_PATH env var so that rustc can find our target spec JSON file. 
     recreated_cmd.env("RUST_TARGET_PATH", target_dir_path);
 
-    // Run the recreated rustc command.
+    // As far as I can tell, we do not need to include or modify the environment variable `LD_LIBRARY_PATH`. 
+    // It seems like rustc doesn't need it, but if we decide it does, add that in here.
+
+    // Finally, we run the recreated rustc command.
     let mut rustc_process = recreated_cmd.spawn().map_err(|io_err| 
         format!("Failed to run cargo command: {:?}", io_err)
     )?;
@@ -603,7 +605,7 @@ fn get_out_dir_arg(cmd_str: &str) -> Result<String, String> {
     let out_dir_str_start = cmd_str.find(" --out-dir")
         .map(|idx| &cmd_str[idx..])
         .ok_or_else(|| format!("Captured rustc command did not have an --out-dir argument"))?;
-    let out_dir_parse = rustc_clap_options()
+    let out_dir_parse = rustc_clap_options("")
         .setting(clap::AppSettings::DisableHelpFlags)
         .setting(clap::AppSettings::DisableHelpSubcommand)
         .setting(clap::AppSettings::AllowExternalSubcommands)
@@ -660,13 +662,16 @@ fn populate_crates_from_dir<P: AsRef<Path>>(dir_path: P) -> Result<HashMap<Strin
 
 
 use serde::Deserialize;
+
+/// Config and environment variables that describe a prior build of Theseus. 
+/// These are parsed from the `TheseusBuild.toml` file created in the top-level Makefile.
 #[derive(Deserialize, Debug)]
 struct BuildConfig {
     target:        String,
-    // xargo_toml:    Option<PathBuf>,
     sysroot:       PathBuf,
     rustflags:     String,
     cargoflags:    String,
+    host_deps:     PathBuf,
 }
 impl BuildConfig {
     fn populate_from_dir<P: Into<PathBuf>>(dir_path: P) -> Result<BuildConfig, String> {
@@ -686,8 +691,13 @@ impl BuildConfig {
 /// accepted by the `rustc` executable. 
 ///
 /// I obtained this by looking at the output of `rustc --help --verbose`. 
-fn rustc_clap_options<'a, 'b>() -> clap::App<'a, 'b> {
-    clap::App::new("")
+fn rustc_clap_options<'a, 'b>(app_name: &str) -> clap::App<'a, 'b> {
+    clap::App::new(app_name)
+        // The first argument that we want to see, --crate-name.
+        .arg(clap::Arg::with_name("--crate-name")
+            .long("crate-name")
+            .takes_value(true)
+        )
         .arg(clap::Arg::with_name("-L")
             .short("L")
             .takes_value(true)
@@ -775,6 +785,10 @@ fn rustc_clap_options<'a, 'b>() -> clap::App<'a, 'b> {
         )
         .arg(clap::Arg::with_name("--sysroot")
             .long("sysroot")
+            .takes_value(true)
+        )
+        .arg(clap::Arg::with_name("--edition")
+            .long("edition")
             .takes_value(true)
         )
         .arg(clap::Arg::with_name("--cfg")

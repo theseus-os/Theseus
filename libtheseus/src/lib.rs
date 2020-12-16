@@ -1,13 +1,13 @@
 //! Sample test of a dynamically-linked library atop Theseus kernel crates.
 
 #![no_std]
-#![feature(allocator_api)]
-#![feature(alloc_error_handler)]
-#![feature(lang_items)]
-#![feature(panic_info_message)]
+// #![feature(allocator_api)]
+// #![feature(alloc_error_handler)]
+// #![feature(lang_items)]
+// #![feature(panic_info_message)]
 
-// extern crate panic_entry;
-// extern crate heap;
+extern crate panic_entry;
+extern crate heap;
 
 extern crate rlibc;
 #[macro_use] extern crate alloc;
@@ -21,18 +21,24 @@ pub mod my_mod;
 
 pub fn main() {
     libtheseus_hello(vec![String::from("hisss"), String::from("there")]);
+    panic!("hello from my main");
 }
+
 
 #[inline(never)]
 pub fn libtheseus_hello(_args: Vec<String>) -> isize {
-
     // println!("Hello from an example dylib main function!");
     serial_port::write_fmt(format_args!("\n\nHello from libtheseus: args: {:?}", _args)).unwrap();
-    panic!("hello from my main");
     0
 }
 
 
+
+////////////////////////////////////////////////
+////// Dummy lang items 
+////////////////////////////////////////////////
+
+/*
 
 #[panic_handler] // same as:  #[lang = "panic_impl"]
 fn panic_entry_point(_info: &core::panic::PanicInfo) -> ! {
@@ -76,3 +82,5 @@ unsafe impl GlobalAlloc for DummyHeap {
 extern "C" fn _Unwind_Resume(_arg: usize) -> ! {
     panic!("_Unwind_Resume invoked");
 }
+
+*/
