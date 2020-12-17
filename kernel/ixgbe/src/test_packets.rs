@@ -1,11 +1,11 @@
 //! A set of functions to create packets for testing the NIC transmission functionality.
 
-use super::{IXGBE_NIC, NetworkInterfaceCard, TransmitBuffer};
+use super::{get_ixgbe_nic, NetworkInterfaceCard, TransmitBuffer};
 
 /// Sends a dhcp request packet on the ixgbe NIC.
-pub fn dhcp_request_packet() -> Result<(), &'static str> {
+pub fn dhcp_request_packet(nic_id: usize) -> Result<(), &'static str> {
     let transmit_buffer = create_dhcp_test_packet()?;
-    let ixgbe_nc = IXGBE_NIC.try().ok_or("ixgbe NIC hasn't been initialized yet")?;
+    let ixgbe_nc = get_ixgbe_nic(nic_id).ok_or("ixgbe NIC hasn't been initialized yet")?;
     ixgbe_nc.lock().send_packet(transmit_buffer)
 }
 

@@ -3,7 +3,7 @@
 //! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. 
 //! We also support language-level virtualization of the NIC so that applications can directly access their assigned transmit and receive queues.
 //! When using virtualization, we disable RSS since we use 5-tuple filters to ensure packets are routed to the correct queues.
-//! We also disable interrupts, since we do not yet have support for allowing applications to register their own interrupt handlers.
+//! We also disable interrupts when using virtualization, since we do not yet have support for allowing applications to register their own interrupt handlers.
 
 #![no_std]
 #![feature(untagged_unions)]
@@ -61,8 +61,8 @@ use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages};
 use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism};
 use bit_field::BitField;
-use interrupts::{eoi,register_msi_interrupt};
-use x86_64::structures::idt::{ExceptionStackFrame, HandlerFunc};
+use interrupts::register_msi_interrupt;
+use x86_64::structures::idt::HandlerFunc;
 use hpet::get_hpet;
 use network_interface_card::NetworkInterfaceCard;
 use nic_initialization::*;
@@ -102,7 +102,7 @@ const NUM_L34_5_TUPLE_FILTERS:              usize   = 128;
 
 
 
-/*** Developer Device Parameters of the Intel 82599 NIC ***/
+/*** Developer Parameters of the Intel 82599 NIC ***/
 
 /// The number of receive queues that are enabled. 
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
@@ -115,13 +115,20 @@ const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
 
 
 
-/// The single instance of the 82599 NIC.
-pub static IXGBE_NIC: Once<MutexIrqSafe<IxgbeNic>> = Once::new();
+lazy_static! {
+    /// All the 82599 NICs found in the PCI space are initialized and then stored here.
+    pub static ref IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
+}
 
-/// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe,
-/// if it exists and has been initialized.
-pub fn get_ixgbe_nic() -> Option<&'static MutexIrqSafe<IxgbeNic>> {
-    IXGBE_NIC.try()
+/// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
+/// Currently we use the index of the nic within the `IXGBE_NICS` as identification since it should not chage
+/// after initialization. We can change this later to give each NIC a proper name.
+pub fn get_ixgbe_nic(id: usize) -> Option<&'static MutexIrqSafe<IxgbeNic>> {
+    IXGBE_NICS.try().and_then(
+        |nics| {
+            if id >= nics.len() { return None; }
+            Some(&nics[id])
+        })
 }
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
@@ -209,8 +216,7 @@ impl NetworkInterfaceCard for IxgbeNic {
 
 // Functions that setup the NIC struct and handle the sending and receiving of packets.
 impl IxgbeNic {
-    /// Store required values from the device's PCI config space,
-    /// and initialize different features of the nic.
+    /// Store required values from the device's PCI config space, and initialize different features of the nic.
     /// 
     /// # Arguments
     /// * `ixgbe_pci_dev`: Contains the pci device information for this NIC
@@ -238,7 +244,7 @@ impl IxgbeNic {
         rx_buffer_size_kbytes: RxBufferSizeKiB,
         num_rx_descriptors: u16,
         num_tx_descriptors: u16
-    ) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
+    ) -> Result<MutexIrqSafe<IxgbeNic>, &'static str> {
         // Series of checks to determine if starting parameters are acceptable
         if (link_speed == LinkSpeedMbps::LSUnknown) | (link_speed == LinkSpeedMbps::LS100) {
             return Err("Ixgbe driver can only be configured for 1 Gbps or 10 Gbps link speeds");
@@ -388,8 +394,7 @@ impl IxgbeNic {
 
         info!("Link is up with speed: {} Mb/s", ixgbe_nic.link_speed() as u32);
 
-        let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
-        Ok(nic_ref)
+        Ok(MutexIrqSafe::new(ixgbe_nic))
     }
 
     /// Returns the memory-mapped control registers of the nic and the rx/tx queue registers.
@@ -1284,8 +1289,8 @@ pub enum FilterProtocol {
 }
 
 /// A helper function to poll the nic receive queues (only for testing purposes).
-fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {
-    let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?;
+fn rx_poll_mq(qid: usize, nic_id: usize) -> Result<ReceivedFrame, &'static str> {
+    let nic_ref = get_ixgbe_nic(nic_id).ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();      
     nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
     let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
@@ -1293,20 +1298,20 @@ fn rx_poll_mq(qid: usize) -> Result<ReceivedFrame, &'static str> {
 }
 
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
-fn tx_send_mq(qid: usize) -> Result<(), &'static str> {
+fn tx_send_mq(qid: usize, nic_id: usize) -> Result<(), &'static str> {
     let packet = test_packets::create_dhcp_test_packet()?;
-    let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?;
+    let nic_ref = get_ixgbe_nic(nic_id).ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();  
 
     nic.tx_queues[qid].send_on_queue(packet);
     Ok(())
 }
 
-/// A generic interrupt handler that can be used for packet reception interrupts for any queue.
+/// A generic interrupt handler that can be used for packet reception interrupts for any queue on any ixgbe nic.
 /// It returns the interrupt number for the rx queue 'qid'.
-fn rx_interrupt_handler(qid: u8) -> Option<u8> {
+fn rx_interrupt_handler(qid: u8, nic_id: usize) -> Option<u8> {
     let interrupt_num = 
-        if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
+        if let Some(ref ixgbe_nic_ref) = get_ixgbe_nic(nic_id){
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
             ixgbe_nic.interrupt_num.get(&qid).and_then(|int| Some(*int))
@@ -1316,9 +1321,4 @@ fn rx_interrupt_handler(qid: u8) -> Option<u8> {
         };
     
     interrupt_num
-}
-
-/// The interrupt handler for rx queue 0
-extern "x86-interrupt" fn ixgbe_handler_0(_stack_frame: &mut ExceptionStackFrame) {
-    eoi(rx_interrupt_handler(0));
 }

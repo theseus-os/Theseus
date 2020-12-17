@@ -33,7 +33,7 @@ pub fn create_virtual_nic(
         return Err("default queue value is out of bounds");
     }
     
-    let mut nic = get_ixgbe_nic().ok_or("Ixgbe nic not initialized")?.lock();
+    let mut nic = get_ixgbe_nic(0).ok_or("Ixgbe nic not initialized")?.lock();
     // Allocate queues from the physical NIC
     let mut rx_queues = nic.take_rx_queues_from_physical_nic(num_queues)?;
     let tx_queues = nic.take_tx_queues_from_physical_nic(num_queues)?;
@@ -49,7 +49,7 @@ pub fn create_virtual_nic(
         tx_queues,
         default_tx_queue,
         nic.mac_address(),
-        get_ixgbe_nic().ok_or("Ixgbe nic isn't initialized")?
+        get_ixgbe_nic(0).ok_or("Ixgbe nic isn't initialized")?
     )
 }
 
