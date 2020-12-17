@@ -14,12 +14,14 @@ use network_interface_card::NetworkInterfaceCard;
 /// Create a virtual NIC from the ixgbe device.
 /// 
 /// # Arguments
+/// * `nic_id`: the ixgbe NIC we will take receive and transmit queue from.
 /// * `ip_addresses`: set of ip addresses that will be assigned to the allocated receive queues.
 ///    The number of ip addresses is equal to the number of queue pairs that will be assigned to the vNIC.
 ///    Packets with the destination ip addresses specified here will be routed to the vNIC's queues. 
 /// * `default_rx_queue`: the queue that will be polled for packets when no other queue is specified.
 /// * `default_tx_queue`: the queue that packets will be sent on when no other queue is specified.
 pub fn create_virtual_nic(
+    nic_id: usize,
     ip_addresses: Vec<[u8; 4]>, 
     default_rx_queue: usize, 
     default_tx_queue: usize
@@ -33,7 +35,7 @@ pub fn create_virtual_nic(
         return Err("default queue value is out of bounds");
     }
     
-    let mut nic = get_ixgbe_nic(0).ok_or("Ixgbe nic not initialized")?.lock();
+    let mut nic = get_ixgbe_nic(nic_id).ok_or("Ixgbe nic not initialized")?.lock();
     // Allocate queues from the physical NIC
     let mut rx_queues = nic.take_rx_queues_from_physical_nic(num_queues)?;
     let tx_queues = nic.take_tx_queues_from_physical_nic(num_queues)?;
@@ -49,7 +51,7 @@ pub fn create_virtual_nic(
         tx_queues,
         default_tx_queue,
         nic.mac_address(),
-        get_ixgbe_nic(0).ok_or("Ixgbe nic isn't initialized")?
+        get_ixgbe_nic(nic_id).ok_or("Ixgbe nic isn't initialized")?
     )
 }
 

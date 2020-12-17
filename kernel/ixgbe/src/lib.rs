@@ -221,14 +221,13 @@ impl IxgbeNic {
     /// # Arguments
     /// * `ixgbe_pci_dev`: Contains the pci device information for this NIC
     /// * `link_speed`: The link speed of the ethernet connection which depends on the SFI module attached to the cable.
-    ///     We do not access the PHY module for link information yet, and currently only support 1 Gbps and 10 Gbps links.
+    ///     We do not access the PHY module for link information yet and currently only support 1 Gbps and 10 Gbps links.
     /// * `virtualization_enabled`: True if language-level virtualization is enabled.
-    ///     Currently, if this is true then interrupts and RSS need to be disabled.
-    ///     When the virtual NIC is created, these features should be enabled on a per-queue basis.
-    ///     We do not support that as of yet.
+    ///     If this is true then interrupts and RSS need to be disabled. When the virtual NIC is created, these features 
+    ///     should be enabled on a per-queue basis. We do not support that as of yet.
     /// * `interrupts`: A vector of packet reception interrupt handlers where the length of the vector is the number of
     ///     receive queues for which interrupts are enabled. We have currently tested for 16 receive queues.
-    ///     The interrupt handler at index i is for receive queue i.
+    ///     The interrupt handler at index `i` is for receive queue `i`.
     ///     The number of handlers must be less than or equal to `IXGBE_NUM_RX_QUEUES_ENABLED`.
     ///     If interrupts are disabled, this should be set to None.
     /// * `rss_enabled`: true if receive side scaling is enabled.
