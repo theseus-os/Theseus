@@ -55,11 +55,11 @@ use alloc::{
     vec::Vec,
     collections::VecDeque,
     sync::Arc,
-    boxed::Box
+    boxed::Box,
 };
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages};
-use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism};
+use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
 use bit_field::BitField;
 use interrupts::register_msi_interrupt;
 use x86_64::structures::idt::HandlerFunc;
@@ -115,20 +115,23 @@ const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
 
 
 
-lazy_static! {
-    /// All the 82599 NICs found in the PCI space are initialized and then stored here.
-    pub static ref IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
-}
+/// All the 82599 NICs found in the PCI space are initialized and then stored here.
+pub static IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
+
 
 /// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
-/// Currently we use the index of the nic within the `IXGBE_NICS` as identification since it should not chage
-/// after initialization. We can change this later to give each NIC a proper name.
-pub fn get_ixgbe_nic(id: usize) -> Option<&'static MutexIrqSafe<IxgbeNic>> {
+/// Currently we use the pci location of the device as identification since it should not change after initialization.
+pub fn get_ixgbe_nic(id: PciLocation) -> Option<&'static MutexIrqSafe<IxgbeNic>> {
     IXGBE_NICS.try().and_then(
         |nics| {
-            if id >= nics.len() { return None; }
-            Some(&nics[id])
-        })
+            nics.iter().find( |nic| { nic.lock().dev_id == id } )
+        }
+    )
+}
+
+/// Returns a reference to the list of all initialized ixgbe NICs
+pub fn get_ixgbe_nics_list() -> Option<&'static Vec<MutexIrqSafe<IxgbeNic>>> {
+    IXGBE_NICS.try()
 }
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
@@ -146,6 +149,8 @@ lazy_static! {
 
 /// A struct representing an ixgbe network interface card.
 pub struct IxgbeNic {
+    /// Device ID of the NIC assigned by the device manager.
+    dev_id: PciLocation,
     /// Type of Base Address Register 0,
     /// if it's memory mapped or I/O.
     bar_type: u8,
@@ -219,7 +224,9 @@ impl IxgbeNic {
     /// Store required values from the device's PCI config space, and initialize different features of the nic.
     /// 
     /// # Arguments
-    /// * `ixgbe_pci_dev`: Contains the pci device information for this NIC
+    /// * `ixgbe_pci_dev`: Contains the pci device information for this NIC.
+    /// * `dev_id`: Device id as assigned by the device manager.
+    ///     Currently this is just the pci location.
     /// * `link_speed`: The link speed of the ethernet connection which depends on the SFI module attached to the cable.
     ///     We do not access the PHY module for link information yet and currently only support 1 Gbps and 10 Gbps links.
     /// * `virtualization_enabled`: True if language-level virtualization is enabled.
@@ -236,6 +243,7 @@ impl IxgbeNic {
     /// * `num_tx_descriptors`: The number of descriptors in each transmit queue.
     pub fn init(
         ixgbe_pci_dev: &PciDevice,
+        dev_id: PciLocation,
         link_speed: LinkSpeedMbps,
         virtualization_enabled: bool,
         interrupts: Option<Vec<HandlerFunc>>,
@@ -372,6 +380,7 @@ impl IxgbeNic {
         Self::wait_for_link(&mapped_registers2, 10_000_000);
 
         let ixgbe_nic = IxgbeNic {
+            dev_id: dev_id,
             bar_type: bar_type,
             mem_base: mem_base,
             interrupt_num: interrupt_num,
@@ -394,6 +403,11 @@ impl IxgbeNic {
         info!("Link is up with speed: {} Mb/s", ixgbe_nic.link_speed() as u32);
 
         Ok(MutexIrqSafe::new(ixgbe_nic))
+    }
+
+    /// Returns the device id of the PCI device.
+    pub fn device_id(&self) -> PciLocation {
+        self.dev_id
     }
 
     /// Returns the memory-mapped control registers of the nic and the rx/tx queue registers.
@@ -1288,7 +1302,7 @@ pub enum FilterProtocol {
 }
 
 /// A helper function to poll the nic receive queues (only for testing purposes).
-fn rx_poll_mq(qid: usize, nic_id: usize) -> Result<ReceivedFrame, &'static str> {
+fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic(nic_id).ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();      
     nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
@@ -1297,7 +1311,7 @@ fn rx_poll_mq(qid: usize, nic_id: usize) -> Result<ReceivedFrame, &'static str> 
 }
 
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
-fn tx_send_mq(qid: usize, nic_id: usize) -> Result<(), &'static str> {
+fn tx_send_mq(qid: usize, nic_id: PciLocation) -> Result<(), &'static str> {
     let packet = test_packets::create_dhcp_test_packet()?;
     let nic_ref = get_ixgbe_nic(nic_id).ok_or("ixgbe nic not initialized")?;
     let mut nic = nic_ref.lock();  
@@ -1308,7 +1322,7 @@ fn tx_send_mq(qid: usize, nic_id: usize) -> Result<(), &'static str> {
 
 /// A generic interrupt handler that can be used for packet reception interrupts for any queue on any ixgbe nic.
 /// It returns the interrupt number for the rx queue 'qid'.
-fn rx_interrupt_handler(qid: u8, nic_id: usize) -> Option<u8> {
+fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
     let interrupt_num = 
         if let Some(ref ixgbe_nic_ref) = get_ixgbe_nic(nic_id){
             let mut ixgbe_nic = ixgbe_nic_ref.lock();

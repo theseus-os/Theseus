@@ -18,7 +18,7 @@ extern crate spawn;
 use alloc::vec::Vec;
 use alloc::string::String;
 use ixgbe::{
-    virtual_function,
+    virtual_function, get_ixgbe_nics_list,
     test_packets::create_raw_packet,
 };
 use network_interface_card::NetworkInterfaceCard;
@@ -39,11 +39,18 @@ pub fn main(_args: Vec<String>) -> isize {
 }
 
 fn rmain() -> Result<(), &'static str> {
+    
+    let dev_id = {
+        let ixgbe_devs = get_ixgbe_nics_list().ok_or("Ixgbe NICs list not initialized")?;
+        if ixgbe_devs.is_empty() { return Err("No ixgbe device available"); }
+        ixgbe_devs[0].lock().device_id()
+    };
+
     let num_nics = 63;
     let mut nics = Vec::with_capacity(num_nics);
 
     for i in 0..num_nics {
-        nics.push(virtual_function::create_virtual_nic(vec!([192,168,0,i as u8 + 14]),0,0)?);
+        nics.push(virtual_function::create_virtual_nic(dev_id, vec!([192,168,0,i as u8 + 14]), 0, 0)?);
     }
 
     for nic in &mut nics {

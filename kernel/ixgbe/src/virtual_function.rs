@@ -10,6 +10,7 @@ use intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};
 use nic_queues::{RxQueue, TxQueue};
 use alloc::vec::Vec;
 use network_interface_card::NetworkInterfaceCard;
+use pci::PciLocation;
 
 /// Create a virtual NIC from the ixgbe device.
 /// 
@@ -21,7 +22,7 @@ use network_interface_card::NetworkInterfaceCard;
 /// * `default_rx_queue`: the queue that will be polled for packets when no other queue is specified.
 /// * `default_tx_queue`: the queue that packets will be sent on when no other queue is specified.
 pub fn create_virtual_nic(
-    nic_id: usize,
+    nic_id: PciLocation,
     ip_addresses: Vec<[u8; 4]>, 
     default_rx_queue: usize, 
     default_tx_queue: usize

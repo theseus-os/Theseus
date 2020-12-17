@@ -57,8 +57,10 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         debug!("Found pci device: {:?}", dev);
     } 
 
-    // Iterate over all PCI devices and initialize the drivers for the devices we support.
+    // store all the initialized ixgbe NICs here to be added to the network interface list
     let mut ixgbe_devs = Vec::new();
+
+    // Iterate over all PCI devices and initialize the drivers for the devices we support.
 
     for dev in pci::pci_device_iter() {
         // Currently we skip Bridge devices, since we have no use for them yet. 
@@ -91,15 +93,24 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             }
             if dev.vendor_id == ixgbe::INTEL_VEND && dev.device_id == ixgbe::INTEL_82599 {
                 info!("ixgbe PCI device found at: {:?}", dev.location);
+                
+                // Initialization parameters of the NIC.
+                // These can be changed according to the requirements specified in the ixgbe init function.
+                const VIRT_ENABLED: bool = true;
+                const RSS_ENABLED: bool = false;
+                const RX_DESCS: u16 = 8;
+                const TX_DESCS: u16 = 8;
+                
                 let ixgbe_nic = ixgbe::IxgbeNic::init(
                     dev, 
+                    dev.location,
                     ixgbe::LinkSpeedMbps::LS10000, 
-                    true, 
+                    VIRT_ENABLED, 
                     None, 
-                    false, 
+                    RSS_ENABLED, 
                     ixgbe::RxBufferSizeKiB::Buffer8KiB,
-                    8,
-                    8
+                    RX_DESCS,
+                    TX_DESCS
                 )?;
 
                 ixgbe_devs.push(ixgbe_nic);
@@ -112,12 +123,11 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         warn!("Ignoring PCI device with no handler. {:?}", dev);
     }
 
-    // Once all the NICs have been initialized, we can store them and add them to the list of network interfaces
-    let num_nics = ixgbe_devs.len();
-    ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
-    for i in 0..num_nics {
+    // Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.
+    let ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
+    for ixgbe_nic_ref in ixgbe_nics.iter() {
         let ixgbe_interface = EthernetNetworkInterface::new_ipv4_interface(
-            ixgbe::get_ixgbe_nic(i).expect("We should have a NIC at this index"), 
+            ixgbe_nic_ref, 
             DEFAULT_LOCAL_IP, 
             &DEFAULT_GATEWAY_IP
         )?;
