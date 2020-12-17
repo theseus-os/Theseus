@@ -28,7 +28,7 @@ APP_PREFIX    ?= a\#
 BUILD_MODE ?= release
 
 ifeq ($(BUILD_MODE), release)
-	CARGOFLAGS += --release
+	export override CARGOFLAGS += --release
 endif
 
 

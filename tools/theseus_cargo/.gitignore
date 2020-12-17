@@ -1,0 +1,4 @@
+# Build directories
+target/
+bin/
+.crates*
