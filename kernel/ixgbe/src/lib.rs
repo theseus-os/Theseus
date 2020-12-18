@@ -121,12 +121,11 @@ pub static IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
 
 /// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
 /// Currently we use the pci location of the device as identification since it should not change after initialization.
-pub fn get_ixgbe_nic(id: PciLocation) -> Option<&'static MutexIrqSafe<IxgbeNic>> {
-    IXGBE_NICS.try().and_then(
-        |nics| {
-            nics.iter().find( |nic| { nic.lock().dev_id == id } )
-        }
-    )
+pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
+    let nics = IXGBE_NICS.try().ok_or("Ixgbe NICs weren't initialized")?;
+    nics.iter()
+        .find( |nic| { nic.lock().dev_id == id } )
+        .ok_or("Ixgbe NIC with this ID does not exist")
 }
 
 /// Returns a reference to the list of all initialized ixgbe NICs
@@ -229,7 +228,7 @@ impl IxgbeNic {
     ///     Currently this is just the pci location.
     /// * `link_speed`: The link speed of the ethernet connection which depends on the SFI module attached to the cable.
     ///     We do not access the PHY module for link information yet and currently only support 1 Gbps and 10 Gbps links.
-    /// * `virtualization_enabled`: True if language-level virtualization is enabled.
+    /// * `enable_virtualization`: True if language-level virtualization is enabled.
     ///     If this is true then interrupts and RSS need to be disabled. When the virtual NIC is created, these features 
     ///     should be enabled on a per-queue basis. We do not support that as of yet.
     /// * `interrupts`: A vector of packet reception interrupt handlers where the length of the vector is the number of
@@ -237,7 +236,7 @@ impl IxgbeNic {
     ///     The interrupt handler at index `i` is for receive queue `i`.
     ///     The number of handlers must be less than or equal to `IXGBE_NUM_RX_QUEUES_ENABLED`.
     ///     If interrupts are disabled, this should be set to None.
-    /// * `rss_enabled`: true if receive side scaling is enabled.
+    /// * `enable_rss`: true if receive side scaling is enabled.
     /// * `rx_buffer_size_kbytes`: The size of receive buffers. 
     /// * `num_rx_descriptors`: The number of descriptors in each receive queue.
     /// * `num_tx_descriptors`: The number of descriptors in each transmit queue.
@@ -245,9 +244,9 @@ impl IxgbeNic {
         ixgbe_pci_dev: &PciDevice,
         dev_id: PciLocation,
         link_speed: LinkSpeedMbps,
-        virtualization_enabled: bool,
+        enable_virtualization: bool,
         interrupts: Option<Vec<HandlerFunc>>,
-        rss_enabled: bool,
+        enable_rss: bool,
         rx_buffer_size_kbytes: RxBufferSizeKiB,
         num_rx_descriptors: u16,
         num_tx_descriptors: u16
@@ -256,7 +255,7 @@ impl IxgbeNic {
         if (link_speed == LinkSpeedMbps::LSUnknown) | (link_speed == LinkSpeedMbps::LS100) {
             return Err("Ixgbe driver can only be configured for 1 Gbps or 10 Gbps link speeds");
         }
-        if (virtualization_enabled & interrupts.is_some()) | (virtualization_enabled & rss_enabled) {
+        if (enable_virtualization & interrupts.is_some()) | (enable_virtualization & enable_rss) {
             return Err("Cannot enable virtualization when interrupts or RSS are enabled");
         }
 
@@ -372,7 +371,7 @@ impl IxgbeNic {
             };
 
         // enable Receive Side Scaling if required
-        if rss_enabled {
+        if enable_rss {
             Self::enable_rss(&mut mapped_registers2, &mut mapped_registers3)?;
         }
 
@@ -734,13 +733,13 @@ impl IxgbeNic {
             },
             LinkSpeedMbps::LS10000 => {
                 let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
-                regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004
+                regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004 (as seen from Linux driver)
     
                 let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
-                regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004
-    
-                // let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
-                // regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000
+                regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004 (as seen from Linux driver)
+
+                let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
+                regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000 (as seen from Linux driver)
             }
             _ => {
                 return Err("Invalid link speed");
@@ -769,7 +768,7 @@ impl IxgbeNic {
     /// Returns link speed in Mb/s
     pub fn link_speed(&self) -> LinkSpeedMbps {
         let speed = self.regs2.links.read() & LINKS_SPEED_MASK; 
-        speed.into()
+        LinkSpeedMbps::from_links_register_value(speed)
     }
 
     /// Wait for link to be up for upto 10 seconds.
@@ -1256,15 +1255,15 @@ pub enum LinkSpeedMbps {
     LSUnknown = 0,
 }
 
-/// Converts between a LinkSpeedMbps enum and a u32 number.
-/// The u32 number is the value in the links register that represents the link speed.
-impl From<u32> for LinkSpeedMbps {
-    fn from(item: u32) -> Self {
-        if item == (0x1 << 28) {
+impl LinkSpeedMbps {
+    /// Converts between a u32 and a LinkSpeedMbps enum.
+    /// The u32 number is the value in the links register that represents the link speed.
+    fn from_links_register_value(value: u32) -> LinkSpeedMbps {
+        if value == (1 << 28) {
             Self::LS100
-        } else if item == (0x2 << 28) {
+        } else if value == (2 << 28) {
             Self::LS1000
-        } else if item == (0x3 << 28) {
+        } else if value == (3 << 28) {
             Self::LS10000
         } else {
             Self::LSUnknown
@@ -1303,7 +1302,7 @@ pub enum FilterProtocol {
 
 /// A helper function to poll the nic receive queues (only for testing purposes).
 fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
-    let nic_ref = get_ixgbe_nic(nic_id).ok_or("ixgbe nic not initialized")?;
+    let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();      
     nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
     let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
@@ -1313,7 +1312,7 @@ fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
 fn tx_send_mq(qid: usize, nic_id: PciLocation) -> Result<(), &'static str> {
     let packet = test_packets::create_dhcp_test_packet()?;
-    let nic_ref = get_ixgbe_nic(nic_id).ok_or("ixgbe nic not initialized")?;
+    let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();  
 
     nic.tx_queues[qid].send_on_queue(packet);
@@ -1323,15 +1322,15 @@ fn tx_send_mq(qid: usize, nic_id: PciLocation) -> Result<(), &'static str> {
 /// A generic interrupt handler that can be used for packet reception interrupts for any queue on any ixgbe nic.
 /// It returns the interrupt number for the rx queue 'qid'.
 fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
-    let interrupt_num = 
-        if let Some(ref ixgbe_nic_ref) = get_ixgbe_nic(nic_id){
+    match get_ixgbe_nic(nic_id) {
+        Ok(ref ixgbe_nic_ref) => {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
             ixgbe_nic.interrupt_num.get(&qid).and_then(|int| Some(*int))
-        } else {
-            error!("BUG: ixgbe_handler_{}(): IXGBE NIC hasn't yet been initialized!", qid);
+        }
+        Err(e) => {
+            error!("BUG: ixgbe_handler_{}(): {}", qid, e);
             None
-        };
-    
-    interrupt_num
+        }
+    }
 }

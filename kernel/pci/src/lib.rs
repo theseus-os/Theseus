@@ -186,7 +186,7 @@ fn scan_pci() -> Vec<PciBus> {
 
 /// The bus, slot, and function number of a given PCI device.
 /// This offers methods for reading and writing the PCI config space. 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PciLocation {
     bus:  u16,
     slot: u16,
