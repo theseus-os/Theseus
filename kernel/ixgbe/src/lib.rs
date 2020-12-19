@@ -252,10 +252,11 @@ impl IxgbeNic {
         num_tx_descriptors: u16
     ) -> Result<MutexIrqSafe<IxgbeNic>, &'static str> {
         // Series of checks to determine if starting parameters are acceptable
-        if (link_speed == LinkSpeedMbps::LSUnknown) | (link_speed == LinkSpeedMbps::LS100) {
+        if (link_speed == LinkSpeedMbps::LSUnknown) || (link_speed == LinkSpeedMbps::LS100) {
             return Err("Ixgbe driver can only be configured for 1 Gbps or 10 Gbps link speeds");
         }
-        if (enable_virtualization & interrupts.is_some()) | (enable_virtualization & enable_rss) {
+
+        if (enable_virtualization && interrupts.is_some()) || (enable_virtualization && enable_rss) {
             return Err("Cannot enable virtualization when interrupts or RSS are enabled");
         }
 
@@ -1051,7 +1052,7 @@ impl IxgbeNic {
         priority: u8, qid: u8
     ) -> Result<u8, &'static str> {
 
-        if source_ip.is_none() & dest_ip.is_none() & source_port.is_none() & dest_port.is_none() & protocol.is_none() {
+        if source_ip.is_none() && dest_ip.is_none() && source_port.is_none() && dest_port.is_none() && protocol.is_none() {
             return Err("Must set one of the five filter options");
         }
 

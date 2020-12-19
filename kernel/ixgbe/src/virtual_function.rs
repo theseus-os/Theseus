@@ -32,7 +32,7 @@ pub fn create_virtual_nic(
 
     let num_queues = ip_addresses.len();
     if num_queues == 0 { return Err("need to request >0 number of queues"); }
-    if (default_rx_queue >= num_queues) | (default_tx_queue >= num_queues) {
+    if (default_rx_queue >= num_queues) || (default_tx_queue >= num_queues) {
         return Err("default queue value is out of bounds");
     }
     

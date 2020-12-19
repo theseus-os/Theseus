@@ -45,11 +45,16 @@ pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, 
 impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> VirtualNic<S,T,U,V> {
     /// Create a new `VirtualNIC` with the given parameters.
     /// For now we require that there is at least one Rx and one Tx queue.
-    pub fn new(rx_queues: Vec<RxQueue<S,T>>,default_rx_queue: usize, tx_queues: Vec<TxQueue<U,V>>,
-        default_tx_queue: usize, mac_address: [u8; 6], physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>) 
-        -> Result<VirtualNic<S,T,U,V>, &'static str> 
-    {
-        if rx_queues.is_empty() | tx_queues.is_empty() { 
+    pub fn new(
+        rx_queues: Vec<RxQueue<S,T>>,
+        default_rx_queue: usize, 
+        tx_queues: Vec<TxQueue<U,V>>,
+        default_tx_queue: usize, 
+        mac_address: [u8; 6], 
+        physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>
+    ) -> Result<VirtualNic<S,T,U,V>, &'static str> {
+
+        if rx_queues.is_empty() || tx_queues.is_empty() { 
             return Err("Must have at least one Rx and Tx queue to create virtual NIC");
         }
 
