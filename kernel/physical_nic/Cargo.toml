@@ -1,0 +1,20 @@
+[package]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "physical_nic"
+description = "A trait that defines functions a physical NIC has to implement to support virtualization"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
+[dependencies.nic_queues]
+path = "../nic_queues"
+
+[dependencies.intel_ethernet]
+path = "../intel_ethernet"
+
+[lib]
+crate-type = ["rlib"]

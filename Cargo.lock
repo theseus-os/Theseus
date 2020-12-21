@@ -548,6 +548,7 @@ dependencies = [
  "e1000",
  "ethernet_smoltcp_device",
  "event_types",
+ "ixgbe",
  "keyboard",
  "log",
  "memory",
@@ -1042,6 +1043,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
 dependencies = [
  "either",
+]
+
+[[package]]
+name = "ixgbe"
+version = "0.1.0"
+dependencies = [
+ "acpi",
+ "apic",
+ "bit_field 0.7.0",
+ "hashbrown",
+ "hpet",
+ "intel_ethernet",
+ "interrupts",
+ "irq_safety",
+ "kernel_config",
+ "lazy_static",
+ "log",
+ "memory",
+ "mpmc",
+ "network_interface_card",
+ "nic_buffers",
+ "nic_initialization",
+ "nic_queues",
+ "owning_ref",
+ "pci",
+ "physical_nic",
+ "pic",
+ "pit_clock",
+ "rand",
+ "runqueue",
+ "spin",
+ "static_assertions",
+ "virtual_nic",
+ "volatile",
+ "x86_64",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1545,6 +1582,7 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
+ "nic_queues",
  "owning_ref",
  "pci",
  "volatile",
@@ -1557,6 +1595,7 @@ dependencies = [
  "intel_ethernet",
  "log",
  "memory",
+ "mpmc",
  "nic_buffers",
  "owning_ref",
 ]
@@ -1694,6 +1733,15 @@ dependencies = [
 [[package]]
 name = "percent-encoding"
 version = "1.0.2"
+
+[[package]]
+name = "physical_nic"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet",
+ "nic_buffers",
+ "nic_queues",
+]
 
 [[package]]
 name = "pic"
@@ -2782,6 +2830,18 @@ dependencies = [
  "serial_port",
  "spin",
  "volatile",
+]
+
+[[package]]
+name = "virtual_nic"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet",
+ "irq_safety",
+ "network_interface_card",
+ "nic_buffers",
+ "nic_queues",
+ "physical_nic",
 ]
 
 [[package]]
