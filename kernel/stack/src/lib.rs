@@ -13,16 +13,15 @@ extern crate page_allocator;
 use core::ops::{Deref, DerefMut};
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::VirtualAddress;
-use memory::{FrameAllocator, FrameAllocatorRef, EntryFlags, Mapper, MappedPages};
+use memory::{EntryFlags, FrameAllocator, FrameAllocatorRef, MappedPages, Mapper};
 use page_allocator::AllocatedPages;
 
 
 /// Allocates a new stack and maps it to the active page table. 
-/// The given `page_table` can be a `PageTable` or a `Mapper`, 
-/// because `PageTable` automatically derefs into a `Mapper`.
-/// Reserves an unmapped guard page beneath the bottom of the stack
+///
+/// This also reserves an unmapped guard page beneath the bottom of the stack
 /// in order to catch stack overflows. 
-/// The given `usermode` argument determines whether the stack is accessible from userspace.
+///
 /// Returns the newly-allocated stack and a VMA to represent its mapping.
 pub fn alloc_stack<FA>(
     size_in_pages: usize,
@@ -134,5 +133,13 @@ impl Stack {
         } else {
             Err((guard_page, stack_pages))
         }
+    }
+
+    /// Returns the guard page(s) for this stack. 
+    ///
+    /// Guard pages are virtual pages that are reserved/owned by this stack
+    /// but are not mapped, causing any access to them to result in a page fault. 
+    pub fn guard_page(&self) -> &memory_structs::PageRange {
+        &self.guard_page
     }
 }
