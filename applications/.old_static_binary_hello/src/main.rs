@@ -4,7 +4,6 @@
 
 
 // extern crate alloc;
-extern crate rlibc;
 #[macro_use] extern crate log;
 extern crate print;
 

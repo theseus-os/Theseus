@@ -21,6 +21,18 @@ CFG_DIR := $(ROOT_DIR)/cfg
 KERNEL_PREFIX ?= k\#
 APP_PREFIX    ?= a\#
 
+
+## Enable the following two unstable flags.
+CARGOFLAGS += -Z unstable-options
+
+## Instruct cargo that we want to build the `compiler_builtins` crate by ourselves,
+## so that we can enable the "mem" feature in our built version.
+CARGOFLAGS += -Z build-std
+
+## Enable "mem" feature so that memory utility functions (e.g. memcpy) are not
+## mangled. Rust implicitly relies on these functions.
+CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
+
 ## Build modes: debug is development mode, release is with full optimizations.
 ## We build using release mode by default, because running in debug mode is prohibitively slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"

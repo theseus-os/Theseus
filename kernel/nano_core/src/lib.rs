@@ -19,7 +19,6 @@
 
 #[macro_use] extern crate log;
 extern crate alloc;
-extern crate rlibc; // basic memset/memcpy libc functions
 extern crate spin;
 extern crate multiboot2;
 extern crate x86_64;

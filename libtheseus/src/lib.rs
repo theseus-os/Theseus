@@ -9,7 +9,6 @@
 extern crate panic_entry;
 extern crate heap;
 
-extern crate rlibc;
 #[macro_use] extern crate alloc;
 // #[macro_use] extern crate terminal_print;
 extern crate serial_port;
