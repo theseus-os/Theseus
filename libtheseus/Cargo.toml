@@ -7,7 +7,6 @@ build = "../build.rs"
 # links = "serial_port"
 
 [dependencies]
-rlibc = "1.0.0"
 # getopts = "0.2.21"
 
 [dependencies.serial_port]
