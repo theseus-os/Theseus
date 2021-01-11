@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 
 [dependencies]
-rlibc = "1.0.0"
 
 
 [dependencies.log]
