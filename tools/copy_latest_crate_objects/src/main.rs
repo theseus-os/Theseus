@@ -235,9 +235,9 @@ fn main() -> Result<(), String> {
         "",
     ).unwrap();
 
-    // Here, if requested, we create the sysroot directory, which is inside of the output_deps directory. 
-    // This will include the fundamental Rust libraries, e.g., core, alloc, compiler_builtins
-    // that cargo has custom-built for our Theseus target.
+    // Here, if requested, we create the sysroot directory, containing the fundamental Rust libraries 
+    // that we ask cargo to build for us for Theseus's custom platform target
+    // Currently this comprises core, alloc, compiler_builtins, and rustc_std_workspace_core.
     if let Some(output_sysroot_dir) = matches.opt_str("output-sysroot") {
         fs::create_dir_all(&output_sysroot_dir).map_err(|e|
             format!("Error creating output sysroot directory {:?}, {:?}", output_sysroot_dir, e)
