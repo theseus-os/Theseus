@@ -42,7 +42,7 @@ use walkdir::WalkDir;
 
 
 /// Debug option: if true, print all crate names and their object file path. 
-const PRINT_CRATES: bool = true;
+const PRINT_CRATES: bool = false;
 /// Debug option: if both this and `print_crates_objects` are true, print sorted crate names. 
 const PRINT_SORTED: bool = false;
 
