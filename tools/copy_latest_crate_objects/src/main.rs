@@ -34,7 +34,6 @@ use std::{
         hash_map::Entry,
     },
     env,
-    ffi::OsStr,
     fs::{self, DirEntry, File},
     io::{self, BufRead},
     path::{Path, PathBuf},
@@ -66,15 +65,6 @@ fn main() -> Result<(), String> {
         "INPUT_DIR"
     );
     opts.reqopt(
-        "",
-        "sysroot",
-        "(required) path to the target-specific subdirectory within the sysroot directory that holds fundamental Rust library files,
-         e.g., core, alloc, compiler_builtins. There should be at least an object file (.o) for each library. 
-         Typically the sysroot subdirectory is located at \"$HOME/.xargo/lib/rustlib/$TARGET/lib/\" if using xargo
-         for a cross-platform build (as with Theseus), otherwise you can locate the top-level sysroot using `rustc --print sysroot`.",
-        "SYSROOT_DIR"
-    );
-    opts.reqopt(
         "", 
         "output-objects",  
         "(required) path to the output directory where crate object files should be copied to, 
@@ -88,6 +78,15 @@ fn main() -> Result<(), String> {
          typically part of the build directory, e.g., \"/path/to/build/deps/\"", 
         "OUTPUT_DIR"
     );
+    opts.optopt(
+        "", 
+        "output-sysroot",  
+        "path to the output directory where the sysroot files should be copied to,
+         which includes the .rmeta and .rlib files for fundamental Rust library crates, e.g., core, alloc, compiler_builtins. 
+         Typically this should be \"/path/to/build/deps/sysroot/lib/rustlib/$TARGET/lib/\".
+         If not provided, no sysroot output directory will be created.",
+        "OUTPUT_DIR"
+     );
     opts.reqopt(
         "k", 
         "kernel",  
@@ -152,7 +151,6 @@ fn main() -> Result<(), String> {
 
     // Parse the required command-line arguments.
     let input_dir          = matches.opt_str("i").expect("no -i or --input arg provided");
-    let sysroot_dir        = matches.opt_str("sysroot").expect("no --sysroot arg provided");
     let output_objects_dir = matches.opt_str("output-objects").expect("no --output-objects arg provided");
     let output_deps_dir    = matches.opt_str("output-deps").expect("no --output-deps arg provided");
     let kernel_arg         = matches.opt_str("k").expect("no -k or --kernel arg provided");
@@ -184,18 +182,6 @@ fn main() -> Result<(), String> {
 
     let extra_app_names = matches.opt_strs("e");
     app_crates_set.extend(extra_app_names.iter().flat_map(|n| n.split_whitespace()).map(|s| s.to_string()));
-
-    // Get all the object files from the provided sysroot directory. 
-    let object_file_extension = OsStr::new("o");
-    let core_object_file_paths = fs::read_dir(&sysroot_dir)
-        .expect("Could not access --sysroot directory")
-        .flat_map(|d| d)
-        .filter(|d| Path::new(&d.file_name()).extension() == Some(&object_file_extension))
-        .map(|d| d.path())
-        .collect::<Vec<PathBuf>>();
-    if core_object_file_paths.is_empty() {
-        return Err(format!("The provided --sysroot directory {:?} did not have any object files (.o)", sysroot_dir));
-    }
 
     let (
         app_object_files,
@@ -229,11 +215,7 @@ fn main() -> Result<(), String> {
         other_objects_and_deps_files.values().map(|(obj_direnty, _)| obj_direnty.path()),
         &kernel_prefix
     ).unwrap(); 
-    copy_files(
-        &output_objects_dir,
-        core_object_file_paths.into_iter(),
-        &kernel_prefix
-    ).unwrap(); 
+
 
     
     // Now we do the same kind of copy operation of crate dependency files, namely the .rlib and .rmeta files,
@@ -252,9 +234,28 @@ fn main() -> Result<(), String> {
         other_objects_and_deps_files.values().flat_map(|(_, deps)| deps.iter()),
         "",
     ).unwrap();
-    // Here we *could* optionally copy over the .rmeta/.rlib files from the sysroot, 
-    // but we choose not to because they are very large (tens of MBs) and aren't needed for future build steps.
-    // Also, this is debatably easier to do in the main Theseus Makefile.
+
+    // Here, if requested, we create the sysroot directory, containing the fundamental Rust libraries 
+    // that we ask cargo to build for us for Theseus's custom platform target
+    // Currently this comprises core, alloc, compiler_builtins, and rustc_std_workspace_core.
+    if let Some(output_sysroot_dir) = matches.opt_str("output-sysroot") {
+        fs::create_dir_all(&output_sysroot_dir).map_err(|e|
+            format!("Error creating output sysroot directory {:?}, {:?}", output_sysroot_dir, e)
+        )?;
+        let sysroot_files = other_objects_and_deps_files.iter()
+            .filter(|(crate_name, val)| {
+                crate_name.starts_with("core-") || 
+                crate_name.starts_with("compiler_builtins-") || 
+                crate_name.starts_with("rustc_std_workspace_core-") || 
+                crate_name.starts_with("alloc-")
+            })
+            .flat_map(|(_key, (_, deps))| deps.iter());
+        copy_files(
+            &output_sysroot_dir,
+            sysroot_files,
+            "",
+        ).unwrap();
+    }
 
     Ok(())
 }

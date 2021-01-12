@@ -3,7 +3,7 @@
 Theseus uses the [cargo virtual workspace](https://doc.rust-lang.org/cargo/reference/fest.html#the-workspace-section) feature to group all of the crates together into a single meta project, which significantly speeds up build times.
 
 The top-level Makefile basically just invokes the Rust toolchain and compiler, copies the built object files into a top-level build directory, and then generates a bootable .iso image using various bootloader tools.
-We build all of the Rust code using [`xargo`](https://github.com/ric/xargo), a cross-compiler toolchain that wraps the default Rust `cargo`.
+We build all of the Rust code using `cargo`, Rust's build tool and dependency manager.
 The only special action it takes is to build the `nano_core` separately and fully link it against the architecture-specific assembly code in `nano_core/boot` into a static binary.
 
 ## Debug vs. Release Mode

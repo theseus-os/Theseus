@@ -1,18 +1,15 @@
 //! This program is basically a wrapper around cargo that cross-compiles Theseus components
-//! in a way that supports out-of-tree builds based on a set of pre-built Theseus crates. 
+//! in a way that supports out-of-tree builds based on a previous build of Theseus.
 //!
 //! Specifically, this program can (inefficiently) build a standalone crate in a way that allows
-//! that crate to depend upon and link against a set of pre-built crates. 
-//! This requires a set of prebuilt dependencies, specified as the `.rmeta` and `.rlib` files.
+//! that crate to depend upon and link against a set of pre-built crates;
+//! those pre-built crates are given as a set of dependencies, primarily `.rmeta` and `.rlib` files.
 //! 
 //! This program works by invoking Rust's `cargo` build tool and capturing its verbose output
 //! such that we can modify and re-run the commands that cargo issued to rustc. 
 //!
-//! It also performs a special form of linking, which I've dubbed "partially-static" linking. 
+//! In the future, it may also perform a special form of linking, which I've dubbed "partially-static" linking. 
 //!
-//! TODO: FIXME: finish this documentation once the tool is complete. 
-//! 
-
 
 //! TODO: FIXME: idea: if we want to avoid actually building things twice, we could maybe use a fake no-op wrapper around rustc
 //!                    using the `RUSTC` environment variable, which would not actually perform any compilation activity. 
