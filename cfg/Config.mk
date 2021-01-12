@@ -22,17 +22,6 @@ KERNEL_PREFIX ?= k\#
 APP_PREFIX    ?= a\#
 
 
-## Enable the following two unstable flags.
-CARGOFLAGS += -Z unstable-options
-
-## Instruct cargo that we want to build the `compiler_builtins` crate by ourselves,
-## so that we can enable the "mem" feature in our built version.
-CARGOFLAGS += -Z build-std
-
-## Enable "mem" feature so that memory utility functions (e.g. memcpy) are not
-## mangled. Rust implicitly relies on these functions.
-CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
-
 ## Build modes: debug is development mode, release is with full optimizations.
 ## We build using release mode by default, because running in debug mode is prohibitively slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
@@ -42,6 +31,13 @@ BUILD_MODE ?= release
 ifeq ($(BUILD_MODE), release)
 	export override CARGOFLAGS += --release
 endif
+
+## Tell cargo to build our own target-specific version of the `core` and `alloc` crates.
+## Also ensure that core memory functions (e.g., memcpy) are included in the build and not name-mangled.
+## We keep these flags separate from the regular CARGOFLAGS for purposes of easily creating a sysroot directory.
+BUILD_STD_CARGOFLAGS += -Z unstable-options
+BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
+BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 
 
 ## emit obj gives us the object file for the crate, instead of an rlib that we have to unpack.

@@ -55,32 +55,6 @@ endif
 
 
 ###################################################################################################
-### For ensuring that the host computer has the proper version of xargo
-###################################################################################################
-
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.22
-XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1 | grep -o 'xargo [0-9]*\.[0-9]*\.[0-9]*')
-
-check_xargo: 	
-ifneq (${BYPASS_XARGO_CHECK}, yes)
-ifneq (xargo ${XARGO_CURRENT_SUPPORTED_VERSION}, ${XARGO_OUTPUT})
-	@echo -e "\nError: your xargo version does not match our supported xargo version."
-	@echo -e "To install the proper version of xargo, run the following commands:\n"
-	@echo -e "   cargo uninstall xargo"
-	@echo -e '   rm -rf $$HOME/.xargo'   ## use single quotes to escape dollar sign
-	@echo -e "   rustup toolchain install stable"
-	@echo -e "   cargo +stable install --vers $(XARGO_CURRENT_SUPPORTED_VERSION) xargo"
-	@echo -e "   make clean\n"
-	@echo -e "Then you can retry building!\n"
-	@exit 1
-else
-	@echo -e '\nFound proper xargo version, proceeding with build...\n'
-endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
-endif ## BYPASS_XARGO_CHECK
-
-
-
-###################################################################################################
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
 
@@ -91,13 +65,14 @@ GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
 DEPS_DIR := $(BUILD_DIR)/deps
-HOST_DEPS_DIR := $(BUILD_DIR)/deps/host_deps
+HOST_DEPS_DIR := $(DEPS_DIR)/host_deps
+DEPS_SYSROOT_DIR := $(DEPS_DIR)/sysroot
 THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
 THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
 
 
-## This is the output path of the xargo command, defined by cargo (not our choice).
+## This is the default output path defined by cargo.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
 NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
@@ -134,7 +109,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
-		check_rustc check_xargo \
+		check_rustc \
 		clean run run_pause iso build cargo \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
@@ -189,9 +164,9 @@ build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
-		--sysroot "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/ \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
 		--output-deps $(DEPS_DIR) \
+		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
 		-k ./kernel \
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
@@ -199,13 +174,10 @@ build: $(nano_core_binary)
 		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
 
 ## Create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
-## This includes the target file, sysroot directory contents, host OS dependencies (proc macros, etc)., 
+## This includes the target file, host OS dependencies (proc macros, etc)., 
 ## and most importantly, a TOML file to describe these and other config variables.
 	@rm -rf $(THESEUS_BUILD_TOML)
 	@cp -vf $(CFG_DIR)/$(TARGET).json  $(DEPS_DIR)/
-	@cp -vf $(ROOT_DIR)/Xargo.toml  $(DEPS_DIR)/
-	@mkdir -p $(DEPS_DIR)/sysroot/lib/rustlib/$(TARGET)/lib/
-	@cp -r "$(HOME)"/.xargo/lib/rustlib/$(TARGET)  $(DEPS_DIR)/sysroot/lib/rustlib/
 	@mkdir -p $(HOST_DEPS_DIR)
 	@cp -f ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
@@ -245,23 +217,23 @@ endif
 
 
 ## This target invokes the actual Rust build process
-cargo: check_rustc check_xargo
+cargo: check_rustc 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build  $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
 
-## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
-## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
-## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
+## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
+## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
+## For the "cargo rustc" command below, all of the arguments to cargo come before the "--",
 ## whereas all of the arguments to rustc come after the "--".
 # 	for kd in $(KERNEL_CRATE_NAMES) ; do  \
 # 		cd $${kd} ; \
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
 # 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
-# 			xargo rustc \
+# 			cargo rustc \
 # 			$(CARGOFLAGS) \
 # 			$(RUST_FEATURES) \
 # 			--target $(TARGET) ; \
@@ -270,7 +242,7 @@ cargo: check_rustc check_xargo
 # for app in $(APP_CRATE_NAMES) ; do  \
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
-# 		xargo rustc \
+# 		cargo rustc \
 # 		$(CARGOFLAGS) \
 # 		--target $(TARGET) \
 # 		-- \

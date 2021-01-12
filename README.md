@@ -82,10 +82,6 @@ Note: building and running Theseus within a Docker container may be slower than 
 Install the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html), which is just this command:    
 `curl https://sh.rustup.rs -sSf | sh`
 
-We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:    
-`rustup toolchain install stable`    
-`cargo +stable install --vers 0.3.22 xargo`    
-
 
 ## Building and Running
 To build and run Theseus in QEMU, simply run:   

@@ -4,7 +4,9 @@ set -e
 # capture all output to a file
 # script -e .script_output
 
-THESEUS_CARGO_PATH="../tools/theseus_cargo"
+LIBTHESEUS_DIR="$(dirname "$(readlink -f "$0")")"
+THESEUS_BASE_DIR=$LIBTHESEUS_DIR/..
+THESEUS_CARGO_PATH="$THESEUS_BASE_DIR/tools/theseus_cargo"
 
 export RUST_BACKTRACE=1
 
@@ -13,7 +15,18 @@ cargo install --force --path=$THESEUS_CARGO_PATH --root=$THESEUS_CARGO_PATH
 
 
 ### This is our new auto-config'd cargo command
-$THESEUS_CARGO_PATH/bin/theseus_cargo --input ../build/deps build
+# $THESEUS_CARGO_PATH/bin/theseus_cargo --input ../build/deps build
+
+
+
+## The newer NEWER raw cargo command that works without xargo at all, using cargo build-std.
+## We don't want to pass the build-std flags to cargo since that would re-build all of the core files from scratch. 
+## Instead, we want to re-use the existing pre-built core files from our previously-created sysroot output directory.
+RUST_TARGET_PATH="$THESEUS_BASE_DIR/build/deps"   \
+	RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no --sysroot $THESEUS_BASE_DIR/build/deps/sysroot" \
+	cargo build --release  --verbose \
+	--target x86_64-theseus
+    # -Z unstable-options -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem \
 
 
 ## The "newer" raw cargo command that works without xargo at all. This is good because we can use a pre-built/distributed sysroot directory.

@@ -10,7 +10,7 @@ ifeq ($(BUILD_MODE), release)
 endif  ## otherwise, nothing, which means "debug" by default
 
 
-## this is the output path of the xargo command, not our choice.
+## this is the output path of the cargo command, not our choice.
 ## The name of the lib (lib_____.a) is defined by the target above.
 cargo-obj := target/$(TARGET)/$(BUILD_MODE)/hello
 
@@ -26,4 +26,4 @@ clean:
 
 
 build: 
-	RUST_TARGET_PATH="$(PWD)/../../cfg" RUSTFLAGS=$(RUSTFLAGS) xargo build $(CARGO_OPTIONS) --target $(TARGET)
+	RUST_TARGET_PATH="$(PWD)/../../cfg" RUSTFLAGS=$(RUSTFLAGS) cargo build $(CARGO_OPTIONS) --target $(TARGET)
