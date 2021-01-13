@@ -1668,6 +1668,7 @@ dependencies = [
 name = "page_allocator"
 version = "0.1.0"
 dependencies = [
+ "intrusive-collections",
  "kernel_config",
  "log",
  "memory_structs",

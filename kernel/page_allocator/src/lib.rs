@@ -10,12 +10,18 @@
 //! but there are several convenience functions that offer simpler interfaces for general usage. 
 
 #![no_std]
+#![feature(const_fn, const_in_array_repeat_expressions)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate kernel_config;
 extern crate memory_structs;
 extern crate spin;
+extern crate intrusive_collections;
+
+
+mod static_array_rb_tree;
+
 
 use alloc::collections::LinkedList;
 use core::{
