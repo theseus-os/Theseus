@@ -1,8 +1,8 @@
 use alloc::boxed::Box;
-use core::marker::PhantomData;
+use core::ops::{Deref, DerefMut};
 use intrusive_collections::{
     intrusive_adapter,
-    rbtree::{RBTree, RBTreeOps},
+    rbtree::{RBTree, RBTreeOps, CursorMut},
     RBTreeLink,
 	Adapter,
 	KeyAdapter,
@@ -10,11 +10,11 @@ use intrusive_collections::{
 };
 
 /// A wrapper for the type stored in the `StaticArrayRBTree::Inner::RBTree` variant.
-struct Wrapper<T: Ord> {
+pub struct Wrapper<T: Ord> {
     link: RBTreeLink,
     inner: T,
 }
-intrusive_adapter!(WrapperAdapter<T> = Box<Wrapper<T>>: Wrapper<T> { link: RBTreeLink } where T: Ord);
+intrusive_adapter!(pub WrapperAdapter<T> = Box<Wrapper<T>>: Wrapper<T> { link: RBTreeLink } where T: Ord);
 
 // Use the inner type `T` (which must implement `Ord`) to define the key
 // for properly ordering the elements in the RBTree.
@@ -24,7 +24,17 @@ impl<'a, T: Ord + 'a> KeyAdapter<'a> for WrapperAdapter<T> {
         &value.inner
     }
 }
-
+impl <T: Ord> Deref for Wrapper<T> {
+	type Target = T;
+	fn deref(&self) -> &T {
+		&self.inner
+	}
+}
+impl <T: Ord> DerefMut for Wrapper<T> {
+	fn deref_mut(&mut self) -> &mut T {
+		&mut self.inner
+	}
+}
 impl <T: Ord> Wrapper<T> {
     /// Convenience method for creating a new link
     fn new_link(value: T) -> Box<Self> {
@@ -42,22 +52,28 @@ impl <T: Ord> Wrapper<T> {
 /// and then abstract over both that and the inner `RBTree` when using it. 
 /// 
 /// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.
-pub struct StaticArrayRBTree<T: Ord>(Inner<T>);
+pub struct StaticArrayRBTree<T: Ord>(pub(crate) Inner<T>);
 
 /// The inner enum, hidden for visibility reasons because Rust lacks private enum variants.
-enum Inner<T: Ord> {
+pub(crate) enum Inner<T: Ord> {
 	Array([Option<T>; 32]),
 	RBTree(RBTree<WrapperAdapter<T>>),
 }
 
 impl<T: Ord> Default for StaticArrayRBTree<T> {
 	fn default() -> Self {
-		Self::new()
+		Self::empty()
 	}
 }
 impl<T: Ord> StaticArrayRBTree<T> {
-	pub const fn new() -> Self {
+	/// Create a new empty collection (the default).
+	pub const fn empty() -> Self {
 		StaticArrayRBTree(Inner::Array([None; 32]))
+	}
+
+	/// Create a new collection based on the given array of values.
+	pub const fn new(arr: [Option<T>; 32]) -> Self {
+		StaticArrayRBTree(Inner::Array(arr))
 	}
 }
 
@@ -139,4 +155,32 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 	// 	}
 	// 	iter_a.into_iter().flatten().chain(iter_b.into_iter().flatten())
 	// }
+}
+
+
+/// A mutable reference to a value in the `StaticArrayRBTree`. 
+pub enum ValueRefMut<'list, T: Ord> {
+	Array(&'list mut T),
+	RBTree(CursorMut<'list, WrapperAdapter<T>>),
+}
+impl <'list, T: Ord> ValueRefMut<'list, T> {
+	pub fn replace_with(&mut self, new_value: T) -> Result<(), T> {
+		match self {
+			Self::Array(ref mut arr_ref) => {
+				**arr_ref = new_value;
+			}
+			Self::RBTree(ref mut cursor_mut) => {
+				cursor_mut.replace_with(Wrapper::new_link(new_value))
+					.map_err(|e| (*e).inner)?;
+			}
+		}
+		Ok(())
+	}
+
+	pub fn get(&self) -> Option<&T> {
+		match self {
+			Self::Array(ref arr_ref) => Some(arr_ref),
+			Self::RBTree(ref cursor_mut) => cursor_mut.get().map(|w| w.deref()),
+		}
+	}
 }
