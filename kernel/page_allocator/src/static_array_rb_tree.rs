@@ -2,11 +2,9 @@ use alloc::boxed::Box;
 use core::ops::{Deref, DerefMut};
 use intrusive_collections::{
     intrusive_adapter,
-    rbtree::{RBTree, RBTreeOps, CursorMut},
+    rbtree::{RBTree, CursorMut},
     RBTreeLink,
-	Adapter,
 	KeyAdapter,
-	PointerOps,
 };
 
 /// A wrapper for the type stored in the `StaticArrayRBTree::Inner::RBTree` variant.
@@ -161,7 +159,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 /// A mutable reference to a value in the `StaticArrayRBTree`. 
 pub enum ValueRefMut<'list, T: Ord> {
 	Array(&'list mut T),
-	RBTree(CursorMut<'list, WrapperAdapter<T>>),
+	RBTree(&'list mut CursorMut<'list, WrapperAdapter<T>>),
 }
 impl <'list, T: Ord> ValueRefMut<'list, T> {
 	pub fn replace_with(&mut self, new_value: T) -> Result<(), T> {
@@ -177,6 +175,7 @@ impl <'list, T: Ord> ValueRefMut<'list, T> {
 		Ok(())
 	}
 
+	#[allow(dead_code)]
 	pub fn get(&self) -> Option<&T> {
 		match self {
 			Self::Array(ref arr_ref) => Some(arr_ref),
