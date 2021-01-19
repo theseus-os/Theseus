@@ -50,22 +50,25 @@ use window_inner::{WindowInner, WindowMovingStatus};
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 
 /// The width and height size of mouse in number of pixels.
-const MOUSE_POINTER_SIZE: usize = 9;
+const MOUSE_POINTER_SIZE_Y: usize = 18;
+const MOUSE_POINTER_SIZE_X: usize = 11;
 /// The mouse pointer image defined as a 2-D pixel array.
-static MOUSE_POINTER_IMAGE: [[Color; MOUSE_POINTER_SIZE]; MOUSE_POINTER_SIZE] = {
+static MOUSE_POINTER_IMAGE: [[Color; MOUSE_POINTER_SIZE_Y]; MOUSE_POINTER_SIZE_X] = {
     const T: Color = color::TRANSPARENT;
-    const W: Color = color::WHITE;
-    const B: Color = color::BLUE;
+    const C: Color = color::BLACK; // Cursor
+    const B: Color = color::WHITE; // Border
     [
-        [B, B, B, B, B, B, B, B, B],
-        [B, W, W, W, W, W, W, B, T],
-        [B, W, W, W, W, W, B, T, T],
-        [B, W, W, W, W, B, T, T, T],
-        [B, W, W, W, W, B, T, T, T],
-        [B, W, W, B, B, W, B, T, T],
-        [B, W, B, T, T, B, W, B, T],
-        [B, B, T, T, T, T, B, W, B],
-        [B, T, T, T, T, T, T, B, B],
+        [B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, T, T],
+        [T, B, C, C, C, C, C, C, C, C, C, C, C, C, B, T, T, T],
+        [T, T, B, C, C, C, C, C, C, C, C, C, C, B, T, T, T, T],
+        [T, T, T, B, C, C, C, C, C, C, C, C, B, T, T, T, T, T],
+        [T, T, T, T, B, C, C, C, C, C, C, C, C, B, B, T, T, T],
+        [T, T, T, T, T, B, C, C, C, C, C, C, C, C, C, B, B, T],
+        [T, T, T, T, T, T, B, C, C, C, C, B, B, C, C, C, C, B],
+        [T, T, T, T, T, T, T, B, C, C, B, T, T, B, B, C, B, T],
+        [T, T, T, T, T, T, T, T, B, C, B, T, T, T, T, B, B, T],
+        [T, T, T, T, T, T, T, T, T, B, B, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, T, T, T, T, B, T, T, T, T, T, T, T],
     ]
 };
 
@@ -504,7 +507,7 @@ impl WindowManager {
     pub fn refresh_mouse(&mut self) -> Result<(), &'static str> {
         let bounding_box = Some(Rectangle {
             top_left: self.mouse,
-            bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
+            bottom_right: self.mouse + (MOUSE_POINTER_SIZE_X as isize, MOUSE_POINTER_SIZE_Y as isize)
         });
         
         self.refresh_top(bounding_box.into_iter())
@@ -534,23 +537,23 @@ impl WindowManager {
     // Move mouse to absolute position `new`
     fn move_mouse_to(&mut self, new: Coord) -> Result<(), &'static str> {
         // clear old mouse
-        for y in self.mouse.y..self.mouse.y + MOUSE_POINTER_SIZE as isize {
+        for y in self.mouse.y..self.mouse.y + MOUSE_POINTER_SIZE_Y as isize {
             for x in
-                self.mouse.x..self.mouse.x + MOUSE_POINTER_SIZE as isize {
+                self.mouse.x..self.mouse.x + MOUSE_POINTER_SIZE_X as isize {
                 let coordinate = Coord::new(x, y);
                 self.top_fb.overwrite_pixel(coordinate, color::TRANSPARENT.into());
             }
         }
         let bounding_box = Some(Rectangle {
             top_left: self.mouse,
-            bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
+            bottom_right: self.mouse + (MOUSE_POINTER_SIZE_X as isize, MOUSE_POINTER_SIZE_Y as isize)
         });
         self.refresh_bottom_windows(bounding_box.into_iter(), true)?;
 
         // draw new mouse
         self.mouse = new;
-        for y in new.y..new.y + MOUSE_POINTER_SIZE as isize {
-            for x in new.x..new.x + MOUSE_POINTER_SIZE as isize {
+        for y in new.y..new.y + MOUSE_POINTER_SIZE_Y as isize {
+            for x in new.x..new.x + MOUSE_POINTER_SIZE_X as isize {
                 let coordinate = Coord::new(x, y);
                 let pixel = MOUSE_POINTER_IMAGE[(x - new.x) as usize][(y - new.y) as usize].into();
                 self.top_fb.overwrite_pixel(coordinate, pixel);
