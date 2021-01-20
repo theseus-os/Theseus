@@ -335,7 +335,7 @@ unsafe impl Step for Frame {
 
 
 /// A range of `Frame`s that are contiguous in physical memory.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FrameRange(RangeInclusive<Frame>);
 
 impl FrameRange {
@@ -532,7 +532,7 @@ unsafe impl Step for Page {
 
 
 /// An inclusive range of `Page`s that are contiguous in virtual memory.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct PageRange(RangeInclusive<Page>);
 
 impl PageRange {

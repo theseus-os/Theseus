@@ -243,7 +243,7 @@ fn main() -> Result<(), String> {
             format!("Error creating output sysroot directory {:?}, {:?}", output_sysroot_dir, e)
         )?;
         let sysroot_files = other_objects_and_deps_files.iter()
-            .filter(|(crate_name, val)| {
+            .filter(|(crate_name, _val)| {
                 crate_name.starts_with("core-") || 
                 crate_name.starts_with("compiler_builtins-") || 
                 crate_name.starts_with("rustc_std_workspace_core-") || 
