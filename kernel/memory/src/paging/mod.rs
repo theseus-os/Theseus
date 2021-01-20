@@ -86,13 +86,13 @@ impl PageTable {
 
             table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
 
-            // Note: now that virtual pages are all dynamically allocated, we would either want to 
-            //       copy all mappings by default or no mappings at all, depending on policy choice.
+            // Note: now that virtual pages are all dynamically allocated,
+            //       we don't want to copy any mappings by default. 
+            //
             // // start out by copying all the kernel sections into the new table
             // table.copy_entry_from_table(current_page_table.p4(), KERNEL_TEXT_P4_INDEX);
             // table.copy_entry_from_table(current_page_table.p4(), KERNEL_HEAP_P4_INDEX);
             // table.copy_entry_from_table(current_page_table.p4(), KERNEL_STACK_P4_INDEX);
-            // // TODO: FIXME: we should probably copy all of the mappings here just to be safe (except 510, the recursive P4 entry.)
         }
 
         Ok( PageTable { 
