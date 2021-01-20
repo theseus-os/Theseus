@@ -8,6 +8,7 @@ use intrusive_collections::{
 };
 
 /// A wrapper for the type stored in the `StaticArrayRBTree::Inner::RBTree` variant.
+#[derive(Debug)]
 pub struct Wrapper<T: Ord> {
     link: RBTreeLink,
     inner: T,
@@ -35,7 +36,7 @@ impl <T: Ord> DerefMut for Wrapper<T> {
 }
 impl <T: Ord> Wrapper<T> {
     /// Convenience method for creating a new link
-    fn new_link(value: T) -> Box<Self> {
+    pub(crate) fn new_link(value: T) -> Box<Self> {
         Box::new(Wrapper {
             link: RBTreeLink::new(),
             inner: value,

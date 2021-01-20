@@ -101,6 +101,8 @@ pub fn init(
                 .ok_or("could not allocate privilege stack")?,
         )
     };
+    debug!("Allocated double fault stack: {:?}, privilege stack: {:?}", double_fault_stack, privilege_stack);
+    
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // init other featureful (non-exception) interrupt handlers

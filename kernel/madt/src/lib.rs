@@ -95,6 +95,7 @@ impl<'t> Madt<'t> {
     pub fn bsp_init(&self, page_table: &mut PageTable) -> Result<(), &'static str> {
         handle_ioapic_entries(self.iter(), page_table)?;
         handle_bsp_lapic_entry(self.iter(), page_table)?;
+        debug!("bsp_init() complete");
         Ok(())
     }
 

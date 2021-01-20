@@ -54,7 +54,7 @@ fn create_mappings(
     for _i in 0..num_mappings {
         let split_at_page = *remaining_chunk.start() + size_in_pages;
         let (small_chunk, big_chunk) = remaining_chunk.split(split_at_page)
-            .ok_or("failed to split allocated pages")?;
+            .map_err(|_ap| "failed to split allocated pages")?;
         remaining_chunk = big_chunk;
         allocated_pages_list.push(small_chunk);
     }

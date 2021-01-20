@@ -221,29 +221,79 @@ impl AllocatedPages {
 	/// Depending on the size of this `AllocatedPages`, either one of the 
 	/// returned `AllocatedPages` objects may be empty. 
 	/// 
-	/// Returns `None` if `at_page` is not within the bounds of this `AllocatedPages`.
-	pub fn split(self, at_page: Page) -> Option<(AllocatedPages, AllocatedPages)> {
+	/// Returns an `Err` containing this `AllocatedPages` if `at_page` is not within its bounds.
+	pub fn split(self, at_page: Page) -> Result<(AllocatedPages, AllocatedPages), AllocatedPages> {
 		let end_of_first = at_page - 1;
 		if at_page > *self.pages.start() && end_of_first <= *self.pages.end() {
 			let first  = PageRange::new(*self.pages.start(), end_of_first);
 			let second = PageRange::new(at_page, *self.pages.end());
-			Some((
+			// ensure the original AllocatedPages doesn't run its drop handler and free its pages.
+			core::mem::forget(self); 
+			Ok((
 				AllocatedPages { pages: first }, 
 				AllocatedPages { pages: second },
 			))
 		} else {
-			None
+			Err(self)
 		}
 	}
 }
 
-// impl Drop for AllocatedPages {
-//     fn drop(&mut self) {
-// 		trace!("page_allocator: deallocate_pages is not yet implemented, trying to dealloc: {:?}", self);
-// 	// 	unimplemented!();
-// 	// 	Ok(())
-//     }
-// }
+impl Drop for AllocatedPages {
+    fn drop(&mut self) {
+		if self.size_in_pages() == 0 { return; }
+		
+		trace!("page_allocator: deallocating {:?} at ptr {:#X}", self, &self as *const _ as usize);
+		let mut locked_list = FREE_PAGE_LIST.lock();
+
+		match &mut locked_list.0 {
+			Inner::Array(ref mut arr) => {
+				for chunk in arr.iter_mut().flatten() {
+					// TODO: support splitting/merging non-exact chunk sizes
+					//
+					// if self.start() >= chunk.start() && self.end() <= chunk.end() {
+					//
+					if self.pages == chunk.pages {
+						// Here: we found the chunk that we wish to deallocate. 
+						if !chunk.allocated {
+							error!("BUG: (in array) while dropping {:?}, chunk {:?} was already marked as not allocated.", self, chunk);
+							return;
+						}
+						warn!("(in array) Successfully deallocated {:?} into chunk {:?}", self, chunk);
+						chunk.allocated = false;
+						return;
+					}
+				}
+			}
+			Inner::RBTree(ref mut tree) => {
+				let mut cursor_mut = tree.upper_bound_mut(Bound::Included(self.start()));
+				if let Some(chunk) = cursor_mut.get().map(|w| w.deref().clone()) {
+					// TODO: support splitting/merging non-exact chunk sizes
+					//
+					// if self.start() >= chunk.start() && self.end() <= chunk.end() {
+					//
+					if self.pages == chunk.pages {
+						// Here: we found the chunk that we wish to deallocate. 
+						if !chunk.allocated {
+							error!("BUG: (in RBTree) while dropping {:?}, chunk {:?} was already marked as not allocated.", self, chunk);
+							return;
+						}
+						warn!("(in RBTree) Successfully deallocated {:?} into chunk {:?}", self, chunk);
+						cursor_mut.replace_with(
+							Wrapper::new_link(Chunk {
+								allocated: false,
+								pages: chunk.pages.clone()
+							})
+						).expect("BUG: failed to replace allocator chunk when deallocating");
+						return;
+					}
+				}
+			}
+		}
+
+		error!("BUG: unable to deallocate {:?}", self);
+    }
+}
 
 
 
@@ -595,6 +645,10 @@ pub fn allocate_pages_deferred(
 	} else {
 		find_any_chunk(&mut locked_list, num_pages)
 	}.map_err(From::from) // convert from AllocationError to &str
+	.map(|(ap, d)| {
+		warn!("Successfully allocated {} pages at requested vaddr {:?}: {:?}", num_pages, requested_vaddr, ap);
+		(ap, d)
+	})
 }
 
 

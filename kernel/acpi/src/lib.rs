@@ -54,6 +54,7 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
     // The first step is to search for the RSDP (Root System Descriptor Pointer),
     // which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).
     let rsdp = Rsdp::get_rsdp(page_table)?;
+    debug!("RSDP mapped pages: {:?}", rsdp.as_owner());
     let rsdt_phys_addr = rsdp.sdt_address();
     debug!("RXSDT is located in Frame {:#X}", rsdt_phys_addr);
 

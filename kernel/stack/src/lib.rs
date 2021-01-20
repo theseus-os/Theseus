@@ -43,7 +43,7 @@ fn inner_alloc_stack<FA>(
     frame_allocator_ref: &FrameAllocatorRef<FA>,
 ) -> Option<Stack> where FA: FrameAllocator {
     let start_of_stack_pages = *pages.start() + 1; 
-    let (guard_page, stack_pages) = pages.split(start_of_stack_pages)?;
+    let (guard_page, stack_pages) = pages.split(start_of_stack_pages).ok()?;
 
     // For stack memory, the minimum required flag is WRITABLE.
     let flags = EntryFlags::WRITABLE; 

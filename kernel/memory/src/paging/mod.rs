@@ -293,7 +293,7 @@ pub fn init(
             let pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
             let start_of_stack_pages = *pages.start() + 1; 
             let (stack_guard_page, stack_allocated_pages) = pages.split(start_of_stack_pages)
-                .ok_or("BUG: initial stack's allocated pages were not split correctly after guard page")?;
+                .map_err(|_ap| "BUG: initial stack's allocated pages were not split correctly after guard page")?;
             let stack_mapped_pages = mapper.map_allocated_pages_to(
                 stack_allocated_pages,
                 FrameRange::new(
