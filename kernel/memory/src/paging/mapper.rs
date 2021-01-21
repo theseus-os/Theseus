@@ -666,7 +666,7 @@ pub fn mapped_pages_unmap<A: FrameAllocator>(
 impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
-        trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
+        // trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
 
         let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {

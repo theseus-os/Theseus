@@ -160,8 +160,6 @@ pub fn init(
     // Before we finish initialization, drop any other local stack variables that still exist.
     drop(kernel_mmi_ref);
 
-    memory::dump_page_allocator_state();
-
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!

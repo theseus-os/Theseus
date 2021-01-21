@@ -81,22 +81,25 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
     /// Push the given `value` into this collection.
     ///
     /// If the inner collection is an array, it is pushed onto the back of the array.
-    /// If there is no space left in the array, an `Err` containing the given `value` is returned.
-	pub fn insert(&mut self, value: T) -> Result<(), T> {
+	/// If there is no space left in the array, an `Err` containing the given `value` is returned.
+	///
+	/// If success
+	pub fn insert(&mut self, value: T) -> Result<ValueRefMut<T>, T> {
 		match &mut self.0 {
 			Inner::Array(arr) => {
 				for elem in arr {
 					if elem.is_none() {
 						*elem = Some(value);
-						return Ok(());
+						return Ok(ValueRefMut::Array(elem));
 					}
 				}
 				error!("Out of space in StaticArrayRBTree's inner array, failed to insert value.");
 				Err(value)
 			}
 			Inner::RBTree(tree) => {
-                tree.insert(Wrapper::new_link(value));
-				Ok(())
+                Ok(ValueRefMut::RBTree(
+					tree.insert(Wrapper::new_link(value))
+				))
 			}
 		}
 	}
@@ -167,7 +170,7 @@ impl<T: Ord> RemovedValue<T> {
 /// A mutable reference to a value in the `StaticArrayRBTree`. 
 pub enum ValueRefMut<'list, T: Ord> {
 	Array(&'list mut Option<T>),
-	RBTree(&'list mut CursorMut<'list, WrapperAdapter<T>>),
+	RBTree(CursorMut<'list, WrapperAdapter<T>>),
 }
 impl <'list, T: Ord> ValueRefMut<'list, T> {
 	/// Removes this value from the collection and returns the removed value, if one existed. 
