@@ -1673,6 +1673,7 @@ dependencies = [
  "log",
  "memory_structs",
  "spin",
+ "static_assertions",
 ]
 
 [[package]]

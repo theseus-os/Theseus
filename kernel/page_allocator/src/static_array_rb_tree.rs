@@ -82,12 +82,6 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
     ///
     /// If the inner collection is an array, it is pushed onto the back of the array.
     /// If there is no space left in the array, an `Err` containing the given `value` is returned.
-    //
-    // pub fn insert<'a>(&'a mut self, val: <A::PointerOps as PointerOps>::Pointer) -> CursorMut<'_, A>
-    // where
-    //     <A as KeyAdapter<'a>>::Key: Ord,
-    // {
-    // pub fn insert<'a>(&'a mut self, value: T) -> Result<(), T> where T: 'a{
 	pub fn insert(&mut self, value: T) -> Result<(), T> {
 		match &mut self.0 {
 			Inner::Array(arr) => {
@@ -97,7 +91,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 						return Ok(());
 					}
 				}
-				error!("Out of space in array, failed to insert value.");
+				error!("Out of space in StaticArrayRBTree's inner array, failed to insert value.");
 				Err(value)
 			}
 			Inner::RBTree(tree) => {
@@ -127,7 +121,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 		*self = StaticArrayRBTree(Inner::RBTree(new_tree));
 	}
 
-	/// Returns a forward iterator over references to items in this collection.
+	/// Returns a forward iterator over immutable references to items in this collection.
 	pub fn iter(&self) -> impl Iterator<Item = &T> {
 		let mut iter_a = None;
 		let mut iter_b = None;
@@ -141,7 +135,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
                 iter_b.into_iter()
                     .flatten()
                     .map(|wrapper| &wrapper.inner)
-                )
+			)
 	}
 
 	// /// Returns a forward iterator over mutable references to items in this collection.
@@ -157,29 +151,59 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 }
 
 
+pub enum RemovedValue<T: Ord> {
+	Array(Option<T>),
+	RBTree(Option<Box<Wrapper<T>>>),
+}
+impl<T: Ord> RemovedValue<T> {
+	pub fn as_ref(&self) -> Option<&T> {
+		match self {
+			Self::Array(opt) => opt.as_ref(),
+			Self::RBTree(opt) => opt.as_ref().map(|bw| &bw.inner),
+		}
+	}
+}
+
 /// A mutable reference to a value in the `StaticArrayRBTree`. 
 pub enum ValueRefMut<'list, T: Ord> {
-	Array(&'list mut T),
+	Array(&'list mut Option<T>),
 	RBTree(&'list mut CursorMut<'list, WrapperAdapter<T>>),
 }
 impl <'list, T: Ord> ValueRefMut<'list, T> {
-	pub fn replace_with(&mut self, new_value: T) -> Result<(), T> {
+	/// Removes this value from the collection and returns the removed value, if one existed. 
+	pub fn remove(&mut self) -> RemovedValue<T> {
 		match self {
 			Self::Array(ref mut arr_ref) => {
-				**arr_ref = new_value;
+				RemovedValue::Array(arr_ref.take())
+			}
+			Self::RBTree(ref mut cursor_mut) => {
+				RemovedValue::RBTree(cursor_mut.remove())
+			}
+		}
+	}
+
+
+	/// Removes this value from the collection and replaces it with the given `new_value`. 
+	///
+	/// Returns the removed value, if one existed. If not, the 
+	#[allow(dead_code)]
+	pub fn replace_with(&mut self, new_value: T) -> Result<Option<T>, T> {
+		match self {
+			Self::Array(ref mut arr_ref) => {
+				Ok(arr_ref.replace(new_value))
 			}
 			Self::RBTree(ref mut cursor_mut) => {
 				cursor_mut.replace_with(Wrapper::new_link(new_value))
-					.map_err(|e| (*e).inner)?;
+					.map(|removed| Some(removed.inner))
+					.map_err(|e| e.inner)
 			}
 		}
-		Ok(())
 	}
 
 	#[allow(dead_code)]
 	pub fn get(&self) -> Option<&T> {
 		match self {
-			Self::Array(ref arr_ref) => Some(arr_ref),
+			Self::Array(ref arr_ref) => arr_ref.as_ref(),
 			Self::RBTree(ref cursor_mut) => cursor_mut.get().map(|w| w.deref()),
 		}
 	}
