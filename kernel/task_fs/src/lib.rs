@@ -296,7 +296,7 @@ impl File for TaskFile {
             return Err("read offset exceeds file size");
         }
         let count = core::cmp::min(buf.len(), output.len() - offset);
-        buf[..count].copy_from_slice(&output.as_bytes()[offset..count]);
+        buf[..count].copy_from_slice(&output.as_bytes()[offset..(offset + count)]);
         Ok(count)
     }
 
@@ -444,7 +444,7 @@ impl File for MmiFile {
             return Err("read offset exceeds file size");
         }
         let count = core::cmp::min(buf.len(), output.len() - offset);
-        buf[..count].copy_from_slice(&output.as_bytes()[offset..count]);
+        buf[..count].copy_from_slice(&output.as_bytes()[offset..(offset + count)]);
         Ok(count)
     }
 
