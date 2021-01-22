@@ -5,25 +5,25 @@
 //! spawns and manages tasks, and records the history of executed user commands.
 
 #![no_std]
-extern crate keycodes_ascii;
-extern crate spin;
-extern crate dfqueue;
-extern crate spawn;
-extern crate task;
-extern crate runqueue;
-extern crate event_types; 
-extern crate window_manager;
-extern crate path;
-extern crate root;
-extern crate scheduler;
-extern crate stdio;
-extern crate bare_io;
-extern crate app_io;
-extern crate fs_node;
-extern crate terminal_print;
-extern crate print;
-extern crate environment;
-extern crate libterm;
+
+
+
+use spawn;
+use task;
+use runqueue;
+ 
+
+
+use root;
+use scheduler;
+
+
+use app_io;
+
+use terminal_print;
+use print;
+
+
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -411,8 +411,8 @@ impl Shell {
                 };
 
                 // Lock the shared structure in `app_io` and then kill the running application
-                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                _streamss_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
+                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<'_, BTreeMap<usize, IoControlFlags>>,
+                                                _streamss_guard: MutexGuard<'_, BTreeMap<usize, IoStreams>>| {
 
                     // Kill all tasks in the job.
                     for task_ref in &task_refs {
@@ -463,8 +463,8 @@ impl Shell {
                 };
 
                 // Lock the shared structure in `app_io` and then stop the running application
-                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                _streams_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
+                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<'_, BTreeMap<usize, IoControlFlags>>,
+                                                _streams_guard: MutexGuard<'_, BTreeMap<usize, IoStreams>>| {
                     
                     // Stop all tasks in the job.
                     for task_ref in &task_refs {

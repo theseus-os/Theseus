@@ -4,7 +4,7 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 // #[macro_use] extern crate terminal_print;
-extern crate task;
+use task;
 
 
 use alloc::vec::Vec;

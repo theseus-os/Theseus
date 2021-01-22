@@ -6,10 +6,10 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate lazy_static;
-extern crate getopts;
+
 extern crate alloc;
-extern crate spawn;
-extern crate spin;
+
+
 
 
 use spin::Mutex;

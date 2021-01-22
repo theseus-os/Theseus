@@ -8,21 +8,21 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
-extern crate itertools;
 
-extern crate getopts;
-extern crate task;
-extern crate ota_update_client;
-extern crate network_manager;
-extern crate memory;
-extern crate mod_mgmt;
-extern crate crate_swap;
-extern crate smoltcp;
-extern crate path;
-extern crate memfs;
-extern crate fs_node;
-extern crate vfs_node;
-extern crate spin;
+
+
+use task;
+use ota_update_client;
+
+use memory;
+use mod_mgmt;
+use crate_swap;
+
+
+
+
+
+
 
 
 use core::str::FromStr;

@@ -3,9 +3,9 @@
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate debugit;
 
-extern crate task;
-extern crate runqueue;
-extern crate getopts;
+use task;
+use runqueue;
+
 
 use getopts::Options;
 use alloc::vec::Vec;

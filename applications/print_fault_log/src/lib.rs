@@ -3,7 +3,7 @@
 #![no_std]
 
 extern crate alloc;
-extern crate fault_log;
+
 
 use alloc::vec::Vec;
 use alloc::string::String;

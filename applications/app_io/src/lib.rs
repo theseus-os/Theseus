@@ -17,14 +17,14 @@
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate stdio;
-extern crate spin;
+
+
 #[macro_use] extern crate alloc;
-extern crate keycodes_ascii;
-extern crate libterm;
-extern crate serial_port;
-extern crate bare_io;
-extern crate window_manager;
+
+
+use serial_port;
+
+
 
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
@@ -321,7 +321,7 @@ use core::fmt;
 use bare_io::Write;
 /// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct
 /// terminal print-producer
-pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
+pub fn print_to_stdout_args(fmt_args: fmt::Arguments<'_>) {
     let task_id = match task::get_my_current_task_id() {
         Some(task_id) => task_id,
         None => {

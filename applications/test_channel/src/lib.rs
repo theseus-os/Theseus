@@ -3,14 +3,14 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
-extern crate getopts;
-extern crate spin;
-extern crate task;
-extern crate spawn;
-extern crate scheduler;
-extern crate rendezvous;
-extern crate async_channel;
-extern crate apic;
+
+
+
+use spawn;
+
+use rendezvous;
+use async_channel;
+use apic;
 
 
 use alloc::{

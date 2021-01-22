@@ -8,14 +8,14 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
-extern crate itertools;
 
-extern crate getopts;
-extern crate task;
-extern crate memory;
-extern crate mod_mgmt;
-extern crate crate_name_utils;
-extern crate spin;
+
+
+use task;
+
+use mod_mgmt;
+
+
 
 
 use alloc::{

@@ -9,14 +9,14 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
-extern crate smoltcp;
-extern crate network_manager;
-extern crate byteorder;
-extern crate hpet;
-extern crate smoltcp_helper;
-extern crate hashbrown;
-extern crate ota_update_client;
-extern crate getopts;
+
+
+
+
+
+
+
+
 
 
 use getopts::{Matches, Options};
@@ -151,7 +151,7 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 
 // Retrieves the echo reply contained in the receive buffer and prints data pertaining to the packet
 fn get_icmp_pong (waiting_queue: &mut HashMap<u16, u64>, times: &mut Vec<u64>, total_time: &mut u64, 
-    repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: u64)  {
+    repr: Icmpv4Repr<'_>, received: &mut u16, remote_addr: IpAddress, timestamp: u64)  {
     
     if let Icmpv4Repr::EchoReply { seq_no, data, ..} = repr {
         if let Some(_) = waiting_queue.get(&seq_no) {
@@ -231,7 +231,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
                 Ok(time) => time,
                 Err(err) => return println!("couldn't get timestamp:{}", err),
             };
-            let mut socket = sockets.get::<IcmpSocket>(icmp_handle); 
+            let mut socket = sockets.get::<IcmpSocket<'_, '_>>(icmp_handle); 
             
             // Checks if the icmp socket is open, and only bind the identifier icmp to it if 
             // it is closed

@@ -4,9 +4,9 @@
 
 extern crate alloc;
 #[macro_use] extern crate print;
-extern crate getopts;
-extern crate pmu_x86;
-extern crate spawn;
+
+use pmu_x86;
+
 
 use alloc::vec::Vec;
 use alloc::string::String;

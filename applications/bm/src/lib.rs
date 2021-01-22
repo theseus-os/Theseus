@@ -9,25 +9,25 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-extern crate task;
-extern crate hpet;
+use task;
+
 #[macro_use] extern crate terminal_print;
 // #[macro_use] extern crate log;
-extern crate fs_node;
-extern crate apic;
-extern crate spawn;
-extern crate path;
-extern crate runqueue;
-extern crate heapfile;
-extern crate scheduler;
-extern crate libtest;
-extern crate memory;
-extern crate rendezvous;
-extern crate async_channel;
-extern crate simple_ipc;
-extern crate getopts;
-extern crate pmu_x86;
-extern crate mod_mgmt;
+
+use apic;
+use spawn;
+
+
+
+use scheduler;
+
+
+use rendezvous;
+use async_channel;
+use simple_ipc;
+
+use pmu_x86;
+
 
 use core::str;
 use alloc::vec::Vec;

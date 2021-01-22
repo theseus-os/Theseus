@@ -1,12 +1,12 @@
 #![no_std]
 
-extern crate task;
+use task;
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate alloc;
 // #[macro_use] extern crate log;
-extern crate fs_node;
-extern crate getopts;
-extern crate path;
+
+
+
 
 use alloc::vec::Vec;
 use alloc::string::String;

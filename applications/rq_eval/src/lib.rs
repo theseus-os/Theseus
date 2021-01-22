@@ -21,13 +21,13 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
-extern crate task;
-extern crate apic;
-extern crate spawn;
-extern crate runqueue;
-extern crate getopts;
-extern crate hpet;
-extern crate libtest;
+
+use apic;
+use spawn;
+use runqueue;
+
+
+
 
 use alloc::{
     boxed::Box,
