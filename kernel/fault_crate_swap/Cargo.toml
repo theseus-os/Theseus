@@ -5,6 +5,7 @@ description = "Handles crate swapping of fault crates for fault tolerance purpos
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies.log]
 default-features = false

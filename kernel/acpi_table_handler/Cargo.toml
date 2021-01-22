@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Functions for handling specific types of ACPI tables"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies.log]
 version = "0.4.8"

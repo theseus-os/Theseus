@@ -5,6 +5,7 @@ description = "Handles crate swapping for live evolution and fault recovery purp
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

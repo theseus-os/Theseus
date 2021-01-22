@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "an easy-to-use window object owned by application"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

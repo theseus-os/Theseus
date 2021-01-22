@@ -3,6 +3,7 @@ name = "root"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>"]
 description = "a special concrete implementation of the Directory trait; differs from VFSDirectory only in that there is no parent field, and any attempt to access a parent field will return some error value"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.5"

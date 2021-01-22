@@ -4,6 +4,7 @@ name = "nic_initialization"
 description = "A set of functions used to initialize a Network Interface Card"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }

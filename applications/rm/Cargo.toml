@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Andrew Pham <apham@rice.edu"]
 build = "../../build.rs"
 description = "removes the directory from the virtual filesystem"
+edition = "2018"
 
 [dependencies]
 getopts = "0.2.21"

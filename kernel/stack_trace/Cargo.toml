@@ -4,6 +4,7 @@ name = "stack_trace"
 description = "The default stack trace (backtrace) functionality, which uses DWARF debugging info"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 fallible-iterator = { version = "0.2.0", default-features = false }

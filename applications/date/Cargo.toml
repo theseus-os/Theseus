@@ -3,6 +3,7 @@ name = "date"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 

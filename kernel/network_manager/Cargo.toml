@@ -4,6 +4,7 @@ name = "network_manager"
 description = "A crate for managing network interfaces"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

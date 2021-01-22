@@ -4,6 +4,7 @@ name = "rtc"
 description = "Support for the Real-time Clock chip on x86 processors"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

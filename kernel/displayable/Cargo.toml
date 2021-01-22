@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "provides a Displayable trait, which abstracts objects that can display themselves onto a framebuffer"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

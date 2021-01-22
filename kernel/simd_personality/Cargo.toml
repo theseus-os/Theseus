@@ -4,6 +4,7 @@ name = "simd_personality"
 description = "Support for multiple kernel personalities: SIMD and non-SIMD"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 cfg-if = "0.1.6"

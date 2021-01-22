@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "a simple app for testing recovery from a machine exception"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 

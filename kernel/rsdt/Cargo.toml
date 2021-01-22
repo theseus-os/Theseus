@@ -5,6 +5,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for ACPI RSDT and XSDT"
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies.memory]
 path = "../memory"

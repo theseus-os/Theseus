@@ -5,6 +5,7 @@ description = "The WaitQueue type that can block/sleep and wake up tasks"
 version = "0.1.0"
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies.log]
 version = "0.4.8"

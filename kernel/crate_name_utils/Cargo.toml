@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "crate_name_utils"
 description = "Utility functions for processing, parsing, and working with crate names/symbol strings"
 version = "0.1.0"
+edition = "2018"
 
 [dependencies.itertools]
 version = "0.7.9"

@@ -4,6 +4,7 @@ name = "context_switch"
 description = "Top-level wrapper crate for managing all possible configurations for context switching routines and structs"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 cfg-if = "0.1.6"

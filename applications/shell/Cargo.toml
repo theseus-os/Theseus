@@ -5,6 +5,7 @@ description = "Shell that can run commands in application directory"
 authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

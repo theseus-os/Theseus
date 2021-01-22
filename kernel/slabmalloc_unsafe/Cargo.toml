@@ -5,6 +5,7 @@ authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ramla Ijaz <ijazramla@gma
 description = "Simple slab based malloc implementation in rust"
 
 keywords = ["os", "malloc", "slab", "alloc", "memory"]
+edition = "2018"
 
 [features]
 unstable = []

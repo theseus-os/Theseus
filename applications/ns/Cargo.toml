@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "An app for interacting with crate namespaces"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 getopts = "0.2.21"

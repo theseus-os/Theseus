@@ -5,6 +5,7 @@ description = "Functions and wrappers for spawning new Tasks, both kernel thread
 version = "0.1.0"
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies.log]
 version = "0.4.8"

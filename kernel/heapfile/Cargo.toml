@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "An implementation of in-memory files, backed by heap memory"
 
+edition = "2018"
 
 [dependencies]
 spin = "0.4.5"

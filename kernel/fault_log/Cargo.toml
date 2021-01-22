@@ -5,6 +5,7 @@ description = "Logs all exceptions occuring in Theseus"
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
