@@ -5,12 +5,12 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 
-extern crate getopts;
-extern crate memory;
-extern crate task;
-extern crate mod_mgmt;
-extern crate fs_node;
-extern crate path;
+
+use memory;
+use task;
+
+
+
 
 use core::{
     ops::Deref,

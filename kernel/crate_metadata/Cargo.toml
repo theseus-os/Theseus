@@ -5,6 +5,7 @@ description = "Types for tracking loaded crates and their dependency metadata wi
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

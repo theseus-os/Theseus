@@ -21,13 +21,13 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
-extern crate task;
-extern crate apic;
-extern crate spawn;
-extern crate runqueue;
-extern crate getopts;
-extern crate hpet;
-extern crate libtest;
+
+use apic;
+use spawn;
+use runqueue;
+
+
+
 
 use alloc::{
     boxed::Box,
@@ -168,7 +168,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         #[cfg(runqueue_spillful)] 
         {   
             let task_on_rq = { taskref.lock().on_runqueue.clone() };
-            if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.try() {
+            if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.r#try() {
                 if let Some(rq) = task_on_rq {
                     remove_from_runqueue(&taskref, rq)?;
                 }

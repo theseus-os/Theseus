@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Benchmarks to evaluate Theseus's heap design"
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 qp-trie = "0.7.3"

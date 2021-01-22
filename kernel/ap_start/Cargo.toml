@@ -4,6 +4,7 @@ name = "ap_start"
 description = "High-level initialization code that runs on each AP (core) after it has booted up"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

@@ -4,6 +4,7 @@ name = "unwind"
 description = "Routines for unwinding the call stack and running cleanup handlers for Theseus tasks"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 fallible-iterator = { version = "0.2.0", default-features = false }

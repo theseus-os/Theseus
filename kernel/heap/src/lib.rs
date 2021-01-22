@@ -75,7 +75,7 @@ impl Heap {
 unsafe impl GlobalAlloc for Heap {
 
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        match DEFAULT_ALLOCATOR.try() {
+        match DEFAULT_ALLOCATOR.r#try() {
             Some(allocator) => {
                 allocator.alloc(layout)
             }
@@ -90,7 +90,7 @@ unsafe impl GlobalAlloc for Heap {
             self.initial_allocator.lock().deallocate(ptr, layout);
         }
         else {
-            DEFAULT_ALLOCATOR.try()
+            DEFAULT_ALLOCATOR.r#try()
                 .expect("Ptr passed to dealloc is not within the initial allocator's range, and another allocator has not been set up")
                 .dealloc(ptr, layout);
         }

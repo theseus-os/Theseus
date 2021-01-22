@@ -4,6 +4,7 @@ name = "acpi"
 description = "ACPI (Advanced Configuration and Power Interface) support for Theseus"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

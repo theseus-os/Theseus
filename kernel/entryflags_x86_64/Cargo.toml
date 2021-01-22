@@ -4,6 +4,7 @@ name = "entryflags_x86_64"
 description = "Defines the structure of page table entry flags on x86_64"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 bitflags = "1.0.4"

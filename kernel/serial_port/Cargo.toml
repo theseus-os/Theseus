@@ -4,6 +4,7 @@ name = "serial_port"
 description = "Basic driver for the serial port, e.g., COM1, COM2"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies.port_io]
 path = "../../libs/port_io"

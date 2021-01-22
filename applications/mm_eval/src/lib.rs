@@ -7,15 +7,15 @@
 extern crate alloc;
 #[macro_use] extern crate cfg_if;
 #[macro_use] extern crate terminal_print;
-extern crate log;
-extern crate memory;
-extern crate getopts;
-extern crate hpet;
-extern crate kernel_config;
-extern crate tsc;
-extern crate memory_structs;
-extern crate apic;
-extern crate runqueue;
+
+
+
+
+
+
+
+
+
 
 use alloc::string::String;
 use alloc::vec::Vec;

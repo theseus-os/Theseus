@@ -3,16 +3,16 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-extern crate task;
-extern crate getopts;
-extern crate path;
-extern crate fs_node;
-extern crate keycodes_ascii;
-extern crate libterm;
-extern crate spin;
-extern crate app_io;
-extern crate stdio;
-extern crate bare_io;
+use task;
+
+
+
+
+
+
+use app_io;
+
+
 #[macro_use] extern crate log;
 
 use keycodes_ascii::{Keycode, KeyAction};

@@ -18,7 +18,7 @@ use core::ops::DerefMut;
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, get_frame_allocator_ref};
 use owning_ref::BoxRefMut;
 use shapes::Coord;
-pub use pixel::*;
+pub use crate::pixel::*;
 
 /// Initializes the final framebuffer based on VESA graphics mode information obtained during boot.
 /// 

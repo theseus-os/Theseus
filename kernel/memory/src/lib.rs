@@ -61,7 +61,7 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 /// Returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
 pub fn get_kernel_mmi_ref() -> Option<MmiRef> {
-    KERNEL_MMI.try().cloned()
+    KERNEL_MMI.r#try().cloned()
 }
 
 
@@ -77,17 +77,17 @@ pub type FrameAllocatorRef<A: FrameAllocator> = MutexIrqSafe<A>;
 /// 
 /// Currently, the system-wide allocator is an `AreaFrameAllocator` reference.
 pub fn get_frame_allocator_ref() -> Option<&'static FrameAllocatorRef<AreaFrameAllocator>> {
-    FRAME_ALLOCATOR.try()
+    FRAME_ALLOCATOR.r#try()
 }
 
 /// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
-    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frame())
+    FRAME_ALLOCATOR.r#try().and_then(|fa| fa.lock().allocate_frame())
 }
 
 /// Convenience method for allocating several contiguous Frames.
 pub fn allocate_frames(num_frames: usize) -> Option<FrameRange> {
-    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
+    FRAME_ALLOCATOR.r#try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
 
 
@@ -141,7 +141,7 @@ pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedP
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    let mut frame_allocator = FRAME_ALLOCATOR.try()
+    let mut frame_allocator = FRAME_ALLOCATOR.r#try()
         .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
         .lock();
     
@@ -256,7 +256,7 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
 
     page_allocator::convert_to_heap_allocated();
-    FRAME_ALLOCATOR.try().ok_or("BUG: FRAME_ALLOCATOR not initialized")?.lock().alloc_ready();
+    FRAME_ALLOCATOR.r#try().ok_or("BUG: FRAME_ALLOCATOR not initialized")?.lock().alloc_ready();
 
     let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     higher_half_mapped_pages.push(heap_mapped_pages);

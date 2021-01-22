@@ -5,6 +5,7 @@ authors = ["Andrew Pham <apham727@gmail.com>"]
 description = "Offers applications the ability to print to the terminal via the print! and println! macros"
 build = "../../build.rs"
 
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

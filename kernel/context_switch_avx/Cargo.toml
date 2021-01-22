@@ -4,6 +4,7 @@ name = "context_switch_avx"
 description = "Context switching routines and structs for AVX-enabled register sets"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 zerocopy = "0.3.0"

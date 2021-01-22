@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Tests the wait queue functionality of Theseus with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

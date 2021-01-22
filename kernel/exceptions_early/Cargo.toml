@@ -4,6 +4,7 @@ name = "exceptions_early"
 description = "Early exception handlers that do nothing but print an error and hang."
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }

@@ -4,6 +4,7 @@ name = "simd_test"
 description = "Test code for SIMD instructions"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 cfg-if = "0.1.6"

@@ -4,6 +4,7 @@ name = "pmu_x86"
 description = "Diagnostic tools, specifically provides acccess to performance monitoring unit on x86 Nehalem and above."
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.4.10"

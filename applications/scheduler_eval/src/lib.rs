@@ -2,9 +2,9 @@
 
 #[macro_use] extern crate log;
 extern crate alloc;
-extern crate spawn;
-extern crate scheduler;
-extern crate task;
+use spawn;
+use scheduler;
+use task;
 
 use alloc::string::String;
 use alloc::vec::Vec;

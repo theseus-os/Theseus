@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Definitions for ACPI tables bookkeeping"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 zerocopy = "0.3.0"

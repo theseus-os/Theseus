@@ -2,9 +2,9 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 
-extern crate task;
-extern crate getopts;
-extern crate scheduler;
+
+
+
 
 use getopts::Options;
 use alloc::vec::Vec;

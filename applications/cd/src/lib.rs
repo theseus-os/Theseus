@@ -3,11 +3,11 @@
 // #[macro_use] extern crate log;
 
 extern crate alloc;
-extern crate task;
-extern crate getopts;
-extern crate path;
-extern crate fs_node;
-extern crate root;
+use task;
+
+
+
+use root;
 
 use alloc::vec::Vec;
 use alloc::string::String;

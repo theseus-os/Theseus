@@ -4,6 +4,7 @@ name = "kernel_config"
 description = "configuration values and settings used in the Theseus kernel, e.g., timeslices, memory layouts, etc"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [lib]
 crate-type = ["rlib"]

@@ -3,6 +3,7 @@ name = "libterm"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 

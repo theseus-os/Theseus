@@ -36,9 +36,9 @@ mod pages;
 mod sc;
 mod zone;
 
-pub use pages::*;
-pub use sc::*;
-pub use zone::*;
+pub use crate::pages::*;
+pub use crate::sc::*;
+pub use crate::zone::*;
 
 use core::alloc::Layout;
 use core::mem;

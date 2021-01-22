@@ -6,11 +6,11 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
-extern crate getopts;
-extern crate unified_channel;
-extern crate task;
-extern crate spawn;
-extern crate apic;
+
+use unified_channel;
+
+use spawn;
+use apic;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::vec::Vec;

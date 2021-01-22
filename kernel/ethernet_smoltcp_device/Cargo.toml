@@ -4,6 +4,7 @@ name = "ethernet_smoltcp_device"
 description = "An interface glue layer that allows smoltcp to use ethernet crates"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }

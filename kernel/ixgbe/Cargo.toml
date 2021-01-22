@@ -3,6 +3,7 @@ name = "ixgbe"
 version = "0.1.0"
 description = "Driver for the 10 GbE Intel 82599 NIC"
 authors = ["Ramla <ijazramla@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 spin = "0.4.5"

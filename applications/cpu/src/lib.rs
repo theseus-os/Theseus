@@ -2,10 +2,10 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 
-extern crate apic;
-extern crate getopts;
-extern crate task;
-extern crate runqueue;
+
+
+
+use runqueue;
 
 use getopts::Options;
 use alloc::vec::Vec;

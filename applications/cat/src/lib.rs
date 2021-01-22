@@ -3,11 +3,11 @@
 // #[macro_use] extern crate log;
 
 #[macro_use] extern crate alloc;
-extern crate task;
-extern crate getopts;
-extern crate path;
-extern crate fs_node;
-extern crate bare_io;
+use task;
+
+
+
+
 
 use core::str;
 use alloc::{

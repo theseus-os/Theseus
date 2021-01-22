@@ -113,7 +113,7 @@ pub fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
     // mouse_to_print(&mouse_event);  // use this to debug
     let event = Event::MouseMovementEvent(mouse_event);
 
-    if let Some(producer) = MOUSE_PRODUCER.try() {
+    if let Some(producer) = MOUSE_PRODUCER.r#try() {
         producer.push(event).map_err(|_e| "Fail to enqueue the mouse event")
     } else {
         warn!("handle_keyboard_input(): MOUSE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);

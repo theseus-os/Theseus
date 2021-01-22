@@ -4,22 +4,22 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate terminal_print;
-extern crate getopts;
-extern crate spin;
-extern crate task;
-extern crate spawn;
-extern crate scheduler;
-extern crate rendezvous;
-extern crate async_channel;
-extern crate apic;
-extern crate runqueue;
-extern crate window;
-extern crate framebuffer;
-extern crate framebuffer_drawer;
-extern crate color;
-extern crate shapes;
-extern crate hpet;
-extern crate unified_channel;
+
+
+
+
+
+
+
+use apic;
+use runqueue;
+
+use framebuffer;
+use framebuffer_drawer;
+use color;
+use shapes;
+
+use unified_channel;
 
 
 use alloc::{

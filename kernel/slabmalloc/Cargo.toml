@@ -5,6 +5,7 @@ authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ramla Ijaz <ijazramla@gma
 description = "Simple slab based malloc implementation in rust. Edited to work more closely with Theseus's memory management abstractions"
 
 keywords = ["os", "malloc", "slab", "alloc", "memory"]
+edition = "2018"
 
 [features]
 unstable = []

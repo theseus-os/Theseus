@@ -2,8 +2,8 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-extern crate bare_io;
-extern crate app_io;
+
+use app_io;
 #[macro_use] extern crate log;
 
 use alloc::vec::Vec;

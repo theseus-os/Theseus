@@ -3,6 +3,7 @@ authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "memory_initialization"
 description = "Initialization routine for the virtual memory subsystem."
 version = "0.1.0"
+edition = "2018"
 
 [dependencies]
 multiboot2 = "0.7.1"
