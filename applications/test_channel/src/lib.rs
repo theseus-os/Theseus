@@ -25,13 +25,13 @@ use spin::Once;
 static VERBOSE: Once<bool> = Once::new();
 #[allow(unused)]
 macro_rules! verbose {
-    () => (VERBOSE.try() == Some(&true));
+    () => (VERBOSE.r#try() == Some(&true));
 }
 
 static PINNED: Once<bool> = Once::new();
 macro_rules! pin_task {
     ($tb:ident, $cpu:expr) => (
-        if PINNED.try() == Some(&true) {
+        if PINNED.r#try() == Some(&true) {
             $tb.pin_on_core($cpu)
         } else {
             $tb

@@ -88,8 +88,8 @@ impl IoStreams {
 mod shared_maps {
     use spin::{Mutex, MutexGuard};
     use alloc::collections::BTreeMap;
-    use IoControlFlags;
-    use IoStreams;
+    use crate::IoControlFlags;
+    use crate::IoStreams;
 
     lazy_static! {
         /// Map a task to its IoControlFlags structure.

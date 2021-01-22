@@ -36,7 +36,7 @@ pub fn millis_since(start_time: u64) -> Result<u64, &'static str> {
     const FEMTOSECONDS_PER_MILLISECOND: u64 = 1_000_000_000_000;
     static HPET_PERIOD_FEMTOSECONDS: Once<u32> = Once::new();
 
-    let hpet_freq = match HPET_PERIOD_FEMTOSECONDS.try() {
+    let hpet_freq = match HPET_PERIOD_FEMTOSECONDS.r#try() {
         Some(period) => period,
         _ => {
             let freq = get_hpet().as_ref().ok_or("couldn't get HPET")?.counter_period_femtoseconds();

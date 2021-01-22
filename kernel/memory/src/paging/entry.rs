@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use super::super::{Frame, EntryFlags};
-use PhysicalAddress;
+use crate::PhysicalAddress;
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;
 use zerocopy::FromBytes;

@@ -67,7 +67,7 @@ static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
 /// which must exist because it contains the initially-loaded kernel crates. 
 /// Returns None if the default namespace hasn't yet been initialized.
 pub fn get_initial_kernel_namespace() -> Option<&'static Arc<CrateNamespace>> {
-    INITIAL_KERNEL_NAMESPACE.try()
+    INITIAL_KERNEL_NAMESPACE.r#try()
 }
 
 /// Returns the top-level directory that contains all of the namespaces. 

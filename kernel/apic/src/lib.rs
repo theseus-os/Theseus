@@ -61,7 +61,7 @@ static APIC_REGS: Once<BoxRef<MappedPages, ApicRegisters>> = Once::new();
 static BSP_PROCESSOR_ID: Once<u8> = Once::new(); 
 
 pub fn get_bsp_id() -> Option<u8> {
-    BSP_PROCESSOR_ID.try().cloned()
+    BSP_PROCESSOR_ID.r#try().cloned()
 }
 
 /// Returns true if the currently executing processor core is the bootstrap processor, 

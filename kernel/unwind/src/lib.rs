@@ -72,7 +72,7 @@ use gimli::{
     RegisterRule,
     X86_64
 };
-use registers::{Registers, LandingRegisters, SavedRegs};
+use crate::registers::{Registers, LandingRegisters, SavedRegs};
 use fallible_iterator::FallibleIterator;
 use mod_mgmt::{
     CrateNamespace,

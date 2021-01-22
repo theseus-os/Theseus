@@ -17,7 +17,9 @@ extern crate mod_mgmt;
 #[cfg(not(loadable))] extern crate panic_wrapper;
 #[cfg(not(loadable))] extern crate unwind;
 
+#[cfg(not(test))]
 use core::panic::PanicInfo;
+
 
 /// The singular entry point for a language-level panic.
 /// 

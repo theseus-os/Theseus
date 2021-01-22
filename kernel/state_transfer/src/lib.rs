@@ -93,7 +93,7 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
 
 /// Just like core::convert::From
 trait MyFrom<T>: Sized {
-    fn from(T) -> Self;
+    fn from(_: T) -> Self;
 }
 
 /// Just like core::convert::Into

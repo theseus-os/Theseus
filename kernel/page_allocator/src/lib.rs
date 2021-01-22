@@ -29,7 +29,7 @@ use core::{borrow::Borrow, cmp::Ordering, fmt, ops::Deref};
 use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
-use static_array_rb_tree::*;
+use crate::static_array_rb_tree::*;
 
 
 /// Regions that are pre-designated for special usage, specifically the kernel's initial identity mapping.

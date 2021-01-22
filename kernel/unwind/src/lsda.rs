@@ -5,7 +5,7 @@
 
 use core::ops::Range;
 use gimli::{Reader, DwEhPe, Endianity, EndianSlice, constants::*, };
-use FallibleIterator;
+use crate::FallibleIterator;
 
 /// `GccExceptTableArea` contains the contents of the Language-Specific Data Area (LSDA)
 /// that is used to locate cleanup (run destructors for) a given function during stack unwinding. 
