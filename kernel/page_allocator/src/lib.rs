@@ -354,7 +354,6 @@ fn find_specific_chunk(
 		Inner::RBTree(ref mut tree) => {
 			let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_page));
 			if let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
-				warn!("find_specific_chunk [RBtree]: looking at element {:?}", chunk);
 				if requested_page >= *chunk.pages.start() {
 					if requested_end_page <= *chunk.pages.end() {
 						return adjust_chosen_chunk(requested_page, num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor_mut));
@@ -411,16 +410,20 @@ fn find_any_chunk<'list>(
 			// ```
 			//
 			// However, RBTree doesn't have a `range_mut()` method, so we use cursors for manual iteration.
-			let mut cursor = tree.lower_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_LOW_END));
+			//
+			// Because we allocate new pages by peeling them off from the beginning part of a chunk, 
+			// it's MUCH faster to start the search for free pages from higher addresses moving down. 
+			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
+			let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_HIGH_START));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				warn!("find_any_chunk [RBTree]: looking at element {:?}", chunk);
-				if (*chunk.pages.start() + num_pages) > DESIGNATED_PAGES_HIGH_START { // Use greater than (not >=) because ranges are inclusive
-					break;
+				if chunk.pages.start() <= &DESIGNATED_PAGES_LOW_END {
+					break; // move on to searching through the designated regions
 				}
 				if num_pages < chunk.size_in_pages() {
 					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
 				}
-				cursor.move_next();
+				warn!("Page allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages at any address.", num_pages);
+				cursor.move_prev();
 			}
 		}
 	}
@@ -455,21 +458,23 @@ fn find_any_chunk<'list>(
 			// The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.
 			let mut cursor = tree.upper_bound_mut(Bound::Included(&DESIGNATED_PAGES_LOW_END));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				warn!("find_any_chunk [RBtree]: looking at designated element {:?}", chunk);
 				if num_pages < chunk.size_in_pages() {
 					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
 				}
 				cursor.move_prev();
 			}
 
-			// The second cursor iterates over the higher designated region, from lower addresses to higher, up to max.
-			let mut cursor = tree.lower_bound_mut(Bound::Included(&DESIGNATED_PAGES_HIGH_START));
+			// The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
+			let mut cursor = tree.upper_bound_mut::<Chunk>(Bound::Unbounded);
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				warn!("find_any_chunk [RBtree]: looking at designated element {:?}", chunk);
+				if chunk.pages.start() < &DESIGNATED_PAGES_HIGH_START {
+					// we already iterated over non-designated pages in the first match statement above, so we're out of memory. 
+					break; 
+				}
 				if num_pages < chunk.size_in_pages() {
 					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
 				}
-				cursor.move_next();
+				cursor.move_prev();
 			}
 		}
 	}
@@ -581,10 +586,6 @@ pub fn allocate_pages_deferred(
 	} else {
 		find_any_chunk(&mut locked_list, num_pages)
 	}.map_err(From::from) // convert from AllocationError to &str
-	.map(|(ap, d)| {
-		trace!("Successfully allocated pages {:?}", ap);
-		(ap, d)
-	})
 }
 
 
