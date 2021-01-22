@@ -60,7 +60,7 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 /// Returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
 pub fn get_kernel_mmi_ref() -> Option<MmiRef> {
-    KERNEL_MMI.try().cloned()
+    KERNEL_MMI.get().cloned()
 }
 
 

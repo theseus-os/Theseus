@@ -88,7 +88,7 @@ impl Log for Logger {
         // If there was an error above, there's literally nothing we can do but ignore it,
         // because there is no other lower-level way to log errors than the serial port.
         
-        if let Some(func) = MIRROR_VGA_FUNC.try() {
+        if let Some(func) = MIRROR_VGA_FUNC.get() {
             // Currently printing to the VGA terminal doesn't support ANSI color escape sequences,
             // so we exclude the first and the last elements that set those colors.
             func(format_args!("{}{}:{}: {}",

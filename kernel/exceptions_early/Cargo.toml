@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-spin = "0.4.10"
+spin = "0.7.1"
 
 [dependencies.memory]
 path = "../memory"

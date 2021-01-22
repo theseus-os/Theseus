@@ -6,9 +6,11 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
+spin = "0.7.1"
 
+
+[dependencies.owning_ref]
+git = "https://github.com/theseus-os/owning-ref-rs.git"
 
 [dependencies.log]
 version = "0.4.8"

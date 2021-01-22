@@ -11,7 +11,7 @@ dependencies = [
  "fadt",
  "hpet",
  "ioapic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -22,7 +22,7 @@ dependencies = [
  "pit_clock",
  "rsdp",
  "rsdt",
- "spin",
+ "spin 0.7.1",
  "volatile",
 ]
 
@@ -55,14 +55,14 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
  "memory",
  "scheduler",
  "spawn",
- "spin",
+ "spin 0.7.1",
  "stack",
  "tlb_shootdown",
 ]
@@ -74,7 +74,7 @@ dependencies = [
  "atomic",
  "atomic_linked_list",
  "bit_field 0.7.0",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -82,7 +82,7 @@ dependencies = [
  "owning_ref",
  "pit_clock",
  "raw-cpuid",
- "spin",
+ "spin 0.7.1",
  "static_assertions",
  "volatile",
  "x86_64",
@@ -101,7 +101,7 @@ dependencies = [
  "log",
  "print",
  "serial_port",
- "spin",
+ "spin 0.7.1",
  "stdio",
  "task",
  "window_manager",
@@ -126,7 +126,7 @@ dependencies = [
  "hpet",
  "log",
  "mpmc",
- "spin",
+ "spin 0.7.1",
  "task",
  "wait_queue",
 ]
@@ -139,7 +139,7 @@ dependencies = [
  "log",
  "pci",
  "port_io",
- "spin",
+ "spin 0.7.1",
  "storage_device",
 ]
 
@@ -279,7 +279,7 @@ dependencies = [
  "exceptions_full",
  "first_application",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "keycodes_ascii",
  "log",
@@ -411,7 +411,7 @@ name = "cow_arc"
 version = "0.1.0"
 dependencies = [
  "owning_ref",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -435,7 +435,7 @@ dependencies = [
  "hashbrown",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
  "xmas-elf",
 ]
 
@@ -462,7 +462,7 @@ dependencies = [
  "mod_mgmt",
  "path",
  "qp-trie",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -522,7 +522,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "spin",
+ "spin 0.7.1",
  "task",
  "terminal_print",
 ]
@@ -563,7 +563,7 @@ dependencies = [
 name = "dfqueue"
 version = "0.1.0"
 dependencies = [
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -582,7 +582,7 @@ dependencies = [
  "color",
  "framebuffer",
  "shapes",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -597,7 +597,7 @@ dependencies = [
  "apic",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -610,7 +610,7 @@ dependencies = [
  "owning_ref",
  "pci",
  "pic",
- "spin",
+ "spin 0.7.1",
  "static_assertions",
  "volatile",
  "x86_64",
@@ -645,7 +645,7 @@ dependencies = [
 name = "ethernet_smoltcp_device"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -680,7 +680,7 @@ dependencies = [
  "gdt",
  "memory",
  "mod_mgmt",
- "spin",
+ "spin 0.7.1",
  "tss",
  "vga_buffer",
  "x86_64",
@@ -742,7 +742,7 @@ name = "fault_log"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -765,7 +765,7 @@ dependencies = [
 name = "font"
 version = "0.1.0"
 dependencies = [
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -777,7 +777,7 @@ dependencies = [
  "log",
  "memory_structs",
  "page_table_entry",
- "spin",
+ "spin 0.7.1",
  "static_assertions",
 ]
 
@@ -802,7 +802,7 @@ dependencies = [
  "hashbrown",
  "lazy_static",
  "shapes",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -829,7 +829,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
  "x86_64",
 ]
 
@@ -843,7 +843,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
  "tss",
  "x86_64",
 ]
@@ -874,7 +874,7 @@ dependencies = [
  "arrayvec",
  "byteorder",
  "fallible-iterator",
- "stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait 1.2.0",
 ]
 
 [[package]]
@@ -902,11 +902,11 @@ name = "heap"
 version = "0.1.0"
 dependencies = [
  "block_allocator",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -914,10 +914,10 @@ name = "heapfile"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
  "x86_64",
 ]
 
@@ -939,7 +939,7 @@ dependencies = [
  "memory",
  "owning_ref",
  "sdt",
- "spin",
+ "spin 0.7.1",
  "volatile",
  "zerocopy",
 ]
@@ -1000,7 +1000,7 @@ dependencies = [
  "apic",
  "exceptions_early",
  "gdt",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "keyboard",
  "lazy_static",
@@ -1012,7 +1012,7 @@ dependencies = [
  "port_io",
  "ps2",
  "scheduler",
- "spin",
+ "spin 0.7.1",
  "task",
  "tlb_shootdown",
  "tss",
@@ -1038,9 +1038,19 @@ dependencies = [
  "log",
  "memory",
  "owning_ref",
- "spin",
+ "spin 0.7.1",
  "volatile",
  "zerocopy",
+]
+
+[[package]]
+name = "irq_safety"
+version = "0.1.1"
+source = "git+https://github.com/kevinaboos/irq_safety#d7903a8f064170fae58a3da477300469faaf28d2"
+dependencies = [
+ "owning_ref",
+ "spin 0.4.10",
+ "stable_deref_trait 1.1.1",
 ]
 
 [[package]]
@@ -1049,8 +1059,8 @@ version = "0.1.1"
 source = "git+https://github.com/theseus-os/irq_safety#d7903a8f064170fae58a3da477300469faaf28d2"
 dependencies = [
  "owning_ref",
- "spin",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "spin 0.4.10",
+ "stable_deref_trait 1.1.1",
 ]
 
 [[package]]
@@ -1073,7 +1083,7 @@ dependencies = [
  "hpet",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1090,7 +1100,7 @@ dependencies = [
  "pit_clock",
  "rand",
  "runqueue",
- "spin",
+ "spin 0.7.1",
  "static_assertions",
  "virtual_nic",
  "volatile",
@@ -1117,7 +1127,7 @@ dependencies = [
  "log",
  "mpmc",
  "ps2",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -1155,7 +1165,7 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a374c89b9db55895453a74c1e38861d9deec0b01b405a82516e9d5de4820dea1"
 dependencies = [
- "spin",
+ "spin 0.4.10",
 ]
 
 [[package]]
@@ -1170,7 +1180,7 @@ dependencies = [
  "libterm",
  "log",
  "path",
- "spin",
+ "spin 0.7.1",
  "stdio",
  "task",
 ]
@@ -1224,7 +1234,7 @@ dependencies = [
  "memory",
  "pmu_x86",
  "runqueue",
- "spin",
+ "spin 0.7.1",
  "task",
  "x86_64",
 ]
@@ -1250,7 +1260,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "serial_port",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -1272,7 +1282,7 @@ dependencies = [
  "acpi_table",
  "apic",
  "ioapic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "memory",
  "pic",
@@ -1291,7 +1301,7 @@ name = "mapper_spillful"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1315,10 +1325,10 @@ name = "memfs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
  "x86_64",
 ]
 
@@ -1339,7 +1349,7 @@ dependencies = [
  "bit_field 0.7.0",
  "bitflags",
  "frame_allocator",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1348,7 +1358,7 @@ dependencies = [
  "multiboot2",
  "page_allocator",
  "page_table_entry",
- "spin",
+ "spin 0.7.1",
  "x86_64",
  "xmas-elf",
  "zerocopy",
@@ -1359,7 +1369,7 @@ name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
  "heap",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "log",
  "memory",
@@ -1442,7 +1452,7 @@ dependencies = [
  "qp-trie",
  "root",
  "rustc-demangle",
- "spin",
+ "spin 0.7.1",
  "util",
  "vfs_node",
  "xmas-elf",
@@ -1457,7 +1467,7 @@ dependencies = [
  "mouse_data",
  "mpmc",
  "ps2",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -1484,7 +1494,7 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "log",
  "madt",
@@ -1492,7 +1502,7 @@ dependencies = [
  "mod_mgmt",
  "pause",
  "pit_clock",
- "spin",
+ "spin 0.7.1",
  "stack",
  "volatile",
  "zerocopy",
@@ -1507,7 +1517,7 @@ dependencies = [
  "hashbrown",
  "heap",
  "intrusive-collections",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "log",
  "memory",
@@ -1515,7 +1525,7 @@ dependencies = [
  "slabmalloc",
  "slabmalloc_safe",
  "slabmalloc_unsafe",
- "spin",
+ "spin 0.7.1",
  "static_assertions",
 ]
 
@@ -1525,8 +1535,8 @@ version = "0.1.0"
 dependencies = [
  "log",
  "owning_ref",
- "spin",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "spin 0.7.1",
+ "stable_deref_trait 1.1.1",
  "task",
  "wait_queue",
 ]
@@ -1537,7 +1547,7 @@ version = "0.1.0"
 dependencies = [
  "captain",
  "exceptions_early",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "log",
  "logger",
@@ -1546,7 +1556,7 @@ dependencies = [
  "mod_mgmt",
  "multiboot2",
  "panic_entry",
- "spin",
+ "spin 0.7.1",
  "stack",
  "state_store",
  "vga_buffer",
@@ -1569,7 +1579,7 @@ dependencies = [
  "log",
  "owning_ref",
  "smoltcp",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -1650,7 +1660,7 @@ dependencies = [
  "hpet",
  "http_client",
  "httparse",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "itertools",
  "log",
  "network_manager",
@@ -1669,8 +1679,8 @@ name = "owning_ref"
 version = "0.4.0"
 source = "git+https://github.com/theseus-os/owning-ref-rs#ce14b539e3aa891ff463c6f5e28617b27bc2510b"
 dependencies = [
- "spin",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "spin 0.4.10",
+ "stable_deref_trait 1.1.1",
 ]
 
 [[package]]
@@ -1691,7 +1701,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "spin",
+ "spin 0.7.1",
  "static_assertions",
 ]
 
@@ -1740,7 +1750,7 @@ dependencies = [
  "lazy_static",
  "log",
  "root",
- "spin",
+ "spin 0.7.1",
  "vfs_node",
  "x86_64",
 ]
@@ -1757,7 +1767,7 @@ dependencies = [
  "log",
  "memory",
  "port_io",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -1806,7 +1816,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "port_io",
- "spin",
+ "spin 0.7.1",
  "x86_64",
 ]
 
@@ -1842,7 +1852,7 @@ dependencies = [
  "apic",
  "atomic",
  "bit_field 0.10.0",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -1850,7 +1860,7 @@ dependencies = [
  "pit_clock",
  "port_io",
  "raw-cpuid",
- "spin",
+ "spin 0.7.1",
  "task",
  "x86_64",
 ]
@@ -1866,7 +1876,7 @@ dependencies = [
  "dfqueue",
  "event_types",
  "log",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -1910,7 +1920,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "port_io",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -2042,10 +2052,10 @@ version = "0.1.0"
 dependencies = [
  "debugit",
  "hpet",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "scheduler",
- "spin",
+ "spin 0.7.1",
  "task",
  "wait_queue",
 ]
@@ -2070,7 +2080,7 @@ dependencies = [
  "fs_node",
  "lazy_static",
  "log",
- "spin",
+ "spin 0.7.1",
  "x86_64",
 ]
 
@@ -2111,12 +2121,12 @@ dependencies = [
 name = "rtc"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
  "port_io",
- "spin",
+ "spin 0.7.1",
  "state_store",
  "x86_64",
 ]
@@ -2126,7 +2136,7 @@ name = "runqueue"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "runqueue_priority",
@@ -2140,7 +2150,7 @@ name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2152,7 +2162,7 @@ name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2179,12 +2189,12 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "runqueue",
  "scheduler_priority",
  "scheduler_round_robin",
- "spin",
+ "spin 0.7.1",
  "task",
 ]
 
@@ -2206,7 +2216,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_priority",
- "spin",
+ "spin 0.7.1",
  "task",
 ]
 
@@ -2217,7 +2227,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_round_robin",
- "spin",
+ "spin 0.7.1",
  "task",
 ]
 
@@ -2262,7 +2272,7 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "port_io",
 ]
 
@@ -2303,7 +2313,7 @@ dependencies = [
  "runqueue",
  "scheduler",
  "spawn",
- "spin",
+ "spin 0.7.1",
  "stdio",
  "task",
  "terminal_print",
@@ -2394,7 +2404,7 @@ dependencies = [
  "log",
  "network_manager",
  "smoltcp",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -2408,7 +2418,7 @@ dependencies = [
  "fault_crate_swap",
  "fault_log",
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -2428,18 +2438,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ceac490aa12c567115b40b7b7fceca03a6c9d53d5defea066123debc83c5dc1f"
 
 [[package]]
-name = "stable_deref_trait"
-version = "1.1.1"
+name = "spin"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
+checksum = "13287b4da9d1207a4f4929ac390916d64eacfe236a487e9a9f5b3be392be5162"
 
 [[package]]
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b"
 dependencies = [
- "spin",
+ "spin 0.4.10",
 ]
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "stack"
@@ -2450,7 +2466,7 @@ dependencies = [
  "memory",
  "memory_structs",
  "page_allocator",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -2478,7 +2494,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "lazy_static",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -2487,14 +2503,14 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "hpet",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "log",
  "memory",
  "mod_mgmt",
  "runqueue_priority",
  "runqueue_round_robin",
- "spin",
+ "spin 0.7.1",
  "task",
 ]
 
@@ -2510,7 +2526,7 @@ version = "0.1.0"
 dependencies = [
  "bare-io",
  "keycodes_ascii",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -2522,7 +2538,7 @@ dependencies = [
  "log",
  "owning_ref",
  "pci",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -2534,7 +2550,7 @@ dependencies = [
  "log",
  "owning_ref",
  "pci",
- "spin",
+ "spin 0.7.1",
  "storage_device",
 ]
 
@@ -2594,14 +2610,14 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "environment",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
  "memory",
  "mod_mgmt",
  "root",
- "spin",
+ "spin 0.7.1",
  "stack",
  "tss",
  "x86_64",
@@ -2616,7 +2632,7 @@ dependencies = [
  "memory",
  "path",
  "root",
- "spin",
+ "spin 0.7.1",
  "task",
  "x86_64",
 ]
@@ -2629,7 +2645,7 @@ dependencies = [
  "event_types",
  "lazy_static",
  "serial_port",
- "spin",
+ "spin 0.7.1",
  "task",
  "x86_64",
 ]
@@ -2645,7 +2661,7 @@ dependencies = [
  "rendezvous",
  "scheduler",
  "spawn",
- "spin",
+ "spin 0.7.1",
  "task",
  "terminal_print",
 ]
@@ -2668,7 +2684,7 @@ dependencies = [
  "scheduler",
  "shapes",
  "spawn",
- "spin",
+ "spin 0.7.1",
  "task",
  "terminal_print",
  "unified_channel",
@@ -2692,7 +2708,7 @@ dependencies = [
  "lazy_static",
  "log",
  "spawn",
- "spin",
+ "spin 0.7.1",
  "terminal_print",
 ]
 
@@ -2706,7 +2722,7 @@ dependencies = [
  "framebuffer",
  "framebuffer_printer",
  "shapes",
- "spin",
+ "spin 0.7.1",
 ]
 
 [[package]]
@@ -2714,7 +2730,7 @@ name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "memory",
  "pause",
@@ -2739,7 +2755,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
  "x86_64",
 ]
 
@@ -2825,7 +2841,7 @@ dependencies = [
  "ota_update_client",
  "path",
  "smoltcp",
- "spin",
+ "spin 0.7.1",
  "task",
  "terminal_print",
  "vfs_node",
@@ -2842,7 +2858,7 @@ dependencies = [
  "fs_node",
  "log",
  "memory",
- "spin",
+ "spin 0.7.1",
  "x86_64",
 ]
 
@@ -2852,7 +2868,7 @@ version = "0.1.0"
 dependencies = [
  "kernel_config",
  "serial_port",
- "spin",
+ "spin 0.7.1",
  "volatile",
 ]
 
@@ -2861,7 +2877,7 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "network_interface_card",
  "nic_buffers",
  "nic_queues",
@@ -2894,7 +2910,7 @@ dependencies = [
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "scheduler",
  "task",
@@ -2915,7 +2931,7 @@ dependencies = [
  "path",
  "shapes",
  "spawn",
- "spin",
+ "spin 0.7.1",
  "window_inner",
  "window_manager",
 ]
@@ -2951,7 +2967,7 @@ dependencies = [
  "scheduler",
  "shapes",
  "spawn",
- "spin",
+ "spin 0.7.1",
  "window_inner",
 ]
 
@@ -2961,7 +2977,7 @@ version = "0.1.2"
 dependencies = [
  "bit_field 0.7.0",
  "bitflags",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
 ]
 
 [[package]]
