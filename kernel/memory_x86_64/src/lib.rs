@@ -105,7 +105,6 @@ pub fn get_available_memory(
             base_addr: start_paddr,
             size_in_bytes: area_size,
             typ: 1,
-            acpi: 0,
         };
 
         info!("--> memory region established: start={:#x}, size_in_bytes={:#x}",
@@ -140,7 +139,6 @@ pub fn get_boot_info_mem_area(
         PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)?,
         boot_info.end_address() - boot_info.start_address(),
         1,
-        0,
     ))
 }
 

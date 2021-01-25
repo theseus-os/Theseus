@@ -128,7 +128,7 @@ impl AcpiTables {
 
         // Inform the frame allocator that the physical frame(s) where the RSDT/XSDT exists are now in use.
         if mapping_changed {
-            let sdt_area = PhysicalMemoryArea::new(sdt_phys_addr, sdt_length, 1, 3);
+            let sdt_area = PhysicalMemoryArea::new(sdt_phys_addr, sdt_length, 1);
             allocator.lock().add_area(sdt_area, false)?;
         }
 

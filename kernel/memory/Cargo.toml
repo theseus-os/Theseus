@@ -8,7 +8,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 bitflags = "1.1.0"
-multiboot2 = "0.7.1"
+multiboot2 = "0.10.1"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 bit_field = "0.7.0"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
@@ -39,6 +39,9 @@ path = "../memory_structs"
 
 [dependencies.page_allocator]
 path = "../page_allocator"
+
+[dependencies.frame_allocator]
+path = "../frame_allocator"
 
 [lib]
 crate-type = ["rlib"]

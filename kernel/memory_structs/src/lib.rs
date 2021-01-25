@@ -152,14 +152,14 @@ impl PhysicalAddress {
 
     /// Creates a new `PhysicalAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:52] to be 0.
-    pub fn new_canonical(mut phys_addr: usize) -> PhysicalAddress {
-        phys_addr.set_bits(52..64, 0);
-        PhysicalAddress(phys_addr)
+    pub const fn new_canonical(phys_addr: usize) -> PhysicalAddress {
+        // phys_addr.set_bits(52..64, 0);
+        PhysicalAddress(phys_addr & 0x000F_FFFF_FFFF_FFFF)
     }
 
     /// Returns the underlying `usize` value for this `PhysicalAddress`.
     #[inline]
-    pub fn value(&self) -> usize {
+    pub const fn value(&self) -> usize {
         self.0
     }
 
@@ -172,7 +172,7 @@ impl PhysicalAddress {
     ///
     /// For example, if the PAGE_SIZE is 4KiB, then this will return
     /// the least significant 12 bits (12:0] of this PhysicalAddress.
-    pub fn frame_offset(&self) -> usize {
+    pub const fn frame_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
     }
 }
@@ -230,25 +230,21 @@ impl From<PhysicalAddress> for usize {
 
 /// An area of physical memory.
 #[derive(Copy, Clone, Debug, Default)]
-#[repr(C)]
 pub struct PhysicalMemoryArea {
     pub base_addr: PhysicalAddress,
     pub size_in_bytes: usize,
     pub typ: u32,
-    pub acpi: u32,
 }
 impl PhysicalMemoryArea {
     pub fn new(
         paddr: PhysicalAddress,
         size_in_bytes: usize,
         typ: u32,
-        acpi: u32,
     ) -> PhysicalMemoryArea {
         PhysicalMemoryArea {
             base_addr: paddr,
             size_in_bytes: size_in_bytes,
             typ: typ,
-            acpi: acpi,
         }
     }
 }
@@ -268,14 +264,14 @@ impl fmt::Debug for Frame {
 
 impl Frame {
     /// Returns the `Frame` containing the given `PhysicalAddress`.
-    pub fn containing_address(phys_addr: PhysicalAddress) -> Frame {
+    pub const fn containing_address(phys_addr: PhysicalAddress) -> Frame {
         Frame {
             number: phys_addr.value() / PAGE_SIZE,
         }
     }
 
     /// Returns the `PhysicalAddress` at the start of this `Frame`.
-    pub fn start_address(&self) -> PhysicalAddress {
+    pub const fn start_address(&self) -> PhysicalAddress {
         PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
     }
 }
@@ -341,12 +337,12 @@ pub struct FrameRange(RangeInclusive<Frame>);
 impl FrameRange {
     /// Creates a new range of `Frame`s that spans from `start` to `end`,
     /// both inclusive bounds.
-    pub fn new(start: Frame, end: Frame) -> FrameRange {
+    pub const fn new(start: Frame, end: Frame) -> FrameRange {
         FrameRange(RangeInclusive::new(start, end))
     }
 
     /// Creates a FrameRange that will always yield `None`.
-    pub fn empty() -> FrameRange {
+    pub const fn empty() -> FrameRange {
         FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
     }
 
@@ -362,7 +358,7 @@ impl FrameRange {
     }
 
     /// Returns the `PhysicalAddress` of the starting `Frame` in this `FrameRange`.
-    pub fn start_address(&self) -> PhysicalAddress {
+    pub const fn start_address(&self) -> PhysicalAddress {
         self.0.start().start_address()
     }
 

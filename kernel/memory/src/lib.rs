@@ -21,6 +21,7 @@ extern crate memory_x86_64;
 extern crate x86_64;
 extern crate memory_structs;
 extern crate page_allocator;
+extern crate frame_allocator;
 extern crate zerocopy;
 
 
@@ -202,14 +203,31 @@ pub fn init(boot_info: &BootInformation)
     // Set up the initial list of reserved physical memory frames such that the frame allocator does not re-use them.
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
     let mut occup_index = 0;
-    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1, 0); // reserve addresses under 1 MB
+    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1); // reserve addresses under 1 MB
     occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
+    occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1); // the kernel boot image is already in use
     occup_index += 1;
     occupied[occup_index] = get_boot_info_mem_area(&boot_info)?; // preserve the multiboot information for x86_64. 
     occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value(), 1, 0); // preserve all bootloader modules
+    occupied[occup_index] = PhysicalMemoryArea::new(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value(), 1); // preserve all bootloader modules
     occup_index += 1;
+
+    // This iterator covers *all* memory areas, not just those classified as "available" by multiboot. 
+    // This is because we also want the frame allocator to manage physical memory areas for ACPI 
+    let all_areas_iter = boot_info.memory_map_tag()
+        .unwrap()
+        .all_memory_areas()
+        .map(|area| {
+            warn!("Multiboot2 Memory area: {:X?}", area);
+            PhysicalMemoryArea::new(
+                PhysicalAddress::new_canonical(area.start_address() as usize),
+                area.size() as usize,
+                if area.typ() == multiboot2::MemoryAreaType::Available { 1 } else { 2 },
+            )
+        });
+    frame_allocator::init(all_areas_iter)?;
+    warn!("Initialized new frame allocator!");
+    frame_allocator::dump_frame_allocator_state();
 
 
     // init the frame allocator with the available memory sections and the occupied memory sections

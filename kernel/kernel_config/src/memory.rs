@@ -32,7 +32,7 @@ pub const P4_INDEX_SHIFT: usize = P3_INDEX_SHIFT + 9;
 /// Value: 512 GiB.
 pub const ADDRESSABILITY_PER_P4_ENTRY: usize = 1 << (PAGE_SHIFT + P4_INDEX_SHIFT);
 
-pub const MAX_VIRTUAL_ADDRESS: usize = 0xFFFF_FFFF_FFFF_FFFF;
+pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 
 pub const TEMPORARY_PAGE_VIRT_ADDR: usize = MAX_VIRTUAL_ADDRESS;
 
