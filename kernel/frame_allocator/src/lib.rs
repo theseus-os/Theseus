@@ -255,6 +255,14 @@ impl AllocatedFrames {
             Err(self)
         }
     }
+
+    /// An escape hatch to create an AllocatedFrames object without actually allocating it. 
+    /// Currently used in page table and mapper code only. 
+    /// TODO: remove this once we flesh out the rest of the frame deallocation interface.
+    #[doc(hidden)]
+    pub unsafe fn from_parts_unsafe(frames: FrameRange) -> AllocatedFrames {
+        AllocatedFrames { frames }
+    }
 }
 
 impl Drop for AllocatedFrames {
@@ -569,7 +577,7 @@ fn adjust_chosen_chunk(
 /// Fragmentation isn't cleaned up until we're out of address space, but that's not really a big deal.
 /// 
 /// # Arguments
-/// * `requested_vaddr`: if `Some`, the returned `AllocatedFrames` will start at the `Frame`
+/// * `requested_paddr`: if `Some`, the returned `AllocatedFrames` will start at the `Frame`
 ///   containing this `PhysicalAddress`. 
 ///   If `None`, the first available `Frame` range will be used, starting at any random physical address.
 /// * `num_frames`: the number of `Frame`s to be allocated. 
@@ -581,7 +589,7 @@ fn adjust_chosen_chunk(
 ///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, 
 ///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.
 pub fn allocate_frames_deferred(
-    requested_vaddr: Option<PhysicalAddress>,
+    requested_paddr: Option<PhysicalAddress>,
     num_frames: usize,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), &'static str> {
     if num_frames == 0 {
@@ -596,8 +604,8 @@ pub fn allocate_frames_deferred(
     // - Can fit the requested size (starting at the requested address) within the chunk.
     // - The chunk can only be within in a designated region if a specific address was requested, 
     //   or all other non-designated chunks are already in use.
-    if let Some(vaddr) = requested_vaddr {
-        find_specific_chunk(&mut locked_list, Frame::containing_address(vaddr), num_frames)
+    if let Some(paddr) = requested_paddr {
+        find_specific_chunk(&mut locked_list, Frame::containing_address(paddr), num_frames)
     } else {
         find_any_chunk(&mut locked_list, num_frames)
     }.map_err(From::from) // convert from AllocationError to &str
@@ -609,16 +617,16 @@ pub fn allocate_frames_deferred(
 /// 
 /// This function still allocates whole frames by rounding up the number of bytes. 
 pub fn allocate_frames_by_bytes_deferred(
-    requested_vaddr: Option<PhysicalAddress>,
+    requested_paddr: Option<PhysicalAddress>,
     num_bytes: usize,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), &'static str> {
-    let actual_num_bytes = if let Some(vaddr) = requested_vaddr {
-        num_bytes + (vaddr.value() % FRAME_SIZE)
+    let actual_num_bytes = if let Some(paddr) = requested_paddr {
+        num_bytes + (paddr.value() % FRAME_SIZE)
     } else {
         num_bytes
     };
     let num_frames = (actual_num_bytes + FRAME_SIZE - 1) / FRAME_SIZE; // round up
-    allocate_frames_deferred(requested_vaddr, num_frames)
+    allocate_frames_deferred(requested_paddr, num_frames)
 }
 
 
@@ -648,8 +656,8 @@ pub fn allocate_frames_by_bytes(num_bytes: usize) -> Option<AllocatedFrames> {
 /// 
 /// This function still allocates whole frames by rounding up the number of bytes. 
 /// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
-pub fn allocate_frames_by_bytes_at(vaddr: PhysicalAddress, num_bytes: usize) -> Result<AllocatedFrames, &'static str> {
-    allocate_frames_by_bytes_deferred(Some(vaddr), num_bytes)
+pub fn allocate_frames_by_bytes_at(paddr: PhysicalAddress, num_bytes: usize) -> Result<AllocatedFrames, &'static str> {
+    allocate_frames_by_bytes_deferred(Some(paddr), num_bytes)
         .map(|(ap, _action)| ap)
 }
 
@@ -657,8 +665,8 @@ pub fn allocate_frames_by_bytes_at(vaddr: PhysicalAddress, num_bytes: usize) -> 
 /// Allocates the given number of frames starting at (inclusive of) the frame containing the given `PhysicalAddress`.
 /// 
 /// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
-pub fn allocate_frames_at(vaddr: PhysicalAddress, num_frames: usize) -> Result<AllocatedFrames, &'static str> {
-    allocate_frames_deferred(Some(vaddr), num_frames)
+pub fn allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -> Result<AllocatedFrames, &'static str> {
+    allocate_frames_deferred(Some(paddr), num_frames)
         .map(|(ap, _action)| ap)
 }
 

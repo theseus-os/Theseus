@@ -245,7 +245,7 @@ impl AllocatedPages {
 impl Drop for AllocatedPages {
     fn drop(&mut self) {
 		if self.size_in_pages() == 0 { return; }
-		// trace!("page_allocator: deallocating {:?}", self);
+		trace!("page_allocator: deallocating {:?}", self);
 
 		// Simply add the newly-deallocated chunk to the free pages list.
 		let mut locked_list = FREE_PAGE_LIST.lock();

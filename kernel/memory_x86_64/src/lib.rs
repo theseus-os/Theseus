@@ -262,7 +262,7 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 return Err("Kernel ELF Section had an unexpected name (expected .init, .text, .data, .bss, .rodata)");
             }
         };
-        debug!("     mapping kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
+        debug!("     will map kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
 
         sections_memory_bounds[index] = Some(SectionMemoryBounds {
             start: (start_virt_addr, start_phys_addr),

@@ -11,18 +11,17 @@ use core::mem;
 use core::ops::Deref;
 use core::ptr::Unique;
 use core::slice;
-use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, get_frame_allocator_ref, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, FrameAllocator, AllocatedPages, AllocatedFrames}; 
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
-use irq_safety::MutexIrqSafe;
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
     /// The Frame contaning the top-level P4 page table.
-    pub target_p4: Frame,
+    pub(crate) target_p4: Frame,
 }
 
 impl Mapper {
@@ -127,7 +126,7 @@ impl Mapper {
     /// Maps the given `AllocatedPages` to the given physical frames.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to<A>(&mut self, pages: AllocatedPages, frames: FrameRange, flags: EntryFlags, allocator: &mut A)
+    pub fn map_allocated_pages_to<A>(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
@@ -146,7 +145,7 @@ impl Mapper {
         }
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.deref().clone().into_iter().zip(frames) {
+        for (page, frame) in pages.deref().clone().into_iter().zip(frames.deref().clone().into_iter()) {
             let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
             let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
@@ -158,6 +157,12 @@ impl Mapper {
 
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
         }
+
+        // Currently we forget the actual AllocatedPages object because
+        // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
+        // This is okay because we will deallocate each of these frames when this MappedPages object is dropped
+        // and each of the page table entries for its pages are cleared.
+        core::mem::forget(frames);
 
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
@@ -364,14 +369,54 @@ impl MappedPages {
         self.flags = new_flags;
         Ok(())
     }   
+    
+    /// Consumes and unmaps this `MappedPages` object without auto-deallocating its `AllocatedPages` and `AllocatedFrames`,
+    /// allowing the caller to continue using them directly, e.g., reusing them for a future mapping. 
+    /// This removes the need to attempt to to reallocate those same pages or frames on a separate code path.
+    ///
+    /// Note that only the first contiguous range of `AllocatedFrames` will be returned,
+    /// all other non-contiguous ranges will be auto-dropped and deallocated.
+    /// This is due to how frame deallocation works.
+    #[doc(hidden)]
+    pub(crate) fn unmap_into_parts(mut self, active_table_mapper: &mut Mapper) -> Result<(AllocatedPages, AllocatedFrames), Self> {
+        match self.unmap(active_table_mapper) {
+            Ok(first_frames) => {
+                let pages = mem::replace(&mut self.pages, AllocatedPages::empty());
+                Ok((pages, first_frames))
+            }
+            Err(e) => {
+                error!("MappedPages::unmap_into_parts(): failed to unmap {:?}, error: {}", self, e);
+                return Err(self);
+            }
+        }
+    }
 
 
     /// Remove the virtual memory mapping for the given `Page`s.
     /// This should NOT be public because it should only be invoked when a `MappedPages` object is dropped.
-    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator_ref: &MutexIrqSafe<A>) -> Result<(), &'static str> 
-        where A: FrameAllocator
+    ///
+    /// Returns the **first, contiguous** range of frames that was mapped to these pages.
+    /// If there are multiple discontiguous ranges of frames that were unmapped, 
+    /// or the frames were not mapped bijectively (i.e., multiple pages mapped to these frames),
+    /// then only the first range will be returned
+    fn unmap(&mut self, active_table_mapper: &mut Mapper, /*_allocator_ref: &MutexIrqSafe<A>*/) -> Result<AllocatedFrames, &'static str> 
+        // where A: FrameAllocator
     {
-        if self.size_in_pages() == 0 { return Ok(()); }
+        if self.size_in_pages() == 0 { return Ok(AllocatedFrames::empty()); }
+
+        if active_table_mapper.target_p4 != self.page_table_p4 {
+            error!("BUG: MappedPages::unmap(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
+                cannot unmap MappedPages from a different page table than they were originally mapped to!",
+                self, get_current_p4(), self.page_table_p4
+            );
+            return Err(
+                "BUG: MappedPages::unmap(): current P4 must equal original P4, \
+                cannot unmap MappedPages from a different page table than they were originally mapped to!"
+            );
+        }   
+
+        let mut first_frame_range: Option<FrameRange> = None; // this is what we'll return
+        let mut frame_range: Option<FrameRange> = None;
 
         for page in self.pages.clone() {            
             let p1 = active_table_mapper.p4_mut()
@@ -380,13 +425,37 @@ impl MappedPages {
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or("mapping code does not support huge pages")?;
             
-            let _frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
+            let frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
             p1[page.p1_index()].set_unused();
 
             tlb_flush_virt_addr(page.start_address());
             
-            // TODO free p(1,2,3) table if empty
-            // _allocator_ref.lock().deallocate_frame(frame);
+            // TODO: deallocate contiguous ranges of frames here based on the `_frame` of the p1 (PTE) entry above.
+
+            if let Some(ref mut range) = frame_range {
+                if frame == *range.end() + 1 {
+                    // the current `frame` is contiguously after the end of the existing frame range, so extend it
+                    *range = FrameRange::new(*range.start(), frame);
+                } else if frame == *range.start() - 1 {
+                    // the current `frame` is contiguously before the beginning of the existing frame range, so extend it
+                    *range = FrameRange::new(frame, *range.end());
+                } else {
+                    // the current `frame` is NOT contiguous with the existing frame range,
+                    // so we "finish" the current range and then start a new one.
+                    if first_frame_range.is_none() {
+                        first_frame_range = Some(range.clone());
+                    }
+
+                    // Drop "range"
+                    let _af = unsafe { AllocatedFrames::from_parts_unsafe(range.clone()) };
+                    trace!("MappedPages::unmap(): dropping {:?}", _af);
+
+                    frame_range = None;
+                }
+            } else {
+                frame_range = Some(FrameRange::new(frame, frame));
+            }
+
         }
     
         #[cfg(not(bm_map))]
@@ -396,7 +465,8 @@ impl MappedPages {
             }
         }
 
-        Ok(())
+        let first_frame_range = first_frame_range.unwrap_or(FrameRange::empty());
+        Ok(unsafe { AllocatedFrames::from_parts_unsafe(first_frame_range) })
     }
 
 
@@ -659,33 +729,25 @@ pub fn mapped_pages_unmap<A: FrameAllocator>(
     mapper: &mut Mapper,
     allocator_ref: &super::FrameAllocatorRef<A>, 
 ) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper, allocator_ref)
+    mapped_pages.unmap(mapper, /*allocator_ref*/)
 }
 
 
 impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
-        // trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
+        trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
 
-        let mut mapper = Mapper::from_current();
-        if mapper.target_p4 != self.page_table_p4 {
-            error!("BUG: MappedPages::drop(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
-                cannot unmap MappedPages from a different page table than they were originally mapped to!",
-                self, get_current_p4(), self.page_table_p4
-            );
-            return;
-        }   
-
-        let frame_allocator_ref = match get_frame_allocator_ref() {
-            Some(fa) => fa,
-            _ => {
-                error!("MappedPages::drop(): couldn't get frame allocator!");
-                return;
-            }
-        };
+        // let _frame_allocator_ref = match get_frame_allocator_ref() {
+        //     Some(fa) => fa,
+        //     _ => {
+        //         error!("MappedPages::drop(): couldn't get frame allocator!");
+        //         return;
+        //     }
+        // };
         
-        if let Err(e) = self.unmap(&mut mapper, &frame_allocator_ref) {
+        let mut mapper = Mapper::from_current();
+        if let Err(e) = self.unmap(&mut mapper, /*&_frame_allocator_ref*/) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 

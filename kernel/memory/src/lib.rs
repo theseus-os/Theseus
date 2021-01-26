@@ -38,6 +38,7 @@ pub use self::paging::*;
 
 pub use memory_structs::*;
 pub use page_allocator::*;
+pub use frame_allocator::*;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::*;
@@ -114,16 +115,15 @@ pub struct MemoryManagementInfo {
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate pages!")?;
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
+    let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
     let mut frame_allocator = get_frame_allocator_ref().ok_or("create_contiguous_mapping(): couldnt get frame allocator")?.lock();
-    let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
-        .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
-    let starting_phys_addr = frames.start_address();
-    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, frames, flags, &mut *frame_allocator)?;
+    let starting_phys_addr = allocated_frames.start_address();
+    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags, &mut *frame_allocator)?;
     Ok((mp, starting_phys_addr))
 }
 
