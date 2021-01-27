@@ -349,11 +349,11 @@ impl FrameRange {
     /// A convenience method for creating a new `FrameRange`
     /// that spans all `Frame`s from the given physical address
     /// to an end bound based on the given size.
-    pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
+    pub fn from_phys_addr(starting_phys_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
         assert!(size_in_bytes > 0);
-        let start_frame = Frame::containing_address(starting_virt_addr);
+        let start_frame = Frame::containing_address(starting_phys_addr);
 		// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-        let end_frame = Frame::containing_address(starting_virt_addr + (size_in_bytes - 1));
+        let end_frame = Frame::containing_address(starting_phys_addr + (size_in_bytes - 1));
         FrameRange::new(start_frame, end_frame)
     }
 

@@ -16,7 +16,7 @@ extern crate volatile;
 extern crate nic_queues;
 
 use core::ops::DerefMut;
-use memory::{get_frame_allocator_ref, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
+use memory::{get_frame_allocator_ref, EntryFlags, PhysicalMemoryArea, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
 use pci::{PciDevice};
 use alloc::{
     vec::Vec,
@@ -62,8 +62,10 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
     }
 
     // set up virtual pages and physical frames to be mapped
-    let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("NicInit::mem_map(): couldn't allocated virtual page!")?;
-    let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
+    let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes)
+        .ok_or("NicInit::mem_map(): couldn't allocate virtual page!")?;
+    let frames_nic = allocate_frames_by_bytes_at(mem_base, mem_size_in_bytes)
+        .map_err(|_e| "NicInit::mem_map(): couldn't allocate physical frames!")?;
 
     // debug!("NicInit: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
 

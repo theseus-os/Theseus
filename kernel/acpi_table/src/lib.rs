@@ -15,7 +15,7 @@ extern crate zerocopy;
 
 use core::ops::DerefMut;
 use alloc::collections::BTreeMap;
-use memory::{MappedPages, allocate_pages, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, get_frame_allocator_ref, PhysicalMemoryArea};
+use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, get_frame_allocator_ref, PhysicalMemoryArea};
 use sdt::Sdt;
 use core::ops::Add;
 use zerocopy::FromBytes;
@@ -70,11 +70,19 @@ impl AcpiTables {
         let first_frame = Frame::containing_address(sdt_phys_addr);
         // If the Frame containing the given `sdt_phys_addr` wasn't already mapped, then we need to map it.
         if !self.frames.contains(&first_frame) {
+            // Drop the current MappedPages and deallocate its frames so we can reallocate over them below. 
+            let _orig_mp = core::mem::replace(&mut self.mapped_pages, MappedPages::empty());
+            trace!("[0] Dropping original {:?}", _orig_mp);
+            drop(_orig_mp);
+
             let new_frames = self.frames.to_extended(first_frame);
-            let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
+            let new_pages = allocate_pages(new_frames.size_in_frames())
+                .ok_or("couldn't allocate pages for ACPI table")?;
+            let af = allocate_frames_at(new_frames.start_address(), new_frames.size_in_frames())
+                .map_err(|_e| "Couldn't allocate frames for ACPI table")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
-                new_frames.clone(),
+                af,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
                 allocator.lock().deref_mut(),
             )?;
@@ -89,12 +97,19 @@ impl AcpiTables {
         // Here we check if the header of the ACPI table fits at the offset.
         // If not, we add the next frame as well.
         if sdt_offset + core::mem::size_of::<Sdt>() > self.mapped_pages.size_in_bytes() {
-            let new_frames = self.frames.to_extended(first_frame.add(1));
+            // Drop the current MappedPages and deallocate its frames so we can reallocate over them below. 
+            let _orig_mp = core::mem::replace(&mut self.mapped_pages, MappedPages::empty());
+            trace!("[1] Dropping original {:?}", _orig_mp);
+            drop(_orig_mp);
 
-            let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
+            let new_frames = self.frames.to_extended(first_frame.add(1));
+            let new_pages = allocate_pages(new_frames.size_in_frames())
+                .ok_or("couldn't allocate pages for ACPI table")?;
+            let af = allocate_frames_at(new_frames.start_address(), new_frames.size_in_frames())
+                .map_err(|_e| "Couldn't allocate frames for ACPI table")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
-                new_frames.clone(),
+                af,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
                 allocator.lock().deref_mut(),
             )?;
@@ -112,11 +127,19 @@ impl AcpiTables {
         let last_frame_of_table = Frame::containing_address(sdt_phys_addr + sdt_length);
         if !self.frames.contains(&last_frame_of_table) {
             trace!("AcpiTables::map_new_table(): SDT's length requires mapping frames {:#X} to {:#X}", self.frames.end().start_address(), last_frame_of_table.start_address());
+            // Drop the current MappedPages and deallocate its frames so we can reallocate over them below. 
+            let _orig_mp = core::mem::replace(&mut self.mapped_pages, MappedPages::empty());
+            trace!("[2] Dropping original {:?}", _orig_mp);
+            drop(_orig_mp);
+
             let new_frames = self.frames.to_extended(last_frame_of_table);
-            let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
+            let new_pages = allocate_pages(new_frames.size_in_frames())
+                .ok_or("couldn't allocate pages for ACPI table")?;
+            let af = allocate_frames_at(new_frames.start_address(), new_frames.size_in_frames())
+                .map_err(|_e| "Couldn't allocate frames for ACPI table")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
-                new_frames.clone(),
+                af,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
                 allocator.lock().deref_mut(),
             )?;

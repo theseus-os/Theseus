@@ -32,7 +32,7 @@ use spin::Mutex;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use irq_safety::MutexIrqSafe;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
@@ -95,10 +95,12 @@ pub fn handle_ap_cores(
         // Map trampoline frame and the ap_startup code to the AP_STARTUP frame.
         // These frames MUST be identity mapped because they're accessed in AP boot up code,
         // which has no page tables because it operates in 16-bit real mode.
-        let trampoline_frame  = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(TRAMPOLINE), 1);
+        let trampoline_frame  = memory::allocate_frames_at(PhysicalAddress::new_canonical(TRAMPOLINE), 1)
+            .map_err(|_e| "handle_ap_cores(): failed to allocate trampoline frame")?;
         let trampoline_page   = memory::allocate_pages_at(VirtualAddress::new_canonical(TRAMPOLINE), trampoline_frame.size_in_frames())
             .map_err(|_e| "handle_ap_cores(): failed to allocate trampoline page")?;
-        let ap_startup_frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
+        let ap_startup_frames = memory::allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes)
+            .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup frames")?;
         let ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(AP_STARTUP), ap_startup_frames.size_in_frames())
             .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup pages")?;
         let mut allocator = frame_allocator_ref.lock();

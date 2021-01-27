@@ -73,13 +73,14 @@ impl<P: Pixel> Framebuffer<P> {
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
         let size = width * height * core::mem::size_of::<P>();
-        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
+        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages for a new framebuffer")?;
 
         let mapped_framebuffer = if let Some(address) = physical_address {
-            let frame = FrameRange::from_phys_addr(address, size);
+            let frames = memory::allocate_frames_by_bytes_at(address, size)
+                .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
             kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
-                frame,
+                frames,
                 vesa_display_flags,
                 allocator.lock().deref_mut()
             )?

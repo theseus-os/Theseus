@@ -39,7 +39,7 @@ use xmas_elf::{
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
 };
 use util::round_up_power_of_two;
-use memory::{MmiRef, get_frame_allocator_ref, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, get_frame_allocator_ref, MemoryManagementInfo, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use multiboot2::BootInformation;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -143,7 +143,8 @@ fn parse_bootloader_modules_into_files(
 
     for m in boot_info.module_tags() {
         let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-        let frames = FrameRange::from_phys_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
+        let frames = allocate_frames_by_bytes_at(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes)
+            .map_err(|_e| "Failed to allocate frames for bootloader module")?;
         let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
         let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
         let name = String::from(file_name);
