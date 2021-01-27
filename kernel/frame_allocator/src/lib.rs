@@ -55,10 +55,8 @@ const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonica
 // TODO: replace this with the dynamically-discovered end of the kernel identity mapping section (kernel_phys_end)
 const DESIGNATED_FRAMES_LOW_END: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x40_0000 - 1));
 /// Any physical addresses **greater than or equal to** this address are considered "designated".
-/// This higher part of the address range covers from the beginning of the KERNEL_OFFSET to the end of the physical address space.
-// TODO: initialize this dynamically at the same time as the `DESIGNATED_FRAMES_LOW_END`.
-const DESIGNATED_FRAMES_HIGH_START: Frame = Frame::containing_address(PhysicalAddress::new_canonical(KERNEL_OFFSET));
-
+/// Currently there are no designated regions at the higher end of the address space.
+const DESIGNATED_FRAMES_HIGH_START: Frame = MAX_FRAME;
 
 
 /// The single, system-wide list of free physical memory frames.
@@ -84,10 +82,33 @@ pub fn init<I, P>(physical_memory_areas: I) -> Result<(), &'static str>
         if area.typ != 1 {
             debug!("\t\t--> area was a reserved region: {:?}", area);
         }
-        list[list_idx] = Some(Chunk { 
-            frames: FrameRange::from_phys_addr(area.base_addr, area.size_in_bytes),
-        });
-        list_idx += 1;
+        let range = FrameRange::from_phys_addr(area.base_addr, area.size_in_bytes);
+
+        // If the area spans (contains) a designated region boundary, split it at that boundary.
+        if range.contains(&DESIGNATED_FRAMES_LOW_END) {
+            list[list_idx] = Some(Chunk { 
+                frames: FrameRange::new(*range.start(), DESIGNATED_FRAMES_LOW_END),
+            });
+            list_idx += 1;
+            list[list_idx] = Some(Chunk { 
+                frames: FrameRange::new(DESIGNATED_FRAMES_LOW_END + 1, *range.end()),
+            });
+            list_idx += 1;
+        } else if range.contains(&DESIGNATED_FRAMES_HIGH_START) {
+            list[list_idx] = Some(Chunk { 
+                frames: FrameRange::new(*range.start(), DESIGNATED_FRAMES_HIGH_START - 1),
+            });
+            list_idx += 1;
+            list[list_idx] = Some(Chunk { 
+                frames: FrameRange::new(DESIGNATED_FRAMES_HIGH_START, *range.end()),
+            });
+            list_idx += 1;
+        } else {
+            list[list_idx] = Some(Chunk { 
+                frames: range,
+            });
+            list_idx += 1;
+        }
     }
 
     // Ensure that no two chunks overlap.
@@ -623,6 +644,10 @@ pub fn allocate_frames_deferred(
         .map(|(af, _action)| {
             warn!("Allocated {} frames at requested paddr {:?}: {:?}", num_frames, requested_paddr, af);
             (af, _action)
+        })
+        .map_err(|_e| {
+            error!("Failed to allocate {} frames at requested paddr {:?}: {:?}", num_frames, requested_paddr, _e);
+            _e
         })
 }
 
