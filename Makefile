@@ -114,7 +114,8 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs
+		gdb doc docs view-doc view-docs \
+		arm run-arm\
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -383,6 +384,23 @@ preserve_old_modules:
 	cargo clean
 
 
+### Build for Cortex-m4 targets. Currently it only builds the nanocore.
+arm:
+	cargo build -p nano_core --target thumbv7em-none-eabi
+	arm-none-eabi-ld \
+		-T target/thumbv7em-none-eabi/debug/build/cortex-m-rt*/out/link.x \
+		--nmagic \
+		-o target/thumbv7em-none-eabi/theseus.bin \
+		target/thumbv7em-none-eabi/debug/libnano_core.a
+
+### Run the build for Cortex-m4 with QEMU.
+run-arm: arm
+	@qemu-system-gnuarmeclipse \
+		--board STM32F4-Discovery \
+		-nographic \
+		-semihosting-config enable=on,target=native \
+		-kernel target/thumbv7em-none-eabi/theseus.bin
+
 
 ## The top-level (root) documentation file
 DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
@@ -435,7 +453,7 @@ view-book: book
 clean:
 	cargo clean
 	@rm -rf build
-	
+
 
 
 help: 

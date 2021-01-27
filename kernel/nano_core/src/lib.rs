@@ -16,6 +16,13 @@
 //! 
 
 #![no_std]
+#![feature(alloc_error_handler)]
+
+#[macro_use] extern crate cfg_if;
+
+cfg_if!{
+// Architecture dependent code for x86_64.
+if #[cfg(target_arch="x86_64")] {
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -249,3 +256,36 @@ extern {
 /// This module is a hack to get around the lack of the 
 /// `__truncdfsf2` function in the `compiler_builtins` crate.
 mod truncate;
+
+} // End of architecture dependent code for x86_64.
+
+// Architecture dependent code for thumbv7em.
+else if #[cfg(target_arch="arm")] {
+
+extern crate alloc;
+extern crate cortex_m;
+extern crate panic_halt;
+extern crate alloc_cortex_m;
+#[macro_use] extern crate cortex_m_rt;
+#[macro_use] extern crate cortex_m_semihosting;
+
+use alloc_cortex_m::CortexMHeap;
+
+#[global_allocator]
+static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
+
+#[alloc_error_handler]
+fn default_alloc_error_handler(_: core::alloc::Layout) -> ! {
+    loop {}
+}
+
+
+#[entry]
+fn main() -> ! {
+    hprintln!("hello world!").unwrap();
+    loop {}
+}
+
+} // End of architecture dependent code for thumbv7em.
+
+}
