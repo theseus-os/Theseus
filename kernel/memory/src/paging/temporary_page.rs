@@ -54,6 +54,7 @@ impl TemporaryPage {
                 frame,
                 super::EntryFlags::WRITABLE,
             )?);
+            warn!("map_table_frame: {:?}", self.mapped_page);
         }
         self.mapped_page.as_mut().unwrap().as_type_mut(0)
     }
@@ -75,7 +76,7 @@ impl TemporaryPage {
 impl Drop for TemporaryPage {
     fn drop(&mut self) {
         if let Some(_mp) = self.mapped_page.take() {
-            warn!("BUG: TemporaryPage was dropped, should use `unmap_into_parts()` instead. Contained {:?}", _mp);
+            error!("LIKELY BUG: TemporaryPage was dropped, should use `unmap_into_parts()` instead. Contained {:?}", _mp);
         }
     }    
 }

@@ -104,6 +104,7 @@ impl PageTable {
         }
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
+        warn!("PageTable::new_table(): _temp_page: {:?}, inited_new_p4_frame: {:?}", _temp_page, inited_new_p4_frame);
 
         Ok( PageTable { 
             mapper: Mapper::with_p4_frame(p4_frame),
@@ -220,7 +221,9 @@ pub fn init(
     info!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
+    warn!("new_p4_frame: {:?}", new_p4_frame);
     let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, TemporaryPage::new())?;
+    warn!("new_table: {:?}", new_table);
 
     let mut text_mapped_pages: Option<MappedPages> = None;
     let mut rodata_mapped_pages: Option<MappedPages> = None;

@@ -45,9 +45,20 @@ const FRAME_SIZE: usize = PAGE_SIZE;
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
 const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
 
-// Currently we don't treat any regions of physical frames as designated for special use. 
-const DESIGNATED_FRAMES_LOW_END: Frame = MIN_FRAME;
-const DESIGNATED_FRAMES_HIGH_START: Frame = MAX_FRAME;
+/// Regions that are pre-designated for special usage, specifically the kernel's initial identity mapping.
+/// They will be allocated from if an address within them is specifically requested;
+/// otherwise, they will only be allocated from as a "last resort" once all other non-designated address ranges are exhausted.
+///
+/// Any physical addresses **less than or equal** to this address are considered "designated".
+/// This lower part of the address range covers from 0x0 to the end of the kernel physical address.
+/// 
+// TODO: replace this with the dynamically-discovered end of the kernel identity mapping section (kernel_phys_end)
+const DESIGNATED_FRAMES_LOW_END: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x40_0000 - 1));
+/// Any physical addresses **greater than or equal to** this address are considered "designated".
+/// This higher part of the address range covers from the beginning of the KERNEL_OFFSET to the end of the physical address space.
+// TODO: initialize this dynamically at the same time as the `DESIGNATED_FRAMES_LOW_END`.
+const DESIGNATED_FRAMES_HIGH_START: Frame = Frame::containing_address(PhysicalAddress::new_canonical(KERNEL_OFFSET));
+
 
 
 /// The single, system-wide list of free physical memory frames.
@@ -268,7 +279,7 @@ impl AllocatedFrames {
 impl Drop for AllocatedFrames {
     fn drop(&mut self) {
         if self.size_in_frames() == 0 { return; }
-        // trace!("frame_allocator: deallocating {:?}", self);
+        trace!("frame_allocator: deallocating {:?}", self);
 
         // Simply add the newly-deallocated chunk to the free frames list.
         let mut locked_list = FREE_FRAME_LIST.lock();
@@ -609,6 +620,10 @@ pub fn allocate_frames_deferred(
     } else {
         find_any_chunk(&mut locked_list, num_frames)
     }.map_err(From::from) // convert from AllocationError to &str
+        .map(|(af, _action)| {
+            warn!("Allocated {} frames at requested paddr {:?}: {:?}", num_frames, requested_paddr, af);
+            (af, _action)
+        })
 }
 
 

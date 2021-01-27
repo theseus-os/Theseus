@@ -398,6 +398,9 @@ impl MappedPages {
     /// If there are multiple discontiguous ranges of frames that were unmapped, 
     /// or the frames were not mapped bijectively (i.e., multiple pages mapped to these frames),
     /// then only the first range will be returned
+    ///
+    /// TODO: FIXME: consider changing this to `Result<Option<AllocatedFrames>>` 
+    ///              instead of using `Ok(AllocatedFrames::empty())` to mean `Ok(None)`
     fn unmap(&mut self, active_table_mapper: &mut Mapper) -> Result<AllocatedFrames, &'static str> {
         if self.size_in_pages() == 0 { return Ok(AllocatedFrames::empty()); }
 
@@ -437,22 +440,23 @@ impl MappedPages {
                     // the current `frame` is contiguously before the beginning of the existing frame range, so extend it
                     *range = FrameRange::new(frame, *range.end());
                 } else {
-                    // the current `frame` is NOT contiguous with the existing frame range,
+                    // The current `frame` is NOT contiguous with the existing frame range,
                     // so we "finish" the current range and then start a new one.
                     if first_frame_range.is_none() {
+                        // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
                         first_frame_range = Some(range.clone());
+                    } else {
+                        // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
+                        // otherwise there will not be any other opportunity for it to be dropped.
+                        let _af = unsafe { AllocatedFrames::from_parts_unsafe(range.clone()) };
+                        trace!("MappedPages::unmap(): dropping {:?}", _af);
                     }
-
-                    // Drop "range"
-                    let _af = unsafe { AllocatedFrames::from_parts_unsafe(range.clone()) };
-                    trace!("MappedPages::unmap(): dropping {:?}", _af);
 
                     frame_range = None;
                 }
             } else {
                 frame_range = Some(FrameRange::new(frame, frame));
             }
-
         }
     
         #[cfg(not(bm_map))]
@@ -462,7 +466,8 @@ impl MappedPages {
             }
         }
 
-        let first_frame_range = first_frame_range.unwrap_or(FrameRange::empty());
+        // Ensure that we return at least some frame range, even if we broke out of the above loop early.
+        let first_frame_range = first_frame_range.unwrap_or(frame_range.unwrap_or(FrameRange::empty()));
         Ok(unsafe { AllocatedFrames::from_parts_unsafe(first_frame_range) })
     }
 
