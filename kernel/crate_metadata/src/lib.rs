@@ -61,7 +61,7 @@ use alloc::{
     vec::Vec,
 };
 use memory::{MappedPages, VirtualAddress, EntryFlags};
-#[cfg(internal_deps)] use memory::{PageTable, FrameAllocator};
+#[cfg(internal_deps)] use memory::PageTable;
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
@@ -375,10 +375,9 @@ impl LoadedCrate {
     /// 
     /// This is only available when the `internal_deps` cfg option is set.
     #[cfg(internal_deps)]
-    pub fn deep_copy<A: FrameAllocator>(
+    pub fn deep_copy(
         &self, 
         page_table: &mut PageTable, 
-        allocator: &mut A
     ) -> Result<StrongCrateRef, &'static str> {
 
         // This closure deep copies the given mapped_pages (mapping them as WRITABLE)
@@ -390,7 +389,7 @@ impl LoadedCrate {
             let old_start_address = old_mp_range.1.start.value();
             let size = old_mp_range.1.end.value() - old_start_address;
             let offset = old_start_address - old_mp_locked.start_address().value();
-            let new_mp = old_mp_range.0.lock().deep_copy(Some(flags | EntryFlags::WRITABLE), page_table, allocator)?;
+            let new_mp = old_mp_range.0.lock().deep_copy(Some(flags | EntryFlags::WRITABLE), page_table)?;
             let new_start_address = new_mp.start_address() + offset;
             Ok((Arc::new(Mutex::new(new_mp)), new_start_address .. (new_start_address + size)))
         };

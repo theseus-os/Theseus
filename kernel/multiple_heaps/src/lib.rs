@@ -47,9 +47,9 @@ use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::boxed::Box;
 use hashbrown::HashMap;
-use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, create_mapping};
+use memory::{MappedPages, VirtualAddress, get_kernel_mmi_ref, create_mapping};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
-use core::ops::{Deref, DerefMut};
+use core::ops::Deref;
 use core::ptr;
 use heap::HEAP_FLAGS;
 use irq_safety::MutexIrqSafe;
@@ -130,16 +130,12 @@ fn create_heap_mapping(
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_heap_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    let mut frame_allocator = get_frame_allocator_ref()
-        .ok_or("create_heap_mapping(): couldnt get FRAME_ALLOCATOR")?
-        .lock();
-
     let (pages, action) = allocate_pages_by_bytes_deferred(Some(starting_address), size_in_bytes)
         .map_err(|_e| "create_heap_mapping(): failed to allocate pages at the starting address")?;
     if pages.start_address().value() % HEAP_MAPPED_PAGES_SIZE_IN_BYTES != 0 {
         return Err("multiple_heaps: the allocated pages for the heap wasn't properly aligned");
     }
-    let mp = kernel_mmi.page_table.map_allocated_pages(pages, HEAP_FLAGS, frame_allocator.deref_mut())?;
+    let mp = kernel_mmi.page_table.map_allocated_pages(pages, HEAP_FLAGS)?;
 
     // trace!("Allocated heap pages at: {:#X}", starting_address);
 

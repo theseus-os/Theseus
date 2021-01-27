@@ -9,7 +9,7 @@
 
 use super::entry::{Entry};
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, FrameAllocator, EntryFlags};
+use super::super::{VirtualAddress, EntryFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 use zerocopy::FromBytes;
@@ -81,17 +81,17 @@ impl<L> Table<L>
         self.next_table_address(index).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
     }
 
-    pub fn next_table_create<A>(&mut self,
-                                index: usize,
-                                flags: EntryFlags,
-                                allocator: &mut A)
-                                -> &mut Table<L::NextLevel>
-        where A: FrameAllocator
-    {
+    pub fn next_table_create(
+        &mut self,
+        index: usize,
+        flags: EntryFlags,
+    ) -> &mut Table<L::NextLevel> {
         if self.next_table(index).is_none() {
-            assert!(!self[index].flags().is_huge(),
-                    "mapping code does not support huge pages");
-            let frame = allocator.allocate_frame().expect("no frames available");
+            assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
+            let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
+            let frame = *af.start();
+            core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
+
             self[index].set(frame, flags.into_writable() | EntryFlags::PRESENT); // must be PRESENT | WRITABLE for x86_64
             self.next_table_mut(index).unwrap().zero();
         }

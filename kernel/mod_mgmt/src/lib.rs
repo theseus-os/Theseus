@@ -25,7 +25,7 @@ extern crate hashbrown;
 
 use core::{
     fmt,
-    ops::{DerefMut, Deref, Range},
+    ops::{Deref, Range},
 };
 use alloc::{
     vec::Vec,
@@ -39,7 +39,7 @@ use xmas_elf::{
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
 };
 use util::round_up_power_of_two;
-use memory::{MmiRef, get_frame_allocator_ref, MemoryManagementInfo, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use multiboot2::BootInformation;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -134,8 +134,6 @@ fn parse_bootloader_modules_into_files(
     // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
     let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
 
-    let fa = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
-
     // Closure to create the directory for a new namespace.
     let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
         VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
@@ -154,7 +152,6 @@ fn parse_bootloader_modules_into_files(
             pages, 
             frames, 
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
-            fa.lock().deref_mut()
         )?;
 
         // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
@@ -2222,9 +2219,8 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
 /// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
 /// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
 fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: &MmiRef) -> Result<MappedPages, &'static str> {
-    let frame_allocator = get_frame_allocator_ref().ok_or("couldn't get frame allocator")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.lock().deref_mut())
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE)
 }
 
 

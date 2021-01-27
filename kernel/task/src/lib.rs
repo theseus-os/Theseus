@@ -56,7 +56,7 @@ use alloc::{
     sync::Arc,
 };
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{MmiRef, VirtualAddress, get_frame_allocator_ref};
+use memory::{MmiRef, VirtualAddress};
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 // use tss::tss_set_rsp0;
@@ -302,9 +302,7 @@ impl Task {
         };
 
         let kstack = kstack
-            .or_else(|| get_frame_allocator_ref().and_then(|fa_ref| 
-                stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table, fa_ref)
-            ))
+            .or_else(|| stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table))
             .ok_or("couldn't allocate kernel stack!")?;
 
         Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate, failure_cleanup_function))

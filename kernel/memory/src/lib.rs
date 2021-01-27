@@ -25,7 +25,6 @@ extern crate frame_allocator;
 extern crate zerocopy;
 
 
-mod area_frame_allocator;
 #[cfg(not(mapper_spillful))]
 mod paging;
 
@@ -33,7 +32,6 @@ mod paging;
 pub mod paging;
 
 
-pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 
 pub use memory_structs::*;
@@ -52,7 +50,6 @@ use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::KERNEL_OFFSET;
-use core::ops::DerefMut;
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<MmiRef> = Once::new();
@@ -64,32 +61,6 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 /// If not, it returns None.
 pub fn get_kernel_mmi_ref() -> Option<MmiRef> {
     KERNEL_MMI.try().cloned()
-}
-
-
-/// The one and only frame allocator, a singleton. 
-static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
-
-/// A shareable reference to a `FrameAllocator` struct wrapper in a lock.
-#[allow(type_alias_bounds)]
-pub type FrameAllocatorRef<A: FrameAllocator> = MutexIrqSafe<A>;
-
-/// Returns a reference to the system-wide `FrameAllocator`, if initialized.
-/// If not, it returns `None`.
-/// 
-/// Currently, the system-wide allocator is an `AreaFrameAllocator` reference.
-pub fn get_frame_allocator_ref() -> Option<&'static FrameAllocatorRef<AreaFrameAllocator>> {
-    FRAME_ALLOCATOR.try()
-}
-
-/// Convenience method for allocating a new Frame.
-pub fn allocate_frame() -> Option<Frame> {
-    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frame())
-}
-
-/// Convenience method for allocating several contiguous Frames.
-pub fn allocate_frames(num_frames: usize) -> Option<FrameRange> {
-    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
 
 
@@ -121,9 +92,8 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    let mut frame_allocator = get_frame_allocator_ref().ok_or("create_contiguous_mapping(): couldnt get frame allocator")?.lock();
     let starting_phys_addr = allocated_frames.start_address();
-    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags, &mut *frame_allocator)?;
+    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)?;
     Ok((mp, starting_phys_addr))
 }
 
@@ -134,19 +104,13 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 /// Returns the new `MappedPages.` 
 /// 
 /// # Locking / Deadlock
-/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
-/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+/// Currently, this function acquires the lock on the kernel's `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that lock is not held when invoking this function.
 pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
-
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-
-    let mut frame_allocator = FRAME_ALLOCATOR.try()
-        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-        .lock();
-    
-    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags, frame_allocator.deref_mut())
+    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags)
 }
 
 
@@ -175,7 +139,6 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(boot_info: &BootInformation) 
     -> Result<(
-        &MutexIrqSafe<AreaFrameAllocator>,
         PageTable,
         MappedPages,
         MappedPages,
@@ -230,12 +193,6 @@ pub fn init(boot_info: &BootInformation)
     frame_allocator::dump_frame_allocator_state();
 
 
-    // init the frame allocator with the available memory sections and the occupied memory sections
-    let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;
-    let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new(fa) 
-    });
-
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     let (
         page_table,
@@ -245,11 +202,10 @@ pub fn init(boot_info: &BootInformation)
         (stack_guard_page, stack_pages),
         higher_half_mapped_pages,
         identity_mapped_pages
-    ) = paging::init(frame_allocator_mutex, &boot_info)?;
+    ) = paging::init(&boot_info)?;
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
     Ok((
-        frame_allocator_mutex,
         page_table,
         text_mapped_pages,
         rodata_mapped_pages,
@@ -274,7 +230,7 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
 
     page_allocator::convert_to_heap_allocated();
-    FRAME_ALLOCATOR.try().ok_or("BUG: FRAME_ALLOCATOR not initialized")?.lock().alloc_ready();
+    frame_allocator::convert_to_heap_allocated();
 
     let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     higher_half_mapped_pages.push(heap_mapped_pages);
@@ -292,12 +248,3 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
 
     Ok( (kernel_mmi_ref.clone(), identity_mapped_pages) )
 }
-
-pub trait FrameAllocator {
-    fn allocate_frame(&mut self) -> Option<Frame>;
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange>;
-    fn deallocate_frame(&mut self, frame: Frame);
-    /// Call this when a heap is set up, and the `alloc` types can be used.
-    fn alloc_ready(&mut self);
-}
-

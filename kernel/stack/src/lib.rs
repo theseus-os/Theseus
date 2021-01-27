@@ -13,7 +13,7 @@ extern crate page_allocator;
 use core::ops::{Deref, DerefMut};
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::VirtualAddress;
-use memory::{EntryFlags, FrameAllocator, FrameAllocatorRef, MappedPages, Mapper};
+use memory::{EntryFlags, MappedPages, Mapper};
 use page_allocator::AllocatedPages;
 
 
@@ -23,25 +23,23 @@ use page_allocator::AllocatedPages;
 /// in order to catch stack overflows. 
 ///
 /// Returns the newly-allocated stack and a VMA to represent its mapping.
-pub fn alloc_stack<FA>(
+pub fn alloc_stack(
     size_in_pages: usize,
     page_table: &mut Mapper, 
-    frame_allocator_ref: &FrameAllocatorRef<FA>, 
-) -> Option<Stack> where FA: FrameAllocator {
+) -> Option<Stack> {
     // Allocate enough pages for an additional guard page. 
     let pages = page_allocator::allocate_pages(size_in_pages + 1)?;
-    inner_alloc_stack(pages, page_table, frame_allocator_ref)
+    inner_alloc_stack(pages, page_table)
 }
 
 /// The inner implementation of stack allocation. 
 /// 
 /// `pages` is the combined `AllocatedPages` object that holds
 /// the guard page followed by the actual stack pages to be mapped.
-fn inner_alloc_stack<FA>(
+fn inner_alloc_stack(
     pages: AllocatedPages,
     page_table: &mut Mapper, 
-    frame_allocator_ref: &FrameAllocatorRef<FA>,
-) -> Option<Stack> where FA: FrameAllocator {
+) -> Option<Stack> {
     let start_of_stack_pages = *pages.start() + 1; 
     let (guard_page, stack_pages) = pages.split(start_of_stack_pages).ok()?;
 
@@ -53,7 +51,6 @@ fn inner_alloc_stack<FA>(
     let pages = match page_table.map_allocated_pages(
         stack_pages, 
         flags, 
-        frame_allocator_ref.lock().deref_mut()
     ) {
         Ok(pages) => pages,
         Err(e) => {

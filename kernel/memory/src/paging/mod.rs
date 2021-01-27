@@ -200,8 +200,7 @@ pub fn get_current_p4() -> Frame {
 ///
 /// Otherwise, it returns a str error message. 
 pub fn init(
-    allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>,
-    boot_info: &multiboot2::BootInformation
+    boot_info: &multiboot2::BootInformation,
 ) -> Result<(
         PageTable,
         MappedPages,
@@ -233,126 +232,115 @@ pub fn init(
     // consumes and auto unmaps temporary page
     page_table.with(&mut new_table, TemporaryPage::new(), |mapper| {
 
-        // scoped to release the frame allocator lock
-        {
-            let mut allocator = allocator_mutex.lock(); 
-
-            let (aggregated_section_memory_bounds, sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
-            
-            // Map every section found in the kernel image (given by boot information above) into memory. 
-            // To allow the APs to boot up, we identity map those kernel sections too
-            // (lower half virtual addresses mapped to same lower half physical addresses).
-            // We will unmap these lower-half identity mappings later, before we start running applications.
-            let mut index = 0;
-            for sec in sections_memory_bounds.iter().filter_map(|s| s.as_ref()).fuse() {
-                let (start_virt_addr, start_phys_addr) = sec.start;
-                let (_end_virt_addr, end_phys_addr) = sec.end;
-                let size = end_phys_addr.value() - start_phys_addr.value();
-                // let frames = FrameRange::from_phys_addr(start_phys_addr, size);
-                let frames = frame_allocator::allocate_frames_by_bytes_at(start_phys_addr, size)?;
-                let pages = page_allocator::allocate_pages_at(start_virt_addr - KERNEL_OFFSET, frames.size_in_frames())?;
-                identity_mapped_pages[index] = Some(
-                    mapper.map_allocated_pages_to(
-                        pages,
-                        frames,
-                        sec.flags,
-                        allocator.deref_mut()
-                    )?
-                );
-                debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, size);
-                index += 1;
-            }
-
-
-            let (text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
-            let (text_end_virt,      text_end_phys)      = aggregated_section_memory_bounds.text.end;
-            let (rodata_start_virt,  rodata_start_phys)  = aggregated_section_memory_bounds.rodata.start;
-            let (rodata_end_virt,    rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
-            let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
-            let (data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
-            let (stack_start_virt,   stack_start_phys)   = aggregated_section_memory_bounds.stack.start;
-            let (stack_end_virt,     _stack_end_phys)    = aggregated_section_memory_bounds.stack.end;
-
-            let text_flags    = aggregated_section_memory_bounds.text.flags;
-            let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
-            let data_flags    = aggregated_section_memory_bounds.data.flags;
-
-
-            // Map all the main kernel sections: text, rodata, and data.
-            text_mapped_pages = Some(mapper.map_allocated_pages_to(
-                page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?, 
-                // FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
-                frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?,
-                text_flags,
-                allocator.deref_mut()
-            )?);
-            rodata_mapped_pages = Some(mapper.map_allocated_pages_to(
-                page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?, 
-                // FrameRange::from_phys_addr(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value()), 
-                frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?,
-                rodata_flags,
-                allocator.deref_mut()
-            )?);
-            data_mapped_pages = Some(mapper.map_allocated_pages_to(
-                page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?, 
-                // FrameRange::from_phys_addr(data_start_phys, data_end_phys.value() - data_start_phys.value()),
-                frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?,
-                data_flags,
-                allocator.deref_mut()
-            )?);
-
-            // Handle the stack (a separate data section), which has one guard page followed by the real stack pages.
-            let pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
-            let start_of_stack_pages = *pages.start() + 1; 
-            let (stack_guard_page, stack_allocated_pages) = pages.split(start_of_stack_pages)
-                .map_err(|_ap| "BUG: initial stack's allocated pages were not split correctly after guard page")?;
-            let stack_start_frame = Frame::containing_address(stack_start_phys) + 1; // skip 1st frame, which corresponds to the guard page
-            let stack_allocated_frames = frame_allocator::allocate_frames_at(stack_start_frame.start_address(), stack_allocated_pages.size_in_pages())?;
-            let stack_mapped_pages = mapper.map_allocated_pages_to(
-                stack_allocated_pages,
-                stack_allocated_frames,
-                data_flags, allocator.deref_mut()
-            )?;
-            stack_pages = Some((stack_guard_page, stack_mapped_pages));
-
-            // map the VGA display memory as writable
-            let (vga_display_phys_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
-            let vga_display_virt_addr = VirtualAddress::new_canonical(vga_display_phys_addr.value() + KERNEL_OFFSET);
-            higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
-                page_allocator::allocate_pages_by_bytes_at(vga_display_virt_addr, vga_size_in_bytes)?, 
-                // FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
-                frame_allocator::allocate_frames_by_bytes_at(vga_display_phys_addr, vga_size_in_bytes)?, 
-                vga_display_flags,
-                allocator.deref_mut()
-            )?);
-            debug!("mapped kernel section: vga_buffer at addr: {:#X} and {:#X}, size {} bytes", 
-                vga_display_virt_addr, vga_display_virt_addr - KERNEL_OFFSET, vga_size_in_bytes
+        let (aggregated_section_memory_bounds, sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
+        
+        // Map every section found in the kernel image (given by boot information above) into memory. 
+        // To allow the APs to boot up, we identity map those kernel sections too
+        // (lower half virtual addresses mapped to same lower half physical addresses).
+        // We will unmap these lower-half identity mappings later, before we start running applications.
+        let mut index = 0;
+        for sec in sections_memory_bounds.iter().filter_map(|s| s.as_ref()).fuse() {
+            let (start_virt_addr, start_phys_addr) = sec.start;
+            let (_end_virt_addr, end_phys_addr) = sec.end;
+            let size = end_phys_addr.value() - start_phys_addr.value();
+            // let frames = FrameRange::from_phys_addr(start_phys_addr, size);
+            let frames = frame_allocator::allocate_frames_by_bytes_at(start_phys_addr, size)?;
+            let pages = page_allocator::allocate_pages_at(start_virt_addr - KERNEL_OFFSET, frames.size_in_frames())?;
+            identity_mapped_pages[index] = Some(
+                mapper.map_allocated_pages_to(
+                    pages,
+                    frames,
+                    sec.flags,
+                )?
             );
-            // also do an identity mapping for APs that need it while booting
-            identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
-                page_allocator::allocate_pages_by_bytes_at(vga_display_virt_addr - KERNEL_OFFSET, vga_size_in_bytes)?, 
-                // FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
-                frame_allocator::allocate_frames_by_bytes_at(vga_display_phys_addr, vga_size_in_bytes)?, 
-                vga_display_flags, allocator.deref_mut()
-            )?);
+            debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, size);
             index += 1;
-            
+        }
 
-            // map the multiboot boot_info at the same address it is currently at, so we can continue to access boot_info 
-            let boot_info_pages  = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
-            debug!("Boot info covers pages: {:?}", boot_info_pages);
-            // let boot_info_frames = FrameRange::from_phys_addr(boot_info_start_paddr, boot_info_size);
-            let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
-            let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
-            debug!("Mapping boot info pages {:?} to frames {:?}", boot_info_pages, boot_info_frames);
-            higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
-                boot_info_pages, boot_info_frames, EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut()
-            )?);
-            index += 1;
 
-            debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..=index]);
+        let (text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
+        let (text_end_virt,      text_end_phys)      = aggregated_section_memory_bounds.text.end;
+        let (rodata_start_virt,  rodata_start_phys)  = aggregated_section_memory_bounds.rodata.start;
+        let (rodata_end_virt,    rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
+        let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
+        let (data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
+        let (stack_start_virt,   stack_start_phys)   = aggregated_section_memory_bounds.stack.start;
+        let (stack_end_virt,     _stack_end_phys)    = aggregated_section_memory_bounds.stack.end;
 
-        } // unlocks the frame allocator 
+        let text_flags    = aggregated_section_memory_bounds.text.flags;
+        let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
+        let data_flags    = aggregated_section_memory_bounds.data.flags;
+
+
+        // Map all the main kernel sections: text, rodata, and data.
+        text_mapped_pages = Some(mapper.map_allocated_pages_to(
+            page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?, 
+            // FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
+            frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?,
+            text_flags,
+        )?);
+        rodata_mapped_pages = Some(mapper.map_allocated_pages_to(
+            page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?, 
+            // FrameRange::from_phys_addr(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value()), 
+            frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?,
+            rodata_flags,
+        )?);
+        data_mapped_pages = Some(mapper.map_allocated_pages_to(
+            page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?, 
+            // FrameRange::from_phys_addr(data_start_phys, data_end_phys.value() - data_start_phys.value()),
+            frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?,
+            data_flags,
+        )?);
+
+        // Handle the stack (a separate data section), which has one guard page followed by the real stack pages.
+        let pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
+        let start_of_stack_pages = *pages.start() + 1; 
+        let (stack_guard_page, stack_allocated_pages) = pages.split(start_of_stack_pages)
+            .map_err(|_ap| "BUG: initial stack's allocated pages were not split correctly after guard page")?;
+        let stack_start_frame = Frame::containing_address(stack_start_phys) + 1; // skip 1st frame, which corresponds to the guard page
+        let stack_allocated_frames = frame_allocator::allocate_frames_at(stack_start_frame.start_address(), stack_allocated_pages.size_in_pages())?;
+        let stack_mapped_pages = mapper.map_allocated_pages_to(
+            stack_allocated_pages,
+            stack_allocated_frames,
+            data_flags,
+        )?;
+        stack_pages = Some((stack_guard_page, stack_mapped_pages));
+
+        // map the VGA display memory as writable
+        let (vga_display_phys_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
+        let vga_display_virt_addr = VirtualAddress::new_canonical(vga_display_phys_addr.value() + KERNEL_OFFSET);
+        higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
+            page_allocator::allocate_pages_by_bytes_at(vga_display_virt_addr, vga_size_in_bytes)?, 
+            // FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
+            frame_allocator::allocate_frames_by_bytes_at(vga_display_phys_addr, vga_size_in_bytes)?, 
+            vga_display_flags,
+        )?);
+        debug!("mapped kernel section: vga_buffer at addr: {:#X} and {:#X}, size {} bytes", 
+            vga_display_virt_addr, vga_display_virt_addr - KERNEL_OFFSET, vga_size_in_bytes
+        );
+        // also do an identity mapping for APs that need it while booting
+        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
+            page_allocator::allocate_pages_by_bytes_at(vga_display_virt_addr - KERNEL_OFFSET, vga_size_in_bytes)?, 
+            // FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
+            frame_allocator::allocate_frames_by_bytes_at(vga_display_phys_addr, vga_size_in_bytes)?, 
+            vga_display_flags,
+        )?);
+        index += 1;
+        
+
+        // map the multiboot boot_info at the same address it is currently at, so we can continue to access boot_info 
+        let boot_info_pages  = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
+        debug!("Boot info covers pages: {:?}", boot_info_pages);
+        // let boot_info_frames = FrameRange::from_phys_addr(boot_info_start_paddr, boot_info_size);
+        let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
+        let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
+        debug!("Mapping boot info pages {:?} to frames {:?}", boot_info_pages, boot_info_frames);
+        higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
+            boot_info_pages, boot_info_frames, EntryFlags::PRESENT | EntryFlags::GLOBAL,
+        )?);
+        index += 1;
+
+        debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..=index]);
 
         Ok(()) // mapping closure completed successfully
 

@@ -7,9 +7,8 @@ extern crate memory;
 extern crate owning_ref;
 extern crate zerocopy;
 
-use core::ops::DerefMut;
 use core::mem;
-use memory::{PageTable, MappedPages, get_frame_allocator_ref, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, EntryFlags};
+use memory::{PageTable, MappedPages, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, EntryFlags};
 use owning_ref::BoxRef;
 use alloc::boxed::Box;
 use zerocopy::FromBytes;
@@ -49,12 +48,7 @@ impl Rsdp {
         let pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
         let frames_to_search = allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(RSDP_SEARCH_START), size)
             .map_err(|_e| "Couldn't allocate physical frames when searching for RSDP")?;
-        
-        let mapped_pages = {
-            let allocator = get_frame_allocator_ref().ok_or("frame allocator wasn't initialized")?;
-            page_table.map_allocated_pages_to(pages, frames_to_search, EntryFlags::PRESENT, allocator.lock().deref_mut())?
-        };
-        
+        let mapped_pages = page_table.map_allocated_pages_to(pages, frames_to_search, EntryFlags::PRESENT)?;
         Rsdp::search(mapped_pages)
     }
 

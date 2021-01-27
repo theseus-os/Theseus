@@ -9,7 +9,7 @@
 
 use paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
-use super::{AllocatedPages, AllocatedFrames, FrameAllocator, VirtualAddress};
+use super::{AllocatedPages, AllocatedFrames, VirtualAddress};
 use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
 
 
@@ -23,7 +23,6 @@ use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
 
 pub struct TemporaryPage {
     mapped_page: Option<MappedPages>,
-    allocator: TinyAllocator,
 }
 
 impl TemporaryPage {
@@ -32,7 +31,6 @@ impl TemporaryPage {
     pub fn new() -> TemporaryPage {
         TemporaryPage {
             mapped_page: None,
-            allocator: TinyAllocator::new(),
         }
     }
 
@@ -55,7 +53,6 @@ impl TemporaryPage {
                 page.ok_or("Couldn't allocate a new Page for the temporary P4 table frame")?,
                 frame,
                 super::EntryFlags::WRITABLE,
-                &mut self.allocator
             )?);
         }
         self.mapped_page.as_mut().unwrap().as_type_mut(0)
@@ -81,43 +78,4 @@ impl Drop for TemporaryPage {
             warn!("BUG: TemporaryPage was dropped, should use `unmap_into_parts()` instead. Contained {:?}", _mp);
         }
     }    
-}
-
-
-use super::{FrameRange, Frame};
-
-/// A simple wrapper around our real frame_allocator crate
-/// that accommodates the `FrameAllocator` trait which allocates `Frame` objects.
-/// FIXME: remove this once we use the real `frame_allocator` crate properly.
-struct TinyAllocator;
-
-impl TinyAllocator {
-    fn new() -> TinyAllocator {
-        TinyAllocator { }
-    }
-}
-
-impl FrameAllocator for TinyAllocator {
-    fn allocate_frame(&mut self) -> Option<Frame> {
-        frame_allocator::allocate_frames(1).map(|af| {
-            let frame = *af.start();
-            // TODO: FIXME: properly handle allocated frames here once map_allocated_pages_to() actually works correctly.
-            core::mem::forget(af); 
-            frame
-        })                    
-    }
-
-    
-    fn allocate_frames(&mut self, _num_frames: usize) -> Option<FrameRange> {
-        unimplemented!();
-    }
-
-
-    fn deallocate_frame(&mut self, _frame: Frame) {
-        todo!("Implement deallocate frames for TinyAllocator!");
-    }
-
-    fn alloc_ready(&mut self) {
-        // this is a no-op
-    }
 }

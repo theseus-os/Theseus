@@ -452,7 +452,7 @@ fn find_any_chunk<'list>(
     }
 
     // If we can't find any suitable chunks in the non-designated regions, then look in both designated regions.
-    warn!("FrameAllocator: unlikely scenario: non-designated chunks are all allocated, \
+    warn!("frame_allocator: unlikely scenario: non-designated chunks are all allocated, \
           falling back to allocating {} frames from designated regions!", num_frames);
     match list.0 {
         Inner::Array(ref mut arr) => {
@@ -593,7 +593,7 @@ pub fn allocate_frames_deferred(
     num_frames: usize,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), &'static str> {
     if num_frames == 0 {
-        warn!("FrameAllocator: requested an allocation of 0 frames... stupid!");
+        warn!("frame_allocator: requested an allocation of 0 frames... stupid!");
         return Err("cannot allocate zero frames");
     }
 

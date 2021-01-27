@@ -13,9 +13,8 @@ extern crate memory;
 extern crate sdt;
 extern crate zerocopy;
 
-use core::ops::DerefMut;
 use alloc::collections::BTreeMap;
-use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, get_frame_allocator_ref, PhysicalMemoryArea};
+use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange};
 use sdt::Sdt;
 use core::ops::Add;
 use zerocopy::FromBytes;
@@ -60,8 +59,6 @@ impl AcpiTables {
     /// Returns a tuple describing the SDT discovered at the given `sdt_phys_addr`: 
     /// the `AcpiSignature` and the total length of the table.
     pub fn map_new_table(&mut self, sdt_phys_addr: PhysicalAddress, page_table: &mut PageTable) -> Result<(AcpiSignature, usize), &'static str> {
-        let allocator = get_frame_allocator_ref().ok_or("couldn't get Frame Allocator")?;
-        let mut mapping_changed = false;
 
         // First, we map the SDT header so we can obtain its `length` field, 
         // which determines whether we need to map additional pages. 
@@ -84,11 +81,9 @@ impl AcpiTables {
                 new_pages, 
                 af,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
-                allocator.lock().deref_mut(),
             )?;
 
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
-            mapping_changed = true;
         }
 
         let sdt_offset = self.frames.offset_from_start(sdt_phys_addr)
@@ -111,11 +106,9 @@ impl AcpiTables {
                 new_pages, 
                 af,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
-                allocator.lock().deref_mut(),
             )?;
 
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
-            mapping_changed = true;
         }
 
         // Here, if the current mapped_pages is insufficient to cover the table's full length,
@@ -141,18 +134,10 @@ impl AcpiTables {
                 new_pages, 
                 af,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
-                allocator.lock().deref_mut(),
             )?;
             // No real need to adjust mapping offsets here, since we've only appended frames (not prepended);
             // we call this just to set the new frames and new mapped pages
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
-            mapping_changed = true;
-        }
-
-        // Inform the frame allocator that the physical frame(s) where the RSDT/XSDT exists are now in use.
-        if mapping_changed {
-            let sdt_area = PhysicalMemoryArea::new(sdt_phys_addr, sdt_length, 1);
-            allocator.lock().add_area(sdt_area, false)?;
         }
 
         // Here, the entire table is mapped into memory, and ready to be used elsewhere.

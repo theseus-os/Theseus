@@ -20,7 +20,6 @@ extern crate pit_clock;
 extern crate atomic;
 extern crate bit_field;
 
-use core::ops::DerefMut;
 use core::sync::atomic::Ordering;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
@@ -30,7 +29,7 @@ use spin::Once;
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{get_frame_allocator_ref, PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at};
+use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use atomic::Atomic;
@@ -162,12 +161,10 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
     let frame = allocate_frames_at(phys_addr, 1).map_err(|_e| "couldn't allocate physical frame for APIC")?;
-    let fa = get_frame_allocator_ref().ok_or("apic::init(): couldn't get frame allocator")?;
     let apic_mapped_page = page_table.map_allocated_pages_to(
         new_page, 
         frame, 
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
-        fa.lock().deref_mut()
     )?;
 
     Ok(apic_mapped_page)

@@ -13,13 +13,12 @@ extern crate acpi_table;
 extern crate spin;
 extern crate owning_ref;
 
-use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
 use owning_ref::BoxRefMut;
 use alloc::boxed::Box;
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use memory::{MappedPages, allocate_pages, allocate_frames_by_bytes_at, get_frame_allocator_ref, PageTable, PhysicalAddress, EntryFlags};
+use memory::{MappedPages, allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags};
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
 
@@ -178,12 +177,10 @@ impl HpetAcpiTable {
             .map_err(|_e| "Couldn't allocate frames for HPET")?;
         let pages = allocate_pages(frames.size_in_frames())
             .ok_or("Couldn't allocate pages for HPET")?;
-        let fa = get_frame_allocator_ref().ok_or("Couldn't get Frame allocator")?;
         let hpet_mp = page_table.map_allocated_pages_to(
             pages,
             frames, 
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
-            fa.lock().deref_mut()
         )?;
 
         let mut hpet = BoxRefMut::new(Box::new(hpet_mp)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(phys_addr.frame_offset()))?;

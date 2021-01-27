@@ -11,10 +11,10 @@ use core::mem;
 use core::ops::Deref;
 use core::ptr::Unique;
 use core::slice;
-use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, FrameAllocator, AllocatedPages, AllocatedFrames}; 
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
-use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
+use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 
@@ -126,9 +126,8 @@ impl Mapper {
     /// Maps the given `AllocatedPages` to the given physical frames.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to<A>(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags, allocator: &mut A)
+    pub fn map_allocated_pages_to(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags)
         -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
     {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
         let mut top_level_flags = flags.clone();
@@ -146,9 +145,9 @@ impl Mapper {
 
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.deref().clone().into_iter().zip(frames.deref().clone().into_iter()) {
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -175,9 +174,8 @@ impl Mapper {
     /// Maps the given `AllocatedPages` to randomly chosen (allocated) physical frames.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages<A>(&mut self, pages: AllocatedPages, flags: EntryFlags, allocator: &mut A)
+    pub fn map_allocated_pages(&mut self, pages: AllocatedPages, flags: EntryFlags)
         -> Result<MappedPages, &'static str>
-        where A: FrameAllocator
     {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
         let mut top_level_flags = flags.clone();
@@ -185,12 +183,13 @@ impl Mapper {
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
         for page in pages.deref().clone() {
-            let frame = allocator.allocate_frame()
-                .ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory!")?;
+            let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
+            let frame = *af.start();
+            core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
 
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
@@ -297,47 +296,47 @@ impl MappedPages {
     }
 
 
-    /// Creates a deep copy of this `MappedPages` memory region,
-    /// by duplicating not only the virtual memory mapping
-    /// but also the underlying physical memory frames. 
-    /// 
-    /// The caller can optionally specify new flags for the duplicated mapping,
-    /// otherwise, the same flags as the existing `MappedPages` will be used. 
-    /// This is useful for when you want to modify contents in the new pages,
-    /// since it avoids extra `remap()` operations.
-    /// 
-    /// Returns a new `MappedPages` object with the same in-memory contents
-    /// as this object, but at a completely new memory region.
-    pub fn deep_copy<A: FrameAllocator>(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper, allocator: &mut A) -> Result<MappedPages, &'static str> {
-        let size_in_pages = self.size_in_pages();
+    // Removing this function for now since it's unused and untested.
+    // /// Creates a deep copy of this `MappedPages` memory region,
+    // /// by duplicating not only the virtual memory mapping
+    // /// but also the underlying physical memory frames. 
+    // /// 
+    // /// The caller can optionally specify new flags for the duplicated mapping,
+    // /// otherwise, the same flags as the existing `MappedPages` will be used. 
+    // /// This is useful for when you want to modify contents in the new pages,
+    // /// since it avoids extra `remap()` operations.
+    // /// 
+    // /// Returns a new `MappedPages` object with the same in-memory contents
+    // /// as this object, but at a completely new memory region.
+    // pub fn deep_copy(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper) -> Result<MappedPages, &'static str> {
+    //     let size_in_pages = self.size_in_pages();
 
-        use paging::allocate_pages;
-        let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
+    //     use paging::allocate_pages;
+    //     let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
 
-        // we must temporarily map the new pages as Writable, since we're about to copy data into them
-        let new_flags = new_flags.unwrap_or(self.flags);
-        let needs_remapping = new_flags.is_writable(); 
-        let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
-            new_pages, 
-            new_flags | EntryFlags::WRITABLE, // force writable
-            allocator
-        )?;
+    //     // we must temporarily map the new pages as Writable, since we're about to copy data into them
+    //     let new_flags = new_flags.unwrap_or(self.flags);
+    //     let needs_remapping = new_flags.is_writable(); 
+    //     let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
+    //         new_pages, 
+    //         new_flags | EntryFlags::WRITABLE, // force writable
+    //     )?;
 
-        // perform the actual copy of in-memory content
-        // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
-        {
-            type PageContent = [u8; PAGE_SIZE];
-            let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
-            let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;
-            dest.copy_from_slice(source);
-        }
+    //     // perform the actual copy of in-memory content
+    //     // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
+    //     {
+    //         type PageContent = [u8; PAGE_SIZE];
+    //         let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
+    //         let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;
+    //         dest.copy_from_slice(source);
+    //     }
 
-        if needs_remapping {
-            new_mapped_pages.remap(active_table_mapper, new_flags)?;
-        }
+    //     if needs_remapping {
+    //         new_mapped_pages.remap(active_table_mapper, new_flags)?;
+    //     }
         
-        Ok(new_mapped_pages)
-    }
+    //     Ok(new_mapped_pages)
+    // }
 
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
@@ -399,9 +398,7 @@ impl MappedPages {
     /// If there are multiple discontiguous ranges of frames that were unmapped, 
     /// or the frames were not mapped bijectively (i.e., multiple pages mapped to these frames),
     /// then only the first range will be returned
-    fn unmap(&mut self, active_table_mapper: &mut Mapper, /*_allocator_ref: &MutexIrqSafe<A>*/) -> Result<AllocatedFrames, &'static str> 
-        // where A: FrameAllocator
-    {
+    fn unmap(&mut self, active_table_mapper: &mut Mapper) -> Result<AllocatedFrames, &'static str> {
         if self.size_in_pages() == 0 { return Ok(AllocatedFrames::empty()); }
 
         if active_table_mapper.target_p4 != self.page_table_p4 {
@@ -724,12 +721,11 @@ impl MappedPages {
 /// (which is normally hidden/non-public because it's typically called from the Drop handler)
 /// for usage from testing/benchmark code for the memory mapping evaluation.
 #[cfg(mapper_spillful)]
-pub fn mapped_pages_unmap<A: FrameAllocator>(
+pub fn mapped_pages_unmap(
     mapped_pages: &mut MappedPages,
     mapper: &mut Mapper,
-    allocator_ref: &super::FrameAllocatorRef<A>, 
 ) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper, /*allocator_ref*/)
+    mapped_pages.unmap(mapper)
 }
 
 
@@ -737,17 +733,9 @@ impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
         trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
-
-        // let _frame_allocator_ref = match get_frame_allocator_ref() {
-        //     Some(fa) => fa,
-        //     _ => {
-        //         error!("MappedPages::drop(): couldn't get frame allocator!");
-        //         return;
-        //     }
-        // };
         
         let mut mapper = Mapper::from_current();
-        if let Err(e) = self.unmap(&mut mapper, /*&_frame_allocator_ref*/) {
+        if let Err(e) = self.unmap(&mut mapper) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 

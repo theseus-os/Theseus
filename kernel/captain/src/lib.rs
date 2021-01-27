@@ -92,12 +92,11 @@ pub fn init(
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
-        let frame_allocator_ref = memory::get_frame_allocator_ref().ok_or("frame allocator not initialized")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
-            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table, frame_allocator_ref)
+            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table)
                 .ok_or("could not allocate double fault stack")?,
-            stack::alloc_stack(1, &mut kernel_mmi.page_table, frame_allocator_ref)
+            stack::alloc_stack(1, &mut kernel_mmi.page_table)
                 .ok_or("could not allocate privilege stack")?,
         )
     };

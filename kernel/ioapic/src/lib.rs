@@ -12,12 +12,11 @@ extern crate atomic_linked_list;
 extern crate owning_ref;
 
 
-use core::ops::DerefMut;
 use alloc::boxed::Box;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
 use zerocopy::FromBytes;
-use memory::{get_frame_allocator_ref, PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, MappedPages};
+use memory::{PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, MappedPages};
 use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
 
@@ -83,12 +82,10 @@ impl IoApic {
     pub fn new(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
         let new_page = allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!")?;
         let frame = allocate_frames_at(phys_addr, 1).map_err(|_e| "Couldn't allocate physical frame for IOAPIC")?;
-        let fa = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
         let ioapic_mapped_page = page_table.map_allocated_pages_to(
             new_page,
             frame, 
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
-            fa.lock().deref_mut(),
         )?;
 
         let ioapic_regs = BoxRefMut::new(Box::new(ioapic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IoApicRegisters>(0))?;
