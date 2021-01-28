@@ -56,7 +56,7 @@ cfg_if! { if #[cfg(simd_personality)] {
 
 
 /* 
- * NOTE: now, we're using the compiler_builtins crate that is built by xargo by default, but we can switch back
+ * NOTE: now, we're using the compiler_builtins crate that is built by cargo's build-std feature by default, but we can switch back
  * to this one if needed since it does export different symbols based on Cargo.toml feature choices.
 // This crate is required for the SIMD environment,
 // so we can resolve symbols that the core lib requires. 

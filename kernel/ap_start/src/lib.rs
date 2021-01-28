@@ -69,7 +69,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
         (
             stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table, frame_allocator_ref)
                 .expect("kstart_ap(): could not allocate double fault stack"),
-            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table, frame_allocator_ref)
+            stack::alloc_stack(1, &mut kernel_mmi.page_table, frame_allocator_ref)
                 .expect("kstart_ap(): could not allocate privilege stack"),
         )
     };

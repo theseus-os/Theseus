@@ -31,9 +31,6 @@ If you're on Mac OS, do the following:
 Install the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html), which is basically just this command:
 `curl https://sh.rustup.rs -sSf | sh`
 
-We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:
-`cargo install --vers 0.3.13 xargo`
-
 
 
 ### Building and Running

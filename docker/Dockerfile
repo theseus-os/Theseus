@@ -63,6 +63,3 @@ ENV PATH="$HOME/.cargo/bin:${PATH}"
 
 # Install the specific version of the Rust toolchain currently required by Theseus.
 RUN rustup toolchain install ${RUSTC_VERSION} && rustup component add rust-src
-
-# Install xargo (for cross compilation)
-RUN cargo install --vers 0.3.22 xargo

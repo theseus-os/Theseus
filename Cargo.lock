@@ -548,6 +548,7 @@ dependencies = [
  "e1000",
  "ethernet_smoltcp_device",
  "event_types",
+ "ixgbe",
  "keyboard",
  "log",
  "memory",
@@ -1045,6 +1046,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "ixgbe"
+version = "0.1.0"
+dependencies = [
+ "acpi",
+ "apic",
+ "bit_field 0.7.0",
+ "hashbrown",
+ "hpet",
+ "intel_ethernet",
+ "interrupts",
+ "irq_safety",
+ "kernel_config",
+ "lazy_static",
+ "log",
+ "memory",
+ "mpmc",
+ "network_interface_card",
+ "nic_buffers",
+ "nic_initialization",
+ "nic_queues",
+ "owning_ref",
+ "pci",
+ "physical_nic",
+ "pic",
+ "pit_clock",
+ "rand",
+ "runqueue",
+ "spin",
+ "static_assertions",
+ "virtual_nic",
+ "volatile",
+ "x86_64",
+ "zerocopy",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1490,7 +1527,6 @@ dependencies = [
  "mod_mgmt",
  "multiboot2",
  "panic_entry",
- "rlibc",
  "spin",
  "stack",
  "state_store",
@@ -1545,6 +1581,7 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
+ "nic_queues",
  "owning_ref",
  "pci",
  "volatile",
@@ -1557,6 +1594,7 @@ dependencies = [
  "intel_ethernet",
  "log",
  "memory",
+ "mpmc",
  "nic_buffers",
  "owning_ref",
 ]
@@ -1571,9 +1609,11 @@ checksum = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
 name = "ns"
 version = "0.1.0"
 dependencies = [
+ "fs_node",
  "getopts",
  "memory",
  "mod_mgmt",
+ "path",
  "task",
  "terminal_print",
 ]
@@ -1628,10 +1668,12 @@ dependencies = [
 name = "page_allocator"
 version = "0.1.0"
 dependencies = [
+ "intrusive-collections",
  "kernel_config",
  "log",
  "memory_structs",
  "spin",
+ "static_assertions",
 ]
 
 [[package]]
@@ -1692,6 +1734,15 @@ dependencies = [
 [[package]]
 name = "percent-encoding"
 version = "1.0.2"
+
+[[package]]
+name = "physical_nic"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet",
+ "nic_buffers",
+ "nic_queues",
+]
 
 [[package]]
 name = "pic"
@@ -1969,12 +2020,6 @@ dependencies = [
  "task",
  "wait_queue",
 ]
-
-[[package]]
-name = "rlibc"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc874b127765f014d792f16763a81245ab80500e2ad921ed4ee9e82481ee08fe"
 
 [[package]]
 name = "rm"
@@ -2780,6 +2825,18 @@ dependencies = [
  "serial_port",
  "spin",
  "volatile",
+]
+
+[[package]]
+name = "virtual_nic"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet",
+ "irq_safety",
+ "network_interface_card",
+ "nic_buffers",
+ "nic_queues",
+ "physical_nic",
 ]
 
 [[package]]

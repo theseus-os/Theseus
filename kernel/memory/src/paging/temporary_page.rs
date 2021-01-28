@@ -11,7 +11,7 @@ use {FrameRange};
 use paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
 use super::{Frame, FrameAllocator, VirtualAddress};
-use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
+use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
 
 
 /// A Page that can be temporarily mapped to the recursive page table frame,
@@ -48,12 +48,14 @@ impl TemporaryPage {
     /// 
     pub fn map_table_frame(&mut self, frame: Frame, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str> {
         if self.mapped_page.is_none() {
-            let page = page_allocator::allocate_pages_at(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR), 1)
-                .or_else(|_err| page_allocator::allocate_pages(1)
-                    .ok_or("Couldn't allocate a new Page for the temporary P4 table frame")
-                )?;
+            let mut vaddr = VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR);
+            let mut page = None;
+            while page.is_none() && vaddr.value() != 0 {
+                page = page_allocator::allocate_pages_at(vaddr, 1).ok();
+                vaddr -= PAGE_SIZE;
+            }
             self.mapped_page = Some(page_table.map_allocated_pages_to(
-                page,
+                page.ok_or("Couldn't allocate a new Page for the temporary P4 table frame")?,
                 FrameRange::new(frame, frame),
                 super::EntryFlags::WRITABLE,
                 &mut self.allocator

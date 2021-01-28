@@ -343,7 +343,7 @@ pub fn swap_crates(
                 // This closure finds the section in the `new_crate` that corresponds to the given `old_sec` from the `old_crate`.
                 // And, if enabled, it will reexport that new section under the same name as the `old_sec`.
                 // We put this procedure in a closure because it's relatively expensive, allowing us to run it only when necessary.
-                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<String>| {
+                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<String>| -> Result<StrongSectionRef, &'static str> {
                     // Use the new namespace to find the new source_sec that old target_sec should point to.
                     // The new source_sec must have the same name as the old one (old_sec here),
                     // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.

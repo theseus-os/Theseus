@@ -55,32 +55,6 @@ endif
 
 
 ###################################################################################################
-### For ensuring that the host computer has the proper version of xargo
-###################################################################################################
-
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.22
-XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1 | grep -o 'xargo [0-9]*\.[0-9]*\.[0-9]*')
-
-check_xargo: 	
-ifneq (${BYPASS_XARGO_CHECK}, yes)
-ifneq (xargo ${XARGO_CURRENT_SUPPORTED_VERSION}, ${XARGO_OUTPUT})
-	@echo -e "\nError: your xargo version does not match our supported xargo version."
-	@echo -e "To install the proper version of xargo, run the following commands:\n"
-	@echo -e "   cargo uninstall xargo"
-	@echo -e '   rm -rf $$HOME/.xargo'   ## use single quotes to escape dollar sign
-	@echo -e "   rustup toolchain install stable"
-	@echo -e "   cargo +stable install --vers $(XARGO_CURRENT_SUPPORTED_VERSION) xargo"
-	@echo -e "   make clean\n"
-	@echo -e "Then you can retry building!\n"
-	@exit 1
-else
-	@echo -e '\nFound proper xargo version, proceeding with build...\n'
-endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
-endif ## BYPASS_XARGO_CHECK
-
-
-
-###################################################################################################
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
 
@@ -90,9 +64,15 @@ iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
+DEPS_DIR := $(BUILD_DIR)/deps
+HOST_DEPS_DIR := $(DEPS_DIR)/host_deps
+DEPS_SYSROOT_DIR := $(DEPS_DIR)/sysroot
+THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
+THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
+THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
 
 
-## This is the output path of the xargo command, defined by cargo (not our choice).
+## This is the default output path defined by cargo.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
 NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
@@ -129,8 +109,9 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
-		check_rustc check_xargo \
+		check_rustc \
 		clean run run_pause iso build cargo \
+		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs
@@ -144,13 +125,28 @@ $(eval CFLAGS += -DENABLE_AVX)
 endif
 
 
+
+### Demo/test target for building libtheseus
+libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
+	@( \
+		cd $(ROOT_DIR)/libtheseus && \
+		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
+	)
+
+
+### This target builds the `theseus_cargo` tool as a dedicated binary.
+$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
+	@echo -e "\n=================== Building the theseus_cargo tool ==================="
+	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+
+
 ### This target builds an .iso OS image from all of the compiled crates.
 $(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
-	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
@@ -166,15 +162,29 @@ iso: $(iso)
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	@cargo run --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
-		-o $(OBJECT_FILES_BUILD_DIR) \
+		--output-objects $(OBJECT_FILES_BUILD_DIR) \
+		--output-deps $(DEPS_DIR) \
+		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
 		-k ./kernel \
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
 		--app-prefix $(APP_PREFIX) \
-		-e "$(EXTRA_APP_CRATE_NAMES)" \
-		-c "`echo "$(HOME)"/.xargo/lib/rustlib/x86_64-theseus/lib/*.o`"
+		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
+
+## Create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
+## This includes the target file, host OS dependencies (proc macros, etc)., 
+## and most importantly, a TOML file to describe these and other config variables.
+	@rm -rf $(THESEUS_BUILD_TOML)
+	@cp -vf $(CFG_DIR)/$(TARGET).json  $(DEPS_DIR)/
+	@mkdir -p $(HOST_DEPS_DIR)
+	@cp -f ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
+	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'sysroot = "./sysroot"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'rustflags = "$(RUSTFLAGS)"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'cargoflags = "$(CARGOFLAGS)"' >> $(THESEUS_BUILD_TOML)
+	@echo -e 'host_deps = "./host_deps"' >> $(THESEUS_BUILD_TOML)
 
 ## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
 	@mkdir -p $(DEBUG_SYMBOLS_DIR)
@@ -200,25 +210,30 @@ else
 $(error Error: unsupported option "debug=$(debug)")
 endif
 
+#############################
+### end of "build" target ###
+#############################
+
+
 
 ## This target invokes the actual Rust build process
-cargo: check_rustc check_xargo
+cargo: check_rustc 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build  $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
 
-## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
-## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
-## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
+## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
+## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
+## For the "cargo rustc" command below, all of the arguments to cargo come before the "--",
 ## whereas all of the arguments to rustc come after the "--".
 # 	for kd in $(KERNEL_CRATE_NAMES) ; do  \
 # 		cd $${kd} ; \
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
 # 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
-# 			xargo rustc \
+# 			cargo rustc \
 # 			$(CARGOFLAGS) \
 # 			$(RUST_FEATURES) \
 # 			--target $(TARGET) ; \
@@ -227,7 +242,7 @@ cargo: check_rustc check_xargo
 # for app in $(APP_CRATE_NAMES) ; do  \
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
-# 		xargo rustc \
+# 		cargo rustc \
 # 		$(CARGOFLAGS) \
 # 		--target $(TARGET) \
 # 		-- \
@@ -242,9 +257,11 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@mkdir -p $(DEPS_DIR)
+
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove irrelevant LOCAL or WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
-	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
@@ -301,7 +318,7 @@ simd_personality_sse: build_sse build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	@cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
@@ -322,7 +339,7 @@ simd_personality_avx: build_avx build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
