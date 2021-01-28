@@ -187,6 +187,16 @@ pub fn init(boot_info: &BootInformation)
                 if area.typ() == multiboot2::MemoryAreaType::Available { 1 } else { 2 },
             )
         });
+    // Add the VGA memory region to the list of available physical memory areas.
+    let vga_area = memory_x86_64::get_vga_mem_addr()?;
+    let all_areas_iter = all_areas_iter.chain(
+        Some(PhysicalMemoryArea {
+            base_addr: vga_area.0,
+            size_in_bytes: vga_area.1,
+            typ: 2,
+        }).into_iter()
+    );
+
     frame_allocator::init(all_areas_iter)?;
     warn!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();

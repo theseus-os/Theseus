@@ -164,14 +164,16 @@ impl PageTable {
 
 
     /// Switches from the currently-active page table (this `PageTable`, i.e., `self`) to the given `new_table`.
-    /// Returns the newly-switched-to PageTable.
-    pub fn switch(&mut self, new_table: &PageTable) -> PageTable {
+    /// After this function, the given `new_table` will be the currently-active `PageTable`.
+    pub fn switch(&mut self, new_table: &PageTable) {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        unsafe { x86_64::registers::control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64)) };
-        let current_table_after_switch = PageTable::from_current();
-        current_table_after_switch
+        unsafe { 
+            x86_64::registers::control_regs::cr3_write(
+                x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64)
+            )
+        };
     }
 
 
@@ -214,6 +216,7 @@ pub fn init(
 {
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current();
+    warn!("Bootstrapped initial {:?}", page_table);
 
     let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).map_err(|_| "boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
@@ -228,38 +231,28 @@ pub fn init(
     let mut text_mapped_pages: Option<MappedPages> = None;
     let mut rodata_mapped_pages: Option<MappedPages> = None;
     let mut data_mapped_pages: Option<MappedPages> = None;
-    let mut stack_pages: Option<(AllocatedPages, MappedPages)> = None;
+    let mut stack_page_group: Option<(AllocatedPages, MappedPages)> = None;
     let mut higher_half_mapped_pages: [Option<MappedPages>; 32] = Default::default();
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
 
     // consumes and auto unmaps temporary page
     page_table.with(&mut new_table, TemporaryPage::new(), |mapper| {
 
-        let (aggregated_section_memory_bounds, sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
+        let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
         
-        // Map every section found in the kernel image (given by boot information above) into memory. 
-        // To allow the APs to boot up, we identity map those kernel sections too
-        // (lower half virtual addresses mapped to same lower half physical addresses).
-        // We will unmap these lower-half identity mappings later, before we start running applications.
-        let mut index = 0;
-        for sec in sections_memory_bounds.iter().filter_map(|s| s.as_ref()).fuse() {
-            let (start_virt_addr, start_phys_addr) = sec.start;
-            let (_end_virt_addr, end_phys_addr) = sec.end;
-            let size = end_phys_addr.value() - start_phys_addr.value();
-            // let frames = FrameRange::from_phys_addr(start_phys_addr, size);
-            let frames = frame_allocator::allocate_frames_by_bytes_at(start_phys_addr, size)?;
-            let pages = page_allocator::allocate_pages_at(start_virt_addr - KERNEL_OFFSET, frames.size_in_frames())?;
-            identity_mapped_pages[index] = Some(
-                mapper.map_allocated_pages_to(
-                    pages,
-                    frames,
-                    sec.flags,
-                )?
-            );
-            debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, size);
-            index += 1;
-        }
+        // Map every section found in the kernel image (given by the boot information above) into our new page table. 
+        // To allow the APs to boot up, we must identity map those kernel sections too, i.e., 
+        // map the same physical frames to both lower-half and higher-half virtual addresses. 
+        // This is the only time in Theseus that we permit non-bijective (non 1-to-1) virtual-to-physical memory mappings,
+        // since it is unavoidable if we want to place the kernel in the higher half. 
+        // Debatably, this is no longer needed because we're don't have a userspace, and there's no real reason to 
+        // place the kernel in the higher half. 
+        //
+        // These identity mappings are short-lived; they are unmapped later after all other CPUs are brought up
+        // but before we start running applications.
 
+        debug!("{:X?}", aggregated_section_memory_bounds);
+        let mut index = 0;
 
         let (text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
         let (text_end_virt,      text_end_phys)      = aggregated_section_memory_bounds.text.end;
@@ -274,31 +267,36 @@ pub fn init(
         let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
         let data_flags    = aggregated_section_memory_bounds.data.flags;
 
+        let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
+        let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
+        let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
+        let text_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(text_frames.deref().clone()) };
+        text_mapped_pages = Some(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?);
+        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(text_pages_identity, text_frames_identity, text_flags)?);
+        index += 1;
 
-        // Map all the main kernel sections: text, rodata, and data.
-        text_mapped_pages = Some(mapper.map_allocated_pages_to(
-            page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?, 
-            // FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
-            frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?,
-            text_flags,
-        )?);
-        rodata_mapped_pages = Some(mapper.map_allocated_pages_to(
-            page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?, 
-            // FrameRange::from_phys_addr(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value()), 
-            frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?,
-            rodata_flags,
-        )?);
-        data_mapped_pages = Some(mapper.map_allocated_pages_to(
-            page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?, 
-            // FrameRange::from_phys_addr(data_start_phys, data_end_phys.value() - data_start_phys.value()),
-            frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?,
-            data_flags,
-        )?);
+        let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
+        let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
+        let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
+        let rodata_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(rodata_frames.deref().clone()) };
+        rodata_mapped_pages = Some(mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?);
+        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(rodata_pages_identity, rodata_frames_identity, rodata_flags)?);
+        index += 1;
 
-        // Handle the stack (a separate data section), which has one guard page followed by the real stack pages.
-        let pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
-        let start_of_stack_pages = *pages.start() + 1; 
-        let (stack_guard_page, stack_allocated_pages) = pages.split(start_of_stack_pages)
+        let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
+        let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
+        let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
+        let data_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(data_frames.deref().clone()) };
+        data_mapped_pages = Some(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?);
+        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(data_pages_identity, data_frames_identity, data_flags)?);
+        index += 1;
+
+
+        // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
+        // It does not need to be identity mapped because each AP core will have its own stack.
+        let stack_pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
+        let start_of_stack_pages = *stack_pages.start() + 1; 
+        let (stack_guard_page, stack_allocated_pages) = stack_pages.split(start_of_stack_pages)
             .map_err(|_ap| "BUG: initial stack's allocated pages were not split correctly after guard page")?;
         let stack_start_frame = Frame::containing_address(stack_start_phys) + 1; // skip 1st frame, which corresponds to the guard page
         let stack_allocated_frames = frame_allocator::allocate_frames_at(stack_start_frame.start_address(), stack_allocated_pages.size_in_pages())?;
@@ -307,66 +305,58 @@ pub fn init(
             stack_allocated_frames,
             data_flags,
         )?;
-        stack_pages = Some((stack_guard_page, stack_mapped_pages));
+        stack_page_group = Some((stack_guard_page, stack_mapped_pages));
 
-        // map the VGA display memory as writable
-        let (vga_display_phys_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
-        let vga_display_virt_addr = VirtualAddress::new_canonical(vga_display_phys_addr.value() + KERNEL_OFFSET);
-        higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
-            page_allocator::allocate_pages_by_bytes_at(vga_display_virt_addr, vga_size_in_bytes)?, 
-            // FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
-            frame_allocator::allocate_frames_by_bytes_at(vga_display_phys_addr, vga_size_in_bytes)?, 
-            vga_display_flags,
-        )?);
-        debug!("mapped kernel section: vga_buffer at addr: {:#X} and {:#X}, size {} bytes", 
-            vga_display_virt_addr, vga_display_virt_addr - KERNEL_OFFSET, vga_size_in_bytes
-        );
-        // also do an identity mapping for APs that need it while booting
-        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
-            page_allocator::allocate_pages_by_bytes_at(vga_display_virt_addr - KERNEL_OFFSET, vga_size_in_bytes)?, 
-            // FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
-            frame_allocator::allocate_frames_by_bytes_at(vga_display_phys_addr, vga_size_in_bytes)?, 
-            vga_display_flags,
-        )?);
+        // Map the VGA display memory as writable. 
+        // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
+        let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
+        let vga_virt_addr_identity = VirtualAddress::new_canonical(vga_phys_addr.value());
+        let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
+        let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
+        let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
+        let vga_display_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(vga_display_frames.deref().clone()) };
+        higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?);
+        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(vga_display_pages_identity, vga_display_frames_identity, vga_flags)?);
         index += 1;
-        
 
-        // map the multiboot boot_info at the same address it is currently at, so we can continue to access boot_info 
-        let boot_info_pages  = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
-        debug!("Boot info covers pages: {:?}", boot_info_pages);
-        // let boot_info_frames = FrameRange::from_phys_addr(boot_info_start_paddr, boot_info_size);
-        let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
+
+        // Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
         let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
+        let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
         debug!("Mapping boot info pages {:?} to frames {:?}", boot_info_pages, boot_info_frames);
         higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
             boot_info_pages, boot_info_frames, EntryFlags::PRESENT | EntryFlags::GLOBAL,
         )?);
         index += 1;
 
-        debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..=index]);
+        debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);
+        debug!("higher_half_mapped_pages: {:?}", &higher_half_mapped_pages[..index]);
 
         Ok(()) // mapping closure completed successfully
 
     })?; // TemporaryPage is dropped here
 
 
-    let text_mapped_pages   = text_mapped_pages  .ok_or("Couldn't map .text section")?;
-    let rodata_mapped_pages = rodata_mapped_pages.ok_or("Couldn't map .rodata section")?;
-    let data_mapped_pages   = data_mapped_pages  .ok_or("Couldn't map .data section")?;
-    let stack_pages         = stack_pages        .ok_or("Couldn't map .stack section")?;
+    let text_mapped_pages     = text_mapped_pages  .ok_or("Couldn't map .text section")?;
+    let rodata_mapped_pages   = rodata_mapped_pages.ok_or("Couldn't map .rodata section")?;
+    let data_mapped_pages     = data_mapped_pages  .ok_or("Couldn't map .data section")?;
+    let stack_page_group      = stack_page_group   .ok_or("Couldn't map .stack section")?;
 
-    debug!("switching to new page table {:?}", new_table);
-    let new_page_table = page_table.switch(&new_table); 
-    // here, new_page_table and new_table should be identical
-    debug!("switched to new page table {:?}.", new_page_table); 
+    debug!("switching from old page table {:?} to new page table {:?}", page_table, new_table);
+    page_table.switch(&new_table); 
+    debug!("switched to new page table {:?}.", new_table); 
 
-    // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
+    // TODO: FIXME: once we fix the way that early frames are allocated, 
+    //              we can properly deallocate the AllocatedFrame inside the initial bootstrapped `PageTable`.
+    core::mem::forget(page_table);
+
+    // Return the new page table because that's the one that should be used by the kernel in future mappings. 
     Ok((
-        new_page_table,
+        new_table,
         text_mapped_pages,
         rodata_mapped_pages,
         data_mapped_pages,
-        stack_pages,
+        stack_page_group,
         higher_half_mapped_pages,
         identity_mapped_pages
     ))

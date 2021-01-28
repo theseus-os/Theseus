@@ -528,7 +528,7 @@ impl Task {
                 // debug!("task_switch [3]: switching tables! From {} {:?} to {} {:?}", 
                 //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
 
-                let _new_active_table = prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
+                prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
             }
         }
        
