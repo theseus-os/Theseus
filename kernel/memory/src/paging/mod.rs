@@ -322,7 +322,10 @@ pub fn init(
 
         // Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
         let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
-        let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
+        // TODO: FIXME: the boot info overlaps some of the bootloader modules in physical memory,
+        //              therefore, if we reserve those frames here, the bootloader modules parsing will fail.
+        // let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
+        let boot_info_frames = unsafe { AllocatedFrames::from_parts_unsafe(FrameRange::from_phys_addr(boot_info_start_paddr, boot_info_size)) };
         debug!("Mapping boot info pages {:?} to frames {:?}", boot_info_pages, boot_info_frames);
         higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
             boot_info_pages, boot_info_frames, EntryFlags::PRESENT | EntryFlags::GLOBAL,

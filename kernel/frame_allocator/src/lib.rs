@@ -52,8 +52,8 @@ const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonica
 /// Any physical addresses **less than or equal** to this address are considered "designated".
 /// This lower part of the address range covers from 0x0 to the end of the kernel physical address.
 /// 
-// TODO: replace this with the dynamically-discovered end of the kernel identity mapping section (kernel_phys_end)
-const DESIGNATED_FRAMES_LOW_END: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x40_0000 - 1));
+// TODO: replace this with the dynamically-discovered end of kernel, bootloader info, or bootloader modules, whichever highest.
+const DESIGNATED_FRAMES_LOW_END: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x150_0000 - 1));
 /// Any physical addresses **greater than or equal to** this address are considered "designated".
 /// Currently there are no designated regions at the higher end of the address space.
 const DESIGNATED_FRAMES_HIGH_START: Frame = MAX_FRAME;
@@ -165,7 +165,7 @@ pub fn init<I, P>(physical_memory_areas: I) -> Result<(), &'static str>
 #[derive(Debug, Clone, Eq)]
 struct Chunk {
     /// Whether this chunk is in a reserved region, e.g., for purposes of ACPI or MMIO.
-    // reserved: bool,
+    reserved: bool,
     /// The Frames covered by this chunk, an inclusive range. 
     frames: FrameRange,
 }
@@ -409,7 +409,7 @@ fn find_specific_chunk(
         Inner::RBTree(ref mut tree) => {
             let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_frame));
             if let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
-                if requested_frame >= *chunk.frames.start() {
+                if chunk.contains(&requested_frame) {
                     if requested_end_frame <= *chunk.frames.end() {
                         return adjust_chosen_chunk(requested_frame, num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor_mut));
                     } else {
@@ -419,6 +419,8 @@ fn find_specific_chunk(
                             requested_frame, num_frames, chunk,
                         );
                     }
+                } else {
+                    error!("HERE XXX address {:?} was already allocated", requested_frame);
                 }
             }
         }

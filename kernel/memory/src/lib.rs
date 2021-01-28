@@ -196,6 +196,9 @@ pub fn init(boot_info: &BootInformation)
             typ: 2,
         }).into_iter()
     );
+    let bootloader_modules_area = get_boot_info_mem_area(&boot_info)?; // preserve the multiboot information for x86_64. 
+    let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
+    debug!("bootloader info memory: {:?}, bootloader modules {:#X} to {:#X}", bootloader_modules_area, modules_start_paddr, modules_end_paddr);
 
     frame_allocator::init(all_areas_iter)?;
     warn!("Initialized new frame allocator!");
