@@ -20,7 +20,7 @@ pub use entryflags_x86_64::EntryFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
-    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
+    PhysicalAddress, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
 };
 use x86_64::{registers::control_regs, instructions::tlb};
 
@@ -63,58 +63,6 @@ pub fn get_kernel_address(
     Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
 
-/// Gets the available physical memory areas from the bootloader-provided list.
-///
-/// Returns the following tuple, if successful:
-///  * An array of available physical memory areas,
-///  * The number of valid entries in that array.
-pub fn get_available_memory(
-    boot_info: &BootInformation,
-    kernel_phys_end: PhysicalAddress,
-) -> Result<([PhysicalMemoryArea; 32], usize), &'static str> {
-    // parse the list of physical memory areas from multiboot
-    let mut available: [PhysicalMemoryArea; 32] = Default::default();
-    let mut avail_index = 0;
-    let memory_map_tag = boot_info
-        .memory_map_tag()
-        .ok_or("Memory map tag not found")?;
-    for area in memory_map_tag.memory_areas() {
-        let area_start = PhysicalAddress::new(area.start_address() as usize)?;
-        let area_end = PhysicalAddress::new(area.end_address() as usize)?;
-        let area_size = area.size() as usize;
-        debug!(
-            "memory area base_addr={:#x} length={:#x} ({:?})",
-            area_start, area_size, area
-        );
-
-        // optimization: we reserve memory from areas below the end of the kernel's physical address,
-        // which includes addresses beneath 1 MB
-        if area_end < kernel_phys_end {
-            debug!("--> skipping region before kernel_phys_end");
-            continue;
-        }
-        let start_paddr: PhysicalAddress = if area_start >= kernel_phys_end {
-            area_start
-        } else {
-            kernel_phys_end
-        };
-        let start_paddr = (Frame::containing_address(start_paddr) + 1).start_address(); // align up to next page
-
-        let new_entry = available.get_mut(avail_index).ok_or("Found more than 32 physical memory areas, only 32 are supported.")?;
-        *new_entry = PhysicalMemoryArea {
-            base_addr: start_paddr,
-            size_in_bytes: area_size,
-            typ: 1,
-        };
-
-        info!("--> memory region established: start={:#x}, size_in_bytes={:#x}",
-            new_entry.base_addr, new_entry.size_in_bytes
-        );
-        avail_index += 1;
-    }
-
-    Ok((available, avail_index))
-}
 
 /// Gets the address bounds of physical memory occupied by all bootloader-loaded modules.
 /// 
@@ -134,11 +82,10 @@ pub fn get_modules_address(boot_info: &BootInformation) -> (PhysicalAddress, Phy
 /// Gets the physical memory area occupied by the bootloader information.
 pub fn get_boot_info_mem_area(
     boot_info: &BootInformation,
-) -> Result<PhysicalMemoryArea, &'static str> {
-    Ok(PhysicalMemoryArea::new(
+) -> Result<(PhysicalAddress, PhysicalAddress), &'static str> {
+    Ok((
         PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)?,
-        boot_info.end_address() - boot_info.start_address(),
-        1,
+        PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)?,
     ))
 }
 

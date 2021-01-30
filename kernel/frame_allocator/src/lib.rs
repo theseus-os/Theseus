@@ -35,9 +35,9 @@ mod static_array_rb_tree;
 // mod static_array_linked_list;
 
 
-use core::{borrow::Borrow, cmp::Ordering, fmt, ops::{Deref, DerefMut}};
+use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
-use memory_structs::{PhysicalAddress, Frame, FrameRange, PhysicalMemoryArea};
+use memory_structs::{PhysicalAddress, Frame, FrameRange};
 use spin::Mutex;
 use static_array_rb_tree::*;
 
@@ -45,111 +45,214 @@ const FRAME_SIZE: usize = PAGE_SIZE;
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
 const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
 
-/// Regions that are pre-designated for special usage, specifically the kernel's initial identity mapping.
-/// They will be allocated from if an address within them is specifically requested;
-/// otherwise, they will only be allocated from as a "last resort" once all other non-designated address ranges are exhausted.
-///
-/// Any physical addresses **less than or equal** to this address are considered "designated".
-/// This lower part of the address range covers from 0x0 to the end of the kernel physical address.
-/// 
-// TODO: replace this with the dynamically-discovered end of kernel, bootloader info, or bootloader modules, whichever highest.
-const DESIGNATED_FRAMES_LOW_END: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x150_0000 - 1));
-/// Any physical addresses **greater than or equal to** this address are considered "designated".
-/// Currently there are no designated regions at the higher end of the address space.
-const DESIGNATED_FRAMES_HIGH_START: Frame = MAX_FRAME;
+// /// Regions that are pre-designated for special usage, specifically the kernel's initial identity mapping.
+// /// They will be allocated from if an address within them is specifically requested;
+// /// otherwise, they will only be allocated from as a "last resort" once all other non-designated address ranges are exhausted.
+// ///
+// /// Any physical addresses **less than or equal** to this address are considered "designated".
+// /// This lower part of the address range covers from 0x0 to the end of the kernel physical address.
+// /// 
+// // TODO: replace this with the dynamically-discovered end of kernel, bootloader info, or bootloader modules, whichever highest.
+// const DESIGNATED_FRAMES_LOW_END: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x150_0000 - 1));
+// /// Any physical addresses **greater than or equal to** this address are considered "designated".
+// /// Currently there are no designated regions at the higher end of the address space.
+// // TODO: replace this  with Chunks that can each be reserved individually. 
+// const DESIGNATED_FRAMES_HIGH_START: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x1FFDF000)); // hard-coded end of free phys mem in QEMU
 
 
 /// The single, system-wide list of free physical memory frames.
 /// This must be initialized during the bootstrap process after we use the bootloader to identify the physical memory map.
 static FREE_FRAME_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
 
+/// The single, system-wide list of physical memory frames that have already been allocated and are in use. 
+/// This is primarily used to track which regions of physical memory are reserved. 
+/// We don't actually need to store 
+/// We only need to store the custom chunks that were added here (`MemoryType::Reserved`).
+///
+/// This is necessary to prevent bugs when a device driver or another entity
+/// attempts to add a new custom region of frames. 
+/// If that new custom region overlaps or is a duplicate of another region, it must be forbidden. 
+/// If if overlaps with a free region, that will be detected when trying to allocate it, 
+/// but first we also need to see if that new region overlaps with a region that has already been allocated. 
+static ALLOCATED_FRAME_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
 
-/// Initialize the frame allocator with the given list of available physical memory areas.
-pub fn init<I, P>(physical_memory_areas: I) -> Result<(), &'static str> 
-    where P: Borrow<PhysicalMemoryArea>,
-          I: IntoIterator<Item = P>,
+
+/// Initialize the frame allocator with the given list of available and reserved physical memory regions.
+///
+/// Any regions in either of the lists may overlap, this is checked for and handled properly.
+/// Reserved regions take priority -- if a reserved region partially or fully overlaps any part of a free region,
+/// that portion will be considered reserved, not free. 
+/// 
+/// The iterator (`R`) over reserved physical memory regions must be cloneable, 
+/// as this runs before heap allocation is available, and we may need to iterate over it multiple times. 
+pub fn init<F, R, P>(
+    free_physical_memory_areas: F,
+    reserved_physical_memory_areas: R,
+) -> Result<(), &'static str> 
+    where P: Borrow<PhysicalMemoryRegion>,
+          F: IntoIterator<Item = P>,
+          R: IntoIterator<Item = P> + Clone,
 {
-    if FREE_FRAME_LIST.lock().len() != 0 {
+    if FREE_FRAME_LIST.lock().len() != 0 || ALLOCATED_FRAME_LIST.lock().len() != 0 {
         return Err("Frame allocator was already initialized, cannot be initialized twice.");
     }
 
-    // Add all available physical memory areas to our list of frame chunks.
-    let mut list: [Option<Chunk>; 32] = [None; 32];
-    let mut list_idx = 0;
-    for area in physical_memory_areas.into_iter() {
-        let area = area.borrow();
-        debug!("Frame Allocator: looking to add physical memory area: {:?}", area);
-        if area.typ != 1 {
-            debug!("\t\t--> area was a reserved region: {:?}", area);
-        }
-        let range = FrameRange::from_phys_addr(area.base_addr, area.size_in_bytes);
+    let mut free_list: [Option<Chunk>; 32] = [None; 32];
+    let mut free_list_idx = 0;
+    let mut reserved_list: [Option<Chunk>; 32] = [None; 32];
+    let mut reserved_list_idx = 0;
 
-        // If the area spans (contains) a designated region boundary, split it at that boundary.
-        if range.contains(&DESIGNATED_FRAMES_LOW_END) {
-            list[list_idx] = Some(Chunk { 
-                frames: FrameRange::new(*range.start(), DESIGNATED_FRAMES_LOW_END),
-            });
-            list_idx += 1;
-            list[list_idx] = Some(Chunk { 
-                frames: FrameRange::new(DESIGNATED_FRAMES_LOW_END + 1, *range.end()),
-            });
-            list_idx += 1;
-        } else if range.contains(&DESIGNATED_FRAMES_HIGH_START) {
-            list[list_idx] = Some(Chunk { 
-                frames: FrameRange::new(*range.start(), DESIGNATED_FRAMES_HIGH_START - 1),
-            });
-            list_idx += 1;
-            list[list_idx] = Some(Chunk { 
-                frames: FrameRange::new(DESIGNATED_FRAMES_HIGH_START, *range.end()),
-            });
-            list_idx += 1;
-        } else {
-            list[list_idx] = Some(Chunk { 
-                frames: range,
-            });
-            list_idx += 1;
-        }
+    
+    for area in free_physical_memory_areas.into_iter() {
+        let area = area.borrow();
+        debug!("Frame Allocator: looking to add free physical memory area: {:?}", area);
+
+        check_and_add_free_region(
+            &area,
+            &mut free_list,
+            &mut free_list_idx,
+            reserved_physical_memory_areas.clone(),
+        );
     }
 
-    // Ensure that no two chunks overlap.
-    // Currently we resolve this by merging the overlapping chunks,
-    // but only if one chunk fully contains another chunk.
-    // This may be undesirable if we don't want to merge a "reserved" and non-reserved chunk.
-    let mut indices_to_remove: [Option<usize>; 32] = [None; 32];
-    let mut itr_index = 0;
-    for (i, elem_opt) in list[..list_idx].iter().enumerate() {
-        let next_idx = i + 1;
-        for (other_opt, j) in list[next_idx..list_idx].iter().zip(next_idx..) {
-            if let (Some(elem), Some(other)) = (elem_opt, other_opt) {
-                if elem.contains(other.start()) && elem.contains(other.end()) {
-                    // Here, the `elem` chunk fully contains the entire `other` chunk, 
-                    // so we can just delete `other` entirely from the list.
-                    indices_to_remove[itr_index] = Some(j);
-                    itr_index += 1;
-                    continue;
-                } 
-                if elem.contains(other.start())  ||
-                    elem.contains(other.end())   || 
-                    other.contains(elem.start()) ||
-                    other.contains(elem.end())
-                {
-                    error!("Physical memory areas {:?} and {:?} overlap, this is logically incorrect and currently unsupported", elem, other);
-                    return Err("Physical memory areas are illegally overlapping.");
-                }
+    // // Ensure that no two chunks overlap.
+    // // Currently we resolve this by merging the overlapping chunks,
+    // // but only if one chunk fully contains another chunk.
+    // // This may be undesirable if we don't want to merge a "reserved" and non-reserved chunk.
+    // let mut indices_to_remove: [Option<usize>; 32] = [None; 32];
+    // let mut itr_index = 0;
+    // for (i, elem_opt) in list[..list_idx].iter().enumerate() {
+    //     let next_idx = i + 1;
+    //     for (other_opt, j) in list[next_idx..list_idx].iter().zip(next_idx..) {
+    //         if let (Some(elem), Some(other)) = (elem_opt, other_opt) {
+    //             if elem.contains(other.start()) && elem.contains(other.end()) {
+    //                 // Here, the `elem` chunk fully contains the entire `other` chunk, 
+    //                 // so we can just delete `other` entirely from the list.
+    //                 indices_to_remove[itr_index] = Some(j);
+    //                 itr_index += 1;
+    //                 continue;
+    //             } 
+    //             if elem.contains(other.start())  ||
+    //                 elem.contains(other.end())   || 
+    //                 other.contains(elem.start()) ||
+    //                 other.contains(elem.end())
+    //             {
+    //                 error!("Physical memory areas {:?} and {:?} overlap, this is logically incorrect and currently unsupported", elem, other);
+    //                 return Err("Physical memory areas are illegally overlapping.");
+    //             }
+    //         }
+    //     }
+    // }
+
+    // // Actually remove the duplicate/overlapping chunks that we found earlier. 
+    // for idx in indices_to_remove.iter().flatten() {
+    //     trace!("### Removed idx {} from list of frame chunks", idx);
+    //     let _removed = list[*idx].take();
+    // }
+
+    *FREE_FRAME_LIST.lock() = StaticArrayRBTree::new(free_list);
+
+    // FIXME TODO deduplicate and add reserved list to FREE_FRAME_LIST too!
+
+    Ok(())
+}
+
+
+
+fn check_and_add_free_region<P, R>(
+    area: &FrameRange,
+    free_list: &mut [Option<Chunk>; 32],
+    free_list_idx: &mut usize,
+    reserved_physical_memory_areas: R,
+)
+    where P: Borrow<PhysicalMemoryRegion>,
+          R: IntoIterator<Item = P> + Clone,
+{
+    // This will be set to the frame that is the start of the current free region. 
+    let mut current_start = *area.start();
+    // This will be set to the frame that is the end of the current free region. 
+    let mut current_end = *area.end();
+    trace!("looking at sub-area {:X?} to {:X?}", current_start, current_end);
+
+    'inner:
+    for reserved in reserved_physical_memory_areas.clone().into_iter() {
+        let reserved = &reserved.borrow().frames;
+        trace!("\t Comparing with reserved area {:X?}", reserved);
+        if reserved.contains(&current_start) {
+            info!("\t\t moving current_start from {:X?} to {:X?}", current_start, *reserved.end() + 1);
+            current_start = *reserved.end() + 1;
+        }
+        if &current_start <= reserved.start() && reserved.start() <= &current_end {
+        // if reserved.contains(&current_end) {
+            // Advance up to the frame right before this reserved region started.
+            info!("\t\t moving current_end from {:X?} to {:X?}", current_end, min(current_end, *reserved.start() - 1));
+            current_end = min(current_end, *reserved.start() - 1);
+            if area.end() <= reserved.end() {
+                // Optimization here: the rest of the current area is reserved,
+                // so there's no need to keep iterating over the reserved areas.
+                info!("\t !!! skipping the rest of the area");
+                break 'inner;
+            } else {
+                let after = FrameRange::new(*reserved.end() + 1, *area.end());
+                warn!("moving on to after {:X?}", after);
+                // Here: the current area extends past this current reserved area,
+                // so there might be another free area that starts after this reserved area.
+                check_and_add_free_region(
+                    &after,
+                    free_list,
+                    free_list_idx,
+                    reserved_physical_memory_areas.clone(),
+                );
             }
         }
     }
 
-    // Actually remove the duplicate/overlapping chunks that we found earlier. 
-    for idx in indices_to_remove.iter().flatten() {
-        trace!("### Removed idx {} from list of frame chunks", idx);
-        let _removed = list[*idx].take();
+    let new_area = FrameRange::new(current_start, current_end);
+    if new_area.size_in_frames() > 0 {
+        free_list[*free_list_idx] = Some(Chunk {
+            typ:  MemoryRegionType::Free,
+            frames: new_area,
+        });
+        *free_list_idx += 1;
     }
-
-    *FREE_FRAME_LIST.lock() = StaticArrayRBTree::new(list);
-    Ok(())
 }
 
+
+/// A region of physical memory.
+#[derive(Clone, Debug)]
+pub struct PhysicalMemoryRegion {
+    pub frames: FrameRange,
+    pub typ: MemoryRegionType,
+}
+impl PhysicalMemoryRegion {
+    pub fn new(frames: FrameRange, typ: MemoryRegionType) -> PhysicalMemoryRegion {
+        PhysicalMemoryRegion { frames, typ }
+    }
+}
+impl Deref for PhysicalMemoryRegion {
+    type Target = FrameRange;
+    fn deref(&self) -> &FrameRange {
+        &self.frames
+    }
+}
+
+/// Types of physical memory. See each variant's documentation.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum MemoryRegionType {
+    /// Memory that is available for any general purpose.
+    Free,
+    // /// Memory that is designated by software for specific purposes.
+    // /// Designated memory regions are only allocated from if specifically requested,
+    // /// or all other `Free` memory has already been used, i.e., a last resort. 
+    // Designated,
+    /// Memory that is reserved for special use and is only ever allocated from if specifically requested. 
+    /// This includes custom memory regions added by third parties, e.g., 
+    /// device memory discovered and added by device drivers later during runtime.
+    Reserved,
+    /// Memory that is inaccessible and should never be used, ever.
+    /// Forbidden regions can never be allocated from. 
+    Forbidden,
+}
 
 /// A range of contiguous frames.
 ///
@@ -164,8 +267,8 @@ pub fn init<I, P>(physical_memory_areas: I) -> Result<(), &'static str>
 /// since it ignores their actual range of frames.
 #[derive(Debug, Clone, Eq)]
 struct Chunk {
-    /// Whether this chunk is in a reserved region, e.g., for purposes of ACPI or MMIO.
-    reserved: bool,
+    /// Whether this chunk is in a free, designated, reserved, or forbidden region.
+    typ: MemoryRegionType,
     /// The Frames covered by this chunk, an inclusive range. 
     frames: FrameRange,
 }
@@ -179,6 +282,7 @@ impl Chunk {
     /// Returns a new `Chunk` with an empty range of frames. 
     fn empty() -> Chunk {
         Chunk {
+            typ: MemoryRegionType::Forbidden,
             frames: FrameRange::empty(),
         }
     }
@@ -305,6 +409,7 @@ impl Drop for AllocatedFrames {
         // Simply add the newly-deallocated chunk to the free frames list.
         let mut locked_list = FREE_FRAME_LIST.lock();
         let res = locked_list.insert(Chunk {
+            typ: todo!("FIXME chunk type in deallocation"),
             frames: self.frames.clone(),
         });
         match res {
@@ -431,9 +536,6 @@ fn find_specific_chunk(
 
 
 /// Searches the given `list` for any chunk large enough to hold at least `num_frames`.
-///
-/// It first attempts to find a suitable chunk **not** in the designated regions,
-/// and only allocates from the designated regions as a backup option.
 fn find_any_chunk<'list>(
     list: &'list mut StaticArrayRBTree<Chunk>,
     num_frames: usize
@@ -444,10 +546,7 @@ fn find_any_chunk<'list>(
             for elem in arr.iter_mut() {
                 if let Some(chunk) = elem {
                     // Skip chunks that are too-small or in the designated regions.
-                    if  chunk.size_in_frames() < num_frames || 
-                        chunk.frames.start() <= &DESIGNATED_FRAMES_LOW_END || 
-                        chunk.frames.end() >= &DESIGNATED_FRAMES_HIGH_START
-                    {
+                    if  chunk.size_in_frames() < num_frames || chunk.typ != MemoryRegionType::Free {
                         continue;
                     } 
                     else {
@@ -471,70 +570,24 @@ fn find_any_chunk<'list>(
             // Because we allocate new frames by peeling them off from the beginning part of a chunk, 
             // it's MUCH faster to start the search for free frames from higher addresses moving down. 
             // This results in an O(1) allocation time in the general case, until all address ranges are already in use.
-            let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_FRAMES_HIGH_START));
+            let mut cursor = tree.upper_bound_mut(Bound::<&Chunk>::Unbounded);
             while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-                if chunk.frames.start() <= &DESIGNATED_FRAMES_LOW_END {
-                    break; // move on to searching through the designated regions
-                }
-                if num_frames < chunk.size_in_frames() {
+                if num_frames < chunk.size_in_frames() && chunk.typ == MemoryRegionType::Free {
                     return adjust_chosen_chunk(*chunk.start(), num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor));
                 }
-                warn!("Frame allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} frames at any address.", num_frames);
+                warn!("Frame allocator: untested scenario: had to search multiple chunks \
+                    (skipping {:?}) while trying to allocate {} frames at any address.",
+                    chunk, num_frames
+                );
                 cursor.move_prev();
             }
         }
     }
 
     // If we can't find any suitable chunks in the non-designated regions, then look in both designated regions.
-    warn!("frame_allocator: unlikely scenario: non-designated chunks are all allocated, \
-          falling back to allocating {} frames from designated regions!", num_frames);
-    match list.0 {
-        Inner::Array(ref mut arr) => {
-            for elem in arr.iter_mut() {
-                if let Some(chunk) = elem {
-                    if num_frames <= chunk.size_in_frames() {
-                        return adjust_chosen_chunk(*chunk.start(), num_frames, &chunk.clone(), ValueRefMut::Array(elem));
-                    }
-                }
-            }
-        }
-        Inner::RBTree(ref mut tree) => {
-            // NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
-            // ```
-            // let eligible_chunks = tree.range(
-            //     Bound::<&Frame>::Unbounded,
-            //     Bound::Included(&DESIGNATED_FRAMES_LOW_END)
-            // ).chain(tree.range(
-            //     Bound::Included(&DESIGNATED_FRAMES_HIGH_START),
-            //     Bound::<&Frame>::Unbounded
-            // ));
-            // for c in eligible_chunks { ... }
-            // ```
-            //
-            // However, RBTree doesn't have a `range_mut()` method, so we use two sets of cursors for manual iteration.
-            // The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.
-            let mut cursor = tree.upper_bound_mut(Bound::Included(&DESIGNATED_FRAMES_LOW_END));
-            while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-                if num_frames < chunk.size_in_frames() {
-                    return adjust_chosen_chunk(*chunk.start(), num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor));
-                }
-                cursor.move_prev();
-            }
-
-            // The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
-            let mut cursor = tree.upper_bound_mut::<Chunk>(Bound::Unbounded);
-            while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-                if chunk.frames.start() < &DESIGNATED_FRAMES_HIGH_START {
-                    // we already iterated over non-designated frames in the first match statement above, so we're out of memory. 
-                    break; 
-                }
-                if num_frames < chunk.size_in_frames() {
-                    return adjust_chosen_chunk(*chunk.start(), num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor));
-                }
-                cursor.move_prev();
-            }
-        }
-    }
+    error!("frame_allocator: non-reserved chunks are all allocated (requested {} frames). \
+        TODO: other frames need to be freed up here.", num_frames
+    );
 
     Err(AllocationError::OutOfAddressSpace(num_frames))
 }
@@ -558,6 +611,7 @@ fn adjust_chosen_chunk(
     // Because Frames and PhysicalAddresses use saturating add and subtract, we need to double-check that we're not creating
     // an overlapping duplicate Chunk at either the very minimum or the very maximum of the address space.
     let new_allocation = Chunk {
+        typ: chosen_chunk.typ,
         // The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
         frames: FrameRange::new(start_frame, start_frame + (num_frames - 1)),
     };
@@ -565,6 +619,7 @@ fn adjust_chosen_chunk(
         None
     } else {
         Some(Chunk {
+            typ: chosen_chunk.typ,
             frames: FrameRange::new(*chosen_chunk.frames.start(), *new_allocation.start() - 1),
         })
     };
@@ -572,6 +627,7 @@ fn adjust_chosen_chunk(
         None
     } else {
         Some(Chunk {
+            typ: chosen_chunk.typ,
             frames: FrameRange::new(*new_allocation.end() + 1, *chosen_chunk.frames.end()),
         })
     };

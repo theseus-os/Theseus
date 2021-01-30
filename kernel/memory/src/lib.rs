@@ -44,7 +44,7 @@ use memory_x86_64::*;
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
 
-
+use core::cmp::{min, max};
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
@@ -137,26 +137,40 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 ///  * a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
 ///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
-pub fn init(boot_info: &BootInformation) 
-    -> Result<(
-        PageTable,
-        MappedPages,
-        MappedPages,
-        MappedPages,
-        (AllocatedPages, MappedPages),
-        [Option<MappedPages>; 32],
-        [Option<MappedPages>; 32]
-    ), &'static str> 
-{
-    // get the start and end addresses of the kernel.
+pub fn init(
+    boot_info: &BootInformation
+) -> Result<(
+    PageTable,
+    MappedPages,
+    MappedPages,
+    MappedPages,
+    (AllocatedPages, MappedPages),
+    [Option<MappedPages>; 32],
+    [Option<MappedPages>; 32]
+), &'static str> {
+    // Get the start and end addresses of the kernel, boot info, boot modules, etc.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
-
-    debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
-        kernel_phys_start,
-        kernel_phys_end,
-        kernel_virt_end
+    let (boot_info_paddr_start, boot_info_paddr_end) = get_boot_info_mem_area(&boot_info)?;
+    let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
+    debug!("bootloader info memory: p{:#X} to p{:#X}, bootloader modules: p{:#X} to p{:#X}", 
+        boot_info_paddr_start, boot_info_paddr_end, modules_start_paddr, modules_end_paddr,
     );
-  
+    debug!("kernel_phys_start: p{:#X}, kernel_phys_end: p{:#X} kernel_virt_end = v{:#x}",
+        kernel_phys_start, kernel_phys_end, kernel_virt_end
+    );
+
+    // In addition to the information about the hardware's physical memory map provided by the bootloader,
+    // Theseus chooses to reserve the following regions of physical memory for specific use.
+    let low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), 0x10_0000); // suggested by most OS developers
+    let kernel_frames       = FrameRange::from_phys_addr(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value());
+    let boot_modules_frames = FrameRange::from_phys_addr(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value());
+    let boot_info_frames    = FrameRange::from_phys_addr(boot_info_paddr_start, boot_info_paddr_end.value() - boot_info_paddr_start.value());
+
+    // Add the VGA display's memory region to the list of reserved physical memory areas.
+    let (vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()?;
+    let vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
+    
+
     ////// We don't need this stuff any more, TODO: FIXME: remove
     // // Get the bounds of physical memory that is occupied by bootloader-loaded modules.
     // let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
@@ -174,33 +188,77 @@ pub fn init(boot_info: &BootInformation)
     // occupied[occup_index] = PhysicalMemoryArea::new(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value(), 1); // preserve all bootloader modules
     // occup_index += 1;
 
-    // This iterator covers *all* memory areas, not just those classified as "available" by multiboot. 
-    // This is because we also want the frame allocator to manage physical memory areas for ACPI 
-    let all_areas_iter = boot_info.memory_map_tag()
-        .unwrap()
-        .all_memory_areas()
-        .map(|area| {
-            warn!("Multiboot2 Memory area: {:X?}", area);
-            PhysicalMemoryArea::new(
-                PhysicalAddress::new_canonical(area.start_address() as usize),
-                area.size() as usize,
-                if area.typ() == multiboot2::MemoryAreaType::Available { 1 } else { 2 },
-            )
-        });
-    // Add the VGA memory region to the list of available physical memory areas.
-    let vga_area = memory_x86_64::get_vga_mem_addr()?;
-    let all_areas_iter = all_areas_iter.chain(
-        Some(PhysicalMemoryArea {
-            base_addr: vga_area.0,
-            size_in_bytes: vga_area.1,
-            typ: 2,
-        }).into_iter()
-    );
-    let bootloader_modules_area = get_boot_info_mem_area(&boot_info)?; // preserve the multiboot information for x86_64. 
-    let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
-    debug!("bootloader info memory: {:?}, bootloader modules {:#X} to {:#X}", bootloader_modules_area, modules_start_paddr, modules_end_paddr);
 
-    frame_allocator::init(all_areas_iter)?;
+    // This iterator covers *all* memory areas, not just those classified as "available" by multiboot. 
+    let memory_areas = boot_info.memory_map_tag()
+        .ok_or("Multiboot2 boot information has no physical memory map information")?
+        .all_memory_areas();
+
+
+        // // A closure that returns the highest frame within the given `region`
+        // // that is not within a reserved region.
+        // let find_end_free_frame = |region: &FrameRange| -> Frame {
+        //     // By default, we return the end frame of the region.
+        //     let mut end_frame = *region.end(); 
+        //     for reserved in &reserved_regions {
+        //         if reserved.start() >= region.start() {
+        //             end_frame = min(*reserved.start() - 1, end_frame);
+        //         } else if reserved.contains(region.start()) {
+        //             // the whole region is reserved
+        //             end_frame = *region.start() - 1;
+        //         }
+        //     }
+        //     end_frame
+        // };
+
+        // // A closure that returns the highest frame within the given `region`
+        // // that **is** within a reserved region.
+        // let find_end_free_frame = |region: &FrameRange| -> Frame {
+        //     // By default, we return the end frame of the region.
+        //     let mut end_frame = *region.end(); 
+        //     for reserved in &reserved_regions {
+        //         if reserved.start() >= region.start() {
+        //             end_frame = min(*reserved.start() - 1, end_frame);
+        //         } else if reserved.contains(region.start()) {
+        //             // the whole region is reserved
+        //             end_frame = *region.start() - 1;
+        //         }
+        //     }
+        //     end_frame
+        // };
+
+    let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut free_index = 0;
+    let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut reserved_index = 0;
+
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(kernel_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_modules_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_info_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+
+    for area in memory_areas {
+        let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start_address() as usize), area.size() as usize);
+        warn!("Multiboot2 Memory area: {:X?}", area);
+        if area.typ() == multiboot2::MemoryAreaType::Available {
+            free_regions[free_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
+            free_index += 1;
+        } else {
+            reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Reserved));
+            reserved_index += 1;
+        }
+    }
+
+    warn!("FREE REGIONS: {:X?}", free_regions);
+    warn!("RESERVED REGIONS: {:X?}", reserved_regions);
+    
+    frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     warn!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 

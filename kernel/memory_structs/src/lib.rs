@@ -228,28 +228,6 @@ impl From<PhysicalAddress> for usize {
 }
 
 
-/// An area of physical memory.
-#[derive(Copy, Clone, Debug, Default)]
-pub struct PhysicalMemoryArea {
-    pub base_addr: PhysicalAddress,
-    pub size_in_bytes: usize,
-    pub typ: u32,
-}
-impl PhysicalMemoryArea {
-    pub fn new(
-        paddr: PhysicalAddress,
-        size_in_bytes: usize,
-        typ: u32,
-    ) -> PhysicalMemoryArea {
-        PhysicalMemoryArea {
-            base_addr: paddr,
-            size_in_bytes: size_in_bytes,
-            typ: typ,
-        }
-    }
-}
-
-
 /// A `Frame` is a chunk of **physical** memory,
 /// similar to how a `Page` is a chunk of **virtual** memory.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -367,7 +345,7 @@ impl FrameRange {
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_frames(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.0.end().number + 1 - self.0.start().number
+        (self.0.end().number + 1).saturating_sub(self.0.start().number)
     }
 
     /// Whether this `FrameRange` contains the given `PhysicalAddress`.
@@ -564,7 +542,7 @@ impl PageRange {
     /// This is instant, because it doesn't need to iterate over each `Page`, unlike normal iterators.
     pub const fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.0.end().number + 1 - self.0.start().number
+        (self.0.end().number + 1).saturating_sub(self.0.start().number)
     }
 
     /// Returns the size in number of bytes.
