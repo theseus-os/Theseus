@@ -386,7 +386,7 @@ preserve_old_modules:
 
 ### Build for Cortex-m4 targets. Currently it only builds the nanocore.
 arm:
-	cargo build -p nano_core --target thumbv7em-none-eabi
+	cargo build -p nano_core -p memory_structs --target thumbv7em-none-eabi
 	arm-none-eabi-ld \
 		-T target/thumbv7em-none-eabi/debug/build/cortex-m-rt*/out/link.x \
 		--nmagic \

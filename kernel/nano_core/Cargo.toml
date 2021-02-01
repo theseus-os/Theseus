@@ -50,7 +50,7 @@ path = "../panic_entry"
 [target.'cfg(target_arch = "x86_64")'.dependencies.vga_buffer]
 path = "../vga_buffer"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies.memory_initialization]
+[dependencies.memory_initialization]
 path = "../memory_initialization"
 
 [target.'cfg(target_arch = "arm")'.dependencies]

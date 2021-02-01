@@ -1226,6 +1226,9 @@ checksum = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
 [[package]]
 name = "kernel_config"
 version = "0.1.0"
+dependencies = [
+ "cfg-if 1.0.0",
+]
 
 [[package]]
 name = "keyboard"
@@ -1475,6 +1478,9 @@ dependencies = [
 name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
+ "alloc-cortex-m",
+ "cfg-if 1.0.0",
+ "cortex-m-rt",
  "heap",
  "irq_safety",
  "kernel_config",
@@ -1489,11 +1495,10 @@ name = "memory_structs"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
+ "cfg-if 1.0.0",
  "derive_more",
  "entryflags_x86_64",
  "kernel_config",
- "multiboot2",
- "xmas-elf",
  "zerocopy",
 ]
 

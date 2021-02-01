@@ -5,5 +5,8 @@ description = "configuration values and settings used in the Theseus kernel, e.g
 version = "0.1.0"
 build = "../../build.rs"
 
+[dependencies]
+cfg-if = "1.0.0"
+
 [lib]
 crate-type = ["rlib"]

@@ -16,7 +16,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc_error_handler)]
 
 #[macro_use] extern crate cfg_if;
 
@@ -265,24 +264,17 @@ else if #[cfg(target_arch="arm")] {
 extern crate alloc;
 extern crate cortex_m;
 extern crate panic_halt;
-extern crate alloc_cortex_m;
+extern crate memory_initialization;
 #[macro_use] extern crate cortex_m_rt;
 #[macro_use] extern crate cortex_m_semihosting;
 
-use alloc_cortex_m::CortexMHeap;
-
-#[global_allocator]
-static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
-
-#[alloc_error_handler]
-fn default_alloc_error_handler(_: core::alloc::Layout) -> ! {
-    loop {}
-}
-
+use alloc::string::String;
 
 #[entry]
 fn main() -> ! {
-    hprintln!("hello world!").unwrap();
+    memory_initialization::init_memory_management();
+    let s = String::from("hello world!");
+    hprintln!("{}", &s).unwrap();
     loop {}
 }
 

@@ -5,22 +5,29 @@ description = "Initialization routine for the virtual memory subsystem."
 version = "0.1.0"
 
 [dependencies]
-multiboot2 = "0.7.1"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.stack]
-path = "../stack"
+cfg-if = "1.0.0"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.log]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+multiboot2 = "0.7.1"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.memory]
+path = "../memory"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.stack]
+path = "../stack"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.log]
 version = "0.4.8"
 
-[dependencies.irq_safety]
+[target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.heap]
+[target.'cfg(target_arch = "x86_64")'.dependencies.heap]
 path = "../heap"
+
+[target.'cfg(target_arch = "arm")'.dependencies]
+cortex-m-rt = "0.6.13"
+alloc-cortex-m = "0.4.1"
