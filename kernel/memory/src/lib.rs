@@ -258,6 +258,30 @@ pub fn init(
     warn!("FREE REGIONS: {:X?}", free_regions);
     warn!("RESERVED REGIONS: {:X?}", reserved_regions);
     
+    for (i, range1) in free_regions.iter().flatten().chain(reserved_regions.iter().flatten()).enumerate() {
+        for (j, range2) in free_regions.iter().flatten().chain(reserved_regions.iter().flatten()).enumerate() {
+            if i == j { continue; }
+            let overlap1 = range1.start() <= range2.end() && range1.end() >= range2.start();
+            let one = max(*range1.start(), *range2.start());
+            let two = min(*range1.end(),   *range2.end());
+            let overlap2 = one <= two;
+            if overlap1 != overlap2 { error!("BUG1, {:?} {:?}", range1, range2); }
+            if overlap1 != range1.overlap(range2).is_some() { error!("BUG2, {:?} {:?}", range1, range2); }
+
+            if overlap1 { // if they overlap
+                if one <= two {
+                    debug!("\n Range {:?} and \n Range {:?} overlap, from {:?} ..= {:?}",
+                        range1, range2, one, two,
+                    );
+                } else {
+                    error!("BUG: Ranges {:?} and {:?} didn't overlap, from {:?} ..= {:?}",
+                        range1, range2, one, two,
+                    );
+                }
+            }
+        }
+    }
+
     frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     warn!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();

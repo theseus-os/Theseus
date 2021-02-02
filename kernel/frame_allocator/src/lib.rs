@@ -150,9 +150,54 @@ pub fn init<F, R, P>(
     //     let _removed = list[*idx].take();
     // }
 
-    *FREE_FRAME_LIST.lock() = StaticArrayRBTree::new(free_list);
 
-    // FIXME TODO deduplicate and add reserved list to FREE_FRAME_LIST too!
+    // Insert all of the reserved memory areas to the free list as well,
+    // while removing/merging duplicate or overlapping areas.
+    for (i, reserved) in reserved_physical_memory_areas.clone().into_iter().enumerate() {
+        let reserved = reserved.borrow();
+
+        let mut reserved_was_merged = false;
+        for existing in reserved_list[..reserved_list_idx].iter_mut().flatten() {
+            if let Some(_overlap) = existing.overlap(reserved) {
+                // merge the `reserved` range into the `existing` range
+                existing.frames = FrameRange::new(
+                    min(*existing.start(), *reserved.start()),
+                    max(*existing.end(),   *reserved.end()),
+                );
+                reserved_was_merged = true;
+                break;
+            }
+        }
+        if !reserved_was_merged {
+            reserved_list[reserved_list_idx] = Some(Chunk {
+                typ:  MemoryRegionType::Reserved,
+                frames: reserved.frames.clone(),
+            });
+            reserved_list_idx += 1;
+        }
+    }
+
+    debug!("------------------ RESERVED_LIST -----------------");
+    reserved_list[..reserved_list_idx].iter().flatten().for_each(|e| debug!("\t {:?}", e) );
+    debug!("--------------------------------------------------");
+
+    // Finally, strictly check that no two regions overlap. 
+    for (i, elem_opt) in free_list[..free_list_idx].iter().enumerate() {
+        let next_idx = i + 1;
+        for (other_opt, j) in free_list[next_idx..free_list_idx].iter().zip(next_idx..) {
+            if let (Some(elem), Some(other)) = (elem_opt, other_opt) {
+                if let Some(overlap) = elem.overlap(other) {
+                    error!("BUG: frame allocator free list had overlapping range \n \t {:?} and {:?} overlap at {:?}",
+                        elem, other, overlap,
+                    );
+                }
+            }
+
+        }
+    }
+
+
+    *FREE_FRAME_LIST.lock() = StaticArrayRBTree::new(free_list);
 
     Ok(())
 }

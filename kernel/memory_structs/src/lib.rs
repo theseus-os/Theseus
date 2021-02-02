@@ -15,6 +15,7 @@ extern crate zerocopy;
 
 use bit_field::BitField;
 use core::{
+    cmp::{min, max},
     fmt,
     iter::Step,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
@@ -373,6 +374,20 @@ impl FrameRange {
         let start = core::cmp::min(self.0.start(), &frame_to_include);
         let end = core::cmp::max(self.0.end(), &frame_to_include);
         FrameRange::new(start.clone(), end.clone())
+    }
+
+    /// Returns an inclusive `FrameRange` representing the frames that overlap
+    /// across this `FrameRange` and the given other `FrameRange`. 
+    ///
+    /// If there is no overlap between the two ranges, `None` is returned.
+    pub fn overlap(&self, other: &FrameRange) -> Option<FrameRange> {
+        let starts = max(*self.start(), *other.start());
+        let ends   = min(*self.end(),   *other.end());
+        if starts <= ends {
+            Some(FrameRange::new(starts, ends))
+        } else {
+            None
+        }
     }
 }
 impl fmt::Debug for FrameRange {
