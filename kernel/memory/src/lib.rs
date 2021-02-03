@@ -171,24 +171,6 @@ pub fn init(
     let vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
     
 
-    ////// We don't need this stuff any more, TODO: FIXME: remove
-    // // Get the bounds of physical memory that is occupied by bootloader-loaded modules.
-    // let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
-    // // get available physical memory areas
-    // let (_available, _avail_len) = get_available_memory(&boot_info, kernel_phys_end)?;
-    // // Set up the initial list of reserved physical memory frames such that the frame allocator does not re-use them.
-    // let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
-    // let mut occup_index = 0;
-    // occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1); // reserve addresses under 1 MB
-    // occup_index += 1;
-    // occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1); // the kernel boot image is already in use
-    // occup_index += 1;
-    // occupied[occup_index] = get_boot_info_mem_area(&boot_info)?; // preserve the multiboot information for x86_64. 
-    // occup_index += 1;
-    // occupied[occup_index] = PhysicalMemoryArea::new(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value(), 1); // preserve all bootloader modules
-    // occup_index += 1;
-
-
     // This iterator covers *all* memory areas, not just those classified as "available" by multiboot. 
     let memory_areas = boot_info.memory_map_tag()
         .ok_or("Multiboot2 boot information has no physical memory map information")?

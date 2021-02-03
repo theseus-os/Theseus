@@ -141,7 +141,6 @@ fn parse_bootloader_modules_into_files(
 
     for m in boot_info.module_tags() {
         let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-        debug!("looking to allocate frames for module {:?}", m.name());
         let frames = allocate_frames_by_bytes_at(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes)
             .map_err(|_e| "Failed to allocate frames for bootloader module")?;
         let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
@@ -155,21 +154,7 @@ fn parse_bootloader_modules_into_files(
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
         )?;
 
-        debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
-
-        if name.ends_with(".sym") {
-            debug!("Trying to print nano_core.sym file");
-            let bytes = mp.as_slice(0, size_in_bytes)?;
-            let symbol_cstr = cstr_core::CStr::from_bytes_with_nul(bytes).map_err(|e| {
-                error!("TEMP TEST: error casting nano_core symbol file to CStr: {:?}", e);
-                "FromBytesWithNulError occurred when casting nano_core symbol file to CStr"
-            })?;
-            let symbol_str = symbol_cstr.to_str().map_err(|e| {
-                error!("TEMP TEST: error with CStr::to_str(): {:?}", e);
-                "Utf8Error occurred when parsing nano_core symbols CStr"
-            })?;
-            debug!("========================= nano_core.sym =====================\n{}\n=================================", symbol_str);
-        }
+        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
 
         let create_file = |dir: &DirRef| {
             MemFile::from_mapped_pages(mp, name, size_in_bytes, dir)

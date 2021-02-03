@@ -160,7 +160,11 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     
     let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
-    let frame = allocate_frames_at(phys_addr, 1).map_err(|_e| "couldn't allocate physical frame for APIC")?;
+    let frame = allocate_frames_at(phys_addr, 1)
+        .map_err(|_e| "couldn't allocate physical frame for APIC")
+        .unwrap_or_else(|_e| unsafe { 
+            memory::AllocatedFrames::from_parts_unsafe(memory::FrameRange::from_phys_addr(phys_addr, 1))
+        });
     let apic_mapped_page = page_table.map_allocated_pages_to(
         new_page, 
         frame, 

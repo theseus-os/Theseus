@@ -45,36 +45,30 @@ const FRAME_SIZE: usize = PAGE_SIZE;
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
 const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
 
-// /// Regions that are pre-designated for special usage, specifically the kernel's initial identity mapping.
-// /// They will be allocated from if an address within them is specifically requested;
-// /// otherwise, they will only be allocated from as a "last resort" once all other non-designated address ranges are exhausted.
-// ///
-// /// Any physical addresses **less than or equal** to this address are considered "designated".
-// /// This lower part of the address range covers from 0x0 to the end of the kernel physical address.
-// /// 
-// // TODO: replace this with the dynamically-discovered end of kernel, bootloader info, or bootloader modules, whichever highest.
-// const DESIGNATED_FRAMES_LOW_END: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x150_0000 - 1));
-// /// Any physical addresses **greater than or equal to** this address are considered "designated".
-// /// Currently there are no designated regions at the higher end of the address space.
-// // TODO: replace this  with Chunks that can each be reserved individually. 
-// const DESIGNATED_FRAMES_HIGH_START: Frame = Frame::containing_address(PhysicalAddress::new_canonical(0x1FFDF000)); // hard-coded end of free phys mem in QEMU
+/// The single, system-wide list of free physical memory frames available for general usage. 
+static FREE_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
+/// The single, system-wide list of free physical memory frames reserved for specific usage. 
+static FREE_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
+// Note that we keep separate lists for "free, general-purpose" areas and "reserved" areas, as it's much faster. 
 
-
-/// The single, system-wide list of free physical memory frames.
-/// This must be initialized during the bootstrap process after we use the bootloader to identify the physical memory map.
-static FREE_FRAME_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
+/// The fixed list of all known regions that are reserved for specific purposes. 
+/// This does not indicate whether these regions are currently allocated, 
+/// rather just where they exist and which regions are known to this allocator.
+static RESERVED_REGIONS: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty());
 
 /// The single, system-wide list of physical memory frames that have already been allocated and are in use. 
-/// This is primarily used to track which regions of physical memory are reserved. 
-/// We don't actually need to store 
-/// We only need to store the custom chunks that were added here (`MemoryType::Reserved`).
+/// This is only needed to track frames allocated from reserved regions (`MemoryType::Reserved`).
+/// We don't actually need to track frames allocated from general-purposes free regions, 
+/// because if a set of allocated frames are deallocated, they're either:
+/// (1) present in this list, meaning they came from a reserved region, or
+/// (2) absent from this list, meaning they came from a free general purpose region. 
 ///
 /// This is necessary to prevent bugs when a device driver or another entity
 /// attempts to add a new custom region of frames. 
 /// If that new custom region overlaps or is a duplicate of another region, it must be forbidden. 
 /// If if overlaps with a free region, that will be detected when trying to allocate it, 
 /// but first we also need to see if that new region overlaps with a region that has already been allocated. 
-static ALLOCATED_FRAME_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
+static ALLOCATED_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
 
 
 /// Initialize the frame allocator with the given list of available and reserved physical memory regions.
@@ -93,8 +87,11 @@ pub fn init<F, R, P>(
           F: IntoIterator<Item = P>,
           R: IntoIterator<Item = P> + Clone,
 {
-    if FREE_FRAME_LIST.lock().len() != 0 || ALLOCATED_FRAME_LIST.lock().len() != 0 {
-        return Err("Frame allocator was already initialized, cannot be initialized twice.");
+    if  FREE_FRAMES_LIST.lock().len() != 0 ||
+        FREE_RESERVED_FRAMES_LIST.lock().len() != 0 ||
+        ALLOCATED_RESERVED_FRAMES_LIST.lock().len() != 0 
+    {
+        return Err("BUG: Frame allocator was already initialized, cannot be initialized twice.");
     }
 
     let mut free_list: [Option<Chunk>; 32] = [None; 32];
@@ -102,11 +99,10 @@ pub fn init<F, R, P>(
     let mut reserved_list: [Option<Chunk>; 32] = [None; 32];
     let mut reserved_list_idx = 0;
 
-    
+    // Populate the list of free regions for general-purpose usage.
     for area in free_physical_memory_areas.into_iter() {
         let area = area.borrow();
-        debug!("Frame Allocator: looking to add free physical memory area: {:?}", area);
-
+        // debug!("Frame Allocator: looking to add free physical memory area: {:?}", area);
         check_and_add_free_region(
             &area,
             &mut free_list,
@@ -115,47 +111,10 @@ pub fn init<F, R, P>(
         );
     }
 
-    // // Ensure that no two chunks overlap.
-    // // Currently we resolve this by merging the overlapping chunks,
-    // // but only if one chunk fully contains another chunk.
-    // // This may be undesirable if we don't want to merge a "reserved" and non-reserved chunk.
-    // let mut indices_to_remove: [Option<usize>; 32] = [None; 32];
-    // let mut itr_index = 0;
-    // for (i, elem_opt) in list[..list_idx].iter().enumerate() {
-    //     let next_idx = i + 1;
-    //     for (other_opt, j) in list[next_idx..list_idx].iter().zip(next_idx..) {
-    //         if let (Some(elem), Some(other)) = (elem_opt, other_opt) {
-    //             if elem.contains(other.start()) && elem.contains(other.end()) {
-    //                 // Here, the `elem` chunk fully contains the entire `other` chunk, 
-    //                 // so we can just delete `other` entirely from the list.
-    //                 indices_to_remove[itr_index] = Some(j);
-    //                 itr_index += 1;
-    //                 continue;
-    //             } 
-    //             if elem.contains(other.start())  ||
-    //                 elem.contains(other.end())   || 
-    //                 other.contains(elem.start()) ||
-    //                 other.contains(elem.end())
-    //             {
-    //                 error!("Physical memory areas {:?} and {:?} overlap, this is logically incorrect and currently unsupported", elem, other);
-    //                 return Err("Physical memory areas are illegally overlapping.");
-    //             }
-    //         }
-    //     }
-    // }
-
-    // // Actually remove the duplicate/overlapping chunks that we found earlier. 
-    // for idx in indices_to_remove.iter().flatten() {
-    //     trace!("### Removed idx {} from list of frame chunks", idx);
-    //     let _removed = list[*idx].take();
-    // }
-
-
-    // Insert all of the reserved memory areas to the free list as well,
-    // while removing/merging duplicate or overlapping areas.
-    for (i, reserved) in reserved_physical_memory_areas.clone().into_iter().enumerate() {
+    // Insert all of the reserved memory areas into the list of free reserved regions,
+    // while de-duplicating overlapping areas by merging them.
+    for reserved in reserved_physical_memory_areas.clone().into_iter() {
         let reserved = reserved.borrow();
-
         let mut reserved_was_merged = false;
         for existing in reserved_list[..reserved_list_idx].iter_mut().flatten() {
             if let Some(_overlap) = existing.overlap(reserved) {
@@ -177,28 +136,24 @@ pub fn init<F, R, P>(
         }
     }
 
-    debug!("------------------ RESERVED_LIST -----------------");
-    reserved_list[..reserved_list_idx].iter().flatten().for_each(|e| debug!("\t {:?}", e) );
-    debug!("--------------------------------------------------");
 
-    // Finally, strictly check that no two regions overlap. 
-    for (i, elem_opt) in free_list[..free_list_idx].iter().enumerate() {
+    // Finally, one last sanity check -- ensure no two regions overlap. 
+    let all_areas = free_list[..free_list_idx].iter().flatten()
+        .chain(reserved_list[..reserved_list_idx].iter().flatten());
+    for (i, elem) in all_areas.clone().enumerate() {
         let next_idx = i + 1;
-        for (other_opt, j) in free_list[next_idx..free_list_idx].iter().zip(next_idx..) {
-            if let (Some(elem), Some(other)) = (elem_opt, other_opt) {
-                if let Some(overlap) = elem.overlap(other) {
-                    error!("BUG: frame allocator free list had overlapping range \n \t {:?} and {:?} overlap at {:?}",
-                        elem, other, overlap,
-                    );
-                }
+        for other in all_areas.clone().skip(next_idx) {
+            if let Some(overlap) = elem.overlap(other) {
+                panic!("BUG: frame allocator free list had overlapping ranges: \n \t {:?} and {:?} overlap at {:?}",
+                    elem, other, overlap,
+                );
             }
-
         }
     }
 
-
-    *FREE_FRAME_LIST.lock() = StaticArrayRBTree::new(free_list);
-
+    *FREE_FRAMES_LIST.lock() = StaticArrayRBTree::new(free_list);
+    *FREE_RESERVED_FRAMES_LIST.lock() = StaticArrayRBTree::new(reserved_list.clone());
+    *RESERVED_REGIONS.lock() = StaticArrayRBTree::new(reserved_list);
     Ok(())
 }
 
@@ -217,29 +172,27 @@ fn check_and_add_free_region<P, R>(
     let mut current_start = *area.start();
     // This will be set to the frame that is the end of the current free region. 
     let mut current_end = *area.end();
-    trace!("looking at sub-area {:X?} to {:X?}", current_start, current_end);
+    // trace!("looking at sub-area {:X?} to {:X?}", current_start, current_end);
 
-    'inner:
     for reserved in reserved_physical_memory_areas.clone().into_iter() {
         let reserved = &reserved.borrow().frames;
-        trace!("\t Comparing with reserved area {:X?}", reserved);
+        // trace!("\t Comparing with reserved area {:X?}", reserved);
         if reserved.contains(&current_start) {
-            info!("\t\t moving current_start from {:X?} to {:X?}", current_start, *reserved.end() + 1);
+            // info!("\t\t moving current_start from {:X?} to {:X?}", current_start, *reserved.end() + 1);
             current_start = *reserved.end() + 1;
         }
         if &current_start <= reserved.start() && reserved.start() <= &current_end {
-        // if reserved.contains(&current_end) {
             // Advance up to the frame right before this reserved region started.
-            info!("\t\t moving current_end from {:X?} to {:X?}", current_end, min(current_end, *reserved.start() - 1));
+            // info!("\t\t moving current_end from {:X?} to {:X?}", current_end, min(current_end, *reserved.start() - 1));
             current_end = min(current_end, *reserved.start() - 1);
             if area.end() <= reserved.end() {
                 // Optimization here: the rest of the current area is reserved,
                 // so there's no need to keep iterating over the reserved areas.
-                info!("\t !!! skipping the rest of the area");
-                break 'inner;
+                // info!("\t !!! skipping the rest of the area");
+                break;
             } else {
                 let after = FrameRange::new(*reserved.end() + 1, *area.end());
-                warn!("moving on to after {:X?}", after);
+                // warn!("moving on to after {:X?}", after);
                 // Here: the current area extends past this current reserved area,
                 // so there might be another free area that starts after this reserved area.
                 check_and_add_free_region(
@@ -286,10 +239,6 @@ impl Deref for PhysicalMemoryRegion {
 pub enum MemoryRegionType {
     /// Memory that is available for any general purpose.
     Free,
-    // /// Memory that is designated by software for specific purposes.
-    // /// Designated memory regions are only allocated from if specifically requested,
-    // /// or all other `Free` memory has already been used, i.e., a last resort. 
-    // Designated,
     /// Memory that is reserved for special use and is only ever allocated from if specifically requested. 
     /// This includes custom memory regions added by third parties, e.g., 
     /// device memory discovered and added by device drivers later during runtime.
@@ -452,7 +401,7 @@ impl Drop for AllocatedFrames {
         trace!("frame_allocator: deallocating {:?}", self);
 
         // Simply add the newly-deallocated chunk to the free frames list.
-        let mut locked_list = FREE_FRAME_LIST.lock();
+        let mut locked_list = FREE_FRAMES_LIST.lock();
         let res = locked_list.insert(Chunk {
             typ: todo!("FIXME chunk type in deallocation"),
             frames: self.frames.clone(),
@@ -481,12 +430,14 @@ impl Drop for AllocatedFrames {
 /// that may result in heap allocation should occur. 
 /// Such actions include adding chunks to lists of free frames or frames in use. 
 /// 
-/// The vast majority of use cases don't  care about such precise control, 
+/// The vast majority of use cases don't care about such precise control, 
 /// so you can simply drop this struct at any time or ignore it
 /// with a `let _ = ...` binding to instantly drop it. 
 pub struct DeferredAllocAction<'list> {
-    /// A reference to the list into which we will insert the free `Chunk`s.
+    /// A reference to the list into which we will insert the free general-purpose `Chunk`s.
     free_list: &'list Mutex<StaticArrayRBTree<Chunk>>,
+    /// A reference to the list into which we will insert the free "reserved" `Chunk`s.
+    reserved_list: &'list Mutex<StaticArrayRBTree<Chunk>>,
     /// A free chunk that needs to be added back to the free list.
     free1: Chunk,
     /// Another free chunk that needs to be added back to the free list.
@@ -497,20 +448,32 @@ impl<'list> DeferredAllocAction<'list> {
         where F1: Into<Option<Chunk>>,
               F2: Into<Option<Chunk>>,
     {
-        let free_list = &FREE_FRAME_LIST;
         let free1 = free1.into().unwrap_or(Chunk::empty());
         let free2 = free2.into().unwrap_or(Chunk::empty());
-        DeferredAllocAction { free_list, free1, free2 }
+        DeferredAllocAction {
+            free_list: &FREE_FRAMES_LIST,
+            reserved_list: &FREE_RESERVED_FRAMES_LIST,
+            free1,
+            free2
+        }
     }
 }
 impl<'list> Drop for DeferredAllocAction<'list> {
     fn drop(&mut self) {
         // Insert all of the chunks, both allocated and free ones, into the list. 
         if self.free1.size_in_frames() > 0 {
-            self.free_list.lock().insert(self.free1.clone()).unwrap();
+            match self.free1.typ {
+                MemoryRegionType::Free => self.free_list.lock().insert(self.free1.clone()).unwrap(),
+                MemoryRegionType::Reserved => self.reserved_list.lock().insert(self.free1.clone()).unwrap(),
+                _ => todo!("DeferredAllocAction doesn't yet support tracking forbidden chunks"),
+            };
         }
         if self.free2.size_in_frames() > 0 {
-            self.free_list.lock().insert(self.free2.clone()).unwrap();
+            match self.free2.typ {
+                MemoryRegionType::Free => self.free_list.lock().insert(self.free2.clone()).unwrap(),
+                MemoryRegionType::Reserved => self.reserved_list.lock().insert(self.free2.clone()).unwrap(),
+                _ => todo!("DeferredAllocAction doesn't yet support tracking forbidden chunks"),
+            };
         }
     }
 }
@@ -620,7 +583,7 @@ fn find_any_chunk<'list>(
                 if num_frames < chunk.size_in_frames() && chunk.typ == MemoryRegionType::Free {
                     return adjust_chosen_chunk(*chunk.start(), num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor));
                 }
-                warn!("Frame allocator: untested scenario: had to search multiple chunks \
+                warn!("Frame allocator: inefficient scenario: had to search multiple chunks \
                     (skipping {:?}) while trying to allocate {} frames at any address.",
                     chunk, num_frames
                 );
@@ -732,17 +695,10 @@ pub fn allocate_frames_deferred(
         return Err("cannot allocate zero frames");
     }
 
-    let mut locked_list = FREE_FRAME_LIST.lock();
-
-    // The main logic of the allocator is to find an appropriate chunk that can satisfy the allocation request.
-    // An appropriate chunk satisfies the following conditions:
-    // - Can fit the requested size (starting at the requested address) within the chunk.
-    // - The chunk can only be within in a designated region if a specific address was requested, 
-    //   or all other non-designated chunks are already in use.
     if let Some(paddr) = requested_paddr {
-        find_specific_chunk(&mut locked_list, Frame::containing_address(paddr), num_frames)
+        find_specific_chunk(&mut FREE_RESERVED_FRAMES_LIST.lock(), Frame::containing_address(paddr), num_frames)
     } else {
-        find_any_chunk(&mut locked_list, num_frames)
+        find_any_chunk(&mut FREE_FRAMES_LIST.lock(), num_frames)
     }.map_err(From::from) // convert from AllocationError to &str
         .map(|(af, _action)| {
             warn!("Allocated {} frames at requested paddr {:?}: {:?}", num_frames, requested_paddr, af);
@@ -820,15 +776,20 @@ pub fn allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -> Result<A
 /// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
 #[doc(hidden)] 
 pub fn convert_to_heap_allocated() {
-    FREE_FRAME_LIST.lock().convert_to_heap_allocated();
+    FREE_FRAMES_LIST.lock().convert_to_heap_allocated();
+    dump_frame_allocator_state();
 }
 
 /// A debugging function used to dump the full internal state of the frame allocator. 
 #[doc(hidden)] 
 pub fn dump_frame_allocator_state() {
-    debug!("--------------- FREE FRAMES LIST ---------------");
-    for c in FREE_FRAME_LIST.lock().iter() {
-        debug!("{:X?}", c);
-    }
-    debug!("---------------------------------------------------");
+    debug!("----------------- FREE GENERAL FRAMES ---------------");
+    FREE_FRAMES_LIST.lock().iter().for_each(|e| debug!("\t {:?}", e) );
+    debug!("-----------------------------------------------------");
+    debug!("----------------- FREE RESERVED FRAMES --------------");
+    FREE_RESERVED_FRAMES_LIST.lock().iter().for_each(|e| debug!("\t {:?}", e) );
+    debug!("-----------------------------------------------------");
+    debug!("------------------ RESERVED REGIONS -----------------");
+    RESERVED_REGIONS.lock().iter().for_each(|e| debug!("\t {:?}", e) );
+    debug!("-----------------------------------------------------");
 }
