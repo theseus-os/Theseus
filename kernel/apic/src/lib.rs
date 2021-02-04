@@ -157,6 +157,8 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
 
     // make sure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
     unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
+
+    memory::dump_frame_allocator_state();
     
     let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;

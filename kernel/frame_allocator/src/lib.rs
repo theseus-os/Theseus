@@ -45,30 +45,16 @@ const FRAME_SIZE: usize = PAGE_SIZE;
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
 const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
 
+// Note: we keep separate lists for "free, general-purpose" areas and "reserved" areas, as it's much faster. 
 /// The single, system-wide list of free physical memory frames available for general usage. 
 static FREE_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
 /// The single, system-wide list of free physical memory frames reserved for specific usage. 
 static FREE_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
-// Note that we keep separate lists for "free, general-purpose" areas and "reserved" areas, as it's much faster. 
 
 /// The fixed list of all known regions that are reserved for specific purposes. 
 /// This does not indicate whether these regions are currently allocated, 
 /// rather just where they exist and which regions are known to this allocator.
 static RESERVED_REGIONS: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty());
-
-/// The single, system-wide list of physical memory frames that have already been allocated and are in use. 
-/// This is only needed to track frames allocated from reserved regions (`MemoryType::Reserved`).
-/// We don't actually need to track frames allocated from general-purposes free regions, 
-/// because if a set of allocated frames are deallocated, they're either:
-/// (1) present in this list, meaning they came from a reserved region, or
-/// (2) absent from this list, meaning they came from a free general purpose region. 
-///
-/// This is necessary to prevent bugs when a device driver or another entity
-/// attempts to add a new custom region of frames. 
-/// If that new custom region overlaps or is a duplicate of another region, it must be forbidden. 
-/// If if overlaps with a free region, that will be detected when trying to allocate it, 
-/// but first we also need to see if that new region overlaps with a region that has already been allocated. 
-static ALLOCATED_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
 
 
 /// Initialize the frame allocator with the given list of available and reserved physical memory regions.
@@ -87,9 +73,9 @@ pub fn init<F, R, P>(
           F: IntoIterator<Item = P>,
           R: IntoIterator<Item = P> + Clone,
 {
-    if  FREE_FRAMES_LIST.lock().len() != 0 ||
+    if  FREE_FRAMES_LIST         .lock().len() != 0 ||
         FREE_RESERVED_FRAMES_LIST.lock().len() != 0 ||
-        ALLOCATED_RESERVED_FRAMES_LIST.lock().len() != 0 
+        RESERVED_REGIONS         .lock().len() != 0 
     {
         return Err("BUG: Frame allocator was already initialized, cannot be initialized twice.");
     }
@@ -243,9 +229,10 @@ pub enum MemoryRegionType {
     /// This includes custom memory regions added by third parties, e.g., 
     /// device memory discovered and added by device drivers later during runtime.
     Reserved,
-    /// Memory that is inaccessible and should never be used, ever.
-    /// Forbidden regions can never be allocated from. 
-    Forbidden,
+    /// Memory of an unknown type.
+    /// This is typically used when free memory was "recovered" 
+    /// from a context where we don't know what type of region it was allocated from. 
+    Unknown,
 }
 
 /// A range of contiguous frames.
@@ -261,7 +248,7 @@ pub enum MemoryRegionType {
 /// since it ignores their actual range of frames.
 #[derive(Debug, Clone, Eq)]
 struct Chunk {
-    /// Whether this chunk is in a free, designated, reserved, or forbidden region.
+    /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
     typ: MemoryRegionType,
     /// The Frames covered by this chunk, an inclusive range. 
     frames: FrameRange,
@@ -276,7 +263,7 @@ impl Chunk {
     /// Returns a new `Chunk` with an empty range of frames. 
     fn empty() -> Chunk {
         Chunk {
-            typ: MemoryRegionType::Forbidden,
+            typ: MemoryRegionType::Unknown,
             frames: FrameRange::empty(),
         }
     }
@@ -398,12 +385,18 @@ impl AllocatedFrames {
 impl Drop for AllocatedFrames {
     fn drop(&mut self) {
         if self.size_in_frames() == 0 { return; }
-        trace!("frame_allocator: deallocating {:?}", self);
+
+        let (list, typ) = if frame_is_in_list(&RESERVED_REGIONS.lock(), self.start()) {
+            (&FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
+        } else {
+            (&FREE_FRAMES_LIST, MemoryRegionType::Free)
+        };
+        trace!("frame_allocator: deallocating {:?}, typ {:?}", self, typ);
 
         // Simply add the newly-deallocated chunk to the free frames list.
-        let mut locked_list = FREE_FRAMES_LIST.lock();
+        let mut locked_list = list.lock();
         let res = locked_list.insert(Chunk {
-            typ: todo!("FIXME chunk type in deallocation"),
+            typ,
             frames: self.frames.clone(),
         });
         match res {
@@ -664,6 +657,93 @@ fn adjust_chosen_chunk(
 }
 
 
+
+/// Returns whether the given `Frame` is contained within the.
+///
+/// Acquires the lock to the `RESERVED_REGIONS` list.
+fn frame_is_in_list(
+    list: &StaticArrayRBTree<Chunk>,
+    frame: &Frame,
+) -> bool {
+    match &list.0 {
+        Inner::Array(ref arr) => {
+            for elem in arr.iter() {
+                if let Some(chunk) = elem {
+                    if chunk.contains(frame) { 
+                        return true;
+                    }
+                }
+            }
+        }
+        Inner::RBTree(ref tree) => {     
+            let cursor = tree.upper_bound(Bound::Included(frame));
+            if let Some(chunk) = cursor.get().map(|w| w.deref()) {
+                if chunk.contains(frame) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+
+
+/// Adds the given `frames` to the given `list` as a Chunk of reserved frames. 
+/// 
+/// Returns the range of **new** frames that were added to the list, 
+/// which will be a subset of the given input `frames`.
+///
+/// Currently, this function adds no new frames at all if any frames within the given `frames` list
+/// overlap any existing regions at all. 
+/// Handling partially-overlapping regions 
+fn add_reserved_region(
+    list: &mut StaticArrayRBTree<Chunk>,
+    frames: FrameRange,
+) -> Result<FrameRange, &'static str> {
+
+    // Check whether the reserved region overlaps any existing regions.
+    match &mut list.0 {
+        Inner::Array(ref mut arr) => {
+            for elem in arr.iter() {
+                if let Some(chunk) = elem {
+                    if let Some(_overlap) = chunk.overlap(&frames) {
+                        error!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                            frames, _overlap, chunk
+                        );
+                        return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
+                    }
+                }
+            }
+        }
+        Inner::RBTree(ref mut tree) => {
+            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(frames.start()));
+            while let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
+                if chunk.start() > frames.end() {
+                    // We're iterating in ascending order over a sorted tree,
+                    // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
+                    break;
+                }
+                if let Some(_overlap) = chunk.overlap(&frames) {
+                    error!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                        frames, _overlap, chunk
+                    );
+                    return Err("Failed to add reserved region that overlapped with existing reserved regions (RBTree).");
+                }
+                cursor_mut.move_next();
+            }
+        }
+    }
+
+    list.insert(Chunk {
+        typ: MemoryRegionType::Reserved,
+        frames: frames.clone(),
+    }).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+
+    Ok(frames)
+}
+
 /// The core frame allocation routine that allocates the given number of physical frames,
 /// optionally at the requested starting `PhysicalAddress`.
 /// 
@@ -696,7 +776,25 @@ pub fn allocate_frames_deferred(
     }
 
     if let Some(paddr) = requested_paddr {
-        find_specific_chunk(&mut FREE_RESERVED_FRAMES_LIST.lock(), Frame::containing_address(paddr), num_frames)
+        let start_frame = Frame::containing_address(paddr);
+        // Try to allocate the frames at the specific address.
+        // If it fails, add the requested address as a new reserved region and then retry the allocation.
+        let mut free_reserved_frames_list = FREE_RESERVED_FRAMES_LIST.lock();
+        match find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames) {
+            Err(_e) => {
+                let frames = FrameRange::new(start_frame, start_frame + (num_frames - 1));
+                trace!("FrameAllocator: trying to add new reserved region {:?}", frames);
+                let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames.clone())?;
+                trace!("FrameAllocator: trying to add free reserved frames {:?} (original {:?})", new_reserved_frames, frames);
+                // If we successfully added a new reserved region,
+                // then add those frames to the actual list of *available* reserved regions.
+                let _new_free_reserved_frames = add_reserved_region(&mut free_reserved_frames_list, new_reserved_frames.clone())?;
+                trace!("FrameAllocator: added free reserved frames {:?} (original {:?})", _new_free_reserved_frames, frames);
+                assert_eq!(new_reserved_frames, _new_free_reserved_frames);
+                find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames)
+            }
+            success => success,
+        }
     } else {
         find_any_chunk(&mut FREE_FRAMES_LIST.lock(), num_frames)
     }.map_err(From::from) // convert from AllocationError to &str
