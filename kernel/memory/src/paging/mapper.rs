@@ -25,11 +25,11 @@ pub struct Mapper {
 }
 
 impl Mapper {
-    pub fn from_current() -> Mapper {
+    pub(crate) fn from_current() -> Mapper {
         Self::with_p4_frame(get_current_p4())
     }
 
-    pub fn with_p4_frame(p4: Frame) -> Mapper {
+    pub(crate) fn with_p4_frame(p4: Frame) -> Mapper {
         Mapper { 
             p4: Unique::new(P4).unwrap(), // cannot panic because we know the P4 value is valid
             target_p4: p4,
@@ -373,11 +373,10 @@ impl MappedPages {
     /// allowing the caller to continue using them directly, e.g., reusing them for a future mapping. 
     /// This removes the need to attempt to to reallocate those same pages or frames on a separate code path.
     ///
-    /// Note that only the first contiguous range of `AllocatedFrames` will be returned,
-    /// all other non-contiguous ranges will be auto-dropped and deallocated.
+    /// Note that only the first contiguous range of `AllocatedFrames` will be returned, if any were unmapped.
+    /// All other non-contiguous ranges will be auto-dropped and deallocated.
     /// This is due to how frame deallocation works.
-    #[doc(hidden)]
-    pub(crate) fn unmap_into_parts(mut self, active_table_mapper: &mut Mapper) -> Result<(AllocatedPages, AllocatedFrames), Self> {
+    pub fn unmap_into_parts(mut self, active_table_mapper: &mut Mapper) -> Result<(AllocatedPages, Option<AllocatedFrames>), Self> {
         match self.unmap(active_table_mapper) {
             Ok(first_frames) => {
                 let pages = mem::replace(&mut self.pages, AllocatedPages::empty());
@@ -391,18 +390,26 @@ impl MappedPages {
     }
 
 
-    /// Remove the virtual memory mapping for the given `Page`s.
-    /// This should NOT be public because it should only be invoked when a `MappedPages` object is dropped.
+    /// Remove the virtual memory mapping represented by this `MappedPages`.
+    ///
+    /// This must NOT be public because it does not take ownership of this `MappedPages` object (`self`).
+    /// This is to allow it to be invoked from the `MappedPages` drop handler.
     ///
     /// Returns the **first, contiguous** range of frames that was mapped to these pages.
     /// If there are multiple discontiguous ranges of frames that were unmapped, 
     /// or the frames were not mapped bijectively (i.e., multiple pages mapped to these frames),
-    /// then only the first range will be returned
+    /// then only the first contiguous range of frames will be returned.
     ///
-    /// TODO: FIXME: consider changing this to `Result<Option<AllocatedFrames>>` 
-    ///              instead of using `Ok(AllocatedFrames::empty())` to mean `Ok(None)`
-    fn unmap(&mut self, active_table_mapper: &mut Mapper) -> Result<AllocatedFrames, &'static str> {
-        if self.size_in_pages() == 0 { return Ok(AllocatedFrames::empty()); }
+    /// TODO: a few optional improvements could be made here:
+    ///   (1) Accept an `Option<&mut Vec<AllocatedFrames>>` argument that allows the caller to 
+    ///       recover **all** `AllocatedFrames` unmapped during this function, not just the first contiguous frame range.
+    ///   (2) Redesign this to take/consume `self` by ownership, and expose it as the only unmap function,
+    ///       avoiding the need for a separate `unmap_into_parts()` function. 
+    ///       We could then use `mem::replace(&mut self, MappedPages::empty())` in the drop handler 
+    ///       to obtain ownership of `self`, which would allow us to transfer ownership of the dropped `MappedPages` here.
+    ///
+    fn unmap(&mut self, active_table_mapper: &mut Mapper) -> Result<Option<AllocatedFrames>, &'static str> {
+        if self.size_in_pages() == 0 { return Ok(None); }
 
         if active_table_mapper.target_p4 != self.page_table_p4 {
             error!("BUG: MappedPages::unmap(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
@@ -425,22 +432,22 @@ impl MappedPages {
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or("mapping code does not support huge pages")?;
             
-            let frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
+            let unmapped_frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
             p1[page.p1_index()].set_unused();
 
             tlb_flush_virt_addr(page.start_address());
             
-            // TODO: deallocate contiguous ranges of frames here based on the `_frame` of the p1 (PTE) entry above.
-
+            // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frame`
+            // freed from the newly-cleared p1 (PTE) entry above.
             if let Some(ref mut range) = frame_range {
-                if frame == *range.end() + 1 {
-                    // the current `frame` is contiguously after the end of the existing frame range, so extend it
-                    *range = FrameRange::new(*range.start(), frame);
-                } else if frame == *range.start() - 1 {
-                    // the current `frame` is contiguously before the beginning of the existing frame range, so extend it
-                    *range = FrameRange::new(frame, *range.end());
+                if unmapped_frame == *range.end() + 1 {
+                    // `unmapped_frame` comes contiguously right after the end of the existing frame range, so extend it
+                    *range = FrameRange::new(*range.start(), unmapped_frame);
+                } else if unmapped_frame == *range.start() - 1 {
+                    // `unmapped_frame` comes contiguously right before the beginning of the existing frame range, so extend it
+                    *range = FrameRange::new(unmapped_frame, *range.end());
                 } else {
-                    // The current `frame` is NOT contiguous with the existing frame range,
+                    // `unmapped_frame` is NOT contiguous with the existing frame range,
                     // so we "finish" the current range and then start a new one.
                     if first_frame_range.is_none() {
                         // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
@@ -449,13 +456,13 @@ impl MappedPages {
                         // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
                         // otherwise there will not be any other opportunity for it to be dropped.
                         let _af = unsafe { AllocatedFrames::from_parts_unsafe(range.clone()) };
-                        trace!("MappedPages::unmap(): dropping {:?}", _af);
+                        trace!("MappedPages::unmap(): dropping additional non-contiguous frames {:?}", _af);
                     }
 
                     frame_range = None;
                 }
             } else {
-                frame_range = Some(FrameRange::new(frame, frame));
+                frame_range = Some(FrameRange::new(unmapped_frame, unmapped_frame));
             }
         }
     
@@ -467,8 +474,11 @@ impl MappedPages {
         }
 
         // Ensure that we return at least some frame range, even if we broke out of the above loop early.
-        let first_frame_range = first_frame_range.unwrap_or(frame_range.unwrap_or(FrameRange::empty()));
-        Ok(unsafe { AllocatedFrames::from_parts_unsafe(first_frame_range) })
+        Ok(
+            first_frame_range
+                .or(frame_range)
+                .map(|fr| unsafe { AllocatedFrames::from_parts_unsafe(fr) })
+        )
     }
 
 
@@ -730,14 +740,14 @@ pub fn mapped_pages_unmap(
     mapped_pages: &mut MappedPages,
     mapper: &mut Mapper,
 ) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper)
+    mapped_pages.unmap(mapper)?;
+    Ok(())
 }
 
 
 impl Drop for MappedPages {
     fn drop(&mut self) {
-        if self.size_in_pages() == 0 { return; }
-        trace!("MappedPages::drop(): unmapping MappedPages {:?}", &*self.pages);
+        if self.size_in_pages() > 0 { trace!("MappedPages::drop(): unmapped MappedPages {:?}", &*self.pages); }
         
         let mut mapper = Mapper::from_current();
         if let Err(e) = self.unmap(&mut mapper) {
@@ -745,7 +755,7 @@ impl Drop for MappedPages {
         }
 
         // Note that the AllocatedPages will automatically be dropped here too,
-        // we do not need to call anything to make that happen
+        // we do not need to call anything to make that happen.
     }
 }
 

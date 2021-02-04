@@ -61,7 +61,10 @@ impl TemporaryPage {
 
     /// Call this to clean up a `TemporaryPage` instead of just letting it be dropped.
     /// A simple wrapper around `MappedPages::unmap_into_parts()`.
-    pub fn unmap_into_parts(mut self, page_table: &mut PageTable) -> Result<(AllocatedPages, AllocatedFrames), &'static str> {
+    ///
+    /// This is useful for unmapping pages but still maintaining ownership of the previously-mapped pages and frames
+    /// without having them be auto-dropped as normal.
+    pub fn unmap_into_parts(mut self, page_table: &mut PageTable) -> Result<(AllocatedPages, Option<AllocatedFrames>), &'static str> {
         if let Some(mp) = self.mapped_page.take() {
             mp.unmap_into_parts(page_table).map_err(|e_mp| {
                 error!("TemporaryPage::unmap_into_parts(): failed to unmap internal {:?}", e_mp);

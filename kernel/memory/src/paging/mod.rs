@@ -108,7 +108,7 @@ impl PageTable {
 
         Ok( PageTable { 
             mapper: Mapper::with_p4_frame(p4_frame),
-            p4_table: inited_new_p4_frame,
+            p4_table: inited_new_p4_frame.ok_or("BUG: PageTable::new_table(): failed to take back unmapped Frame for p4_table")?,
         })
     }
 
@@ -157,7 +157,7 @@ impl PageTable {
         // Here, recover the current page table's p4 frame and restore it into this current page table,
         // since we removed it earlier at the top of this function and gave it to the temporary page. 
         let (_temp_page, p4_frame) = temporary_page.unmap_into_parts(self)?;
-        self.p4_table = p4_frame;
+        self.p4_table = p4_frame.ok_or("BUG: PageTable::with(): failed to take back unmapped Frame for p4_table")?;
 
         ret
     }

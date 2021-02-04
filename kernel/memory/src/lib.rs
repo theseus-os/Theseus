@@ -44,7 +44,6 @@ use memory_x86_64::*;
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
 
-use core::cmp::{min, max};
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
@@ -165,50 +164,13 @@ pub fn init(
     let kernel_frames       = FrameRange::from_phys_addr(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value());
     let boot_modules_frames = FrameRange::from_phys_addr(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value());
     let boot_info_frames    = FrameRange::from_phys_addr(boot_info_paddr_start, boot_info_paddr_end.value() - boot_info_paddr_start.value());
-
+    
     // Add the VGA display's memory region to the list of reserved physical memory areas.
+    // Currently this is covered by the first 1MiB region, but it's okay to duplicate it here.
     let (vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()?;
     let vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
     
-
-    // This iterator covers *all* memory areas, not just those classified as "available" by multiboot. 
-    let memory_areas = boot_info.memory_map_tag()
-        .ok_or("Multiboot2 boot information has no physical memory map information")?
-        .all_memory_areas();
-
-
-        // // A closure that returns the highest frame within the given `region`
-        // // that is not within a reserved region.
-        // let find_end_free_frame = |region: &FrameRange| -> Frame {
-        //     // By default, we return the end frame of the region.
-        //     let mut end_frame = *region.end(); 
-        //     for reserved in &reserved_regions {
-        //         if reserved.start() >= region.start() {
-        //             end_frame = min(*reserved.start() - 1, end_frame);
-        //         } else if reserved.contains(region.start()) {
-        //             // the whole region is reserved
-        //             end_frame = *region.start() - 1;
-        //         }
-        //     }
-        //     end_frame
-        // };
-
-        // // A closure that returns the highest frame within the given `region`
-        // // that **is** within a reserved region.
-        // let find_end_free_frame = |region: &FrameRange| -> Frame {
-        //     // By default, we return the end frame of the region.
-        //     let mut end_frame = *region.end(); 
-        //     for reserved in &reserved_regions {
-        //         if reserved.start() >= region.start() {
-        //             end_frame = min(*reserved.start() - 1, end_frame);
-        //         } else if reserved.contains(region.start()) {
-        //             // the whole region is reserved
-        //             end_frame = *region.start() - 1;
-        //         }
-        //     }
-        //     end_frame
-        // };
-
+    // Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
     let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
     let mut free_index = 0;
     let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
@@ -225,9 +187,11 @@ pub fn init(
     reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
     reserved_index += 1;
 
-    for area in memory_areas {
+    for area in boot_info.memory_map_tag()
+        .ok_or("Multiboot2 boot information has no physical memory map information")?
+        .all_memory_areas()
+    {
         let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start_address() as usize), area.size() as usize);
-        warn!("Multiboot2 Memory area: {:X?}", area);
         if area.typ() == multiboot2::MemoryAreaType::Available {
             free_regions[free_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
             free_index += 1;
@@ -237,35 +201,8 @@ pub fn init(
         }
     }
 
-    warn!("FREE REGIONS: {:X?}", free_regions);
-    warn!("RESERVED REGIONS: {:X?}", reserved_regions);
-    
-    for (i, range1) in free_regions.iter().flatten().chain(reserved_regions.iter().flatten()).enumerate() {
-        for (j, range2) in free_regions.iter().flatten().chain(reserved_regions.iter().flatten()).enumerate() {
-            if i == j { continue; }
-            let overlap1 = range1.start() <= range2.end() && range1.end() >= range2.start();
-            let one = max(*range1.start(), *range2.start());
-            let two = min(*range1.end(),   *range2.end());
-            let overlap2 = one <= two;
-            if overlap1 != overlap2 { error!("BUG1, {:?} {:?}", range1, range2); }
-            if overlap1 != range1.overlap(range2).is_some() { error!("BUG2, {:?} {:?}", range1, range2); }
-
-            if overlap1 { // if they overlap
-                if one <= two {
-                    debug!("\n Range {:?} and \n Range {:?} overlap, from {:?} ..= {:?}",
-                        range1, range2, one, two,
-                    );
-                } else {
-                    error!("BUG: Ranges {:?} and {:?} didn't overlap, from {:?} ..= {:?}",
-                        range1, range2, one, two,
-                    );
-                }
-            }
-        }
-    }
-
     frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
-    warn!("Initialized new frame allocator!");
+    debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
 
