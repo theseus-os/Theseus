@@ -6,39 +6,42 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+cfg-if = "1.0.0"
 spin = "0.4.10"
-bitflags = "1.1.0"
-multiboot2 = "0.7.1"
-xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-bit_field = "0.7.0"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" }
 zerocopy = "0.3.0"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.memory_x86_64]
-path = "../memory_x86_64"
 
 [dependencies.memory_structs]
 path = "../memory_structs"
 
 [dependencies.page_allocator]
 path = "../page_allocator"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+bitflags = "1.1.0"
+multiboot2 = "0.7.1"
+xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
+bit_field = "0.7.0"
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.log]
+version = "0.4.8"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.kernel_config]
+path = "../kernel_config"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.memory_x86_64]
+path = "../memory_x86_64"
 
 [lib]
 crate-type = ["rlib"]

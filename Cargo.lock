@@ -930,7 +930,6 @@ dependencies = [
  "log",
  "memory",
  "spin",
- "x86_64",
 ]
 
 [[package]]
@@ -1370,6 +1369,8 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 1.0.0",
+ "cortex-m-semihosting",
  "log",
  "serial_port",
  "spin",
@@ -1437,11 +1438,8 @@ name = "memfs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety",
- "log",
  "memory",
  "spin",
- "x86_64",
 ]
 
 [[package]]
@@ -1460,6 +1458,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "cfg-if 1.0.0",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -1662,18 +1661,19 @@ dependencies = [
  "cfg-if 1.0.0",
  "cortex-m 0.6.7",
  "cortex-m-rt",
- "cortex-m-semihosting",
  "exceptions_early",
  "irq_safety",
  "kernel_config",
  "log",
  "logger",
+ "memfs",
  "memory",
  "memory_initialization",
  "mod_mgmt",
  "multiboot2",
  "panic-halt",
  "panic_entry",
+ "root",
  "spin",
  "stack",
  "state_store",
@@ -1830,8 +1830,10 @@ dependencies = [
 name = "page_allocator"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 1.0.0",
  "intrusive-collections",
  "kernel_config",
+ "lazy_static",
  "log",
  "memory_structs",
  "spin",
@@ -2215,7 +2217,6 @@ dependencies = [
  "lazy_static",
  "log",
  "spin",
- "x86_64",
 ]
 
 [[package]]

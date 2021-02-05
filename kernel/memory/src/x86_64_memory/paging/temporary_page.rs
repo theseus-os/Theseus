@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use {FrameRange};
-use paging::{PageTable, MappedPages};
+use super::paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
 use super::{Frame, FrameAllocator, VirtualAddress};
 use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};

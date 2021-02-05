@@ -18,19 +18,19 @@
 #![no_std]
 
 #[macro_use] extern crate cfg_if;
+#[macro_use] extern crate log;
+extern crate logger;
 
 cfg_if!{
 // Architecture dependent code for x86_64.
 if #[cfg(target_arch="x86_64")] {
 
-#[macro_use] extern crate log;
 extern crate alloc;
 extern crate spin;
 extern crate multiboot2;
 extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
-extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate stack;
@@ -262,19 +262,35 @@ mod truncate;
 else if #[cfg(target_arch="arm")] {
 
 extern crate alloc;
+extern crate memfs;
+extern crate root;
 extern crate cortex_m;
 extern crate panic_halt;
 extern crate memory_initialization;
 #[macro_use] extern crate cortex_m_rt;
-#[macro_use] extern crate cortex_m_semihosting;
 
 use alloc::string::String;
+use memfs::MemFile;
 
 #[entry]
 fn main() -> ! {
     memory_initialization::init_memory_management();
-    let s = String::from("hello world!");
-    hprintln!("{}", &s).unwrap();
+    logger::init().unwrap();
+
+    info!("memory and logging initialized");
+
+    let heap_hello = String::from("hello world!");
+
+    let file = MemFile::new("filename".into(), root::get_root()).unwrap();
+    file.lock().write("hello world!".as_bytes(), 0).unwrap();
+
+    let mut buf = [0u8; 20];
+    let len = file.lock().read(&mut buf, 0).unwrap();
+    let memfile_hello = core::str::from_utf8(&buf[0..len]).unwrap();
+
+    info!("heap: {}", &heap_hello);
+    info!("memfile: {}", &memfile_hello);
+
     loop {}
 }
 

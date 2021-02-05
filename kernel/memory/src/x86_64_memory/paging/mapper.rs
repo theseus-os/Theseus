@@ -12,8 +12,8 @@ use core::ops::Deref;
 use core::ptr::Unique;
 use core::slice;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, get_frame_allocator_ref, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
-use paging::{PageRange, get_current_p4};
-use paging::table::{P4, Table, Level4};
+use super::paging::{PageRange, get_current_p4};
+use super::paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
 use irq_safety::MutexIrqSafe;
 use super::{EntryFlags, tlb_flush_virt_addr};
@@ -306,7 +306,7 @@ impl MappedPages {
     pub fn deep_copy<A: FrameAllocator>(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper, allocator: &mut A) -> Result<MappedPages, &'static str> {
         let size_in_pages = self.size_in_pages();
 
-        use paging::allocate_pages;
+        use super::paging::allocate_pages;
         let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
 
         // we must temporarily map the new pages as Writable, since we're about to copy data into them

@@ -386,12 +386,12 @@ preserve_old_modules:
 
 ### Build for Cortex-m4 targets. Currently it only builds the nanocore.
 arm:
-	cargo build -p nano_core -p memory_structs --target thumbv7em-none-eabi
+	cargo build -p nano_core --target thumbv7em-none-eabi --release
 	arm-none-eabi-ld \
-		-T target/thumbv7em-none-eabi/debug/build/cortex-m-rt*/out/link.x \
+		-T target/thumbv7em-none-eabi/release/build/cortex-m-rt*/out/link.x \
 		--nmagic \
 		-o target/thumbv7em-none-eabi/theseus.bin \
-		target/thumbv7em-none-eabi/debug/libnano_core.a
+		target/thumbv7em-none-eabi/release/libnano_core.a
 
 ### Run the build for Cortex-m4 with QEMU.
 run-arm: arm

@@ -5,13 +5,17 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+cfg-if = "1.0.0"
+log = "0.4.8"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
 spin = "0.4.10"
 
-[dependencies.serial_port]
+[target.'cfg(target_arch = "x86_64")'.dependencies.serial_port]
 path = "../serial_port"
 
-[dependencies.log]
-version = "0.4.8"
+[target.'cfg(target_arch = "arm")'.dependencies.cortex-m-semihosting]
+version = "0.3.7"
 
 
 [lib]

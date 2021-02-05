@@ -9,7 +9,6 @@ extern crate alloc;
 extern crate spin;
 extern crate fs_node;
 extern crate memory;
-extern crate irq_safety;
 
 
 // use alloc::vec::Vec;
