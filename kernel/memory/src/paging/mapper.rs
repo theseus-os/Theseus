@@ -123,7 +123,7 @@ impl Mapper {
     }
 
 
-    /// Maps the given `AllocatedPages` to the given physical frames.
+    /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
     pub fn map_allocated_pages_to(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags)
@@ -154,7 +154,7 @@ impl Mapper {
                 return Err("map_allocated_pages_to(): page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::PRESENT);
         }
 
         // Currently we forget the actual AllocatedPages object because
@@ -198,7 +198,7 @@ impl Mapper {
                 return Err("map_allocated_pages(): page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::PRESENT);
         }
 
         Ok(MappedPages {
@@ -356,7 +356,7 @@ impl MappedPages {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, new_flags | EntryFlags::PRESENT);
 
             tlb_flush_virt_addr(page.start_address());
         }
@@ -431,12 +431,15 @@ impl MappedPages {
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or("mapping code does not support huge pages")?;
-            
-            let unmapped_frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
-            p1[page.p1_index()].set_unused();
+            let pte = &mut p1[page.p1_index()];
+            if pte.is_unused() {
+                return Err("unmap(): page not mapped");
+            }
+
+            let unmapped_frames = pte.set_unmapped();
 
             tlb_flush_virt_addr(page.start_address());
-            
+
             // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frame`
             // freed from the newly-cleared p1 (PTE) entry above.
             if let Some(ref mut range) = frame_range {
@@ -758,4 +761,3 @@ impl Drop for MappedPages {
         // we do not need to call anything to make that happen.
     }
 }
-

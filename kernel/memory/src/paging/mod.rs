@@ -7,7 +7,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-mod entry;
 mod temporary_page;
 mod mapper;
 #[cfg(not(mapper_spillful))]
@@ -16,7 +15,7 @@ mod table;
 pub mod table;
 
 
-pub use self::entry::*;
+pub use page_table_entry::*;
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
 
@@ -91,16 +90,7 @@ impl PageTable {
         {
             let table = temporary_page.map_table_frame(new_p4_frame, current_page_table)?;
             table.zero();
-
-            table[RECURSIVE_P4_INDEX].set(p4_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-
-            // Note: now that virtual pages are all dynamically allocated,
-            //       we don't want to copy any mappings by default. 
-            //
-            // // start out by copying all the kernel sections into the new table
-            // table.copy_entry_from_table(current_page_table.p4(), KERNEL_TEXT_P4_INDEX);
-            // table.copy_entry_from_table(current_page_table.p4(), KERNEL_HEAP_P4_INDEX);
-            // table.copy_entry_from_table(current_page_table.p4(), KERNEL_STACK_P4_INDEX);
+            table[RECURSIVE_P4_INDEX].set_entry(p4_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
         }
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -138,7 +128,7 @@ impl PageTable {
         let p4_table = temporary_page.map_table_frame(this_p4, self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set(*other_table.p4_table.start(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
+        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(*other_table.p4_table.start(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
         tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -151,7 +141,7 @@ impl PageTable {
         self.mapper.target_p4 = active_p4_frame;
 
         // restore recursive mapping to original p4 table
-        p4_table[RECURSIVE_P4_INDEX].set(active_p4_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
+        p4_table[RECURSIVE_P4_INDEX].set_entry(active_p4_frame, EntryFlags::PRESENT | EntryFlags::WRITABLE);
         tlb_flush_all();
 
         // Here, recover the current page table's p4 frame and restore it into this current page table,

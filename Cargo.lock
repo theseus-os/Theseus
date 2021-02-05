@@ -772,6 +772,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
+ "page_table_entry",
  "spin",
  "static_assertions",
 ]
@@ -1342,6 +1343,7 @@ dependencies = [
  "memory_x86_64",
  "multiboot2",
  "page_allocator",
+ "page_table_entry",
  "spin",
  "x86_64",
  "xmas-elf",
@@ -1687,6 +1689,16 @@ dependencies = [
  "memory_structs",
  "spin",
  "static_assertions",
+]
+
+[[package]]
+name = "page_table_entry"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "kernel_config",
+ "memory_structs",
+ "zerocopy",
 ]
 
 [[package]]

@@ -20,6 +20,7 @@ extern crate bit_field;
 extern crate memory_x86_64;
 extern crate x86_64;
 extern crate memory_structs;
+extern crate page_table_entry;
 extern crate page_allocator;
 extern crate frame_allocator;
 extern crate zerocopy;

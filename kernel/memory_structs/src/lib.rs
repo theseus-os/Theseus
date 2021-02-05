@@ -22,7 +22,7 @@ use core::{
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
-use entryflags_x86_64::EntryFlags;
+pub use entryflags_x86_64::EntryFlags;
 use zerocopy::FromBytes;
 
 /// A virtual memory address, which is a `usize` under the hood.
@@ -443,24 +443,24 @@ impl Page {
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.
-    pub fn p4_index(&self) -> usize {
+    pub const fn p4_index(&self) -> usize {
         (self.number >> 27) & 0x1FF
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list.
-    pub fn p3_index(&self) -> usize {
+    pub const fn p3_index(&self) -> usize {
         (self.number >> 18) & 0x1FF
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    pub fn p2_index(&self) -> usize {
+    pub const fn p2_index(&self) -> usize {
         (self.number >> 9) & 0x1FF
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
     /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped `Frame` (or its physical address) using `pointed_frame()`.
-    pub fn p1_index(&self) -> usize {
+    pub const fn p1_index(&self) -> usize {
         (self.number >> 0) & 0x1FF
     }
 }

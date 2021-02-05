@@ -26,9 +26,9 @@ extern crate alloc;
 extern crate kernel_config;
 extern crate memory_structs;
 extern crate spin;
+extern crate page_table_entry;
 #[macro_use] extern crate static_assertions;
 extern crate intrusive_collections;
-use intrusive_collections::Bound;
 
 
 mod static_array_rb_tree;
@@ -39,6 +39,8 @@ use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut
 use kernel_config::memory::*;
 use memory_structs::{PhysicalAddress, Frame, FrameRange};
 use spin::Mutex;
+use intrusive_collections::Bound;
+use page_table_entry::UnmappedFrames;
 use static_array_rb_tree::*;
 
 const FRAME_SIZE: usize = PAGE_SIZE;
@@ -379,6 +381,14 @@ impl AllocatedFrames {
     #[doc(hidden)]
     pub unsafe fn from_parts_unsafe(frames: FrameRange) -> AllocatedFrames {
         AllocatedFrames { frames }
+    }
+}
+
+impl Into<AllocatedFrames> for UnmappedFrames {
+    fn into(self) -> AllocatedFrames {
+        AllocatedFrames {
+            frames: self.deref().clone(),
+        }
     }
 }
 
