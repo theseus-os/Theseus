@@ -336,16 +336,25 @@ impl AllocatedFrames {
     /// Merges the given `AllocatedFrames` object `ap` into this `AllocatedFrames` object (`self`).
     /// This is just for convenience and usability purposes, it performs no allocation or remapping.
     ///
-    /// The `ap` must be physically contiguous and come immediately after `self`,
-    /// that is, `self.end` must equal `ap.start`. 
-    /// If this condition is met, `self` is modified and `Ok(())` is returned,
+    /// The given `ap` must be physically contiguous with `self`, i.e., come immediately before or after `self`.
+    /// That is, either `self.start == ap.end + 1` or `self.end + 1 == ap.start` must be true. 
+    ///
+    /// If either of those conditions are met, `self` is modified and `Ok(())` is returned,
     /// otherwise `Err(ap)` is returned.
     pub fn merge(&mut self, ap: AllocatedFrames) -> Result<(), AllocatedFrames> {
-        // make sure the frames are contiguous
-        if *ap.start() != (*self.end() + 1) {
+        if *self.start() == *ap.end() + 1 {
+            // `ap` comes contiguously before `self`
+            self.frames = FrameRange::new(*self.start(), *ap.end());
+        } 
+        else if *self.end() + 1 == *ap.start() {
+            // `self` comes contiguously before `ap`
+            self.frames = FrameRange::new(*ap.start(), *self.end());
+        }
+        else {
+            // non-contiguous
             return Err(ap);
         }
-        self.frames = FrameRange::new(*self.start(), *ap.end());
+
         // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
         core::mem::forget(ap); 
         Ok(())
@@ -384,6 +393,12 @@ impl AllocatedFrames {
     }
 }
 
+// The `UnmappedFrames` type represents frames that have been unmapped
+// from a page that had exclusively mapped them,
+// meaning that no other pages have been mapped to those same frames.
+//
+// Therefore, they can be safely converted into `AllocatedFrames`
+// which can then be dropped and subsequently deallocated.
 impl Into<AllocatedFrames> for UnmappedFrames {
     fn into(self) -> AllocatedFrames {
         AllocatedFrames {

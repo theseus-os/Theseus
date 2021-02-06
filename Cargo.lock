@@ -629,6 +629,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "multiboot2",
+ "static_assertions",
  "xmas-elf",
 ]
 

@@ -36,11 +36,12 @@ use zerocopy::FromBytes;
 pub struct PageTableEntry(u64);
 
 impl PageTableEntry {
+    /// Returns `true` if this entry is unused, i.e., cleared/zeroed out.
     pub fn is_unused(&self) -> bool {
         self.0 == 0
     }
 
-    /// Zeroes out this entry. 
+    /// Zeroes out this entry, setting it as "unused".
     pub fn zero(&mut self) {
         self.0 = 0;
     }
