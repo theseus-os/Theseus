@@ -344,11 +344,11 @@ impl AllocatedFrames {
     pub fn merge(&mut self, ap: AllocatedFrames) -> Result<(), AllocatedFrames> {
         if *self.start() == *ap.end() + 1 {
             // `ap` comes contiguously before `self`
-            self.frames = FrameRange::new(*self.start(), *ap.end());
+            self.frames = FrameRange::new(*ap.start(), *self.end());
         } 
         else if *self.end() + 1 == *ap.start() {
             // `self` comes contiguously before `ap`
-            self.frames = FrameRange::new(*ap.start(), *self.end());
+            self.frames = FrameRange::new(*self.start(), *ap.end());
         }
         else {
             // non-contiguous

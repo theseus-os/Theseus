@@ -11,7 +11,7 @@ use core::mem;
 use core::ops::Deref;
 use core::ptr::Unique;
 use core::slice;
-use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, AllocatedPages, AllocatedFrames}; 
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
@@ -36,11 +36,11 @@ impl Mapper {
         }
     }
 
-    pub fn p4(&self) -> &Table<Level4> {
+    pub(crate) fn p4(&self) -> &Table<Level4> {
         unsafe { self.p4.as_ref() }
     }
 
-    pub fn p4_mut(&mut self) -> &mut Table<Level4> {
+    pub(crate) fn p4_mut(&mut self) -> &mut Table<Level4> {
         unsafe { self.p4.as_mut() }
     }
 
@@ -129,9 +129,13 @@ impl Mapper {
     pub fn map_allocated_pages_to(&mut self, pages: AllocatedPages, frames: AllocatedFrames, flags: EntryFlags)
         -> Result<MappedPages, &'static str>
     {
+        let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        let mut top_level_flags = flags.clone();
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
+        // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
+        // because another page table frame may re-use (create another alias for) it without us knowing here.
+        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped as
+        top_level_flags.set(EntryFlags::EXCLUSIVE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
         let pages_count = pages.size_in_pages();
@@ -154,7 +158,7 @@ impl Mapper {
                 return Err("map_allocated_pages_to(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT);
         }
 
         // Currently we forget the actual AllocatedPages object because
@@ -177,9 +181,13 @@ impl Mapper {
     pub fn map_allocated_pages(&mut self, pages: AllocatedPages, flags: EntryFlags)
         -> Result<MappedPages, &'static str>
     {
+        let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        let mut top_level_flags = flags.clone();
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
+        // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
+        // because another page table frame may re-use (create another alias for) it without us knowing here.
+        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped as
+        top_level_flags.set(EntryFlags::EXCLUSIVE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
         for page in pages.deref().clone() {
@@ -198,7 +206,7 @@ impl Mapper {
                 return Err("map_allocated_pages(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT);
         }
 
         Ok(MappedPages {
