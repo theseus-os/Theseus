@@ -17,6 +17,7 @@ use paging::table::{P4, Table, Level4};
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
+use page_table_entry::UnmapResult;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -131,12 +132,13 @@ impl Mapper {
     {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
+        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
         // because another page table frame may re-use (create another alias for) it without us knowing here.
-        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped as
+        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped truly exclusively using this function.
         top_level_flags.set(EntryFlags::EXCLUSIVE, false);
-        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
+        let actual_flags = flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT;
 
         let pages_count = pages.size_in_pages();
         let frames_count = frames.size_in_frames();
@@ -158,7 +160,7 @@ impl Mapper {
                 return Err("map_allocated_pages_to(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, actual_flags);
         }
 
         // Currently we forget the actual AllocatedPages object because
@@ -170,7 +172,7 @@ impl Mapper {
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
             pages,
-            flags,
+            flags: actual_flags,
         })
     }
 
@@ -183,12 +185,13 @@ impl Mapper {
     {
         let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
+        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
         // because another page table frame may re-use (create another alias for) it without us knowing here.
-        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped as
+        // Only the lowest-level P1 entry can be considered exclusive, only if it's mapped truly exclusively using this function.
         top_level_flags.set(EntryFlags::EXCLUSIVE, false);
-        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
+        let actual_flags = flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT;
 
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
@@ -206,13 +209,13 @@ impl Mapper {
                 return Err("map_allocated_pages(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(frame, flags | EntryFlags::EXCLUSIVE | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, actual_flags);
         }
 
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
             pages,
-            flags,
+            flags: actual_flags,
         })
     }
 }
@@ -348,13 +351,21 @@ impl MappedPages {
 
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
+    ///
+    /// Note that attempting to change certain flags will have no effect. 
+    /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
     pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
         if self.size_in_pages() == 0 { return Ok(()); }
+
+        // Use the existing value of the `EXCLUSIVE` flag rather than whatever value was passed in.
+        let mut new_flags = new_flags;
+        new_flags.set(EntryFlags::EXCLUSIVE, self.flags.is_exclusive());
 
         if new_flags == self.flags {
             trace!("remap(): new_flags were the same as existing flags, doing nothing.");
             return Ok(());
         }
+        info!("### REMAP: old {:?} to new {:?}", self.flags, new_flags);
 
         for page in self.pages.clone() {
             let p1 = active_table_mapper.p4_mut()
@@ -444,45 +455,49 @@ impl MappedPages {
                 return Err("unmap(): page not mapped");
             }
 
-            let unmapped_frames: Option<AllocatedFrames> = pte.set_unmapped().map(Into::into);
+            let unmapped_frames = pte.set_unmapped();
             tlb_flush_virt_addr(page.start_address());
 
             // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frames`
             // freed from the newly-unmapped P1 PTE entry above.
-            if let Some(newly_unmapped_frames) = unmapped_frames {
-                if let Some(mut curr_frames) = current_frame_range.take() {
-                    match curr_frames.merge(newly_unmapped_frames) {
-                        Ok(()) => {
-                            // Here, the newly unmapped frames were contiguous with the current frame_range,
-                            // and we successfully merged them into a single range of AllocatedFrames.
-                            current_frame_range = Some(curr_frames);
-                        }
-                        Err(newly_unmapped_frames) => {
-                            // Here, the newly unmapped frames were **NOT** contiguous with the current_frame_range,
-                            // so we "finish" the current_frame_range (it's already been "taken") and start a new one
-                            // based on the newly unmapped frames.
-                            current_frame_range = Some(newly_unmapped_frames);
-                            
-                            // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
-                            if first_frame_range.is_none() {
-                                first_frame_range = Some(curr_frames);
-                            } else {
-                                // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
-                                // otherwise there will not be any other opportunity for it to be dropped.
-                                //
-                                // TODO: here in the future, we could add it to the optional input list (see this function's doc comments)
-                                //       of AllocatedFrames to return, i.e., `Option<&mut Vec<AllocatedFrames>>`.
-                                trace!("MappedPages::unmap(): dropping additional non-contiguous frames {:?}", curr_frames);
-                                // curr_frames is dropped here
+            match unmapped_frames {
+                UnmapResult::Exclusive(newly_unmapped_frames) => {
+                    let newly_unmapped_frames: AllocatedFrames = newly_unmapped_frames.into();
+                    if let Some(mut curr_frames) = current_frame_range.take() {
+                        match curr_frames.merge(newly_unmapped_frames) {
+                            Ok(()) => {
+                                // Here, the newly unmapped frames were contiguous with the current frame_range,
+                                // and we successfully merged them into a single range of AllocatedFrames.
+                                current_frame_range = Some(curr_frames);
+                            }
+                            Err(newly_unmapped_frames) => {
+                                // Here, the newly unmapped frames were **NOT** contiguous with the current_frame_range,
+                                // so we "finish" the current_frame_range (it's already been "taken") and start a new one
+                                // based on the newly unmapped frames.
+                                current_frame_range = Some(newly_unmapped_frames);
+                                
+                                // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
+                                if first_frame_range.is_none() {
+                                    first_frame_range = Some(curr_frames);
+                                } else {
+                                    // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
+                                    // otherwise there will not be any other opportunity for it to be dropped.
+                                    //
+                                    // TODO: here in the future, we could add it to the optional input list (see this function's doc comments)
+                                    //       of AllocatedFrames to return, i.e., `Option<&mut Vec<AllocatedFrames>>`.
+                                    trace!("MappedPages::unmap(): dropping additional non-contiguous frames {:?}", curr_frames);
+                                    // curr_frames is dropped here
+                                }
                             }
                         }
+                    } else {
+                        // This was the first frames we unmapped, so start a new current_frame_range.
+                        current_frame_range = Some(newly_unmapped_frames);
                     }
-                } else {
-                    // This was the first frames we unmapped, so start a new current_frame_range.
-                    current_frame_range = Some(newly_unmapped_frames);
                 }
-            } else {
-                trace!("Note: FYI: page {:X?} was just unmapped but not mapped as EXCLUSIVE.", page);
+                UnmapResult::NonExclusive(frames) => {
+                    trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, frames);
+                }
             }
         }
     
@@ -763,7 +778,7 @@ pub fn mapped_pages_unmap(
 
 impl Drop for MappedPages {
     fn drop(&mut self) {
-        if self.size_in_pages() > 0 { trace!("MappedPages::drop(): unmapped MappedPages {:?}", &*self.pages); }
+        if self.size_in_pages() > 0 { trace!("MappedPages::drop(): unmapped MappedPages {:?}, flags: {:?}", &*self.pages, self.flags); }
         
         let mut mapper = Mapper::from_current();
         if let Err(e) = self.unmap(&mut mapper) {

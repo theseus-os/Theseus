@@ -52,14 +52,19 @@ impl PageTableEntry {
     /// i.e., owned by this entry and not mapped anywhere else by any other entries,
     /// then this function returns those frames. 
     /// This is useful because those returned frames can then be safely deallocated.
-    pub fn set_unmapped(&mut self) -> Option<UnmappedFrames> {
-        let frame = self.pointed_frame();
+    pub fn set_unmapped(&mut self) -> UnmapResult {
+        let frame = self.frame_value();
         let flags = self.flags();
         self.zero();
-        if flags.contains(EntryFlags::EXCLUSIVE) {
-            frame.map(|f| UnmappedFrames(FrameRange::new(f, f)))
+
+        // Since we don't support huge pages, this PTE can only cover one 4KiB frame. 
+        // Once we support huge pages, we can use a type parameter 
+        // to specify whether this is a 4KiB, 2MiB, or 1GiB PTE. 
+        let frame_range = FrameRange::new(frame, frame);
+        if flags.is_exclusive() {
+            UnmapResult::Exclusive(UnmappedFrames(frame_range))
         } else {
-            None
+            UnmapResult::NonExclusive(frame_range)
         }
     }
 
@@ -69,14 +74,20 @@ impl PageTableEntry {
     }
 
     /// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.
+    /// If this page table entry is not `PRESENT`, this returns `None`. 
     pub fn pointed_frame(&self) -> Option<Frame> {
-        if self.flags().contains(EntryFlags::PRESENT) {
-            let mut frame_paddr = self.0 as usize;
-            frame_paddr.set_bits(0 .. (PAGE_SHIFT as u8), 0);
-            Some(Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr)))
+        if self.flags().intersects(EntryFlags::PRESENT) {
+            Some(self.frame_value())
         } else {
             None
         }
+    }
+
+    /// Extracts the value of the frame referred to by this page table entry.
+    fn frame_value(&self) -> Frame {
+        let mut frame_paddr = self.0 as usize;
+        frame_paddr.set_bits(0 .. (PAGE_SHIFT as u8), 0);
+        Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr))
     }
 
     /// Sets this `PageTableEntry` to map the given `Frame` with the given `flags`.
@@ -93,6 +104,18 @@ impl PageTableEntry {
     }
 }
 
+/// The frames returned from the action of unmapping a page table entry.
+/// See the `PageTableEntry::set_unmapped()` function.
+///
+/// If exclusive, the contained `UnmappedFrames` can be used to deallocate frames. 
+///
+/// If non-exclusive, the contained `FrameRange` is provided just for debugging feedback.
+/// Note that we use `FrameRange` instead of `Frame` because a single page table entry
+/// can map many frames, e.g., using huge pages. 
+pub enum UnmapResult {
+    Exclusive(UnmappedFrames),
+    NonExclusive(FrameRange)
+}
 
 /// A range of frames that have been unmapped from a `PageTableEntry`
 /// that previously mapped that frame exclusively (i.e., "owned it").

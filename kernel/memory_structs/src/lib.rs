@@ -253,6 +253,11 @@ impl Frame {
     pub const fn start_address(&self) -> PhysicalAddress {
         PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
     }
+
+    #[inline(always)]
+    pub const fn number(&self) -> usize {
+        self.number
+    }
 }
 
 impl Add<usize> for Frame {

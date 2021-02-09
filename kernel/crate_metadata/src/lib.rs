@@ -268,7 +268,11 @@ impl Drop for LoadedCrate {
     fn drop(&mut self) {
         
         #[cfg(not(downtime_eval))]
-        trace!("### Dropped LoadedCrate: {}", self.crate_name);
+        trace!("### Dropped LoadedCrate: {}\n\t text:   {:?}\n\t rodata: {:?}\n\t data:   {:?}",
+            self.crate_name, self.text_pages, self.rodata_pages, self.data_pages
+        );
+
+
     }
 }
 
