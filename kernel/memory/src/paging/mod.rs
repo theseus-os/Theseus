@@ -96,7 +96,6 @@ impl PageTable {
         }
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
-        warn!("PageTable::new_table(): _temp_page: {:?}, inited_new_p4_frame: {:?}", _temp_page, inited_new_p4_frame);
 
         Ok( PageTable { 
             mapper: Mapper::with_p4_frame(p4_frame),
@@ -213,17 +212,15 @@ pub fn init(
     // bootstrap a PageTable from the currently-loaded page table
     let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
     let mut page_table = PageTable::from_current(current_active_p4)?;
-    warn!("Bootstrapped initial {:?}", page_table);
+    debug!("Bootstrapped initial {:?}", page_table);
 
     let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).map_err(|_| "boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
     let boot_info_size = boot_info.total_size();
-    info!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
+    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
-    warn!("new_p4_frame: {:?}", new_p4_frame);
     let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, TemporaryPage::new())?;
-    warn!("new_table: {:?}", new_table);
 
     let mut text_mapped_pages:        Option<MappedPages> = None;
     let mut rodata_mapped_pages:      Option<MappedPages> = None;
@@ -330,7 +327,6 @@ pub fn init(
         // Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
         let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
         let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
-        debug!("Mapping boot info pages {:?} to frames {:?}", boot_info_pages, boot_info_frames);
         boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
             boot_info_pages,
             boot_info_frames,

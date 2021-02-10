@@ -555,8 +555,8 @@ impl MappedPages {
                         current_frame_range = Some(newly_unmapped_frames);
                     }
                 }
-                UnmapResult::NonExclusive(frames) => {
-                    // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, frames);
+                UnmapResult::NonExclusive(_frames) => {
+                    // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
                 }
             }
         }
@@ -838,7 +838,9 @@ pub fn mapped_pages_unmap(
 
 impl Drop for MappedPages {
     fn drop(&mut self) {
-        if self.size_in_pages() > 0 { trace!("MappedPages::drop(): unmapped MappedPages {:?}, flags: {:?}", &*self.pages, self.flags); }
+        // if self.size_in_pages() > 0 {
+        //     trace!("MappedPages::drop(): unmapped MappedPages {:?}, flags: {:?}", &*self.pages, self.flags);
+        // }
         
         let mut mapper = Mapper::from_current();
         if let Err(e) = self.unmap(&mut mapper) {

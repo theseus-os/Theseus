@@ -54,7 +54,6 @@ impl TemporaryPage {
                 frame,
                 super::EntryFlags::WRITABLE,
             )?);
-            warn!("map_table_frame: {:?}", self.mapped_page);
         }
         self.mapped_page.as_mut().unwrap().as_type_mut(0)
     }

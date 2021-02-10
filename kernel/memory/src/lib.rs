@@ -205,8 +205,6 @@ pub fn init(
 
     frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
-    frame_allocator::dump_frame_allocator_state();
-
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     let (
@@ -220,7 +218,7 @@ pub fn init(
         identity_mapped_pages
     ) = paging::init(boot_info)?;
 
-    debug!("Done with paging::init()!, page_table: {:?}", page_table);
+    debug!("Done with paging::init(). new page_table: {:?}", page_table);
     Ok((
         page_table,
         text_mapped_pages,

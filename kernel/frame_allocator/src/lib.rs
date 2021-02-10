@@ -408,7 +408,7 @@ impl Drop for AllocatedFrames {
         } else {
             (&FREE_FRAMES_LIST, MemoryRegionType::Free)
         };
-        trace!("frame_allocator: deallocating {:?}, typ {:?}", self, typ);
+        // trace!("frame_allocator: deallocating {:?}, typ {:?}", self, typ);
 
         // Simply add the newly-deallocated chunk to the free frames list.
         let mut locked_list = list.lock();
@@ -825,13 +825,13 @@ pub fn allocate_frames_deferred(
         match find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames) {
             Err(_e) => {
                 let frames = FrameRange::new(start_frame, start_frame + (num_frames - 1));
-                trace!("FrameAllocator: trying to add new reserved region {:?}", frames);
+                // trace!("FrameAllocator: trying to add new reserved region {:?}", frames);
                 let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames.clone())?;
-                trace!("FrameAllocator: trying to add free reserved frames {:?} (original {:?})", new_reserved_frames, frames);
+                // trace!("FrameAllocator: trying to add free reserved frames {:?} (original {:?})", new_reserved_frames, frames);
                 // If we successfully added a new reserved region,
                 // then add those frames to the actual list of *available* reserved regions.
                 let _new_free_reserved_frames = add_reserved_region(&mut free_reserved_frames_list, new_reserved_frames.clone())?;
-                trace!("FrameAllocator: added free reserved frames {:?} (original {:?})", _new_free_reserved_frames, frames);
+                // trace!("FrameAllocator: added free reserved frames {:?} (original {:?})", _new_free_reserved_frames, frames);
                 assert_eq!(new_reserved_frames, _new_free_reserved_frames);
                 find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames)
             }
@@ -840,14 +840,6 @@ pub fn allocate_frames_deferred(
     } else {
         find_any_chunk(&mut FREE_FRAMES_LIST.lock(), num_frames)
     }.map_err(From::from) // convert from AllocationError to &str
-        .map(|(af, _action)| {
-            warn!("Allocated {} frames at requested paddr {:?}: {:?}", num_frames, requested_paddr, af);
-            (af, _action)
-        })
-        .map_err(|_e| {
-            error!("Failed to allocate {} frames at requested paddr {:?}: {:?}", num_frames, requested_paddr, _e);
-            _e
-        })
 }
 
 
@@ -919,7 +911,6 @@ pub fn convert_to_heap_allocated() {
     FREE_FRAMES_LIST.lock().convert_to_heap_allocated();
     FREE_RESERVED_FRAMES_LIST.lock().convert_to_heap_allocated();
     RESERVED_REGIONS.lock().convert_to_heap_allocated();
-    dump_frame_allocator_state();
 }
 
 /// A debugging function used to dump the full internal state of the frame allocator. 

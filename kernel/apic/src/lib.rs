@@ -144,9 +144,6 @@ pub fn init(_page_table: &mut PageTable) -> Result<(), &'static str> {
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
     }
 
-    debug!("Dumping frame allocator state before apic::init()");
-    memory::dump_frame_allocator_state();
-
     Ok(())
 }
 
@@ -159,10 +156,8 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
     let flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
     let apic_mapped_page = if let Ok(allocated_frame) = allocate_frames_at(phys_addr, 1) {
-        error!("HERE1");
         page_table.map_allocated_pages_to(new_page, allocated_frame, flags)?
     } else {
-        error!("HERE2");
         // The APIC frame is the same actual physical address across all CPU cores,
         // but they're actually completely independent pieces of hardware that share one address.
         // Therefore, there's no way to represent that to the Rust language or MappedPages/AllocatedFrames types,
