@@ -36,16 +36,18 @@ macro_rules! try_forget {
 
 /// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
 /// which represents the initial (kernel) address space. 
-/// Consumes the given BootInformation, because after the memory system is initialized,
+///
+/// This consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * The kernel's new MemoryManagementInfo
-///  * the MappedPages of the kernel's text section,
-///  * the MappedPages of the kernel's rodata section,
-///  * the MappedPages of the kernel's data section,
-///  * the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
-///  * the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
+///  1. The kernel's new MemoryManagementInfo
+///  2. the MappedPages of the kernel's text section,
+///  3. the MappedPages of the kernel's rodata section,
+///  4. the MappedPages of the kernel's data section,
+///  5. the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
+///  6. the list of bootloader modules obtained from the given `boot_info`,
+///  7. the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
 pub fn init_memory_management(
     boot_info: BootInformation
 ) -> Result<(
@@ -56,7 +58,8 @@ pub fn init_memory_management(
         Stack,
         Vec<BootloaderModule>,
         Vec<MappedPages>
-), &'static str> {
+    ), &'static str>
+{
     // Initialize memory management: paging (create a new page table), essential kernel mappings
     let (
         mut page_table, 
@@ -64,6 +67,7 @@ pub fn init_memory_management(
         rodata_mapped_pages, 
         data_mapped_pages, 
         (stack_guard_page, stack_pages), 
+        boot_info_mapped_pages,
         higher_half_mapped_pages, 
         identity_mapped_pages
     ) = memory::init(&boot_info)?;
@@ -92,8 +96,11 @@ pub fn init_memory_management(
         debug!("Initial heap starts at: {:#X}, size: {:#X}, pages: {:?}", heap_start, heap_initial_size, pages);
         let heap_mp = try_forget!(
             page_table.map_allocated_pages(pages, HEAP_FLAGS).map_err(|e| {
-                error!("Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}", KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e);
-                "Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE exceeds the size of the system's physical memory?"
+                error!("Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}",
+                    KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e
+                );
+                "Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE \
+                 exceeds the size of the system's physical memory?"
             }),
             text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, higher_half_mapped_pages, identity_mapped_pages
         );
@@ -117,7 +124,9 @@ pub fn init_memory_management(
         }
     }).collect();
 
-    TODO FIXME unmap boot info pages
+    // Now that we've recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
+    // This frees up those frames such that future code can exclusively map and access those pages/frames.
+    drop(boot_info_mapped_pages);
 
     Ok((
         kernel_mmi_ref,
@@ -132,9 +141,14 @@ pub fn init_memory_management(
 
 
 /// A record of a bootloader module's name and location in physical memory.
+#[derive(Debug)]
 pub struct BootloaderModule {
+    /// The starting address of this module, inclusive.
     pub start: PhysicalAddress,
+    /// The ending address of this module, exclusive.
     pub end: PhysicalAddress,
+    /// The name of this module, i.e.,
+    /// the filename it was given in the bootloader's cfg file.
     pub name: String,
 }
 impl BootloaderModule {

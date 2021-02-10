@@ -143,24 +143,24 @@ fn parse_bootloader_modules_into_files(
     };
 
     for m in bootloader_modules {
-        let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-        let frames = allocate_frames_by_bytes_at(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes)
-            .map_err(|_e| "Failed to allocate frames for bootloader module")?;
-        let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
+        let (crate_type, prefix, file_name) = CrateType::from_module_name(&m.name)?;
         let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
         let name = String::from(file_name);
 
-        let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
+        let frames = allocate_frames_by_bytes_at(m.start, m.size_in_bytes())
+            .map_err(|_e| "Failed to allocate frames for bootloader module")?;
+        let pages = allocate_pages_by_bytes(m.size_in_bytes())
+            .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
         let mp = kernel_mmi.page_table.map_allocated_pages_to(
             pages, 
             frames, 
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+        // debug!("Module: {:?}, size {}, mp: {:?}", m.name, m.size_in_bytes(), mp);
 
         let create_file = |dir: &DirRef| {
-            MemFile::from_mapped_pages(mp, name, size_in_bytes, dir)
+            MemFile::from_mapped_pages(mp, name, m.size_in_bytes(), dir)
         };
 
         // Get the existing (or create a new) namespace directory corresponding to the given directory name.

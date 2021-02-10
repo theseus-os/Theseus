@@ -524,7 +524,7 @@ fn find_specific_chunk(
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
 
     // The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-    let requested_end_frame = requested_frame + (num_frames - 1); 
+    let requested_end_frame = requested_frame + (num_frames - 1);
 
     match &mut list.0 {
         Inner::Array(ref mut arr) => {
@@ -900,6 +900,8 @@ pub fn allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -> Result<A
 #[doc(hidden)] 
 pub fn convert_to_heap_allocated() {
     FREE_FRAMES_LIST.lock().convert_to_heap_allocated();
+    FREE_RESERVED_FRAMES_LIST.lock().convert_to_heap_allocated();
+    RESERVED_REGIONS.lock().convert_to_heap_allocated();
     dump_frame_allocator_state();
 }
 

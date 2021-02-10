@@ -185,13 +185,14 @@ pub fn get_current_p4() -> Frame {
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
 /// 
-///  * The kernel's new PageTable, which is now currently active,
-///  * the kernels' text section MappedPages,
-///  * the kernels' rodata section MappedPages,
-///  * the kernels' data section MappedPages,
-///  * a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
+///  1. The kernel's new PageTable, which is now currently active,
+///  2. the kernels' text section MappedPages,
+///  3. the kernels' rodata section MappedPages,
+///  4. the kernels' data section MappedPages,
+///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
+///  6. the `MappedPages` holding the bootloader info,
+///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 ///
 /// Otherwise, it returns a str error message. 
 pub fn init(
@@ -202,6 +203,7 @@ pub fn init(
         MappedPages,
         MappedPages,
         (AllocatedPages, MappedPages),
+        MappedPages,
         [Option<MappedPages>; 32],
         [Option<MappedPages>; 32]
     ), &'static str>
@@ -223,12 +225,13 @@ pub fn init(
     let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, TemporaryPage::new())?;
     warn!("new_table: {:?}", new_table);
 
-    let mut text_mapped_pages: Option<MappedPages> = None;
-    let mut rodata_mapped_pages: Option<MappedPages> = None;
-    let mut data_mapped_pages: Option<MappedPages> = None;
-    let mut stack_page_group: Option<(AllocatedPages, MappedPages)> = None;
+    let mut text_mapped_pages:        Option<MappedPages> = None;
+    let mut rodata_mapped_pages:      Option<MappedPages> = None;
+    let mut data_mapped_pages:        Option<MappedPages> = None;
+    let mut stack_page_group:         Option<(AllocatedPages, MappedPages)> = None;
+    let mut boot_info_mapped_pages:   Option<MappedPages> = None;
     let mut higher_half_mapped_pages: [Option<MappedPages>; 32] = Default::default();
-    let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
+    let mut identity_mapped_pages:    [Option<MappedPages>; 32] = Default::default();
 
     // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
     page_table.with(&mut new_table, TemporaryPage::new(), |mapper| {
@@ -318,15 +321,13 @@ pub fn init(
 
         // Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
         let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
-        // TODO: FIXME: the boot info overlaps some of the bootloader modules in physical memory,
-        //              therefore, if we reserve those frames here, the bootloader modules parsing will fail.
-        // let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
-        let boot_info_frames = unsafe { AllocatedFrames::from_parts_unsafe(FrameRange::from_phys_addr(boot_info_start_paddr, boot_info_size)) };
+        let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
         debug!("Mapping boot info pages {:?} to frames {:?}", boot_info_pages, boot_info_frames);
-        higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(
-            boot_info_pages, boot_info_frames, EntryFlags::PRESENT | EntryFlags::GLOBAL,
+        boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
+            boot_info_pages,
+            boot_info_frames,
+            EntryFlags::PRESENT,
         )?);
-        index += 1;
 
         debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);
         debug!("higher_half_mapped_pages: {:?}", &higher_half_mapped_pages[..index]);
@@ -336,10 +337,11 @@ pub fn init(
     })?; // TemporaryPage is dropped here
 
 
-    let text_mapped_pages     = text_mapped_pages  .ok_or("Couldn't map .text section")?;
-    let rodata_mapped_pages   = rodata_mapped_pages.ok_or("Couldn't map .rodata section")?;
-    let data_mapped_pages     = data_mapped_pages  .ok_or("Couldn't map .data section")?;
-    let stack_page_group      = stack_page_group   .ok_or("Couldn't map .stack section")?;
+    let text_mapped_pages       = text_mapped_pages     .ok_or("Couldn't map .text section")?;
+    let rodata_mapped_pages     = rodata_mapped_pages   .ok_or("Couldn't map .rodata section")?;
+    let data_mapped_pages       = data_mapped_pages     .ok_or("Couldn't map .data section")?;
+    let boot_info_mapped_pages  = boot_info_mapped_pages.ok_or("Couldn't map boot_info pages section")?;
+    let stack_page_group        = stack_page_group      .ok_or("Couldn't map .stack section")?;
 
     debug!("switching from old page table {:?} to new page table {:?}", page_table, new_table);
     page_table.switch(&new_table); 
@@ -353,8 +355,8 @@ pub fn init(
         rodata_mapped_pages,
         data_mapped_pages,
         stack_page_group,
+        boot_info_mapped_pages,
         higher_half_mapped_pages,
         identity_mapped_pages
     ))
 }
-

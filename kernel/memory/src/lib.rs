@@ -129,14 +129,14 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * a reference to the Frame Allocator to be used by the remaining memory init functions
-///  * the kernel's new `PageTable`, which is now currently active 
-///  * the `MappedPages` of the kernel's text section,
-///  * the `MappedPages` of the kernel's rodata section,
-///  * the `MappedPages` of the kernel's data section,
-///  * a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
+///  1. the kernel's new `PageTable`, which is now currently active,
+///  2. the `MappedPages` of the kernel's text section,
+///  3. the `MappedPages` of the kernel's rodata section,
+///  4. the `MappedPages` of the kernel's data section,
+///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
+///  6. the `MappedPages` holding the bootloader info,
+///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(
     boot_info: &BootInformation
 ) -> Result<(
@@ -145,6 +145,7 @@ pub fn init(
     MappedPages,
     MappedPages,
     (AllocatedPages, MappedPages),
+    MappedPages,
     [Option<MappedPages>; 32],
     [Option<MappedPages>; 32]
 ), &'static str> {
@@ -214,6 +215,7 @@ pub fn init(
         rodata_mapped_pages,
         data_mapped_pages,
         (stack_guard_page, stack_pages),
+        boot_info_pages,
         higher_half_mapped_pages,
         identity_mapped_pages
     ) = paging::init(boot_info)?;
@@ -225,6 +227,7 @@ pub fn init(
         rodata_mapped_pages,
         data_mapped_pages,
         (stack_guard_page, stack_pages),
+        boot_info_pages,
         higher_half_mapped_pages,
         identity_mapped_pages
     ))
