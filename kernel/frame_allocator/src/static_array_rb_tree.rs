@@ -171,6 +171,7 @@ pub enum RemovedValue<T: Ord> {
 	RBTree(Option<Box<Wrapper<T>>>),
 }
 impl<T: Ord> RemovedValue<T> {
+	#[allow(dead_code)]
 	pub fn as_ref(&self) -> Option<&T> {
 		match self {
 			Self::Array(opt) => opt.as_ref(),

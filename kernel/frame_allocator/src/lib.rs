@@ -370,9 +370,9 @@ impl AllocatedFrames {
     /// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is not within its bounds.
     pub fn split(self, at_frame: Frame) -> Result<(AllocatedFrames, AllocatedFrames), AllocatedFrames> {
         let end_of_first = at_frame - 1;
-        if at_frame > *self.frames.start() && end_of_first <= *self.frames.end() {
-            let first  = FrameRange::new(*self.frames.start(), end_of_first);
-            let second = FrameRange::new(at_frame, *self.frames.end());
+        if at_frame > *self.start() && end_of_first <= *self.end() {
+            let first  = FrameRange::new(*self.start(), end_of_first);
+            let second = FrameRange::new(at_frame, *self.end());
             // ensure the original AllocatedFrames doesn't run its drop handler and free its frames.
             core::mem::forget(self); 
             Ok((
@@ -481,16 +481,16 @@ impl<'list> Drop for DeferredAllocAction<'list> {
         // Insert all of the chunks, both allocated and free ones, into the list. 
         if self.free1.size_in_frames() > 0 {
             match self.free1.typ {
-                MemoryRegionType::Free => self.free_list.lock().insert(self.free1.clone()).unwrap(),
-                MemoryRegionType::Reserved => self.reserved_list.lock().insert(self.free1.clone()).unwrap(),
-                _ => todo!("DeferredAllocAction doesn't yet support tracking forbidden chunks"),
-            };
+                MemoryRegionType::Free     => { self.free_list.lock().insert(self.free1.clone()).unwrap(); }
+                MemoryRegionType::Reserved => { self.reserved_list.lock().insert(self.free1.clone()).unwrap(); }
+                _ => error!("BUG likely: DeferredAllocAction encountered free1 chunk {:?} of a type Unknown", self.free1),
+            }
         }
         if self.free2.size_in_frames() > 0 {
             match self.free2.typ {
-                MemoryRegionType::Free => self.free_list.lock().insert(self.free2.clone()).unwrap(),
-                MemoryRegionType::Reserved => self.reserved_list.lock().insert(self.free2.clone()).unwrap(),
-                _ => todo!("DeferredAllocAction doesn't yet support tracking forbidden chunks"),
+                MemoryRegionType::Free     => { self.free_list.lock().insert(self.free2.clone()).unwrap(); }
+                MemoryRegionType::Reserved => { self.reserved_list.lock().insert(self.free2.clone()).unwrap(); }
+                _ => error!("BUG likely: DeferredAllocAction encountered free2 chunk {:?} of a type Unknown", self.free2),
             };
         }
     }
@@ -530,7 +530,7 @@ fn find_specific_chunk(
         Inner::Array(ref mut arr) => {
             for elem in arr.iter_mut() {
                 if let Some(chunk) = elem {
-                    if requested_frame >= *chunk.frames.start() && requested_end_frame <= *chunk.frames.end() {
+                    if requested_frame >= *chunk.start() && requested_end_frame <= *chunk.end() {
                         // Here: `chunk` was big enough and did contain the requested address.
                         return adjust_chosen_chunk(requested_frame, num_frames, &chunk.clone(), ValueRefMut::Array(elem));
                     }
@@ -538,20 +538,57 @@ fn find_specific_chunk(
             }
         }
         Inner::RBTree(ref mut tree) => {
-            let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_frame));
-            if let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
+            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_frame));
+            if let Some(chunk) = cursor_mut.get().map(|w| w.deref().clone()) {
                 if chunk.contains(&requested_frame) {
-                    if requested_end_frame <= *chunk.frames.end() {
+                    if requested_end_frame <= *chunk.end() {
                         return adjust_chosen_chunk(requested_frame, num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor_mut));
                     } else {
-                        todo!("Frame allocator: found chunk containing requested address, but it was too small. \
-                            Merging multiple chunks during an allocation is currently unsupported, please contact the Theseus developers. \
-                            Requested address: {:?}, num_frames: {}, chunk: {:?}",
-                            requested_frame, num_frames, chunk,
-                        );
+                        // We found the chunk containing the requested address, but it was too small to cover all of the requested frames.
+                        // Let's try to merge the next-highest contiguous chunk to see if those two chunks together 
+                        // cover enough frames to fulfill the allocation request.
+                        //
+                        // trace!("Frame allocator: found chunk containing requested address, but it was too small. \
+                        //     Attempting to merge multiple chunks during an allocation. \
+                        //     Requested address: {:?}, num_frames: {}, chunk: {:?}",
+                        //     requested_frame, num_frames, chunk,
+                        // );
+                        let next_contiguous_chunk: Option<Chunk> = {
+                            let next_cursor = cursor_mut.peek_next();
+                            if let Some(next_chunk) = next_cursor.get().map(|w| w.deref()) {
+                                if *chunk.end() + 1 == *next_chunk.start() {
+                                    // Here: next chunk was contiguous with the original chunk. 
+                                    if requested_end_frame <= *next_chunk.end() {
+                                        // trace!("Frame allocator: found suitably-large contiguous next {:?} after initial too-small {:?}", next_chunk, chunk);
+                                        Some(next_chunk.clone())
+                                    } else {
+                                        todo!("Frame allocator: found chunk containing requested address, but it was too small. \
+                                            Theseus does not yet support merging more than two chunks during an allocation request. \
+                                            Requested address: {:?}, num_frames: {}, chunk: {:?}, next_chunk {:?}",
+                                            requested_frame, num_frames, chunk, next_chunk
+                                        );
+                                        // None
+                                    }
+                                } else {
+                                    trace!("Frame allocator: next {:?} was not contiguously above initial too-small {:?}", next_chunk, chunk);
+                                    None
+                                }
+                            } else {
+                                trace!("Frame allocator: couldn't get next chunk above initial too-small {:?}", chunk);
+                                None
+                            }
+                        };
+                        if let Some(mut next_chunk) = next_contiguous_chunk {
+                            // We found a suitable chunk that came contiguously after the initial too-small chunk. 
+                            // Remove the initial chunk (since we have a cursor pointing to it already) 
+                            // and "merge" it into this `next_chunk`.
+                            let _removed_initial_chunk = cursor_mut.remove();
+                            // trace!("Frame allocator: removed suitably-large contiguous next {:?} after initial too-small {:?}", _removed_initial_chunk, chunk);
+                            // Here, `cursor_mut` has been moved forward to point to the `next_chunk` now. 
+                            next_chunk.frames = FrameRange::new(*chunk.start(), *next_chunk.end());
+                            return adjust_chosen_chunk(requested_frame, num_frames, &next_chunk, ValueRefMut::RBTree(cursor_mut));
+                        }
                     }
-                } else {
-                    error!("HERE XXX address {:?} was already allocated", requested_frame);
                 }
             }
         }
@@ -634,8 +671,8 @@ fn adjust_chosen_chunk(
     // The new allocated chunk might start in the middle of an existing chunk,
     // so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
     //
-    // Because Frames and PhysicalAddresses use saturating add and subtract, we need to double-check that we're not creating
-    // an overlapping duplicate Chunk at either the very minimum or the very maximum of the address space.
+    // Because Frames and PhysicalAddresses use saturating add/subtract, we need to double-check that 
+    // we don't create overlapping duplicate Chunks at either the very minimum or the very maximum of the address space.
     let new_allocation = Chunk {
         typ: chosen_chunk.typ,
         // The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
@@ -646,7 +683,7 @@ fn adjust_chosen_chunk(
     } else {
         Some(Chunk {
             typ: chosen_chunk.typ,
-            frames: FrameRange::new(*chosen_chunk.frames.start(), *new_allocation.start() - 1),
+            frames: FrameRange::new(*chosen_chunk.start(), *new_allocation.start() - 1),
         })
     };
     let after = if new_allocation.end() == &MAX_FRAME { 
@@ -654,7 +691,7 @@ fn adjust_chosen_chunk(
     } else {
         Some(Chunk {
             typ: chosen_chunk.typ,
-            frames: FrameRange::new(*new_allocation.end() + 1, *chosen_chunk.frames.end()),
+            frames: FrameRange::new(*new_allocation.end() + 1, *chosen_chunk.end()),
         })
     };
 
@@ -670,7 +707,6 @@ fn adjust_chosen_chunk(
 
     // Remove the chosen chunk from the free frame list.
     let _removed_chunk = chosen_chunk_ref.remove();
-    assert_eq!(Some(chosen_chunk), _removed_chunk.as_ref()); // sanity check
 
     // TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
     // if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }

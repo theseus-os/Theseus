@@ -39,7 +39,7 @@ use xmas_elf::{
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
 };
 use util::round_up_power_of_two;
-use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use memory_initialization::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
