@@ -650,11 +650,13 @@ pub struct SectionMemoryBounds {
 /// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
 /// * The `.data` section bounds cover those that are writable (.data, .bss).
 /// 
-/// It also contains the stack bounds, which are maintained separately.
+/// It also contains the bounds of the initial page table (root p4 frame) and 
+/// the initial stack, which are maintained separately.
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
-   pub text:   SectionMemoryBounds,
-   pub rodata: SectionMemoryBounds,
-   pub data:   SectionMemoryBounds,
-   pub stack:  SectionMemoryBounds,
+   pub text:        SectionMemoryBounds,
+   pub rodata:      SectionMemoryBounds,
+   pub data:        SectionMemoryBounds,
+   pub page_table:  SectionMemoryBounds,
+   pub stack:       SectionMemoryBounds,
 }

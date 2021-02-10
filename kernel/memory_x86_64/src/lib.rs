@@ -101,18 +101,20 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
     let mut index = 0;
-    let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut text_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut rodata_start: Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut rodata_end:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut rodata_start:      Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut rodata_end:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut stack_start:       Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut stack_end:         Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut page_table_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut page_table_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
-    let mut text_flags: Option<EntryFlags> = None;
+    let mut text_flags:   Option<EntryFlags> = None;
     let mut rodata_flags: Option<EntryFlags> = None;
-    let mut data_flags: Option<EntryFlags> = None;
+    let mut data_flags:   Option<EntryFlags> = None;
 
     let mut sections_memory_bounds: [Option<SectionMemoryBounds>; 32] = Default::default();
 
@@ -158,14 +160,21 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         }
 
         // The linker script (linker_higher_half.ld) defines the following order of sections:
-        // (1) .init (start of executable pages)
-        // (2) .text (end of executable pages)
-        // (3) .rodata (start of read-only pages)
-        // (4) .eh_frame
-        // (5) .gcc_except_table (end of read-only pages)
-        // (6) .data (start of read-write pages)
-        // (7) .bss (end of read-write pages)
-        // (8) .stack
+        // |-----|-------------------|------------------------------|
+        // | Sec |    Sec Name       |    Description / purpose     |
+        // | Num |                   |                              |
+        // |-----|--------------------------------------------------|
+        // | (1) | .init             | start of executable pages    |
+        // | (2) | .text             | end of executable pages      |
+        // | (3) | .rodata           | start of read-only pages     |
+        // | (4) | .eh_frame         | part of read-only pages      |
+        // | (5) | .gcc_except_table | end of read-only pages       |
+        // | (6) | .data             | start of read-write pages    | 
+        // | (7) | .bss              | end of read-write pages      |
+        // | (8) | .page_table       | separate .data-like section  |
+        // | (9) | .stack            | separate .data-like section  |
+        // |-----|-------------------|------------------------------|
+        //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
             ".init" => {
@@ -198,15 +207,20 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 data_end = Some((end_virt_addr, end_phys_addr));
                 "nano_core .bss"
             }
+            ".page_table" => {
+                page_table_start = Some((start_virt_addr, start_phys_addr));
+                page_table_end   = Some((end_virt_addr, end_phys_addr));
+                "initial page_table"
+            }
             ".stack" => {
                 stack_start = Some((start_virt_addr, start_phys_addr));
                 stack_end   = Some((end_virt_addr, end_phys_addr));
                 "initial stack"
             }
             _ =>  {
-                error!("Section {} at {:#X}, size {:#X} was not an expected section (.init, .text, .data, .bss, .rodata)", 
+                error!("Section {} at {:#X}, size {:#X} was not an expected section", 
                         section.name(), section.start_address(), section.size());
-                return Err("Kernel ELF Section had an unexpected name (expected .init, .text, .data, .bss, .rodata)");
+                return Err("Kernel ELF Section had an unexpected name");
             }
         };
         debug!("     will map kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
@@ -220,15 +234,17 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         index += 1;
     }
 
-    let text_start    = text_start  .ok_or("Couldn't find start of .text section")?;
-    let text_end      = text_end    .ok_or("Couldn't find end of .text section")?;
-    let rodata_start  = rodata_start.ok_or("Couldn't find start of .rodata section")?;
-    let rodata_end    = rodata_end  .ok_or("Couldn't find end of .rodata section")?;
-    let data_start    = data_start  .ok_or("Couldn't find start of .data section")?;
-    let data_end      = data_end    .ok_or("Couldn't find start of .data section")?;
-    let stack_start   = stack_start .ok_or("Couldn't find start of .stack section")?;
-    let stack_end     = stack_end   .ok_or("Couldn't find start of .stack section")?;
-
+    let text_start         = text_start       .ok_or("Couldn't find start of .text section")?;
+    let text_end           = text_end         .ok_or("Couldn't find end of .text section")?;
+    let rodata_start       = rodata_start     .ok_or("Couldn't find start of .rodata section")?;
+    let rodata_end         = rodata_end       .ok_or("Couldn't find end of .rodata section")?;
+    let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
+    let data_end           = data_end         .ok_or("Couldn't find start of .data section")?;
+    let page_table_start   = page_table_start .ok_or("Couldn't find start of .page_table section")?;
+    let page_table_end     = page_table_end   .ok_or("Couldn't find start of .page_table section")?;
+    let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
+    let stack_end          = stack_end        .ok_or("Couldn't find start of .stack section")?;
+     
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
     let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
@@ -248,6 +264,11 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         end: data_end,
         flags: data_flags,
     };
+    let page_table = SectionMemoryBounds {
+        start: page_table_start,
+        end: page_table_end,
+        flags: data_flags, // same flags as data sections
+    };
     let stack = SectionMemoryBounds {
         start: stack_start,
         end: stack_end,
@@ -258,6 +279,7 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         text,
         rodata,
         data,
+        page_table,
         stack,
     };
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))

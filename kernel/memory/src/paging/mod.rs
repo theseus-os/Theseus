@@ -57,18 +57,20 @@ impl DerefMut for PageTable {
 }
 
 impl PageTable {
-    /// An internal function to create a new top-level PageTable 
-    /// based on the currently-active page table register (e.g., CR3). 
-    ///
-    /// FIXME: remove this function, it's no longer safe now that frame deallocation has been reworked.
-    #[deprecated(since = "2021-01-26", note = "no longer safe now that frame deallocation has been reworked")]
-    fn from_current() -> PageTable {
+    /// An internal function to bootstrap a new top-level PageTable 
+    /// based on the given currently-active P4 frame (the frame holding the page table root).
+    /// 
+    /// Returns an error if the given `active_p4_frame` is not the currently active page table.
+    fn from_current(active_p4_frame: AllocatedFrames) -> Result<PageTable, &'static str> {
+        assert!(active_p4_frame.size_in_frames() == 1);
         let current_p4 = get_current_p4();
-        let af = unsafe { AllocatedFrames::from_parts_unsafe(FrameRange::new(current_p4, current_p4)) };
-        PageTable { 
-            mapper: Mapper::from_current(),
-            p4_table: af,
+        if active_p4_frame.start() != &current_p4 {
+            return Err("PageTable::from_current(): the active_p4_frame must be the root of the currently-active page table.");
         }
+        Ok(PageTable { 
+            mapper: Mapper::with_p4_frame(current_p4),
+            p4_table: active_p4_frame,
+        })
     }
 
     /// Initializes a brand new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`. 
@@ -174,7 +176,7 @@ impl PageTable {
 }
 
 
-/// Returns the current top-level page table frame
+/// Returns the current top-level (P4) root page table frame.
 pub fn get_current_p4() -> Frame {
     Frame::containing_address(get_p4())
 }
@@ -204,8 +206,11 @@ pub fn init(
         [Option<MappedPages>; 32]
     ), &'static str>
 {
+    let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
+
     // bootstrap a PageTable from the currently-loaded page table
-    let mut page_table = PageTable::from_current();
+    let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
+    let mut page_table = PageTable::from_current(current_active_p4)?;
     warn!("Bootstrapped initial {:?}", page_table);
 
     let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).map_err(|_| "boot_info start virtual address was invalid")?;
@@ -225,10 +230,8 @@ pub fn init(
     let mut higher_half_mapped_pages: [Option<MappedPages>; 32] = Default::default();
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
 
-    // consumes and auto unmaps temporary page
+    // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
     page_table.with(&mut new_table, TemporaryPage::new(), |mapper| {
-
-        let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
         
         // Map every section found in the kernel image (given by the boot information above) into our new page table. 
         // To allow the APs to boot up, we must identity map those kernel sections too, i.e., 
@@ -281,6 +284,9 @@ pub fn init(
         identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(data_pages_identity, data_frames_identity, data_flags)?);
         index += 1;
 
+        // We don't need to do any mapping for the initial root (P4) page table stack (a separate data section),
+        // which was initially set up and created by the bootstrap assembly code. 
+        // It was used to bootstrap the initial page table at the beginning of this function. 
 
         // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
         // It does not need to be identity mapped because each AP core will have its own stack.
@@ -338,10 +344,7 @@ pub fn init(
     debug!("switching from old page table {:?} to new page table {:?}", page_table, new_table);
     page_table.switch(&new_table); 
     debug!("switched to new page table {:?}.", new_table); 
-
-    // TODO: FIXME: once we fix the way that early frames are allocated, 
-    //              we can properly deallocate the AllocatedFrame inside the initial bootstrapped `PageTable`.
-    core::mem::forget(page_table);
+    // The old page_table set up during bootstrap will be dropped here. It's no longer being used.
 
     // Return the new page table because that's the one that should be used by the kernel in future mappings. 
     Ok((

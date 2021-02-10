@@ -365,7 +365,6 @@ impl MappedPages {
             trace!("remap(): new_flags were the same as existing flags, doing nothing.");
             return Ok(());
         }
-        info!("### REMAP: old {:?} to new {:?}", self.flags, new_flags);
 
         for page in self.pages.clone() {
             let p1 = active_table_mapper.p4_mut()
