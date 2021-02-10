@@ -1434,7 +1434,7 @@ dependencies = [
  "log",
  "memfs",
  "memory",
- "multiboot2",
+ "memory_initialization",
  "path",
  "qp-trie",
  "root",

@@ -7,7 +7,7 @@
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
-extern crate multiboot2;
+extern crate memory_initialization;
 extern crate kernel_config;
 extern crate util;
 extern crate crate_name_utils;
@@ -40,7 +40,7 @@ use xmas_elf::{
 };
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
-use multiboot2::BootInformation;
+use memory_initialization::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, wrapper::BString};
@@ -106,8 +106,11 @@ pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespa
 
 /// Initializes the module management system based on the bootloader-provided modules, 
 /// and creates and returns the default `CrateNamespace` for kernel crates.
-pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static Arc<CrateNamespace>, &'static str> {
-    let (_namespaces_dir, default_kernel_namespace_dir) = parse_bootloader_modules_into_files(boot_info, kernel_mmi)?;
+pub fn init(
+    bootloader_modules: Vec<BootloaderModule>,
+    kernel_mmi: &mut MemoryManagementInfo
+) -> Result<&'static Arc<CrateNamespace>, &'static str> {
+    let (_namespaces_dir, default_kernel_namespace_dir) = parse_bootloader_modules_into_files(bootloader_modules, kernel_mmi)?;
     // Create the default CrateNamespace for kernel crates.
     let name = default_kernel_namespace_dir.lock().get_name();
     let default_namespace = CrateNamespace::new(name, default_kernel_namespace_dir, None);
@@ -124,7 +127,7 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
 /// * the top-level root "namespaces" directory that contains all other namespace directories,
 /// * the directory of the default kernel crate namespace.
 fn parse_bootloader_modules_into_files(
-    boot_info: &BootInformation, 
+    bootloader_modules: Vec<BootloaderModule>,
     kernel_mmi: &mut MemoryManagementInfo
 ) -> Result<(DirRef, NamespaceDir), &'static str> {
 
@@ -139,7 +142,7 @@ fn parse_bootloader_modules_into_files(
         VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
     };
 
-    for m in boot_info.module_tags() {
+    for m in bootloader_modules {
         let size_in_bytes = (m.end_address() - m.start_address()) as usize;
         let frames = allocate_frames_by_bytes_at(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes)
             .map_err(|_e| "Failed to allocate frames for bootloader module")?;

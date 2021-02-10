@@ -216,7 +216,7 @@ pub fn init(
         (stack_guard_page, stack_pages),
         higher_half_mapped_pages,
         identity_mapped_pages
-    ) = paging::init(&boot_info)?;
+    ) = paging::init(boot_info)?;
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
     Ok((

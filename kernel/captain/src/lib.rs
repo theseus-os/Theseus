@@ -131,8 +131,7 @@ pub fn init(
     task_fs::init()?;
 
 
-    // We can drop and unmap the identity mappings (e.g., for the multiboot2 boot_info) 
-    // after the initial bootstrap is complete, 
+    // We can drop and unmap the identity mappings after the initial bootstrap is complete.
     // We could probably do this earlier, but we definitely can't do it until after the APs boot.
     drop(identity_mapped_pages);
     

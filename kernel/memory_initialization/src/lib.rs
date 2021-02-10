@@ -8,10 +8,13 @@ extern crate memory;
 extern crate stack;
 extern crate multiboot2;
 
-use memory::{MmiRef, MappedPages, VirtualAddress};
+use memory::{MmiRef, MappedPages, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use multiboot2::BootInformation;
-use alloc::vec::Vec;
+use alloc::{
+    string::String, 
+    vec::Vec,
+};
 use heap::HEAP_FLAGS;
 use stack::Stack;
 
@@ -43,9 +46,17 @@ macro_rules! try_forget {
 ///  * the MappedPages of the kernel's data section,
 ///  * the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
 ///  * the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
-pub fn init_memory_management(boot_info: &BootInformation)  
-    -> Result<(MmiRef, MappedPages, MappedPages, MappedPages, Stack, Vec<MappedPages>), &'static str>
-{
+pub fn init_memory_management(
+    boot_info: BootInformation
+) -> Result<(
+        MmiRef,
+        MappedPages,
+        MappedPages,
+        MappedPages,
+        Stack,
+        Vec<BootloaderModule>,
+        Vec<MappedPages>
+), &'static str> {
     // Initialize memory management: paging (create a new page table), essential kernel mappings
     let (
         mut page_table, 
@@ -95,7 +106,39 @@ pub fn init_memory_management(boot_info: &BootInformation)
     // Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(page_table, higher_half_mapped_pages, identity_mapped_pages, heap_mapped_pages)?;
 
-    Ok((kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, identity_mapped_pages))
+    // Because bootloader modules may overlap with the actual boot information, 
+    // we need to preserve those records here in a separate list,
+    // such that we can unmap the boot info pages & frames here but still access that info in the future .
+    let bootloader_modules: Vec<BootloaderModule> = boot_info.module_tags().map(|m| {
+        BootloaderModule {
+            start: PhysicalAddress::new_canonical(m.start_address() as usize),
+            end:   PhysicalAddress::new_canonical(m.end_address()   as usize),
+            name:  String::from(m.name()),
+        }
+    }).collect();
+
+    TODO FIXME unmap boot info pages
+
+    Ok((
+        kernel_mmi_ref,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        stack,
+        bootloader_modules,
+        identity_mapped_pages
+    ))
 }
 
 
+/// A record of a bootloader module's name and location in physical memory.
+pub struct BootloaderModule {
+    pub start: PhysicalAddress,
+    pub end: PhysicalAddress,
+    pub name: String,
+}
+impl BootloaderModule {
+    pub fn size_in_bytes(&self) -> usize {
+        self.end.value() - self.start.value()
+    }
+}
