@@ -11,7 +11,7 @@ use core::mem;
 use core::ops::Deref;
 use core::ptr::Unique;
 use core::slice;
-use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, AllocatedPages, AllocatedFrames}; 
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
@@ -214,6 +214,67 @@ impl Mapper {
 
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
+            pages,
+            flags: actual_flags,
+        })
+    }
+}
+
+// This implementation block contains a hacky function for non-bijective mappings 
+// that shouldn't be exposed to most other OS components, especially applications.
+impl Mapper {
+    /// An unsafe escape hatch that allows one to map the given virtual `AllocatedPages` 
+    /// to the given range of physical `frames`. 
+    ///
+    /// This is unsafe because it violates Theseus's bijective mapping guarantee, 
+    /// in which only one virtual page can map to a given physical frame,
+    /// which preserves Rust's knowledge of language-level aliasing and thus its safety checks.
+    ///
+    /// As such, the pages mapped here will be marked as non-`EXCLUSIVE`, regardless of the `flags` passed in.
+    /// 
+    /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
+    #[doc(hidden)]
+    pub unsafe fn map_to_non_exclusive(mapper: &mut Self, pages: AllocatedPages, frames: FrameRange, flags: EntryFlags)
+        -> Result<MappedPages, &'static str>
+    {
+        let mut top_level_flags = flags.clone() | EntryFlags::PRESENT;
+        // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
+        // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
+        top_level_flags.set(EntryFlags::NO_EXECUTE, false);
+        // Currently we cannot use the EXCLUSIVE bit for page table frames (P4, P3, P2),
+        // because another page table frame may re-use (create another alias for) it without us knowing here.
+        top_level_flags.set(EntryFlags::EXCLUSIVE, false);
+        // In fact, in this function, none of the frames can be mapped as exclusive
+        // because we're not accepting the `AllocatedFrames` type. 
+        let mut actual_flags = flags | EntryFlags::PRESENT;
+        actual_flags.set(EntryFlags::EXCLUSIVE, false);
+        
+
+        let pages_count = pages.size_in_pages();
+        let frames_count = frames.size_in_frames();
+        if pages_count != frames_count {
+            error!("map_to_non_exclusive(): pages {:?} count {} must equal frames {:?} count {}!", 
+                pages, pages_count, frames, frames_count
+            );
+            return Err("map_to_non_exclusive(): page count must equal frame count");
+        }
+
+        // iterate over pages and frames in lockstep
+        for (page, frame) in pages.deref().clone().into_iter().zip(frames.deref().clone().into_iter()) {
+            let p3 = mapper.p4_mut().next_table_create(page.p4_index(), top_level_flags);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
+
+            if !p1[page.p1_index()].is_unused() {
+                error!("map_to_non_exclusive(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+                return Err("map_to_non_exclusive(): page was already in use");
+            } 
+
+            p1[page.p1_index()].set_entry(frame, actual_flags);
+        }
+
+        Ok(MappedPages {
+            page_table_p4: mapper.target_p4.clone(),
             pages,
             flags: actual_flags,
         })
@@ -495,7 +556,7 @@ impl MappedPages {
                     }
                 }
                 UnmapResult::NonExclusive(frames) => {
-                    trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, frames);
+                    // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, frames);
                 }
             }
         }

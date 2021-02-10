@@ -266,25 +266,31 @@ pub fn init(
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
         let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
-        let text_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(text_frames.deref().clone()) };
+        let text_frames_identity = text_frames.deref().clone();
         text_mapped_pages = Some(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?);
-        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(text_pages_identity, text_frames_identity, text_flags)?);
+        identity_mapped_pages[index] = Some( unsafe {
+            Mapper::map_to_non_exclusive(mapper, text_pages_identity, text_frames_identity, text_flags)?
+        });
         index += 1;
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
         let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
         let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
-        let rodata_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(rodata_frames.deref().clone()) };
+        let rodata_frames_identity = rodata_frames.deref().clone();
         rodata_mapped_pages = Some(mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?);
-        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(rodata_pages_identity, rodata_frames_identity, rodata_flags)?);
+        identity_mapped_pages[index] = Some( unsafe {
+            Mapper::map_to_non_exclusive(mapper, rodata_pages_identity, rodata_frames_identity, rodata_flags)?
+        });
         index += 1;
 
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
         let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
         let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
-        let data_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(data_frames.deref().clone()) };
+        let data_frames_identity = data_frames.deref().clone();
         data_mapped_pages = Some(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?);
-        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(data_pages_identity, data_frames_identity, data_flags)?);
+        identity_mapped_pages[index] = Some( unsafe {
+            Mapper::map_to_non_exclusive(mapper, data_pages_identity, data_frames_identity, data_flags)?
+        });
         index += 1;
 
         // We don't need to do any mapping for the initial root (P4) page table stack (a separate data section),
@@ -313,9 +319,11 @@ pub fn init(
         let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
         let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
         let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
-        let vga_display_frames_identity = unsafe { AllocatedFrames::from_parts_unsafe(vga_display_frames.deref().clone()) };
+        let vga_display_frames_identity = vga_display_frames.deref().clone();
         higher_half_mapped_pages[index] = Some(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?);
-        identity_mapped_pages[index] = Some(mapper.map_allocated_pages_to(vga_display_pages_identity, vga_display_frames_identity, vga_flags)?);
+        identity_mapped_pages[index] = Some( unsafe {
+            Mapper::map_to_non_exclusive(mapper, vga_display_pages_identity, vga_display_frames_identity, vga_flags)?
+        });
         index += 1;
 
 

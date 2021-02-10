@@ -383,14 +383,6 @@ impl AllocatedFrames {
             Err(self)
         }
     }
-
-    /// An escape hatch to create an AllocatedFrames object without actually allocating it. 
-    /// Currently used in page table and mapper code only. 
-    /// TODO: remove this once we flesh out the rest of the frame deallocation interface.
-    #[doc(hidden)]
-    pub unsafe fn from_parts_unsafe(frames: FrameRange) -> AllocatedFrames {
-        AllocatedFrames { frames }
-    }
 }
 
 // The `UnmappedFrames` type represents frames that have been unmapped
@@ -619,17 +611,6 @@ fn find_any_chunk<'list>(
             }
         }
         Inner::RBTree(ref mut tree) => {
-            // NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
-            // ```
-            // let eligible_chunks = tree.range(
-            //     Bound::Excluded(&DESIGNATED_FRAMES_LOW_END),
-            //     Bound::Excluded(&DESIGNATED_FRAMES_HIGH_START)
-            // );
-            // for c in eligible_chunks { ... }
-            // ```
-            //
-            // However, RBTree doesn't have a `range_mut()` method, so we use cursors for manual iteration.
-            //
             // Because we allocate new frames by peeling them off from the beginning part of a chunk, 
             // it's MUCH faster to start the search for free frames from higher addresses moving down. 
             // This results in an O(1) allocation time in the general case, until all address ranges are already in use.
@@ -770,9 +751,9 @@ fn add_reserved_region(
             for elem in arr.iter() {
                 if let Some(chunk) = elem {
                     if let Some(_overlap) = chunk.overlap(&frames) {
-                        error!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                            frames, _overlap, chunk
-                        );
+                        // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                        //     frames, _overlap, chunk
+                        // );
                         return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
                     }
                 }
@@ -787,9 +768,9 @@ fn add_reserved_region(
                     break;
                 }
                 if let Some(_overlap) = chunk.overlap(&frames) {
-                    error!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                        frames, _overlap, chunk
-                    );
+                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                    //     frames, _overlap, chunk
+                    // );
                     return Err("Failed to add reserved region that overlapped with existing reserved regions (RBTree).");
                 }
                 cursor_mut.move_next();
