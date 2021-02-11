@@ -112,6 +112,7 @@ impl PageTableEntry {
 /// If non-exclusive, the contained `FrameRange` is provided just for debugging feedback.
 /// Note that we use `FrameRange` instead of `Frame` because a single page table entry
 /// can map many frames, e.g., using huge pages. 
+#[must_use]
 pub enum UnmapResult {
     Exclusive(UnmappedFrames),
     NonExclusive(FrameRange)

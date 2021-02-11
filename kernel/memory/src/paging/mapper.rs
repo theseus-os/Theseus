@@ -822,20 +822,6 @@ impl MappedPages {
     }
 }
 
-
-/// A convenience function that exposes the `MappedPages::unmap` function
-/// (which is normally hidden/non-public because it's typically called from the Drop handler)
-/// for usage from testing/benchmark code for the memory mapping evaluation.
-#[cfg(mapper_spillful)]
-pub fn mapped_pages_unmap(
-    mapped_pages: &mut MappedPages,
-    mapper: &mut Mapper,
-) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper)?;
-    Ok(())
-}
-
-
 impl Drop for MappedPages {
     fn drop(&mut self) {
         // if self.size_in_pages() > 0 {
@@ -850,4 +836,20 @@ impl Drop for MappedPages {
         // Note that the AllocatedPages will automatically be dropped here too,
         // we do not need to call anything to make that happen.
     }
+}
+
+
+// Exposing private functions to the spillful mapper for benchmarking purposes.
+#[cfg(mapper_spillful)]
+pub fn mapped_pages_unmap(
+    mapped_pages: &mut MappedPages,
+    mapper: &mut Mapper,
+) -> Result<(), &'static str> {
+    mapped_pages.unmap(mapper)?;
+    Ok(())
+}
+
+#[cfg(mapper_spillful)]
+pub fn mapper_from_current() -> Mapper {
+    Mapper::from_current()
 }

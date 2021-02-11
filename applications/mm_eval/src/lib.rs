@@ -30,7 +30,7 @@ extern crate mapper_spillful;
 use getopts::{Matches, Options};
 use kernel_config::memory::PAGE_SIZE;
 use libtest::{hpet_timing_overhead, hpet_2_ns, calculate_stats, check_myrq};
-use memory::{allocate_pages, AllocatedPages, VirtualAddress, Mapper, MappedPages, EntryFlags, mapped_pages_unmap};
+use memory::{allocate_pages, AllocatedPages, VirtualAddress, Mapper, MappedPages, EntryFlags, mapper_from_current, mapped_pages_unmap};
 use mapper_spillful::MapperSpillful;
 use hpet::get_hpet;
 
@@ -228,7 +228,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     const TRIES: usize = 10;
-    let mut mapper_normal   = Mapper::from_current();
+    let mut mapper_normal   = mapper_from_current();
     let mut mapper_spillful = MapperSpillful::new();
 
     let num_mappings = matches.opt_str("n")

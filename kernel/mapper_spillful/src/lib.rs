@@ -117,7 +117,7 @@ impl MapperSpillful {
                     error!("MapperSpillful::map() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                     return Err("page was already mapped");
                 }
-                p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+                p1[page.p1_index()].set_entry(frame, flags | EntryFlags::PRESENT | EntryFlags::EXCLUSIVE);
             }
         }
 
@@ -151,7 +151,7 @@ impl MapperSpillful {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, new_flags | EntryFlags::PRESENT);
 
             tlb_flush_virt_addr(page.start_address());
         }
@@ -184,7 +184,7 @@ impl MapperSpillful {
                 .ok_or("mapping code does not support huge pages")?;
             
             let _frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
-            p1[page.p1_index()].set_unused();
+            let _ = p1[page.p1_index()].set_unmapped();
 
             tlb_flush_virt_addr(page.start_address());
         }
