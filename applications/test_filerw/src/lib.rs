@@ -15,7 +15,6 @@ use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use core::str;
 use core::ops::DerefMut;
-use memory::get_frame_allocator_ref;
 
 
 
@@ -68,13 +67,12 @@ fn test_filerw() -> Result<(), &'static str> {
     // first we obtain non-writable mapped pages
         // Obtain the active kernel page table
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-    let allocator = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
     // Allocate and map the least number of pages we need to store the information contained in the buffer
     // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
     // need (because it entered this conditional statement)
     let pages = memory::allocate_pages_by_bytes(1).ok_or("could not allocate pages")?;
     // the default flag is that the MappedPages are not writable
-    let mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, Default::default() , allocator.lock().deref_mut())?;
+    let mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, Default::default())?;
 
     let non_writable_file = MemFile::from_mapped_pages(mapped_pages, "non-writable testfile".to_string(), 1, &parent)?;
     match non_writable_file.lock().write(&mut string_slice_as_bytes, 0) {

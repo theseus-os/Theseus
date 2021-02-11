@@ -371,12 +371,20 @@ strings:
 .long_start:
 	db 'Hello long mode!',0
 
-section .bss
-; This reserves space for the first page table that we must set up
-; before enabling paging and jumping to long mode.
-align 4096
+
+; The following `resb` commands reserve space for the first page table,
+; which we must set up before enabling paging and jumping to long mode.
+; We split it into two parts:
+; (1) the initial p4 page table (the root P4 frame), and
+; (2) all the other initial page table frames. 
+; This is because Theseus needs to obtain exclusive ownership of the root p4 table
+; separately from the rest of the .data/.bss section contents.
+section .page_table nobits alloc noexec write  ; same section flags as .bss
+align 4096 
 p4_table:
 	resb 4096
+
+section .bss
 low_p3_table:
 	resb 4096
 high_p3_table:
@@ -394,7 +402,7 @@ kernel_table:
 ; with Theseus's stack abstractions in Rust. 
 ; We place the stack in its own sections for loading/parsing convenience.
 ; Currently, the stack is 16 pages in size, with a guard page beneath the bottom.
-section .stack nobits alloc noexec write  ; give it the same section flags as .bss
+section .stack nobits alloc noexec write  ; same section flags as .bss
 align 4096 
 global initial_bsp_stack_guard_page
 initial_bsp_stack_guard_page:

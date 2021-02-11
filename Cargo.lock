@@ -629,6 +629,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "multiboot2",
+ "static_assertions",
  "xmas-elf",
 ]
 
@@ -762,6 +763,19 @@ name = "font"
 version = "0.1.0"
 dependencies = [
  "spin",
+]
+
+[[package]]
+name = "frame_allocator"
+version = "0.1.0"
+dependencies = [
+ "intrusive-collections",
+ "kernel_config",
+ "log",
+ "memory_structs",
+ "page_table_entry",
+ "spin",
+ "static_assertions",
 ]
 
 [[package]]
@@ -1321,6 +1335,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "frame_allocator",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -1329,6 +1344,7 @@ dependencies = [
  "memory_x86_64",
  "multiboot2",
  "page_allocator",
+ "page_table_entry",
  "spin",
  "x86_64",
  "xmas-elf",
@@ -1418,7 +1434,7 @@ dependencies = [
  "log",
  "memfs",
  "memory",
- "multiboot2",
+ "memory_initialization",
  "path",
  "qp-trie",
  "root",
@@ -1451,9 +1467,9 @@ version = "0.1.6-pre"
 
 [[package]]
 name = "multiboot2"
-version = "0.7.1"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ebbe89ab663a65cab341428d5fc7013b0eab5543ace92a401a86581e50fdd81"
+checksum = "13e9fc890ff2ef2ded9084c964b950da1bc9e26d480e446ae721607b899db1fd"
 dependencies = [
  "bitflags",
 ]
@@ -1674,6 +1690,16 @@ dependencies = [
  "memory_structs",
  "spin",
  "static_assertions",
+]
+
+[[package]]
+name = "page_table_entry"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "kernel_config",
+ "memory_structs",
+ "zerocopy",
 ]
 
 [[package]]

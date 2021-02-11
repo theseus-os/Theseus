@@ -15,13 +15,14 @@ extern crate zerocopy;
 
 use bit_field::BitField;
 use core::{
+    cmp::{min, max},
     fmt,
     iter::Step,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
-use entryflags_x86_64::EntryFlags;
+pub use entryflags_x86_64::EntryFlags;
 use zerocopy::FromBytes;
 
 /// A virtual memory address, which is a `usize` under the hood.
@@ -152,14 +153,14 @@ impl PhysicalAddress {
 
     /// Creates a new `PhysicalAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:52] to be 0.
-    pub fn new_canonical(mut phys_addr: usize) -> PhysicalAddress {
-        phys_addr.set_bits(52..64, 0);
-        PhysicalAddress(phys_addr)
+    pub const fn new_canonical(phys_addr: usize) -> PhysicalAddress {
+        // phys_addr.set_bits(52..64, 0);
+        PhysicalAddress(phys_addr & 0x000F_FFFF_FFFF_FFFF)
     }
 
     /// Returns the underlying `usize` value for this `PhysicalAddress`.
     #[inline]
-    pub fn value(&self) -> usize {
+    pub const fn value(&self) -> usize {
         self.0
     }
 
@@ -172,7 +173,7 @@ impl PhysicalAddress {
     ///
     /// For example, if the PAGE_SIZE is 4KiB, then this will return
     /// the least significant 12 bits (12:0] of this PhysicalAddress.
-    pub fn frame_offset(&self) -> usize {
+    pub const fn frame_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
     }
 }
@@ -228,32 +229,6 @@ impl From<PhysicalAddress> for usize {
 }
 
 
-/// An area of physical memory.
-#[derive(Copy, Clone, Debug, Default)]
-#[repr(C)]
-pub struct PhysicalMemoryArea {
-    pub base_addr: PhysicalAddress,
-    pub size_in_bytes: usize,
-    pub typ: u32,
-    pub acpi: u32,
-}
-impl PhysicalMemoryArea {
-    pub fn new(
-        paddr: PhysicalAddress,
-        size_in_bytes: usize,
-        typ: u32,
-        acpi: u32,
-    ) -> PhysicalMemoryArea {
-        PhysicalMemoryArea {
-            base_addr: paddr,
-            size_in_bytes: size_in_bytes,
-            typ: typ,
-            acpi: acpi,
-        }
-    }
-}
-
-
 /// A `Frame` is a chunk of **physical** memory,
 /// similar to how a `Page` is a chunk of **virtual** memory.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -268,15 +243,20 @@ impl fmt::Debug for Frame {
 
 impl Frame {
     /// Returns the `Frame` containing the given `PhysicalAddress`.
-    pub fn containing_address(phys_addr: PhysicalAddress) -> Frame {
+    pub const fn containing_address(phys_addr: PhysicalAddress) -> Frame {
         Frame {
             number: phys_addr.value() / PAGE_SIZE,
         }
     }
 
     /// Returns the `PhysicalAddress` at the start of this `Frame`.
-    pub fn start_address(&self) -> PhysicalAddress {
+    pub const fn start_address(&self) -> PhysicalAddress {
         PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
+    }
+
+    #[inline(always)]
+    pub const fn number(&self) -> usize {
+        self.number
     }
 }
 
@@ -341,28 +321,28 @@ pub struct FrameRange(RangeInclusive<Frame>);
 impl FrameRange {
     /// Creates a new range of `Frame`s that spans from `start` to `end`,
     /// both inclusive bounds.
-    pub fn new(start: Frame, end: Frame) -> FrameRange {
+    pub const fn new(start: Frame, end: Frame) -> FrameRange {
         FrameRange(RangeInclusive::new(start, end))
     }
 
     /// Creates a FrameRange that will always yield `None`.
-    pub fn empty() -> FrameRange {
+    pub const fn empty() -> FrameRange {
         FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
     }
 
     /// A convenience method for creating a new `FrameRange`
     /// that spans all `Frame`s from the given physical address
     /// to an end bound based on the given size.
-    pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
+    pub fn from_phys_addr(starting_phys_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
         assert!(size_in_bytes > 0);
-        let start_frame = Frame::containing_address(starting_virt_addr);
+        let start_frame = Frame::containing_address(starting_phys_addr);
 		// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-        let end_frame = Frame::containing_address(starting_virt_addr + (size_in_bytes - 1));
+        let end_frame = Frame::containing_address(starting_phys_addr + (size_in_bytes - 1));
         FrameRange::new(start_frame, end_frame)
     }
 
     /// Returns the `PhysicalAddress` of the starting `Frame` in this `FrameRange`.
-    pub fn start_address(&self) -> PhysicalAddress {
+    pub const fn start_address(&self) -> PhysicalAddress {
         self.0.start().start_address()
     }
 
@@ -371,7 +351,7 @@ impl FrameRange {
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_frames(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.0.end().number + 1 - self.0.start().number
+        (self.0.end().number + 1).saturating_sub(self.0.start().number)
     }
 
     /// Whether this `FrameRange` contains the given `PhysicalAddress`.
@@ -399,6 +379,20 @@ impl FrameRange {
         let start = core::cmp::min(self.0.start(), &frame_to_include);
         let end = core::cmp::max(self.0.end(), &frame_to_include);
         FrameRange::new(start.clone(), end.clone())
+    }
+
+    /// Returns an inclusive `FrameRange` representing the frames that overlap
+    /// across this `FrameRange` and the given other `FrameRange`. 
+    ///
+    /// If there is no overlap between the two ranges, `None` is returned.
+    pub fn overlap(&self, other: &FrameRange) -> Option<FrameRange> {
+        let starts = max(*self.start(), *other.start());
+        let ends   = min(*self.end(),   *other.end());
+        if starts <= ends {
+            Some(FrameRange::new(starts, ends))
+        } else {
+            None
+        }
     }
 }
 impl fmt::Debug for FrameRange {
@@ -454,24 +448,24 @@ impl Page {
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.
-    pub fn p4_index(&self) -> usize {
+    pub const fn p4_index(&self) -> usize {
         (self.number >> 27) & 0x1FF
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list.
-    pub fn p3_index(&self) -> usize {
+    pub const fn p3_index(&self) -> usize {
         (self.number >> 18) & 0x1FF
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    pub fn p2_index(&self) -> usize {
+    pub const fn p2_index(&self) -> usize {
         (self.number >> 9) & 0x1FF
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
     /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped `Frame` (or its physical address) using `pointed_frame()`.
-    pub fn p1_index(&self) -> usize {
+    pub const fn p1_index(&self) -> usize {
         (self.number >> 0) & 0x1FF
     }
 }
@@ -568,7 +562,7 @@ impl PageRange {
     /// This is instant, because it doesn't need to iterate over each `Page`, unlike normal iterators.
     pub const fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.0.end().number + 1 - self.0.start().number
+        (self.0.end().number + 1).saturating_sub(self.0.start().number)
     }
 
     /// Returns the size in number of bytes.
@@ -656,11 +650,13 @@ pub struct SectionMemoryBounds {
 /// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
 /// * The `.data` section bounds cover those that are writable (.data, .bss).
 /// 
-/// It also contains the stack bounds, which are maintained separately.
+/// It also contains the bounds of the initial page table (root p4 frame) and 
+/// the initial stack, which are maintained separately.
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
-   pub text:   SectionMemoryBounds,
-   pub rodata: SectionMemoryBounds,
-   pub data:   SectionMemoryBounds,
-   pub stack:  SectionMemoryBounds,
+   pub text:        SectionMemoryBounds,
+   pub rodata:      SectionMemoryBounds,
+   pub data:        SectionMemoryBounds,
+   pub page_table:  SectionMemoryBounds,
+   pub stack:       SectionMemoryBounds,
 }

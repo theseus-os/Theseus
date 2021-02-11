@@ -52,6 +52,11 @@ SECTIONS {
 		*(.bss .bss.*)
 	}
 
+	.page_table ALIGN(4K) : AT(ADDR(.page_table) - KERNEL_OFFSET)
+	{
+		*(.page_table)
+	}
+
 	.stack ALIGN(4K) : AT(ADDR(.stack) - KERNEL_OFFSET)
 	{
 		*(.stack)
