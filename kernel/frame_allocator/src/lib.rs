@@ -1,11 +1,12 @@
 //! Provides an allocator for physical memory frames.
 //! The minimum unit of allocation is a single frame. 
 //!
-//! This is currently a copy of the `page_allocator` crate.
+//! This is currently a modified and more complex version of the `page_allocator` crate.
 //! TODO: extract the common code and create a generic allocator that can be specialized to allocate pages or frames.
 //! 
-//! This also supports early allocation of frames (up to 32 individual chunks)
-//! before heap allocation is available, and does so behind the scenes using the same single interface. 
+//! This also supports early allocation of frames before heap allocation is available, 
+//! and does so behind the scenes using the same single interface. 
+//! Early pre-heap allocations are limited to tracking a small number of available chunks (currently 32).
 //! 
 //! Once heap allocation is available, it uses a dynamically-allocated list of frame chunks to track allocations.
 //! 
@@ -15,8 +16,7 @@
 //! # Notes and Missing Features
 //! This allocator currently does **not** merge freed chunks (de-fragmentation). 
 //! We don't need to do so until we actually run out of address space or until 
-//! a requested address is in a chunk that needs to be merged;
-//! that's where we should add those merging features in whenever we do so.
+//! a requested address is in a chunk that needs to be merged.
 
 #![no_std]
 #![feature(const_fn, const_in_array_repeat_expressions)]
@@ -146,7 +146,12 @@ pub fn init<F, R, P>(
 }
 
 
-
+/// The main logic of the initialization routine 
+/// used to populate the list of free frame chunks.
+///
+/// This function recursively iterates over the given `area` of frames
+/// and adds any ranges of frames within that `area` that are not covered by
+/// the given list of `reserved_physical_memory_areas`.
 fn check_and_add_free_region<P, R>(
     area: &FrameRange,
     free_list: &mut [Option<Chunk>; 32],
@@ -232,8 +237,8 @@ pub enum MemoryRegionType {
     /// device memory discovered and added by device drivers later during runtime.
     Reserved,
     /// Memory of an unknown type.
-    /// This is typically used when free memory was "recovered" 
-    /// from a context where we don't know what type of region it was allocated from. 
+    /// This is a default value that acts as a sanity check, because it is invalid
+    /// to do any real work (e.g., allocation, access) with an unknown memory region.
     Unknown,
 }
 
@@ -628,9 +633,8 @@ fn find_any_chunk<'list>(
         }
     }
 
-    // If we can't find any suitable chunks in the non-designated regions, then look in both designated regions.
     error!("frame_allocator: non-reserved chunks are all allocated (requested {} frames). \
-        TODO: other frames need to be freed up here.", num_frames
+        TODO: we could attempt to merge free chunks here.", num_frames
     );
 
     Err(AllocationError::OutOfAddressSpace(num_frames))
@@ -699,7 +703,6 @@ fn adjust_chosen_chunk(
 }
 
 
-
 /// Returns whether the given `Frame` is contained within the.
 ///
 /// Acquires the lock to the `RESERVED_REGIONS` list.
@@ -729,7 +732,6 @@ fn frame_is_in_list(
 
     false
 }
-
 
 
 /// Adds the given `frames` to the given `list` as a Chunk of reserved frames. 
@@ -785,6 +787,7 @@ fn add_reserved_region(
 
     Ok(frames)
 }
+
 
 /// The core frame allocation routine that allocates the given number of physical frames,
 /// optionally at the requested starting `PhysicalAddress`.
