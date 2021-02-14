@@ -8,12 +8,14 @@ extern crate memory;
 extern crate stack;
 extern crate multiboot2;
 
-use memory::{MmiRef, MappedPages, VirtualAddress};
+use memory::{MmiRef, MappedPages, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use multiboot2::BootInformation;
-use alloc::vec::Vec;
+use alloc::{
+    string::String, 
+    vec::Vec,
+};
 use heap::HEAP_FLAGS;
-use core::ops::DerefMut;
 use stack::Stack;
 
 /// Just like Rust's `try!()` macro, 
@@ -34,27 +36,38 @@ macro_rules! try_forget {
 
 /// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
 /// which represents the initial (kernel) address space. 
-/// Consumes the given BootInformation, because after the memory system is initialized,
+///
+/// This consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * The kernel's new MemoryManagementInfo
-///  * the MappedPages of the kernel's text section,
-///  * the MappedPages of the kernel's rodata section,
-///  * the MappedPages of the kernel's data section,
-///  * the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
-///  * the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
-pub fn init_memory_management(boot_info: &BootInformation)  
-    -> Result<(MmiRef, MappedPages, MappedPages, MappedPages, Stack, Vec<MappedPages>), &'static str>
+///  1. The kernel's new MemoryManagementInfo
+///  2. the MappedPages of the kernel's text section,
+///  3. the MappedPages of the kernel's rodata section,
+///  4. the MappedPages of the kernel's data section,
+///  5. the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
+///  6. the list of bootloader modules obtained from the given `boot_info`,
+///  7. the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
+pub fn init_memory_management(
+    boot_info: BootInformation
+) -> Result<(
+        MmiRef,
+        MappedPages,
+        MappedPages,
+        MappedPages,
+        Stack,
+        Vec<BootloaderModule>,
+        Vec<MappedPages>
+    ), &'static str>
 {
     // Initialize memory management: paging (create a new page table), essential kernel mappings
     let (
-        frame_allocator_mutex, 
         mut page_table, 
         text_mapped_pages, 
         rodata_mapped_pages, 
         data_mapped_pages, 
         (stack_guard_page, stack_pages), 
+        boot_info_mapped_pages,
         higher_half_mapped_pages, 
         identity_mapped_pages
     ) = memory::init(&boot_info)?;
@@ -81,13 +94,14 @@ pub fn init_memory_management(boot_info: &BootInformation)
             text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, higher_half_mapped_pages, identity_mapped_pages
         );
         debug!("Initial heap starts at: {:#X}, size: {:#X}, pages: {:?}", heap_start, heap_initial_size, pages);
-        let mut allocator = frame_allocator_mutex.lock();
         let heap_mp = try_forget!(
-            page_table.map_allocated_pages(pages, HEAP_FLAGS, allocator.deref_mut())
-                .map_err(|e| {
-                    error!("Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}", KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e);
-                    "Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE exceeds the size of the system's physical memory?"
-                }),
+            page_table.map_allocated_pages(pages, HEAP_FLAGS).map_err(|e| {
+                error!("Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}",
+                    KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e
+                );
+                "Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE \
+                 exceeds the size of the system's physical memory?"
+            }),
             text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, higher_half_mapped_pages, identity_mapped_pages
         );
         heap::init_single_heap(heap_start, heap_initial_size);
@@ -99,7 +113,46 @@ pub fn init_memory_management(boot_info: &BootInformation)
     // Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(page_table, higher_half_mapped_pages, identity_mapped_pages, heap_mapped_pages)?;
 
-    Ok((kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, identity_mapped_pages))
+    // Because bootloader modules may overlap with the actual boot information, 
+    // we need to preserve those records here in a separate list,
+    // such that we can unmap the boot info pages & frames here but still access that info in the future .
+    let bootloader_modules: Vec<BootloaderModule> = boot_info.module_tags().map(|m| {
+        BootloaderModule {
+            start: PhysicalAddress::new_canonical(m.start_address() as usize),
+            end:   PhysicalAddress::new_canonical(m.end_address()   as usize),
+            name:  String::from(m.name()),
+        }
+    }).collect();
+
+    // Now that we've recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
+    // This frees up those frames such that future code can exclusively map and access those pages/frames.
+    drop(boot_info_mapped_pages);
+
+    Ok((
+        kernel_mmi_ref,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        stack,
+        bootloader_modules,
+        identity_mapped_pages
+    ))
 }
 
 
+/// A record of a bootloader module's name and location in physical memory.
+#[derive(Debug)]
+pub struct BootloaderModule {
+    /// The starting address of this module, inclusive.
+    pub start: PhysicalAddress,
+    /// The ending address of this module, exclusive.
+    pub end: PhysicalAddress,
+    /// The name of this module, i.e.,
+    /// the filename it was given in the bootloader's cfg file.
+    pub name: String,
+}
+impl BootloaderModule {
+    pub fn size_in_bytes(&self) -> usize {
+        self.end.value() - self.start.value()
+    }
+}

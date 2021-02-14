@@ -30,7 +30,7 @@ extern crate mapper_spillful;
 use getopts::{Matches, Options};
 use kernel_config::memory::PAGE_SIZE;
 use libtest::{hpet_timing_overhead, hpet_2_ns, calculate_stats, check_myrq};
-use memory::{allocate_pages, AllocatedPages, get_frame_allocator_ref, VirtualAddress, Mapper, MappedPages, EntryFlags, mapped_pages_unmap};
+use memory::{allocate_pages, AllocatedPages, VirtualAddress, Mapper, MappedPages, EntryFlags, mapper_from_current, mapped_pages_unmap};
 use mapper_spillful::MapperSpillful;
 use hpet::get_hpet;
 
@@ -62,7 +62,6 @@ fn create_mappings(
         return Err("failed to split allocated pages into num_mappings even segments");
     }
 
-    let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     let mut mapped_pages: Vec<MappedPages> = match mapper {
@@ -79,7 +78,6 @@ fn create_mappings(
                 let mp = mapper.map_allocated_pages(
                     allocated_pages,
                     EntryFlags::WRITABLE | EntryFlags::PRESENT,
-                    &mut *frame_allocator.lock(),
                 )?;
                 mapped_pages.push(mp);
             }
@@ -91,7 +89,6 @@ fn create_mappings(
                 let vaddr = start_vaddr + i*size_in_bytes;
                 let _res = mapper.map(vaddr, size_in_bytes,
                     EntryFlags::WRITABLE | EntryFlags::PRESENT,
-                    frame_allocator
                 )?;
             }
             let end_time = hpet.get_counter() - hpet_overhead;
@@ -148,12 +145,11 @@ fn unmap_normal(
     hpet_overhead: u64
 ) -> Result<u64, &'static str> {
 
-    let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start_time = hpet.get_counter();
 
     for mp in &mut mapped_pages {
-        mapped_pages_unmap(mp, mapper_normal, frame_allocator)?;
+        mapped_pages_unmap(mp, mapper_normal)?;
     }
 
     let end_time = hpet.get_counter() - hpet_overhead;
@@ -176,14 +172,13 @@ fn unmap_spillful(
     hpet_overhead: u64
 ) -> Result<u64, &'static str> {
 
-    let frame_allocator = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
 
     let start_time = hpet.get_counter();
 
     for i in 0..num_mappings {
         let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
-        let _res = mapper_spillful.unmap(vaddr, frame_allocator)?;
+        let _res = mapper_spillful.unmap(vaddr)?;
     }
 
     let end_time = hpet.get_counter() - hpet_overhead;
@@ -233,7 +228,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     const TRIES: usize = 10;
-    let mut mapper_normal   = Mapper::from_current();
+    let mut mapper_normal   = mapper_from_current();
     let mut mapper_spillful = MapperSpillful::new();
 
     let num_mappings = matches.opt_str("n")

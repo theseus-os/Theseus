@@ -114,8 +114,15 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): booted via multiboot2."); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, identity_mapped_pages) = 
-        try_exit!(memory_initialization::init_memory_management(&boot_info));
+    let (
+        kernel_mmi_ref,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        stack,
+        bootloader_modules,
+        identity_mapped_pages
+    ) = try_exit!(memory_initialization::init_memory_management(boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped upon a returned error, causing all execution to stop. 
@@ -127,7 +134,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized state store.");     
 
     // initialize the module management subsystem, so we can create the default crate namespace
-    let default_namespace = match mod_mgmt::init(&boot_info, kernel_mmi_ref.lock().deref_mut()) {
+    let default_namespace = match mod_mgmt::init(bootloader_modules, kernel_mmi_ref.lock().deref_mut()) {
         Ok(namespace) => namespace,
         Err(err) => { 
             core::mem::forget(text_mapped_pages);
