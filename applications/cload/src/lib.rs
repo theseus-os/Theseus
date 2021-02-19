@@ -75,9 +75,25 @@ fn rmain(matches: Matches) -> Result<(), String> {
     // Parse the file as an ELF executable
     let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
     
-    parse_elf_executable(file_mp, file.size())?;
+    let (segments, entry_point) = parse_elf_executable(file_mp, file.size())?;
+    let exec = LoadedExecutable { segments, entry_point };
     
+    debug!("Jumping to entry point {:#X}", entry_point);
+
+    let start_fn: StartFunction = unsafe { core::mem::transmute(entry_point.value()) };
+    let _retval = start_fn();
+
+    debug!("C _start entry point returned value {}({:#X})", _retval, _retval);
+
     Ok(())
+}
+
+/// Corresponds to C function:  `int foo()`
+type StartFunction = extern "C" fn() -> i32;
+
+struct LoadedExecutable {
+    segments: Vec<MappedSegment>,
+    entry_point: VirtualAddress,
 }
 
 

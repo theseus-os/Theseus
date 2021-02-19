@@ -26,7 +26,7 @@ build: dummy.c
 		-O0 \
 		-o dummy \
 		dummy.c \
-		start_stub.S
+		start.c
 	
 		
 		# -static \
