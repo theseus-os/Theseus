@@ -413,7 +413,7 @@ impl MappedPages {
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
     ///
-    /// Note that attempting to change certain flags will have no effect. 
+    /// Note that attempting to change certain "reserved" flags will have no effect. 
     /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
     pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
         if self.size_in_pages() == 0 { return Ok(()); }

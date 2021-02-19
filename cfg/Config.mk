@@ -18,8 +18,9 @@ ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 CFG_DIR := $(ROOT_DIR)/cfg
 
 ## Prefixes for object files
-KERNEL_PREFIX ?= k\#
-APP_PREFIX    ?= a\#
+KERNEL_PREFIX       ?= k\#
+APP_PREFIX          ?= a\#
+EXECUTABLE_PREFIX   ?= e\#
 
 
 ## Build modes: debug is development mode, release is with full optimizations.

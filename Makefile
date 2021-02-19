@@ -125,6 +125,18 @@ $(eval CFLAGS += -DENABLE_AVX)
 endif
 
 
+### Target for building a test C language executable.
+### This should be run after `make iso` has completed.
+.PHONY: c_test
+C_TEST_EXE := c_test/dummy
+c_test: $(C_TEST_EXE)
+	$(MAKE) -C c_test
+	@for f in $(C_TEST_EXE); do \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+
 
 ### Demo/test target for building libtheseus
 libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
