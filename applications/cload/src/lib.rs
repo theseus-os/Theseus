@@ -13,6 +13,7 @@ extern crate path;
 extern crate memory;
 extern crate task;
 extern crate xmas_elf;
+extern crate libc; // for basic C types/typedefs used in libc
 
 use core::{
     cmp::{min, max},
@@ -89,7 +90,8 @@ fn rmain(matches: Matches) -> Result<(), String> {
 }
 
 /// Corresponds to C function:  `int foo()`
-type StartFunction = extern "C" fn() -> i32;
+use libc::c_int;
+type StartFunction = extern "C" fn() -> c_int;
 
 struct LoadedExecutable {
     segments: Vec<MappedSegment>,
