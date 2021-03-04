@@ -20,7 +20,7 @@ path = "../kernel_config"
 version = "0.4.8"
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.heap]
 path = "../heap"
