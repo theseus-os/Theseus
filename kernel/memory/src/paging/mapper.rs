@@ -853,3 +853,182 @@ pub fn mapped_pages_unmap(
 pub fn mapper_from_current() -> Mapper {
     Mapper::from_current()
 }
+
+
+/// TODO: add documentation for these types
+
+pub struct TypedMappedPages<T: FromBytes> {
+    inner: Unique<T>,
+    _mp: MappedPages,
+}
+impl<T: FromBytes> Deref for TypedMappedPages<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        unsafe { self.inner.as_ref() }
+    }
+}
+impl<T: FromBytes> TypedMappedPages<T> {
+    pub fn new(mp: MappedPages, offset: usize) -> Result<TypedMappedPages<T>, &'static str> {
+        let size = mem::size_of::<T>();
+        if true {
+            debug!("TypedMappedPages::new(): requested type {} with size {} at offset {}, MappedPages size {}!",
+                core::any::type_name::<T>(),
+                size, offset, mp.size_in_bytes()
+            );
+        }
+
+        let end = offset + size;
+        if end > mp.size_in_bytes() {
+            error!("TypedMappedPages::new(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+                core::any::type_name::<T>(),
+                size, offset, mp.size_in_bytes()
+            );
+            return Err("requested type would not fit within the MappedPages bounds at starting offset");
+        }
+
+        let mut typed_mp = TypedMappedPages {
+            inner: Unique::<T>::dangling(),
+            _mp: mp,
+        };
+        typed_mp.inner = Unique::new((typed_mp._mp.pages.start_address().value() + offset) as *mut T)
+            .ok_or("BUG: MappedPages had invalid start address")?;
+
+        Ok(typed_mp)
+    }
+}
+
+pub struct TypedMappedPagesMut<T: FromBytes> {
+    inner: Unique<T>,
+    _mp: MappedPages,
+}
+impl<T: FromBytes> Deref for TypedMappedPagesMut<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        unsafe { self.inner.as_ref() }
+    }
+}
+impl<T: FromBytes> core::ops::DerefMut for TypedMappedPagesMut<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { self.inner.as_mut() }
+    }
+}
+
+impl<T: FromBytes> TypedMappedPagesMut<T> {
+    pub fn new(mp: MappedPages, offset: usize) -> Result<TypedMappedPagesMut<T>, &'static str> {
+        let size = mem::size_of::<T>();
+        if true {
+            debug!("TypedMappedPagesMut::new(): requested type {} with size {} at offset {}, MappedPages size {}!",
+                core::any::type_name::<T>(),
+                size, offset, mp.size_in_bytes()
+            );
+        }
+
+        // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
+        if !mp.flags.is_writable() {
+            error!("TypedMappedPagesMut::new(): requested type {} with size {} at offset {}, but MappedPages weren't writable (flags: {:?})",
+                core::any::type_name::<T>(),
+                size, offset, mp.flags
+            );
+            return Err("TypedMappedPagesMut::new(): MappedPages were not writable");
+        }
+
+        let end = offset + size;
+        if end > mp.size_in_bytes() {
+            error!("TypedMappedPagesMut::new(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+                core::any::type_name::<T>(),
+                size, offset, mp.size_in_bytes()
+            );
+            return Err("TypedMappedPagesMut::new(): requested type would not fit within the MappedPages bounds at starting offset");
+        }
+
+        let mut typed_mp = TypedMappedPagesMut {
+            inner: Unique::<T>::dangling(),
+            _mp: mp,
+        };
+        typed_mp.inner = Unique::new((typed_mp._mp.pages.start_address().value() + offset) as *mut T)
+            .ok_or("BUG: TypedMappedPagesMut::new(): MappedPages had invalid start address")?;
+
+        Ok(typed_mp)
+    }
+}
+
+
+/// Could also be called IntrusiveMappedPages.
+/// Only works for writable MappedPages. 
+///
+/// TODO: extend this with another type parameter `EmbedLocation`,
+///       which is a trait with multiple types that could include:
+///       Start, End, right before type, right after type, or arbitrary offset. Use const generics for this. 
+pub struct EmbeddedMappedPages<T: FromBytes>(Unique<T>);
+impl<T: FromBytes> EmbeddedMappedPages<T> {
+    /// Note: the given `mp` must havebeen mapped as mutable
+    pub fn new(mut mp: MappedPages, offset: usize) -> Result<EmbeddedMappedPages<T>, &'static str> {
+        let size = mem::size_of::<T>();
+        if true {
+            debug!("EmbeddedMappedPages::new(): requested type {} with size {} at offset {}, MappedPages size {}!",
+                core::any::type_name::<T>(),
+                size, offset, mp.size_in_bytes()
+            );
+        }
+
+        // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
+        if !mp.flags.is_writable() {
+            error!("EmbeddedMappedPages::new(): requested type {} with size {} at offset {}, but MappedPages weren't writable (flags: {:?})",
+                core::any::type_name::<T>(),
+                size, offset, mp.flags
+            );
+            return Err("as_type_mut(): MappedPages were not writable");
+        }
+
+        // check that size of the type T starting at the given `offset` fits within the size of the mapping,
+        // taking into account the size of the MappedPages fields that we must encode. 
+        let end_of_type = offset + size;
+        let end_total = end_of_type + mem::size_of::<MappedPages>();
+        if end_total > mp.size_in_bytes() {
+            error!("EmbeddedMappedPages::new(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
+                core::any::type_name::<T>(),
+                size, offset, mp.size_in_bytes()
+            );
+            return Err("requested type and embedded metadata would not fit within the MappedPages bounds at starting offset");
+        }
+
+        let mp_parts = (
+            mp.page_table_p4,
+            mp.flags,
+            mem::replace(&mut mp.pages, AllocatedPages::empty()) // renders the given `mp` empty.
+        );
+
+        // Perform the actual embedding of mapped pages metadata
+        unsafe {
+            core::ptr::write(end_of_type as *mut _, mp_parts);
+        }      
+
+        Ok(EmbeddedMappedPages(
+            Unique::new((mp.pages.start_address().value() + offset) as *mut T).ok_or("BUG: MappedPages had invalid start address")?
+        ))
+    }
+}
+
+impl<T: FromBytes> Drop for EmbeddedMappedPages<T> {
+    fn drop(&mut self) {
+        // reconstitute the previously-embedded MappedPages and then drop it.
+        let start = self.0.as_ptr() as usize + mem::size_of::<T>();
+        let (page_table_p4, flags, pages): (Frame, EntryFlags, AllocatedPages) = unsafe {
+            core::ptr::read(start as *mut _)
+        };
+
+        warn!("Dropping reconstituted unembedded mp_parts: {:?} {:?} {:?}", page_table_p4, flags, pages);
+        let _ = MappedPages { page_table_p4, pages, flags };
+    }
+}
+impl<T: FromBytes> Deref for EmbeddedMappedPages<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        unsafe { self.0.as_ref() }
+    }
+}
+impl<T: FromBytes> core::ops::DerefMut for EmbeddedMappedPages<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { self.0.as_mut() }
+    }
+}
