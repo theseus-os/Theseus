@@ -11,7 +11,7 @@ dependencies = [
  "fadt",
  "hpet",
  "ioapic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -55,7 +55,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -74,12 +74,12 @@ dependencies = [
  "atomic",
  "atomic_linked_list",
  "bit_field 0.7.0",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
  "memory",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pit_clock",
  "raw-cpuid",
  "spin",
@@ -279,7 +279,7 @@ dependencies = [
  "exceptions_full",
  "first_application",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "keycodes_ascii",
  "log",
@@ -425,7 +425,7 @@ dependencies = [
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin",
 ]
 
@@ -482,9 +482,9 @@ dependencies = [
 
 [[package]]
 name = "cstr_core"
-version = "0.1.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ebe7158ee57e848621d24d0ed87910edb97639cb94ad9977edf440e31226035"
+checksum = "2807c5e92588b6bf1c8c0354af2a4f079d0586c683df322aea719d5dc9b8d5bb"
 dependencies = [
  "cty",
  "memchr",
@@ -492,9 +492,9 @@ dependencies = [
 
 [[package]]
 name = "cty"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4e1d41c471573612df00397113557693b5bf5909666a8acb253930612b93312"
+checksum = "7313c0d620d0cb4dbd9d019e461a4beb501071ff46ec0ab933efb4daa76d73e3"
 
 [[package]]
 name = "date"
@@ -517,7 +517,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "rustc-demangle",
  "util",
  "xmas-elf",
@@ -612,7 +612,7 @@ dependencies = [
  "apic",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -622,7 +622,7 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci",
  "pic",
  "spin",
@@ -660,14 +660,14 @@ dependencies = [
 name = "ethernet_smoltcp_device"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "memory",
  "network_interface_card",
  "network_manager",
  "nic_buffers",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "smoltcp",
 ]
 
@@ -754,7 +754,7 @@ name = "fault_log"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -800,7 +800,7 @@ dependencies = [
  "color",
  "memory",
  "multicore_bringup",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "shapes",
  "zerocopy",
 ]
@@ -914,7 +914,7 @@ name = "heap"
 version = "0.1.0"
 dependencies = [
  "block_allocator",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "log",
  "memory",
@@ -926,7 +926,7 @@ name = "heapfile"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log",
  "memory",
  "spin",
@@ -949,7 +949,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "sdt",
  "spin",
  "volatile",
@@ -1012,7 +1012,7 @@ dependencies = [
  "apic",
  "exceptions_early",
  "gdt",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "keyboard",
  "lazy_static",
@@ -1049,7 +1049,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin",
  "volatile",
  "zerocopy",
@@ -1060,9 +1060,19 @@ name = "irq_safety"
 version = "0.1.1"
 source = "git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed"
 dependencies = [
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin",
  "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+]
+
+[[package]]
+name = "irq_safety"
+version = "0.1.1"
+source = "git+https://github.com/theseus-os/irq_safety#d7903a8f064170fae58a3da477300469faaf28d2"
+dependencies = [
+ "owning_ref 0.4.0 (git+https://github.com/theseus-os/owning-ref-rs.git)",
+ "spin",
+ "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
 ]
 
 [[package]]
@@ -1085,7 +1095,7 @@ dependencies = [
  "hpet",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1095,7 +1105,7 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci",
  "physical_nic",
  "pic",
@@ -1290,7 +1300,7 @@ dependencies = [
  "acpi_table",
  "apic",
  "ioapic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log",
  "memory",
  "pic",
@@ -1309,7 +1319,7 @@ name = "mapper_spillful"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1321,19 +1331,16 @@ dependencies = [
 
 [[package]]
 name = "memchr"
-version = "2.1.3"
+version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1dd4eaac298c32ce07eb6ed9242eda7d82955b9170b7d6db59b2e02cc63fcb8"
-dependencies = [
- "cfg-if",
-]
+checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
 name = "memfs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log",
  "memory",
  "spin",
@@ -1357,7 +1364,7 @@ dependencies = [
  "bit_field 0.7.0",
  "bitflags",
  "frame_allocator",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1377,7 +1384,7 @@ name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
  "heap",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "log",
  "memory",
@@ -1502,7 +1509,7 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "log",
  "madt",
@@ -1525,7 +1532,7 @@ dependencies = [
  "hashbrown",
  "heap",
  "intrusive-collections",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "log",
  "memory",
@@ -1542,7 +1549,7 @@ name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
  "log",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin",
  "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
  "task",
@@ -1555,7 +1562,7 @@ version = "0.1.0"
 dependencies = [
  "captain",
  "exceptions_early",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "log",
  "logger",
@@ -1585,7 +1592,7 @@ dependencies = [
  "e1000",
  "lazy_static",
  "log",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "smoltcp",
  "spin",
 ]
@@ -1606,7 +1613,7 @@ dependencies = [
  "log",
  "memory",
  "mpmc",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
 ]
 
 [[package]]
@@ -1619,7 +1626,7 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_queues",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci",
  "volatile",
 ]
@@ -1633,7 +1640,7 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
 ]
 
 [[package]]
@@ -1668,11 +1675,11 @@ dependencies = [
  "hpet",
  "http_client",
  "httparse",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "itertools",
  "log",
  "network_manager",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "percent-encoding",
  "rand",
  "sha3",
@@ -1689,6 +1696,15 @@ source = "git+https://github.com/kevinaboos/owning-ref-rs#03db99a3707a5d7c9e3768
 dependencies = [
  "spin",
  "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+]
+
+[[package]]
+name = "owning_ref"
+version = "0.4.0"
+source = "git+https://github.com/theseus-os/owning-ref-rs.git#ce14b539e3aa891ff463c6f5e28617b27bc2510b"
+dependencies = [
+ "spin",
+ "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
 ]
 
 [[package]]
@@ -1860,7 +1876,7 @@ dependencies = [
  "apic",
  "atomic",
  "bit_field 0.10.0",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -2060,7 +2076,7 @@ version = "0.1.0"
 dependencies = [
  "debugit",
  "hpet",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log",
  "scheduler",
  "spin",
@@ -2112,7 +2128,7 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "zerocopy",
 ]
 
@@ -2129,7 +2145,7 @@ dependencies = [
 name = "rtc"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -2144,7 +2160,7 @@ name = "runqueue"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "runqueue_priority",
@@ -2158,7 +2174,7 @@ name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2170,7 +2186,7 @@ name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2197,7 +2213,7 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log",
  "runqueue",
  "scheduler_priority",
@@ -2280,7 +2296,7 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "port_io",
 ]
 
@@ -2426,7 +2442,7 @@ dependencies = [
  "fault_crate_swap",
  "fault_log",
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -2455,6 +2471,14 @@ checksum = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b"
+dependencies = [
+ "spin",
+]
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.1.1"
+source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b"
 dependencies = [
  "spin",
 ]
@@ -2505,7 +2529,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "hpet",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static",
  "log",
  "memory",
@@ -2538,7 +2562,7 @@ dependencies = [
  "downcast-rs",
  "lazy_static",
  "log",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci",
  "spin",
 ]
@@ -2550,7 +2574,7 @@ dependencies = [
  "ata",
  "lazy_static",
  "log",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci",
  "spin",
  "storage_device",
@@ -2612,7 +2636,7 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "environment",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config",
  "lazy_static",
  "log",
@@ -2732,7 +2756,7 @@ name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log",
  "memory",
  "pause",
@@ -2879,7 +2903,7 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "network_interface_card",
  "nic_buffers",
  "nic_queues",
@@ -2912,7 +2936,7 @@ dependencies = [
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log",
  "scheduler",
  "task",
@@ -2929,7 +2953,7 @@ dependencies = [
  "log",
  "mouse",
  "mpmc",
- "owning_ref",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "path",
  "shapes",
  "spawn",
@@ -2979,7 +3003,7 @@ version = "0.1.2"
 dependencies = [
  "bit_field 0.7.0",
  "bitflags",
- "irq_safety",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
 ]
 
 [[package]]
