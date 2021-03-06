@@ -17,6 +17,10 @@ pub unsafe extern "C" fn __errno_location() -> *mut c_int {
     &mut errno
 }
 
+pub fn errno_str() -> &'static str {
+    &STR_ERROR[ unsafe { errno } as usize ]
+}
+
 
 pub const EPERM: c_int = 1; /* Operation not permitted */
 pub const ENOENT: c_int = 2; /* No such file or directory */

@@ -607,7 +607,7 @@ impl Iterator for PrintfIter {
 }
 
 unsafe fn inner_printf<W: Write>(w: W, format: *const c_char, mut ap: VaList) -> io::Result<c_int> {
-    let w = &mut platform::CountingWriter::new(w);
+    let w = &mut io::CountingWriter::new(w);
 
     let iterator = PrintfIter {
         format: format as *const u8,

@@ -39,8 +39,10 @@ pub use types::*;
 #[no_mangle]
 pub fn _start(args: &[&str], env: &[&str]) -> c_int {
     debug!("args: {:?}\n env: {:?}", args, env);
-    let (args_cstrings, args_char_ptrs) = to_cstring_vec(args);
-    let (env_cstrings,  env_char_ptrs)  = to_cstring_vec(env);
+    let (_args_cstrings, mut args_char_ptrs) = to_cstring_vec(args);
+    let (_env_cstrings,  mut env_char_ptrs)  = to_cstring_vec(env);
+    
+    // Note: `_args_cstrings` and `_env_cstrings` must persist for all execution of `main()`
 
     // set the global pointers to the args and the environment
     let args_ptr = args_char_ptrs.as_mut_ptr();
@@ -62,6 +64,9 @@ pub fn _start(args: &[&str], env: &[&str]) -> c_int {
 }
 
 
+/// Clones the given slice of strings into a `Vec` of `CStrings`,
+/// and returns it, along with a `Vec` of C-style strings (`char *`) 
+/// that point to the corresponding `CStrings` in the first `Vec`.
 fn to_cstring_vec(slice_of_strs: &[&str]) -> (Vec<CString>, Vec<*mut c_char>) {
     let mut cstrings = Vec::with_capacity(slice_of_strs.len()); 
     cstrings.extend(slice_of_strs.iter().filter_map(|&s| CString::new(s).ok()));
