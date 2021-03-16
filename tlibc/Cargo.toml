@@ -23,6 +23,7 @@ path = "../kernel/task"
 # crate-type = ["rlib"]
 
 
+### Patch section was copied from the top-level Theseus Cargo.toml
 [patch.crates-io]
 ### use our own version of volatile which supports zerocopy
 volatile = { git = "https://github.com/theseus-os/volatile" }

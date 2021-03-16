@@ -35,7 +35,12 @@ pub use errno::*;
 pub use types::*;
 
 
-
+/// The entry point that Theseus's task spawning logic will invoke (from its task wrapper).
+/// 
+/// This function invokes the C language `main()` function after setting up some necessary items:
+/// function arguments, environment, stack, etc.
+///
+/// This must be `no_mangle` because compilers look for the `_start` symbol as a link-time dependency.
 #[no_mangle]
 pub fn _start(args: &[&str], env: &[&str]) -> c_int {
     debug!("args: {:?}\n env: {:?}", args, env);
