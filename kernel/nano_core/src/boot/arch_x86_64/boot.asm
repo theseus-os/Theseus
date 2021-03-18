@@ -120,7 +120,7 @@ unmap_guard_page:
 	and ecx, 0x1FF  ; get p2 index by itself
 	; ecx now holds the index into the p2 page table of the entry we want to unmap
 	mov eax, 0x0  ; set huge page flag, clear all others
-	mov [(kernel_table - KERNEL_OFFSET) + (ecx)], eax ; unmap (clear) ecx-th entry
+	mov [(kernel_table - KERNEL_OFFSET) + ecx], eax ; unmap (clear) ecx-th entry
 	ret
 
 

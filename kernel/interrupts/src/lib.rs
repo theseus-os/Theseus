@@ -257,7 +257,6 @@ static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
-	trace!("PS2_PORT keyboard interrupt");
 
     let indicator = ps2::ps2_status_register();
 
@@ -267,7 +266,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
         if indicator & 0x20 != 0x20 {
             // in this interrupt, we must read the PS2_PORT scancode register before acknowledging the interrupt.
             let scan_code = ps2::ps2_read_data();
-            trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
+            // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
 
 
             let extended = EXTENDED_SCANCODE.load(Ordering::SeqCst);
