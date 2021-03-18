@@ -677,8 +677,11 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "gdt",
  "memory",
  "mod_mgmt",
+ "spin",
+ "tss",
  "vga_buffer",
  "x86_64",
 ]

@@ -7,12 +7,63 @@
 extern crate x86_64;
 extern crate mod_mgmt;
 extern crate memory; 
+extern crate spin;
+extern crate tss;
+extern crate gdt;
 
+use spin::Mutex;
+use x86_64::structures::{
+    idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode},
+    tss::TaskStateSegment,
+};
+use gdt::{Gdt, create_gdt};
 
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
+/// The initial GDT structure for the BSP (the first CPU to boot),
+/// which is only really used for the purpose of setting up a special
+/// interrupt stack to support gracefully handling early double faults. 
+static EARLY_GDT: Mutex<Gdt> = Mutex::new(Gdt::new());
 
+/// The initial TSS structure for the BSP (the first CPU to boot),
+/// which is only really used for the purpose of setting up a special
+/// interrupt stack to support gracefully handling early double faults. 
+static EARLY_TSS: Mutex<TaskStateSegment> = Mutex::new(TaskStateSegment::new());
 
-pub fn init(idt_ref: &'static LockedIdt) {
+/// Initializes the given `IDT` with a basic set of early exception handlers
+/// that print out basic information when an exception occurs, mostly for debugging.
+///
+/// If a double fault stack address is specified, a new TSS and GDT
+/// will be created and set up such that the processor will jump to 
+/// that stack upon a double fault.
+pub fn init(
+    idt_ref: &'static LockedIdt, 
+    double_fault_stack_top_unusable: Option<memory::VirtualAddress>,
+) {
+    println_raw!("exceptions_early(): double_fault_stack_top_unusable: {:X?}", double_fault_stack_top_unusable);
+    if let Some(df_stack_top) = double_fault_stack_top_unusable {
+        // Create and load an initial TSS and GDT so we can handle early exceptions such as double faults. 
+        let mut tss = TaskStateSegment::new();
+        tss.interrupt_stack_table[tss::DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(df_stack_top.value());
+        println_raw!("exceptions_early(): Created TSS: {:?}", tss);
+        *EARLY_TSS.lock() = tss;
+        
+        let (gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(&*EARLY_TSS.lock());
+        *EARLY_GDT.lock() = gdt;
+        EARLY_GDT.lock().load();
+
+        use x86_64::instructions::{
+            segmentation::{set_cs, load_ds, load_ss},
+            tables::load_tss,
+        };
+
+        unsafe {
+            set_cs(kernel_cs); // reload code segment register
+            load_tss(tss_segment);      // load TSS
+            let kernel_ds_2 = x86_64::structures::gdt::SegmentSelector::new(kernel_ds.index(), kernel_ds.rpl());
+            load_ss(kernel_ds); // unsure if necessary, but doesn't hurt
+            load_ds(kernel_ds_2); // unsure if necessary, but doesn't hurt
+        }
+    }
+
     { 
         let mut idt = idt_ref.lock(); // withholds interrupts
 
@@ -25,7 +76,14 @@ pub fn init(idt_ref: &'static LockedIdt) {
         // missing: 0x05 bound range exceeded exception
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
-        idt.double_fault.set_handler_fn(double_fault_handler);
+        let double_fault_idt_entry_options = idt.double_fault.set_handler_fn(double_fault_handler);
+        if let Some(_df_stack_top) = double_fault_stack_top_unusable {
+            // SAFE: we set up the required TSS index at the top of this function.
+            unsafe {
+                double_fault_idt_entry_options.set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16);
+            }
+        }
+
         // reserved: 0x09 coprocessor segment overrun exception
         // missing: 0x0a invalid TSS exception
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
@@ -99,6 +157,7 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
 
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
     println_raw!("\nEXCEPTION (early): DOUBLE FAULT\n{:#?}", stack_frame);
+    println_raw!("\nNote: this may be caused by stack overflow. Is the size of the initial_bsp_stack is too small?");
 
     loop {}
 }

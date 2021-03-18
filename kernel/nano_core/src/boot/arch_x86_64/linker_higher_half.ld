@@ -57,6 +57,14 @@ SECTIONS {
 		*(.page_table)
 	}
 
+	/* 
+	 * Theseus's boot code uses 2MiB huge pages for its initial mapping,
+	 * so we waste a little bit of address space when setting up stack guard pages
+	 * in order to keep things simple with an easily-compatible 2MiB guard page.
+	 * If we ever use regular 4KiB pages in the boot code, then we can remove/shrink this.
+	 */
+	. = ALIGN(2M);
+	. = . + 2M; /* make space for a 2MiB stack guard page */
 	.stack ALIGN(4K) : AT(ADDR(.stack) - KERNEL_OFFSET)
 	{
 		*(.stack)
