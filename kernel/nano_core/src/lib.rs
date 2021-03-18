@@ -91,7 +91,10 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// then change the [`captain::init`](../captain/fn.init.html) routine.
 /// 
 #[no_mangle]
-pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
+pub extern "C" fn nano_core_start(
+    multiboot_information_virtual_address: usize,
+    early_double_fault_stack_top: usize,
+) {
     println_raw!("Entered nano_core_start()."); 
 	
 	// start the kernel with interrupts disabled
@@ -103,7 +106,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
-    exceptions_early::init(&EARLY_IDT);
+    exceptions_early::init(&EARLY_IDT, Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
