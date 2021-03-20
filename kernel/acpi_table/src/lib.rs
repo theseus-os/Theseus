@@ -222,6 +222,7 @@ impl AcpiTables {
     pub fn table_slice<S: FromBytes>(&self, signature: &AcpiSignature) -> Result<&[S], &'static str> {
         let loc = self.tables.get(signature).ok_or("couldn't find ACPI table with matching signature")?;
         let (offset, len) = loc.slice_offset_and_length.ok_or("specified ACPI table has no dynamically-sized part")?;
+        warn!("signature {:?}, loc {:?}, offset {:?}, len {:?}", signature, loc, offset, len);
         self.mapped_pages.as_slice(offset, len)
     }
 

@@ -205,6 +205,11 @@ pub fn init(
 
     frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
+    frame_allocator::dump_frame_allocator_state();
+
+    page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
+    debug!("Initialized new page allocator!");
+    page_allocator::dump_page_allocator_state();
 
     page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
     debug!("Initialized new page allocator!");
