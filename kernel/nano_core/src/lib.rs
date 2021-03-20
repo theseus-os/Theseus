@@ -149,6 +149,8 @@ pub extern "C" fn nano_core_start(
         }
     };
     println_raw!("nano_core_start(): initialized crate namespace subsystem."); 
+    memory::dump_frame_allocator_state();
+    memory::dump_page_allocator_state();
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 

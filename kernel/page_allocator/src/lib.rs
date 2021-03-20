@@ -1,7 +1,7 @@
 //! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
-//! This also supports early allocation of pages (up to 32 individual chunks)
+//! This also supports early allocation of pages (up to 32 separate chunks)
 //! before heap allocation is available, and does so behind the scenes using the same single interface. 
 //! 
 //! Once heap allocation is available, it uses a dynamically-allocated list of page chunks to track allocations.
@@ -35,75 +35,89 @@ mod static_array_rb_tree;
 use core::{borrow::Borrow, cmp::Ordering, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange};
-use spin::Mutex;
+use spin::{Mutex, Once};
 use static_array_rb_tree::*;
 
 
-/// Regions that are pre-designated for special usage, specifically the kernel's initial identity mapping.
+/// Certain regions are pre-designated for special usage, specifically the kernel's initial identity mapping.
 /// They will be allocated from if an address within them is specifically requested;
-/// otherwise, they will only be allocated from as a "last resort" once all other non-designated address ranges are exhausted.
+/// otherwise, they will only be allocated from as a "last resort" if all other non-designated address ranges are exhausted.
 ///
-/// Any virtual addresses **less than or equal** to this address is considered "designated".
-/// This lower part of the address range covers from 0x0 to the end of the kernel physical address.
-/// 
-// TODO: replace this with the dynamically-discovered end of the kernel identity mapping section (kernel_phys_end)
-const DESIGNATED_PAGES_LOW_END: Page = Page::containing_address(VirtualAddress::new_canonical(0x40_0000 - 1));
+/// Any virtual addresses **less than or equal** to this address are considered "designated".
+/// This lower part of the address range that's designated covers from 0x0 to this address.
+static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
+
+/// Defines the upper part of the address space that's designated, similar to `DESIGNATED_PAGES_LOW_END`. 
 /// Any virtual addresses **greater than or equal to** this address is considered "designated".
 /// This higher part of the address range covers from the beginning of the heap area to the end of the address space.
-// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
-const DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical( KERNEL_HEAP_START));
+///
+/// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
+static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START));
 
 const MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
 const MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));
 
-/// The single, system-wide list of free virtual memory pages.
-/// Currently this list includes both free and allocated chunks of pages together in the same list,
-/// but it may be better to separate them in the future,
-/// especially when we transition to a RB-tree or a better data structure to track allocated pages. 
+/// The single, system-wide list of free chunks of virtual memory pages.
+static FREE_PAGE_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty());
+
+
+/// Initialize the page allocator.
 ///
-/// Because we use 510th entry of the top-level P4 page table for our recursive page table mapping,
-/// we must never invlude the range of addresses covered by that entry.
-/// Those forbidden addresses include the range from `0xFFFF_FF00_0000_0000` to `0xFFFF_FF80_0000_0000 - 1`.
-/// All other possible virtual addresses are usable by the page allocator.
-static FREE_PAGE_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::new([
+/// # Arguments
+/// * `end_vaddr_of_low_designated_region`: the `VirtualAddress` that marks the end of the 
+///   lower designated region, which should be the ending address of the initial kernel image
+///   (a lower-half identity address).
+/// 
+/// The page allocator will only allocate addresses lower than `end_vaddr_of_low_designated_region`
+/// if specifically requested.
+/// General allocation requests for any virtual address will not use any address lower than that,
+/// unless the rest of the entire virtual address space is already in use.
+///
+pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'static str> {
+	assert!(end_vaddr_of_low_designated_region < DESIGNATED_PAGES_HIGH_START.start_address());
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.call_once(|| Page::containing_address(end_vaddr_of_low_designated_region));
+	let designated_low_end = *designated_low_end;
 
-	// The first region contains all pages *below* the beginning of the 510th entry of P4. 
-	// We split it up into three chunks just for ease, since it overlaps the designated regions.
-	Some(Chunk { 
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::zero()),
-			DESIGNATED_PAGES_LOW_END,
-		)
-	}),
-	Some(Chunk { 
-		pages: PageRange::new(
-			// This is just DESIGNATED_PAGES_LOW_END + 1, but written in a way that is const-compatible.
-			Page::containing_address(VirtualAddress::new_canonical(DESIGNATED_PAGES_LOW_END.start_address().value() + PAGE_SIZE)),
-			// This is just DESIGNATED_PAGES_HIGH_START - 1, but written in a way that is const-compatible.
-			Page::containing_address(VirtualAddress::new_canonical(DESIGNATED_PAGES_HIGH_START.start_address().value() - PAGE_SIZE)),
-		)
-	}),
-	Some(Chunk { 
-		pages: PageRange::new(
-			DESIGNATED_PAGES_HIGH_START,
-			// End at the last page right beneath the beginning of the 510th entry of P4.
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START - ADDRESSABILITY_PER_P4_ENTRY - 1)),
-		)
-	}),
+	let initial_free_chunks = [
+		// The first region contains all pages *below* the beginning of the 510th entry of P4. 
+		// We split it up into three chunks just for ease, since it overlaps the designated regions.
+		Some(Chunk { 
+			pages: PageRange::new(
+				Page::containing_address(VirtualAddress::zero()),
+				designated_low_end,
+			)
+		}),
+		Some(Chunk { 
+			pages: PageRange::new(
+				designated_low_end + 1,
+				DESIGNATED_PAGES_HIGH_START - 1,
+			)
+		}),
+		Some(Chunk { 
+			pages: PageRange::new(
+				DESIGNATED_PAGES_HIGH_START,
+				// This is the page right below the beginning of the 510th entry of the top-level P4 page table.
+				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START - ADDRESSABILITY_PER_P4_ENTRY - 1)),
+			)
+		}),
 
-	// The second region contains all pages *above* the end of the 510th entry of P4, i.e., starting at the 511th (last) entry of P4.
-	// This is fully covered by the second (higher) designated region.
-	Some(Chunk { 
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
-			Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
-		)
-	}),
-	None, None, None, None,
-	None, None, None, None, None, None, None, None,
-	None, None, None, None, None, None, None, None,
-	None, None, None, None, None, None, None, None,
-]));
+		// The second region contains all pages *above* the end of the 510th entry of P4, i.e., starting at the 511th (last) entry of P4.
+		// This is fully covered by the second (higher) designated region.
+		Some(Chunk { 
+			pages: PageRange::new(
+				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
+				Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
+			)
+		}),
+		None, None, None, None,
+		None, None, None, None, None, None, None, None,
+		None, None, None, None, None, None, None, None,
+		None, None, None, None, None, None, None, None,
+	];
+
+	*FREE_PAGE_LIST.lock() = StaticArrayRBTree::new(initial_free_chunks);
+	Ok(())
+}
 
 
 /// A range of contiguous pages.
@@ -381,6 +395,8 @@ fn find_any_chunk<'list>(
 	list: &'list mut StaticArrayRBTree<Chunk>,
 	num_pages: usize
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.try().expect("BUG: page allocator wasn't yet inited");
+
 	// During the first pass, we ignore designated regions.
 	match list.0 {
 		Inner::Array(ref mut arr) => {
@@ -388,7 +404,7 @@ fn find_any_chunk<'list>(
 				if let Some(chunk) = elem {
 					// Skip chunks that are too-small or in the designated regions.
 					if  chunk.size_in_pages() < num_pages || 
-						chunk.pages.start() <= &DESIGNATED_PAGES_LOW_END || 
+						chunk.pages.start() <= &designated_low_end || 
 						chunk.pages.end() >= &DESIGNATED_PAGES_HIGH_START
 					{
 						continue;
@@ -416,7 +432,7 @@ fn find_any_chunk<'list>(
 			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
 			let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_HIGH_START));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if chunk.pages.start() <= &DESIGNATED_PAGES_LOW_END {
+				if chunk.pages.start() <= &designated_low_end {
 					break; // move on to searching through the designated regions
 				}
 				if num_pages < chunk.size_in_pages() {
@@ -456,7 +472,7 @@ fn find_any_chunk<'list>(
 			//
 			// However, RBTree doesn't have a `range_mut()` method, so we use two sets of cursors for manual iteration.
 			// The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.
-			let mut cursor = tree.upper_bound_mut(Bound::Included(&DESIGNATED_PAGES_LOW_END));
+			let mut cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
 				if num_pages < chunk.size_in_pages() {
 					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
@@ -573,6 +589,8 @@ pub fn allocate_pages_deferred(
 		warn!("PageAllocator: requested an allocation of 0 pages... stupid!");
 		return Err("cannot allocate zero pages");
 	}
+
+    warn!("Requesting {} pages starting at {:X?}", num_pages, requested_vaddr);
 
 	let mut locked_list = FREE_PAGE_LIST.lock();
 
