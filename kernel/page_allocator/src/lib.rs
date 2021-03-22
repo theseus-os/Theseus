@@ -398,7 +398,7 @@ fn find_any_chunk<'list>(
 	list: &'list mut StaticArrayRBTree<Chunk>,
 	num_pages: usize
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
-	let designated_low_end = DESIGNATED_PAGES_LOW_END.try().ok_or("BUG: page allocator wasn't yet inited");
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.try().ok_or(AllocationError::NotInitialized)?;
 
 	// During the first pass, we ignore designated regions.
 	match list.0 {
