@@ -87,7 +87,6 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 #[no_mangle]
 #[doc(hidden)]
 extern "C" fn rust_eh_personality() -> ! {
-    println_raw!("\nBUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
     error!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
     loop { }
 }
@@ -135,7 +134,6 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
 #[alloc_error_handler]
 #[cfg(not(test))]
 fn oom(_layout: core::alloc::Layout) -> ! {
-    println_raw!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
     error!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
     panic!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
 }

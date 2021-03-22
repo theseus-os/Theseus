@@ -421,8 +421,7 @@ section .guard_huge_page nobits noalloc noexec nowrite
 ; we use page alignment (4096B) for convenience and compatibility 
 ; with Theseus's stack abstractions in Rust. 
 ; We place the stack in its own sections for loading/parsing convenience.
-; Currently, the stack is 32 pages in size, with a guard page beneath the bottom
-; (and a 2MiB huge page guard beneath that).
+; Currently, the stack is 16 pages in size, with a guard page beneath the bottom.
 ; ---
 ; Note that the `initial_bsp_stack_guard_page` is actually mapped by the boot-time page tables,
 ; but that's okay because we have real guard pages above. 
@@ -433,7 +432,7 @@ initial_bsp_stack_guard_page:
 	resb 4096
 global initial_bsp_stack_bottom
 initial_bsp_stack_bottom:
-	resb 4096 * 32
+	resb 4096 * 16
 global initial_bsp_stack_top
 initial_bsp_stack_top:
 	resb 4096
