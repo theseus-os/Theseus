@@ -332,12 +332,15 @@ enum AllocationError {
 	/// The address space was full, or there was not a large-enough chunk 
 	/// or enough remaining chunks that could satisfy the requested allocation size.
 	OutOfAddressSpace(usize),
+	/// The allocator has not yet been initialized.
+	NotInitialized,
 }
 impl From<AllocationError> for &'static str {
 	fn from(alloc_err: AllocationError) -> &'static str {
 		match alloc_err {
 			AllocationError::AddressNotFree(..) => "address was in use or outside of this allocator's range",
 			AllocationError::OutOfAddressSpace(..) => "out of address space",
+			AllocationError::NotInitialized => "the allocator has not yet been initialized",
 		}
 	}
 }
@@ -395,7 +398,7 @@ fn find_any_chunk<'list>(
 	list: &'list mut StaticArrayRBTree<Chunk>,
 	num_pages: usize
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
-	let designated_low_end = DESIGNATED_PAGES_LOW_END.try().expect("BUG: page allocator wasn't yet inited");
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.try().ok_or("BUG: page allocator wasn't yet inited");
 
 	// During the first pass, we ignore designated regions.
 	match list.0 {
