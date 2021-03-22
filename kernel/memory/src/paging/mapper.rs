@@ -679,11 +679,10 @@ impl MappedPages {
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
     pub fn as_slice<T: FromBytes>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
-        if true {
-            debug!("MappedPages::as_slice(): requested slice of type {} (align {}) with length {} (total size {}) at byte_offset {}, MappedPages start {:#X}, size {}",
+        if false {
+            debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
                 core::any::type_name::<T>(),
-                core::mem::align_of::<T>(),
-                length, size_in_bytes, byte_offset, self.start_address(), self.size_in_bytes()
+                length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
         
