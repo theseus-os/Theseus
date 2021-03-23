@@ -206,6 +206,9 @@ pub fn init(
     frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
 
+    page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
+    debug!("Initialized new page allocator!");
+
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     let (
         page_table,
