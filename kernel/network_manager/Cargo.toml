@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 
 
 [dependencies.log]

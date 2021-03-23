@@ -13,7 +13,7 @@ version = "0.4.8"
 
 
 [dependencies.stable_deref_trait]
-git = "https://github.com/kevinaboos/stable_deref_trait.git"
+git = "https://github.com/theseus-os/stable_deref_trait.git"
 branch = "spin"
 default-features = false
 features = [ "alloc", "spin" ]
@@ -21,7 +21,7 @@ features = [ "alloc", "spin" ]
 [dependencies.owning_ref]
 # version = "0.3.3"
 # path = "../../libs/owning-ref-rs"
-git = "https://github.com/kevinaboos/owning-ref-rs.git"
+git = "https://github.com/theseus-os/owning-ref-rs.git"
 
 
 [dependencies.wait_queue]

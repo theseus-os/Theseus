@@ -677,8 +677,11 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "gdt",
  "memory",
  "mod_mgmt",
+ "spin",
+ "tss",
  "vga_buffer",
  "x86_64",
 ]
@@ -857,7 +860,7 @@ dependencies = [
 [[package]]
 name = "getopts"
 version = "0.2.21"
-source = "git+https://github.com/kevinaboos/getopts#da1e04828d3ecd6adc90e2da61e2e3cccc7ca97c"
+source = "git+https://github.com/theseus-os/getopts#da1e04828d3ecd6adc90e2da61e2e3cccc7ca97c"
 dependencies = [
  "unicode-width",
 ]
@@ -1043,11 +1046,11 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed"
+source = "git+https://github.com/theseus-os/irq_safety#d7903a8f064170fae58a3da477300469faaf28d2"
 dependencies = [
  "owning_ref",
  "spin",
- "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
 ]
 
 [[package]]
@@ -1523,7 +1526,7 @@ dependencies = [
  "log",
  "owning_ref",
  "spin",
- "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
  "task",
  "wait_queue",
 ]
@@ -1664,10 +1667,10 @@ dependencies = [
 [[package]]
 name = "owning_ref"
 version = "0.4.0"
-source = "git+https://github.com/kevinaboos/owning-ref-rs#03db99a3707a5d7c9e376800498c94c88a877d15"
+source = "git+https://github.com/theseus-os/owning-ref-rs#ce14b539e3aa891ff463c6f5e28617b27bc2510b"
 dependencies = [
  "spin",
- "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
 ]
 
 [[package]]
@@ -2433,7 +2436,7 @@ checksum = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 [[package]]
 name = "stable_deref_trait"
 version = "1.1.1"
-source = "git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b"
+source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#82478940fa89747f48523bfbcb0ab700fd1cbe7b"
 dependencies = [
  "spin",
 ]
@@ -2964,7 +2967,7 @@ dependencies = [
 [[package]]
 name = "xmas-elf"
 version = "0.6.2"
-source = "git+https://github.com/kevinaboos/xmas-elf.git#faf514033cb815a58f5119c3e867c42fac5cb6d6"
+source = "git+https://github.com/theseus-os/xmas-elf.git#635d55f6886ae3fe0ec8a78e0bcc1238224c903d"
 dependencies = [
  "zero",
 ]
@@ -2972,7 +2975,7 @@ dependencies = [
 [[package]]
 name = "zero"
 version = "0.1.3"
-source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2d6bf91deafc62"
+source = "git+https://github.com/theseus-os/zero.git#9fc7ff523138a21f40359b706d2d6bf91deafc62"
 
 [[package]]
 name = "zerocopy"
