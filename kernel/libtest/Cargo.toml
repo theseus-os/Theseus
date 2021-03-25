@@ -34,7 +34,7 @@ path = "../hpet"
 path = "../pmu_x86"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.9.1"
 features = ["nightly"]
 
 [lib]

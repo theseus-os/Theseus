@@ -591,9 +591,8 @@ orun_pause:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
-### Currently, loadable module mode requires release build mode
+### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
 loadable : export override THESEUS_CONFIG += loadable
-loadable : export BUILD_MODE = release
 loadable: run
 
 
