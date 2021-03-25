@@ -209,9 +209,6 @@ pub fn init(
     page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
     debug!("Initialized new page allocator!");
 
-    page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
-    debug!("Initialized new page allocator!");
-
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     let (
         page_table,

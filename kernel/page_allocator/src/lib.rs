@@ -593,8 +593,6 @@ pub fn allocate_pages_deferred(
 		return Err("cannot allocate zero pages");
 	}
 
-    warn!("Requesting {} pages starting at {:X?}", num_pages, requested_vaddr);
-
 	let mut locked_list = FREE_PAGE_LIST.lock();
 
 	// The main logic of the allocator is to find an appropriate chunk that can satisfy the allocation request.

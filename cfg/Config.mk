@@ -33,7 +33,7 @@ ifeq ($(BUILD_MODE), debug)
 else ifeq ($(BUILD_MODE), release)
 	export override CARGOFLAGS += --release
 else 
-$(error 'BUILD_MODE' of '$(BUILD_MODE)' is invalid, it must be either 'debug' or 'release')
+$(error 'BUILD_MODE' value of '$(BUILD_MODE)' is invalid, it must be either 'debug' or 'release')
 endif
 
 
