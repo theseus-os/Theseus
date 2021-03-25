@@ -343,28 +343,28 @@ if #[cfg(unsafe_heap)] {
         fn grow_heap(&self, layout: Layout, heap_to_grow: &LockedHeap) -> Result<(), &'static str> {
             // (1) Try to retrieve a page from the another heap
             for heap_ref in self.heaps.values() {
-                if let Some(mp) = heap_ref.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                    info!("Added page from another heap to heap: {}", heap_to_grow.lock().heap_id);
+                if let Some((mp, _giving_heap_id)) = heap_ref.try_lock().and_then(|mut giving_heap| 
+                    giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD).map(|mp| (mp, giving_heap.heap_id))
+                ) {
+                    info!("Added page from another heap {} to heap {}", _giving_heap_id, heap_to_grow.lock().heap_id);
                     return heap_to_grow.lock().refill(layout, mp);
                 }
             }
+
             // (2) Allocate page from the OS
-            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            for saved_action in &mut deferred_alloc_actions {
-                let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+            for _ in 0..HEAP_GROWTH_AMOUNT {
+                let (mp, _action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
                 let start_addr = mp.start_address().value();
                 self.extend_heap_mp(mp)?;
-                let page = unsafe{ core::mem::transmute(start_addr) };
-                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}",
-                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                let page = unsafe { core::mem::transmute(start_addr) };
+                info!("grow_heap:: Allocated page(s) at {:X?} to refill heap {} for layout size: {}, prior heap_end: {:#X}", 
+                    start_addr, heap_to_grow.lock().heap_id, layout.size(), *heap_end
                 );
                 *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                 heap_to_grow.lock().refill(layout, page)?;
-                *saved_action = Some(action);
             }
             Ok(())
-            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         } 
 
         /// Merge mapped pages `mp` with the heap mapped pages.
@@ -405,26 +405,26 @@ if #[cfg(unsafe_heap)] {
         fn grow_heap(&self, layout: Layout, heap_to_grow: &LockedHeap) -> Result<(), &'static str> {
             // (1) Try to retrieve a page from the another heap
             for heap_ref in self.heaps.values() {
-                if let Some(mp) = heap_ref.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                    info!("Added page from another heap to heap: {}", heap_to_grow.lock().heap_id);
+                if let Some((mp, _giving_heap_id)) = heap_ref.try_lock().and_then(|mut giving_heap| 
+                    giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD).map(|mp| (mp, giving_heap.heap_id))
+                ) {
+                    info!("Added page from another heap {} to heap {}", _giving_heap_id, heap_to_grow.lock().heap_id);
                     return heap_to_grow.lock().refill(layout, mp);
                 }
             }
+
             // (2) Allocate page from the OS
-            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            for saved_action in &mut deferred_alloc_actions {
-                let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+            for _ in 0..HEAP_GROWTH_AMOUNT {
+                let (mp, _action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
                 let mp = MappedPages8k::new(mp)?;
-                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", 
-                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                info!("grow_heap:: Allocated page(s) at {:X?} to refill heap {} for layout size: {}, prior heap_end: {:#X}", 
+                    mp.start_address(), heap_to_grow.lock().heap_id, layout.size(), *heap_end
                 );
                 *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                 heap_to_grow.lock().refill(layout, mp)?;
-                *saved_action = Some(action);
             }
             Ok(())
-            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         }  
     }
 
@@ -453,27 +453,26 @@ if #[cfg(unsafe_heap)] {
         fn grow_heap(&self, layout: Layout, heap_to_grow: &LockedHeap) -> Result<(), &'static str> {
             // (1) Try to retrieve a page from the another heap
             for heap_ref in self.heaps.values() {
-                if let Some(mp) = heap_ref.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                    info!("Added page from another heap to heap: {}", heap_to_grow.lock().heap_id);
+                if let Some((mp, _giving_heap_id)) = heap_ref.try_lock().and_then(|mut giving_heap| 
+                    giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD).map(|mp| (mp, giving_heap.heap_id))
+                ) {
+                    info!("Added page from another heap {} to heap {}", _giving_heap_id, heap_to_grow.lock().heap_id);
                     return heap_to_grow.lock().refill(layout, mp);
                 }
             }
 
             // (2) Allocate page from the OS
-            let mut deferred_alloc_actions = [None; HEAP_GROWTH_AMOUNT];
             let mut heap_end = self.end.lock();
-            for saved_action in &mut deferred_alloc_actions {
-                let (mp, action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+            for _ in 0..HEAP_GROWTH_AMOUNT {
+                let (mp, _action) = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
                 let mp = MappedPages8k::new(mp)?;
-                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", 
-                    heap_to_grow.lock().heap_id, layout.size(), *heap_end
+                info!("grow_heap:: Allocated page(s) at {:X?} to refill heap {} for layout size: {}, prior heap_end: {:#X}", 
+                    mp.start_address(), heap_to_grow.lock().heap_id, layout.size(), *heap_end
                 );
                 *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                 heap_to_grow.lock().refill(layout, mp)?;
-                *saved_action = Some(action);
             }
             Ok(())
-            // deferred_alloc_actions is dropped here, only after the heap has been refilled.
         }  
     }
 }

@@ -54,7 +54,10 @@ pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 
 /// The size in pages of each kernel stack. 
 /// If it's too small, complex kernel functions will overflow, causing a page fault / double fault.
+#[cfg(not(debug_assertions))]
 pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 16;
+#[cfg(debug_assertions)]
+pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 32; // debug builds require more stack space.
 
 /// The virtual address where the initial kernel (the nano_core) is mapped to.
 /// Actual value: 0xFFFFFFFF80000000.
@@ -68,22 +71,20 @@ pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 /// The kernel text region is where we load kernel modules. 
 /// It starts at the 511th P4 entry and goes up until the KERNEL_OFFSET,
 /// which is where the nano_core itself starts. 
-/// actual value: 0o177777_777_000_000_000_0000, or 0xFFFF_FF80_0000_0000
+/// Actual value: 0o177777_777_000_000_000_0000, or 0xFFFF_FF80_0000_0000
 pub const KERNEL_TEXT_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_TEXT_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
 /// The size in bytes, not in pages.
 pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 * 1024 * 1024); // because the KERNEL_OFFSET starts at -2GiB
 
 
-/// higher-half heap gets 512 GB address range starting at the 509th P4 entry,
-/// which is the slot right below the recursive P4 entry (510)
-/// actual value: 0o177777_775_000_000_000_0000, or 0xFFFF_FE80_0000_0000
+/// The higher-half heap gets the 512GB address range starting at the 509th P4 entry,
+/// which is the slot right below the recursive P4 entry (510).
+/// Actual value: 0o177777_775_000_000_000_0000, or 0xFFFF_FE80_0000_0000
 pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-#[cfg(not(safe_heap))]
-pub const KERNEL_HEAP_INITIAL_SIZE: usize = 16 * 1024 * 1024; //16 MiB
-#[cfg(safe_heap)]
-/// When using the safe version of the heap we are creating large, statically sized buffers on the initial heap.
-/// So the initial heap size is larger in this case.
-pub const KERNEL_HEAP_INITIAL_SIZE: usize = 20 * 1024 * 1024; //20 MiB
+#[cfg(not(debug_assertions))]
+pub const KERNEL_HEAP_INITIAL_SIZE: usize = 20 * 1024 * 1024; // 20 MiB
+#[cfg(debug_assertions)]
+pub const KERNEL_HEAP_INITIAL_SIZE: usize = 20 * 1024 * 1024 * 5; // 100 MiB, debug builds require more heap space.
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 

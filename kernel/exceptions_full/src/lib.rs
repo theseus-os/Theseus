@@ -325,10 +325,13 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
 
 /// exception 0x08
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
     let accessed_vaddr = control_regs::cr2();
+    println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\nTried to access {:#X}
+        Note: double faults in Theseus are typically caused by stack overflow, is the stack large enough?",
+        stack_frame, accessed_vaddr,
+    );
     if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr.0)) {
-        println_both!("--> Double fault was caused by stack overflow, tried to access {:#X}.\n", accessed_vaddr);
+        println_both!("--> This double fault was definitely caused by stack overflow, tried to access {:#X}.\n", accessed_vaddr);
     }
     
     log_exception(0x8, stack_frame.instruction_pointer.0, Some(error_code), None);
