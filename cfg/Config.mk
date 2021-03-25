@@ -23,14 +23,19 @@ APP_PREFIX    ?= a\#
 
 
 ## Build modes: debug is development mode, release is with full optimizations.
-## We build using release mode by default, because running in debug mode is prohibitively slow.
+## We build using release mode by default, because running in debug mode is quite slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
-# BUILD_MODE ?= debug
 BUILD_MODE ?= release
-
-ifeq ($(BUILD_MODE), release)
+ifeq ($(BUILD_MODE), debug)
+	## "debug" builds are the default in cargo, so don't change cargo options. 
+	## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.
+	export override CFLAGS += -DDEBUG
+else ifeq ($(BUILD_MODE), release)
 	export override CARGOFLAGS += --release
+else 
+$(error 'BUILD_MODE' of '$(BUILD_MODE)' is invalid, it must be either 'debug' or 'release')
 endif
+
 
 ## Tell cargo to build our own target-specific version of the `core` and `alloc` crates.
 ## Also ensure that core memory functions (e.g., memcpy) are included in the build and not name-mangled.
