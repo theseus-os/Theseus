@@ -43,5 +43,5 @@ path = "../slabmalloc_unsafe"
 path = "../heap"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.9.1"
 features = ["nightly"]
