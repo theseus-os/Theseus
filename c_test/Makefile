@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-all: build
+all: dummy
 
 ### Use our custom cross compiler retargeted for Theseus1
 export override PATH := $(HOME)/opt/cross/bin:$(PATH)
@@ -15,18 +15,34 @@ export override LDFLAGS += -z max-page-size=4096
 ### but the gcc manual says to also include fpie/fPIE
 # PIE := -fpic -fPIC -fpie -fPIE -pie
 
+TLIBC_DIR := ../tlibc/target/x86_64-theseus/release
+TLIBC := $(TLIBC_DIR)/tlibc-13d19183eba65090.o
+
 CROSS = x86_64-elf-
 
-build: dummy.c
+LDFLAGS += -nostdlib -nostartfiles 
+# LDFLAGS  = -nostdlib -nostartfiles -static
+
+
+### Above options based on this link: <https://stackoverflow.com/a/10772056>
+
+
+dummy: dummy.c
 	which $(CROSS)gcc
 
+	# Note: `$@` is Make syntax for the target, i.e., "dummy"
+	#       `$^` is Make syntax for the dependencies, i.e., "dummy.c"
+
 	$(CROSS)gcc $(LDFLAGS) \
-		-nostdlib \
 		$(PIE) \
 		-O0 \
-		-o dummy \
-		dummy.c \
-		start.c
-	
+		$(LDFLAGS) \
+		-o $@ \
+		$^ \
+		-lgcc -lc -lgcc -lc
+
+
+		# start.c
+
 		
 		# -static \
