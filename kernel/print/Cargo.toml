@@ -6,7 +6,7 @@ description = "offers kernel crates the ability to print to the default terminal
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.7.1"
+spin = "0.9.0"
 
 
 [dependencies.dfqueue]

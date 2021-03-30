@@ -6,10 +6,8 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 volatile = "0.2.7"
-
-[dependencies.owning_ref]
-git = "https://github.com/theseus-os/owning-ref-rs.git"
 
 [dependencies.log]
 version = "0.4.8"

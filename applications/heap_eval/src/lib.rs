@@ -175,7 +175,7 @@ fn overhead_of_accessing_multiple_heaps_inner() -> Result<u64, &'static str> {
     let hpet = get_hpet(); 
     let start = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
  
-    let allocator = match ALLOCATOR.try() {
+    let allocator = match ALLOCATOR.get() {
         Some(allocator) => allocator,
         None => {
             error!("Multiple heaps not initialized!");

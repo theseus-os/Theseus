@@ -6,7 +6,7 @@ build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"
-spin = "0.7.1"
+spin = "0.9.0"
 
 [dependencies.log]
 default-features = false

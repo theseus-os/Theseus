@@ -6,7 +6,7 @@ description = "define and initialize the bitmaps of ASCII characters"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.7.1"
+spin = "0.9.0"
 
 [lib]
 crate-type = ["rlib"]
