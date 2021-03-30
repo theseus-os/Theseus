@@ -238,7 +238,7 @@ pub fn eoi(irq: Option<u8>) {
             apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").write().eoi();
         }
         InterruptChip::PIC => {
-            PIC.try().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
+            PIC.get().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
         }
     }
 }
@@ -355,7 +355,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut Exc
     println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
 	match apic::INTERRUPT_CHIP.load(Ordering::Acquire) {
         apic::InterruptChip::PIC => {
-            let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+            let irq_regs = PIC.get().map(|pic| pic.read_isr_irr());  
             println_raw!("PIC IRQ Registers: {:?}", irq_regs);
         }
         apic::InterruptChip::APIC | apic::InterruptChip::X2APIC => {
@@ -386,7 +386,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut Exc
 /// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html.
 /// We handle it according to this advice: https://wiki.osdev.org/8259_PIC#Spurious_IRQs
 extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
-    if let Some(pic) = PIC.try() {
+    if let Some(pic) = PIC.get() {
         let irq_regs = pic.read_isr_irr();
         // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
         // (pretty sure this will never happen)

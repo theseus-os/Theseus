@@ -372,7 +372,7 @@ if #[cfg(unsafe_heap)] {
         /// # Warning
         /// The new mapped pages must start from the virtual address that the current heap mapped pages end at.
         fn extend_heap_mp(&self, mp: MappedPages) -> Result<(), &'static str> {
-            if let Some(heap_mp) = self.mp.try() {
+            if let Some(heap_mp) = self.mp.get() {
                 heap_mp.lock().merge(mp).map_err(|(e, _mp)| e)?;
             } else {
                 self.mp.call_once(|| MutexIrqSafe::new(mp));

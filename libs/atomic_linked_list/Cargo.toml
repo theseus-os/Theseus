@@ -4,7 +4,7 @@ name = "atomic_linked_list"
 version = "0.1.0"
 
 [dependencies]
-# spin = "0.4.5"
+# spin = "0.7.1"
 # debugit = "0.1.2"
 
 # [dependencies.lazy_static]

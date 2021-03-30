@@ -6,7 +6,7 @@ description = "defines the traits for File and Directory. These files and direct
 
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.7.1"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.lazy_static]

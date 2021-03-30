@@ -422,7 +422,7 @@ impl Terminal {
 impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
-        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER.get().ok_or("The window manager is not initialized")?;
         let (window_width, window_height) = {
             let wm = wm_ref.lock();
             wm.get_screen_size()

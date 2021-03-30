@@ -6,8 +6,10 @@ description = "Support for ACPI RSDP"
 build = "../../build.rs"
 
 [dependencies]
-owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 zerocopy = "0.3.0"
+
+[dependencies.owning_ref]
+git = "https://github.com/theseus-os/owning-ref-rs.git"
 
 [dependencies.memory]
 path = "../memory"
