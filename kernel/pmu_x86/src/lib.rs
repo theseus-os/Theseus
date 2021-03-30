@@ -177,11 +177,11 @@ fn num_general_purpose_counters() -> u8 {
 }
 
 fn get_pmcs_available() -> Result<&'static Vec<AtomicU8>, &'static str>{
-    Ok(PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?)
+    Ok(PMCS_AVAILABLE.get().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?)
 }
 
 fn get_pmcs_available_for_core(core_id: u8) -> Result<&'static AtomicU8, &'static str>{
-    let pmc = PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?;
+    let pmc = PMCS_AVAILABLE.get().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?;
     Ok(&pmc[core_id as usize])
 }
 

@@ -55,25 +55,25 @@ pub enum AvailableSegmentSelector {
 pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
     let seg: &SegmentSelector = match selector {
         AvailableSegmentSelector::KernelCode => {
-            KERNEL_CODE_SELECTOR.try().expect("KERNEL_CODE_SELECTOR wasn't yet inited!")
+            KERNEL_CODE_SELECTOR.get().expect("KERNEL_CODE_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::KernelData => {
-            KERNEL_DATA_SELECTOR.try().expect("KERNEL_DATA_SELECTOR wasn't yet inited!")
+            KERNEL_DATA_SELECTOR.get().expect("KERNEL_DATA_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserCode32 => {
-            USER_CODE_32_SELECTOR.try().expect("USER_CODE_32_SELECTOR wasn't yet inited!")
+            USER_CODE_32_SELECTOR.get().expect("USER_CODE_32_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserData32 => {
-            USER_DATA_32_SELECTOR.try().expect("USER_DATA_32_SELECTOR wasn't yet inited!")
+            USER_DATA_32_SELECTOR.get().expect("USER_DATA_32_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserCode64 => {
-            USER_CODE_64_SELECTOR.try().expect("USER_CODE_64_SELECTOR wasn't yet inited!")
+            USER_CODE_64_SELECTOR.get().expect("USER_CODE_64_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::UserData64 => {
-            USER_DATA_64_SELECTOR.try().expect("USER_DATA_64_SELECTOR wasn't yet inited!")
+            USER_DATA_64_SELECTOR.get().expect("USER_DATA_64_SELECTOR wasn't yet inited!")
         }
         AvailableSegmentSelector::Tss => {
-            TSS_SELECTOR.try().expect("TSS_SELECTOR wasn't yet inited!")
+            TSS_SELECTOR.get().expect("TSS_SELECTOR wasn't yet inited!")
         }
     };
 
