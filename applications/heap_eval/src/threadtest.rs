@@ -86,7 +86,7 @@ fn worker(_:()) {
     // at the beginning, but the time it takes to do this once at the beginning of thread is
     // insignificant compared to the number of iterations we run. It also printed above.
     #[cfg(direct_access_to_multiple_heaps)]
-    let allocator = match ALLOCATOR.try() {
+    let allocator = match ALLOCATOR.get() {
         Some(allocator) => allocator,
         None => {
             error!("Multiple heaps not initialized!");
