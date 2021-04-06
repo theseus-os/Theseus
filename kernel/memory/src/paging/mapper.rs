@@ -15,8 +15,11 @@ use core::{
     slice,
 };
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
-use paging::{PageRange, get_current_p4};
-use paging::table::{P4, Table, Level4};
+use paging::{
+    get_current_p4,
+    PageRange,
+    table::{P4, Table, Level4},
+};
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
@@ -51,7 +54,7 @@ impl Mapper {
     /// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
     /// and also shows their `EntryFlags`.
     /// 
-    /// The debugging information is written to the the given `writer`.
+    /// The page table details are written to the the given `writer`.
     pub fn dump_pte<W: Write>(&self, writer: &mut W, virtual_address: VirtualAddress) -> fmt::Result {
         let page = Page::containing_address(virtual_address);
         let p4  = self.p4();
@@ -68,12 +71,12 @@ impl Mapper {
             virtual_address,
             &p4[page.p4_index()].value(),
             &p4[page.p4_index()].flags(),
-            p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.value()).unwrap_or(0x0), 
+            p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.value()).unwrap_or(0x0),
             p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.flags()),
-            p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.value()).unwrap_or(0x0), 
+            p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.value()).unwrap_or(0x0),
             p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.flags()),
-            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),  // _pet.value()
-            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),                 // _pte.flags()
+            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),
+            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),
         )
     }
 
