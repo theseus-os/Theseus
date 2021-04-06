@@ -7,13 +7,19 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::mem;
-use core::ops::Deref;
-use core::ptr::Unique;
-use core::slice;
+use core::{
+    mem,
+    fmt::{self, Write},
+    ops::Deref,
+    ptr::Unique,
+    slice,
+};
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
-use paging::{PageRange, get_current_p4};
-use paging::table::{P4, Table, Level4};
+use paging::{
+    get_current_p4,
+    PageRange,
+    table::{P4, Table, Level4},
+};
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
@@ -45,36 +51,33 @@ impl Mapper {
         unsafe { self.p4.as_mut() }
     }
 
-    /// Dumps all page table entries at all four levels for the given `VirtualAddress`, 
+    /// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
     /// and also shows their `EntryFlags`.
     /// 
-    /// Useful for debugging page faults. 
-    pub fn dump_pte(&self, virtual_address: VirtualAddress) {
+    /// The page table details are written to the the given `writer`.
+    pub fn dump_pte<W: Write>(&self, writer: &mut W, virtual_address: VirtualAddress) -> fmt::Result {
         let page = Page::containing_address(virtual_address);
-        let p4 = self.p4();
-        let p3 = p4.next_table(page.p4_index());
-        let p2 = p3.and_then(|p3| p3.next_table(page.p3_index()));
-        let p1 = p2.and_then(|p2| p2.next_table(page.p2_index()));
-        if let Some(_pte) = p1.map(|p1| &p1[page.p1_index()]) {
-            debug!("VirtualAddress: {:#X}:
-                    P4 entry:        {:#X}   ({:?})
-                    P3 entry:        {:#X}   ({:?})
-                    P2 entry:        {:#X}   ({:?})
-                    P1 entry: (PTE)  {:#X}   ({:?})",
-                virtual_address, 
-                &p4[page.p4_index()].value(), 
-                &p4[page.p4_index()].flags(),
-                p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.value()).unwrap_or(0x0), 
-                p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.flags()),
-                p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.value()).unwrap_or(0x0), 
-                p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.flags()),
-                p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),  // _pet.value()
-                p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),                 // _pte.flags()
-            );
-        }
-        else {
-            debug!("Error: couldn't get PTE entry for vaddr: {:#X}. Has it been mapped?", virtual_address);
-        }
+        let p4  = self.p4();
+        let p3  = p4.next_table(page.p4_index());
+        let p2  = p3.and_then(|p3| p3.next_table(page.p3_index()));
+        let p1  = p2.and_then(|p2| p2.next_table(page.p2_index()));
+        write!(
+            writer,
+            "VirtualAddress: {:#X}:
+                P4 entry:        {:#X}   ({:?})
+                P3 entry:        {:#X}   ({:?})
+                P2 entry:        {:#X}   ({:?})
+                P1 entry: (PTE)  {:#X}   ({:?})",
+            virtual_address,
+            &p4[page.p4_index()].value(),
+            &p4[page.p4_index()].flags(),
+            p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.value()).unwrap_or(0x0),
+            p3.map(|p3| &p3[page.p3_index()]).map(|p3_entry| p3_entry.flags()),
+            p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.value()).unwrap_or(0x0),
+            p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.flags()),
+            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),
+            p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),
+        )
     }
 
     /// Translates a `VirtualAddress` to a `PhysicalAddress` by walking the page tables.
