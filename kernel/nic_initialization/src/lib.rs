@@ -42,7 +42,7 @@ pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
 /// * `mem_base`: starting physical address of the device's memory mapped registers
 pub fn allocate_device_register_memory(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
     //find out amount of space needed
-    let mem_size_in_bytes = dev.determine_mem_size() as usize;
+    let mem_size_in_bytes = dev.determine_mem_size(0) as usize;
 
     allocate_memory(mem_base, mem_size_in_bytes)
 }

@@ -196,7 +196,7 @@ impl E1000Nic {
         }
   
         // memory mapped base address
-        let mem_base = e1000_pci_dev.determine_mem_base()?;
+        let mem_base = e1000_pci_dev.determine_mem_base(0)?;
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         e1000_pci_dev.pci_set_command_bus_master_bit();

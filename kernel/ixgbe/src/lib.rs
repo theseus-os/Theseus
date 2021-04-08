@@ -295,7 +295,7 @@ impl IxgbeNic {
         }
 
         // 16-byte aligned memory mapped base address
-        let mem_base =  ixgbe_pci_dev.determine_mem_base()?;
+        let mem_base =  ixgbe_pci_dev.determine_mem_base(0)?;
 
         // map the IntelIxgbeRegisters structs to the address found from the pci space
         let (mut mapped_registers1, mut mapped_registers2, mut mapped_registers3, mut mapped_registers_mac, 
