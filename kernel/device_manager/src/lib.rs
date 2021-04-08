@@ -54,7 +54,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
-        debug!("Found pci device: {:?}", dev);
+        debug!("Found pci device: {:X?}", dev);
     } 
 
     // store all the initialized ixgbe NICs here to be added to the network interface list
@@ -120,7 +120,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             // here: check for and initialize other ethernet cards
         }
 
-        warn!("Ignoring PCI device with no handler. {:?}", dev);
+        warn!("Ignoring PCI device with no handler. {:X?}", dev);
     }
 
     // Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.
