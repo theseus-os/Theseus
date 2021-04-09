@@ -49,7 +49,7 @@ macro_rules! println_log {
 
 static VERBOSE: Once<bool> = Once::new();
 macro_rules! verbose {
-    () => (VERBOSE.try() == Some(&true));
+    () => (VERBOSE.get() == Some(&true));
 }
 
 

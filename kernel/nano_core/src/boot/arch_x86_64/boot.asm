@@ -10,6 +10,17 @@
 ; Kernel is linked to run at -2Gb
 KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
+; Debug builds require a larger initial boot stack,
+; because their code is larger and less optimized.
+%ifndef INITIAL_STACK_SIZE
+%ifdef DEBUG
+	INITIAL_STACK_SIZE equ 32 ; 32 pages for debug builds
+%elif 
+	INITIAL_STACK_SIZE equ 16 ; 16 pages for release builds
+%endif 
+%endif
+
+
 global start
 
 ; Section must have the permissions of .text
@@ -432,7 +443,7 @@ initial_bsp_stack_guard_page:
 	resb 4096
 global initial_bsp_stack_bottom
 initial_bsp_stack_bottom:
-	resb 4096 * 16
+	resb 4096 * INITIAL_STACK_SIZE
 global initial_bsp_stack_top
 initial_bsp_stack_top:
 	resb 4096

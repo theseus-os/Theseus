@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 rustc-demangle = "0.1.14"
 qp-trie = "0.7.3"
@@ -44,7 +44,7 @@ path = "../root"
 path = "../fs_node"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.9.1"
 features = ["nightly"]
 
 [dependencies.vfs_node]

@@ -82,7 +82,7 @@ pub fn init() {
 // /// If the map did not previously have a SystemState of this type, `None` is returned.
 // /// If the map did previously have one, the value is updated, and the old value is returned.
 pub fn insert_state<S: Any>(state: S) -> Option<S> {
-	let old_val: Option<Box<dyn Any>> = SYSTEM_STATE.try().expect("SYSTEM_STATE uninited").0.insert(
+	let old_val: Option<Box<dyn Any>> = SYSTEM_STATE.get().expect("SYSTEM_STATE uninited").0.insert(
 		TypeId::of::<S>(), 
 		Box::new( Arc::new(state) ) // Arc<S> is the type that is represented by Any
 	);
@@ -158,7 +158,7 @@ pub fn get_state<S: Any>() -> SSCached<S> {
 
 
 fn get_state_internal<S: Any>() -> Option<Weak<S>> {
-	SYSTEM_STATE.try().expect("SYSTEM_STATE uninited").0
+	SYSTEM_STATE.get().expect("SYSTEM_STATE uninited").0
 		.get(&TypeId::of::<S>())                       // get the Option<Arc<Any>> value
 		.and_then( |g| g.downcast_ref::<Arc<S>>())    // if it's Some(g), then downcast g to S
 		.map( |dcast_arc| Arc::downgrade(dcast_arc))  // transform result of downcast to weak ptr
