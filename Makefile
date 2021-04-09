@@ -271,6 +271,12 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 ### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
+    ## If the user chose to enable VGA text mode by means of setting `THESEUS_CONFIG`,
+    ## then we need to set CFLAGS such that the assembly code can know about it.
+    ## TODO: move this whole part about invoking `nasm` into a dedicated build.rs script in the nano_core.
+ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
+	$(eval CFLAGS += -DVGA_TEXT_MODE)
+endif
 	@nasm -felf64 $< -o $@ $(CFLAGS)
 
 
