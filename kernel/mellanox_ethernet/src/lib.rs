@@ -21,7 +21,7 @@ use zerocopy::FromBytes;
 const MAX_CMND_QUEUE_ENTRIES: usize = 64;
 #[derive(FromBytes)]
 #[repr(C)]
-struct InitializationSegment {
+pub struct InitializationSegment {
     fw_rev_major:               ReadOnly<u16>,
     fw_rev_minor:               ReadOnly<u16>,
     fw_rev_subminor:            ReadOnly<u16>,
@@ -59,17 +59,25 @@ struct InitializationSegment {
 // const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16396);
 
 impl InitializationSegment {
-    // pub fn set_physical_address_of_cmdq(pa: PhysicalAddress) {
+    pub fn num_cmdq_entries(&self) -> u8 {
+        (self.cmdq_phy_addr_low.read() >> 3) as u8 & 0x0F
+    }
 
-    // }
+    pub fn cmdq_entry_stride(&self) -> u8 {
+        (self.cmdq_phy_addr_low.read()) as u8 & 0x0F
+    }
+    pub fn set_physical_address_of_cmdq(&mut self, pa: PhysicalAddress) {
+        self.cmdq_phy_addr_high.write((pa.value() >> 32) as u32);
+        self.cmdq_phy_addr_low.write(pa.value() as u32);
+    }
 
     // pub fn set_doorbell(command_no: u8) {
 
     // }
 
-    // pub fn device_is_initializing() -> bool {
-
-    // }
+    pub fn device_is_initializing(&self) -> bool {
+        self.initializing_state.read().get_bit(15)
+    }
 
     // pub fn initializing_state() -> InitializingState {
 
@@ -88,13 +96,13 @@ pub enum InitializingState {
 /// The number of enties and the entry stride is retrieved from the initialization segment of the HCA BAR.
 /// It resides in a physically contiguous 4 KiB memory chunk.
 #[repr(C)]
-struct CommandQueue {
+pub struct CommandQueue {
     entries: Vec<CommandQueueEntry>
 }
 
 #[derive(FromBytes)]
 #[repr(C)]
-struct CommandQueueEntry {
+pub struct CommandQueueEntry {
     type_of_transport:              Volatile<u32>,
     input_length:                   Volatile<u32>,
     input_mailbox_pointer:          Volatile<u64>,
@@ -110,7 +118,7 @@ struct CommandQueueEntry {
 
 const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
 
-enum CommandDeliveryStatus {
+pub enum CommandDeliveryStatus {
     Success = 0,
     SignatureErr = 1,
     TokenErr = 2,
@@ -125,7 +133,7 @@ enum CommandDeliveryStatus {
 }
 #[derive(FromBytes)]
 #[repr(C)]
-struct CommandInterfaceMailbox {
+pub struct CommandInterfaceMailbox {
     mailbox_data:       Volatile<[u8; 512]>,
     _padding1:          [u8; 48],
     next_pointer:       Volatile<u64>,

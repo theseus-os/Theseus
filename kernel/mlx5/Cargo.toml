@@ -60,5 +60,8 @@ path = "../nic_queues"
 [dependencies.nic_initialization]
 path = "../nic_initialization"
 
+[dependencies.mellanox_ethernet]
+path = "../mellanox_ethernet"
+
 [lib]
 crate-type = ["rlib"]

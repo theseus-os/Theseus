@@ -1450,6 +1450,7 @@ dependencies = [
  "kernel_config",
  "lazy_static",
  "log",
+ "mellanox_ethernet",
  "memory",
  "mpmc",
  "network_interface_card",
