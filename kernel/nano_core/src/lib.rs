@@ -28,6 +28,7 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate stack;
+extern crate serial_port;
 extern crate mod_mgmt;
 extern crate exceptions_early;
 #[macro_use] extern crate vga_buffer;
@@ -95,10 +96,14 @@ pub extern "C" fn nano_core_start(
     multiboot_information_virtual_address: usize,
     early_double_fault_stack_top: usize,
 ) {
-    println_raw!("Entered nano_core_start()."); 
-	
-	// start the kernel with interrupts disabled
+    // start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
+
+    println_raw!("At top of nano_core_start().");
+
+    try_exit!(serial_port::init_com1());
+    println_raw!("Enabled serial port COM1 for debugging.");
+    info!("Entered nano_core_start().");
 
     // first, bring up the logger so we can debug
     try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
