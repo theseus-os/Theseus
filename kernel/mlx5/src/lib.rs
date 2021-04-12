@@ -117,7 +117,7 @@ impl ConnectX5Nic {
         // write physical location of command queues to initialization segment
         init_segment.set_physical_address_of_cmdq(cmdq_starting_phys_addr);
 
-        // Read iniitalizing field from initialization segment until it is cleared
+        // Read initalizing field from initialization segment until it is cleared
         while init_segment.device_is_initializing() {}
         
         // Execute ENABLE_HCA command

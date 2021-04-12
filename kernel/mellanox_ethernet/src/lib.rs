@@ -2,7 +2,7 @@
 
  #![no_std]
 
-// #[macro_use]extern crate log;
+#[macro_use]extern crate log;
 extern crate memory;
 extern crate volatile;
 extern crate bit_field;
@@ -100,21 +100,30 @@ pub struct CommandQueue {
     entries: Vec<CommandQueueEntry>
 }
 
-#[derive(FromBytes)]
+#[derive(FromBytes, Default)]
 #[repr(C)]
 pub struct CommandQueueEntry {
     type_of_transport:              Volatile<u32>,
     input_length:                   Volatile<u32>,
     input_mailbox_pointer:          Volatile<u64>,
-    command_input_inline_data:      Volatile<u128>,
-    command_output_inline_data:     Volatile<u128>,
+    padding1:                       WriteOnly<u16>,
+    command_input_opcode:           Volatile<u16>,
+    command_input_op_mod:           Volatile<u16>,
+    padding2:                       WriteOnly<u16>,
+    command_input_inline_data:      Volatile<u64>,
+    padding3:                       WriteOnly<u16>,
+    padding4:                       WriteOnly<u8>,
+    command_output_status:          Volatile<u8>,
+    command_output_syndrome:        Volatile<u32>,
+    command_output_inline_data:     Volatile<u64>,
     output_mailbox_pointer:         Volatile<u64>,
     output_length:                  Volatile<u32>,
     status:                         Volatile<u8>,
-    _padding:                       u8,
+    padding5:                       WriteOnly<u8>,
     signature:                      Volatile<u8>,
     token:                          Volatile<u8>
 }
+
 
 const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
 
@@ -131,6 +140,17 @@ pub enum CommandDeliveryStatus {
     ReservedNotZero = 9,
     BadCommandType = 10 //Should this be 10 or 16??
 }
+
+pub enum CommandOpcode {
+    QueryHcaCap = 0x100,
+    QueryAdapter = 0x101,
+    InitHca = 0x102,
+    TeardownHca = 0x103,
+    EnableHca = 0x104,
+    DisableHca = 0x105,
+    QueryPages = 0x107,
+    ManagePages = 0x108
+}
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct CommandInterfaceMailbox {
@@ -146,6 +166,18 @@ pub struct CommandInterfaceMailbox {
 
 const_assert_eq!(core::mem::size_of::<CommandInterfaceMailbox>(), 576);
 
+pub fn init_cmdq_entry(entry: &mut CommandQueueEntry, command: CommandOpcode) {
+    match command {
+        CommandOpcode::InitHca => {
+            let mut init_hca = CommandQueueEntry::default();
+            init_hca.command_input_opcode.write(CommandOpcode::InitHca as u16);
+            core::mem::swap(&mut init_hca, entry);
+        }
+        _=> {
+            debug!("unimplemented opcode");
+        }
+    }
+}
 // #[derive(FromBytes)]
 // #[repr(C)]
 // struct UARPageFormat {
