@@ -8,8 +8,5 @@ build = "../../build.rs"
 [dependencies.port_io]
 path = "../../libs/port_io"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
-
 [lib]
 crate-type = ["rlib"]

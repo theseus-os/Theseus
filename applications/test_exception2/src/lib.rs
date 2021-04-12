@@ -3,7 +3,7 @@
 
 // extern crate alloc;
 // #[macro_use] extern crate log;
-extern crate serial_port;
+extern crate logger;
 // #[macro_use] extern crate terminal_print;
 // extern crate task;
 
@@ -22,7 +22,7 @@ impl MyStruct2 {
 impl Drop for MyStruct2 {
     #[inline(never)]
     fn drop(&mut self) {
-        serial_port::write_str("\n*** DROPPING MYSTRUCT2 ***\n\n").unwrap();
+        logger::write_str("\n*** DROPPING MYSTRUCT2 ***\n\n").unwrap();
     }
 }
 
@@ -46,12 +46,12 @@ pub fn main(val: usize) {
 
         {
             let _my_struct3 = MyStruct2::new(val + 10);
-            let _res = serial_port::write_fmt(format_args!("{:?}\n", _my_struct3));
+            let _res = logger::write_fmt(format_args!("{:?}\n", _my_struct3));
         }
         
         // cause page fault exception by dereferencing random memory value
         unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-        let _res = serial_port::write_fmt(format_args!("{:?}\n", _my_struct2));
+        let _res = logger::write_fmt(format_args!("{:?}\n", _my_struct2));
     }
 
     loop { }

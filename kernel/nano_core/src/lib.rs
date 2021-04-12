@@ -98,15 +98,12 @@ pub extern "C" fn nano_core_start(
 ) {
     // start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
+    println_raw!("Entered nano_core_start(). Interrupts disabled.");
 
-    println_raw!("At top of nano_core_start().");
-
-    try_exit!(serial_port::init_com1());
-    println_raw!("Enabled serial port COM1 for debugging.");
-    info!("Entered nano_core_start().");
-
-    // first, bring up the logger so we can debug
-    try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
+    // Initialize the logger up front so we can see early log messages for debugging.
+    // let logger_serial_ports = [serial_port::COM1_BASE_PORT, serial_port::COM2_BASE_PORT];
+    let logger_serial_ports = [serial_port::COM1_BASE_PORT];
+    try_exit!(logger::init(None, &logger_serial_ports).map_err(|_a| "couldn't init logger!"));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
