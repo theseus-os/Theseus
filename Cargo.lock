@@ -2455,8 +2455,7 @@ checksum = "ceac490aa12c567115b40b7b7fceca03a6c9d53d5defea066123debc83c5dc1f"
 [[package]]
 name = "spin"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b87bbf98cb81332a56c1ee8929845836f85e8ddd693157c30d76660196014478"
+source = "git+https://github.com/theseus-os/spin-rs#8770942ba1790fa536f659e4e07548f0e5da2eb6"
 dependencies = [
  "lock_api",
 ]
