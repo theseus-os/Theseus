@@ -136,22 +136,31 @@ impl SerialPort {
 		serial
 	}
 
-	/// Write the given string to the serial port. 
+	/// Write the given string to the serial port.
+	///
+	/// # Special characters
+	/// Because this function writes strings, it will transmit a carriage return `'\r'`
+	/// after transmitting a line feed (new line) `'\n'` to ensure a proper new line.
 	pub fn out_str(&mut self, s: &str) {
 		for b in s.bytes() {
 			self.out_byte(b);
+			if b == b'\n' {
+				self.out_byte(b'\r');
+			}
 		}
 	}
 
 	/// Write the given byte to the serial port.
-	pub fn out_byte(&mut self, b: u8) {
+	///
+	/// This writes the byte directly with no special cases, e.g., new lines.
+	pub fn out_byte(&mut self, byte: u8) {
 		self.wait_until_ready_to_transmit();
 
 		// SAFE because we're just writing to the serial port. 
 		// worst-case effects here are simple out-of-order characters in the serial log.
 		unsafe { 
-			self.data.write(b); 
-			// E9.write(b); // for Bochs debugging
+			self.data.write(byte); 
+			// E9.write(byte); // for Bochs debugging
 		}
 	}
 
