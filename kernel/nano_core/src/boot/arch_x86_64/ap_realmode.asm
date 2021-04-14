@@ -1,57 +1,61 @@
 ABSOLUTE 0x5000
 VBECardInfo:
-	.signature resb 4
-	.version resw 1
-	.oemstring resd 1
-	.capabilities resd 1
-	.videomodeptr resd 1
-	.totalmemory resw 1
-	.oemsoftwarerev resw 1
-	.oemvendornameptr resd 1
-	.oemproductnameptr resd 1
-	.oemproductrevptr resd 1
-	.reserved resb 222
-	.oemdata resb 256
+	.signature             resb 4
+	.version               resw 1
+	.oemstring             resd 1
+	.capabilities          resd 1
+	.videomodeptr          resd 1
+	.totalmemory           resw 1
+	.oemsoftwarerev        resw 1
+	.oemvendornameptr      resd 1
+	.oemproductnameptr     resd 1
+	.oemproductrevptr      resd 1
+	.reserved              resb 222
+	.oemdata               resb 256
 
 ABSOLUTE 0x5200
 VBEModeInfo:
-	.attributes resw 1
-	.winA resb 1
-	.winB resb 1
-	.granularity resw 1
-	.winsize resw 1
-	.segmentA resw 1
-	.segmentB resw 1
-	.winfuncptr resd 1
-	.bytesperscanline resw 1
-	.xresolution resw 1
-	.yresolution resw 1
-	.xcharsize resb 1
-	.ycharsize resb 1
-	.numberofplanes resb 1
-	.bitsperpixel resb 1
-	.numberofbanks resb 1
-	.memorymodel resb 1
-	.banksize resb 1
-	.numberofimagepages resb 1
-	.unused resb 1
-	.redmasksize resb 1
-	.redfieldposition resb 1
-	.greenmasksize resb 1
-	.greenfieldposition resb 1
-	.bluemasksize resb 1
-	.bluefieldposition resb 1
-	.rsvdmasksize resb 1
-	.rsvdfieldposition resb 1
-	.directcolormodeinfo resb 1
-	.physbaseptr resd 1
+	.attributes            resw 1
+	.winA                  resb 1
+	.winB                  resb 1
+	.granularity           resw 1
+	.winsize               resw 1
+	.segmentA              resw 1
+	.segmentB              resw 1
+	.winfuncptr            resd 1
+	.pitch                 resw 1
+	.width                 resw 1
+	.height                resw 1
+	.xcharsize             resb 1
+	.ycharsize             resb 1
+	.numberofplanes        resb 1
+	.bitsperpixel          resb 1
+	.numberofbanks         resb 1
+	.memorymodel           resb 1
+	.banksize              resb 1
+	.numberofimagepages    resb 1
+	.unused                resb 1
+	.redmasksize           resb 1
+	.redfieldposition      resb 1
+	.greenmasksize         resb 1
+	.greenfieldposition    resb 1
+	.bluemasksize          resb 1
+	.bluefieldposition     resb 1
+	.rsvdmasksize          resb 1
+	.rsvdfieldposition     resb 1
+	.directcolormodeinfo   resb 1
+	.physbaseptr           resd 1
 	.offscreenmemoryoffset resd 1
-	.offscreenmemsize resw 1
-	.reserved resb 206
+	.offscreenmemsize      resw 1
+	.reserved              resb 206
 
 ABSOLUTE 0x5400
 current:
-    .mode resd 1
+    .mode    resd 1
+    .pitch                 resw 1
+	.width                 resw 1
+	.height                resw 1
+    .bitsperpixel          resb 1
 
 section .init.realmodetext16 progbits alloc exec nowrite
 bits 16 ; we're in real mode, that's how APs boot up
@@ -107,7 +111,7 @@ getcardinfo:            ;get super VGA information including available modes lis
     mov di, VBECardInfo ;di, buffer for returned information
     int 0x10            ;BIOS int 10
     cmp al, 0x4F        ;al=4f, function is supported
-    jne gdt             ;if not supported, skip the VESA mode setting block
+    jne graphic_fail    ;if not supported, skip the VESA mode setting block
     
 findmode:               ;initialize the mode pointer
     mov si, [VBECardInfo.videomodeptr]
@@ -115,12 +119,12 @@ findmode:               ;initialize the mode pointer
     mov fs, ax          ;[fs:si] pointes to the first mode
     sub si, 2           ;initilize the pointer [fs:si] to the index before the first mode
 
-;travers the mode list to fint the first mode of intended parameters
+;traverse the mode list to find the first mode of intended parameters
 .searchmodes:
     add si, 2           ;[fs:si] points to the next mode
     mov cx, [fs:si]     ;move current mode index to cx
     cmp cx, 0xFFFF      
-    je gdt              ;if the mode index extends the bound, skip the VESA mode setting block;
+    je graphic_fail     ;if the mode index extends the bound, skip the VESA mode setting block;
 
 .getmodeinfo:
     push esi
@@ -130,56 +134,84 @@ findmode:               ;initialize the mode pointer
     int 0x10                ;BIOS int 10
     pop esi
     cmp al, 0x4F            ;al=4f, function is supported
-    jne gdt                 ;if not supported, skip the VESA mode setting block
+    jne graphic_fail        ;if not supported, skip the VESA mode setting block
 
 .foundmode:
+    ; we only support modes with 32-bit pixels
     cmp byte [VBEModeInfo.bitsperpixel], 32
-    jne .searchmodes; if current mode is not 32-byte, continue to search
-    cmp word [VBEModeInfo.xresolution], 1280
-    jb .searchmodes; if current x-resolution is less than 1280, continue to search
+    jne .searchmodes; if current mode is not 32-byte, continue to search the modes
+    cmp word [VBEModeInfo.width], 1024 ; 1280
+    jb .searchmodes; if current width is less than what we'd like, continue the search
 
-; store resolution and bufferr address to [0000:F100] so that Rust can read them
+; store resolution and buffer address to [0000:F100] so that our Rust code can access it
 store_mode_info:    
     push di
     mov ax, 0
     mov es, ax
     mov di, 0xF100
 
-    ;move x resolution to [0:F100]
-    mov word ax, [VBEModeInfo.xresolution]
-    mov word [es:di], ax
+    ; move x resolution (width) to [0:F100]
+    mov word ax, [VBEModeInfo.width]
+    mov word [es:di+0], ax
     mov word [es:di+2], 0
     mov word [es:di+4], 0
     mov word [es:di+6], 0
 
-    ;move y resolution to [0:F108]
-    mov word ax, [VBEModeInfo.yresolution]
-    mov word [es:di+8], ax
+    ; move y resolution (height) to [0:F108]
+    mov word ax, [VBEModeInfo.height]
+    mov word [es:di+ 8], ax
     mov word [es:di+10], 0
     mov word [es:di+12], 0
     mov word [es:di+14], 0
 
-    ;move lfb address to [0:F110]
-    ;liner frame buffer address
+    ; move the framebuffer's 32-bit physical address to [0:F110]
     mov word ax, [VBEModeInfo.physbaseptr]
     mov word [es:di+16], ax
     mov word ax, [VBEModeInfo.physbaseptr+2]
     mov word [es:di+18], ax
-    mov word [es:di+20], 0000
-    mov word [es:di+22], 0000
+    mov word [es:di+20], 0
+    mov word [es:di+22], 0
     pop di
 
 set_graphic_mode:
     mov ax, 0x4f02;         ;BIOS int 10, ax=4f02, set graphic mode
-    ;0x4f41:640*400*32bit in QEMU; bx 4___ is linear frame buffer 
     mov bx, [current.mode]  ;bx: current mode 
     int 0x10                ;BIOS int 10
+    jmp graphic_mode_complete  ; success!
 
+graphic_fail: 
+    ; write `0` to all graphic mode fields, indicating failure
+    push di
+    mov ax, 0
+    mov es, ax
+    mov di, 0xF100
+
+    ; set framebuffer width to zero
+    mov word [es:di],   0
+    mov word [es:di+2], 0
+    mov word [es:di+4], 0
+    mov word [es:di+6], 0
+
+    ; set framebuffer height to zero
+    mov word [es:di+8],  0
+    mov word [es:di+10], 0
+    mov word [es:di+12], 0
+    mov word [es:di+14], 0
+
+    ; set framebuffer physical address to zero
+    mov word [es:di+16], 0
+    mov word [es:di+18], 0
+    mov word [es:di+20], 0
+    mov word [es:di+22], 0
+    pop di
+
+graphic_mode_complete:
     ;Set the flag [0000:0900] indicating that the graphic mode is set
     mov ax, 0
     mov es, ax
     mov di, 0x900
     mov byte [es:di], 5
+    ; move on (fall through) to the next step, setting up our GDT
 
 gdt:
     ; here we're creating a GDT manually at address 0x800 by writing to addresses starting at 0x800

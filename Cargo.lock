@@ -792,6 +792,7 @@ name = "framebuffer"
 version = "0.1.0"
 dependencies = [
  "color",
+ "log",
  "memory",
  "multicore_bringup",
  "owning_ref",

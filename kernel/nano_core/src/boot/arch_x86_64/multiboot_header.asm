@@ -8,7 +8,7 @@ multiboot_header_start:
 	dd 0							                   ; Run in protected i386 (32-bit) mode
 	dd multiboot_header_end - multiboot_header_start   ; header length
 	; checksum
-	dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
+	dd 0x100000000 - (0xe85250d6 + 0 + (multiboot_header_end - multiboot_header_start))
 	; Place optional header tags here, after the checksum above. Documentation is here:
 	; <https://www.gnu.org/software/grub/manual/multiboot2/multiboot.html#Header-tags>
 	; Note: all tags must be aligned to 8-byte boundaries.

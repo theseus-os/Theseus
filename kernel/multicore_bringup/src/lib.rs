@@ -43,26 +43,27 @@ use pause::spin_loop_hint;
 /// The physical address that an AP jumps to when it first is booted by the BSP.
 /// For x2apic systems, this must be at 0x10000 or higher! 
 const AP_STARTUP: usize = 0x10000; 
+
 /// The physical address of the memory area for AP startup data passed from the BSP in long mode (Rust) code.
-/// Located one page below the AP_STARTUP code entry point.
-/// Value: 0xF000
+/// Located one page below the AP_STARTUP code entry point, at 0xF000.
 const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 
-const GRAPHIC_INFO_TRAMPOLINE_OFFSET: usize = 0x100;
+/// The offset from the `TRAMPOLINE` address to where the AP startup code will write `GraphicInfo`.
+const GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE: usize = 0x100;
 
-// graphic mode information
-pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
-    width:0,
-    height:0,
-    physical_address:0,
+/// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. 
+pub static GRAPHIC_INFO: Mutex<GraphicInfo> = Mutex::new(GraphicInfo {
+    width: 0,
+    height: 0,
+    physical_address: 0,
 });
 
 /// A structure to access framebuffer information 
 /// that was discovered and populated in the AP's real-mode 
 /// initialization seqeunce.
 /// TODO FIXME: remove this struct, find another way to obtain framebuffer info.
-#[derive(FromBytes)]
-pub struct GraphicInfo{
+#[derive(FromBytes, Clone, Debug)]
+pub struct GraphicInfo {
     pub width: u64,
     pub height: u64,
     pub physical_address: u64,
@@ -183,20 +184,10 @@ pub fn handle_ap_cores(
         }
     }
 
-    // Get the graphic mode information
-    {    
-        let rs = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_TRAMPOLINE_OFFSET);
-        match rs {
-            Ok(graphic_info) => {
-                let mut info = GRAPHIC_INFO.lock();
-                *info = GraphicInfo {
-                    width:graphic_info.width,
-                    height:graphic_info.height,
-                    physical_address:graphic_info.physical_address,
-                };
-            },
-            Err(_) => { error!("Fail to get the graphic information"); }
-        };
+    // Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
+    {
+        let graphic_info = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
+        *GRAPHIC_INFO.lock() = graphic_info.clone();
     }
     
     // wait for all cores to finish booting and init
