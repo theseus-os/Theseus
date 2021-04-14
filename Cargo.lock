@@ -105,8 +105,8 @@ dependencies = [
  "lazy_static",
  "libterm",
  "log",
+ "logger",
  "print",
- "serial_port",
  "spin 0.9.0",
  "stdio",
  "task",
@@ -1272,6 +1272,7 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "serial_port",
  "spin 0.9.0",
@@ -1570,6 +1571,7 @@ dependencies = [
  "mod_mgmt",
  "multiboot2",
  "panic_entry",
+ "serial_port",
  "spin 0.9.0",
  "stack",
  "state_store",
@@ -2286,7 +2288,6 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "port_io",
 ]
 
@@ -2660,7 +2661,7 @@ dependencies = [
  "dfqueue",
  "event_types",
  "lazy_static",
- "serial_port",
+ "logger",
  "spin 0.9.0",
  "task",
  "x86_64",
@@ -2883,7 +2884,7 @@ name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
  "kernel_config",
- "serial_port",
+ "logger",
  "spin 0.9.0",
  "volatile",
 ]
