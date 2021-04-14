@@ -38,7 +38,8 @@ exclude = [
 
 
 [patch.crates-io]
-### Patch `spin` to use busy wait loops with the `pause` asm instruction  `core::hint::spin_loop()` by default.
+### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
+### because the `core::hint::spin_loop()` only uses it if "sse2" is enabled.
 spin = { git = "https://github.com/theseus-os/spin-rs" }
 ### use our own version of volatile which supports zerocopy
 volatile = { git = "https://github.com/theseus-os/volatile" }
