@@ -4,13 +4,12 @@ version = "0.1.0"
 description = "The application-facing 'library' that exposes Theseus OS features, similar to a standard library."
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../build.rs"
-# links = "serial_port"
 
 [dependencies]
 # getopts = "0.2.21"
 
-[dependencies.serial_port]
-path = "../kernel/serial_port"
+[dependencies.logger]
+path = "../kernel/logger"
 
 [dependencies.panic_entry]
 path = "../kernel/panic_entry"
