@@ -7,8 +7,7 @@
 ; This file may not be copied, modified, or distributed
 ; except according to those terms.
 
-; Kernel is linked to run at -2Gb
-KERNEL_OFFSET equ 0xFFFFFFFF80000000
+%include "defines.asm"
 
 ; Debug builds require a larger initial boot stack,
 ; because their code is larger and less optimized.

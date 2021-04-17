@@ -277,7 +277,11 @@ $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/
 ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
 	$(eval CFLAGS += -DVGA_TEXT_MODE)
 endif
-	@nasm -felf64 $< -o $@ $(CFLAGS)
+	@nasm -f elf64 \
+		-i "$(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/" \
+		$< \
+		-o $@ \
+		$(CFLAGS)
 
 
 
