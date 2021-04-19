@@ -13,38 +13,35 @@ extern crate page_allocator;
 use core::ops::{Deref, DerefMut};
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::VirtualAddress;
-use memory::{FrameAllocator, FrameAllocatorRef, EntryFlags, Mapper, MappedPages};
+use memory::{EntryFlags, MappedPages, Mapper};
 use page_allocator::AllocatedPages;
 
 
 /// Allocates a new stack and maps it to the active page table. 
-/// The given `page_table` can be a `PageTable` or a `Mapper`, 
-/// because `PageTable` automatically derefs into a `Mapper`.
-/// Reserves an unmapped guard page beneath the bottom of the stack
+///
+/// This also reserves an unmapped guard page beneath the bottom of the stack
 /// in order to catch stack overflows. 
-/// The given `usermode` argument determines whether the stack is accessible from userspace.
+///
 /// Returns the newly-allocated stack and a VMA to represent its mapping.
-pub fn alloc_stack<FA>(
+pub fn alloc_stack(
     size_in_pages: usize,
     page_table: &mut Mapper, 
-    frame_allocator_ref: &FrameAllocatorRef<FA>, 
-) -> Option<Stack> where FA: FrameAllocator {
+) -> Option<Stack> {
     // Allocate enough pages for an additional guard page. 
     let pages = page_allocator::allocate_pages(size_in_pages + 1)?;
-    inner_alloc_stack(pages, page_table, frame_allocator_ref)
+    inner_alloc_stack(pages, page_table)
 }
 
 /// The inner implementation of stack allocation. 
 /// 
 /// `pages` is the combined `AllocatedPages` object that holds
 /// the guard page followed by the actual stack pages to be mapped.
-fn inner_alloc_stack<FA>(
+fn inner_alloc_stack(
     pages: AllocatedPages,
     page_table: &mut Mapper, 
-    frame_allocator_ref: &FrameAllocatorRef<FA>,
-) -> Option<Stack> where FA: FrameAllocator {
+) -> Option<Stack> {
     let start_of_stack_pages = *pages.start() + 1; 
-    let (guard_page, stack_pages) = pages.split(start_of_stack_pages)?;
+    let (guard_page, stack_pages) = pages.split(start_of_stack_pages).ok()?;
 
     // For stack memory, the minimum required flag is WRITABLE.
     let flags = EntryFlags::WRITABLE; 
@@ -54,7 +51,6 @@ fn inner_alloc_stack<FA>(
     let pages = match page_table.map_allocated_pages(
         stack_pages, 
         flags, 
-        frame_allocator_ref.lock().deref_mut()
     ) {
         Ok(pages) => pages,
         Err(e) => {
@@ -134,5 +130,13 @@ impl Stack {
         } else {
             Err((guard_page, stack_pages))
         }
+    }
+
+    /// Returns the guard page(s) for this stack. 
+    ///
+    /// Guard pages are virtual pages that are reserved/owned by this stack
+    /// but are not mapped, causing any access to them to result in a page fault. 
+    pub fn guard_page(&self) -> &memory_structs::PageRange {
+        &self.guard_page
     }
 }

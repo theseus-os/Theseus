@@ -1,0 +1,16 @@
+[package]
+name = "theseus_cargo"
+version = "0.1.0"
+authors = [
+    "Kevin Boos <kevinaboos@gmail.com>",
+]
+description = "A wrapper around cargo that cross-compiles Theseus components, handles out-of-tree builds based on a set of pre-built Theseus crate .rlibs,  and performs special partially-static linking procedures."
+
+[dependencies]
+getopts = "0.2"
+walkdir = "2.2.7"
+regex = "1.4.2"
+itertools = "0.9.0"
+clap = "2.33.3"
+toml = "0.5.7"
+serde = { version = "1.0", features = ["derive"] }

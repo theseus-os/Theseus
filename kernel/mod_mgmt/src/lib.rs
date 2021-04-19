@@ -7,7 +7,7 @@
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
-extern crate multiboot2;
+extern crate memory_initialization;
 extern crate kernel_config;
 extern crate util;
 extern crate crate_name_utils;
@@ -25,7 +25,7 @@ extern crate hashbrown;
 
 use core::{
     fmt,
-    ops::{DerefMut, Deref, Range},
+    ops::{Deref, Range},
 };
 use alloc::{
     vec::Vec,
@@ -39,8 +39,8 @@ use xmas_elf::{
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
 };
 use util::round_up_power_of_two;
-use memory::{MmiRef, get_frame_allocator_ref, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
-use multiboot2::BootInformation;
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+use memory_initialization::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, wrapper::BString};
@@ -67,7 +67,7 @@ static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
 /// which must exist because it contains the initially-loaded kernel crates. 
 /// Returns None if the default namespace hasn't yet been initialized.
 pub fn get_initial_kernel_namespace() -> Option<&'static Arc<CrateNamespace>> {
-    INITIAL_KERNEL_NAMESPACE.try()
+    INITIAL_KERNEL_NAMESPACE.get()
 }
 
 /// Returns the top-level directory that contains all of the namespaces. 
@@ -106,8 +106,11 @@ pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespa
 
 /// Initializes the module management system based on the bootloader-provided modules, 
 /// and creates and returns the default `CrateNamespace` for kernel crates.
-pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static Arc<CrateNamespace>, &'static str> {
-    let (_namespaces_dir, default_kernel_namespace_dir) = parse_bootloader_modules_into_files(boot_info, kernel_mmi)?;
+pub fn init(
+    bootloader_modules: Vec<BootloaderModule>,
+    kernel_mmi: &mut MemoryManagementInfo
+) -> Result<&'static Arc<CrateNamespace>, &'static str> {
+    let (_namespaces_dir, default_kernel_namespace_dir) = parse_bootloader_modules_into_files(bootloader_modules, kernel_mmi)?;
     // Create the default CrateNamespace for kernel crates.
     let name = default_kernel_namespace_dir.lock().get_name();
     let default_namespace = CrateNamespace::new(name, default_kernel_namespace_dir, None);
@@ -124,7 +127,7 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
 /// * the top-level root "namespaces" directory that contains all other namespace directories,
 /// * the directory of the default kernel crate namespace.
 fn parse_bootloader_modules_into_files(
-    boot_info: &BootInformation, 
+    bootloader_modules: Vec<BootloaderModule>,
     kernel_mmi: &mut MemoryManagementInfo
 ) -> Result<(DirRef, NamespaceDir), &'static str> {
 
@@ -134,32 +137,30 @@ fn parse_bootloader_modules_into_files(
     // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
     let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
 
-    let fa = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
-
     // Closure to create the directory for a new namespace.
     let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
         VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
     };
 
-    for m in boot_info.module_tags() {
-        let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-        let frames = FrameRange::from_phys_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
-        let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
+    for m in bootloader_modules {
+        let (crate_type, prefix, file_name) = CrateType::from_module_name(&m.name)?;
         let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
         let name = String::from(file_name);
 
-        let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
+        let frames = allocate_frames_by_bytes_at(m.start, m.size_in_bytes())
+            .map_err(|_e| "Failed to allocate frames for bootloader module")?;
+        let pages = allocate_pages_by_bytes(m.size_in_bytes())
+            .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
         let mp = kernel_mmi.page_table.map_allocated_pages_to(
             pages, 
             frames, 
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
-            fa.lock().deref_mut()
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+        // debug!("Module: {:?}, size {}, mp: {:?}", m.name, m.size_in_bytes(), mp);
 
         let create_file = |dir: &DirRef| {
-            MemFile::from_mapped_pages(mp, name, size_in_bytes, dir)
+            MemFile::from_mapped_pages(mp, name, m.size_in_bytes(), dir)
         };
 
         // Get the existing (or create a new) namespace directory corresponding to the given directory name.
@@ -2221,9 +2222,8 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
 /// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
 /// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
 fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: &MmiRef) -> Result<MappedPages, &'static str> {
-    let frame_allocator = get_frame_allocator_ref().ok_or("couldn't get frame allocator")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.lock().deref_mut())
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE)
 }
 
 

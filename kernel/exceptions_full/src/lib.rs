@@ -19,8 +19,18 @@ extern crate memory;
 extern crate stack_trace;
 extern crate fault_log;
 
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
-use x86_64::registers::msr::*;
+use memory::{VirtualAddress, Page};
+use x86_64::{
+    registers::{
+        control_regs,
+        msr::*,
+    },
+    structures::idt::{
+        LockedIdt,
+        ExceptionStackFrame,
+        PageFaultErrorCode
+    },
+};
 use fault_log::log_exception;
 
 pub fn init(idt_ref: &'static LockedIdt) {
@@ -85,7 +95,7 @@ macro_rules! println_both {
 /// However, stack traces / backtraces work, so we are correctly traversing call stacks with exception frames.
 /// 
 #[inline(never)]
-fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
+fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame, print_stack_trace: bool) {
     #[cfg(all(unwind_exceptions, not(downtime_eval)))] {
         println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
     }
@@ -115,35 +125,36 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
             let debug_sections = debug.load(&app_crate, &curr_task.get_namespace()).unwrap();
             let instr_ptr = stack_frame.instruction_pointer.0 - 1; // points to the next instruction (at least for a page fault)
 
-            let res = debug_sections.find_subprogram_containing(memory::VirtualAddress::new_canonical(instr_ptr));
+            let res = debug_sections.find_subprogram_containing(VirtualAddress::new_canonical(instr_ptr));
             debug!("Result of find_subprogram_containing: {:?}", res);
         }
     }
 
     // print a stack trace
-    #[cfg(not(downtime_eval))]
-    {
-        println_both!("------------------ Stack Trace (DWARF) ---------------------------");
-        let stack_trace_result = stack_trace::stack_trace(
-            &|stack_frame, stack_frame_iter| {
-                let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
-                    memory::VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
-                    false
-                ).map(|(sec, offset)| (sec.name.clone(), offset));
-                if let Some((symbol_name, offset)) = symbol_offset {
-                    println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
-                } else {
-                    println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
-                }
-                true
-            },
-            None,
-        );
-        match stack_trace_result {
-            Ok(()) => { println_both!("  Beginning of stack"); }
-            Err(e) => { println_both!("  {}", e); }
+    #[cfg(not(downtime_eval))] {
+        if print_stack_trace {
+            println_both!("------------------ Stack Trace (DWARF) ---------------------------");
+            let stack_trace_result = stack_trace::stack_trace(
+                &|stack_frame, stack_frame_iter| {
+                    let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
+                        VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
+                        false
+                    ).map(|(sec, offset)| (sec.name.clone(), offset));
+                    if let Some((symbol_name, offset)) = symbol_offset {
+                        println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
+                    } else {
+                        println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
+                    }
+                    true
+                },
+                None,
+            );
+            match stack_trace_result {
+                Ok(()) => { println_both!("  Beginning of stack"); }
+                Err(e) => { println_both!("  {}", e); }
+            }
+            println_both!("---------------------- End of Stack Trace ------------------------");
         }
-        println_both!("---------------------- End of Stack Trace ------------------------");
     }
 
     let cause = task::KillReason::Exception(exception_number);
@@ -200,13 +211,22 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 }
 
 
+/// Checks whether the given `vaddr` falls within a stack guard page, indicating stack overflow. 
+fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
+    let page = Page::containing_address(vaddr);
+    task::get_my_current_task()
+        .map(|curr_task| curr_task.lock().kstack.guard_page().contains(&page))
+        .unwrap_or(false)
+}
+
+
 
 /// exception 0x00
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}\n", stack_frame);
 
     log_exception(0x0, stack_frame.instruction_pointer.0, None, None);
-    kill_and_halt(0x0, stack_frame)
+    kill_and_halt(0x0, stack_frame, true)
 }
 
 /// exception 0x01
@@ -249,7 +269,7 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
              stack_frame);
 
     log_exception(0x2, stack_frame.instruction_pointer.0, None, None);
-    kill_and_halt(0x2, stack_frame)
+    kill_and_halt(0x2, stack_frame, true)
 }
 
 
@@ -269,7 +289,7 @@ pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackF
              stack_frame);
     
     log_exception(0x4, stack_frame.instruction_pointer.0, None, None);
-    kill_and_halt(0x4, stack_frame)
+    kill_and_halt(0x4, stack_frame, true)
 }
 
 // exception 0x05
@@ -279,7 +299,7 @@ pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut Exc
              stack_frame);
     
     log_exception(0x5, stack_frame.instruction_pointer.0, None, None);
-    kill_and_halt(0x5, stack_frame)
+    kill_and_halt(0x5, stack_frame, true)
 }
 
 /// exception 0x06
@@ -289,7 +309,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
              stack_frame);
 
     log_exception(0x6, stack_frame.instruction_pointer.0, None, None);
-    kill_and_halt(0x6, stack_frame)
+    kill_and_halt(0x6, stack_frame, true)
 }
 
 /// exception 0x07
@@ -300,15 +320,22 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
              stack_frame);
 
     log_exception(0x7, stack_frame.instruction_pointer.0, None, None);
-    kill_and_halt(0x7, stack_frame)
+    kill_and_halt(0x7, stack_frame, true)
 }
 
 /// exception 0x08
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\n", stack_frame);
+    let accessed_vaddr = control_regs::cr2();
+    println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\nTried to access {:#X}
+        Note: double faults in Theseus are typically caused by stack overflow, is the stack large enough?",
+        stack_frame, accessed_vaddr,
+    );
+    if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr.0)) {
+        println_both!("--> This double fault was definitely caused by stack overflow, tried to access {:#X}.\n", accessed_vaddr);
+    }
     
     log_exception(0x8, stack_frame.instruction_pointer.0, Some(error_code), None);
-    kill_and_halt(0x8, stack_frame)
+    kill_and_halt(0x8, stack_frame, false)
 }
 
 /// exception 0x0a
@@ -319,7 +346,7 @@ pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionSta
              stack_frame);
     
     log_exception(0xA, stack_frame.instruction_pointer.0, Some(error_code), None);
-    kill_and_halt(0xA, stack_frame)
+    kill_and_halt(0xA, stack_frame, true)
 }
 
 /// exception 0x0b
@@ -330,7 +357,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
              stack_frame);
 
     log_exception(0xB, stack_frame.instruction_pointer.0, Some(error_code), None);
-    kill_and_halt(0xB, stack_frame)
+    kill_and_halt(0xB, stack_frame, true)
 }
 
 /// exception 0x0d
@@ -341,22 +368,27 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
              stack_frame);
 
     log_exception(0xD, stack_frame.instruction_pointer.0, Some(error_code), None);
-    kill_and_halt(0xD, stack_frame)
+    kill_and_halt(0xD, stack_frame, true)
 }
 
 /// exception 0x0e
 pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
-    use x86_64::registers::control_regs;
+    let accessed_vaddr = control_regs::cr2();
 
-    #[cfg(not(downtime_eval))]
-    println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#X}\nerror code: \
-                                  {:?}\n{:#?}\n",
-             control_regs::cr2(),
-             error_code,
-             stack_frame);
+    #[cfg(not(downtime_eval))] {
+        println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#X}\nerror code: \
+            {:?}\n{:#?}",
+            control_regs::cr2(),
+            error_code,
+            stack_frame,
+        );
+        if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr.0)) {
+            println_both!("--> Page fault was caused by stack overflow, tried to access {:#X}\n.", accessed_vaddr);
+        }
+    }
     
     log_exception(0xD, stack_frame.instruction_pointer.0, None, Some(control_regs::cr2().0));
-    kill_and_halt(0xE, stack_frame)
+    kill_and_halt(0xE, stack_frame, true)
 }
 
 // exception 0x0F is reserved on x86

@@ -1,79 +1,138 @@
 //! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
-//! This also supports early allocation of pages (up to 32 individual chunks)
+//! This also supports early allocation of pages (up to 32 separate chunks)
 //! before heap allocation is available, and does so behind the scenes using the same single interface. 
 //! 
 //! Once heap allocation is available, it uses a dynamically-allocated list of page chunks to track allocations.
 //! 
 //! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html), 
 //! but there are several convenience functions that offer simpler interfaces for general usage. 
+//!
+//! # Notes and Missing Features
+//! This allocator currently does **not** merge freed chunks (de-fragmentation). 
+//! We don't need to do so until we actually run out of address space or until 
+//! a requested address is in a chunk that needs to be merged;
+//! that's where we should add those merging features in whenever we do so.
 
 #![no_std]
+#![feature(const_fn, const_in_array_repeat_expressions)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate kernel_config;
 extern crate memory_structs;
 extern crate spin;
+#[macro_use] extern crate static_assertions;
+extern crate intrusive_collections;
+use intrusive_collections::Bound;
 
-use alloc::collections::LinkedList;
-use core::{
-	fmt,
-	ops::Deref,
-};
+
+mod static_array_rb_tree;
+// mod static_array_linked_list;
+
+
+use core::{borrow::Borrow, cmp::Ordering, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange};
-use spin::Mutex;
+use spin::{Mutex, Once};
+use static_array_rb_tree::*;
 
 
-/// The single, system-wide list of free virtual memory pages.
-/// Currently this list includes both free and allocated chunks of pages together in the same list,
-/// but it may be better to separate them in the future,
-/// especially when we transition to a RB-tree or a better data structure to track allocated pages. 
-static FREE_PAGE_LIST: Mutex<StaticArrayLinkedList<Chunk>> = Mutex::new(StaticArrayLinkedList::Array([
-	// The list of available pages starts with the kernel text region (we should rename this).
-	Some(Chunk { 
-		allocated: false,
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
-			Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
-			// Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START + KERNEL_TEXT_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
-		)
-	}),
-	// It also includes the kernel stack and heap regions. 
-	Some(Chunk { 
-		allocated: false,
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)),
-			Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE - BYTES_PER_ADDR)), // inclusive range
-		)
-	}),
-	// It also includes the lower parts of the address space needed for booting up other CPU cores (APs).
-	// See the `multicore_bringup` crate. 
-	Some(Chunk { 
-		allocated: false,
-		pages: PageRange::new(
-			Page::containing_address(VirtualAddress::zero()),
-			Page::containing_address(VirtualAddress::new_canonical(0x100_0000 - 1)), // inclusive range
-		)
-	}),
-	// In the future, we can add additional items here, e.g., the entire virtual address space.
-	// NOTE: we must never include the range of addresses covered by the 510th entry in the top-level (P4) page table,
-	// since that is used for the recursive page table mapping.
-	// Those forbidden addresses include the range from `0xFFFF_FF00_0000_0000` to `0xFFFF_FF80_0000_0000`.
-	None, None, None, None, None, 
-	None, None, None, None, None, None, None, None,
-	None, None, None, None, None, None, None, None,
-	None, None, None, None, None, None, None, None,
-]));
+/// Certain regions are pre-designated for special usage, specifically the kernel's initial identity mapping.
+/// They will be allocated from if an address within them is specifically requested;
+/// otherwise, they will only be allocated from as a "last resort" if all other non-designated address ranges are exhausted.
+///
+/// Any virtual addresses **less than or equal** to this address are considered "designated".
+/// This lower part of the address range that's designated covers from 0x0 to this address.
+static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
+
+/// Defines the upper part of the address space that's designated, similar to `DESIGNATED_PAGES_LOW_END`. 
+/// Any virtual addresses **greater than or equal to** this address is considered "designated".
+/// This higher part of the address range covers from the beginning of the heap area to the end of the address space.
+///
+/// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
+static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START));
+
+const MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
+const MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));
+
+/// The single, system-wide list of free chunks of virtual memory pages.
+static FREE_PAGE_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty());
 
 
-/// A range of contiguous pages and whether they're allocated or free.
-#[derive(Debug, Clone)]
+/// Initialize the page allocator.
+///
+/// # Arguments
+/// * `end_vaddr_of_low_designated_region`: the `VirtualAddress` that marks the end of the 
+///   lower designated region, which should be the ending address of the initial kernel image
+///   (a lower-half identity address).
+/// 
+/// The page allocator will only allocate addresses lower than `end_vaddr_of_low_designated_region`
+/// if specifically requested.
+/// General allocation requests for any virtual address will not use any address lower than that,
+/// unless the rest of the entire virtual address space is already in use.
+///
+pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'static str> {
+	assert!(end_vaddr_of_low_designated_region < DESIGNATED_PAGES_HIGH_START.start_address());
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.call_once(|| Page::containing_address(end_vaddr_of_low_designated_region));
+	let designated_low_end = *designated_low_end;
+
+	let initial_free_chunks = [
+		// The first region contains all pages *below* the beginning of the 510th entry of P4. 
+		// We split it up into three chunks just for ease, since it overlaps the designated regions.
+		Some(Chunk { 
+			pages: PageRange::new(
+				Page::containing_address(VirtualAddress::zero()),
+				designated_low_end,
+			)
+		}),
+		Some(Chunk { 
+			pages: PageRange::new(
+				designated_low_end + 1,
+				DESIGNATED_PAGES_HIGH_START - 1,
+			)
+		}),
+		Some(Chunk { 
+			pages: PageRange::new(
+				DESIGNATED_PAGES_HIGH_START,
+				// This is the page right below the beginning of the 510th entry of the top-level P4 page table.
+				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START - ADDRESSABILITY_PER_P4_ENTRY - 1)),
+			)
+		}),
+
+		// The second region contains all pages *above* the end of the 510th entry of P4, i.e., starting at the 511th (last) entry of P4.
+		// This is fully covered by the second (higher) designated region.
+		Some(Chunk { 
+			pages: PageRange::new(
+				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
+				Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
+			)
+		}),
+		None, None, None, None,
+		None, None, None, None, None, None, None, None,
+		None, None, None, None, None, None, None, None,
+		None, None, None, None, None, None, None, None,
+	];
+
+	*FREE_PAGE_LIST.lock() = StaticArrayRBTree::new(initial_free_chunks);
+	Ok(())
+}
+
+
+/// A range of contiguous pages.
+///
+/// # Ordering and Equality
+///
+/// `Chunk` implements the `Ord` trait, and its total ordering is ONLY based on
+/// its **starting** `Page`. This is useful so we can store `Chunk`s in a sorted collection.
+///
+/// Similarly, `Chunk` implements equality traits, `Eq` and `PartialEq`,
+/// both of which are also based ONLY on the **starting** `Page` of the `Chunk`.
+/// Thus, comparing two `Chunk`s with the `==` or `!=` operators may not work as expected.
+/// since it ignores their actual range of pages.
+#[derive(Debug, Clone, Eq)]
 struct Chunk {
-	/// Whether or not this Chunk is currently allocated. If false, it is free.
-	allocated: bool,
 	/// The Pages covered by this chunk, an inclusive range. 
 	pages: PageRange,
 }
@@ -87,7 +146,6 @@ impl Chunk {
 	/// Returns a new `Chunk` with an empty range of pages. 
 	fn empty() -> Chunk {
 		Chunk {
-			allocated: false,
 			pages: PageRange::empty(),
 		}
 	}
@@ -98,7 +156,26 @@ impl Deref for Chunk {
         &self.pages
     }
 }
-
+impl Ord for Chunk {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.pages.start().cmp(other.pages.start())
+    }
+}
+impl PartialOrd for Chunk {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl PartialEq for Chunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.pages.start() == other.pages.start()
+    }
+}
+impl Borrow<Page> for &'_ Chunk {
+	fn borrow(&self) -> &Page {
+		self.pages.start()
+	}
+}
 
 
 /// Represents a range of allocated `VirtualAddress`es, specified in `Page`s. 
@@ -108,11 +185,13 @@ impl Deref for Chunk {
 /// 
 /// This object represents ownership of the allocated virtual pages;
 /// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop. 
-/// 
-/// TODO: implement proper deallocation for `AllocatedPages` upon drop.
 pub struct AllocatedPages {
 	pages: PageRange,
 }
+
+// AllocatedPages must not be Cloneable, and it must not expose its inner pages as mutable.
+assert_not_impl_any!(AllocatedPages: DerefMut, Clone);
+
 impl Deref for AllocatedPages {
     type Target = PageRange;
     fn deref(&self) -> &PageRange {
@@ -159,128 +238,47 @@ impl AllocatedPages {
 	/// Depending on the size of this `AllocatedPages`, either one of the 
 	/// returned `AllocatedPages` objects may be empty. 
 	/// 
-	/// Returns `None` if `at_page` is not within the bounds of this `AllocatedPages`.
-	pub fn split(self, at_page: Page) -> Option<(AllocatedPages, AllocatedPages)> {
+	/// Returns an `Err` containing this `AllocatedPages` if `at_page` is not within its bounds.
+	pub fn split(self, at_page: Page) -> Result<(AllocatedPages, AllocatedPages), AllocatedPages> {
 		let end_of_first = at_page - 1;
 		if at_page > *self.pages.start() && end_of_first <= *self.pages.end() {
 			let first  = PageRange::new(*self.pages.start(), end_of_first);
 			let second = PageRange::new(at_page, *self.pages.end());
-			Some((
+			// ensure the original AllocatedPages doesn't run its drop handler and free its pages.
+			core::mem::forget(self); 
+			Ok((
 				AllocatedPages { pages: first }, 
 				AllocatedPages { pages: second },
 			))
 		} else {
-			None
+			Err(self)
 		}
 	}
 }
 
-// impl Drop for AllocatedPages {
-//     fn drop(&mut self) {
-// 		trace!("page_allocator: deallocate_pages is not yet implemented, trying to dealloc: {:?}", _pages);
-// 		unimplemented!();
-// 		Ok(())
-//     }
-// }
+impl Drop for AllocatedPages {
+    fn drop(&mut self) {
+		if self.size_in_pages() == 0 { return; }
+		// trace!("page_allocator: deallocating {:?}", self);
 
-
-/// A convenience wrapper that abstracts either a `LinkedList<T>` or a primitive array `[T; N]`.
-/// 
-/// This allows the caller to create an array statically in a const context, 
-/// and then abstract over both that and the inner `LinkedList` when using it. 
-/// 
-/// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.
-pub enum StaticArrayLinkedList<T> {
-	Array([Option<T>; 32]),
-	LinkedList(LinkedList<T>),
+		// Simply add the newly-deallocated chunk to the free pages list.
+		let mut locked_list = FREE_PAGE_LIST.lock();
+		let res = locked_list.insert(Chunk {
+			pages: self.pages.clone(),
+		});
+		match res {
+			Ok(_inserted_free_chunk) => return,
+			Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free page list", c),
+		}
+		
+		// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks
+		// before or after the newly-inserted free chunk. 
+		// However, there's no *need* to do so until we actually run out of address space or until 
+		// a requested address is in a chunk that needs to be merged.
+		// Thus, for performance, we save that for those future situations.
+    }
 }
-impl<T> StaticArrayLinkedList<T> {
-	/// Push the given `value` onto the end of this collection.
-	pub fn push_back(&mut self, value: T) -> Result<(), T> {
-		match self {
-			StaticArrayLinkedList::Array(arr) => {
-				for elem in arr {
-					if elem.is_none() {
-						*elem = Some(value);
-						return Ok(());
-					}
-				}
-				error!("Out of space in array, failed to insert value.");
-				Err(value)
-			}
-			StaticArrayLinkedList::LinkedList(ll) => {
-				ll.push_back(value);
-				Ok(())
-			}
-		}
-	}
 
-	/// Push the given `value` onto the front end of this collection.
-	/// If the inner collection is an array, then this is an expensive operation
-	/// with linear time complexity (on the size of the array) 
-	/// because it requires all successive elements to be right-shifted. 
-	pub fn push_front(&mut self, value: T) -> Result<(), T> {
-		match self {
-			StaticArrayLinkedList::Array(arr) => {
-				// The array must have space for at least one element at the end.
-				if let Some(None) = arr.last() {
-					arr.rotate_right(1);
-					arr[0].replace(value);
-					Ok(())
-				} else {
-					error!("Out of space in array, failed to insert value.");
-					Err(value)
-				}
-			}
-			StaticArrayLinkedList::LinkedList(ll) => {
-				ll.push_front(value);
-				Ok(())
-			}
-		}
-	}
-
-	/// Converts the contained collection from a primitive array into a LinkedList.
-	/// If the contained collection is already using heap allocation, this is a no-op.
-	/// 
-	/// Call this function once heap allocation is available. 
-	pub fn convert_to_heap_allocated(&mut self) {
-		let new_ll = match self {
-			StaticArrayLinkedList::Array(arr) => {
-				let mut ll = LinkedList::<T>::new();
-				for elem in arr {
-					if let Some(e) = elem.take() {
-						ll.push_back(e);
-					}
-				}
-				ll
-			}
-			StaticArrayLinkedList::LinkedList(_ll) => return,
-		};
-		*self = StaticArrayLinkedList::LinkedList(new_ll);
-	}
-
-	/// Returns a forward iterator over references to items in this collection.
-	pub fn iter(&self) -> impl Iterator<Item = &T> {
-		let mut iter_a = None;
-		let mut iter_b = None;
-		match self {
-			StaticArrayLinkedList::Array(arr)     => iter_a = Some(arr.iter().flatten()),
-			StaticArrayLinkedList::LinkedList(ll) => iter_b = Some(ll.iter()),
-		}
-		iter_a.into_iter().flatten().chain(iter_b.into_iter().flatten())
-	}
-
-	/// Returns a forward iterator over mutable references to items in this collection.
-	pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
-		let mut iter_a = None;
-		let mut iter_b = None;
-		match self {
-			StaticArrayLinkedList::Array(arr)     => iter_a = Some(arr.iter_mut().flatten()),
-			StaticArrayLinkedList::LinkedList(ll) => iter_b = Some(ll.iter_mut()),
-		}
-		iter_a.into_iter().flatten().chain(iter_b.into_iter().flatten())
-	}
-}
 
 
 /// A series of pending actions related to page allocator bookkeeping,
@@ -290,63 +288,277 @@ impl<T> StaticArrayLinkedList<T> {
 /// This struct can be returned from the `allocate_pages()` family of functions 
 /// in order to allow the caller to precisely control when those actions 
 /// that may result in heap allocation should occur. 
-/// Such actions include adding free or allocated chunks to the list of free pages or pages in use. 
+/// Such actions include adding chunks to lists of free pages or pages in use. 
 /// 
-/// If you don't care about precise control, simply drop this struct at any time, 
-/// or ignore it with a `let _ = ...` binding to instantly drop it. 
+/// The vast majority of use cases don't  care about such precise control, 
+/// so you can simply drop this struct at any time or ignore it
+/// with a `let _ = ...` binding to instantly drop it. 
 pub struct DeferredAllocAction<'list> {
 	/// A reference to the list into which we will insert the free `Chunk`s.
-	free_list: &'list Mutex<StaticArrayLinkedList<Chunk>>,
-	/// A reference to the list into which we will insert the allocated `Chunk`s.
-	allocated_list: &'list Mutex<StaticArrayLinkedList<Chunk>>,
-	/// The chunk that was marked as allocated during the page allocation. 
-	/// NOTE: we don't actually need to keep track of the list of allocated chunks, 
-	/// but it's handy for debugging purposes.
-	allocated: Chunk,
+	free_list: &'list Mutex<StaticArrayRBTree<Chunk>>,
 	/// A free chunk that needs to be added back to the free list.
 	free1: Chunk,
 	/// Another free chunk that needs to be added back to the free list.
 	free2: Chunk,
 }
 impl<'list> DeferredAllocAction<'list> {
-	fn new<A, F1, F2>(allocated: A, free1: F1, free2: F2) -> DeferredAllocAction<'list> 
-		where A:  Into<Option<Chunk>>,
-			  F1: Into<Option<Chunk>>,
+	fn new<F1, F2>(free1: F1, free2: F2) -> DeferredAllocAction<'list> 
+		where F1: Into<Option<Chunk>>,
 			  F2: Into<Option<Chunk>>,
 	{
 		let free_list = &FREE_PAGE_LIST;
-		let allocated_list = &FREE_PAGE_LIST;
-		let allocated = allocated.into().unwrap_or(Chunk::empty());
 		let free1 = free1.into().unwrap_or(Chunk::empty());
 		let free2 = free2.into().unwrap_or(Chunk::empty());
-		DeferredAllocAction { free_list, allocated_list, allocated, free1, free2 }
+		DeferredAllocAction { free_list, free1, free2 }
 	}
 }
 impl<'list> Drop for DeferredAllocAction<'list> {
 	fn drop(&mut self) {
-		// Insert the free chunks into the list, putting the larger one before the smaller one
-		// and ignoring either one if it is zero-sized. 
-		let size1 = self.free1.size_in_pages();
-		let size2 = self.free2.size_in_pages();
-		let (first, second) = if size1 > size2 {
-			(&self.free1, &self.free2)
-		} else {
-			(&self.free2, &self.free1)
-		};
-
-		if size1 > 0 || size2 > 0 {
-			let mut ll = self.free_list.lock();
-			if size1 > 0 {
-				ll.push_front(first.clone()).unwrap();
-			}
-			if size2 > 0 {
-				ll.push_front(second.clone()).unwrap();
-			}
+		// Insert all of the chunks, both allocated and free ones, into the list. 
+		if self.free1.size_in_pages() > 0 {
+			self.free_list.lock().insert(self.free1.clone()).unwrap();
 		}
-		if self.allocated.size_in_pages() > 0 {
-			self.allocated_list.lock().push_back(self.allocated.clone()).unwrap();
+		if self.free2.size_in_pages() > 0 {
+			self.free_list.lock().insert(self.free2.clone()).unwrap();
 		}
 	}
+}
+
+
+/// Possible allocation errors.
+enum AllocationError {
+	/// The requested address was not free: it was already allocated, or is outside the range of this allocator.
+	AddressNotFree(Page, usize),
+	/// The address space was full, or there was not a large-enough chunk 
+	/// or enough remaining chunks that could satisfy the requested allocation size.
+	OutOfAddressSpace(usize),
+	/// The allocator has not yet been initialized.
+	NotInitialized,
+}
+impl From<AllocationError> for &'static str {
+	fn from(alloc_err: AllocationError) -> &'static str {
+		match alloc_err {
+			AllocationError::AddressNotFree(..) => "address was in use or outside of this allocator's range",
+			AllocationError::OutOfAddressSpace(..) => "out of address space",
+			AllocationError::NotInitialized => "the allocator has not yet been initialized",
+		}
+	}
+}
+
+
+/// Searches the given `list` for the chunk that contains the range of pages from
+/// `requested_page` to `requested_page + num_pages`.
+fn find_specific_chunk(
+	list: &mut StaticArrayRBTree<Chunk>,
+	requested_page: Page,
+	num_pages: usize
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
+
+	// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+	let requested_end_page = requested_page + (num_pages - 1); 
+
+	match &mut list.0 {
+		Inner::Array(ref mut arr) => {
+			for elem in arr.iter_mut() {
+				if let Some(chunk) = elem {
+					if requested_page >= *chunk.pages.start() && requested_end_page <= *chunk.pages.end() {
+						// Here: `chunk` was big enough and did contain the requested address.
+						return adjust_chosen_chunk(requested_page, num_pages, &chunk.clone(), ValueRefMut::Array(elem));
+					}
+				}
+			}
+		}
+		Inner::RBTree(ref mut tree) => {
+			let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_page));
+			if let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
+				if requested_page >= *chunk.pages.start() {
+					if requested_end_page <= *chunk.pages.end() {
+						return adjust_chosen_chunk(requested_page, num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor_mut));
+					} else {
+						todo!("Page allocator: found chunk containing requested address, but it was too small. \
+							Merging multiple chunks during an allocation is currently unsupported, please contact the Theseus developers. \
+							Requested address: {:?}, num_pages: {}, chunk: {:?}",
+							requested_page, num_pages, chunk,
+						);
+					}
+				}
+			}
+		}
+	}
+
+	Err(AllocationError::AddressNotFree(requested_page, num_pages))
+}
+
+
+/// Searches the given `list` for any chunk large enough to hold at least `num_pages`.
+///
+/// It first attempts to find a suitable chunk **not** in the designated regions,
+/// and only allocates from the designated regions as a backup option.
+fn find_any_chunk<'list>(
+	list: &'list mut StaticArrayRBTree<Chunk>,
+	num_pages: usize
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.get().ok_or(AllocationError::NotInitialized)?;
+
+	// During the first pass, we ignore designated regions.
+	match list.0 {
+		Inner::Array(ref mut arr) => {
+			for elem in arr.iter_mut() {
+				if let Some(chunk) = elem {
+					// Skip chunks that are too-small or in the designated regions.
+					if  chunk.size_in_pages() < num_pages || 
+						chunk.pages.start() <= &designated_low_end || 
+						chunk.pages.end() >= &DESIGNATED_PAGES_HIGH_START
+					{
+						continue;
+					} 
+					else {
+						return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::Array(elem));
+					}
+				}
+			}
+		}
+		Inner::RBTree(ref mut tree) => {
+			// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
+			// ```
+			// let eligible_chunks = tree.range(
+			// 	Bound::Excluded(&DESIGNATED_PAGES_LOW_END),
+			// 	Bound::Excluded(&DESIGNATED_PAGES_HIGH_START)
+			// );
+			// for c in eligible_chunks { ... }
+			// ```
+			//
+			// However, RBTree doesn't have a `range_mut()` method, so we use cursors for manual iteration.
+			//
+			// Because we allocate new pages by peeling them off from the beginning part of a chunk, 
+			// it's MUCH faster to start the search for free pages from higher addresses moving down. 
+			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
+			let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_HIGH_START));
+			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
+				if chunk.pages.start() <= &designated_low_end {
+					break; // move on to searching through the designated regions
+				}
+				if num_pages < chunk.size_in_pages() {
+					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
+				}
+				warn!("Page allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages at any address.", num_pages);
+				cursor.move_prev();
+			}
+		}
+	}
+
+	// If we can't find any suitable chunks in the non-designated regions, then look in both designated regions.
+	warn!("PageAllocator: unlikely scenario: non-designated chunks are all allocated, \
+		  falling back to allocating {} pages from designated regions!", num_pages);
+	match list.0 {
+		Inner::Array(ref mut arr) => {
+			for elem in arr.iter_mut() {
+				if let Some(chunk) = elem {
+					if num_pages <= chunk.size_in_pages() {
+						return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::Array(elem));
+					}
+				}
+			}
+		}
+		Inner::RBTree(ref mut tree) => {
+			// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
+			// ```
+			// let eligible_chunks = tree.range(
+			// 	Bound::<&Page>::Unbounded,
+			// 	Bound::Included(&DESIGNATED_PAGES_LOW_END)
+			// ).chain(tree.range(
+			// 	Bound::Included(&DESIGNATED_PAGES_HIGH_START),
+			// 	Bound::<&Page>::Unbounded
+			// ));
+			// for c in eligible_chunks { ... }
+			// ```
+			//
+			// However, RBTree doesn't have a `range_mut()` method, so we use two sets of cursors for manual iteration.
+			// The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.
+			let mut cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
+			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
+				if num_pages < chunk.size_in_pages() {
+					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
+				}
+				cursor.move_prev();
+			}
+
+			// The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
+			let mut cursor = tree.upper_bound_mut::<Chunk>(Bound::Unbounded);
+			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
+				if chunk.pages.start() < &DESIGNATED_PAGES_HIGH_START {
+					// we already iterated over non-designated pages in the first match statement above, so we're out of memory. 
+					break; 
+				}
+				if num_pages < chunk.size_in_pages() {
+					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
+				}
+				cursor.move_prev();
+			}
+		}
+	}
+
+	Err(AllocationError::OutOfAddressSpace(num_pages))
+}
+
+
+/// The final part of the main allocation routine. 
+///
+/// The given chunk is the one we've chosen to allocate from. 
+/// This function breaks up that chunk into multiple ones and returns an `AllocatedPages` 
+/// from (part of) that chunk, ranging from `start_page` to `start_page + num_pages`.
+fn adjust_chosen_chunk(
+	start_page: Page,
+	num_pages: usize,
+	chosen_chunk: &Chunk,
+	mut chosen_chunk_ref: ValueRefMut<Chunk>,
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
+
+	// The new allocated chunk might start in the middle of an existing chunk,
+	// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
+	//
+	// Because Pages and VirtualAddresses use saturating add and subtract, we need to double-check that we're not creating
+	// an overlapping duplicate Chunk at either the very minimum or the very maximum of the address space.
+	let new_allocation = Chunk {
+		// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
+		pages: PageRange::new(start_page, start_page + (num_pages - 1)),
+	};
+	let before = if start_page == MIN_PAGE {
+		None
+	} else {
+		Some(Chunk {
+			pages: PageRange::new(*chosen_chunk.pages.start(), *new_allocation.start() - 1),
+		})
+	};
+	let after = if new_allocation.end() == &MAX_PAGE { 
+		None
+	} else {
+		Some(Chunk {
+			pages: PageRange::new(*new_allocation.end() + 1, *chosen_chunk.pages.end()),
+		})
+	};
+
+	// some sanity checks -- these can be removed or disabled for better performance
+	if let Some(ref b) = before {
+		assert!(!new_allocation.contains(b.end()));
+		assert!(!b.contains(new_allocation.start()));
+	}
+	if let Some(ref a) = after {
+		assert!(!new_allocation.contains(a.start()));
+		assert!(!a.contains(new_allocation.end()));
+	}
+
+	// Remove the chosen chunk from the free page list.
+	let _removed_chunk = chosen_chunk_ref.remove();
+	assert_eq!(Some(chosen_chunk), _removed_chunk.as_ref()); // sanity check
+
+	// TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
+	// if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
+
+	Ok((
+		new_allocation.as_allocated_pages(),
+		DeferredAllocAction::new(before, after),
+	))
 }
 
 
@@ -357,8 +569,7 @@ impl<'list> Drop for DeferredAllocAction<'list> {
 /// actual physical memory frames nor do any memory mapping. 
 /// Thus, the returned `AllocatedPages` aren't directly usable until they are mapped to physical frames. 
 /// 
-/// Allocation is quick, technically `O(n)` but generally will allocate immediately
-/// because the largest free chunks are stored at the front of the list.
+/// Allocation is based on a red-black tree and is thus `O(log(n))`.
 /// Fragmentation isn't cleaned up until we're out of address space, but that's not really a big deal.
 /// 
 /// # Arguments
@@ -382,84 +593,18 @@ pub fn allocate_pages_deferred(
 		return Err("cannot allocate zero pages");
 	}
 
-	let desired_start_page = requested_vaddr.map(|vaddr| Page::containing_address(vaddr));
-
 	let mut locked_list = FREE_PAGE_LIST.lock();
-	for c in locked_list.iter_mut() {
-		// Look for the chunk that contains the desired address, 
-		// or any chunk that is large enough, if no desired address was requested.
-		// Obviously, we cannot use any chunk that is already allocated. 
-		let potential_start_page = desired_start_page.unwrap_or(*c.pages.start());
-		// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-		let potential_end_page   = potential_start_page + (num_pages - 1); 
-		if potential_start_page >= *c.pages.start() && potential_end_page <= *c.pages.end() {
-			// Here: chunk `c` was big enough and did contain the requested address.
-			// If it's not allocated, we can use it. 
-			if c.allocated {
-				if desired_start_page.is_some() {
-					error!("Page allocator: requested {}-page allocation at address {:?}, but address was already allocated.",
-						num_pages, requested_vaddr
-					);
-					return Err("requested address already allocated");
-				} else {
-					continue;
-				}
-			}
-			// Here: we've found a suitable chunk, so fall through to the rest of the loop.
-		} else {
-			// Chunk `c` isn't big enough, or doesn't contain the requested address.
-			continue;
-		}
-		
-		// If this chunk is exactly the right size, just update it in-place as 'allocated' and return that chunk.
-		if num_pages == c.pages.size_in_pages() {
-			c.allocated = true;
-			return Ok((
-				c.as_allocated_pages(),
-				DeferredAllocAction::new(None, None, None),
-			));
-		}
 
-		// The new allocated chunk might start in the middle of an existing chunk,
-		// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
-		let new_allocation = PageRange::new(potential_start_page, potential_end_page);
-		let before = PageRange::new(*c.pages.start(), *new_allocation.start() - 1);
-		let after = PageRange::new(*new_allocation.end() + 1, *c.pages.end());
-
-		// Adjust the current chunk in place here, such that it now holds the smaller of the two free chunks;
-		// the larger free chunk will be inserted into the front of the list later -- see the drop handler
-		// of the `DeferredAllocAction` struct for more details.
-		// However, if either chunk is zero-sized, we use the other one here.
-		// At this point, both cannot be zero-sized due to the exact-sized chunk condition above.
-		let extra_free_pages: PageRange; 
-		if before.size_in_pages() > 0 && 
-			(after.size_in_pages() == 0 || before.size_in_pages() < after.size_in_pages())
-		{
-			c.pages = before;
-			extra_free_pages = after;
-		} else {
-			c.pages = after;
-			extra_free_pages = before;
-		}
-
-		let allocated_chunk = Chunk {
-			allocated: true,
-			pages: new_allocation,
-		};
-		let extra_free_chunk = Chunk {
-			allocated: false,
-			pages: extra_free_pages,
-		};
-		return Ok((
-			allocated_chunk.as_allocated_pages(),
-			DeferredAllocAction::new(allocated_chunk, extra_free_chunk, None),
-		));
-	}
-
-	error!("PageAllocator: out of virtual address space, or requested address {:?} ({} pages) was not covered by page allocator.",
-		requested_vaddr, num_pages
-	);
-	Err("out of virtual address space, or requested virtual address not covered by page allocator.")
+	// The main logic of the allocator is to find an appropriate chunk that can satisfy the allocation request.
+	// An appropriate chunk satisfies the following conditions:
+	// - Can fit the requested size (starting at the requested address) within the chunk.
+	// - The chunk can only be within in a designated region if a specific address was requested, 
+	//   or all other non-designated chunks are already in use.
+	if let Some(vaddr) = requested_vaddr {
+		find_specific_chunk(&mut locked_list, Page::containing_address(vaddr), num_pages)
+	} else {
+		find_any_chunk(&mut locked_list, num_pages)
+	}.map_err(From::from) // convert from AllocationError to &str
 }
 
 
@@ -534,7 +679,7 @@ pub fn convert_to_heap_allocated() {
 /// A debugging function used to dump the full internal state of the page allocator. 
 #[doc(hidden)] 
 pub fn dump_page_allocator_state() {
-	debug!("--------------- PAGE ALLOCATOR LIST ---------------");
+	debug!("--------------- FREE PAGES LIST ---------------");
 	for c in FREE_PAGE_LIST.lock().iter() {
 		debug!("{:X?}", c);
 	}

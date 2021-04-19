@@ -20,11 +20,12 @@ extern crate bit_field;
 extern crate memory_x86_64;
 extern crate x86_64;
 extern crate memory_structs;
+extern crate page_table_entry;
 extern crate page_allocator;
+extern crate frame_allocator;
 extern crate zerocopy;
 
 
-mod area_frame_allocator;
 #[cfg(not(mapper_spillful))]
 mod paging;
 
@@ -32,11 +33,11 @@ mod paging;
 pub mod paging;
 
 
-pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 
 pub use memory_structs::*;
 pub use page_allocator::*;
+pub use frame_allocator::*;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::*;
@@ -44,13 +45,11 @@ use memory_x86_64::*;
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
 
-
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::KERNEL_OFFSET;
-use core::ops::DerefMut;
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<MmiRef> = Once::new();
@@ -61,33 +60,7 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 /// Returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
 pub fn get_kernel_mmi_ref() -> Option<MmiRef> {
-    KERNEL_MMI.try().cloned()
-}
-
-
-/// The one and only frame allocator, a singleton. 
-static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
-
-/// A shareable reference to a `FrameAllocator` struct wrapper in a lock.
-#[allow(type_alias_bounds)]
-pub type FrameAllocatorRef<A: FrameAllocator> = MutexIrqSafe<A>;
-
-/// Returns a reference to the system-wide `FrameAllocator`, if initialized.
-/// If not, it returns `None`.
-/// 
-/// Currently, the system-wide allocator is an `AreaFrameAllocator` reference.
-pub fn get_frame_allocator_ref() -> Option<&'static FrameAllocatorRef<AreaFrameAllocator>> {
-    FRAME_ALLOCATOR.try()
-}
-
-/// Convenience method for allocating a new Frame.
-pub fn allocate_frame() -> Option<Frame> {
-    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frame())
-}
-
-/// Convenience method for allocating several contiguous Frames.
-pub fn allocate_frames(num_frames: usize) -> Option<FrameRange> {
-    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
+    KERNEL_MMI.get().cloned()
 }
 
 
@@ -113,16 +86,14 @@ pub struct MemoryManagementInfo {
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate pages!")?;
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
+    let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    let mut frame_allocator = get_frame_allocator_ref().ok_or("create_contiguous_mapping(): couldnt get frame allocator")?.lock();
-    let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
-        .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
-    let starting_phys_addr = frames.start_address();
-    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, frames, flags, &mut *frame_allocator)?;
+    let starting_phys_addr = allocated_frames.start_address();
+    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)?;
     Ok((mp, starting_phys_addr))
 }
 
@@ -133,19 +104,13 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 /// Returns the new `MappedPages.` 
 /// 
 /// # Locking / Deadlock
-/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
-/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+/// Currently, this function acquires the lock on the kernel's `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that lock is not held when invoking this function.
 pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
-
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-
-    let mut frame_allocator = FRAME_ALLOCATOR.try()
-        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-        .lock();
-    
-    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags, frame_allocator.deref_mut())
+    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags)
 }
 
 
@@ -164,59 +129,85 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * a reference to the Frame Allocator to be used by the remaining memory init functions
-///  * the kernel's new `PageTable`, which is now currently active 
-///  * the `MappedPages` of the kernel's text section,
-///  * the `MappedPages` of the kernel's rodata section,
-///  * the `MappedPages` of the kernel's data section,
-///  * a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
-pub fn init(boot_info: &BootInformation) 
-    -> Result<(
-        &MutexIrqSafe<AreaFrameAllocator>,
-        PageTable,
-        MappedPages,
-        MappedPages,
-        MappedPages,
-        (AllocatedPages, MappedPages),
-        [Option<MappedPages>; 32],
-        [Option<MappedPages>; 32]
-    ), &'static str> 
-{
-    // get the start and end addresses of the kernel.
+///  1. the kernel's new `PageTable`, which is now currently active,
+///  2. the `MappedPages` of the kernel's text section,
+///  3. the `MappedPages` of the kernel's rodata section,
+///  4. the `MappedPages` of the kernel's data section,
+///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
+///  6. the `MappedPages` holding the bootloader info,
+///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
+pub fn init(
+    boot_info: &BootInformation
+) -> Result<(
+    PageTable,
+    MappedPages,
+    MappedPages,
+    MappedPages,
+    (AllocatedPages, MappedPages),
+    MappedPages,
+    [Option<MappedPages>; 32],
+    [Option<MappedPages>; 32]
+), &'static str> {
+    // Get the start and end addresses of the kernel, boot info, boot modules, etc.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
-
-    debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
-        kernel_phys_start,
-        kernel_phys_end,
-        kernel_virt_end
-    );
-  
-    // get available physical memory areas
-    let (available, avail_len) = get_available_memory(&boot_info, kernel_phys_end)?;
-
-    // Get the bounds of physical memory that is occupied by bootloader-loaded modules.
+    let (boot_info_paddr_start, boot_info_paddr_end) = get_boot_info_mem_area(&boot_info)?;
     let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
+    debug!("bootloader info memory: p{:#X} to p{:#X}, bootloader modules: p{:#X} to p{:#X}", 
+        boot_info_paddr_start, boot_info_paddr_end, modules_start_paddr, modules_end_paddr,
+    );
+    debug!("kernel_phys_start: p{:#X}, kernel_phys_end: p{:#X} kernel_virt_end = v{:#x}",
+        kernel_phys_start, kernel_phys_end, kernel_virt_end
+    );
 
-    // Set up the initial list of reserved physical memory frames such that the frame allocator does not re-use them.
-    let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
-    let mut occup_index = 0;
-    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1, 0); // reserve addresses under 1 MB
-    occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
-    occup_index += 1;
-    occupied[occup_index] = get_boot_info_mem_area(&boot_info)?; // preserve the multiboot information for x86_64. 
-    occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value(), 1, 0); // preserve all bootloader modules
-    occup_index += 1;
+    // In addition to the information about the hardware's physical memory map provided by the bootloader,
+    // Theseus chooses to reserve the following regions of physical memory for specific use.
+    let low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), 0x10_0000); // suggested by most OS developers
+    let kernel_frames       = FrameRange::from_phys_addr(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value());
+    let boot_modules_frames = FrameRange::from_phys_addr(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value());
+    let boot_info_frames    = FrameRange::from_phys_addr(boot_info_paddr_start, boot_info_paddr_end.value() - boot_info_paddr_start.value());
+    
+    // Add the VGA display's memory region to the list of reserved physical memory areas.
+    // Currently this is covered by the first 1MiB region, but it's okay to duplicate it here.
+    let (vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()?;
+    let vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
+    
+    // Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
+    let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut free_index = 0;
+    let mut reserved_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
+    let mut reserved_index = 0;
 
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(kernel_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_modules_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_info_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
+    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
+    reserved_index += 1;
 
-    // init the frame allocator with the available memory sections and the occupied memory sections
-    let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;
-    let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
-        MutexIrqSafe::new(fa) 
-    });
+    for area in boot_info.memory_map_tag()
+        .ok_or("Multiboot2 boot information has no physical memory map information")?
+        .all_memory_areas()
+    {
+        let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start_address() as usize), area.size() as usize);
+        if area.typ() == multiboot2::MemoryAreaType::Available {
+            free_regions[free_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
+            free_index += 1;
+        } else {
+            reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Reserved));
+            reserved_index += 1;
+        }
+    }
+
+    frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
+    debug!("Initialized new frame allocator!");
+
+    page_allocator::init(VirtualAddress::new_canonical(kernel_phys_end.value()))?;
+    debug!("Initialized new page allocator!");
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     let (
@@ -225,18 +216,19 @@ pub fn init(boot_info: &BootInformation)
         rodata_mapped_pages,
         data_mapped_pages,
         (stack_guard_page, stack_pages),
+        boot_info_pages,
         higher_half_mapped_pages,
         identity_mapped_pages
-    ) = paging::init(frame_allocator_mutex, &boot_info)?;
+    ) = paging::init(boot_info)?;
 
-    debug!("Done with paging::init()!, page_table: {:?}", page_table);
+    debug!("Done with paging::init(). new page_table: {:?}", page_table);
     Ok((
-        frame_allocator_mutex,
         page_table,
         text_mapped_pages,
         rodata_mapped_pages,
         data_mapped_pages,
         (stack_guard_page, stack_pages),
+        boot_info_pages,
         higher_half_mapped_pages,
         identity_mapped_pages
     ))
@@ -256,7 +248,7 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
 
     page_allocator::convert_to_heap_allocated();
-    FRAME_ALLOCATOR.try().ok_or("BUG: FRAME_ALLOCATOR not initialized")?.lock().alloc_ready();
+    frame_allocator::convert_to_heap_allocated();
 
     let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     higher_half_mapped_pages.push(heap_mapped_pages);
@@ -274,12 +266,3 @@ pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Opti
 
     Ok( (kernel_mmi_ref.clone(), identity_mapped_pages) )
 }
-
-pub trait FrameAllocator {
-    fn allocate_frame(&mut self) -> Option<Frame>;
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange>;
-    fn deallocate_frame(&mut self, frame: Frame);
-    /// Call this when a heap is set up, and the `alloc` types can be used.
-    fn alloc_ready(&mut self);
-}
-

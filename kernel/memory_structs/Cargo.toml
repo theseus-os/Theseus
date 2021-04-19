@@ -6,9 +6,8 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-multiboot2 = "0.7.1"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
+multiboot2 = "0.10.1"
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 bit_field = "0.7.0"
 zerocopy = "0.3.0"
 

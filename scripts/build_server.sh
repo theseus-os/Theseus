@@ -68,7 +68,7 @@ ls *.o > $NEW_DIR/listing.txt
 ### If a state transfer function was specified, then append it to the end of the diff
 if [ -d $OLD_MODULES_DIR ] ; then 
   # DIFF_FILE=$(readlink -e $DIFF_FILE)
-	cargo run --manifest-path $TOOLS_DIR/diff_crates/Cargo.toml -- $OLD_MODULES_DIR  $NEW_MODULES_DIR  >  $NEW_DIR/diff.txt
+	cargo run --release --manifest-path $TOOLS_DIR/diff_crates/Cargo.toml -- $OLD_MODULES_DIR  $NEW_MODULES_DIR  >  $NEW_DIR/diff.txt
 if [ ! -z $STATE_TRANSFER ] ; then
   echo "@$STATE_TRANSFER" >>  $NEW_DIR/diff.txt
 fi

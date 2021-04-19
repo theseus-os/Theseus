@@ -21,15 +21,28 @@ CFG_DIR := $(ROOT_DIR)/cfg
 KERNEL_PREFIX ?= k\#
 APP_PREFIX    ?= a\#
 
-## Build modes: debug is development mode, release is with full optimizations.
-## We build using release mode by default, because running in debug mode is prohibitively slow.
-## You can set these on the command line like so: "make run BUILD_MODE=release"
-# BUILD_MODE ?= debug
-BUILD_MODE ?= release
 
-ifeq ($(BUILD_MODE), release)
-	CARGOFLAGS += --release
+## Build modes: debug is development mode, release is with full optimizations.
+## We build using release mode by default, because running in debug mode is quite slow.
+## You can set these on the command line like so: "make run BUILD_MODE=release"
+BUILD_MODE ?= release
+ifeq ($(BUILD_MODE), debug)
+	## "debug" builds are the default in cargo, so don't change cargo options. 
+	## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.
+	export override CFLAGS += -DDEBUG
+else ifeq ($(BUILD_MODE), release)
+	export override CARGOFLAGS += --release
+else 
+$(error 'BUILD_MODE' value of '$(BUILD_MODE)' is invalid, it must be either 'debug' or 'release')
 endif
+
+
+## Tell cargo to build our own target-specific version of the `core` and `alloc` crates.
+## Also ensure that core memory functions (e.g., memcpy) are included in the build and not name-mangled.
+## We keep these flags separate from the regular CARGOFLAGS for purposes of easily creating a sysroot directory.
+BUILD_STD_CARGOFLAGS += -Z unstable-options
+BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
+BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 
 
 ## emit obj gives us the object file for the crate, instead of an rlib that we have to unpack.

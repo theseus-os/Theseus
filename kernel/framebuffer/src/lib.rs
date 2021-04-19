@@ -15,7 +15,7 @@ pub mod pixel;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
 
-use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, get_frame_allocator_ref};
+use memory::{EntryFlags, MappedPages, PhysicalAddress};
 use owning_ref::BoxRefMut;
 use shapes::Coord;
 pub use pixel::*;
@@ -67,27 +67,25 @@ impl<P: Pixel> Framebuffer<P> {
     ) -> Result<Framebuffer<P>, &'static str> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        let allocator = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
 
         let vesa_display_flags: EntryFlags =
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
         let size = width * height * core::mem::size_of::<P>();
-        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
+        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages for a new framebuffer")?;
 
         let mapped_framebuffer = if let Some(address) = physical_address {
-            let frame = FrameRange::from_phys_addr(address, size);
+            let frames = memory::allocate_frames_by_bytes_at(address, size)
+                .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
             kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
-                frame,
+                frames,
                 vesa_display_flags,
-                allocator.lock().deref_mut()
             )?
         } else {
             kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
                 vesa_display_flags,
-                allocator.lock().deref_mut()
             )?
         };
 

@@ -5,7 +5,7 @@ authors = ["Andrew Pham <apham727@gmail.com>"]
 description = "a special concrete implementation of the Directory trait; differs from VFSDirectory only in that there is no parent field, and any attempt to access a parent field will return some error value"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.9.0"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.lazy_static]

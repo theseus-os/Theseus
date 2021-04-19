@@ -13,22 +13,18 @@ extern crate owning_ref;
 extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate volatile;
+extern crate nic_queues;
 
-use core::ops::DerefMut;
-use memory::{get_frame_allocator_ref, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
+use memory::{EntryFlags, PhysicalAddress, allocate_pages_by_bytes, allocate_frames_by_bytes_at, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
 use pci::{PciDevice};
 use alloc::{
     vec::Vec,
     boxed::Box,
 };
 use owning_ref::BoxRefMut;
-use intel_ethernet::{
-    descriptors::{RxDescriptor, TxDescriptor},
-    types::*
-};
+use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::ReceiveBuffer;
-use volatile::Volatile;
-
+use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 
 /// The mapping flags used for pages that the NIC will map.
 pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
@@ -46,7 +42,7 @@ pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
 /// * `mem_base`: starting physical address of the device's memory mapped registers
 pub fn allocate_device_register_memory(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
     //find out amount of space needed
-    let mem_size_in_bytes = dev.determine_mem_size() as usize;
+    let mem_size_in_bytes = dev.determine_mem_size(0) as usize;
 
     allocate_memory(mem_base, mem_size_in_bytes)
 }
@@ -57,23 +53,17 @@ pub fn allocate_device_register_memory(dev: &PciDevice, mem_base: PhysicalAddres
 /// * `mem_base`: starting physical address of the region that need to be allocated
 /// * `mem_size_in_bytes`: size of the region that needs to be allocated 
 pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> Result<MappedPages, &'static str> {
-    // inform the frame allocator that the physical frames where memory area for the nic exists
-    // is now off-limits and should not be touched
-    {
-        let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); 
-        get_frame_allocator_ref().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
-    }
-
     // set up virtual pages and physical frames to be mapped
-    let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("NicInit::mem_map(): couldn't allocated virtual page!")?;
-    let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
+    let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes)
+        .ok_or("NicInit::mem_map(): couldn't allocate virtual page!")?;
+    let frames_nic = allocate_frames_by_bytes_at(mem_base, mem_size_in_bytes)
+        .map_err(|_e| "NicInit::mem_map(): couldn't allocate physical frames!")?;
 
     // debug!("NicInit: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("NicInit::mem_map(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-    let fa = get_frame_allocator_ref().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?;
-    let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS, fa.lock().deref_mut())?;
+    let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS)?;
 
     Ok(nic_mapped_page)
 }
@@ -104,16 +94,11 @@ pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool:
 /// # Arguments
 /// * `num_desc`: number of descriptors in the queue
 /// * `rx_buffer_pool`: pool from which to take receive buffers
-/// * `buffer_size`: size of each buffer in the pool
-/// * `rdbal`: register to store the lower (least significant) 32 bits of the physical address of the array of receive descriptors
-/// * `rdbah`: register to store the higher (most significant) 32 bits of the physical address of the array of receive descriptors
-/// * `rdlen`: register to store the length in bytes of the array of receive descriptors
-/// * `rdh`: register to store the receive descriptor head index
-/// * `rdt`: register to store the receive descriptor tail index
-pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize, 
-            rdbal: &mut Volatile<Rdbal>, rdbah: &mut Volatile<Rdbah>, rdlen: &mut Volatile<Rdlen>, rdh: &mut Volatile<Rdh>, rdt: &mut Volatile<Rdt>)
-                -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> {
-    
+/// * `buffer_size`: size of each buffer in the pool in bytes
+/// * `rxq_regs`: registers needed to set up a receive queue 
+pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize, rxq_regs: &mut S)
+    -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> 
+{    
     let size_in_bytes_of_all_rx_descs_per_queue = num_desc * core::mem::size_of::<T>();
     
     // Rx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
@@ -147,15 +132,15 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
     let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
     
     // write the physical address of the rx descs ring
-    rdbal.write(rx_desc_phys_addr_lower);
-    rdbah.write(rx_desc_phys_addr_higher);
+    rxq_regs.set_rdbal(rx_desc_phys_addr_lower);
+    rxq_regs.set_rdbah(rx_desc_phys_addr_higher);
 
     // write the length (in total bytes) of the rx descs array
-    rdlen.write(size_in_bytes_of_all_rx_descs_per_queue as u32); // should be 128 byte aligned, minimum 8 descriptors
+    rxq_regs.set_rdlen(size_in_bytes_of_all_rx_descs_per_queue as u32); // should be 128 byte aligned, minimum 8 descriptors
     
     // Write the head index (the first receive descriptor)
-    rdh.write(0);
-    rdt.write(0);   
+    rxq_regs.set_rdh(0);
+    rxq_regs.set_rdt(0);   
 
     Ok((rx_descs, rx_bufs_in_use))        
 }
@@ -164,15 +149,10 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
 /// 
 /// # Arguments
 /// * `num_desc`: number of descriptors in the queue
-/// * `tdbal`: register to store the lower (least significant) 32 bits of the physical address of the array of transmit descriptors
-/// * `tdbah`: register to store the higher (most significant) 32 bits of the physical address of the array of transmit descriptors
-/// * `tdlen`: register to store the length in bytes of the array of transmit descriptors
-/// * `tdh`: register to store the transmit descriptor head index
-/// * `tdt`: register to store the transmit descriptor tail index
-pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, tdbal: &mut Volatile<Tdbal>, tdbah: &mut Volatile<Tdbah>, tdlen: &mut Volatile<Tdlen>, 
-            tdh: &mut Volatile<Tdh>, tdt: &mut Volatile<Tdt>) 
-                -> Result<BoxRefMut<MappedPages, [T]>, &'static str> {
-
+/// * `txq_regs`: registers needed to set up a transmit queue
+pub fn init_tx_queue<T: TxDescriptor, S: TxQueueRegisters>(num_desc: usize, txq_regs: &mut S) 
+    -> Result<BoxRefMut<MappedPages, [T]>, &'static str> 
+{
     let size_in_bytes_of_all_tx_descs = num_desc * core::mem::size_of::<T>();
     
     // Tx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
@@ -192,15 +172,15 @@ pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, tdbal: &mut Volatile<Tdba
     let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
 
     // write the physical address of the tx descs array
-    tdbal.write(tx_desc_phys_addr_lower); 
-    tdbah.write(tx_desc_phys_addr_higher); 
+    txq_regs.set_tdbal(tx_desc_phys_addr_lower); 
+    txq_regs.set_tdbah(tx_desc_phys_addr_higher); 
 
     // write the length (in total bytes) of the tx descs array
-    tdlen.write(size_in_bytes_of_all_tx_descs as u32);               
+    txq_regs.set_tdlen(size_in_bytes_of_all_tx_descs as u32);               
     
     // write the head index and the tail index (both 0 initially because there are no tx requests yet)
-    tdh.write(0);
-    tdt.write(0);
+    txq_regs.set_tdh(0);
+    txq_regs.set_tdt(0);
 
     Ok(tx_descs)
 }

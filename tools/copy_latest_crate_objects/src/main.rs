@@ -43,7 +43,7 @@ use walkdir::WalkDir;
 
 /// Debug option: if true, print all crate names and their object file path. 
 const PRINT_CRATES: bool = false;
-/// Debug option: if both this and `PRINT_CRATES` are true, print sorted crate names. 
+/// Debug option: if both this and `print_crates_objects` are true, print sorted crate names. 
 const PRINT_SORTED: bool = false;
 
 
@@ -60,17 +60,33 @@ fn main() -> Result<(), String> {
     opts.reqopt(
         "i", 
         "input",  
-        "(required) path to the input directory of compiled crate object files, 
-         typically the `target`, e.g., \"/path/to/Theseus/target\"", 
+        "(required) path to the input directory of compiled crate .rlib, .rmeta, and .o files, 
+         typically the `target`, e.g., \"/path/to/Theseus/target/$TARGET/release/deps/\"", 
         "INPUT_DIR"
     );
     opts.reqopt(
-        "o", 
-        "output",  
+        "", 
+        "output-objects",  
         "(required) path to the output directory where crate object files should be copied to, 
          typically the OS image directory, e.g., \"/path/to/build/grub-isofiles/modules/\"", 
         "OUTPUT_DIR"
     );
+    opts.reqopt(
+        "", 
+        "output-deps",  
+        "(required) path to the output directory where crate .rmeta and .rlib files should be copied to, 
+         typically part of the build directory, e.g., \"/path/to/build/deps/\"", 
+        "OUTPUT_DIR"
+    );
+    opts.optopt(
+        "", 
+        "output-sysroot",  
+        "path to the output directory where the sysroot files should be copied to,
+         which includes the .rmeta and .rlib files for fundamental Rust library crates, e.g., core, alloc, compiler_builtins. 
+         Typically this should be \"/path/to/build/deps/sysroot/lib/rustlib/$TARGET/lib/\".
+         If not provided, no sysroot output directory will be created.",
+        "OUTPUT_DIR"
+     );
     opts.reqopt(
         "k", 
         "kernel",  
@@ -103,12 +119,6 @@ fn main() -> Result<(), String> {
         "additional names of crates that should be treated as application crates. Can be provided multiple times",
         "APP_CRATE_NAME"
     );
-    opts.optmulti(
-        "c",
-        "core-files",
-        "paths to additional core files that should be treated as kernel crates, such. Can be provided multiple times",
-        "APP_CRATE_NAME"
-    );
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args[1..]) {
@@ -139,10 +149,12 @@ fn main() -> Result<(), String> {
         return Err(format!("app-prefix {:?} must only contain one '#' character at the end!", app_prefix));
     }
 
-    let kernel_arg = matches.opt_str("k").expect("no -k or --kernel arg provided");
-    let app_arg    = matches.opt_str("a").expect("no -a or --app arg provided");
-    let input_dir  = matches.opt_str("i").expect("no -i or --input arg provided");
-    let output_dir = matches.opt_str("o").expect("no -o or --output arg provided");
+    // Parse the required command-line arguments.
+    let input_dir          = matches.opt_str("i").expect("no -i or --input arg provided");
+    let output_objects_dir = matches.opt_str("output-objects").expect("no --output-objects arg provided");
+    let output_deps_dir    = matches.opt_str("output-deps").expect("no --output-deps arg provided");
+    let kernel_arg         = matches.opt_str("k").expect("no -k or --kernel arg provided");
+    let app_arg            = matches.opt_str("a").expect("no -a or --app arg provided");
 
     let kernel_arg_path = fs::canonicalize(kernel_arg)
         .map_err(|e| format!("kernel arg was invalid path, error: {:?}", e))?;
@@ -171,42 +183,79 @@ fn main() -> Result<(), String> {
     let extra_app_names = matches.opt_strs("e");
     app_crates_set.extend(extra_app_names.iter().flat_map(|n| n.split_whitespace()).map(|s| s.to_string()));
 
-    let extra_core_files = matches.opt_strs("c");
-    let extra_core_file_paths = extra_core_files.iter()
-        .flat_map(|n| n.split_whitespace())
-        .map(|s| s.to_string())
-        .collect::<Vec<String>>();
-
-    let (app_object_files, kernel_object_files, other_object_files) = parse_input_dir(
+    let (
+        app_object_files,
+        kernel_objects_and_deps_files,
+        other_objects_and_deps_files,
+    ) = parse_input_dir(
         app_crates_set,
         kernel_crates_set,
         input_dir,
     ).unwrap();
 
+
     // Now that we have obtained the lists of kernel, app, and other crates, 
-    // we copy them into the output directory with the proper prefix. 
+    // we copy their crate object files into the output object directory with the proper prefix. 
     // Also, we ensure that the specified output directory exists.
-    fs::create_dir_all(&output_dir).map_err(|e| format!("Error creating output directory {:?}, {:?}", output_dir, e))?;
+    fs::create_dir_all(&output_objects_dir).map_err(|e| 
+        format!("Error creating output objects directory {:?}, {:?}", output_objects_dir, e)
+    )?;
     copy_files(
-        &output_dir,
+        &output_objects_dir,
         app_object_files.values().map(|d| d.path()),
         &app_prefix
     ).unwrap();
     copy_files(
-        &output_dir,
-        kernel_object_files.values().map(|d| d.path()),
+        &output_objects_dir,
+        kernel_objects_and_deps_files.values().map(|(obj_direnty, _)| obj_direnty.path()),
         &kernel_prefix
     ).unwrap();
     copy_files(
-        &output_dir,
-        other_object_files.values().map(|d| d.path()),
+        &output_objects_dir,
+        other_objects_and_deps_files.values().map(|(obj_direnty, _)| obj_direnty.path()),
         &kernel_prefix
     ).unwrap(); 
+
+
+    
+    // Now we do the same kind of copy operation of crate dependency files, namely the .rlib and .rmeta files,
+    // into the output deps directory. 
+    fs::create_dir_all(&output_deps_dir).map_err(|e|
+        format!("Error creating output deps directory {:?}, {:?}", output_deps_dir, e)
+    )?;
     copy_files(
-        &output_dir,
-        extra_core_file_paths.into_iter().map(|s| PathBuf::from(s)),
-        &kernel_prefix
-    ).unwrap(); 
+        &output_deps_dir,
+        kernel_objects_and_deps_files.values().flat_map(|(_, deps)| deps.iter()),
+        "",
+    ).unwrap();
+    // Currently we also copy non-kernel dependency files just for efficiency in future out-of-tree builds.
+    copy_files(
+        &output_deps_dir,
+        other_objects_and_deps_files.values().flat_map(|(_, deps)| deps.iter()),
+        "",
+    ).unwrap();
+
+    // Here, if requested, we create the sysroot directory, containing the fundamental Rust libraries 
+    // that we ask cargo to build for us for Theseus's custom platform target
+    // Currently this comprises core, alloc, compiler_builtins, and rustc_std_workspace_core.
+    if let Some(output_sysroot_dir) = matches.opt_str("output-sysroot") {
+        fs::create_dir_all(&output_sysroot_dir).map_err(|e|
+            format!("Error creating output sysroot directory {:?}, {:?}", output_sysroot_dir, e)
+        )?;
+        let sysroot_files = other_objects_and_deps_files.iter()
+            .filter(|(crate_name, _val)| {
+                crate_name.starts_with("core-") || 
+                crate_name.starts_with("compiler_builtins-") || 
+                crate_name.starts_with("rustc_std_workspace_core-") || 
+                crate_name.starts_with("alloc-")
+            })
+            .flat_map(|(_key, (_, deps))| deps.iter());
+        copy_files(
+            &output_sysroot_dir,
+            sysroot_files,
+            "",
+        ).unwrap();
+    }
 
     Ok(())
 }
@@ -271,25 +320,45 @@ fn populate_crates_from_dir<P: AsRef<Path>>(dir_path: P) -> Result<HashSet<Strin
 }
 
 
+/// A key-value set of crate dependency files, in which 
+/// the key is the crate name, and the value is the crate's object file.
+type CrateObjectFiles = HashMap<String, DirEntry>;
+/// A key-value set of crate dependency files, in which 
+/// the key is the crate name, and 
+/// the value is a tuple of the crate's `(object file, [.rmeta file, .rlib file])`. 
+type CrateObjectAndDepsFiles = HashMap<String, (DirEntry, [PathBuf; 2])>;
+
+
+const DEPS_PREFIX:     &str = "lib";
+const RMETA_EXTENSION: &str = "rmeta";
+const RLIB_EXTENSION:  &str = "rlib";
+
+
 /// Parses the given input directory, which should be the directory of object files built by Rust, 
 /// to determine the latest versions of kernel crates, application crates, and other crates.
 /// 
 /// See the top of this file for more details. 
 /// 
 /// Upon success, returns a tuple of:
-/// * application crates
-/// * kernel crates
-/// * all other crates
+/// * application crate object files,
+/// * kernel crate object files,
+/// * all other crate object files,
+/// * kernel dependency files (.rmeta and .rlib),
+/// * all other non-application dependency files (.rmeta and .rlib).
 /// 
 fn parse_input_dir(
     app_crates: HashSet<String>,
     kernel_crates: HashSet<String>,
     input_dir: String,
-) -> std::io::Result<(HashMap<String, DirEntry>, HashMap<String, DirEntry>, HashMap<String, DirEntry>)> {
+) -> std::io::Result<(
+    CrateObjectFiles,
+    CrateObjectAndDepsFiles,
+    CrateObjectAndDepsFiles,
+)> {
 
-    let mut app_objects:     HashMap<String, DirEntry> = HashMap::new();
-    let mut kernel_objects:  HashMap<String, DirEntry> = HashMap::new();
-    let mut other_objects:   HashMap<String, DirEntry> = HashMap::new();
+    let mut app_objects = CrateObjectFiles::new();
+    let mut kernel_files = CrateObjectAndDepsFiles::new();
+    let mut other_files = CrateObjectAndDepsFiles::new();
 
     for dir_entry in fs::read_dir(input_dir)? {
         let dir_entry = dir_entry?;
@@ -300,6 +369,15 @@ fn parse_input_dir(
         let file_stem = file_name.split(".o").next().expect("object file name didn't have the .o extension");
         let prefix = file_name.split("-").next().expect("object file name didn't have the crate/hash '-' delimiter");
         let modified_time = metadata.modified()?;
+
+        // A closure for calculating paths for .rmeta and .rlib files in the same directory as the given object file.
+        let generate_deps_paths = |obj_file: DirEntry| {
+            let mut rmeta_path = obj_file.path();
+            rmeta_path.set_file_name(format!("{}{}.{}", DEPS_PREFIX, file_stem, RMETA_EXTENSION));
+            let mut rlib_path = rmeta_path.clone();
+            rlib_path.set_extension(RLIB_EXTENSION);
+            (obj_file, [rmeta_path, rlib_path])
+        };
 
         // Check whether the object file is for a crate designated as an application, kernel, or other crate.
         if app_crates.contains(prefix) {
@@ -314,61 +392,76 @@ fn parse_input_dir(
                 }
             }
         } else if kernel_crates.contains(prefix) {
-            match kernel_objects.entry(prefix.to_string()) {
+            match kernel_files.entry(prefix.to_string()) {
                 Entry::Occupied(mut occupied) => {
-                    if occupied.get().metadata()?.modified()? < modified_time {
-                        occupied.insert(dir_entry);
+                    if occupied.get().0.metadata()?.modified()? < modified_time {
+                        occupied.insert(generate_deps_paths(dir_entry));
                     }
                 }
                 Entry::Vacant(vacant) => {
-                    vacant.insert(dir_entry);
+                    vacant.insert(generate_deps_paths(dir_entry));
                 }
             }
         } else {
-            other_objects.insert(file_stem.to_string(), dir_entry);
+            other_files.insert(file_stem.to_string(), generate_deps_paths(dir_entry));
         }
 
     }
 
     // optional debug output
     if PRINT_CRATES {
-        println!("APPLICATION OBJECTS:");
-        print_crates(&app_objects, PRINT_SORTED);
-        println!("KERNEL OBJECTS:");
-        print_crates(&kernel_objects, PRINT_SORTED);
-        println!("OTHER OBJECTS:");
-        print_crates(&other_objects, PRINT_SORTED);
+        println!("APPLICATION OBJECT FILES:");
+        print_crates_objects(&app_objects, PRINT_SORTED);
+        println!("KERNEL OBJECT FILES AND DEPS FILES:");
+        print_crates_objects_and_deps(&kernel_files, PRINT_SORTED);
+        println!("OTHER OBJECT FILES AND DEPS FILES:");
+        print_crates_objects_and_deps(&other_files, PRINT_SORTED);
     }
     
     Ok((
         app_objects,
-        kernel_objects,
-        other_objects,
+        kernel_files,
+        other_files,
     ))
 }
 
 
-/// Copies the source files given by the `values()` in `objects`
-/// to the given `output_dir`. 
-/// Prepends the given `prefix` onto the front of the output file names. 
-fn copy_files<'p, P: AsRef<Path>, I: Iterator<Item = PathBuf>>(
-    output_dir: P,
-    objects: I,
+/// Copies each file in the `files` iterator into the given `output_dir`.
+///
+/// Prepends the given `prefix` onto the front of the output file names.
+/// 
+/// Ignores any source files in the `files` iterator that do not exist. 
+/// This is a policy choice due to how we form paths for deps files, which may not actually exist. 
+fn copy_files<'p, O, P, I>(
+    output_dir: O,
+    files: I,
     prefix: &str
-) -> io::Result<()> {
-    for source_path in objects {
+) -> io::Result<()> 
+    where O: AsRef<Path>,
+          P: AsRef<Path>,
+          I: Iterator<Item = P>,
+{
+    for source_path_ref in files {
+        let source_path = source_path_ref.as_ref();
         let mut dest_path = output_dir.as_ref().to_path_buf();
         dest_path.push(format!("{}{}", prefix, source_path.file_name().and_then(|osstr| osstr.to_str()).unwrap()));
-        // println!("Copying {} to {}", source_path.display(), dest_path.display());
-        fs::copy(source_path, dest_path)?;
-    }
 
+        if PRINT_CRATES {
+            println!("Copying {} to {}", source_path.display(), dest_path.display());
+        }
+            
+        match fs::copy(source_path, dest_path) {
+            Ok(_bytes_copied) => { }
+            Err(e) if e.kind() == io::ErrorKind::NotFound => { }  // Ignore source files that don't exist
+            Err(other_err) => return Err(other_err),
+        }
+    }
     Ok(())
 }
 
 
 
-fn print_crates(objects: &HashMap<String, DirEntry>, sorted: bool) {
+fn print_crates_objects(objects: &CrateObjectFiles, sorted: bool) {
     if sorted {
         let mut sorted = objects.keys().collect::<Vec<&String>>();
         sorted.sort_unstable();
@@ -378,6 +471,21 @@ fn print_crates(objects: &HashMap<String, DirEntry>, sorted: bool) {
     } else {
         for (k, v) in objects.iter() {
             println!("\t{} --> {}", k, v.path().display());
+        }
+    }
+}
+
+
+fn print_crates_objects_and_deps(files: &CrateObjectAndDepsFiles, sorted: bool) {
+    if sorted {
+        let mut sorted = files.keys().collect::<Vec<&String>>();
+        sorted.sort_unstable();
+        for o in &sorted {
+            println!("\t{}", o);
+        }
+    } else {
+        for (k, v) in files.iter() {
+            println!("\t{} --> {}, {}, {}", k, v.0.path().display(), v.1[0].display(), v.1[1].display());
         }
     }
 }

@@ -14,7 +14,7 @@ use alloc::{
     vec::Vec,
     sync::Arc,
 };
-use fs_node::{FileOrDir, DirRef};
+use fs_node::{FileOrDir, FileRef, DirRef};
 
 pub const PATH_DELIMITER: &str = "/";
 pub const EXTENSION_DELIMITER: &str = ".";
@@ -191,7 +191,7 @@ impl Path {
     }
 
     /// Returns the file or directory specified by the given path, 
-    /// which can either be absolute, or relative from the given the current working directory 
+    /// which can either be absolute or relative from the given starting directory.
     pub fn get(&self, starting_dir: &DirRef) -> Option<FileOrDir> {
         // let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
         let mut curr_dir = {
@@ -227,6 +227,27 @@ impl Path {
         Some(FileOrDir::Dir(curr_dir))
     }
 
+    /// Returns the file specified by the given path, which can be either absolute,
+    /// or relative from the given starting directory. 
+    ///
+    /// If the path is invalid or points to a directory, then `None` is returned. 
+    pub fn get_file(&self, starting_dir: &DirRef) -> Option<FileRef> {
+        match self.get(starting_dir) {
+            Some(FileOrDir::File(file)) => Some(file),
+            _ => None,
+        }
+    }
+
+    /// Returns the file specified by the given path, which can be either absolute,
+    /// or relative from the given starting directory. 
+    ///
+    /// If the path is invalid or points to a directory, then `None` is returned. 
+    pub fn get_dir(&self, starting_dir: &DirRef) -> Option<DirRef> {
+        match self.get(starting_dir) {
+            Some(FileOrDir::Dir(dir)) => Some(dir),
+            _ => None,
+        }
+    }
 
     /// Returns the file or directory specified by the given absolute path
     pub fn get_absolute(path: &Path) -> Option<FileOrDir> {

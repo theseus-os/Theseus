@@ -6,14 +6,14 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
 
 [dependencies.volatile]
 version = "0.2.7"
 features = ["const_fn"]
 
-[dependencies.serial_port]
-path = "../serial_port"
+[dependencies.logger]
+path = "../logger"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

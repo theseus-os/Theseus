@@ -56,7 +56,7 @@ use alloc::{
     sync::Arc,
 };
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{MmiRef, VirtualAddress, get_frame_allocator_ref};
+use memory::MmiRef;
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 // use tss::tss_set_rsp0;
@@ -229,8 +229,11 @@ pub struct Task {
     pub runstate: RunState,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
-    /// the virtual address of (a pointer to) the `TaskLocalData` struct, which refers back to this `Task` struct.
-    task_local_data_ptr: VirtualAddress,
+    /// A reference to this task's`TaskLocalData` struct, which is used to quickly retrieve the "current" Task
+    /// on a given CPU core. 
+    /// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later
+    /// after the task has been fully created, which currently occurs in `TaskRef::new()`.
+    task_local_data: Option<Box<TaskLocalData>>,
     /// Data that should be dropped after a task switch; for example, the previous Task's TaskLocalData.
     drop_after_task_switch: Option<Box<dyn Any + Send>>,
     /// Memory management details: page tables, mappings, allocators, etc.
@@ -302,9 +305,7 @@ impl Task {
         };
 
         let kstack = kstack
-            .or_else(|| get_frame_allocator_ref().and_then(|fa_ref| 
-                stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table, fa_ref)
-            ))
+            .or_else(|| stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table))
             .ok_or("couldn't allocate kernel stack!")?;
 
         Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate, failure_cleanup_function))
@@ -336,7 +337,7 @@ impl Task {
             on_runqueue: None,
             
             saved_sp: 0,
-            task_local_data_ptr: VirtualAddress::zero(),
+            task_local_data: None,
             drop_after_task_switch: None,
             name: format!("task_{}", task_id),
             kstack,
@@ -450,22 +451,12 @@ impl Task {
     /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
     /// into the FS segment register base MSR.
     fn set_as_current_task(&self) {
-        unsafe {
-            wrmsr(IA32_FS_BASE, self.task_local_data_ptr.value() as u64);
-        }
-    }
-
-    /// Removes this `Task`'s `TaskLocalData` cyclical task reference so that it can be dropped.
-    /// This should only be called once, after the Task will never ever be used again. 
-    fn take_task_local_data(&mut self) -> Option<Box<TaskLocalData>> {
-        // sanity check to ensure we haven't dropped this Task's TaskLocalData twice.
-        if self.task_local_data_ptr.value() != 0 {
-            let tld = unsafe { Box::from_raw(self.task_local_data_ptr.value() as *mut TaskLocalData) };
-            self.task_local_data_ptr = VirtualAddress::zero();
-            Some(tld)
-        }
-        else {
-            None
+        if let Some(ref tld) = self.task_local_data {
+            unsafe {
+                wrmsr(IA32_FS_BASE, tld.deref() as *const _ as u64);
+            }
+        } else {
+            error!("BUG: failed to set current task, it had no TaskLocalData. {:?}", self);
         }
     }
 
@@ -530,7 +521,7 @@ impl Task {
                 // debug!("task_switch [3]: switching tables! From {} {:?} to {} {:?}", 
                 //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
 
-                let _new_active_table = prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
+                prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
             }
         }
        
@@ -541,7 +532,7 @@ impl Task {
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
             // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
-            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<dyn Any + Send>);
+            next.drop_after_task_switch = self.task_local_data.take().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
@@ -679,8 +670,8 @@ pub struct TaskRef(
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
     /// 
-    /// Also establishes the `TaskLocalData` struct that will be used 
-    /// to determine the current `Task` on each processor core.
+    /// Also initializes the given `Task`'s `TaskLocalData` struct,
+    /// which will be used to determine the current `Task` on each CPU core.
     pub fn new(task: Task) -> TaskRef {
         let task_id = task.id;
         let taskref = TaskRef(Arc::new((MutexIrqSafe::new(task), AtomicBool::new(false))));
@@ -688,8 +679,7 @@ impl TaskRef {
             current_taskref: taskref.clone(),
             current_task_id: task_id,
         };
-        let tld_ptr = Box::into_raw(Box::new(tld));
-        taskref.0.deref().0.lock().task_local_data_ptr = VirtualAddress::new_canonical(tld_ptr as usize);
+        taskref.0.deref().0.lock().task_local_data = Some(Box::new(tld));
         taskref
     }
 
@@ -745,14 +735,14 @@ impl TaskRef {
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
             if !task.is_running() {
                 // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
-                let _tld = task.take_task_local_data();
+                let _tld = task.task_local_data.take();
             }
         }
 
         #[cfg(runqueue_spillful)] 
         {   
             let task_on_rq = { self.0.deref().0.lock().on_runqueue.clone() };
-            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.try() {
+            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
                 if let Some(rq) = task_on_rq {
                     remove_from_runqueue(self, rq)?;
                 }

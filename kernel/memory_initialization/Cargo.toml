@@ -5,7 +5,7 @@ description = "Initialization routine for the virtual memory subsystem."
 version = "0.1.0"
 
 [dependencies]
-multiboot2 = "0.7.1"
+multiboot2 = "0.10.1"
 
 [dependencies.memory]
 path = "../memory"
@@ -20,7 +20,7 @@ path = "../kernel_config"
 version = "0.4.8"
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.heap]
 path = "../heap"

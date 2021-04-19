@@ -168,7 +168,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         #[cfg(runqueue_spillful)] 
         {   
             let task_on_rq = { taskref.lock().on_runqueue.clone() };
-            if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.try() {
+            if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {
                 if let Some(rq) = task_on_rq {
                     remove_from_runqueue(&taskref, rq)?;
                 }

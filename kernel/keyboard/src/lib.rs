@@ -115,7 +115,7 @@ pub fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'stat
             match keycode {
                 Some(keycode) => {
                     let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, modifiers.clone()));
-                    if let Some(producer) = KEYBOARD_PRODUCER.try() {
+                    if let Some(producer) = KEYBOARD_PRODUCER.get() {
                         producer.push(event).map_err(|_e| "keyboard input queue is full")
                     }
                     else {

@@ -1,3 +1,175 @@
+//! This file contains the structs that are used to access device registers and contains configuration values to write to registers.
+//! 
+//! The registers are divided into multiple structs because we need to separate out the
+//! receive and transmit queue registers and store them separately in a per-queue struct.
+//! Though the e1000 device only has 1 pair of receive and transmit queues, we still structure
+//! the design this way to be able to use code shared by all network drivers.
+//! 
+//! The 4 structs which cover the registers of the entire memory-mapped region are:
+//! * `E1000Registers`
+//! * `E1000RxRegisters`
+//! * `E1000TxRegisters`
+//! * `E1000MacRegisters`
+
+
+use volatile::{Volatile, ReadOnly};
+use zerocopy::FromBytes;
+
+/// The layout in memory of the first set of e1000 registers. 
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct E1000Registers {
+    pub ctrl:                       Volatile<u32>,          // 0x0
+    _padding0:                      [u8; 4],                // 0x4 - 0x7
+    pub status:                     ReadOnly<u32>,          // 0x8
+    _padding1a:                     [u8; 128],              // 0xC - 0xBF,  180 bytes
+    _padding1b:                     [u8;  52],              
+    
+    /// Interrupt control registers
+    pub icr:                        ReadOnly<u32>,          // 0xC0   
+    _padding2:                      [u8; 12],               // 0xC4 - 0xCF
+    pub ims:                        Volatile<u32>,          // 0xD0
+    _padding3:                      [u8; 44],               // 0xD4 - 0xFF 
+
+    /// Receive control register
+    pub rctl:                       Volatile<u32>,          // 0x100
+    _padding4a:                     [u8; 512],              // 0x104 - 0x3FF,  764 bytes
+    _padding4b:                     [u8; 236],
+    _padding4c:                     [u8;  16],             
+    
+    /// Transmit control register
+    pub tctl:                       Volatile<u32>,          // 0x400
+    _padding5a:                     [u8; 4096],             // 0x404 - 0x1FFF
+    _padding5b:                     [u8; 2048],
+    _padding5c:                     [u8; 512],
+    _padding5d:                     [u8; 256],
+    _padding5e:                     [u8; 128],
+    _padding5f:                     [u8; 64],
+    _padding5g:                     [u8; 60],
+    
+} // 2 4KiB pages
+
+const_assert_eq!(core::mem::size_of::<E1000Registers>(), 2 * 4096);
+
+/// The layout in memory of e1000 receive registers. 
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct E1000RxRegisters {
+    _padding6:                      [u8; 2048],             // 0x2000 - 0x27FF
+
+    pub rx_regs:                    RegistersRx,            // 0x2800    
+    _padding7a:                     [u8; 1024],             // 0x281C - 0x2FFF
+    _padding7b:                     [u8; 512],
+    _padding7c:                     [u8; 256],
+    _padding7d:                     [u8; 128],  
+    _padding7e:                     [u8; 64],
+    _padding7f:                     [u8; 36],  
+} // 1 4KiB page
+
+const_assert_eq!(core::mem::size_of::<E1000RxRegisters>(), 4096);
+
+
+/// The layout in memory of e1000 transmit registers. 
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct E1000TxRegisters {
+    _padding8:                      [u8; 2048],             // 0x3000 - 0x37FF
+
+    pub tx_regs:                    RegistersTx,            // 0x3800
+    _padding9a:                     [u8; 1024],             // 0x381C - 0x3FFF
+    _padding9b:                     [u8; 512],
+    _padding9c:                     [u8; 256],
+    _padding9d:                     [u8; 128],  
+    _padding9e:                     [u8; 64],
+    _padding9f:                     [u8; 36],  
+} // 1 4KiB page
+
+const_assert_eq!(core::mem::size_of::<E1000TxRegisters>(), 4096);
+
+
+/// The layout in memory of e1000 MAC address registers. 
+/// 
+/// Note: the weird padding is a limitation of using the `zerocopy::FromBytes` trait,
+/// which in the absence of const generics, only implements its traits for arrays of [T: N] 
+/// where N is a power of two or is less than 64.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct E1000MacRegisters {
+    _padding10a:                    [u8; 4096],             // 0x4000 - 0x53FF
+    _padding10b:                    [u8; 1024],             
+    
+    /// The lower (least significant) 32 bits of the NIC's MAC hardware address.
+    pub ral:                        Volatile<u32>,          // 0x5400
+    /// The higher (most significant) 32 bits of the NIC's MAC hardware address.
+    pub rah:                        Volatile<u32>,          // 0x5404
+    _padding8a:                     [u8; 65536],            // 0x5408 - 0x1FFFF,  109560 bytes
+    _padding8b:                     [u8; 32768],
+    _padding8c:                     [u8;  8192],
+    _padding8d:                     [u8;  2048],
+    _padding8e:                     [u8;   512],
+    _padding8f:                     [u8;   256],
+    _padding8g:                     [u8;   236],
+    _padding8h:                     [u8;    12],
+    // End of all register structs should be at offset 0x20000 (128 KiB in total size).
+
+} // 28 4KiB pages
+
+const_assert_eq!(core::mem::size_of::<E1000MacRegisters>(), 28 * 4096);
+
+// check that the sum of all the register structs is equal to the memory of the e1000 device (128 KiB).
+const_assert_eq!(core::mem::size_of::<E1000Registers>() + core::mem::size_of::<E1000RxRegisters>() +   
+    core::mem::size_of::<E1000TxRegisters>() + core::mem::size_of::<E1000MacRegisters>(), 0x20000);
+
+
+/// Struct that holds registers related to one receive queue.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct RegistersRx {
+    /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
+    pub rdbal:                      Volatile<u32>,        // 0x2800
+    /// The higher (most significant) 32 bits of the physical address of the array of receive descriptors.
+    pub rdbah:                      Volatile<u32>,        // 0x2804
+    /// The length in bytes of the array of receive descriptors.
+    pub rdlen:                      Volatile<u32>,        // 0x2808
+    _padding0:                      [u8; 4],                // 0x280C - 0x280F
+    /// The receive descriptor head index, which points to the next available receive descriptor.
+    pub rdh:                        Volatile<u32>,          // 0x2810
+    _padding1:                      [u8; 4],                // 0x2814 - 0x2817
+    /// The receive descriptor tail index, which points to the last available receive descriptor.
+    pub rdt:                        Volatile<u32>,          // 0x2818
+}
+
+
+/// Struct that holds registers related to one transmit queue.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct RegistersTx {
+    /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.
+    pub tdbal:                      Volatile<u32>,        // 0x3800
+    /// The higher (most significant) 32 bits of the physical address of the array of transmit descriptors.
+    pub tdbah:                      Volatile<u32>,        // 0x3804
+    /// The length in bytes of the array of transmit descriptors.
+    pub tdlen:                      Volatile<u32>,        // 0x3808
+    _padding0:                      [u8; 4],                // 0x380C - 0x380F
+    /// The transmit descriptor head index, which points to the next available transmit descriptor.
+    pub tdh:                        Volatile<u32>,          // 0x3810
+    _padding1:                      [u8; 4],                // 0x3814 - 0x3817
+    /// The transmit descriptor tail index, which points to the last available transmit descriptor.
+    pub tdt:                        Volatile<u32>,          // 0x3818
+}
+
 pub const REG_CTRL:                 u32 = 0x0000;
 pub const REG_STATUS:               u32 = 0x0008;
 pub const REG_EEPROM:               u32 = 0x0014;

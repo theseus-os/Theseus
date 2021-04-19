@@ -6,8 +6,7 @@ authors = ["Ramla-I <ijazramla@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 
 [dependencies.memory]
 path = "../memory"
@@ -21,6 +20,8 @@ path = "../intel_ethernet"
 [dependencies.nic_buffers]
 path = "../nic_buffers"
 
+[dependencies.mpmc]
+path = "../../libs/mpmc"
 
 [lib]
 crate-type = ["rlib"]
