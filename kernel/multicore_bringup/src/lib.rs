@@ -43,26 +43,29 @@ use pause::spin_loop_hint;
 /// The physical address that an AP jumps to when it first is booted by the BSP.
 /// For x2apic systems, this must be at 0x10000 or higher! 
 const AP_STARTUP: usize = 0x10000; 
+
 /// The physical address of the memory area for AP startup data passed from the BSP in long mode (Rust) code.
-/// Located one page below the AP_STARTUP code entry point.
-/// Value: 0xF000
+/// Located one page below the AP_STARTUP code entry point, at 0xF000.
 const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 
-const GRAPHIC_INFO_TRAMPOLINE_OFFSET: usize = 0x100;
+/// The offset from the `TRAMPOLINE` address to where the AP startup code will write `GraphicInfo`.
+const GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE: usize = 0x100;
 
-// graphic mode information
-pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
-    width:0,
-    height:0,
-    physical_address:0,
+/// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. 
+pub static GRAPHIC_INFO: Mutex<GraphicInfo> = Mutex::new(GraphicInfo {
+    width: 0,
+    height: 0,
+    physical_address: 0,
 });
 
-/// A structure to access framebuffer information 
-/// that was discovered and populated in the AP's real-mode 
-/// initialization seqeunce.
-/// TODO FIXME: remove this struct, find another way to obtain framebuffer info.
-#[derive(FromBytes)]
-pub struct GraphicInfo{
+/// A structure to access information about the graphical framebuffer mode
+/// that was discovered and chosen in the AP's real-mode initialization sequence.
+/// 
+/// # Struct format
+/// The layout of fields in this struct must be kept in sync with the code in 
+/// `ap_realmode.asm` that writes to this structure.
+#[derive(FromBytes, Clone, Debug)]
+pub struct GraphicInfo {
     pub width: u64,
     pub height: u64,
     pub physical_address: u64,
@@ -72,13 +75,17 @@ pub struct GraphicInfo{
 /// (specifically the MADT (APIC) table).
 /// 
 /// # Arguments: 
-/// * kernel_mmi_ref: A reference to the locked MMI structure for the kernel.
-/// * ap_start_realmode_begin: the starting virtual address of where the ap_start realmode code is.
-/// * ap_start_realmode_end: the ending virtual address of where the ap_start realmode code is.
+/// * `kernel_mmi_ref`: A reference to the locked MMI structure for the kernel.
+/// * `ap_start_realmode_begin`: the starting virtual address of where the ap_start realmode code is.
+/// * `ap_start_realmode_end`: the ending virtual address of where the ap_start realmode code is.
+/// * `max_framebuffer_resolution`: the maximum resolution `(width, height)` of the graphical framebuffer
+///    that an AP should request from the BIOS when it boots up in 16-bit real mode.
+///    If `None`, there will be no maximum.
 pub fn handle_ap_cores(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     ap_start_realmode_begin: VirtualAddress,
-    ap_start_realmode_end: VirtualAddress
+    ap_start_realmode_end: VirtualAddress,
+    max_framebuffer_resolution: Option<(u16, u16)>,
 ) -> Result<usize, &'static str> {
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
@@ -136,8 +143,14 @@ pub fn handle_ap_cores(
     }
     // Now, the AP startup code is at the PhysicalAddress `AP_STARTUP`.
 
-    let mut ap_count = 0;
+    let mut ap_count = 0; // the number of AP cores we have successfully booted.
     let ap_trampoline_data: &mut ApTrampolineData = trampoline_mapped_pages.as_type_mut(0)?;
+    // Here, we set up the data items that will be accessible to the APs when they boot up.
+    // We only set the values of fields that are the same for ALL APs here;
+    // values that change for each AP are set individually in `bring_up_ap()` below.
+    let (max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
+    ap_trampoline_data.ap_max_fb_width.write(max_width);
+    ap_trampoline_data.ap_max_fb_height.write(max_height);
 
     let acpi_tables = acpi::get_acpi_tables().lock();
     let madt = Madt::get(&acpi_tables)
@@ -183,20 +196,11 @@ pub fn handle_ap_cores(
         }
     }
 
-    // Get the graphic mode information
-    {    
-        let rs = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_TRAMPOLINE_OFFSET);
-        match rs {
-            Ok(graphic_info) => {
-                let mut info = GRAPHIC_INFO.lock();
-                *info = GraphicInfo {
-                    width:graphic_info.width,
-                    height:graphic_info.height,
-                    physical_address:graphic_info.physical_address,
-                };
-            },
-            Err(_) => { error!("Fail to get the graphic information"); }
-        };
+    // Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
+    {
+        let graphic_info = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
+        info!("Obtained graphic info from real mode: {:?}", graphic_info);
+        *GRAPHIC_INFO.lock() = graphic_info.clone();
     }
     
     // wait for all cores to finish booting and init
@@ -213,9 +217,10 @@ pub fn handle_ap_cores(
 
 
 /// The data items used when an AP core is booting up in real mode.
+///
 /// # Important Layout Note
 /// The order of the members in this struct must exactly match how they are used
-/// in the AP bootup code (at the top of `ap_boot.asm`).
+/// and specified in the AP bootup code (at the top of `defines.asm`).
 #[derive(FromBytes)]
 #[repr(C)]
 struct ApTrampolineData {
@@ -234,7 +239,7 @@ struct ApTrampolineData {
     ap_stack_start:    Volatile<VirtualAddress>,
     /// The ending virtual address (top) of the stack that was allocated for the new AP.
     ap_stack_end:      Volatile<VirtualAddress>,
-    /// The virtual address of the Rust entry point that the new AP should jump to after 
+    /// The virtual address of the Rust entry point that the new AP should jump to after booting up.
     ap_code:           Volatile<VirtualAddress>,
     /// The NMI LINT (Non-Maskable Interrupt Local Interrupt) value for the new AP.
     ap_nmi_lint:       Volatile<u8>,
@@ -242,6 +247,14 @@ struct ApTrampolineData {
     /// The NMI (Non-Maskable Interrupt) flags value for the new AP.
     ap_nmi_flags:      Volatile<u16>,
     _padding3:         [u8; 6],
+    /// The maximum width in pixels of the graphical framebuffer that an AP should request
+    /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
+    ap_max_fb_width:   Volatile<u16>,
+    _padding4:         [u8; 6],
+    /// The maximum height in pixels of the graphical framebuffer that an AP should request
+    /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
+    ap_max_fb_height:  Volatile<u16>,
+    _padding5:         [u8; 6],
 }
 
 
