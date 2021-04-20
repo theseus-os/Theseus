@@ -27,8 +27,8 @@ APP_PREFIX    ?= a\#
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
 BUILD_MODE ?= release
 ifeq ($(BUILD_MODE), debug)
-	## "debug" builds are the default in cargo, so don't change cargo options. 
-	## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.
+    ## "debug" builds are the default in cargo, so don't change cargo options. 
+    ## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.
 	export override CFLAGS += -DDEBUG
 else ifeq ($(BUILD_MODE), release)
 	export override CARGOFLAGS += --release

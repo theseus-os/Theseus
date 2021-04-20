@@ -239,6 +239,12 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
 }
 
 /// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts
+///
+/// # Important Note
+/// Acquiring ANY locks in this function, even irq-safe ones, could cause a deadlock
+/// because this interrupt takes priority over everything else and can interrupt
+/// another regular interrupt. 
+/// This includes printing to the log (e.g., `debug!()`) or the screen.
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     let mut expected_nmi = false;
     
