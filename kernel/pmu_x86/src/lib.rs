@@ -811,7 +811,7 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
 /// * Returns `Ok(true)` if a PMU sample occurred and was handled. 
 /// * Returns `Ok(false)` if PMU isn't supported, or if PMU wasn't yet initialized, 
 ///   or if there was not a pending sampling interrupt. 
-/// * Returns an `Err` if PMU is supported and initialized and a sample was pendind, 
+/// * Returns an `Err` if PMU is supported and initialized and a sample was pending, 
 ///   but an error occurred while logging the sample.
 ///
 pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<bool, &'static str> {
