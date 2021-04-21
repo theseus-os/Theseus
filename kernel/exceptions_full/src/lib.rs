@@ -247,14 +247,6 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
 /// This includes printing to the log (e.g., `debug!()`) or the screen.
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     let mut expected_nmi = false;
-    
-    // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
-    if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-        if let Err(e) = pmu_x86::handle_sample(stack_frame) {
-            println_both!("nmi_handler::pmu_x86: sample couldn't be recorded: {:?}", e);
-        }
-        expected_nmi = true;
-    }
 
     // currently we're using NMIs to send TLB shootdown IPIs
     {
@@ -266,13 +258,27 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
         }
     }
 
+    // Performance monitoring hardware uses NMIs to trigger a sampling interrupt.
+    match pmu_x86::handle_sample(stack_frame) {
+        // A PMU sample did occur and was properly handled, so this NMI was expected. 
+        Ok(true) => expected_nmi = true,
+        // No PMU sample occurred, so this NMI was unexpected.
+        Ok(false) => { }
+        // A PMU sample did occur but wasn't properly handled, so this NMI was expected. 
+        Err(_e) => {
+            println_both!("nmi_handler: pmu_x86 failed to record sample: {:?}", _e);
+            expected_nmi = true;
+        }
+    }
+
     if expected_nmi {
         return;
     }
 
-    println_both!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#X}\n{:#?}\n",
-             stack_frame.instruction_pointer,
-             stack_frame);
+    println_both!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#X}\n{:#X?}\n",
+        stack_frame.instruction_pointer,
+        stack_frame,
+    );
 
     log_exception(0x2, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x2, stack_frame, true)
