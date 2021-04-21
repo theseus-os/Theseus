@@ -54,6 +54,49 @@ impl<T: Write> Write for CountingWriter<T> {
 }
 
 
+
+pub struct StringWriter(pub *mut u8, pub usize);
+impl Write for StringWriter {
+    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+        if self.1 > 1 {
+            let copy_size = buf.len().min(self.1 - 1);
+            unsafe {
+                core::ptr::copy_nonoverlapping(buf.as_ptr(), self.0, copy_size);
+                self.1 -= copy_size;
+
+                self.0 = self.0.add(copy_size);
+                *self.0 = 0;
+            }
+        }
+
+        // Pretend the entire slice was written. This is because many functions
+        // (like snprintf) expects a return value that reflects how many bytes
+        // *would have* been written. So keeping track of this information is
+        // good, and then if we want the *actual* written size we can just go
+        // `cmp::min(written, maxlen)`.
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> bare_io::Result<()> {
+        Ok(())
+    }
+}
+impl fmt::Write for StringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        // can't fail
+        self.write(s.as_bytes()).unwrap();
+        Ok(())
+    }
+}
+impl WriteByte for StringWriter {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        // can't fail
+        self.write(&[byte]).unwrap();
+        Ok(())
+    }
+}
+
+
+
 pub trait WriteByte: fmt::Write {
     fn write_u8(&mut self, byte: u8) -> fmt::Result;
 }

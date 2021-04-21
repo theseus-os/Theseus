@@ -4,7 +4,7 @@
 #![feature(ptr_internals)]
 #![feature(c_variadic)]
 #![feature(untagged_unions)]
-
+#![feature(core_intrinsics)]
 
 // Allowances for C-style syntax.
 #![allow(non_upper_case_globals)]
@@ -13,7 +13,11 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
 extern crate libc; // for C types
+extern crate spin;
+extern crate memchr;
+extern crate cbitset;
 extern crate memory;
 extern crate task;
 extern crate cstr_core;
@@ -25,6 +29,8 @@ mod types;
 mod io;
 mod globals;
 mod printf;
+mod stdlib;
+mod string;
 
 
 use alloc::vec::Vec;

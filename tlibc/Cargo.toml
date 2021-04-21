@@ -6,10 +6,17 @@ version = "0.1.0"
 build = "../build.rs"
 
 [dependencies]
+spin = "0.4.10"
 log = "0.4.8"
 libc = { version = "0.2", default-features = false }
 cstr_core = "0.2.3"
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
+memchr = { version = "2.2.0", default-features = false }
+cbitset = "0.1.0"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.memory]
 path = "../kernel/memory"

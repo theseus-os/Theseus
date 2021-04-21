@@ -73,6 +73,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
+name = "cbitset"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a9afa72f63942dd7e7f01c67b863ce9df35c523ae10e3dddd3eec8f1e07eac"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -463,6 +472,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
+name = "num-traits"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "owning_ref"
 version = "0.4.0"
 source = "git+https://github.com/kevinaboos/owning-ref-rs#ce14b539e3aa891ff463c6f5e28617b27bc2510b"
@@ -737,10 +755,14 @@ name = "tlibc"
 version = "0.1.0"
 dependencies = [
  "bare-io",
+ "cbitset",
  "cstr_core",
+ "lazy_static",
  "libc",
  "log",
+ "memchr",
  "memory",
+ "spin",
  "task",
 ]
 

@@ -125,6 +125,25 @@ $(eval CFLAGS += -DENABLE_AVX)
 endif
 
 
+### Target for building tlibc, Theseus's libc.
+### This should be run after `make iso` has completed.
+### It builds a new .iso that includes tlibc, which can be run using `make orun`.
+### Currently we can manually load tlibc within Theseus using `ns --load path/to/tlibc_file`.
+.PHONY: tlibc
+TLIBC_FILE := tlibc/target/$(TARGET)/$(BUILD_MODE)/tlibc.o
+tlibc: $(TLIBC_FILE)
+# $(MAKE) -C tlibc
+	( cd ./tlibc; sh build.sh )
+
+	@for f in $(TLIBC_FILE); do \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+
+
+
+
 ### Target for building a test C language executable.
 ### This should be run after `make iso` has completed.
 .PHONY: c_test
