@@ -37,11 +37,13 @@ If you run `lspci -v` now, you'll see that a kernel driver is longer mentioned f
 First, load the VFIO driver using the command:  
 `modprobe vfio-pci`
 
-To attach the new driver run the following command, filling in the vendor_id and device_code with values you retrieved in the first step.
+To attach the new driver, run the following command, filling in the vendor_id and device_code with values you retrieved in the first step.
 ```
 echo $(vendor_id) $(device_code) > /sys/bus/pci/drivers/vfio-pci/new_id
 ```
 e.g. `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
+
+Now, QEMU can be launched with access to the device.
 
 ### Note: access for unprivileged users
 To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
@@ -49,11 +51,8 @@ To give access to an unprivileged user to this VFIO device, find the IOMMU group
 readlink /sys/bus/pci/devices/$(slot_info)/iommu_group
 ```
 e.g. `readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group`
-for which we got the output:
-```
-../../../../kernel/iommu_groups/74
-```
-where 74 is the group number.
+
+for which we got the output: `../../../../kernel/iommu_groups/74`, where 74 is the group number.
 
 Then give access to the user using the command:   
 `chown $(user) /dev/vfio/$(group_no)`
