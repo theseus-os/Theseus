@@ -585,6 +585,12 @@ $(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead"
 	# QEMU_FLAGS += -accel kvm
 endif
 
+## Allow pci passthrough of device by passing its bus, device and function number assigned by the OS (e.g. 59:00.0)
+ifdef pci_dev
+	QEMU_FLAGS += -device vfio-pci,host=$(pci_dev)
+endif
+
+
 
 
 ###################################################################################################
