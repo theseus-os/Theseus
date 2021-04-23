@@ -515,6 +515,8 @@ help:
 	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
+	@echo -e "   vfio=(device_slot_info):"
+	@echo -e "\t Pass device slot information for PCI passthrough (e.g vfio=59:00.0)."
 
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
@@ -585,9 +587,9 @@ $(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead"
 	# QEMU_FLAGS += -accel kvm
 endif
 
-## Allow PCI passthrough of device by passing its slot information (bus, device and function number assigned by the OS) to "pci_dev" (e.g. pci_dev=59:00.0)
-ifdef pci_dev
-	QEMU_FLAGS += -device vfio-pci,host=$(pci_dev)
+## Allow PCI passthrough of device by passing its slot information (bus, device and function number assigned by the OS) to "vfio" (e.g. vfio=59:00.0)
+ifdef vfio
+	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
 endif
 
 

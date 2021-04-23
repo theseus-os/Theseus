@@ -7,8 +7,8 @@ There are three main steps to prepare a device for PCI passthrough:
 2. Detach device from current driver
 3. Attach device to VFIO driver
 
-Once these steps are completed, the device slot information can be passed to QEMU using the **pci_dev** flag. For example, for device 59:00.0, we run:    
-`make run pci_dev=59:00.0`
+Once these steps are completed, the device slot information can be passed to QEMU using the **vfio** flag. For example, for device 59:00.0, we run:    
+`make run vfio=59:00.0`
 
 ### Finding device information
 First, using `lspci -vnn`, find the slot information, kernel driver in use for the device, vendor ID and device code for the device you want to use.
