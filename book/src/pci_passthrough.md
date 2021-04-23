@@ -1,6 +1,6 @@
-# PCI Passthrough of devices using QEMU
+# PCI passthrough of devices using QEMU
 PCI passthrough can be used to give direct access of a physical PCI device to a guest OS. 
-The following instructions are a combination of [this](https://www.ibm.com/docs/en/linux-on-systems?topic=vfio-host-setup) guide on host setup for VFIO Pass-through devices and [this](https://www.kernel.org/doc/Documentation/vfio.txt) kernel documentation on VFIO.
+The following instructions are a combination of [this](https://www.ibm.com/docs/en/linux-on-systems?topic=vfio-host-setup) guide on host setup for VFIO passthrough devices and [this](https://www.kernel.org/doc/Documentation/vfio.txt) kernel documentation on VFIO.
 
 There are three main steps to prepare a device for PCI passthrough:
 1. Find device information
@@ -45,3 +45,19 @@ echo $(vendor_id) $(device_code) > /sys/bus/pci/drivers/vfio-pci/new_id
 e.g.
 `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
 
+### Note: access for unprivileged users
+To give access to a unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
+```
+readlink /sys/bus/pci/devices/$(slot_info)/iommu_group
+```
+e.g. 
+`readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group`
+
+for which we got the output:
+```
+../../../../kernel/iommu_groups/74
+```
+where 74 is the group number.
+
+Then give access to the user: 
+`chown $(user) /dev/vfio/$(group_no)`
