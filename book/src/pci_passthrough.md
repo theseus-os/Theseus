@@ -29,8 +29,7 @@ To detach the device from the kernel driver, run the following command, filling 
 ``` 
 echo $(slot_info) > /sys/bus/pci/drivers/$(driver_name)/unbind
 ```
-e.g. we ran:  
-`echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind`
+e.g. `echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind`
 
 If you run `lspci -v` now, you'll see that a kernel driver is longer mentioned for this device
 
@@ -42,16 +41,14 @@ To attach the new driver run the following command, filling in the vendor_id and
 ```
 echo $(vendor_id) $(device_code) > /sys/bus/pci/drivers/vfio-pci/new_id
 ```
-e.g.  
-`echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
+e.g. `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
 
 ### Note: access for unprivileged users
 To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
 ```
 readlink /sys/bus/pci/devices/$(slot_info)/iommu_group
 ```
-e.g.   
-`readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group`
+e.g. `readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group`
 
 for which we got the output:
 ```
