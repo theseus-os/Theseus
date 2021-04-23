@@ -102,6 +102,8 @@ To exit Theseus in QEMU, press `Ctrl+Alt+G` (or `Ctrl+Alt` on some systems), whi
 
 To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`. On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU menu bar.
 
+To access/expose a PCI device in QEMU using PCI passthrough via VFIO, see [these instructions](book/src/pci_passthrough.md).
+
 ### KVM Support
 While not strictly required, KVM will speed up the execution of QEMU.
 To install KVM, run the following command:    
