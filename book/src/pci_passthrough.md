@@ -7,8 +7,8 @@ There are three main steps to prepare a device for PCI passthrough:
 2. Detach device from current driver
 3. Attach device to VFIO driver
 
-Once these steps are completed, QEMU can be started up using the command:  
-`make run host=yes pci_dev=59:00.0`
+Once these steps are completed, the device slot information can be passed to QEMU using the **pci_dev** flag. For example, for device 59:00.0, we run:    
+`make run pci_dev=59:00.0`
 
 ### Finding device information
 First, using `lspci -vnn`, find the slot information, kernel driver in use for the device, vendor ID and device code for the device you want to use.
@@ -45,7 +45,7 @@ To attach the new driver run the following command, filling in the vendor_id and
 e.g.
 `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
 
-### Note: access for unprivileged users
+#### Note: access for unprivileged users
 To give access to a unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
 ```
 `readlink /sys/bus/pci/devices/$(slot_info)/iommu_group`
