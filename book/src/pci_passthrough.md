@@ -27,7 +27,7 @@ This is our output for a Mellanox ethernet card we want to access.
 ### Detach device from current driver
 To detach the device from the kernel driver, run the following command, filling in the slot_info and driver_name from information you retrieved in the previous step.
 ``` 
-`echo $(slot_info) > /sys/bus/pci/drivers/$(driver_name)/unbind`
+echo $(slot_info) > /sys/bus/pci/drivers/$(driver_name)/unbind
 ```
 e.g. we ran:
 `echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind`
@@ -40,15 +40,15 @@ First, load the VFIO driver:
 
 To attach the new driver run the following command, filling in the vendor_id and device_code from information you retrieved in the first step.
 ```
-`echo $(vendor_id) $(device_code) > /sys/bus/pci/drivers/vfio-pci/new_id`
+echo $(vendor_id) $(device_code) > /sys/bus/pci/drivers/vfio-pci/new_id
 ```
 e.g.
 `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
 
-#### Note: access for unprivileged users
-To give access to a unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
+### Note: access for unprivileged users
+To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
 ```
-`readlink /sys/bus/pci/devices/$(slot_info)/iommu_group`
+readlink /sys/bus/pci/devices/$(slot_info)/iommu_group
 ```
 e.g. 
 `readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group`
