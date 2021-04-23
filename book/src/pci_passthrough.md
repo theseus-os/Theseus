@@ -31,10 +31,10 @@ echo $(slot_info) > /sys/bus/pci/drivers/$(driver_name)/unbind
 ```
 e.g. `echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind`
 
-If you run `lspci -v` now, you'll see that a kernel driver is longer mentioned for this device
+If you run `lspci -v` now, you'll see that a kernel driver is longer mentioned for this device.
 
 ### Attach device to VFIO driver
-First, load the VFIO driver:  
+First, load the VFIO driver using the command:  
 `modprobe vfio-pci`
 
 To attach the new driver run the following command, filling in the vendor_id and device_code with values you retrieved in the first step.
@@ -49,7 +49,6 @@ To give access to an unprivileged user to this VFIO device, find the IOMMU group
 readlink /sys/bus/pci/devices/$(slot_info)/iommu_group
 ```
 e.g. `readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group`
-
 for which we got the output:
 ```
 ../../../../kernel/iommu_groups/74
