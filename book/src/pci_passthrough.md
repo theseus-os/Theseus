@@ -1,5 +1,5 @@
 # PCI passthrough of devices with QEMU
-PCI passthrough can be used to give direct access of a physical device to a guest OS. 
+PCI passthrough can be used to allow a guest OS to directly access a physical device.
 The following instructions are a combination of [this](https://www.ibm.com/docs/en/linux-on-systems?topic=vfio-host-setup) guide on host setup for VFIO passthrough devices and [this](https://www.kernel.org/doc/Documentation/vfio.txt) kernel documentation on VFIO.
 
 There are three main steps to prepare a device for PCI passthrough:
@@ -11,8 +11,8 @@ Once these steps are completed, the device slot information can be passed to QEM
 `make run vfio=59:00.0`
 
 ### Finding device information
-First, using `lspci -vnn`, find the slot information, kernel driver in use for the device, vendor ID and device code for the device you want to use.
-This is our output for a Mellanox ethernet card we want to access.
+First, run `lspci -vnn` to find the slot information, the kernel driver in use for the device, and the vendor ID and device code for the device you want to use.
+Below is sample output for a Mellanox ethernet card we'd like to access using PCI passthrough:
 ```
 59:00.0 Ethernet controller [0200]: Mellanox Technologies MT28800 Family [ConnectX-5 Ex] [15b3:1019]
 	Subsystem: Mellanox Technologies MT28800 Family [ConnectX-5 Ex] [15b3:0008]
@@ -25,25 +25,25 @@ This is our output for a Mellanox ethernet card we want to access.
 ```
 
 ### Detach device from current driver
-To detach the device from the kernel driver, run the following command, filling in the slot_info and driver_name with values you retrieved in the previous step.
+To detach the device from the kernel driver, run the following command, filling in the `slot_info` and `driver_name` with values you retrieved in the previous step.
 ``` 
 echo $(slot_info) > /sys/bus/pci/drivers/$(driver_name)/unbind
 ```
 e.g. `echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind`
 
-If you run `lspci -v` now, you'll see that a kernel driver is longer mentioned for this device.
+If you run `lspci -v` now, you'll see that a kernel driver is longer attached to this device.
 
 ### Attach device to VFIO driver
 First, load the VFIO driver using the command:  
 `modprobe vfio-pci`
 
-To attach the new driver, run the following command, filling in the vendor_id and device_code with values you retrieved in the first step.
+To attach the new driver, run the following command, filling in the `vendor_id` and `device_code` with values you retrieved in the first step.
 ```
 echo $(vendor_id) $(device_code) > /sys/bus/pci/drivers/vfio-pci/new_id
 ```
 e.g. `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
 
-Now, QEMU can be launched with access to the device.
+Now, QEMU can be launched with direct access to the device.
 
 ### Note: access for unprivileged users
 To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
