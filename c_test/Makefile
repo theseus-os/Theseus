@@ -30,9 +30,9 @@ GLIBC_DIR := $(HOME)/opt/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone
 STARTFILES := $(GLIBC_DIR)/crtbegin.o
 ENDFILES := $(GLIBC_DIR)/crtend.o
 
-# LIBGROUP := -Wl,--start-group $(TLIBC_A) -lgcc -Wl,--end-group
 # LIBGROUP := -Wl,--start-group ../tlibc/target/x86_64-theseus/release/deps/*.o -lgcc -Wl,--end-group
-LIBGROUP := -Wl,--start-group $(TLIBC_O) -lgcc -Wl,--end-group
+LIBGROUP := -Wl,--start-group $(TLIBC_A) -lgcc -Wl,--end-group
+# LIBGROUP := -Wl,--start-group $(TLIBC_O) -lgcc -Wl,--end-group
 # LIBGROUP := -L$(TLIBC_DIR)/target/x86_64-theseus/release  -ltlibc
 
 # PARTIAL_LINK := -Wl,--relocatable
@@ -98,7 +98,9 @@ dummy3:
 		$(PIE) \
 		-O0 \
 		-static-libgcc \
-		-static \
+		-ffunction-sections -fdata-sections \
+		-Wl,-gc-sections \
+		-mcmodel=large \
 		-o $@ \
 		$(PARTIAL_LINK) \
 		$(STARTFILES) \
@@ -107,8 +109,15 @@ dummy3:
 		../target/x86_64-theseus/release/libnano_core.a \
 		$(ENDFILES)
 
-		# -Wl,--print-map \
 		# -Wl,--emit-relocs \
+		# -Wl,--print-map \
+		# -static \
+	
+	# remove debug symbols, which are HUGE
+	strip --strip-debug $@
+
+
+	
 
 
 # Missing non-rust symbols:

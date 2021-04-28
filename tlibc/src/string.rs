@@ -40,7 +40,7 @@ pub unsafe extern "C" fn memchr(
     }
 }
 
-#[no_mangle]
+// #[no_mangle] // to prevent multiple definition error with compiler_builtins
 pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t) -> c_int {
     let (div, rem) = (n / mem::size_of::<usize>(), n % mem::size_of::<usize>());
     let mut a = s1 as *const usize;
@@ -72,7 +72,7 @@ pub unsafe extern "C" fn memcmp(s1: *const c_void, s2: *const c_void, n: size_t)
     0
 }
 
-#[no_mangle]
+// #[no_mangle] // to prevent multiple definition error with compiler_builtins
 pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
     let mut i = 0;
     while i + 7 < n {
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn memcpy(s1: *mut c_void, s2: *const c_void, n: size_t) -
     s1
 }
 
-#[no_mangle]
+// #[no_mangle] // to prevent multiple definition error with compiler_builtins
 pub unsafe extern "C" fn memmove(s1: *mut c_void, s2: *const c_void, n: size_t) -> *mut c_void {
     if s2 < s1 as *const c_void {
         // copy from end
@@ -120,7 +120,7 @@ pub unsafe extern "C" fn memrchr(
     }
 }
 
-#[no_mangle]
+// #[no_mangle] // to prevent multiple definition error with compiler_builtins
 pub unsafe extern "C" fn memset(s: *mut c_void, c: c_int, n: size_t) -> *mut c_void {
     for i in 0..n {
         *(s as *mut u8).add(i) = c as u8;
