@@ -28,6 +28,7 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate stack;
+extern crate serial_port;
 extern crate mod_mgmt;
 extern crate exceptions_early;
 #[macro_use] extern crate vga_buffer;
@@ -91,19 +92,22 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// then change the [`captain::init`](../captain/fn.init.html) routine.
 /// 
 #[no_mangle]
-pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
-    println_raw!("Entered nano_core_start()."); 
-	
-	// start the kernel with interrupts disabled
+pub extern "C" fn nano_core_start(
+    multiboot_information_virtual_address: usize,
+    early_double_fault_stack_top: usize,
+) {
+    // start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
+    println_raw!("Entered nano_core_start(). Interrupts disabled.");
 
-    // first, bring up the logger so we can debug
-    try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
+    // Initialize the logger up front so we can see early log messages for debugging.
+    let logger_serial_ports = [serial_port::COM1_BASE_PORT];  // some servers use COM2 instead. 
+    try_exit!(logger::init(None, &logger_serial_ports).map_err(|_a| "couldn't init logger!"));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
-    exceptions_early::init(&EARLY_IDT);
+    exceptions_early::init(&EARLY_IDT, Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity

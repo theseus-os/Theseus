@@ -6,8 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+spin = "0.9.0"
 x86_64 = { path = "../../libs/x86_64" }
 
 [dependencies.lazy_static]
@@ -18,7 +17,7 @@ version = "1.2.0"
 version = "0.4.8"
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.port_io]
 path = "../../libs/port_io"

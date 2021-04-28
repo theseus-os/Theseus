@@ -122,7 +122,7 @@ pub static IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
 /// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
 /// Currently we use the pci location of the device as identification since it should not change after initialization.
 pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
-    let nics = IXGBE_NICS.try().ok_or("Ixgbe NICs weren't initialized")?;
+    let nics = IXGBE_NICS.get().ok_or("Ixgbe NICs weren't initialized")?;
     nics.iter()
         .find( |nic| { nic.lock().dev_id == id } )
         .ok_or("Ixgbe NIC with this ID does not exist")
@@ -130,7 +130,7 @@ pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>,
 
 /// Returns a reference to the list of all initialized ixgbe NICs
 pub fn get_ixgbe_nics_list() -> Option<&'static Vec<MutexIrqSafe<IxgbeNic>>> {
-    IXGBE_NICS.try()
+    IXGBE_NICS.get()
 }
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
@@ -295,7 +295,7 @@ impl IxgbeNic {
         }
 
         // 16-byte aligned memory mapped base address
-        let mem_base =  ixgbe_pci_dev.determine_mem_base()?;
+        let mem_base =  ixgbe_pci_dev.determine_mem_base(0)?;
 
         // map the IntelIxgbeRegisters structs to the address found from the pci space
         let (mut mapped_registers1, mut mapped_registers2, mut mapped_registers3, mut mapped_registers_mac, 

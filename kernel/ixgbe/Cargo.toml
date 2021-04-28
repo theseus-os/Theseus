@@ -5,17 +5,16 @@ description = "Driver for the 10 GbE Intel 82599 NIC"
 authors = ["Ramla <ijazramla@gmail.com>"]
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.9.0"
 volatile = "0.2.4"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 bit_field = "0.7.0"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 zerocopy = "0.3.0"
 static_assertions = "1.1.0"
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.9.1"
 features = ["nightly"]
 
 [dependencies.log]
@@ -27,7 +26,7 @@ features = ["spin_no_std"]
 version = "1.0"
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

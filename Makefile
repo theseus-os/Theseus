@@ -130,31 +130,42 @@ endif
 ### It builds a new .iso that includes tlibc, which can be run using `make orun`.
 ### Currently we can manually load tlibc within Theseus using `ns --load path/to/tlibc_file`.
 .PHONY: tlibc
-TLIBC_FILE := tlibc/target/$(TARGET)/$(BUILD_MODE)/tlibc.o
-tlibc: $(TLIBC_FILE)
+TLIBC_OBJ_FILE := tlibc/target/$(TARGET)/$(BUILD_MODE)/tlibc.o
+tlibc:
 # $(MAKE) -C tlibc
 	( cd ./tlibc; sh build.sh )
 
-	@for f in $(TLIBC_FILE); do \
+	@for f in $(TLIBC_OBJ_FILE); do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
-
+	@echo -e "\n\033[1;32m The build of tlibc finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run', that will overwrite tlibc)"
+	@echo -e "    --> In Theseus, run 'ns --load /namespaces/_applications/tlibc.o' to load tlibc."
 
 
 
 ### Target for building a test C language executable.
 ### This should be run after `make iso` has completed.
 .PHONY: c_test
-C_TEST_EXE := c_test/dummy
-c_test: $(C_TEST_EXE)
-	$(MAKE) -C c_test
+C_TEST_EXE := c_test/dummy_ld_r_tlibc.o
+c_test:
+	$(MAKE) -C c_test dummy2
+# @for f in $(C_TEST_EXE); do \
+# 	$(CROSS)strip  --strip-debug  $${f} ; \
+# 	cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
+# done
 	@for f in $(C_TEST_EXE); do \
-		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
+		$(CROSS)strip  --strip-debug  $${f} ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	@echo -e "\n\033[1;32m The build of dummy2 finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
+	@echo -e "    --> In Theseus, run 'cload /namespaces/_executables/dummy_ld_r_tlibc' to load and run the C program."
 
 
 ### Demo/test target for building libtheseus
@@ -302,7 +313,17 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 ### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@ $(CFLAGS)
+    ## If the user chose to enable VGA text mode by means of setting `THESEUS_CONFIG`,
+    ## then we need to set CFLAGS such that the assembly code can know about it.
+    ## TODO: move this whole part about invoking `nasm` into a dedicated build.rs script in the nano_core.
+ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
+	$(eval CFLAGS += -DVGA_TEXT_MODE)
+endif
+	@nasm -f elf64 \
+		-i "$(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/" \
+		$< \
+		-o $@ \
+		$(CFLAGS)
 
 
 
@@ -622,9 +643,8 @@ orun_pause:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
-### Currently, loadable module mode requires release build mode
+### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
 loadable : export override THESEUS_CONFIG += loadable
-loadable : export BUILD_MODE = release
 loadable: run
 
 

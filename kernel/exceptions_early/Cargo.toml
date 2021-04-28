@@ -6,8 +6,8 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
 
 [dependencies.memory]
 path = "../memory"
@@ -17,6 +17,12 @@ path = "../vga_buffer"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
+
+[dependencies.tss]
+path = "../tss"
+
+[dependencies.gdt]
+path = "../gdt"
 
 
 [lib]

@@ -6,8 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+spin = "0.9.0"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 bit_field = "0.10.0"
 atomic = "0.4.5"
@@ -16,7 +15,7 @@ atomic = "0.4.5"
 path = "../apic"
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

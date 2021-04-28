@@ -75,19 +75,14 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 {
     let bsp_id = apic::get_bsp_id().ok_or("couldn't get BSP's id")?;
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
-    gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // initialize early exception handlers
-    exceptions_early::init(&IDT);
+    exceptions_early::init(&IDT, Some(double_fault_stack_top_unusable));
     {
         // set the special double fault handler's stack
         let mut idt = IDT.lock(); // withholds interrupts
-        unsafe {
-            // use a special stack for the double fault handler, which prevents triple faults!
-            idt.double_fault.set_handler_fn(exceptions_early::double_fault_handler)
-                            .set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16); 
-        }
-       
+
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
             idt[i].set_handler_fn(unimplemented_interrupt_handler);
@@ -107,12 +102,13 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 
 
 /// Similar to `init()`, but for APs to call after the BSP has already invoked `init()`.
-pub fn init_ap(apic_id: u8, 
-               double_fault_stack_top_unusable: VirtualAddress, 
-               privilege_stack_top_unusable: VirtualAddress)
-               -> Result<&'static LockedIdt, &'static str> {
+pub fn init_ap(
+    apic_id: u8, 
+    double_fault_stack_top_unusable: VirtualAddress, 
+    privilege_stack_top_unusable: VirtualAddress,
+) -> Result<&'static LockedIdt, &'static str> {
     info!("Setting up TSS & GDT for AP {}", apic_id);
-    gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    gdt::create_and_load_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // We've already created the IDT initially (currently all APs share the BSP's IDT),
     // so we only need to re-load it here for each AP.
@@ -242,7 +238,7 @@ pub fn eoi(irq: Option<u8>) {
             apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").write().eoi();
         }
         InterruptChip::PIC => {
-            PIC.try().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
+            PIC.get().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
         }
     }
 }
@@ -359,7 +355,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut Exc
     println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
 	match apic::INTERRUPT_CHIP.load(Ordering::Acquire) {
         apic::InterruptChip::PIC => {
-            let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+            let irq_regs = PIC.get().map(|pic| pic.read_isr_irr());  
             println_raw!("PIC IRQ Registers: {:?}", irq_regs);
         }
         apic::InterruptChip::APIC | apic::InterruptChip::X2APIC => {
@@ -390,7 +386,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut Exc
 /// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html.
 /// We handle it according to this advice: https://wiki.osdev.org/8259_PIC#Spurious_IRQs
 extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
-    if let Some(pic) = PIC.try() {
+    if let Some(pic) = PIC.get() {
         let irq_regs = pic.read_isr_irr();
         // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
         // (pretty sure this will never happen)

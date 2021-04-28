@@ -13,7 +13,7 @@ const CFG_PREFIX: &'static str = "cargo:rustc-cfg=";
 
 fn main() {
     println!("cargo:rerun-if-env-changed=THESEUS_CONFIG");
-    let configs = std::env::var("THESEUS_CONFIG").unwrap_or(String::new());
+    let configs = std::env::var("THESEUS_CONFIG").unwrap_or(String::new()).to_lowercase();
     
 	// here we just need to print out every provided config option
     for s in configs.split_whitespace() {

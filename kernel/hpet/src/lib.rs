@@ -33,7 +33,7 @@ static HPET: Once<RwLock<BoxRefMut<MappedPages, Hpet>>> = Once::new();
 /// let counter_val = get_hpet().as_ref().unwrap().get_counter();
 /// ```
 pub fn get_hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
-    HPET.try().map(|h| h.read())
+    HPET.get().map(|h| h.read())
 }
 
 /// Returns a mutable reference to the HPET timer structure, wrapped in an Option,
@@ -43,7 +43,7 @@ pub fn get_hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet
 /// get_hpet_mut().as_mut().unwrap().enable_counter(true);
 /// ```
 pub fn get_hpet_mut() -> Option<RwLockWriteGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
-    HPET.try().map(|h| h.write())
+    HPET.get().map(|h| h.write())
 }
 
 

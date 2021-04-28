@@ -4,13 +4,12 @@ version = "0.1.0"
 description = "The application-facing 'library' that exposes Theseus OS features, similar to a standard library."
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../build.rs"
-# links = "serial_port"
 
 [dependencies]
 # getopts = "0.2.21"
 
-[dependencies.serial_port]
-path = "../kernel/serial_port"
+[dependencies.logger]
+path = "../kernel/logger"
 
 [dependencies.panic_entry]
 path = "../kernel/panic_entry"
@@ -39,10 +38,13 @@ incremental = false
 
 
 [patch.crates-io]
+### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
+### because the `core::hint::spin_loop()` only uses it if "sse2" is enabled.
+spin = { git = "https://github.com/theseus-os/spin-rs" }
 ### use our own version of volatile which supports zerocopy
 volatile = { git = "https://github.com/theseus-os/volatile" }
 ### use our own no_std-compatilbe getopts
-getopts = { git = "https://github.com/kevinaboos/getopts" }
+getopts = { git = "https://github.com/theseus-os/getopts" }
 ### use our own no_std-compatible qp trie
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
 ### use our own no_std-compatible downcast-rs

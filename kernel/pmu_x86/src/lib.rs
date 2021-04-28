@@ -177,11 +177,11 @@ fn num_general_purpose_counters() -> u8 {
 }
 
 fn get_pmcs_available() -> Result<&'static Vec<AtomicU8>, &'static str>{
-    Ok(PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?)
+    Ok(PMCS_AVAILABLE.get().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?)
 }
 
 fn get_pmcs_available_for_core(core_id: u8) -> Result<&'static AtomicU8, &'static str>{
-    let pmc = PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?;
+    let pmc = PMCS_AVAILABLE.get().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?;
     Ok(&pmc[core_id as usize])
 }
 
@@ -793,22 +793,51 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
     Ok(())
 }
 
-/// Function called in the interrupt handler to store the instruction pointer and task ID. 
-/// The counter is then reset to its starting value or turned off.
-pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'static str> {
+/// This function is designed to be invoked from an interrupt handler 
+/// when a sampling interrupt has (or may have) occurred. 
+///
+/// It takes a sample by logging the the instruction pointer and task ID at the point
+/// at which the sampling interrupt occurred. 
+/// The counter is then either reset to its starting value 
+/// (if there are more samples that need to be taken)
+/// or disabled entirely if the final sample has been taken. 
+///
+/// # Argument
+/// * `stack_frame`: the stack frame that was pushed onto the stack automatically 
+///    by the CPU and passed into the interrupt/exception handler. 
+///    This is used to determine during which instruction the sampling interrupt occurred.
+///
+/// # Return
+/// * Returns `Ok(true)` if a PMU sample occurred and was handled. 
+/// * Returns `Ok(false)` if PMU isn't supported, or if PMU wasn't yet initialized, 
+///   or if there was not a pending sampling interrupt. 
+/// * Returns an `Err` if PMU is supported and initialized and a sample was pending, 
+///   but an error occurred while logging the sample.
+///
+pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<bool, &'static str> {
+    // Check that PMU hardware exists and is supported on this machine.
+    if *PMU_VERSION < MIN_PMU_VERSION {
+        return Ok(false);
+    }
+    // Check that a PMU sampling event is currently pending.
+    if rdmsr(IA32_PERF_GLOBAL_STAUS) == 0 {
+        return Ok(false);
+    }
+
     unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR); }
 
     let my_core_id = apic::get_my_apic_id();
     let event_mask = rdmsr(IA32_PERFEVTSEL0);
 
     let mut sampling_info = SAMPLING_INFO.lock();
-    let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::handle_sample: Could not retrieve sampling information for this core")?;
+    let mut samples = sampling_info.get_mut(&my_core_id)
+        .ok_or("pmu_x86::handle_sample: Could not retrieve sampling information for this core")?;
 
     let current_count = samples.sample_count;
     // if all samples have already been taken, calls the function to turn off the counter
     if current_count == 0 {
         stop_samples(my_core_id, &mut samples)?; 
-        return Ok(());
+        return Ok(true);
     }
 
     samples.sample_count = current_count - 1;
@@ -842,6 +871,6 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'stat
         error!("Error in Performance Monitoring! Reference to the local APIC could not be retrieved.");
     }
 
-    Ok(())
+    Ok(true)
 }
 

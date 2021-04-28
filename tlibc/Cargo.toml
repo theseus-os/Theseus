@@ -6,13 +6,13 @@ version = "0.1.0"
 build = "../build.rs"
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
 log = "0.4.8"
 libc = { version = "0.2", default-features = false }
 cstr_core = "0.2.3"
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
 memchr = { version = "2.2.0", default-features = false }
-cbitset = "0.1.0"
+cbitset = "0.2.0"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
@@ -25,13 +25,15 @@ path = "../kernel/memory"
 path = "../kernel/task"
 
 
-
-# [lib]
-# crate-type = ["rlib"]
+[lib]
+crate-type = ["lib"]
 
 
 ### Patch section was copied from the top-level Theseus Cargo.toml
 [patch.crates-io]
+### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
+### because the `core::hint::spin_loop()` only uses it if "sse2" is enabled.
+spin = { git = "https://github.com/theseus-os/spin-rs" }
 ### use our own version of volatile which supports zerocopy
 volatile = { git = "https://github.com/theseus-os/volatile" }
 ### use our own no_std-compatilbe getopts

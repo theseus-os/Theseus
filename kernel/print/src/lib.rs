@@ -43,7 +43,7 @@ macro_rules! print {
 /// Enqueues the given `fmt_args` as a String onto the default printing output queue,
 /// which is typically the default terminal application's input queue
 pub fn print_to_default_output(fmt_args: fmt::Arguments) {
-    if let Some(q) = DEFAULT_PRINT_OUTPUT.try() {
+    if let Some(q) = DEFAULT_PRINT_OUTPUT.get() {
         let _ = q.enqueue(Event::new_output_event(format!("{}", fmt_args)));
     }
 }

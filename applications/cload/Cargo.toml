@@ -8,7 +8,7 @@ build = "../../build.rs"
 [dependencies]
 getopts = "0.2.21"
 log = "0.4.8"
-xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 libc = { version = "0.2", default-features = false }
 
 [dependencies.terminal_print]

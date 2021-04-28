@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 # capture all output to a file
 # script -e .script_output
@@ -7,6 +8,7 @@ set -e
 THIS_DIR="$(dirname "$(readlink -f "$0")")"
 THESEUS_BASE_DIR=$THIS_DIR/..
 THESEUS_CARGO_PATH="$THESEUS_BASE_DIR/tools/theseus_cargo"
+THESEUS_DEPS_DIR="$THESEUS_BASE_DIR/build/deps"
 
 export RUST_BACKTRACE=1
 
@@ -18,10 +20,23 @@ cargo clean
 
 ### Use theseus_cargo to build this cargo package (tlibc) 
 ### with an automatic configuration that builds it to depend against pre-built Theseus crates.
-$THESEUS_CARGO_PATH/bin/theseus_cargo --input ../build/deps build
+$THESEUS_CARGO_PATH/bin/theseus_cargo  --input $THESEUS_DEPS_DIR  build
 
-### Create a static library archive (.a file) from all of the tlibc crate object files.
-ar -rcs ./target/x86_64-theseus/release/libtlibc.a ./target/x86_64-theseus/release/deps/*.o
+### Create a library archive (.a) file from all of the tlibc crate object files.
+### Note: it's better to do a partial link, using `ld -r` below.
+ar -rcs ./target/x86_64-theseus/release/libtlibc.a ./target/x86_64-theseus/release/deps/*.o 
 
+### Create a partially-linked object (.o) file from all of the tlibc crate object files. 
 ld -r -o  ./target/x86_64-theseus/release/tlibc.o ./target/x86_64-theseus/release/deps/*.o
+
+### Attempt to statically link everything together in a way we can overwrite the relocations later. 
+# reset
+# ld --emit-relocs -o  ./target/x86_64-theseus/release/tlibc_static  \
+#     -u main  \
+#     ./target/x86_64-theseus/release/deps/*.o  \
+#     $THESEUS_BASE_DIR/target/x86_64-theseus/release/libnano_core.a \
+#     $THESEUS_BASE_DIR/target/x86_64-theseus/release/deps/*.o \
+
+
+    
 
