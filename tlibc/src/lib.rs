@@ -5,6 +5,7 @@
 #![feature(c_variadic)]
 #![feature(untagged_unions)]
 #![feature(core_intrinsics)]
+#![feature(linkage)]
 
 // Allowances for C-style syntax.
 #![allow(non_upper_case_globals)]
@@ -39,6 +40,7 @@ use cstr_core::CString;
 
 pub use errno::*;
 pub use types::*;
+
 
 
 /// The entry point that Theseus's task spawning logic will invoke (from its task wrapper).
@@ -87,6 +89,16 @@ fn to_cstring_vec(slice_of_strs: &[&str]) -> (Vec<CString>, Vec<*mut c_char>) {
 }
 
 
-extern "C" {
-    fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
+// extern "C" {
+//     #[linkage = "weak"]
+//     fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int;
+// }
+
+// The above "extern" block is the right way to do this,
+// but this below dummy main fn block allows us to experiment with weird linker commands.
+#[linkage = "weak"]
+#[no_mangle]
+extern "C" fn main(argc: isize, argv: *mut *mut c_char, envp: *mut *mut c_char) -> c_int {
+    error!("in dummy main! No main function was provided or linked in.");
+    -1
 }

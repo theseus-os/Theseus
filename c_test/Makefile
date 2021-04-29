@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 ## Temporary hack to re-build `dummy` every time
-.PHONY: dummy dummy2 dummy3
+.PHONY: dummy dummy2 dummy3 tlibc.so dummy_pie
 
 all: dummy
 
@@ -19,7 +19,7 @@ export override LDFLAGS += -static-libgcc
 
 ### NOTE: only the -pie argument actually matters, 
 ### but the gcc manual says to also include fpie/fPIE
-# PIE := -fpic -fPIC -fpie -fPIE -pie
+PIE := -fpic -fPIC -fpie -fPIE -pie
 
 TLIBC_DIR := ../tlibc
 TLIBC_A := $(TLIBC_DIR)/target/x86_64-theseus/release/libtlibc.a
@@ -92,15 +92,24 @@ dummy2: dummy.c
 		# -static \
 
 
+### This approach seems to be the closest to what I want.
+### To use the outputted `dummy3` executable, we (Theseus's loader at runtime) just needs to go through all of the relocations
+### that use OBJECT sections (.data, .rodata) as their source section and then re-write those entries to use the corresponding existing Theseus sections 
+### as source sections instead.
+###
+### TODO: figure out a way to remove all irrelevant relocation entries, at a minimum the `R_X86_64_NONE` and local relocation sections, such as the `.rela.eh_frame` section. 
+###
+### 
 dummy3:
 	$(CROSS)gcc \
 		$(LDFLAGS) \
-		$(PIE) \
 		-O0 \
 		-static-libgcc \
-		-ffunction-sections -fdata-sections \
+		-ffunction-sections \
+		-fdata-sections \
 		-Wl,-gc-sections \
 		-mcmodel=large \
+		-Wl,--emit-relocs \
 		-o $@ \
 		$(PARTIAL_LINK) \
 		$(STARTFILES) \
@@ -109,15 +118,16 @@ dummy3:
 		../target/x86_64-theseus/release/libnano_core.a \
 		$(ENDFILES)
 
-		# -Wl,--emit-relocs \
-		# -Wl,--print-map \
+
 		# -static \
 	
 	# remove debug symbols, which are HUGE
 	strip --strip-debug $@
 
+# check this out: https://stackoverflow.com/questions/10465875/is-there-an-option-to-gnu-ld-to-omit-dynamic-linker-pt-interp-completely
 
-	
+
+
 
 
 # Missing non-rust symbols:
@@ -129,3 +139,33 @@ dummy3:
 # _ITM_deregisterTMCloneTable
 # _GLOBAL_OFFSET_TABLE_   # should be removed when moving to large code model
 # 
+
+
+
+
+### This approach is position independent (i think?), but currently doesn't use crtbegin.o and crtend.o (we need to recompile them with -fPIE).
+### It also currently generates code that uses PLT and GOT, which I don't really want or need. 
+### Perhaps we're using too many arguments in the $(PIE) variable? Or we could try `gcc -fno-plt -fno-pic`
+dummy_pie:
+	$(CROSS)gcc \
+		$(LDFLAGS) \
+		$(PIE) \
+		-O0 \
+		-static-libgcc \
+		-ffunction-sections \
+		-fdata-sections \
+		-Wl,-gc-sections \
+		-mcmodel=large \
+		-Wl,--emit-relocs \
+		-o $@ \
+		$(PARTIAL_LINK) \
+		dummy.c \
+		$(TLIBC_A) \
+		../target/x86_64-theseus/release/libnano_core.a
+
+
+		# -static \
+	
+	# remove debug symbols, which are HUGE
+	strip --strip-debug $@
+
