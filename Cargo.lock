@@ -105,8 +105,8 @@ dependencies = [
  "lazy_static",
  "libterm",
  "log",
+ "logger",
  "print",
- "serial_port",
  "spin 0.9.0",
  "stdio",
  "task",
@@ -792,6 +792,7 @@ name = "framebuffer"
 version = "0.1.0"
 dependencies = [
  "color",
+ "log",
  "memory",
  "multicore_bringup",
  "owning_ref",
@@ -1272,6 +1273,7 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "log",
  "serial_port",
  "spin 0.9.0",
@@ -1610,6 +1612,7 @@ dependencies = [
  "mod_mgmt",
  "multiboot2",
  "panic_entry",
+ "serial_port",
  "spin 0.9.0",
  "stack",
  "state_store",
@@ -2326,7 +2329,6 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "port_io",
 ]
 
@@ -2494,8 +2496,7 @@ checksum = "ceac490aa12c567115b40b7b7fceca03a6c9d53d5defea066123debc83c5dc1f"
 [[package]]
 name = "spin"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b87bbf98cb81332a56c1ee8929845836f85e8ddd693157c30d76660196014478"
+source = "git+https://github.com/theseus-os/spin-rs#8770942ba1790fa536f659e4e07548f0e5da2eb6"
 dependencies = [
  "lock_api",
 ]
@@ -2701,7 +2702,7 @@ dependencies = [
  "dfqueue",
  "event_types",
  "lazy_static",
- "serial_port",
+ "logger",
  "spin 0.9.0",
  "task",
  "x86_64",
@@ -2924,7 +2925,7 @@ name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
  "kernel_config",
- "serial_port",
+ "logger",
  "spin 0.9.0",
  "volatile",
 ]

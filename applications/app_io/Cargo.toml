@@ -39,8 +39,8 @@ version = "1.2.0"
 [dependencies.stdio]
 path = "../../libs/stdio"
 
-[dependencies.serial_port]
-path = "../../kernel/serial_port"
+[dependencies.logger]
+path = "../../kernel/logger"
 
 [lib]
 crate-type = ["rlib"]

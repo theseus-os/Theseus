@@ -16,7 +16,7 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
-extern crate serial_port;
+extern crate logger;
 extern crate task;
 extern crate dfqueue;
 extern crate event_types;
@@ -74,7 +74,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         None => {
             // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
             // Instead, we write direclty to the serial port. 
-            let _ = serial_port::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
+            let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
             return;
         }
     };
