@@ -50,7 +50,7 @@ use mellanox_ethernet::{CommandQueueEntry, InitializationSegment};
 
 
 pub const MLX_VEND:           u16 = 0x15B3;  // Vendor ID for Mellanox
-pub const CONNECTX5_DEV:      u16 = 0x1017;  // Device ID for the ConnectX-5 NIC
+pub const CONNECTX5_DEV:      u16 = 0x1019;  // Device ID for the ConnectX-5 NIC
 
 /// Assuming one of these nics for now
 static CONNECTX5_NIC: Once<MutexIrqSafe<ConnectX5Nic>> = Once::new();
