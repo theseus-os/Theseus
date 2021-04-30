@@ -148,22 +148,18 @@ tlibc:
 
 
 ### Target for building a test C language executable.
-### This should be run after `make iso` has completed.
+### This should be run after `make iso` and then `make tlibc` have both completed.
 .PHONY: c_test
-C_TEST_EXE := c_test/dummy_ld_r_tlibc.o
+C_TEST_TARGET := dummy3
 c_test:
-	$(MAKE) -C c_test dummy2
-# @for f in $(C_TEST_EXE); do \
-# 	$(CROSS)strip  --strip-debug  $${f} ; \
-# 	cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
-# done
-	@for f in $(C_TEST_EXE); do \
+	$(MAKE) -C c_test $(C_TEST_TARGET)
+	@for f in c_test/$(C_TEST_TARGET); do \
 		$(CROSS)strip  --strip-debug  $${f} ; \
-		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
-	@echo -e "\n\033[1;32m The build of dummy2 finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "\n\033[1;32m The build of $(C_TEST_TARGET) finished successfully and was packaged into the Theseus ISO.\033[0m"
 	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
 	@echo -e "    --> In Theseus, run 'cload /namespaces/_executables/dummy_ld_r_tlibc' to load and run the C program."
 

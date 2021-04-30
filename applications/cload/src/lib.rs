@@ -3,6 +3,7 @@
 //! This will be integrated into the Theseus kernel in the future.
 
 #![no_std]
+#![feature(slice_fill)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -67,6 +68,9 @@ fn rmain(matches: Matches) -> Result<(), String> {
             .lock().working_dir
     );
 
+    // temporarily dumping page allocator state
+    memory::dump_frame_allocator_state();
+
     let path = matches.free.get(0).ok_or_else(|| format!("Missing path to ELF executable"))?;
     let path = Path::new(path.clone());
     let file_ref = path.get_file(&curr_wd)
@@ -81,8 +85,11 @@ fn rmain(matches: Matches) -> Result<(), String> {
     
     debug!("Jumping to entry point {:#X}", entry_point);
 
+    let dummy_args = ["hello", "world"];
+    let dummy_env = ["USER=root", "PWD=/"];
+
     let start_fn: StartFunction = unsafe { core::mem::transmute(entry_point.value()) };
-    let _retval = start_fn();
+    let _retval = start_fn(&dummy_args, &dummy_env);
 
     debug!("C _start entry point returned value {}({:#X})", _retval, _retval);
 
@@ -91,7 +98,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
 /// Corresponds to C function:  `int foo()`
 use libc::c_int;
-type StartFunction = extern "C" fn() -> c_int;
+type StartFunction = fn(args: &[&str], env: &[&str]) -> c_int;
 
 struct LoadedExecutable {
     segments: Vec<MappedSegment>,
@@ -149,8 +156,15 @@ fn parse_elf_executable(
         return Err("not a relocatable elf file".into());
     }
 
-    // The relative position of each segment in memory (with respect to other segments) must be maintained. 
-    // Therefore, we iterate over all segments first to find the total range of virtual pages we must allocate. 
+    // Currently we aren't building C programs in a position-independent manner,
+    // so we have to load the C executable at the exact virtual address it specifies (since it's non-relocatable).
+
+    // TODO FIXME: remove this old approach of invalidly loading non-PIE executables at other virtual addresses than what they expect.
+    //             Also remove the whole idea of the "Offset", since that will be built into position-independent executables.
+    //             This is because this only works for SUPER SIMPLE C programs, in which we can just maintain the *relative* position of each segment
+    //             in memory with respect to other segments to ensure they're consistent. 
+    // 
+    // Not really necessary to do this, but we iterate over all segments first to find the total range of virtual pages we must allocate. 
     let (mut start_vaddr, mut end_vaddr) = (usize::MAX, usize::MIN);
     let mut num_segments = 0;
     for prog_hdr in elf_file.program_iter() {
@@ -165,21 +179,31 @@ fn parse_elf_executable(
 
     // Allocate enough virtually-contiguous space for all the segments together.
     let total_size_in_bytes = end_vaddr - start_vaddr;
-    let mut all_pages = memory::allocate_pages_by_bytes(total_size_in_bytes)
-        .ok_or_else(|| format!("Failed to allocate {} bytes", total_size_in_bytes))?;
+    let mut all_pages = memory::allocate_pages_by_bytes_at(
+        VirtualAddress::new(start_vaddr).map_err(String::from)?,
+        total_size_in_bytes
+    ).map_err(|_| format!("Failed to allocate {} bytes at {}", total_size_in_bytes, start_vaddr))?;
     let vaddr_adjustment = Offset::new(all_pages.start_address().value(), start_vaddr); 
 
     // Iterate through each segment again and map them into pages we just allocated above,
     // copying their segment data to the proper location.
     for prog_hdr in elf_file.program_iter() {
-        debug!("   prog_hdr: {}", prog_hdr);
+        debug!("\nLooking at {}", prog_hdr);
         if prog_hdr.get_type() != Ok(xmas_elf::program::Type::Load) {
             warn!("Skipping non-LOAD segment {:?}", prog_hdr);
             continue;
         }
 
-        let size_in_bytes = prog_hdr.mem_size() as usize;
-        if size_in_bytes == 0 {
+        // A segment (program header) has two sizes: 
+        // 1) memory size: the size in memory that the segment, when loaded, will actually consume. 
+        //    This is how much virtual memory space we have to allocate for it. 
+        // 2) file size: the size of the segment's actual data from the ELF file itself. 
+        //    This is how much data we will actually copy from the file's segment into our allocated memory.
+        // The difference is primarily due to .bss sections, in which the file size will be less than the memory size. 
+        // If memory size > file size, the difference should be filled with zeros.
+        let memory_size_in_bytes = prog_hdr.mem_size() as usize;
+        let file_size_in_bytes = prog_hdr.file_size() as usize;
+        if memory_size_in_bytes == 0 {
             warn!("Skipping zero-sized LOAD segment {:?}", prog_hdr);
             continue; 
         }
@@ -190,7 +214,7 @@ fn parse_elf_executable(
                 "Program header had an invalid virtual address"
             })?;
         Offset::adjust_assign(&mut start_vaddr, vaddr_adjustment);
-        let end_page = Page::containing_address(start_vaddr + (size_in_bytes - 1));
+        let end_page = Page::containing_address(start_vaddr + (memory_size_in_bytes - 1));
 
         debug!("Splitting {:?} after end page {:?}", all_pages, end_page);
 
@@ -199,7 +223,7 @@ fn parse_elf_executable(
         )?;
         all_pages = remaining_pages;
         debug!("Successfully split pages into {:?} and {:?}", this_ap, all_pages);
-        debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, size_in_bytes, this_ap.start_address());
+        debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, memory_size_in_bytes, this_ap.start_address());
 
         let initial_flags = EntryFlags::from_elf_program_flags(prog_hdr.flags());
         let mmi = task::get_my_current_task().unwrap().lock().mmi.clone();
@@ -212,12 +236,16 @@ fn parse_elf_executable(
         let offset_into_mp = mp.offset_of_address(start_vaddr).ok_or_else(|| 
             format!("BUG: destination address {:#X} wasn't within segment's {:?}", start_vaddr, mp)
         )?;
-
         match prog_hdr.get_data(&elf_file).map_err(String::from)? {
             SegmentData::Undefined(segment_data) => {
-                debug!("Segment had undefined data of {} bytes: {:?}", segment_data.len(), segment_data);
-                let dest_slice: &mut [u8] = mp.as_slice_mut(offset_into_mp, size_in_bytes).map_err(String::from)?;
-                dest_slice.copy_from_slice(segment_data);
+                debug!("Segment had undefined data of {} ({:#X}) bytes, file size {} ({:#X})",
+                    segment_data.len(), segment_data.len(), file_size_in_bytes, file_size_in_bytes);
+                let dest_slice: &mut [u8] = mp.as_slice_mut(offset_into_mp, memory_size_in_bytes).map_err(String::from)?;
+                dest_slice[..file_size_in_bytes].copy_from_slice(&segment_data[..file_size_in_bytes]);
+                if memory_size_in_bytes > file_size_in_bytes {
+                    debug!("    Zero-filling extra bytes for segment from range [{}:{}).", file_size_in_bytes, dest_slice.len());
+                    dest_slice[file_size_in_bytes..].fill(0);
+                }
             }
             other => {
                 warn!("Segment had data of unhandled type: {:?}", other);
@@ -230,7 +258,7 @@ fn parse_elf_executable(
         }
 
         mapped_segments.push(MappedSegment {
-            bounds: start_vaddr .. (start_vaddr + size_in_bytes),
+            bounds: start_vaddr .. (start_vaddr + memory_size_in_bytes),
             mp,
         });
     }

@@ -51,6 +51,7 @@ pub use types::*;
 /// This must be `no_mangle` because compilers look for the `_start` symbol as a link-time dependency.
 #[no_mangle]
 pub fn _start(args: &[&str], env: &[&str]) -> c_int {
+    warn!("AT TOP OF _start in TLIBC");
     debug!("args: {:?}\n env: {:?}", args, env);
     let (_args_cstrings, mut args_char_ptrs) = to_cstring_vec(args);
     let (_env_cstrings,  mut env_char_ptrs)  = to_cstring_vec(env);
