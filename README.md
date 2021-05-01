@@ -28,7 +28,7 @@ Currently, we support building and running Theseus on the following host OSes:
   * Update your system's package list:    
     `sudo apt-get update`.    
   * Install the following packages:    
-    `sudo apt-get install nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm`    
+    `sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm`    
     - Or on Arch Linux:    
       `sudo pacman -S nasm pkg-config grub mtools xorriso qemu`    
 
