@@ -6,8 +6,12 @@ SHELL := /bin/bash
 
 all: dummy
 
-### Use our custom cross compiler retargeted for Theseus1
-export override PATH := $(HOME)/opt/cross/bin:$(PATH)
+CROSS = x86_64-elf-
+
+### Check that our custom cross compiler retargeted for Theseus exists and is on the current PATH.
+ifeq (, $(shell which ${CROSS}gcc))
+$(error "Missing ${CROSS}gcc in PATH, please add it to your path or install it using `scripts/install_x86_64-elf-gcc.sh`")
+endif
 
 ### Disable the red zone because Theseus is a single privilege level OS
 export override LDFLAGS += -mno-red-zone
@@ -25,7 +29,6 @@ TLIBC_DIR := ../tlibc
 TLIBC_A := $(TLIBC_DIR)/target/x86_64-theseus/release/libtlibc.a
 TLIBC_O := $(TLIBC_DIR)/target/x86_64-theseus/release/tlibc.o
 
-CROSS = x86_64-elf-
 GLIBC_DIR := $(HOME)/opt/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone
 STARTFILES := $(GLIBC_DIR)/crtbegin.o
 ENDFILES := $(GLIBC_DIR)/crtend.o

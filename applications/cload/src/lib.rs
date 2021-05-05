@@ -1,6 +1,7 @@
 //! An application that loads C language executables and libraries atop Theseus.
 //!
-//! This will be integrated into the Theseus kernel in the future.
+//! This will be integrated into the Theseus kernel in the future, 
+//! likely as a separate crate that 
 
 #![no_std]
 #![feature(slice_fill)]
@@ -12,6 +13,7 @@ extern crate getopts;
 extern crate fs_node;
 extern crate path;
 extern crate memory;
+extern crate mod_mgmt;
 extern crate task;
 extern crate xmas_elf;
 extern crate libc; // for basic C types/typedefs used in libc
@@ -20,17 +22,15 @@ use core::{
     cmp::{min, max},
     ops::{AddAssign, SubAssign, Range},
 };
-use alloc::{
-    string::String,
-    sync::Arc,
-    vec::Vec,
-};
+use alloc::{collections::BTreeSet, string::String, sync::Arc, vec::Vec};
 use getopts::{Matches, Options};
 use memory::{Page, MappedPages, VirtualAddress, EntryFlags};
+use mod_mgmt::{StrongDependency, find_symbol_table};
 use path::Path;
 use xmas_elf::{
     ElfFile,
     program::SegmentData,
+    sections::ShType,
 };
 
 pub fn main(args: Vec<String>) -> isize {
@@ -79,15 +79,35 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
     // Parse the file as an ELF executable
     let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
+    let byte_slice: &[u8] = file_mp.as_slice(0, file.size())?;
+    let (mut segments, entry_point, elf_file) = parse_and_load_elf_executable(byte_slice)?;
+    debug!("Parsed ELF executable, moving on to overwriting relocations.");
     
-    let (segments, entry_point) = parse_elf_executable(file_mp, file.size())?;
-    let exec = LoadedExecutable { segments, entry_point };
+    // Now, overwrite (recalculate) the relocations that refer to symbols that already exist in Theseus,
+    // most important of which are static data sections, 
+    // as it is logically incorrect to have duplicates of data that are supposed to be global system-wide singletons.
+    // We should throw a warning here if there are no relocations in the file, as it was probably built/linked with the wrong arguments.
+    overwrite_relocations(&mut segments, &elf_file, true)?;
+
+    // Remap each segment's mapped pages using the correct flags; they were previously mapped as always writable.
+    {
+        let mmi = &task::get_my_current_task().unwrap().lock().mmi;
+        let page_table = &mut mmi.lock().page_table;
+        for segment in segments.iter_mut() {
+            if segment.mp.flags() != segment.flags {
+                segment.mp.remap(page_table, segment.flags)?;
+            }
+        }
+    }
+
+    let exec = LoadedExecutable { segments, entry_point }; // must persist through the entire executable's runtime.
     
     debug!("Jumping to entry point {:#X}", entry_point);
 
     let dummy_args = ["hello", "world"];
     let dummy_env = ["USER=root", "PWD=/"];
 
+    // TODO: FIXME: use `MappedPages::as_func()` instead of `transmute()`.
     let start_fn: StartFunction = unsafe { core::mem::transmute(entry_point.value()) };
     let _retval = start_fn(&dummy_args, &dummy_env);
 
@@ -108,8 +128,19 @@ struct LoadedExecutable {
 
 #[derive(Debug)]
 pub struct MappedSegment {
+    /// The memory region allocated to hold this program segment.
     mp: MappedPages,
+    /// The specific range of virtual addresses occupied by this 
+    /// (may be a subset)
     bounds: Range<VirtualAddress>,
+    /// The proper flags for this segment specified by the ELF file.
+    flags: EntryFlags,
+    /// The indices of the sections in the ELF file 
+    /// that were grouped ("mapped") into this segment by the linker.
+    section_ndxs: BTreeSet<usize>,
+    /// The list of sections in existing Theseus crates that this segment's sections depends on,
+    /// i.e., the required dependencies that must exist as long as this segment.
+    sections_i_depend_on: Vec<StrongDependency>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -138,16 +169,28 @@ impl Offset {
 }
 
 
-/// Parses an elf executable file as a slice of bytes starting at the given `MappedPages` mapping.
-/// Consumes the given `MappedPages`, which automatically unmaps it at the end of this function. 
-fn parse_elf_executable(
-    mapped_pages: &MappedPages,
-    size_in_bytes: usize
-) -> Result<(Vec<MappedSegment>, VirtualAddress), String> {
-    debug!("Parsing Elf executable: mapped_pages {:?}, size_in_bytes {}", mapped_pages, size_in_bytes);
+/// Parses an elf executable file from the given slice of bytes and load it into memory.
+///
+/// ## Important note about memory mappings
+/// This function will allocate new memory regions to store each program segment
+/// and copy each segment's data into them.
+/// When this function returns, those segments will be mapped as writable in order to allow them 
+/// to be modified as needed.
+/// Before running this executable, each segment's `MappedPages` should be remapped
+/// to the proper `flags` specified in its `MappedSegment.flags` field. 
+///
+/// ## Return
+/// Returns a tuple of:
+/// 1. A list of program segments mapped into memory. 
+/// 2. The virtual address of the executable's entry point, e.g., the `_start` function.
+///    This is the function that we should call to start running the executable.
+/// 3. A reference to the parsed `ElfFile`, whose lifetime is tied to the given `file_contents` parameter.
+fn parse_and_load_elf_executable<'f>(
+    file_contents: &'f [u8],
+) -> Result<(Vec<MappedSegment>, VirtualAddress, ElfFile<'f>), String> {
+    debug!("Parsing Elf executable of size {}", file_contents.len());
 
-    let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
-    let elf_file = ElfFile::new(byte_slice).map_err(String::from)?;
+    let elf_file = ElfFile::new(file_contents).map_err(String::from)?;
 
     // check that elf_file is an executable type 
     let typ = elf_file.header.pt2.type_().as_type();
@@ -187,7 +230,7 @@ fn parse_elf_executable(
 
     // Iterate through each segment again and map them into pages we just allocated above,
     // copying their segment data to the proper location.
-    for prog_hdr in elf_file.program_iter() {
+    for (segment_ndx, prog_hdr) in elf_file.program_iter().enumerate() {
         debug!("\nLooking at {}", prog_hdr);
         if prog_hdr.get_type() != Ok(xmas_elf::program::Type::Load) {
             warn!("Skipping non-LOAD segment {:?}", prog_hdr);
@@ -252,14 +295,24 @@ fn parse_elf_executable(
             }
         };
 
-        // If needed, remap the mapped pages (which now hold the segment data) using their correct flags.
-        if !initial_flags.is_writable() {
-            mp.remap(&mut mmi.lock().page_table, initial_flags)?;
+        let segment_bounds = start_vaddr .. (start_vaddr + memory_size_in_bytes);
+
+        // Populate the set of sections that comprise this segment.
+        let mut section_ndxs = BTreeSet::new();
+        for (shndx, sec) in elf_file.section_iter().enumerate() {
+            if segment_bounds.contains(&VirtualAddress::new_canonical(sec.address() as usize)) {
+                section_ndxs.insert(shndx);
+            }
         }
 
+        debug!("Segment {} contains sections: {:?}", segment_ndx, section_ndxs);
+
         mapped_segments.push(MappedSegment {
-            bounds: start_vaddr .. (start_vaddr + memory_size_in_bytes),
             mp,
+            bounds: segment_bounds,
+            flags: initial_flags,
+            section_ndxs,
+            sections_i_depend_on: Vec::new(),
         });
     }
 
@@ -269,7 +322,161 @@ fn parse_elf_executable(
     Offset::adjust_assign(&mut entry_point_vaddr, vaddr_adjustment);
     debug!("ELF had entry point {:#X}, adjusted to {:#X}", entry_point, entry_point_vaddr);
 
-    Ok((mapped_segments, entry_point_vaddr))
+    Ok((mapped_segments, entry_point_vaddr, elf_file))
+}
+
+
+
+/// This function uses the relocation sections in the given `ElfFile` to 
+/// rewrite relocations that depend on source sections already existing and currently loaded in Theseus. 
+///
+/// This is necessary to ensure that the newly-loaded ELF executable depends on and references 
+/// the real singleton instances of each data sections (aka `OBJECT`s in ELF terminology) 
+/// rather than using the duplicate instance of those data sections in the executable itself. 
+fn overwrite_relocations(segments: &mut Vec<MappedSegment>, elf_file: &ElfFile, verbose_log: bool) -> Result<(), String> {
+    let symtab = find_symbol_table(&elf_file)?;
+
+    // Fix up the sections that were just loaded, using proper relocation info.
+    // Iterate over every non-zero relocation section in the file
+    for sec in elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::Rela) && sec.size() != 0) {
+        use xmas_elf::sections::SectionData::Rela64;
+        if verbose_log { 
+            trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
+            sec.get_name(&elf_file), sec.get_type(), sec.info()); 
+        }
+
+        let rela_sec_name = sec.get_name(&elf_file).unwrap();
+        // Skip debug special sections for now, those can be processed later. 
+        if rela_sec_name.starts_with(".rela.debug")  { 
+            continue;
+        }
+        // Skip .eh_frame relocations, since they are all local to the .text section
+        // and cannot depend on external symbols directly
+        if rela_sec_name == ".rela.eh_frame"  { 
+            continue;
+        }
+
+        let rela_array = match sec.get_data(&elf_file) {
+            Ok(Rela64(rela_arr)) => rela_arr,
+            _ => {
+                error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
+                return Err(format!("Found Rela section that wasn't able to be parsed as Rela64"));
+            } 
+        };
+
+        // The target section is where we write the relocation data to.
+        // The source section is where we get the data from. 
+        // There is one target section per rela section (`rela_array`), and one source section per rela_entry in this rela section.
+        // The "info" field in the Rela section specifies which section is the target of the relocation.
+            
+        // Get the target section (that we already loaded) for this rela_array Rela section.
+        let target_sec_shndx = sec.info() as usize;
+        let target_segment = segments.iter_mut()
+            .find(|seg| seg.section_ndxs.contains(&target_sec_shndx))
+            .ok_or_else(|| {
+                let err = format!("ELF file error: couldn't find loaded segment that contained section for Rela section {:?}!", sec.get_name(&elf_file));
+                error!("{}", err);
+                err
+            })?;
+        
+        debug!("In {:?}, target sec shndx {} led to relevant segment at {:#X}, which contains sections {:?}", rela_sec_name, target_sec_shndx, target_segment.bounds.start, target_segment.section_ndxs);
+
+        let mut target_segment_dependencies: Vec<StrongDependency> = Vec::new();
+
+        // iterate through each relocation entry in the relocation array for the target_sec
+        for rela_entry in rela_array {
+            use xmas_elf::symbol_table::{Type, Entry};
+            let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
+            // Currently we only rewrite relocations that refer/point to symbols with an OBJECT type (static data sections).
+            if source_sec_entry.get_type() != Ok(Type::Object) {
+                continue; 
+            }
+            if verbose_log {
+                trace!("      Object-type Rela64 entry has offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
+                    rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
+            }
+
+            let source_sec_shndx = source_sec_entry.shndx() as usize; 
+            if verbose_log { 
+                let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                    .and_then(|s| s.get_name(&elf_file));
+                trace!("             --> Points to relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
+                trace!("                 Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
+                    source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                    source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
+                    source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+            }
+
+            /* 
+            let mut source_and_target_in_same_crate = false;
+
+            // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
+            let source_sec = match new_crate.sections.get(&source_sec_shndx) {
+                Some(ss) => {
+                    source_and_target_in_same_crate = true;
+                    Ok(ss.clone())
+                }
+
+                // If we couldn't get the section based on its shndx, it means that the source section wasn't in the crate currently being loaded.
+                // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
+                // At this point, there's no other way to search for the source section besides its name.
+                None => {
+                    if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
+                        const DATARELRO: &'static str = ".data.rel.ro.";
+                        let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
+                            source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
+                        } else {
+                            source_sec_name
+                        };
+                        let demangled = demangle(source_sec_name).to_string();
+
+                        // search for the symbol's demangled name in the kernel's symbol map
+                        self.get_symbol_or_load(&demangled, temp_backup_namespace, kernel_mmi_ref, verbose_log)
+                            .upgrade()
+                            .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
+                    }
+                    else {
+                        let _source_sec_header = source_sec_entry
+                            .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                            .and_then(|s| s.get_name(&elf_file));
+                        error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
+                        Err("Couldn't get source section's name, needed for non-local relocation entry")
+                    }
+                }
+            }?;
+
+            let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+            write_relocation(
+                relocation_entry,
+                &mut target_segment.mp,
+                target_sec.mapped_pages_offset,
+                source_sec.start_address(),
+                verbose_log
+            )?;
+
+            if !source_and_target_in_same_crate {
+                // tell the source_sec that the target_sec is dependent upon it
+                let weak_dep = WeakDependent {
+                    section: Arc::downgrade(&target_sec),
+                    relocation: relocation_entry,
+                };
+                source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
+                
+                // tell the target_sec that it has a strong dependency on the source_sec
+                let strong_dep = StrongDependency {
+                    section: Arc::clone(&source_sec),
+                    relocation: relocation_entry,
+                };
+                target_segment_dependencies.push(strong_dep);          
+            }
+
+            */
+        }
+
+        target_segment.sections_i_depend_on.append(&mut target_segment_dependencies);
+    }
+
+    Err(format!("unfinished"))
 }
 
 

@@ -376,6 +376,7 @@ dependencies = [
  "libc",
  "log",
  "memory",
+ "mod_mgmt",
  "path",
  "task",
  "terminal_print",

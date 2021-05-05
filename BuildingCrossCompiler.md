@@ -1,10 +1,12 @@
 # Build a standalone version of the latest gcc/binutils
 Note: instructions were taken from these tutorials on the OS dev wiki: <https://wiki.osdev.org/Building_GCC>.
 
+**We provide a script that handles this for you;** see `scripts/install_x86_64-elf-gcc.sh`.
+
 ## Prerequisites
 Install the required packages:
 ```
-sudo apt-get install gcc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
+sudo apt-get install gcc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo gcc-multilib
 ```
 
 **Note about directories**: in the following sections, we use two directories:
@@ -16,7 +18,7 @@ For this tutorial, we'll use `gcc` version `10.2.0`, released July 20, 2020,
 and `binutils` version `2.35.1`, released September 19, 2020.
 
 You can obtain it from many mirrors online, such as these:
- * gcc: <https://mirrors.kernel.org/gnu/gcc/gcc-7.5.0/>
+ * gcc: <https://mirrors.kernel.org/gnu/gcc/gcc-10.2.0/>
  * binultis: <https://mirrors.kernel.org/gnu/binutils/>
 
 Create a destination directory for the newly-built packages to be installed into:
@@ -115,15 +117,15 @@ Yes, even though we're building for `x86_64`, we put it in the original x86 arch
 Then, instruct gcc's build process to use that new multilib configuration. Open the file `$SRC/gcc-10.2.0/gcc/config` and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):    
 ```
 x86_64-*-elf*)
-    tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
-    ;;
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
+	;;
 ```
 Add a line such that it looks like this:
 ```
 x86_64-*-elf*)
-    tmake_file="${tmake_file} i386/t-x86_64-elf"
-    tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
-    ;;
+	tmake_file="${tmake_file} i386/t-x86_64-elf"
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
+	;;
 ```
 **Note**: the indentation before `tmake_file` must be a TAB, not spaces. 
 
