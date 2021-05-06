@@ -13,6 +13,7 @@ extern crate getopts;
 extern crate fs_node;
 extern crate path;
 extern crate memory;
+extern crate rustc_demangle;
 extern crate mod_mgmt;
 extern crate task;
 extern crate xmas_elf;
@@ -22,10 +23,11 @@ use core::{
     cmp::{min, max},
     ops::{AddAssign, SubAssign, Range},
 };
-use alloc::{collections::BTreeSet, string::String, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeSet, string::{String, ToString}, sync::Arc, vec::Vec};
 use getopts::{Matches, Options};
 use memory::{Page, MappedPages, VirtualAddress, EntryFlags};
-use mod_mgmt::{StrongDependency, find_symbol_table};
+use mod_mgmt::{CrateNamespace, StrongDependency, find_symbol_table, RelocationEntry, write_relocation};
+use rustc_demangle::demangle;
 use path::Path;
 use xmas_elf::{
     ElfFile,
@@ -62,11 +64,10 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<(), String> {
-    let curr_wd = Arc::clone(
-        &task::get_my_current_task().unwrap()
-            .lock().env
-            .lock().working_dir
-    );
+    let curr_task = task::get_my_current_task().unwrap();
+    let curr_wd   = Arc::clone(&curr_task.lock().env.lock().working_dir);
+    let namespace = curr_task.get_namespace();
+    let mmi       = Arc::clone(&curr_task.lock().mmi);
 
     // temporarily dumping page allocator state
     memory::dump_frame_allocator_state();
@@ -80,18 +81,17 @@ fn rmain(matches: Matches) -> Result<(), String> {
     // Parse the file as an ELF executable
     let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
     let byte_slice: &[u8] = file_mp.as_slice(0, file.size())?;
-    let (mut segments, entry_point, elf_file) = parse_and_load_elf_executable(byte_slice)?;
+    let (mut segments, entry_point, vaddr_offset, elf_file) = parse_and_load_elf_executable(byte_slice)?;
     debug!("Parsed ELF executable, moving on to overwriting relocations.");
     
     // Now, overwrite (recalculate) the relocations that refer to symbols that already exist in Theseus,
     // most important of which are static data sections, 
     // as it is logically incorrect to have duplicates of data that are supposed to be global system-wide singletons.
     // We should throw a warning here if there are no relocations in the file, as it was probably built/linked with the wrong arguments.
-    overwrite_relocations(&mut segments, &elf_file, true)?;
+    overwrite_relocations(&namespace, &mut segments, &elf_file, &mmi, true)?;
 
     // Remap each segment's mapped pages using the correct flags; they were previously mapped as always writable.
     {
-        let mmi = &task::get_my_current_task().unwrap().lock().mmi;
         let page_table = &mut mmi.lock().page_table;
         for segment in segments.iter_mut() {
             if segment.mp.flags() != segment.flags {
@@ -184,10 +184,13 @@ impl Offset {
 /// 1. A list of program segments mapped into memory. 
 /// 2. The virtual address of the executable's entry point, e.g., the `_start` function.
 ///    This is the function that we should call to start running the executable.
-/// 3. A reference to the parsed `ElfFile`, whose lifetime is tied to the given `file_contents` parameter.
+/// 3. The `Offset` by which all virtual addresses in the loaded executable should be shifted by. 
+///    This is the difference between where the program is *actually* loaded in memory
+///    and where the program *expected* to be loaded into memory.
+/// 4. A reference to the parsed `ElfFile`, whose lifetime is tied to the given `file_contents` parameter.
 fn parse_and_load_elf_executable<'f>(
     file_contents: &'f [u8],
-) -> Result<(Vec<MappedSegment>, VirtualAddress, ElfFile<'f>), String> {
+) -> Result<(Vec<MappedSegment>, VirtualAddress, Offset, ElfFile<'f>), String> {
     debug!("Parsing Elf executable of size {}", file_contents.len());
 
     let elf_file = ElfFile::new(file_contents).map_err(String::from)?;
@@ -322,7 +325,7 @@ fn parse_and_load_elf_executable<'f>(
     Offset::adjust_assign(&mut entry_point_vaddr, vaddr_adjustment);
     debug!("ELF had entry point {:#X}, adjusted to {:#X}", entry_point, entry_point_vaddr);
 
-    Ok((mapped_segments, entry_point_vaddr, elf_file))
+    Ok((mapped_segments, entry_point_vaddr, vaddr_adjustment, elf_file))
 }
 
 
@@ -333,7 +336,13 @@ fn parse_and_load_elf_executable<'f>(
 /// This is necessary to ensure that the newly-loaded ELF executable depends on and references 
 /// the real singleton instances of each data sections (aka `OBJECT`s in ELF terminology) 
 /// rather than using the duplicate instance of those data sections in the executable itself. 
-fn overwrite_relocations(segments: &mut Vec<MappedSegment>, elf_file: &ElfFile, verbose_log: bool) -> Result<(), String> {
+fn overwrite_relocations(
+    namespace: &Arc<CrateNamespace>,
+    segments: &mut Vec<MappedSegment>,
+    elf_file: &ElfFile,
+    mmi: &memory::MmiRef,
+    verbose_log: bool
+) -> Result<(), String> {
     let symtab = find_symbol_table(&elf_file)?;
 
     // Fix up the sections that were just loaded, using proper relocation info.
@@ -359,8 +368,9 @@ fn overwrite_relocations(segments: &mut Vec<MappedSegment>, elf_file: &ElfFile, 
         let rela_array = match sec.get_data(&elf_file) {
             Ok(Rela64(rela_arr)) => rela_arr,
             _ => {
-                error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
-                return Err(format!("Found Rela section that wasn't able to be parsed as Rela64"));
+                let err = format!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
+                error!("{}", err);
+                return Err(err);
             } 
         };
 
@@ -397,6 +407,11 @@ fn overwrite_relocations(segments: &mut Vec<MappedSegment>, elf_file: &ElfFile, 
             }
 
             let source_sec_shndx = source_sec_entry.shndx() as usize; 
+            let source_sec_name = match source_sec_entry.get_name(&elf_file) {
+                Ok(name) => name,
+                _ => continue,
+            };
+
             if verbose_log { 
                 let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
                     .and_then(|s| s.get_name(&elf_file));
@@ -407,76 +422,62 @@ fn overwrite_relocations(segments: &mut Vec<MappedSegment>, elf_file: &ElfFile, 
                     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
             }
 
-            /* 
-            let mut source_and_target_in_same_crate = false;
+            let demangled = demangle(source_sec_name).to_string();
 
-            // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
-            let source_sec = match new_crate.sections.get(&source_sec_shndx) {
-                Some(ss) => {
-                    source_and_target_in_same_crate = true;
-                    Ok(ss.clone())
-                }
-
-                // If we couldn't get the section based on its shndx, it means that the source section wasn't in the crate currently being loaded.
-                // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
-                // At this point, there's no other way to search for the source section besides its name.
-                None => {
-                    if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
-                        const DATARELRO: &'static str = ".data.rel.ro.";
-                        let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
-                            source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
-                        } else {
-                            source_sec_name
-                        };
-                        let demangled = demangle(source_sec_name).to_string();
-
-                        // search for the symbol's demangled name in the kernel's symbol map
-                        self.get_symbol_or_load(&demangled, temp_backup_namespace, kernel_mmi_ref, verbose_log)
-                            .upgrade()
-                            .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
-                    }
-                    else {
-                        let _source_sec_header = source_sec_entry
-                            .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                            .and_then(|s| s.get_name(&elf_file));
-                        error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
-                        Err("Couldn't get source section's name, needed for non-local relocation entry")
-                    }
-                }
-            }?;
-
-            let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
-            write_relocation(
-                relocation_entry,
-                &mut target_segment.mp,
-                target_sec.mapped_pages_offset,
-                source_sec.start_address(),
-                verbose_log
-            )?;
-
-            if !source_and_target_in_same_crate {
-                // tell the source_sec that the target_sec is dependent upon it
-                let weak_dep = WeakDependent {
-                    section: Arc::downgrade(&target_sec),
-                    relocation: relocation_entry,
-                };
-                source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
+            // If the source section exists in this namespace already, rewrite the relocation entry to point to the existing section instead.
+            if let Some(existing_source_sec) = namespace.get_symbol_or_load(&demangled, None, mmi, verbose_log).upgrade() {
+                let mut relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                let original_relocation_offset = relocation_entry.offset;
                 
-                // tell the target_sec that it has a strong dependency on the source_sec
+                // Here, in an executable ELF file, the relocation entry's "offset" represents an absolute virtual address
+                // rather than an offset from the beginning of the section/segment (I think).
+                // Therefore, we need to adjust that value before we invoke `write_relocation()`, 
+                // which expects a regular `offset` + an offset into the target segment's mapped pages. 
+                let offset_into_target_segment = target_segment.mp.offset_of_address(
+                    VirtualAddress::new(relocation_entry.offset).map_err(|_e| 
+                        format!("relocation_entry.offset {:#X} was not a valid virtual address", relocation_entry.offset)
+                    )?
+                ).ok_or(format!("target segment {:X?} did not contain relocation_entry.offset {:#X}", target_segment, relocation_entry.offset))?;
+                // Now that we have incorporated the relocation_entry's actual offset into the target_segment offset,
+                // we set it to zero for the duration of this call. 
+                // TODO: this is hacky as hell, we should just create a new `write_relocation()` function instead.
+                relocation_entry.offset = 0;
+                write_relocation(
+                    relocation_entry,
+                    &mut target_segment.mp,
+                    offset_into_target_segment,
+                    existing_source_sec.start_address(),
+                    verbose_log
+                )?;
+                relocation_entry.offset = original_relocation_offset;
+    
+                // Here, we typically tell the existing_source_sec that the target_segment is dependent upon it.
+                // However, the `WeakDependent` entry type only accepts a weak section reference at the moment,
+                // and we don't have that -- we only have a target segment. 
+                // TODO: if/when we wish to track weak dependencies from a section to a target segment, we should add it below.
+                //
+                // let weak_dep = WeakDependent {
+                //     section: Arc::downgrade(&target_sec),
+                //     relocation: relocation_entry,
+                // };
+                // existing_source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
+                
+                // tell the target_sec that it has a strong dependency on the existing_source_sec
                 let strong_dep = StrongDependency {
-                    section: Arc::clone(&source_sec),
+                    section: Arc::clone(&existing_source_sec),
                     relocation: relocation_entry,
                 };
                 target_segment_dependencies.push(strong_dep);          
+            } else {
+                trace!("Skipping relocation that points to non-Theseus OBJECT section: {:?}", demangled);
             }
-
-            */
         }
 
+        debug!("Target segment dependencies: {:#X?}", target_segment_dependencies);
         target_segment.sections_i_depend_on.append(&mut target_segment_dependencies);
     }
 
-    Err(format!("unfinished"))
+    Ok(())
 }
 
 

@@ -17,7 +17,7 @@ void test() {
 	__asm__("mov $0x4444555566667777, %r10");
 }
 
-int __main() {
+int main() {
 	// __asm__("cli");
 	// __asm__("mov $0xBEEFBEEFBEEFBEEF, %r9");
 	// while (1) {

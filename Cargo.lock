@@ -378,6 +378,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "path",
+ "rustc-demangle",
  "task",
  "terminal_print",
  "xmas-elf",
