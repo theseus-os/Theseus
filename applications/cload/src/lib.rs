@@ -1,7 +1,7 @@
 //! An application that loads C language executables and libraries atop Theseus.
 //!
 //! This will be integrated into the Theseus kernel in the future, 
-//! likely as a separate crate that 
+//! likely as a separate crate that integrates well with the `mod_mgmt` crate.
 
 #![no_std]
 #![feature(slice_fill)]
@@ -78,7 +78,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
     // Parse the file as an ELF executable
     let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
     let byte_slice: &[u8] = file_mp.as_slice(0, file.size())?;
-    let (mut segments, entry_point, vaddr_offset, elf_file) = parse_and_load_elf_executable(byte_slice)?;
+    let (mut segments, entry_point, _vaddr_offset, elf_file) = parse_and_load_elf_executable(byte_slice)?;
     debug!("Parsed ELF executable, moving on to overwriting relocations.");
     
     // Now, overwrite (recalculate) the relocations that refer to symbols that already exist in Theseus,
@@ -97,9 +97,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
         }
     }
 
-    for (i, seg) in segments.iter().enumerate() {
-        debug!("Segment {} needed {} relocations to be rewritten.", i, seg.sections_i_depend_on.len());
-    }
+    segments.iter().enumerate().for_each(|(i, seg)| debug!("Segment {} needed {} relocations to be rewritten.", i, seg.sections_i_depend_on.len()) );
 
     let _executable = LoadedExecutable { segments, entry_point }; // must persist through the entire executable's runtime.
     
@@ -110,25 +108,28 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
 
     // TODO: FIXME: use `MappedPages::as_func()` instead of `transmute()`.
     let start_fn: StartFunction = unsafe { core::mem::transmute(entry_point.value()) };
-    let _retval = start_fn(&dummy_args, &dummy_env);
+    let c_retval = start_fn(&dummy_args, &dummy_env);
 
-    debug!("C _start entry point returned value {}({:#X})", _retval, _retval);
+    debug!("C _start entry point returned value {}({:#X})", c_retval, c_retval);
 
-    Ok(_retval)
+    Ok(c_retval)
 }
 
 /// Corresponds to C function:  `int foo()`
 use libc::c_int;
 type StartFunction = fn(args: &[&str], env: &[&str]) -> c_int;
 
+
+#[allow(unused)]
 struct LoadedExecutable {
-    segments: Vec<MappedSegment>,
+    segments: Vec<LoadedSegment>,
     entry_point: VirtualAddress,
 }
 
 
+/// Represents an ELF program segment that has been loaded into memory. 
 #[derive(Debug)]
-pub struct MappedSegment {
+pub struct LoadedSegment {
     /// The memory region allocated to hold this program segment.
     mp: MappedPages,
     /// The specific range of virtual addresses occupied by this 
@@ -178,7 +179,7 @@ impl Offset {
 /// When this function returns, those segments will be mapped as writable in order to allow them 
 /// to be modified as needed.
 /// Before running this executable, each segment's `MappedPages` should be remapped
-/// to the proper `flags` specified in its `MappedSegment.flags` field. 
+/// to the proper `flags` specified in its `LoadedSegment.flags` field. 
 ///
 /// ## Return
 /// Returns a tuple of:
@@ -191,7 +192,7 @@ impl Offset {
 /// 4. A reference to the parsed `ElfFile`, whose lifetime is tied to the given `file_contents` parameter.
 fn parse_and_load_elf_executable<'f>(
     file_contents: &'f [u8],
-) -> Result<(Vec<MappedSegment>, VirtualAddress, Offset, ElfFile<'f>), String> {
+) -> Result<(Vec<LoadedSegment>, VirtualAddress, Offset, ElfFile<'f>), String> {
     debug!("Parsing Elf executable of size {}", file_contents.len());
 
     let elf_file = ElfFile::new(file_contents).map_err(String::from)?;
@@ -255,11 +256,10 @@ fn parse_and_load_elf_executable<'f>(
             continue; 
         }
 
-        let mut start_vaddr = VirtualAddress::new(prog_hdr.virtual_addr() as usize)
-            .map_err(|_e| {
-                error!("Program header virtual address was invalid: {:?}", prog_hdr);
-                "Program header had an invalid virtual address"
-            })?;
+        let mut start_vaddr = VirtualAddress::new(prog_hdr.virtual_addr() as usize).map_err(|_e| {
+            error!("Program header virtual address was invalid: {:?}", prog_hdr);
+            "Program header had an invalid virtual address"
+        })?;
         Offset::adjust_assign(&mut start_vaddr, vaddr_adjustment);
         let end_page = Page::containing_address(start_vaddr + (memory_size_in_bytes - 1));
 
@@ -311,12 +311,12 @@ fn parse_and_load_elf_executable<'f>(
 
         debug!("Loaded segment {} at {:X?} contains sections: {:?}", segment_ndx, segment_bounds, section_ndxs);
 
-        mapped_segments.push(MappedSegment {
+        mapped_segments.push(LoadedSegment {
             mp,
             bounds: segment_bounds,
             flags: initial_flags,
             section_ndxs,
-            sections_i_depend_on: Vec::new(),
+            sections_i_depend_on: Vec::new(), // this is populated later in `overwrite_relocations()`
         });
     }
 
@@ -339,7 +339,7 @@ fn parse_and_load_elf_executable<'f>(
 /// rather than using the duplicate instance of those data sections in the executable itself. 
 fn overwrite_relocations(
     namespace: &Arc<CrateNamespace>,
-    segments: &mut Vec<MappedSegment>,
+    segments: &mut Vec<LoadedSegment>,
     elf_file: &ElfFile,
     mmi: &memory::MmiRef,
     verbose_log: bool
@@ -494,4 +494,4 @@ fn print_usage(opts: Options) {
 
 
 const USAGE: &'static str = "Usage: cload [ARGS] PATH
-Loads C language ELF executables or libraries on Theseus.";
+Loads C language ELF executables on Theseus.";

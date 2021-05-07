@@ -1,10 +1,10 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
-## Temporary hack to re-build `dummy` every time
-.PHONY: dummy dummy2 dummy3 tlibc.so dummy_pie
+## Temporary hack to re-build `dummy` C targets every time
+.PHONY: dummy dummy2 dummy_works dummy_pie
 
-all: dummy
+all: dummy_works
 
 CROSS = x86_64-elf-
 
@@ -96,14 +96,13 @@ dummy2: dummy.c
 
 
 ### This approach seems to be the closest to what I want.
-### To use the outputted `dummy3` executable, we (Theseus's loader at runtime) just needs to go through all of the relocations
+### To use the outputted `dummy_works` executable, we (Theseus's loader at runtime) just needs to go through all of the relocations
 ### that use OBJECT sections (.data, .rodata) as their source section and then re-write those entries to use the corresponding existing Theseus sections 
 ### as source sections instead.
 ###
 ### TODO: figure out a way to remove all irrelevant relocation entries, at a minimum the `R_X86_64_NONE` and local relocation sections, such as the `.rela.eh_frame` section. 
-###
 ### 
-dummy3:
+dummy_works:
 	$(CROSS)gcc \
 		$(LDFLAGS) \
 		-O0 \
@@ -128,20 +127,6 @@ dummy3:
 	strip --strip-debug $@
 
 # check this out: https://stackoverflow.com/questions/10465875/is-there-an-option-to-gnu-ld-to-omit-dynamic-linker-pt-interp-completely
-
-
-
-
-
-# Missing non-rust symbols:
-# malloc
-# free
-# abort
-# strlen
-# _ITM_registerTMCloneTable
-# _ITM_deregisterTMCloneTable
-# _GLOBAL_OFFSET_TABLE_   # should be removed when moving to large code model
-# 
 
 
 

@@ -1,6 +1,4 @@
-// We don't have a C library or anything, so we can't really call or do anything yet. 
-// We just disable interrupts and write a value to a register so that we have a chance to observe
-// the effects of this program running.
+// We don't yet have C library header files, so we can't really call or do anything yet. 
 
 // create some named .rodata
 const char *const HELLO = "hello world";
