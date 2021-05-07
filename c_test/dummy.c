@@ -23,5 +23,5 @@ int main() {
 	// while (1) {
 	// 	test();
 	// }
-	return 0xDEADDEAD;
+	return 0x1234BEEF;
 }

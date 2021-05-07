@@ -54,7 +54,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     match rmain(matches) {
-        Ok(_) => 0,
+        Ok(retval) => retval as isize,
         Err(e) => {
             println!("Error:\n{}", e);
             -1
@@ -63,14 +63,11 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 
-fn rmain(matches: Matches) -> Result<(), String> {
+fn rmain(matches: Matches) -> Result<c_int, String> {
     let curr_task = task::get_my_current_task().unwrap();
     let curr_wd   = Arc::clone(&curr_task.lock().env.lock().working_dir);
     let namespace = curr_task.get_namespace();
     let mmi       = Arc::clone(&curr_task.lock().mmi);
-
-    // temporarily dumping page allocator state
-    memory::dump_frame_allocator_state();
 
     let path = matches.free.get(0).ok_or_else(|| format!("Missing path to ELF executable"))?;
     let path = Path::new(path.clone());
@@ -88,7 +85,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     // most important of which are static data sections, 
     // as it is logically incorrect to have duplicates of data that are supposed to be global system-wide singletons.
     // We should throw a warning here if there are no relocations in the file, as it was probably built/linked with the wrong arguments.
-    overwrite_relocations(&namespace, &mut segments, &elf_file, &mmi, true)?;
+    overwrite_relocations(&namespace, &mut segments, &elf_file, &mmi, false)?;
 
     // Remap each segment's mapped pages using the correct flags; they were previously mapped as always writable.
     {
@@ -100,7 +97,11 @@ fn rmain(matches: Matches) -> Result<(), String> {
         }
     }
 
-    let exec = LoadedExecutable { segments, entry_point }; // must persist through the entire executable's runtime.
+    for (i, seg) in segments.iter().enumerate() {
+        debug!("Segment {} needed {} relocations to be rewritten.", i, seg.sections_i_depend_on.len());
+    }
+
+    let _executable = LoadedExecutable { segments, entry_point }; // must persist through the entire executable's runtime.
     
     debug!("Jumping to entry point {:#X}", entry_point);
 
@@ -113,7 +114,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
     debug!("C _start entry point returned value {}({:#X})", _retval, _retval);
 
-    Ok(())
+    Ok(_retval)
 }
 
 /// Corresponds to C function:  `int foo()`
@@ -234,9 +235,9 @@ fn parse_and_load_elf_executable<'f>(
     // Iterate through each segment again and map them into pages we just allocated above,
     // copying their segment data to the proper location.
     for (segment_ndx, prog_hdr) in elf_file.program_iter().enumerate() {
-        debug!("\nLooking at {}", prog_hdr);
+        // debug!("\nLooking at {}", prog_hdr);
         if prog_hdr.get_type() != Ok(xmas_elf::program::Type::Load) {
-            warn!("Skipping non-LOAD segment {:?}", prog_hdr);
+            // warn!("Skipping non-LOAD segment {:?}", prog_hdr);
             continue;
         }
 
@@ -250,7 +251,7 @@ fn parse_and_load_elf_executable<'f>(
         let memory_size_in_bytes = prog_hdr.mem_size() as usize;
         let file_size_in_bytes = prog_hdr.file_size() as usize;
         if memory_size_in_bytes == 0 {
-            warn!("Skipping zero-sized LOAD segment {:?}", prog_hdr);
+            // warn!("Skipping zero-sized LOAD segment {:?}", prog_hdr);
             continue; 
         }
 
@@ -262,14 +263,14 @@ fn parse_and_load_elf_executable<'f>(
         Offset::adjust_assign(&mut start_vaddr, vaddr_adjustment);
         let end_page = Page::containing_address(start_vaddr + (memory_size_in_bytes - 1));
 
-        debug!("Splitting {:?} after end page {:?}", all_pages, end_page);
+        // debug!("Splitting {:?} after end page {:?}", all_pages, end_page);
 
         let (this_ap, remaining_pages) = all_pages.split(end_page + 1).map_err(|_ap|
             format!("Failed to split allocated pages {:?} at page {:#X}", _ap, start_vaddr)
         )?;
         all_pages = remaining_pages;
-        debug!("Successfully split pages into {:?} and {:?}", this_ap, all_pages);
-        debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, memory_size_in_bytes, this_ap.start_address());
+        // debug!("Successfully split pages into {:?} and {:?}", this_ap, all_pages);
+        // debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, memory_size_in_bytes, this_ap.start_address());
 
         let initial_flags = EntryFlags::from_elf_program_flags(prog_hdr.flags());
         let mmi = task::get_my_current_task().unwrap().lock().mmi.clone();
@@ -284,12 +285,12 @@ fn parse_and_load_elf_executable<'f>(
         )?;
         match prog_hdr.get_data(&elf_file).map_err(String::from)? {
             SegmentData::Undefined(segment_data) => {
-                debug!("Segment had undefined data of {} ({:#X}) bytes, file size {} ({:#X})",
-                    segment_data.len(), segment_data.len(), file_size_in_bytes, file_size_in_bytes);
+                // debug!("Segment had undefined data of {} ({:#X}) bytes, file size {} ({:#X})",
+                //     segment_data.len(), segment_data.len(), file_size_in_bytes, file_size_in_bytes);
                 let dest_slice: &mut [u8] = mp.as_slice_mut(offset_into_mp, memory_size_in_bytes).map_err(String::from)?;
                 dest_slice[..file_size_in_bytes].copy_from_slice(&segment_data[..file_size_in_bytes]);
                 if memory_size_in_bytes > file_size_in_bytes {
-                    debug!("    Zero-filling extra bytes for segment from range [{}:{}).", file_size_in_bytes, dest_slice.len());
+                    // debug!("    Zero-filling extra bytes for segment from range [{}:{}).", file_size_in_bytes, dest_slice.len());
                     dest_slice[file_size_in_bytes..].fill(0);
                 }
             }
@@ -308,7 +309,7 @@ fn parse_and_load_elf_executable<'f>(
             }
         }
 
-        debug!("Segment {} contains sections: {:?}", segment_ndx, section_ndxs);
+        debug!("Loaded segment {} at {:X?} contains sections: {:?}", segment_ndx, segment_bounds, section_ndxs);
 
         mapped_segments.push(MappedSegment {
             mp,
@@ -374,9 +375,9 @@ fn overwrite_relocations(
             } 
         };
 
-        // The target section is where we write the relocation data to.
+        // The target section (segment) is where we write the relocation data to.
         // The source section is where we get the data from. 
-        // There is one target section per rela section (`rela_array`), and one source section per rela_entry in this rela section.
+        // There is one target section per rela section (`rela_array`), and one source section per `rela_entry` in each `rela_array`.
         // The "info" field in the Rela section specifies which section is the target of the relocation.
             
         // Get the target section (that we already loaded) for this rela_array Rela section.
@@ -389,20 +390,20 @@ fn overwrite_relocations(
                 err
             })?;
         
-        debug!("In {:?}, target sec shndx {} led to relevant segment at {:#X}, which contains sections {:?}", rela_sec_name, target_sec_shndx, target_segment.bounds.start, target_segment.section_ndxs);
-
         let mut target_segment_dependencies: Vec<StrongDependency> = Vec::new();
 
         // iterate through each relocation entry in the relocation array for the target_sec
         for rela_entry in rela_array {
             use xmas_elf::symbol_table::{Type, Entry};
             let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
-            // Currently we only rewrite relocations that refer/point to symbols with an OBJECT type (static data sections).
-            if source_sec_entry.get_type() != Ok(Type::Object) {
-                continue; 
+
+            // Ignore relocations that refer/point to irrelevant things: sections, files, notypes, or nothing.
+            match source_sec_entry.get_type() {
+                Err(_) | Ok(Type::NoType) | Ok(Type::Section) | Ok(Type::File) => continue,
+                _ => { } // keep going to process the relocation
             }
             if verbose_log {
-                trace!("      Object-type Rela64 entry has offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
+                trace!("      Rela64 entry has offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
                     rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
             }
 
@@ -442,6 +443,12 @@ fn overwrite_relocations(
                 // we set it to zero for the duration of this call. 
                 // TODO: this is hacky as hell, we should just create a new `write_relocation()` function instead.
                 relocation_entry.offset = 0;
+
+                if verbose_log { 
+                    debug!("                 Performing relocation target {} + {:#X} <-- source {}", 
+                        target_segment.mp.start_address(), offset_into_target_segment, existing_source_sec.name
+                    );
+                }
                 write_relocation(
                     relocation_entry,
                     &mut target_segment.mp,
@@ -469,11 +476,11 @@ fn overwrite_relocations(
                 };
                 target_segment_dependencies.push(strong_dep);          
             } else {
-                trace!("Skipping relocation that points to non-Theseus OBJECT section: {:?}", demangled);
+                trace!("Skipping relocation that points to non-Theseus section: {:?}", demangled);
             }
         }
 
-        debug!("Target segment dependencies: {:#X?}", target_segment_dependencies);
+        // debug!("Target segment dependencies: {:#X?}", target_segment_dependencies);
         target_segment.sections_i_depend_on.append(&mut target_segment_dependencies);
     }
 
