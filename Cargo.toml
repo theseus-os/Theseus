@@ -22,7 +22,7 @@ exclude = [
 	"tools",
 	"userspace",
 
-	## exclude tlibc, for now at least. 
+	## exclude tlibc, since we currently build it separately.
 	"tlibc",
 
 	## exclude unused test applications by default
