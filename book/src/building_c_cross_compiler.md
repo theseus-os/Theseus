@@ -1,17 +1,19 @@
-# Build a standalone version of the latest gcc/binutils
-Note: instructions were taken from these tutorials on the OS dev wiki: <https://wiki.osdev.org/Building_GCC>.
+# Building GCC and Binutils to target Theseus (x86_64-elf)
 
-**We provide a script that handles this for you;** see `scripts/install_x86_64-elf-gcc.sh`.
-
-## Prerequisites
-Install the required packages:
-```
-sudo apt-get install gcc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo gcc-multilib
-```
+**We provide a script that does all of this for you;** see [`scripts/install_x86_64-elf-gcc.sh`](../../scripts/install_x86_64-elf-gcc.sh).
 
 **Note about directories**: in the following sections, we use two directories:
  1. `$SRC`: the directory that contains the source for gcc and binutils, e.g., `$HOME/src/`
  2. `$DEST`: the directory that will hold our compiled gcc and binutils packages and libraries, e.g., `$HOME/opt/`
+
+(Instructions were taken from [this tutorial on the OS dev wiki](https://wiki.osdev.org/Building_GCC).)
+
+# 1. Build a standalone version of GCC & Binutils
+
+Install the required packages:
+```
+sudo apt-get install gcc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo gcc-multilib
+```
 
 ## Download and build GCC/Binutils
 For this tutorial, we'll use `gcc` version `10.2.0`, released July 20, 2020,
@@ -51,13 +53,12 @@ make install
 ```
 
 
-# Build the Cross Compiler for Theseus
-Now that we have a standalone build of gcc/binutils that is independent from the one installed by your host system's package manager, we can use that to build a version of gcc that inherently performs cross-compilation for a specific target, in this case, our Theseus target.
+# Build GCC and Binutils again, to cross-target Theseus (x86_64-elf)
+Now that we have a standalone build of gcc/binutils that is independent from the one installed by your host system's package manager, we can use that to build a version of gcc that inherently performs cross-compilation for a specific target, in this case, our Theseus `x86_64-elf` target.
 
-Note: these instructions are based on this tutorial from the OS dev wiki: <https://wiki.osdev.org/GCC_Cross-Compiler#The_Build>.
+Note: these instructions are based on [this tutorial from the OS dev wiki](https://wiki.osdev.org/GCC_Cross-Compiler#The_Build).
 
-## Preparation
-Create a directory for the cross compiler to be built and installed into, e.g., `$DEST/cross`.
+First, create a directory for the cross compiler to be built and installed into, e.g., `$DEST/cross`.
 ```
 mkdir $DEST/cross
 export PREFIX="$DEST/cross"
@@ -65,8 +66,7 @@ export TARGET=x86_64-elf
 export PATH="$PREFIX/bin:$PATH"
 ```
 
-## Build binutils and gcc that cross-compile to Theseus
-Build the same binutils package as above, but in a way that configures it to target Theseus. 
+Second, re-build the same binutils package as above, but in a way that configures it to target Theseus. 
 ```
 ../binutils-2.35.1/configure --target=$TARGET --prefix="$PREFIX" --with-sysroot --disable-nls --disable-werror
 make -j$(nproc)
@@ -100,12 +100,12 @@ $DEST/cross/bin/$TARGET-gcc --version
 This should print out some information about your newly-built gcc. Add the `-v` flag to dump out even more info. 
 
 
-## Re-building without the default `red-zone` usage
+# Re-building GCC without the default `red-zone` usage
 Importantly, we must disable the [red zone](https://en.wikipedia.org/wiki/Red_zone_(computing)) in gcc entirely. When invoking gcc itself, we can simply pass the `-mno-red-zone` argument on the command line, but that doesn't affect the cross-compiled version of `libgcc` itself. Thus, in order to avoid `libgcc` functions invalidly using the non-existing red zone in Theseus, we have to build a no-red-zone version of `libgcc` in order to successfully build and link C programs for Theseus,  without `libgcc`'s methods trying to write to the red zone. 
 
-Note: instructions were adapted from this tutorial: <https://wiki.osdev.org/Libgcc_without_red_zone>.
+Note: instructions were adapted from [this tutorial](https://wiki.osdev.org/Libgcc_without_red_zone).
 
-### Adjusting the GCC config
+## Adjusting the GCC config
 First, create a new file within the gcc source tree at `$SRC/gcc-10.2.0/gcc/config/i386`.    
 Add the following lines to that new file and save it:
 ```
@@ -129,7 +129,7 @@ x86_64-*-elf*)
 ```
 **Note**: the indentation before `tmake_file` must be a TAB, not spaces. 
 
-### Build GCC again with no red zone
+## Building GCC again with no red zone
 Go back to the build directory and reconfigure and re-make libgcc:
 ```
 cd $SRC/cross-build-gcc
