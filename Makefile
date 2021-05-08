@@ -126,7 +126,7 @@ endif
 
 
 
-### Convenience target for building the ISO	using the above target
+### Convenience target for building the ISO using the below $(iso) target
 iso: $(iso)
 
 
