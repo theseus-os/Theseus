@@ -48,53 +48,6 @@ export override LDFLAGS += -nostdlib -nostartfiles
 ### Above options based on this link: <https://stackoverflow.com/a/10772056>
 
 
-dummy: dummy.c
-	@which $(CROSS)gcc
-	@echo "PATH: $(PATH)"
-
-# Note: `$@` is Make syntax for the target, i.e., "dummy"
-#       `$^` is Make syntax for the dependencies, i.e., "dummy.c"
-
-	$(CROSS)gcc \
-		$(LDFLAGS) \
-		$(PIE) \
-		-O0 \
-		-o $@ \
-		$^ \
-		start.c
-
-
-dummy2: dummy.c
-	@echo "LD_PRELOAD: $(LD_PRELOAD)"
-
-	$(CROSS)gcc \
-		$(LDFLAGS) \
-		$(PIE) \
-		-O0 \
-		-static-libgcc \
-		-o $@ \
-		$(PARTIAL_LINK) \
-		$(STARTFILES) \
-		$^ \
-		$(LIBGROUP) \
-		$(ENDFILES)
-
-		# -Wl,--print-map \
-		# -Wl,--emit-relocs \
-
-
-
-	# $(CROSS)ld -r -o  dummy_ld_r_tlibc.o  $(TLIBC_O)  $@
-		
-		#-lgcc -lc -lgcc -lc
-
-
-		# start.c
-
-		
-		# -static \
-
-
 ### This approach seems to be the closest to what I want.
 ### To use the outputted `dummy_works` executable, we (Theseus's loader at runtime) just needs to go through all of the relocations
 ### that use OBJECT sections (.data, .rodata) as their source section and then re-write those entries to use the corresponding existing Theseus sections 
@@ -157,3 +110,47 @@ dummy_pie:
 	# remove debug symbols, which are HUGE
 	strip --strip-debug $@
 
+
+
+### Below here are older attempts that didn't quite do what we want, 
+### but I'm preserving them for potential use in the future. 
+
+dummy: dummy.c
+	@which $(CROSS)gcc
+	@echo "PATH: $(PATH)"
+
+# Note: `$@` is Make syntax for the target, i.e., "dummy"
+#       `$^` is Make syntax for the dependencies, i.e., "dummy.c"
+
+	$(CROSS)gcc \
+		$(LDFLAGS) \
+		$(PIE) \
+		-O0 \
+		-o $@ \
+		$^ \
+		start.c
+
+
+dummy2: dummy.c
+	@echo "LD_PRELOAD: $(LD_PRELOAD)"
+
+	$(CROSS)gcc \
+		$(LDFLAGS) \
+		$(PIE) \
+		-O0 \
+		-static-libgcc \
+		-o $@ \
+		$(PARTIAL_LINK) \
+		$(STARTFILES) \
+		$^ \
+		$(LIBGROUP) \
+		$(ENDFILES)
+
+
+	# $(CROSS)ld -r -o  dummy_ld_r_tlibc.o  $(TLIBC_O)  $@
+		
+
+		# start.c
+
+		
+		# -static \
