@@ -1,4 +1,4 @@
-//! An application that loads C language executables and libraries atop Theseus.
+//! An application that loads C language ELF executables atop Theseus.
 //!
 //! This will be integrated into the Theseus kernel in the future, 
 //! likely as a separate crate that integrates well with the `mod_mgmt` crate.
@@ -493,5 +493,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: cload [ARGS] PATH
+const USAGE: &'static str = "Usage: loadc [ARGS] PATH
 Loads C language ELF executables on Theseus.";

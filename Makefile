@@ -313,7 +313,7 @@ c_test:
 	$(MAKE) grub
 	@echo -e "\n\033[1;32m The build of $(C_TEST_TARGET) finished successfully and was packaged into the Theseus ISO.\033[0m"
 	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
-	@echo -e "    --> In Theseus, run 'cload /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
+	@echo -e "    --> In Theseus, run 'loadc /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
 
 
 
