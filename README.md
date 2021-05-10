@@ -28,7 +28,7 @@ Currently, we support building and running Theseus on the following host OSes:
   * Update your system's package list:    
     `sudo apt-get update`.    
   * Install the following packages:    
-    `sudo apt-get install nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm`    
+    `sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm`    
     - Or on Arch Linux:    
       `sudo pacman -S nasm pkg-config grub mtools xorriso qemu`    
 
@@ -101,6 +101,8 @@ QEMU allows us to run Theseus quickly and easily in its own virtual machine.
 To exit Theseus in QEMU, press `Ctrl+Alt+G` (or `Ctrl+Alt` on some systems), which releases your keyboard and mouse focus from the QEMU window. Then press `Ctrl+C` in the terminal window that you ran `make run` from originally to kill QEMU, or you can also quit QEMU using the GUI `(x)` button.
 
 To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`. On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU menu bar.
+
+To access/expose a PCI device in QEMU using PCI passthrough via VFIO, see [these instructions](book/src/pci_passthrough.md).
 
 ### KVM Support
 While not strictly required, KVM will speed up the execution of QEMU.
