@@ -6,16 +6,13 @@
 - [Intralingual Design Principle](intralinguality.md)
 - [Boot-up Process](booting.md)
 
-## Understanding the Build Process
-- [Build process](build_process.md)
+## Structure of Theseus
+- [Structure of Theseus OS](structure.md)
+
+## The Build Process
+- [The Build process](build_process.md)
+- [Configuring Theseus](configuration.md)
 - [`theseus_cargo`: Building Rust Crates Out-of-Tree](rust_builds_out_of_tree.md)
-
-## How to Contribute
-- [How to Contribute](ch01.md)
-    - [`git` Guidlines](git.md)
-
-## Getting started
-- [Development Environment](chapter_2.md)
 
 ## Application Development
 - [Developing a Rust Application](app.md)
@@ -30,3 +27,15 @@
     - [How Window Manager Works](window_manager.md)
     - [Tutorial of the display subsystem](window_tutorial.md)
 
+## Booting on Real Hardware
+- [Booting on Real Hardware](real_hardware.md)
+    - [Booting via USB drive](booting_usb.md)
+    - [Booting over the network (PXE)](pxe.md)
+
+## How to Contribute
+- [How to Contribute](ch01.md)
+    - [`git` Guidlines](git.md)
+
+
+## Link to Theseus README
+- [Theseus README + Quick Start](_root_README.md)

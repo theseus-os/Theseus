@@ -14,7 +14,7 @@ To build in debug mode, set the `BUILD_MODE` environment variable when running `
 `make run BUILD_MODE=debug`
 
 There is a special file `cfg/Config.mk` that contains the build mode options as well as other configuration options used in the kernel Makefile.
-As with most languages, release mode in Rust is *way* faster, but it does take longer to compile and can be difficult to attach a debugger.
+As with most languages, release mode in Rust is *way* faster, but can be difficult to debug with GDB.
 
 ## Runtime Loading and Linking of Crates
 
