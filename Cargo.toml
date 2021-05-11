@@ -22,6 +22,9 @@ exclude = [
 	"tools",
 	"userspace",
 
+	## exclude tlibc, since we currently build it separately.
+	"tlibc",
+
 	## exclude unused test applications by default
 	# "applications/test_channel",
 	"applications/test_exception",

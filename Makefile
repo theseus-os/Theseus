@@ -110,7 +110,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
 		check_rustc \
-		clean run run_pause iso build cargo \
+		clean run run_pause iso build cargo grub \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -126,18 +126,8 @@ endif
 
 
 
-### Demo/test target for building libtheseus
-libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
-	@( \
-		cd $(ROOT_DIR)/libtheseus && \
-		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
-	)
-
-
-### This target builds the `theseus_cargo` tool as a dedicated binary.
-$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
-	@echo -e "\n=================== Building the theseus_cargo tool ==================="
-	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+### Convenience target for building the ISO using the below $(iso) target
+iso: $(iso)
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
@@ -145,13 +135,8 @@ $(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-# autogenerate the grub.cfg file
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) grub
 
-
-### Convenience target for building the ISO	using the above target
-iso: $(iso)
 
 
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
@@ -267,6 +252,7 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
 
+
 ### This compiles the assembly files in the nano_core. 
 ### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
@@ -282,6 +268,76 @@ endif
 		$< \
 		-o $@ \
 		$(CFLAGS)
+
+
+
+### This target auto-generates a new grub.cfg file and uses grub to build a bootable ISO.
+### This target should be invoked when all of contents of `GRUB_ISOFILES` are ready to be packaged into an ISO.
+grub:
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+
+
+
+### Target for building tlibc, Theseus's libc.
+### This should be run after `make iso` has completed.
+### It builds a new .iso that includes tlibc, which can be run using `make orun`.
+### Currently we can manually load tlibc within Theseus for testing purposes by running `ns --load path/to/tlibc_file`.
+.PHONY: tlibc
+TLIBC_OBJ_FILE := tlibc/target/$(TARGET)/$(BUILD_MODE)/tlibc.o
+tlibc:
+# $(MAKE) -C tlibc
+	( cd ./tlibc; sh build.sh )
+
+	@for f in $(TLIBC_OBJ_FILE); do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	$(MAKE) grub
+	@echo -e "\n\033[1;32m The build of tlibc finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run', that will overwrite tlibc)"
+	@echo -e "    --> In Theseus, run 'ns --load /namespaces/_applications/tlibc.o' to load tlibc."
+
+
+
+### Target for building a test C language executable.
+### This should be run after `make iso` and then `make tlibc` have both completed.
+.PHONY: c_test
+C_TEST_TARGET := dummy_works
+c_test:
+	$(MAKE) -C c_test $(C_TEST_TARGET)
+	@for f in c_test/$(C_TEST_TARGET); do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	$(MAKE) grub
+	@echo -e "\n\033[1;32m The build of $(C_TEST_TARGET) finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
+	@echo -e "    --> In Theseus, run 'loadc /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
+
+
+
+### Demo/test target for building libtheseus
+libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
+	@( \
+		cd $(ROOT_DIR)/libtheseus && \
+		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
+	)
+
+
+
+### This target builds the `theseus_cargo` tool as a dedicated binary.
+$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
+	@echo -e "\n=================== Building the theseus_cargo tool ==================="
+	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+
+
+
+### Removes all build files
+clean:
+	cargo clean
+	@rm -rf build
+	
 
 
 
@@ -328,8 +384,7 @@ simd_personality_sse: build_sse build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) grub
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -349,8 +404,7 @@ simd_personality_avx: build_avx build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) grub
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -393,6 +447,11 @@ preserve_old_modules:
 	cargo clean
 
 
+
+
+###################################################################################################
+############################ Targets for building documentation ###################################
+###################################################################################################
 
 ## The top-level (root) documentation file
 DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
@@ -441,13 +500,7 @@ endif
 view-book: book
 
 
-## Removes all build files
-clean:
-	cargo clean
-	@rm -rf build
-	
-
-
+### The primary documentation for this makefile itself.
 help: 
 	@echo -e "\nThe following make targets are available:"
 	@echo -e "   iso:"
@@ -532,11 +585,10 @@ help:
 
 
 
-
-
 ###################################################################################################
-### This section has QEMU arguments and configuration
+##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
+
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 
@@ -597,7 +649,7 @@ endif
 
 
 ###################################################################################################
-### This section has targets for running and debugging 
+########################## Targets for running and debugging Theseus ##############################
 ###################################################################################################
 
 ### Old Run: runs the most recent build without rebuilding

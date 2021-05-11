@@ -110,6 +110,7 @@ pub enum CrateType {
     Kernel,
     Application,
     Userspace,
+    Executable,
 }
 impl CrateType {
     fn first_char(&self) -> &'static str {
@@ -117,6 +118,7 @@ impl CrateType {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
             CrateType::Userspace    => "u",
+            CrateType::Executable   => "e",
         }
     }
     
@@ -127,6 +129,7 @@ impl CrateType {
             CrateType::Kernel       => "_kernel",
             CrateType::Application  => "_applications",
             CrateType::Userspace    => "_userspace",
+            CrateType::Executable   => "_executables",
         }
     }
     
@@ -161,25 +164,13 @@ impl CrateType {
         else if prefix.starts_with(CrateType::Userspace.first_char()) {
             Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
+        else if prefix.starts_with(CrateType::Executable.first_char()) {
+            Ok((CrateType::Executable, namespace_prefix, crate_name))
+        }
         else {
             error!("module_name {:?} didn't start with a known CrateType prefix", module_name);
             Err("module_name didn't start with a known CrateType prefix")
         }
-    }
-
-    /// Returns `true` if the given `module_name` indicates an application crate.
-    pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a kernel crate.
-    pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a userspace crate.
-    pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.first_char())
     }
 }
 

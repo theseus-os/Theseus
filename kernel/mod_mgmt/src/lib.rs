@@ -1857,7 +1857,7 @@ impl CrateNamespace {
             weak_sec
         } else {
             #[cfg(not(loscd_eval))]
-            error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            debug!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
             Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
         }
     }
