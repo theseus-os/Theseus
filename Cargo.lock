@@ -1265,6 +1265,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84565678e403453d1a27a0886882b3b271701e65146d972d9d7d9a4c4a0ff498"
 
 [[package]]
+name = "loadc"
+version = "0.1.0"
+dependencies = [
+ "fs_node",
+ "getopts",
+ "libc",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "path",
+ "rustc-demangle",
+ "task",
+ "terminal_print",
+ "xmas-elf",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

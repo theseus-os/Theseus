@@ -1,15 +1,17 @@
 {
-  "_" : "check this out: https://github.com/tsgates/rust.ko/blob/master/x86_64-unknown-none-gnu.json",
+  "__NOTE": [ "Despite not being Unix-like or Redox-like, we use the `unix` family and `redox` OS type in order to",
+              "enable the `libc` crate to build correctly, such that we can use its various c_* type definitions" ],
 
   "llvm-target": "x86_64-unknown-none-gnu",
   "data-layout": "e-m:e-i64:64-f80:128-n8:16:32:64-S128",
   "linker-flavor": "gcc",
+  "target-family": "unix",
   "target-endian": "little",
   "target-pointer-width": "64",
   "target-c-int-width": "32",
   "arch": "x86_64",
-  "os": "none",
+  "os": "redox",
   "features": "+sse2",
   "disable-redzone": true,
-  "panic": "abort"
+  "panic": "unwind"
 }

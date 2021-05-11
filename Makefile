@@ -126,7 +126,7 @@ endif
 
 
 
-### Convenience target for building the ISO	using the above target
+### Convenience target for building the ISO using the below $(iso) target
 iso: $(iso)
 
 
@@ -313,7 +313,7 @@ c_test:
 	$(MAKE) grub
 	@echo -e "\n\033[1;32m The build of $(C_TEST_TARGET) finished successfully and was packaged into the Theseus ISO.\033[0m"
 	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
-	@echo -e "    --> In Theseus, run 'cload /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
+	@echo -e "    --> In Theseus, run 'loadc /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
 
 
 
@@ -575,6 +575,8 @@ help:
 	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
+	@echo -e "   vfio=<pci_device_slot>:"
+	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
 
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
@@ -643,6 +645,13 @@ ifeq ($(kvm),yes)
 $(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
 	# QEMU_FLAGS += -accel kvm
 endif
+
+## Enable passthrough of a PCI device in QEMU by passing its slot information to VFIO.
+## Slot information is its bus, device, and function number assigned by the host OS, e.g., 'vfio=59:00.0'.
+ifdef vfio
+	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
+endif
+
 
 
 
