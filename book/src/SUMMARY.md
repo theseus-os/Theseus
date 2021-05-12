@@ -1,31 +1,37 @@
 # The Theseus OS Book
 
-## Intro to Theseus
-- [Introduction and Brief Overview](ch00-00-introduction.md)
-- [Safe-language OS design](idea.md)
-- [Intralingual Design Principle](intralinguality.md)
-- [Boot-up Process](booting.md)
+## Introduction to Theseus
+- [Introduction to Theseus OS](ch00-00-introduction.md)
 
-## Structure of Theseus
-- [Structure of Theseus OS](structure.md)
+## Design and Structure of Theseus 
+- [Theseus's Design and Structure](design.md)
+    - [Boot-up Procedure](booting.md)
+- [Safe-language OS Principles](idea.md)
+- [Intralingual Design](intralingual.md)
 
-## The Build Process
-- [The Build process](build_process.md)
-- [Configuring Theseus](configuration.md)
-- [`theseus_cargo`: Building Rust Crates Out-of-Tree](rust_builds_out_of_tree.md)
+
+## Building and Configuring Theseus
+- [Building and Configuring Theseus](build_process.md)
+    - [`theseus_cargo`: Building Rust Crates Out-of-Tree](rust_builds_out_of_tree.md)
+
 
 ## Application Development
-- [Developing a Rust Application](app.md)
+- [Developing a Theseus Application](app.md)
 
 ## Experimental Support for C programs
 - [Building a C cross compiler for Theseus](building_c_cross_compiler.md)
-- [Building and Running a basic C program](c_program.md)
-- [How C compiling and linking works with tlibc (Theseus's libc)](c_compilation_tlibc.md)
+    - [Building and Running a basic C program](c_program.md)
+    - [How C compiling and linking works with tlibc (Theseus's libc)](c_compilation_tlibc.md)
 
-## Display Subsystem
-- [Display Subsystem](display.md)
-    - [How Window Manager Works](window_manager.md)
-    - [Tutorial of the display subsystem](window_tutorial.md)
+
+## Overview of Key Subsystems 
+- [Overview of Key Subsystems](subsystems.md)
+    - [Memory Management](memory.md)    
+    - [Task Management](task.md)
+    - [Display and Window Management](display.md)
+        - [The Window Manager](window_manager.md)
+        - [Creating and Displaying Windows](window_tutorial.md)
+
 
 ## Booting on Real Hardware
 - [Booting on Real Hardware](real_hardware.md)
@@ -38,4 +44,4 @@
 
 
 ## Link to Theseus README
-- [Theseus README + Quick Start](_root_README.md)
+[ ↗️ Theseus README + Quick Start](_root_readme.md)

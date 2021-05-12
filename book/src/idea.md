@@ -5,6 +5,8 @@ As such, it foregoes hardware protection, which generally results in higher effi
 
 This is possible only when all applications are written in safe Rust, which prevents them from circumventing any type-based restrictions to cause unintended or undefined behavior.
 
+Check out [this presentation slide deck](https://docs.google.com/presentation/d/1GG5xGyK5IOuRpdNV0O_BhibO-X5tI6u_qtO_okoI1Gk/edit?usp=sharing) to learn more about how we ensure protection and isolation in Theseus based on the foundation of Rust's type and memory safety guarantees.
+
 For more details about Theseus's research merit and novel design principles, see our [OSDI 2020 paper or slides](https://www.usenix.org/conference/osdi20/presentation/boos) (or the [video here](https://www.youtube.com/watch?v=i1pLDZKtlBI)), Kevin's [dissertation](https://scholarship.rice.edu/handle/1911/109201), or Ramla's [thesis](https://scholarship.rice.edu/handle/1911/109609). 
 
 
@@ -25,9 +27,11 @@ We believe that hardware cannot fully realize all three:
 We assert that hardware should *only* be responsible for increasing performance, i.e., via various accelerators and dedicated improvements, but should have *no role* (or a minimal role) in providing isolation, safety, and security.
 Isolation and efficiency should be the responsibility of software alone.
 
+We sometimes refer to this as the **PHIS** principle: **Performance** in **Hardware**, **Isolation** in **Software**.
+
 *But why?*
 
-For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted userspace applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where we can verify the OS, compiler, language libraries, and more. 
+For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted userspace applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where we have the ability to verify the OS, compiler, language libraries, and more. 
 
 In addition, modern languages like Rust are able to ensure type safety and memory safety at compile time, without the overhead of traditional safe/managed languages that rely upon inefficient garbage collection and transparent heap-based object management.
 Thus, we can leverage these safety guarantees to ensure that compiled code does not violation isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.

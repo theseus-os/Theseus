@@ -1,14 +1,16 @@
-# How the window manager works
+# How the Window Manager works
 
 ## Design
 
-In most of the cases, both an application and the window manager want to get access to the same window. The application needs to display in the window, and the window manager requires the information and order of windows to render them to the screen. In order to share a window between an application and the window manager, we wrap a window object with `Mutex`. The application owns a strong reference to the window, while the window manager holds a weak reference since its lifetime is longer than the window.
+Typically, both the application that owns/creates a window and the window manager that controls that window need to access it jointly. The application needs to display its content into the main part of the window, and the window manager needs information about the location and depth ordering of all windows to render them. 
 
-However, `Mutex` introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operate on it and then release it. If an application does not release the locked window, the window manager will be blocked in most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one.
+To share a window between an application and the window manager, the application holds a strong reference (`Arc`) to the window, while the window manager holds a weak reference (`Weak`) to that same window. This allows the window manager to control an manage a window without conceptually owning it.
 
-To solve this problem, we define two objects `Window` and `WindowInner`. `WindowInner` only contains the information required by the window manager. A window manager holds a list of reference to `WindowInner`s. An application owns a `Window` object which wraps a reference to its `WindowInner` object together with other states required by the application.
+We use a `Mutex` to wrap each window to allow the application task and window manager task to safely access it jointly. However, `Mutex` introduces the possibility of deadlock: when an application wants toaccess its window, it must acquire the Mutex lock, operate on the window, and then release the lock. If the application doesn't release the lock on its window, the window manager will be forced to block until the lock is released, preventing it from performing typical operations like switching between windows, delivering events, or deleting windows.
 
-## The WindowInner structure
+To solve this problem, we define two structures: `Window` and `WindowInner`. `WindowInner` only contains the information required by the window manager. The window manager holds a list of references to `WindowInner` objects, while only the application owns the outer `Window` object (which itself does contain a reference to the underlying WM-owned `WindowInner` object. The `Window` struct also contains other application-relevant states that describe the window.
+
+## The `WindowInner` structure
 
 The `window_inner` crate defines a `WindowInner` structure. It has states and methods of displaying the window on the screen.
 

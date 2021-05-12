@@ -147,7 +147,7 @@ make run host=yes
 Theseus includes two forms of documentation:
 1. The [source-level documentation](https://theseus-os.github.io/Theseus/doc/___Theseus_Crates___/index.html), generated from code and inline comments (via *rustdoc*).
     * Intended for Theseus developers and contributors, or those who want low-level details.
-2. The [book-style documentation](https://theseus-os.github.io/Theseus/doc/___Theseus_Crates___/index.html), written in Markdown.
+2. The [book-style documentation](https://theseus-os.github.io/Theseus/book/index.html), written in Markdown.
     * Useful for high-level descriptions of design concepts and key components.
 
 The above links may be out of date, so it's best to build the docs yourself, as shown below. 

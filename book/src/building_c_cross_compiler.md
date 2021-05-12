@@ -1,10 +1,17 @@
 # Building GCC and Binutils to target Theseus (x86_64-elf)
 
-**We provide a script that does all of this for you;** see [`scripts/install_x86_64-elf-gcc.sh`](../../scripts/install_x86_64-elf-gcc.sh).
+**We provide a script that does all of this for you;** see [scripts/install_x86_64-elf-gcc.sh](../../scripts/install_x86_64-elf-gcc.sh), 
+```sh
+./scripts/install_x86_64-elf-gcc.sh $HOME/src $HOME/opt
+```
 
-**Note about directories**: in the following sections, we use two directories:
- 1. `$SRC`: the directory that contains the source for gcc and binutils, e.g., `$HOME/src/`
- 2. `$DEST`: the directory that will hold our compiled gcc and binutils packages and libraries, e.g., `$HOME/opt/`
+---------------------------------------------------------------------------------
+
+In this document, we refer to two directories, both of which can be set to the location of your choice:
+ 1. `$SRC`: the directory that contains the source for gcc and binutils
+ 	* For example, `$HOME/src/`
+ 2. `$DEST`: the directory that will hold our compiled gcc and binutils packages and libraries (where they will be installed)
+ 	* For example, `$HOME/opt/`
 
 (Instructions were taken from [this tutorial on the OS dev wiki](https://wiki.osdev.org/Building_GCC).)
 
@@ -53,7 +60,7 @@ make install
 ```
 
 
-# Build GCC and Binutils again, to cross-target Theseus (x86_64-elf)
+# 2. Build GCC and Binutils again, to cross-target Theseus (x86_64-elf)
 Now that we have a standalone build of gcc/binutils that is independent from the one installed by your host system's package manager, we can use that to build a version of gcc that inherently performs cross-compilation for a specific target, in this case, our Theseus `x86_64-elf` target.
 
 Note: these instructions are based on [this tutorial from the OS dev wiki](https://wiki.osdev.org/GCC_Cross-Compiler#The_Build).
@@ -100,7 +107,7 @@ $DEST/cross/bin/$TARGET-gcc --version
 This should print out some information about your newly-built gcc. Add the `-v` flag to dump out even more info. 
 
 
-# Re-building GCC without the default `red-zone` usage
+# 3. Re-building GCC without the default `red-zone` usage
 Importantly, we must disable the [red zone](https://en.wikipedia.org/wiki/Red_zone_(computing)) in gcc entirely. When invoking gcc itself, we can simply pass the `-mno-red-zone` argument on the command line, but that doesn't affect the cross-compiled version of `libgcc` itself. Thus, in order to avoid `libgcc` functions invalidly using the non-existing red zone in Theseus, we have to build a no-red-zone version of `libgcc` in order to successfully build and link C programs for Theseus,  without `libgcc`'s methods trying to write to the red zone. 
 
 Note: instructions were adapted from [this tutorial](https://wiki.osdev.org/Libgcc_without_red_zone).
@@ -152,7 +159,7 @@ $DEST/cross/lib/gcc/x86_64-elf/10.2.0/libgcc.a
 $DEST/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone/libgcc.a
 ```
 
-# Using the proper no red zone version of GCC
+# Appendix: How to use the no-red-zone version of GCC
 To properly use this new version of GCC that cross-compiles to the Theseus target and disables the red zone, make sure you:
  1. use the `x86_64-elf-gcc` executable that now resides in `$DEST/cross` 
  2. specify the `-mno-red-zone` flag, either on the command line or as part of `LDFLAGS`

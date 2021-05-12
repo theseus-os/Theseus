@@ -4,7 +4,7 @@ This directory contains a custom libc implementation that targets the Theseus OS
 Large portions of `tlibc` code have been borrowed from Redox's [relibc](https://gitlab.redox-os.org/redox-os/relibc) to get up and running quickly, but will be replaced over time with equivalent Theseus-specific code.
 
 It requires a cross-compiled version of `gcc` and `binutils` that will compile C code targeted at Theseus. 
-[Read more about how to build those here](../BuildingCrossCompiler.md).
+[Read more about how to build those here](../book/src/building_c_cross_compiler.md).
 
 ### Manual build fixes
 Currently, to get everything to build from scratch properly,  we need to add the following manual steps to ensure the build process works:

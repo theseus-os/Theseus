@@ -1,10 +1,9 @@
 # Application Support and Development
-One of the unusual features of Theseus, compared to mainstream operating systems like Linux, is that safe applications can be loaded into the same address space as the kernel and run at the kernel privilege level. Below we provide information about how such apps are supported by Theseus and are developed.
+One of the unusual features of Theseus, compared to mainstream operating systems like Linux, is that safe applications are loaded into the same single address space as the kernel and run at the same kernel privilege level. Below, we provide information about how such apps are supported by Theseus and how you can develop a new app.
 
 
 ## Dynamic Linking and Loading of Application Crates
-Currently, all applications run directly in kernel space at the same privilege level (Ring 0).
-Applications are simply object files that are loaded into the kernel address space, just like any other kernel crate.
+Applications are simply object files that are loaded into the  address space, just like any other kernel crate.
 The only real distinction is that they must use only safe code (unsafe code is forbidden),
 and they must expose a **public** entry point function named `main`, shown below.
 If the `main` function is not `pub`, it may be removed by compiler optimizations or undiscoverable by the application loader code, 
