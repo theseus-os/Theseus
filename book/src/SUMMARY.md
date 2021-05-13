@@ -6,6 +6,7 @@
 
 ## Design and Structure of Theseus 
 - [Design and Structure of Theseus](design.md)
+    - [Source Code Repository Organization](source_code_organization.md)
     - [Boot-up Procedure](booting.md)
     - [Safe-language OS Principles](idea.md)
     - [Intralingual Design]() <!-- TODO: intralingual.md -->

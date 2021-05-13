@@ -17,7 +17,32 @@ Note that application-level *libraries* do not need to expose a `main` function;
 only applications that intend to be run as binary executables do. 
 
 
-## Example
+## Creating and building a new application
+Theseus's build system will automatically build any crates in the `applications/` directory, so all you have to do is place your new application crate there. 
+The name of the directory holding your crate files **must be the same** as the name of the crate as specified in its Cargo.toml `name` field. 
+
+So, for example, you could create a new application crate called `my_app` with the following file structure:
+```
+applications/
+├── my_app
+│   ├── Cargo.toml
+│   └── src
+│       └── lib.rs
+├── ...
+```
+
+The `applications/my_app/src/lib.rs` file contains the application code with at least a `fn main()` body (as shown above). 
+The `applications/my_app/Cargo.toml` file must specify the same name:
+```toml
+[package]
+name = "my_app"
+...
+```
+
+After building and running Theseus, you can type `my_app` into the Theseus shell to run the application as expected.
+
+
+## Examples
 See the many examples in the `applications/` directory. The `example` application is designed to serve as a starting point for your new application that you can easily duplicate. We offer a ported version of `getopts` to help parse command-line arguments. 
 
 

@@ -1,10 +1,19 @@
 # Theseus's Build Process
 
-Theseus uses the [cargo virtual workspace](https://doc.rust-lang.org/cargo/reference/fest.html#the-workspace-section) feature to group all of the crates together into a single meta project, which significantly speeds up build times.
+### Cargo
+Theseus uses [cargo](https://doc.rust-lang.org/cargo/index.html), Rust's package manager and build tool, to automatically manage dependencies and invoke the actual Rust compiler for us.
+We utilize cargo's [workspace feature](https://doc.rust-lang.org/cargo/reference/workspaces.html) with a virtual manifest to group all of the main crates together into a single top-level meta project, which significantly speeds up build times.
+As such, the crates from the main repository folders (`kernel/` and `applications/`) and all of their dependencies are all compiled into a single `target/` folder.
 
-The top-level [Makefile](https://github.com/theseus-os/Theseus/blob/theseus_main/Makefile) essentially just invokes the Rust toolchain and compiler, copies the compiled object files into the top-level `build/` directory, and then generates a bootable `.iso` image using various bootloader tools, e.g., GRUB.
-We build all of the Rust code using `cargo`, Rust's build tool and dependency manager.
-The only special action it takes is to build the `nano_core` separately and fully link it against the architecture-specific assembly code in `nano_core/boot` into a static binary.
+The members of this workspace are defined in the root [Cargo.toml](https://github.com/theseus-os/Theseus/blob/theseus_main/Cargo.toml) manifest file, plus the list of other folders that should be ignored by cargo.
+
+
+### Makefiles
+Although we use cargo to build all Rust code, we still use `make` and Makefiles to handle high-level build tasks. You should never need to directly run `cargo` or `rustc` commands; go through `make` instead. 
+
+The top-level [Makefile](https://github.com/theseus-os/Theseus/blob/theseus_main/Makefile) essentially just invokes the Rust toolchain and compiler via `cargo`, then copies the compiled object files from the appropriate `target/` directory into the top-level `build/` directory, and finally generates a bootable `.iso` image using various bootloader tools, e.g., GRUB.
+
+The only special build action the Makefile takes is to use the `nasm` assembler to compile the  architecture-specific assembly code in `nano_core/boot/`, and then fully link that against the `nano_core` into a separate static binary.
 
 
 # Configuring Theseus
@@ -101,13 +110,20 @@ As with most languages, release mode in Rust is *way* faster, but can be difficu
 There is a special Makefile [`cfg/Config.mk`](https://github.com/theseus-os/Theseus/blob/theseus_main/cfg/Config.mk) that contains the build mode options as well as other configuration options used in the kernel Makefile.
 
 
-## Runtime Linking vs. Static Linking
+## Static Build-time Linking vs. Dynamic Runtime Linking
 
-### Regular static linking
+Theseus offers two primary forms of linking and packaging its compiled crates into an ISO image.
+As depicted in the image below, the first (left side) is a conventional fully staticaly-linked build, as used in all other OSes,
+while the second (right side) is a novel dynamic linking approach used for Theseus research. 
+
+![Standard Build-time Static Linking (left) vs. Theseus Dynamic Linking (right)](images/boot_image.svg)
+
+
+### Standard build-time (static) linking
 By default, Theseus is built into a single kernel binary just like a regular OS, in which all `kernel` crates are linked into a single static library and then packaged into a bootable .iso file.
 This is what happens when you run `make` as usual. 
 
-### Dynamic runtime linking (`loadable` mode)
+###  Dynamic runtime linking (`loadable` mode)
 However, the research version of Theseus uses full dynamic loading and linking for all crates (except the `nano_core`) to achieve its various goals of live evolution, availability through fault tolerance, flexibility, etc. 
 Loading and linking of crates at runtime is precisely how Theseus achieves *runtime-persistent bounds*; the crate management subsystem knows where it loaded a given crate into memory and can therefore maintain metadata about each loaded crate to track its bounds and dependencies. 
 
@@ -147,6 +163,6 @@ Another option for configuration is to expose `features` from a given crate; [re
 
 Theseus does not use features extensively because it is structured as many small crates in one overarching virtual workspace. In this form, you cannot easily set one feature for a target crate across multiple dependent crates at the same time, e.g., using a single command-line argument; instead, you must individually change the Cargo.toml specification of *every single crate* that depends on that target crate. 
 
-Thus, we use the `cfg` blocks instead of `features. 
+Thus, we use the `cfg` blocks instead of `features`. 
 
-That being said, Theseus does choose which features it wants to use when bringing in dependencies on third-party crates, but this is minimal and only occurs for a few dependencies. 
+That being said, Theseus does choose which features it wants to use when bringing in dependencies on third-party crates, but this is minimal and only occurs for a few dependencies. Typically, features are only specified in order to choose a `no_std` version of a crate, i.e., telling that crate to use the Rust `core` library instead of the standard library.

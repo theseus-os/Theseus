@@ -10,6 +10,7 @@ Then, it jumps to `start_high`, such that we're not running the base kernel imag
 We then set up a new Global Descriptor Table (GDT), segmentation registers, and finally call the Rust code entry point [`nano_core_start()`](https://theseus-os.github.io/Theseus/doc/nano_core/index.html) with the proper arguments. 
 After calling `nano_core_start`, the assembly files are no longer used, and `nano_core_start` should never return.
 
+
 ## Initial Rust code: the `nano_core`
 The `nano_core`, specifically `nano_core_start()`, is the first Rust code to run in Theseus. 
 It performs a very minimal bootstrap/setup procedure, in which it performs the following duties:
