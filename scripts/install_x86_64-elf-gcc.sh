@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-### This scripts builds and installs GCC and binutils that are cross-compiled to target Theseus on x86_64. 
+### This script builds and installs GCC and binutils that are cross-compiled to target Theseus on x86_64. 
 ### It has been tested on Ubuntu 20.04 but will likely work on any Debian-based distribution.
 ### Note: this script takes about 45-60 minutes to execute, as it builds gcc twice. Go grab a drink!
 ###

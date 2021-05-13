@@ -1,4 +1,4 @@
-# Tutorial of the display subsystem
+# How to Create Windows and Display Content
 
 ## Create a Window
 

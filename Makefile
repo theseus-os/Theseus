@@ -14,7 +14,7 @@ debug ?= none
 net ?= none
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
-IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 
 
 
@@ -453,19 +453,21 @@ preserve_old_modules:
 ############################ Targets for building documentation ###################################
 ###################################################################################################
 
-## The top-level (root) documentation file
-DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
+## The output directory for source-level documentation.
+DOC_BUILD := $(BUILD_DIR)/doc
+## The top-level (root) documentation file built by `rustdoc` (`cargo doc`).
+RUSTDOC_OUT := $(DOC_BUILD)/___Theseus_Crates___/index.html
 
-## Builds Theseus's documentation.
-## The entire project is built as normal using the "cargo doc" command.
+## Builds Theseus's source-level documentation for all Rust crates except applications.
+## The entire project is built as normal using the `cargo doc` command.
 docs: doc
 doc: check_rustc
 	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
-	@mkdir -p build
-	@rm -rf build/doc
-	@cp -rf target/doc ./build/
-	@echo -e "\nDocumentation is now available at: \"$(DOC_ROOT)\"."
+	@rm -rf $(DOC_BUILD)
+	@mkdir -p $(DOC_BUILD)
+	@cp -rf target/doc $(BUILD_DIR)/
+	@echo -e "\nDocumentation is now available at: \"$(RUSTDOC_OUT)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
@@ -474,30 +476,37 @@ view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
-## building on WSL
-	@cmd.exe /C start "$(shell wslpath -w $(DOC_ROOT))" &
+	@cmd.exe /C start "$(shell wslpath -w $(RUSTDOC_OUT))" &
 else
-## building on regular Linux or macOS
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
+	@xdg-open $(RUSTDOC_OUT) > /dev/null 2>&1 || open $(RUSTDOC_OUT) &
 endif
 
 
-## The top-level book file.
-BOOK_ROOT := $(ROOT_DIR)/book/book/index.html
+### The location of Theseus's book-style documentation. 
+BOOK_DIR := $(ROOT_DIR)/book
+BOOK_OUT := $(BOOK_DIR)/book/html/index.html
 
-## Builds the Theseus book in the `book` directory.
-book: $(wildcard book/src/*)
+### Builds the Theseus book-style documentation using `mdbook`.
+book: $(wildcard $(BOOK_DIR)/src/*) $(BOOK_DIR)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
-	@echo -e "  cargo +stable install mdbook"
+	@echo -e "    cargo +stable install mdbook"
+	@echo -e "You can optionally install linkcheck too:"
+	@echo -e "    cargo +stable install mdbook-linkcheck"
 	@exit 1
 endif
-	@cd book && mdbook build
-	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_ROOT)\"."
+	@(cd $(BOOK_DIR) && mdbook build)
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT)\"."
 
 
-## Opens the top-level file of the Theseus book.
+### Opens the Theseus book.
 view-book: book
+	@echo -e "Opening the Theseus book in your browser..."
+ifneq ($(IS_WSL), )
+	cmd.exe /C start "$(shell wslpath -w $(BOOK_OUT))" &
+else
+	xdg-open $(BOOK_OUT) > /dev/null 2>&1 || open $(BOOK_OUT) &
+endif
 
 
 ### The primary documentation for this makefile itself.
