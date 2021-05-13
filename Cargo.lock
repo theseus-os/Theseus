@@ -368,23 +368,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cload"
-version = "0.1.0"
-dependencies = [
- "fs_node",
- "getopts",
- "libc",
- "log",
- "memory",
- "mod_mgmt",
- "path",
- "rustc-demangle",
- "task",
- "terminal_print",
- "xmas-elf",
-]
-
-[[package]]
 name = "color"
 version = "0.1.0"
 

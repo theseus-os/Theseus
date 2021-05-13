@@ -22,9 +22,9 @@ In short, building a C program requires the following steps:
  4. `make orun`     -- run Theseus in QEMU (without rebuilding anything)
 
 ## Running a C program
-Once the C program's executable ELF file has been packaged into Theseus's ISO image, you can run it in Theseus using the `cload` application. For example, in Theseus's shell, run the following:
+Once the C program's executable ELF file has been packaged into Theseus's ISO image, you can run it in Theseus using the `loadc` application. For example, in Theseus's shell, run the following:
 ```
-cload /namespaces/_executable/dummy_works
+loadc /namespaces/_executable/dummy_works
 ```
 You should observe the return value displayed on the shell GUI, as well as various log messages that show output from tlibc alongside those from Theseus's kernel. 
 
