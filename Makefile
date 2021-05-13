@@ -484,20 +484,22 @@ endif
 
 ### The location of Theseus's book-style documentation. 
 BOOK_DIR := $(ROOT_DIR)/book
-BOOK_OUT := $(BOOK_DIR)/book/index.html
+BOOK_OUT := $(BOOK_DIR)/book/html/index.html
 
-## Builds the Theseus book-style documentation.
-book: $(wildcard $(BOOK_DIR)/src/*)
+### Builds the Theseus book-style documentation using `mdbook`.
+book: $(wildcard $(BOOK_DIR)/src/*) $(BOOK_DIR)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
 	@echo -e "    cargo +stable install mdbook"
+	@echo -e "You can optionally install linkcheck too:"
+	@echo -e "    cargo +stable install mdbook-linkcheck"
 	@exit 1
 endif
 	@(cd $(BOOK_DIR) && mdbook build)
 	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT)\"."
 
 
-## Opens the Theseus book .
+### Opens the Theseus book.
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
 ifneq ($(IS_WSL), )

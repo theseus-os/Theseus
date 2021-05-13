@@ -9,7 +9,7 @@ and they must expose a **public** entry point function named `main`, shown below
 If the `main` function is not `pub`, it may be removed by compiler optimizations or undiscoverable by the application loader code, 
 causing the application crate to be non-runnable.
 
-```rust
+```rust,no_run,no_playground
 pub fn main(args: Vec<String>) -> isize { ... }
 ```
 

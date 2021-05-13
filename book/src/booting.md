@@ -7,7 +7,7 @@ In the future, we intend to add support for booting via the UEFI standard, espec
 
 After initializing a very simple page table and other miscellaneous hardware features, the assembly file `boot.asm` jumps to `long_mode_start`, which now runs *64-bit code* in long mode.
 Then, it jumps to `start_high`, such that we're not running the base kernel image in the higher half (see more about [higher-half kernels here](https://wiki.osdev.org/Higher_Half_Kernel)).
-We then set up a new Global Descriptor Table (GDT), segmentation registers, and finally call the Rust code entry point [`nano_core_start()`](../nano_core/fn.nano_core_start.html) with the proper arguments. 
+We then set up a new Global Descriptor Table (GDT), segmentation registers, and finally call the Rust code entry point [`nano_core_start()`](https://theseus-os.github.io/Theseus/doc/nano_core/index.html) with the proper arguments. 
 After calling `nano_core_start`, the assembly files are no longer used, and `nano_core_start` should never return.
 
 ## Initial Rust code: the `nano_core`
@@ -38,3 +38,5 @@ Currently, there is a single `captain` implementation in Theseus (for a standard
 
 At the end, the `captain` must enable interrupts to allow the system to schedule other tasks. 
 It then falls into an idle loop that does nothing and will never be run again by the scheduler.
+
+> Note: in the future, Theseus will add additional architecture-specific `captain`s for different platforms.

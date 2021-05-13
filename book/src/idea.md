@@ -5,9 +5,9 @@ As such, it foregoes hardware protection, which generally results in higher effi
 
 This is possible only when all applications are written in safe Rust, which prevents them from circumventing any type-based restrictions to cause unintended or undefined behavior.
 
-Check out [this presentation slide deck](https://docs.google.com/presentation/d/1GG5xGyK5IOuRpdNV0O_BhibO-X5tI6u_qtO_okoI1Gk/edit?usp=sharing) to learn more about how we ensure protection and isolation in Theseus based on the foundation of Rust's type and memory safety guarantees.
+Check out [this presentation slide deck](https://docs.google.com/presentation/d/e/2PACX-1vSa0gp8sbq8S9MB4V-FYjs6xJGIPm0fsZSVdtZ9U2bQWRX9gngwztXTIJiRwxtAosLWPk0v60abDMTU/pub?start=false&loop=false) to learn more about how we ensure protection and isolation in Theseus based on the foundation of Rust's type and memory safety guarantees.
 
-For more details about Theseus's research merit and novel design principles, see our [OSDI 2020 paper or slides](https://www.usenix.org/conference/osdi20/presentation/boos) (or the [video here](https://www.youtube.com/watch?v=i1pLDZKtlBI)), Kevin's [dissertation](https://scholarship.rice.edu/handle/1911/109201), or Ramla's [thesis](https://scholarship.rice.edu/handle/1911/109609). 
+For more details about Theseus's research merit and novel design principles, see our [selected list of papers and presentations here](papers_presentations.md).
 
 
 ## P.I.E. Principle
@@ -46,4 +46,4 @@ Theseus still does use virtual memory translation provided by the MMU, but simpl
 ## Going beyond safety
 
 We show that it's possible to leverage safe languages and compilers to go much further than just basic isolation and memory safety. 
-For more details, read about Theseus's novel concept of [intralingual design here](intralingual.md).
+For more details, read about Theseus's novel concept of intralingual design (coming soon). <!-- TODO [intralingual design here](intralingual.md). -->

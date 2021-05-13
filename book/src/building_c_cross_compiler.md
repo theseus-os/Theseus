@@ -1,6 +1,6 @@
 # Building GCC and Binutils to target Theseus (x86_64-elf)
 
-**We provide a script that does all of this for you;** see [scripts/install_x86_64-elf-gcc.sh](../../scripts/install_x86_64-elf-gcc.sh), 
+**We provide a script that does all of this for you;** see [scripts/install_x86_64-elf-gcc.sh](https://github.com/theseus-os/Theseus/blob/theseus_main/scripts/install_x86_64-elf-gcc.sh), 
 ```sh
 ./scripts/install_x86_64-elf-gcc.sh $HOME/src $HOME/opt
 ```
@@ -18,7 +18,7 @@ In this document, we refer to two directories, both of which can be set to the l
 # 1. Build a standalone version of GCC & Binutils
 
 Install the required packages:
-```
+```sh
 sudo apt-get install gcc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo gcc-multilib
 ```
 
@@ -31,13 +31,13 @@ You can obtain it from many mirrors online, such as these:
  * binultis: <https://mirrors.kernel.org/gnu/binutils/>
 
 Create a destination directory for the newly-built packages to be installed into:
-```
+```sh
 mkdir $DEST
 export PREFIX="$DEST/gcc-10.2.0"
 ```
 
 Extract each source code package into the directory of your choice (`$SRC`), and then build binutils:
-```
+```sh
 mkdir build-binutils
 cd build-binutils
 ../binutils-2.35.1/configure --prefix="$PREFIX" --disable-nls --disable-werror
@@ -46,7 +46,7 @@ make install
 ```
 
 Then go back to the `$SRC` directory and build gcc:
-```
+```sh
 # Use a GCC script to download all necessary prerequisites
 cd gcc-10.2.0
 ./contrib/download_prerequisites
@@ -66,7 +66,7 @@ Now that we have a standalone build of gcc/binutils that is independent from the
 Note: these instructions are based on [this tutorial from the OS dev wiki](https://wiki.osdev.org/GCC_Cross-Compiler#The_Build).
 
 First, create a directory for the cross compiler to be built and installed into, e.g., `$DEST/cross`.
-```
+```sh
 mkdir $DEST/cross
 export PREFIX="$DEST/cross"
 export TARGET=x86_64-elf
@@ -74,23 +74,23 @@ export PATH="$PREFIX/bin:$PATH"
 ```
 
 Second, re-build the same binutils package as above, but in a way that configures it to target Theseus. 
-```
+```sh
 ../binutils-2.35.1/configure --target=$TARGET --prefix="$PREFIX" --with-sysroot --disable-nls --disable-werror
 make -j$(nproc)
 make install
 ```
 
 Confirm that your new cross-compiler binutils package exists and is on your system PATH:
-```
+```sh
 which --$TARGET-as 
 ```
 should output something like:
-```
-/home/$USER/opt/cross/bin/x86_64-elf-as
-```
+> ```
+> /home/my_username/opt/cross/bin/x86_64-elf-as
+> ```
 
 Then go back to the `$SRC` directory and build a version of gcc that cross compiles C/C++ programs to Theseus.     
-```
+```sh
 mkdir cross-build-gcc
 cd cross-build-gcc
 ../gcc-10.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
@@ -101,7 +101,7 @@ make install-target-libgcc
 ```
 
 Before moving on, let's check to make sure our cross-compiled gcc is working.
-```
+```sh
 $DEST/cross/bin/$TARGET-gcc --version
 ```
 This should print out some information about your newly-built gcc. Add the `-v` flag to dump out even more info. 
@@ -138,7 +138,7 @@ x86_64-*-elf*)
 
 ## Building GCC again with no red zone
 Go back to the build directory and reconfigure and re-make libgcc:
-```
+```sh
 cd $SRC/cross-build-gcc
 ../gcc-10.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
 make all-gcc -j$(nproc)
@@ -148,16 +148,16 @@ make install-target-libgcc
 ```
 
 To check that it worked, run the following two commands:
-```
+```sh
 x86_64-elf-gcc -print-libgcc-file-name
 x86_64-elf-gcc -mno-red-zone -print-libgcc-file-name
 ```
 
 The first one should output a path to `libgcc.a`, and the second should output a similar path with `no-red-zone` as the containing directory:
-```
-$DEST/cross/lib/gcc/x86_64-elf/10.2.0/libgcc.a
-$DEST/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone/libgcc.a
-```
+> ```
+> $DEST/cross/lib/gcc/x86_64-elf/10.2.0/libgcc.a
+> $DEST/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone/libgcc.a
+> ```
 
 # Appendix: How to use the no-red-zone version of GCC
 To properly use this new version of GCC that cross-compiles to the Theseus target and disables the red zone, make sure you:

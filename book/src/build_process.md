@@ -14,7 +14,7 @@ Theseus source code uses the standard Rust-provided `cfg` options for conditiona
 We expose the ability to set this via the `THESEUS_CONFIG` environment variable, which can be set on the command line, in the Makefile itself, or in a Rust build script. 
 
 To set one or more cfg options on the command line, all cfg options must be specified in one quoted string, with each individual cfg option separated by whitespace. For example:
-```
+```sh
 make run THESEUS_CONFIG="cfg_option_1 cfg_option_2"
 ```
 
@@ -30,7 +30,7 @@ my_target:
 In Rust, you can use cfg statements in one of two main ways:
 1. As attributes on code blocks, which enable conditional compilation.
     * Below, `foo()` will be compiled as the top block if `cfg_option_1` was set, otherwise `foo()` will be compiled as the bottom block. 
-        ```rust
+        ```rust,no_run,no_playground
         #[cfg(cfg_option_1)]
         fn foo() {
           println!("cfg_option_1 was enabled!");
@@ -43,7 +43,7 @@ In Rust, you can use cfg statements in one of two main ways:
         ```
 
 2. As runtime if-conditionals, which enable runtime use and checking of a statically-known cfg option via the `cfg!()` macro, which returns a boolean value.
-    ```rust
+    ```rust,no_run,no_playground
     fn foo() {
        if cfg!("cfg_option_1") {
           println!("cfg_option_1 was enabled!");
@@ -89,7 +89,7 @@ The last line in the above TOML snippet is what informs cargo that it should run
 Theseus can be built in a variety of modes, but offers two presets: **debug** and **release** build modes.
 By default, Theseus is built in release mode for usable performance within an emulator like QEMU.
 To build in debug mode, set the `BUILD_MODE` environment variable when running `make`, like so:
-```
+```sh
 make run  BUILD_MODE=debug  [host=yes]
 ```
 
