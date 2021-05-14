@@ -3,7 +3,7 @@ name = "sdt"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for ACPI SDT and other descriptor tables"
-build = "../../build.rs"
+build = "../../../build.rs"
 
 [dependencies]
 zerocopy = "0.3.0"

@@ -38,7 +38,7 @@ path = "../runqueue_round_robin"
 path = "../runqueue_priority"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [lib]
 crate-type = ["rlib"]

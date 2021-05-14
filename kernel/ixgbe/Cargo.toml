@@ -61,7 +61,7 @@ default-features = false
 features = [ "alloc" ]
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [dependencies.runqueue]
 path = "../runqueue"

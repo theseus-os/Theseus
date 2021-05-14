@@ -41,29 +41,30 @@ path = "../pic"
 [dependencies.ap_start]
 path = "../ap_start"
 
-[dependencies.acpi_table]
-path = "../acpi_table"
-
-[dependencies.acpi_table_handler]
-path = "../acpi_table_handler"
-
-[dependencies.rsdp]
-path = "../rsdp"
-
-[dependencies.rsdt]
-path = "../rsdt"
-
-[dependencies.fadt]
-path = "../fadt"
-
-[dependencies.madt]
-path = "../madt"
-
-[dependencies.hpet]
-path = "../hpet"
-
 [dependencies.pause]
 path = "../pause"
+
+[dependencies.acpi_table]
+path = "acpi_table"
+
+[dependencies.acpi_table_handler]
+path = "acpi_table_handler"
+
+[dependencies.rsdp]
+path = "rsdp"
+
+[dependencies.rsdt]
+path = "rsdt"
+
+[dependencies.fadt]
+path = "fadt"
+
+[dependencies.madt]
+path = "madt"
+
+[dependencies.hpet]
+path = "hpet"
+
 
 [lib]
 crate-type = ["rlib"]
