@@ -2,7 +2,7 @@
 
 Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
-For more info, check out Theseus's [documentation](#Documentation) or our [published academic papers](http://kevinaboos.web.rice.edu/publications.html), which describe Theseus's design and implementation. 
+For more info, check out Theseus's [documentation](#Documentation) or our [published academic papers](book/src/papers_presentations.md), which describe Theseus's design and implementation. 
 
 Theseus is under active development, and although it is not yet mature, we envision that Theseus will be useful in high-end embedded systems or edge datacenter environments. 
 We are continually working to improve the OS, including its fault recovery abilities for higher system availability without redundancy, as well as easier and more arbitrary live evolution and runtime flexbility.
@@ -175,8 +175,6 @@ On WSL or other host environments where `/dev` device nodes don't exist, you can
 To boot Theseus over PXE (network boot), see [this set of separate instructions](book/src/pxe.md).
 
 
-
-
 ## Debugging Theseus on QEMU
 GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in 64-bit long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](https://os.phil-opp.com/set-up-gdb/)), so we can just quickly set it up with the following commands.  
 
@@ -228,10 +226,11 @@ In that case, try the following steps to fix it:
 We would like to express our thanks to the [OS Dev wiki](https://wiki.osdev.org/) and its community and to Philipp Oppermann's [blog_os](https://os.phil-opp.com/) for serving as excellent starting points for Theseus. The early days of Theseus's development progress are indebted to these resources. 
 
 
-# License
+## License
 Theseus's source code is licensed under the MIT License. See the [LICENSE-MIT](LICENSE-MIT) file for more. 
 
-# Contributing
+
+## Contributing
 We adhere to similar development and code style guidelines as the core Rust language project. See more [here](book/src/ch01.md)
 
 PRs and issues are welcome from anyone; because Theseus is an experimental OS, certain features may be deprioritized or excluded from the main branch. Don't hesitate to ask or mention something though! :smile:
