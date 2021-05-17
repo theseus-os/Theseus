@@ -14,7 +14,7 @@ debug ?= none
 net ?= none
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
-IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 
 
 
@@ -110,7 +110,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
 		check_rustc \
-		clean run run_pause iso build cargo \
+		clean run run_pause iso build cargo grub \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -126,18 +126,8 @@ endif
 
 
 
-### Demo/test target for building libtheseus
-libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
-	@( \
-		cd $(ROOT_DIR)/libtheseus && \
-		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
-	)
-
-
-### This target builds the `theseus_cargo` tool as a dedicated binary.
-$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
-	@echo -e "\n=================== Building the theseus_cargo tool ==================="
-	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+### Convenience target for building the ISO using the below $(iso) target
+iso: $(iso)
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
@@ -145,13 +135,8 @@ $(iso): build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-# autogenerate the grub.cfg file
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) grub
 
-
-### Convenience target for building the ISO	using the above target
-iso: $(iso)
 
 
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
@@ -267,6 +252,7 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
 
+
 ### This compiles the assembly files in the nano_core. 
 ### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
@@ -282,6 +268,76 @@ endif
 		$< \
 		-o $@ \
 		$(CFLAGS)
+
+
+
+### This target auto-generates a new grub.cfg file and uses grub to build a bootable ISO.
+### This target should be invoked when all of contents of `GRUB_ISOFILES` are ready to be packaged into an ISO.
+grub:
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+
+
+
+### Target for building tlibc, Theseus's libc.
+### This should be run after `make iso` has completed.
+### It builds a new .iso that includes tlibc, which can be run using `make orun`.
+### Currently we can manually load tlibc within Theseus for testing purposes by running `ns --load path/to/tlibc_file`.
+.PHONY: tlibc
+TLIBC_OBJ_FILE := tlibc/target/$(TARGET)/$(BUILD_MODE)/tlibc.o
+tlibc:
+# $(MAKE) -C tlibc
+	( cd ./tlibc; sh build.sh )
+
+	@for f in $(TLIBC_OBJ_FILE); do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	$(MAKE) grub
+	@echo -e "\n\033[1;32m The build of tlibc finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run', that will overwrite tlibc)"
+	@echo -e "    --> In Theseus, run 'ns --load /namespaces/_applications/tlibc.o' to load tlibc."
+
+
+
+### Target for building a test C language executable.
+### This should be run after `make iso` and then `make tlibc` have both completed.
+.PHONY: c_test
+C_TEST_TARGET := dummy_works
+c_test:
+	$(MAKE) -C c_test $(C_TEST_TARGET)
+	@for f in c_test/$(C_TEST_TARGET); do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+	$(MAKE) grub
+	@echo -e "\n\033[1;32m The build of $(C_TEST_TARGET) finished successfully and was packaged into the Theseus ISO.\033[0m"
+	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
+	@echo -e "    --> In Theseus, run 'loadc /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
+
+
+
+### Demo/test target for building libtheseus
+libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
+	@( \
+		cd $(ROOT_DIR)/libtheseus && \
+		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
+	)
+
+
+
+### This target builds the `theseus_cargo` tool as a dedicated binary.
+$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
+	@echo -e "\n=================== Building the theseus_cargo tool ==================="
+	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+
+
+
+### Removes all build files
+clean:
+	cargo clean
+	@rm -rf build
+	
 
 
 
@@ -328,8 +384,7 @@ simd_personality_sse: build_sse build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) grub
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -349,8 +404,7 @@ simd_personality_avx: build_avx build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(MAKE) grub
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -394,19 +448,26 @@ preserve_old_modules:
 
 
 
-## The top-level (root) documentation file
-DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
-## Builds Theseus's documentation.
-## The entire project is built as normal using the "cargo doc" command.
+###################################################################################################
+############################ Targets for building documentation ###################################
+###################################################################################################
+
+## The output directory for source-level documentation.
+DOC_BUILD := $(BUILD_DIR)/doc
+## The top-level (root) documentation file built by `rustdoc` (`cargo doc`).
+RUSTDOC_OUT := $(DOC_BUILD)/___Theseus_Crates___/index.html
+
+## Builds Theseus's source-level documentation for all Rust crates except applications.
+## The entire project is built as normal using the `cargo doc` command.
 docs: doc
 doc: check_rustc
 	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
-	@mkdir -p build
-	@rm -rf build/doc
-	@cp -rf target/doc ./build/
-	@echo -e "\nDocumentation is now available at: \"$(DOC_ROOT)\"."
+	@rm -rf $(DOC_BUILD)
+	@mkdir -p $(DOC_BUILD)
+	@cp -rf target/doc $(BUILD_DIR)/
+	@echo -e "\nDocumentation is now available at: \"$(RUSTDOC_OUT)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
@@ -415,39 +476,40 @@ view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
-## building on WSL
-	@cmd.exe /C start "$(shell wslpath -w $(DOC_ROOT))" &
+	@cmd.exe /C start "$(shell wslpath -w $(RUSTDOC_OUT))" &
 else
-## building on regular Linux or macOS
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
+	@xdg-open $(RUSTDOC_OUT) > /dev/null 2>&1 || open $(RUSTDOC_OUT) &
 endif
 
 
-## The top-level book file.
-BOOK_ROOT := $(ROOT_DIR)/book/book/index.html
+### The location of Theseus's book-style documentation. 
+BOOK_DIR := $(ROOT_DIR)/book
+BOOK_OUT := $(BOOK_DIR)/book/html/index.html
 
-## Builds the Theseus book in the `book` directory.
-book: $(wildcard book/src/*)
+### Builds the Theseus book-style documentation using `mdbook`.
+book: $(wildcard $(BOOK_DIR)/src/*) $(BOOK_DIR)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
-	@echo -e "  cargo +stable install mdbook"
+	@echo -e "    cargo +stable install mdbook"
+	@echo -e "You can optionally install linkcheck too:"
+	@echo -e "    cargo +stable install mdbook-linkcheck"
 	@exit 1
 endif
-	@cd book && mdbook build
-	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_ROOT)\"."
+	@(cd $(BOOK_DIR) && mdbook build)
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT)\"."
 
 
-## Opens the top-level file of the Theseus book.
+### Opens the Theseus book.
 view-book: book
+	@echo -e "Opening the Theseus book in your browser..."
+ifneq ($(IS_WSL), )
+	cmd.exe /C start "$(shell wslpath -w $(BOOK_OUT))" &
+else
+	xdg-open $(BOOK_OUT) > /dev/null 2>&1 || open $(BOOK_OUT) &
+endif
 
 
-## Removes all build files
-clean:
-	cargo clean
-	@rm -rf build
-	
-
-
+### The primary documentation for this makefile itself.
 help: 
 	@echo -e "\nThe following make targets are available:"
 	@echo -e "   iso:"
@@ -532,11 +594,10 @@ help:
 
 
 
-
-
 ###################################################################################################
-### This section has QEMU arguments and configuration
+##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
+
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 
@@ -597,7 +658,7 @@ endif
 
 
 ###################################################################################################
-### This section has targets for running and debugging 
+########################## Targets for running and debugging Theseus ##############################
 ###################################################################################################
 
 ### Old Run: runs the most recent build without rebuilding

@@ -1,11 +1,12 @@
 # Booting Theseus on Real Hardware via PXE
-The following instructions are a combination of [this](https://www.ostechnix.com/how-to-install-pxe-server-on-ubuntu-16-04/) guide on OSTechNix to set up PXE for Ubuntu and [this](https://wellsie.net/p/286/) guide by Andrew Wells for using an arbitrary ISO with PXE.
+The following instructions are a combination of [this guide on OSTechNix](https://www.ostechnix.com/how-to-install-pxe-server-on-ubuntu-16-04/) to set up PXE for Ubuntu and [this guide by Andrew Wells](https://wellsie.net/p/286/) on how to use any ISO with PXE.
 
 PXE can be used to load Rust onto a target computer that is connected by LAN to the host machine used for development. To set up the host machine for PXE, first make the Theseus ISO by navigating to the directory Theseus is in and running:
 `make iso`
 
 Then, you will need to set up a TFTP and DHCP server which the test machine will access.
-### Setting up the TFTP Server
+
+## Setting up the TFTP Server
 First, install all necessary packages and dependencies for TFTP:
 `sudo apt-get install apache2 tftpd-hpa inetutils-inetd nasm`
 Edit the tftp-hpa configuration file:
@@ -26,7 +27,7 @@ Restart the TFTP server and check to see if it's running:
 
 If the TFTP server is unable to start and mentions an in-use socket, reopen the tftp-hpa configuration file,set the line that has `TFTP_ADDRESS=":69"` to be equal to `6969` instead and restart the TFTP server.
 
-### Setting up the DHCP Server
+## Setting up the DHCP Server
 First, install package for DHCP server:
 `sudo apt-get install isc-dhcp-server`
 
@@ -60,7 +61,7 @@ Restart the DHCP server and check to see if it's running:
 `sudo systemctl restart isc-dhcp-server`
 `sudo systemctl status isc-dhcp-server`
 
-### Loading the Theseus ISO Into the TFTP Server
+## Loading the Theseus ISO Into the TFTP Server
 In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.
 `wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz`
 `tar -xzvf syslinux-*.tar.gz`
@@ -90,7 +91,7 @@ Finally, restart the DHCP server one more time and make sure it's running:
 
 On the target computer, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the target computer is restarted, it should boot into a menu which displays booting into Theseus as an option.
 
-### Subsequent PXE Uses
+## Subsequent PXE Uses
 After setting up PXE the first time, you can run `make pxe` to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier:
 `sudo ifconfig <network-device-name> 192.168.1.105`
 

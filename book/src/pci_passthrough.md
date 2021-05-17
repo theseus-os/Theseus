@@ -8,7 +8,9 @@ There are three main steps to prepare a device for PCI passthrough:
 3. Attach device to VFIO driver
 
 Once these steps are completed, the device slot information can be passed to QEMU using the **vfio** flag. For example, for device 59:00.0, we run:    
-`make run vfio=59:00.0`
+```sh
+make run vfio=59:00.0
+```
 
 ### Finding device information
 First, run `lspci -vnn` to find the slot information, the kernel driver in use for the device, and the vendor ID and device code for the device you want to use.
@@ -26,20 +28,25 @@ Below is sample output for a Mellanox ethernet card we'd like to access using PC
 
 ### Detach device from current driver
 To detach the device from the kernel driver, run the following command, filling in the `slot_info` and `driver_name` with values you retrieved in the previous step.
-``` 
-echo $(slot_info) > /sys/bus/pci/drivers/$(driver_name)/unbind
+```sh
+echo $slot_info > /sys/bus/pci/drivers/$driver_name/unbind
 ```
-e.g. `echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind`
+In the above example, this would look like:
+```sh
+echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind
+```
 
 If you run `lspci -v` now, you'll see that a kernel driver is longer attached to this device.
 
 ### Attach device to VFIO driver
-First, load the VFIO driver using the command:  
-`modprobe vfio-pci`
+First, load the VFIO driver by doing:
+```sh
+modprobe vfio-pci
+```
 
 To attach the new driver, run the following command, filling in the `vendor_id` and `device_code` with values you retrieved in the first step.
-```
-echo $(vendor_id) $(device_code) > /sys/bus/pci/drivers/vfio-pci/new_id
+```sh
+echo $vendor_id $device_code > /sys/bus/pci/drivers/vfio-pci/new_id
 ```
 e.g. `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
 
@@ -47,12 +54,20 @@ Now, QEMU can be launched with direct access to the device.
 
 ### Note: access for unprivileged users
 To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
+```sh
+readlink /sys/bus/pci/devices/$slot_info/iommu_group
 ```
-readlink /sys/bus/pci/devices/$(slot_info)/iommu_group
+for example:
+```sh
+readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group
 ```
-e.g. `readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group`
 
-for which we got the output: `../../../../kernel/iommu_groups/74`, where 74 is the group number.
+for which we obtain the output below, in which `74` is the group number:
+> ```
+> ../../../../kernel/iommu_groups/74
+>```
 
-Then give access to the user using the command:   
-`chown $(user) /dev/vfio/$(group_no)`
+Finally, give access to the current user via this command:
+```sh
+chown $USER /dev/vfio/$group_number
+```

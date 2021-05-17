@@ -1,49 +1,18 @@
-# Overview of Theseus
+# Introduction to Theseus
 
-Theseus is a new OS written from scratch in Rust, with the goals of runtime composability and state spill freedom.
+*Note: for general info about Theseus and a quick start guide, see the [top-level README](https://github.com/theseus-os/Theseus#readme).*
 
-The Theseus kernel is composed of many small entities, each contained within a single Rust crate, and built all together as a cargo virtual workspace.
-All crates in Theseus are listed in the sidebar to the left. Click on a crate name to read more about it, and the functions and types it provides.
-Each crate is its own project with its own "Cargo.toml" manifest file that specifies that crate's dependencies and features.
 
-## Basic Overview of All Crates
+Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
-One-line summaries of what each crate includes (may be incomplete):
+Continue to the next chapter to learn more about Theseus, or feel free to check out our [published academic papers](papers_presentations.md) for a deep dive into the research and design concept behind Theseus.
 
-* `acpi`: ACPI (Advanced Configuration and Power Interface) support for Theseus, including multicore discovery.
-* `apic`: APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic.
-* `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
-* `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
-* `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
-* `event_types`: The types used for passing input and output events across the system.
-* `device_manager`: Code for handling the sequence required to initialize each driver.
-* `e1000`: Support for the e1000 NIC and driver.
-* `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
-* `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
-* `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
-* `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
-* `interrupts`: Interrupt configuration and handlers for Theseus.
-* `ioapic`: IOAPIC (I/O Advanced Programmable Interrupt Controller) support (x86 only) for Theseus.
-* `keyboard`: simple PS2 keyboard driver.
-* `memory`: The virtual memory subsystem.
-* `mod_mgmt`: Module management, including parsing, loading, linking, unloading, and metadata management.
-* `mouse`: simple PS2 mouse driver.
-* `nano-core`: a tiny module that is responsible for bootstrapping the OS at startup.
-* `panic_entry`: Default entry point for panics and unwinding, as required by the Rust compiler.
-* `panic_wrapper`: Wrapper functions for handling and propagating panics.
-* `path`: contains functions for navigating the filesystem / getting pointers to specific directories via the Path struct.
-* `pci`: Basic PCI support for Theseus, x86 only.
-* `pic`: PIC (Programmable Interrupt Controller), support for a legacy interrupt controller that isn't used much.
-* `pit_clock`: PIT (Programmable Interval Timer) support for Theseus, x86 only.
-* `ps2`: general driver for interfacing with PS2 devices and issuing PS2 commands (for mouse/keyboard).
-* `root`: special implementation of the root directory; initializes the root of the filesystem
-* `rtc`: simple driver for handling the Real Time Clock chip.
-* `scheduler`: The scheduler and runqueue management.
-* `serial_port`: simple driver for writing to the serial_port, used mostly for debugging.
-* `spawn`: Functions and wrappers for spawning new Tasks.
-* `task`: Task types and structure definitions, a Task is a thread of execution.
-* `text_display` : Defines a trait for anything that can display text to the screen
-* `tsc`: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.
-* `tss`: TSS (Task State Segment support (x86 only) for Theseus.
-* `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
-* `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
+
+### What's in a name? 
+
+> The ship wherein Theseus and the youth of Athens returned from Crete had thirty oars, and was preserved by the Athenians down even to the time of Demetrius Phalereus, for they took away the old planks as they decayed, putting in new and stronger timber in their places, in so much that this ship became a standing example among the philosophers, for the logical question of things that grow; one side holding that the ship remained the same, and the other contending that it was not the same.
+> &nbsp; — &nbsp; *Plutarch, Theseus*
+
+The name "Theseus" was inspired by *The Ship of Theseus*, an ancient Greek metaphysical paradox and thought experiment that pondered: "if you iteratively replace every individual piece of an object, is that re-built object still the same object?"
+
+Though we do not attempt to answer this question, we do wish to enable any and every OS component to be replaced,  across all layers of the system, at runtime without rebooting. This goal of easy and arbitrary *live evolution* was (and still is) one of the original motivating factors behind Theseus.
