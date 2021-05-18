@@ -1,4 +1,4 @@
-# Building Rust crates out of tree, in a safe way
+# Building Out-of-Tree Rust Crates Safely
 
 
 ## Background: The Problem
@@ -7,7 +7,7 @@ By *integrate*, we mean the ability to have one binary depend upon or invoke ano
 
 There is another related problem that stems from how the Rust compiler appends unique IDs (metadata used by the compiler) to each compiled crate and each (non-mangled) symbol in those crates; this issue presents itself even in unlinked object files.
 
-As an example, the `page_allocator` crate in Theseus will be compiled into an object file with a name like `page_allocator-c55b593144fe8446.o`, and the function `page_allocator::AllocatedPages::split()` implemented and exposed by that crate will be emitted as the symbol `_ZN14page_allocator14AllocatedPages5split17heb9fd5c4948b3ccfE`.
+As an example, the `page_allocator` crate in Theseus will be compiled into an object file with a name like `page_allocator-c55b593144fe8446.o`, and the function `page_allocator::allocate_pages_at()` implemented and exposed by that crate will be emitted as the symbol `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE`. 
 
 The values of both the crate's unique ID (`c55b593144fe8446`) and every symbol's unique ID (e.g., `heb9fd5c4948b3ccfE`) are deterministic, but depend on many factors. 
 One of those factors is the compiler version, the source directory, the target directory, and more. 
@@ -15,80 +15,96 @@ We sometimes refer to both of these unique IDs as a *hash* value since the compi
 
 Theseus loads and links crate object files dynamically at runtime. 
 When we build all of the Theseus kernel crates together into a single target directory ([read more here](build_process.md#cargo)),the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
-A running instance of Theseus will have a single instance of the `page_allocator` crate loaded into memory and expect all other crates to depend upon that instance, meaning that they should be compiled to expect linkage against its specifically-hashed symbols, e.g., `_ZN14page_allocator14AllocatedPages5split17heb9fd5c4948b3ccfE`.
+A running instance of Theseus will have a single instance of the `page_allocator` crate loaded into memory and expect all other crates to depend upon that instance, meaning that they should be compiled to expect linkage against its specifically-hashed symbols, e.g., `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE`.
 
 If you separately compile another crate `my_crate` that depends on the exact same set of Theseus kernel crates, cargo will recompile all Theseus crates *from source* into that new target directory, resulting in the recompiled object files and their symbols having completely different unique ID hashes from the original Theseus instance. 
-As such, when attempting to load `my_crate` into that already-running prebuilt instance of Theseus, it will fail to load and link because that version of `my_crate` will depend on differently-hashed crates/symbols, e.g., it may depend upon the symbol `_ZN14page_allocator14AllocatedPages5splithd64cba3bd66ea729E` instead of `_ZN14page_allocator14AllocatedPages5split17heb9fd5c4948b3ccfE` (note the different appended hash values).
+As such, when attempting to load `my_crate` into that already-running prebuilt instance of Theseus, it will fail to load and link because that version of `my_crate` will depend on differently-hashed crates/symbols, e.g., it may depend upon the symbol `_ZN14page_allocator17allocate_pages_at17hd64cba3bd66ea729E` instead of `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE` (note the different appended hash values).
 
-Therefore, the *real* problem is that there is no default, easy way to tell cargo that it should build a crate against a prebuilt set of dependencies. [See this GitHub issue for more](https://github.com/rust-lang/cargo/issues/1139) about why this feature would be useful, but why it still isn't supported (hint: no stable Rust ABI).
+Therefore, the *real* problem is that there is no supported method to tell cargo that it should build a crate against a prebuilt set of dependencies. [See this GitHub issue for more](https://github.com/rust-lang/cargo/issues/1139) about why this feature would be useful, but why it still isn't supported (hint: no stable Rust ABI).
 
 
-### Bad solution
+### A Bad, Unsafe Solution
 
-Technically, we can solve this by using an existing non-Rust stable ABI, i.e., the C language ABI. 
-However, doing so requires defining/exposing Rust functions, data, types, or any other kind of symbol in a C-compatible way, such that you can invoke them using the C ABI (its expected struct memory layout and calling convention).
+Technically, we could solve this by using an existing non-Rust stable ABI, like the C language ABI. 
+This would entail defining/exposing Rust functions, data, and types in a C-compatible way such that they can are comaptible with the C ABI (its expected struct memory layout and calling convention).
+Unfortunately, this necessitates the usage of unsafe FFI code blocks (via C-style extern functions) to connect two separate bodies of fully-safe Rust code, which is both dumb and tedious. 
 
-Unfortunately, this necessitates the usage of unsafe FFI code blocks (via C-style extern functions) to connect two separate bodies of fully-safe Rust code, which is just plain dumb, not to mention tedious!
-In the above example, we would be required to export the `page_allocator::AllocatePages::split()` function in the `page_allocator` crate as such:
+In the above example, instead of simply invoking `page_allocator::allocate_pages_at()` directly, we would need to export the appropriate wrapper functions like so:
 ```rust
+// in `page_allocator`
 #[no_mangle]
-pub extern "C" fn split_allocated_pages(...) { ... }
-```
-and then invoke it unsafely from the dependent `my_crate` as such:
-```rust
-extern "C" {
-    fn split_allocated_pages(...) { ... }
+pub extern "C" fn allocate_pages_at(num_pages: usize, ...) -> ... {
+    page_allocator::allocate_pages_at(num_pages, ...)
+    ...
 }
-fn foo(ap: AllocatedPages) {
+```
+and then invoke it using unsafe FFI code blocks like so:
+```rust
+// in `my_crate` 
+extern "C" {
+    fn allocate_pages_at(num_pages: usize, ...);
+}
+fn main() {
     unsafe {
-        split_allocated_pages(ap);
+        allocate_pages_at(15, ...);
         ...
     }
 }
 ```
-instead of just invoking `AllocatedPages::split()` directly in safe Rust code. (Note that many FFI details are omitted above.)
-
+Note that many details are omitted above; while these code wrappers and bindings can be autogenerated, unsafety cannot be avoided. 
 
 Surely we can do better!
 
 
 ## Solution: `theseus_cargo` for out-of-tree builds
 
-The solution is to force cargo to use the existing pre-built crate objects to resolve dependencies that an out-of-tree crate has on Theseus's in-tree crates, and prevent cargo from re-compiling all of Theseus's in-tree crates from source.
+A superior solution is to "trick" the Rust compiler into using the prebuilt crates from an existing build of Theseus.
+To this end, we've created `theseus_cargo`, a custom build tool and wrapper around cargo that resolves an out-of-tree crate's dependencies on in-tree Theseus crates using their prebuilt objects instead of rebuiling them from source.   
 
 This is realized in two parts:
-1. Generating the prebuilt dependencies while building Theseus, which will be used to resolve dependencies when separately building the out-of-tree crate(s),
-2. Correctly building the out-of-tree crate(s) against those prebuilt Theseus dependencies. 
+1. Generating the prebuilt dependencies while building Theseus's (in-tree) kernel crates,
+2. Correctly building the out-of-tree crate(s) against those prebuilt Theseus crates. 
 
 
 ### 1. Generating the set of prebuilt dependencies
 
-To create a set of dependency files understood by Rust's compiler toolchain, the main top-level Makefile  we build all of the 
-
-We use the `tools/copy_latest_crate_objects` build tool to accomplish this:
+To create a set of dependency files understood by Rust's compiler toolchain, the main top-level Makefile invokes another custom build tool, a Rust program called `copy_latest_crate_objects` found in the `tools/` directory. 
+It is invoked like so (details omitted):
 ```mk
-cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
-    -i ./target/$(TARGET)/$(BUILD_MODE)/deps \
-    --output-objects $(OBJECT_FILES_BUILD_DIR) \
-    --output-deps $(DEPS_DIR) \
-    --output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
-    -k ./kernel \
-    -a ./applications \
-    --kernel-prefix $(KERNEL_PREFIX) \
-    --app-prefix $(APP_PREFIX) \
-    -e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
+cargo run ... tools/copy_latest_crate_objects -- \
+    --input  "target/.../deps"                   \
+    --output-deps  "build/deps/"                 \
+    --output-sysroot  "build/deps/sysroot/"      \
+    ...
 ```
+The arguments above specify that we wish to
+1. Use the Rust-produced build artifacts (compiled crates) in the `target/.../deps` directory as input, and then
+2. Copy them into the `build/deps/` output directory.  
+3. Also, copy the prebuilt Rust fundamental libraries (`core`, `alloc`) that were cross-compiled into the Theseus platform-specific sysroot folder into `build/deps/sysroot/`.
+
+Afterwards, the `build/deps/` directory contains all prebuilt dependencies needed to compile an out-of-tree crate against the existing build of Theseus, with all the properly versioned (correctly hashed) crates and symbols.
 
 
 ### 2. Building other Rust code against the prebuilt Theseus dependencies
 
-TODO: describe `theseus_cargo` build tool and what it does.
+With the contents of `build/deps/` described above, we can invoke `theseus_cargo` to build the new out-of-tree crate in a separate compilation instance. 
+The `theseus_cargo` tool is a Rust program that invokes cargo, captures its verbose output, and then modifies and re-runs the `rustc` commands issued by cargo to use the prebuilt crates to fulfill the out-of-tree crate's dependencies. 
+Those prebuilt crates are a set of dependencies, namely `.rmeta` and `.rlib` files, that are understood by the Rust compiler's internal metadata parsers.
+
+
+Currently, to use `theseus_cargo`, it must be compiled and installed from source:
+```sh
+cargo install --path="tools/theseus_cargo" --root=$INSTALL_DIR
+```
+
+Then, it can be invoked just like `cargo build`, e.g., to build a crate against the prebuilt dependencies in the input folder:
+```sh
+$INSTALL_DIR/theseus_cargo --input "build/deps/"  build
+```
 
 See the [`tools/theseus_cargo` source code](https://github.com/theseus-os/Theseus/blob/theseus_main/tools/theseus_cargo/src/main.rs) for more details.
 
-
-
-
+The approach of capturing and modifying rustc commands using verbose output from cargo is obviously not ideal, but there is currently no other supported way to obtain this info because [cargo is removing its `--build-plan` option](https://github.com/rust-lang/cargo/issues/5579).
 
 
 ## Related Links, Discussions, Alternative Approaches
