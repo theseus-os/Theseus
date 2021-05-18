@@ -83,6 +83,13 @@ The arguments above specify that we wish to
 3. Also, copy the prebuilt Rust fundamental libraries (`core`, `alloc`) that were cross-compiled into the Theseus platform-specific sysroot folder into `build/deps/sysroot/`.
 
 Afterwards, the `build/deps/` directory contains all prebuilt dependencies needed to compile an out-of-tree crate against the existing build of Theseus, with all the properly versioned (correctly hashed) crates and symbols.
+This tool also generates a `TheseusBuild.toml` file that describes the parameters of this build of Theseus, such that it can be replicated by `theseus_cargo`. For example:
+```toml
+target = "x86_64-theseus"
+rustflags = "--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no"
+cargoflags = "--release"
+host_deps = "./host_deps"
+```
 
 
 ### 2. Building other Rust code against the prebuilt Theseus dependencies
@@ -91,6 +98,11 @@ With the contents of `build/deps/` described above, we can invoke `theseus_cargo
 The `theseus_cargo` tool is a Rust program that invokes cargo, captures its verbose output, and then modifies and re-runs the `rustc` commands issued by cargo to use the prebuilt crates to fulfill the out-of-tree crate's dependencies. 
 Those prebuilt crates are a set of dependencies, namely `.rmeta` and `.rlib` files, that are understood by the Rust compiler's internal metadata parsers.
 
+The main modifications `theseus_cargo` makes to rustc commands is to replace the `<values>` of the following arguments with the paths and names of the prebuilt Theseus crates in `/build/deps/`:
+* `-L dependency=<dir>`  
+* `--extern <crate_name>=<crate_file>.rmeta`    
+
+If a given rustc command has any arguments that need to be changed, `theseus_cargo` reissues that command.
 
 Currently, to use `theseus_cargo`, it must be compiled and installed from source:
 ```sh
@@ -101,6 +113,8 @@ Then, it can be invoked just like `cargo build`, e.g., to build a crate against 
 ```sh
 $INSTALL_DIR/theseus_cargo --input "build/deps/"  build
 ```
+
+Currently, `theseus_cargo` prints ***very verbose*** output and will show a lot of irrelevant warning and log statements describing what it is doing. If the out-of-tree crate was successfully built, it will finally print something like "Ran rustc command (modified for Theseus) successfully" before exiting successfully with exit code 0.
 
 See the [`tools/theseus_cargo` source code](https://github.com/theseus-os/Theseus/blob/theseus_main/tools/theseus_cargo/src/main.rs) for more details.
 
