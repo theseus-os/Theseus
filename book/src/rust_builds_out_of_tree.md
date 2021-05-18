@@ -10,17 +10,17 @@ There is another related problem that stems from how the Rust compiler appends u
 As an example, the `page_allocator` crate in Theseus will be compiled into an object file with a name like `page_allocator-c55b593144fe8446.o`, and the function `page_allocator::allocate_pages_at()` implemented and exposed by that crate will be emitted as the symbol `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE`. 
 
 The values of both the crate's unique ID (`c55b593144fe8446`) and every symbol's unique ID (e.g., `heb9fd5c4948b3ccfE`) are deterministic, but depend on many factors. 
-One of those factors is the compiler version, the source directory, the target directory, and more. 
+Those factors include the compiler version, the source directory, the target directory, and more. 
 We sometimes refer to both of these unique IDs as a *hash* value since the compiler creates them by hashing together these various factors; how this hash is generated is considered opaque and liable to change, thus we treat it as a black box. 
 
 Theseus loads and links crate object files dynamically at runtime. 
-When we build all of the Theseus kernel crates together into a single target directory ([read more here](build_process.md#cargo)),the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
+When we build all of the Theseus kernel crates together into a single target directory ([read more here](build_process.md#cargo)), the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
 A running instance of Theseus will have a single instance of the `page_allocator` crate loaded into memory and expect all other crates to depend upon that instance, meaning that they should be compiled to expect linkage against its specifically-hashed symbols, e.g., `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE`.
 
 If you separately compile another crate `my_crate` that depends on the exact same set of Theseus kernel crates, cargo will recompile all Theseus crates *from source* into that new target directory, resulting in the recompiled object files and their symbols having completely different unique ID hashes from the original Theseus instance. 
 As such, when attempting to load `my_crate` into that already-running prebuilt instance of Theseus, it will fail to load and link because that version of `my_crate` will depend on differently-hashed crates/symbols, e.g., it may depend upon the symbol `_ZN14page_allocator17allocate_pages_at17hd64cba3bd66ea729E` instead of `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE` (note the different appended hash values).
 
-Therefore, the *real* problem is that there is no supported method to tell cargo that it should build a crate against a prebuilt set of dependencies. [See this GitHub issue for more](https://github.com/rust-lang/cargo/issues/1139) about why this feature would be useful, but why it still isn't supported (hint: no stable Rust ABI).
+Therefore, the **real problem** is that there is no supported method to tell cargo that it should build a crate against a prebuilt set of dependencies. [See this GitHub issue for more](https://github.com/rust-lang/cargo/issues/1139) about why this feature would be useful, but why it still isn't supported (hint: no stable Rust ABI).
 
 
 ### A Bad, Unsafe Solution
@@ -72,10 +72,10 @@ This is realized in two parts:
 To create a set of dependency files understood by Rust's compiler toolchain, the main top-level Makefile invokes another custom build tool, a Rust program called `copy_latest_crate_objects` found in the `tools/` directory. 
 It is invoked like so (details omitted):
 ```mk
-cargo run ... tools/copy_latest_crate_objects -- \
-    --input  "target/.../deps"                   \
-    --output-deps  "build/deps/"                 \
-    --output-sysroot  "build/deps/sysroot/"      \
+cargo run ... tools/copy_latest_crate_objects --  \
+    --input  "target/.../deps"                    \
+    --output-deps  "build/deps/"                  \
+    --output-sysroot  "build/deps/sysroot/"       \
     ...
 ```
 The arguments above specify that we wish to
