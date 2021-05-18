@@ -25,7 +25,7 @@ make view-book
 
 If you have problems installing or using `mdbook`, try to uninstall it, update Rust, and then reinstall it:
 ```sh
-cargo uninstallmdbook
+cargo uninstall mdbook
 rustup toolchain update stable
 cargo +stable install mdbook
 ```
