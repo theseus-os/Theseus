@@ -23,5 +23,12 @@ From the top-level directory, you can use `make` to build and view the book by r
 make view-book
 ```
 
+If you have problems installing or using `mdbook`, try to uninstall it, update Rust, and then reinstall it:
+```sh
+cargo uninstallmdbook
+rustup toolchain update stable
+cargo +stable install mdbook
+```
+
 ## See also: Source-level Documentation
 For specific details about the source code, e.g., structs, functions, modules, and more, please check out the source-level documentation generated from the inline source code comments by `rustdoc`.

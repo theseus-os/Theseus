@@ -30,7 +30,8 @@ This would entail defining/exposing Rust functions, data, and types in a C-compa
 Unfortunately, this necessitates the usage of unsafe FFI code blocks (via C-style extern functions) to connect two separate bodies of fully-safe Rust code, which is both dumb and tedious. 
 
 In the above example, instead of simply invoking `page_allocator::allocate_pages_at()` directly, we would need to export the appropriate wrapper functions like so:
-```rust
+
+```rust,no_run,no_playground
 // in `page_allocator`
 #[no_mangle]
 pub extern "C" fn allocate_pages_at(num_pages: usize, ...) -> ... {
@@ -39,7 +40,7 @@ pub extern "C" fn allocate_pages_at(num_pages: usize, ...) -> ... {
 }
 ```
 and then invoke it using unsafe FFI code blocks like so:
-```rust
+```rust,no_run,no_playground
 // in `my_crate` 
 extern "C" {
     fn allocate_pages_at(num_pages: usize, ...);
