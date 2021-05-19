@@ -12,19 +12,21 @@
     - [Intralingual Design]() <!-- TODO: intralingual.md -->
 
 
-## Building and Configuring Theseus
-- [Building and Configuring Theseus](build_process.md)
-    - [`theseus_cargo`: Building Rust Crates Out-of-Tree](rust_builds_out_of_tree.md)
-
-
 ## Application Development
 - [Developing a Theseus Application](app.md)
 
 
+## Building and Configuring Theseus
+- [The Theseus Build Process](build_process.md)
+    - [Configuring Theseus](configuration.md)
+    - [`theseus_cargo`: Building Rust Crates Out-of-Tree](rust_builds_out_of_tree.md)
+
+
 ## Experimental Support for C programs
-- [Building a C cross compiler for Theseus](building_c_cross_compiler.md)
-    - [Building and Running a basic C program](c_program.md)
-    - [How C compiling and linking works with tlibc (Theseus's libc)](c_compilation_tlibc.md)
+- [Experimental Support for C programs](c_program.md)
+    - [Building a C cross compiler for Theseus](building_c_cross_compiler.md)
+    - [`tlibc`: Theseus's libc and how it works](c_compilation_tlibc.md)
+    - [Compiling and linking C programs](c_compiler_linker.md)
 
 
 ## Overview of Key Subsystems 
