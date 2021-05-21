@@ -49,6 +49,8 @@ path = "../ethernet_smoltcp_device"
 [dependencies.ixgbe]
 path = "../ixgbe"
 
+[dependencies.mlx5]
+path = "../mlx5"
 
 [lib]
 crate-type = ["rlib"]

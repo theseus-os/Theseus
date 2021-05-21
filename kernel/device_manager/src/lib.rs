@@ -16,6 +16,7 @@ extern crate ethernet_smoltcp_device;
 extern crate mpmc;
 extern crate ixgbe;
 extern crate alloc;
+extern crate mlx5;
 
 use mpmc::Queue;
 use event_types::Event;
@@ -115,6 +116,10 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
                 ixgbe_devs.push(ixgbe_nic);
                 continue;
+            }
+            if dev.vendor_id == mlx5::MLX_VEND && dev.device_id == mlx5::CONNECTX5_DEV {
+                info!("mlx5 PCI device found at: {:?}", dev.location);
+                mlx5::ConnectX5Nic::init(dev)?;
             }
 
             // here: check for and initialize other ethernet cards

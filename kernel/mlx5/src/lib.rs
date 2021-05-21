@@ -46,7 +46,7 @@ use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool, i
 use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
-use mellanox_ethernet::{CommandQueueEntry, InitializationSegment};
+use mellanox_ethernet::{CommandQueueEntry, InitializationSegment, CommandQueue, CommandOpcode};
 
 
 pub const MLX_VEND:           u16 = 0x15B3;  // Vendor ID for Mellanox
@@ -94,36 +94,61 @@ impl ConnectX5Nic {
             error!("mlx5::init(): BAR0 is of I/O type");
             return Err("mlx5::init(): BAR0 is of I/O type")
         }
+        trace!("init segment size = {}", core::mem::size_of::<mellanox_ethernet::InitializationSegment>());
   
+
+        // set the bus mastering bit for this PciDevice, which allows it to use DMA
+        mlx5_pci_dev.pci_set_command_bus_master_bit();
+
         // memory mapped base address
         let mem_base = mlx5_pci_dev.determine_mem_base(0)?;
-
+        trace!("mlx5 mem base = {}", mem_base);
         // map pages to the physical address given by mem_base as that is the intialization segment
         let mut init_segment = ConnectX5Nic::mapped_init_segment(mem_base)?;
 
+        // init_segment.pf_reset();
+        init_segment.print();
+        
         // find number of entries in command queue and stride
         let max_cmdq_entries = init_segment.num_cmdq_entries() as usize;
+        trace!("mlx5 cmdq entries = {}", max_cmdq_entries);
         let cmdq_stride = init_segment.cmdq_entry_stride();
+        trace!("mlx5 cmdq stride = {}", cmdq_stride);
 
         // create command queue
         let size_in_bytes_of_cmdq = max_cmdq_entries * core::mem::size_of::<CommandQueueEntry>();
+        trace!("total size in bytes of cmdq = {}", size_in_bytes_of_cmdq);
     
         // cmdp needs to be aligned, check??
         let (cmdq_mapped_pages, cmdq_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_cmdq, NIC_MAPPING_FLAGS)?;
+        trace!("cmdq mem base = {}", cmdq_starting_phys_addr);
     
         // cast our physically-contiguous MappedPages into a slice of command queue entries
-        let mut cmdq = BoxRefMut::new(Box::new(cmdq_mapped_pages)).try_map_mut(|mp| mp.as_slice_mut::<CommandQueueEntry>(0, max_cmdq_entries))?;
+        let mut cmdq = CommandQueue{
+            entries: BoxRefMut::new(Box::new(cmdq_mapped_pages)).try_map_mut(|mp| mp.as_slice_mut::<CommandQueueEntry>(0, max_cmdq_entries))?,
+            current_entry: 0
+        };
 
         // write physical location of command queues to initialization segment
         init_segment.set_physical_address_of_cmdq(cmdq_starting_phys_addr);
 
         // Read initalizing field from initialization segment until it is cleared
         while init_segment.device_is_initializing() {}
-        
-        // Execute ENABLE_HCA command
+        trace!("initializing field is cleared.");
 
-        // set the bus mastering bit for this PciDevice, which allows it to use DMA
-        mlx5_pci_dev.pci_set_command_bus_master_bit();
+        
+        // // Execute ENABLE_HCA command
+        // cmdq.entries[cmdq.current_entry].init_cmdq_entry(CommandOpcode::EnableHca);
+
+        // // ring doorbell
+        // init_segment.post_command(cmdq.current_entry);
+
+        // // wait for command to complete 
+        // while cmdq.entries[cmdq.current_entry].owned_by_hw() {}
+
+        // trace!("init hca status: {:?}", cmdq.entries[cmdq.current_entry].status());
+
+
 
         Ok(())
 

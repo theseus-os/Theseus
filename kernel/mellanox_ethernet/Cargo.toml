@@ -10,6 +10,7 @@ volatile = "0.2.7"
 bit_field = "0.7.0"
 zerocopy = "0.3.0"
 static_assertions = "1.1.0"
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 
 
 [dependencies.memory]
