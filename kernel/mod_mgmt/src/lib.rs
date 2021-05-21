@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(rustc_private)]
-#![feature(const_fn)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;

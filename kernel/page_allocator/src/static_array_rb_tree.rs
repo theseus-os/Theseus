@@ -67,7 +67,13 @@ impl<T: Ord> Default for StaticArrayRBTree<T> {
 impl<T: Ord> StaticArrayRBTree<T> {
 	/// Create a new empty collection (the default).
 	pub const fn empty() -> Self {
-		StaticArrayRBTree(Inner::Array([None; 32]))
+		// Yes, this is stupid... Rust seems to have removed the [None; 32] array init syntax.
+		StaticArrayRBTree(Inner::Array([
+			None, None, None, None, None, None, None, None,
+			None, None, None, None, None, None, None, None,
+			None, None, None, None, None, None, None, None,
+			None, None, None, None, None, None, None, None,
+		]))
 	}
 
 	/// Create a new collection based on the given array of values.

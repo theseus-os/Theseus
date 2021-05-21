@@ -208,7 +208,8 @@ pub fn init(
     ), &'static str>
 {
     let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info)?;
-
+    debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
+    
     // bootstrap a PageTable from the currently-loaded page table
     let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
     let mut page_table = PageTable::from_current(current_active_p4)?;

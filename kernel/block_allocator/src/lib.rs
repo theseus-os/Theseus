@@ -10,8 +10,6 @@
 // Allocator code taken from Philipp Oppermann's blog "Writing an OS in Rust" (https://github.com/phil-opp/blog_os/tree/post-11)
 // and modified by Ramla Ijaz
 
-#![feature(const_fn)]
-#![feature(const_in_array_repeat_expressions)]
 #![feature(const_mut_refs)]
 #![no_std]
 
@@ -51,8 +49,10 @@ impl FixedSizeBlockAllocator {
 
     /// Creates an empty FixedSizeBlockAllocator.
     pub const fn new() -> Self {
+        const SIZE: usize = BLOCK_SIZES.len();
+        const INIT_VALUE: Option<&'static mut ListNode> = None;
         FixedSizeBlockAllocator {
-            list_heads: [None; BLOCK_SIZES.len()],
+            list_heads: [INIT_VALUE; SIZE],
             fallback_allocator: linked_list_allocator::Heap::empty(),
         }
     }

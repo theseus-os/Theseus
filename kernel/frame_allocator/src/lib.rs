@@ -19,7 +19,7 @@
 //! a requested address is in a chunk that needs to be merged.
 
 #![no_std]
-#![feature(const_fn, const_in_array_repeat_expressions)]
+#![feature(const_fn_trait_bound)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -82,9 +82,9 @@ pub fn init<F, R, P>(
         return Err("BUG: Frame allocator was already initialized, cannot be initialized twice.");
     }
 
-    let mut free_list: [Option<Chunk>; 32] = [None; 32];
+    let mut free_list: [Option<Chunk>; 32] = Default::default();
     let mut free_list_idx = 0;
-    let mut reserved_list: [Option<Chunk>; 32] = [None; 32];
+    let mut reserved_list: [Option<Chunk>; 32] = Default::default();
     let mut reserved_list_idx = 0;
 
     // Populate the list of free regions for general-purpose usage.
