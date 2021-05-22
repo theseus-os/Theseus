@@ -2,7 +2,6 @@
 //! It starts off as a single fixed size allocator.
 //! When a more complex heap is set up, it is set as the default allocator.
 
-#![feature(const_fn)]
 #![feature(allocator_api)]
 #![no_std]
 

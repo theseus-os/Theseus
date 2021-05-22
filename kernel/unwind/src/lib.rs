@@ -1,6 +1,6 @@
 //! Support for unwinding the call stack and cleaning up stack frames.
 //! 
-//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table`) from object files.
+//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
 //! It can also be used to generate stack traces (backtrace) using only that debug information
 //! without using frame pointer registers.
 //! 
@@ -135,7 +135,7 @@ impl StackFrame {
     /// The address of the Language-Specific Data Area (LSDA)
     /// that is needed to discover the unwinding cleanup routines (landing pads)
     /// for this stack frame. 
-    /// Typically, this points to an area within the `.gcc_except_table` section,
+    /// Typically, this points to an area within a `.gcc_except_table` section,
     /// which then needs to be parsed.
     pub fn lsda(&self) -> Option<u64> {
         self.lsda

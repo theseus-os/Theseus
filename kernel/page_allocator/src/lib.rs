@@ -16,7 +16,7 @@
 //! that's where we should add those merging features in whenever we do so.
 
 #![no_std]
-#![feature(const_fn, const_in_array_repeat_expressions)]
+#![feature(const_fn_trait_bound)]
 
 extern crate alloc;
 #[macro_use] extern crate log;

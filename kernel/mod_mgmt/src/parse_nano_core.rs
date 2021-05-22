@@ -49,7 +49,10 @@ fn mp_range(mp_ref: &Arc<Mutex<MappedPages>>) -> Range<VirtualAddress> {
 
 
 /// Parses the nano_core object file that represents the already loaded (and currently running) nano_core code.
+///
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
+/// We consider both `GLOBAL` and `WEAK` symbols to be global public symbols; this is necessary because symbols that are 
+/// compiler builtins, such as memset, memcpy, etc, are symbols with weak linkage in newer versions of Rust (2021 and later).
 /// 
 /// # Return
 /// If successful, this returns a tuple of the following:
@@ -321,7 +324,7 @@ fn parse_nano_core_symbol_file(
             let sec_ndx   = parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 6 'Ndx'")?;
             let name      = parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 7 'Name'")?;
             
-            let global = bind == "GLOBAL";
+            let global = bind == "GLOBAL" || bind == "WEAK";
             let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
                 error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                 "parse_nano_core_symbol_file(): couldn't parse virtual address (value column)"
@@ -505,15 +508,15 @@ fn parse_nano_core_binary(
         let data_pages_locked = data_pages.lock();
 
         // Iterate through the symbol table so we can find which sections are global (publicly visible).
-        use xmas_elf::symbol_table::Entry;
+        use xmas_elf::symbol_table::{Entry, Binding};
         for entry in symtab.iter() {
-            // public symbols can have any visibility setting, but it's the binding that matters (GLOBAL or LOCAL)
+            // public symbols can have any visibility setting, but it's the binding that matters (GLOBAL/WEAK vs. LOCAL)
             if let (Ok(bind), Ok(typ)) = (entry.get_binding(), entry.get_type()) {
                 if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
                     let sec_vaddr_value = entry.value() as usize;
                     let sec_size = entry.size() as usize;
                     let name = entry.get_name(&elf_file)?;
-                    let global = bind == xmas_elf::symbol_table::Binding::Global;
+                    let global = bind == Binding::Global || bind == Binding::Weak;
 
                     let demangled = demangle(name).to_string();
                     // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_value, sec_size);
