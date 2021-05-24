@@ -6,7 +6,7 @@ description = "Support for ACPI FADT"
 build = "../../build.rs"
 
 [dependencies]
-zerocopy = "0.3.0"
+zerocopy = "0.5.0"
 
 [dependencies.memory]
 path = "../memory"

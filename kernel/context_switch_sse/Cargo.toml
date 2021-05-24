@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-zerocopy = "0.3.0"
+zerocopy = "0.5.0"
 
 [dependencies.context_switch_regular]
 path = "../context_switch_regular"
