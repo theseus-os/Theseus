@@ -21,6 +21,9 @@ sudo port install gmake wget coreutils findutils nasm pkgconfig x86_64-elf-gcc
 sudo ln -s /opt/local/bin/gmake /opt/local/bin/make
 ### Macports doesn't have xorriso
 brew install xorriso
+### Install dependencies needed to cross-compile grub for macOS
+brew install autoconf automake libtool pkg-config
+
 
 export SRC_DIR="$HOME/theseus_tools_src"
 export PREFIX="$HOME/theseus_tools_opt/"
