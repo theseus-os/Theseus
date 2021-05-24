@@ -89,11 +89,11 @@ If you're on WSL, also do the following steps:
     rm -rf $HOME/theseus_tools_src $HOME/theseus_tools_opt /opt/local/bin/make
     ```
 
-  * If you're building Theseus on an M1-based Mac, you may need to use x86 emulation:
+  * If you're building Theseus on an M1-based Mac, you may need to use x86 emulation
     ```sh
     arch -x86_64 bash   # or another shell of your choice
     ```
-    You may need to adjust your system `PATH` if both x86 and ARM homebrew binaries are installed:
+    and possibly adjust your system `PATH` if both x86 and ARM homebrew binaries are installed:
     ```sh
     export PATH=/usr/local/Homebrew/bin:$PATH
     ```
