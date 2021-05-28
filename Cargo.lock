@@ -226,10 +226,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "block_io"
+name = "block_cache"
 version = "0.1.0"
 dependencies = [
  "hashbrown",
+ "lazy_static",
+ "log",
+ "storage_device",
+]
+
+[[package]]
+name = "block_io"
+version = "0.1.0"
+dependencies = [
+ "block_cache",
  "lazy_static",
  "log",
  "storage_device",
