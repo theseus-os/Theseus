@@ -16,6 +16,7 @@ extern crate ethernet_smoltcp_device;
 extern crate mpmc;
 extern crate ixgbe;
 extern crate alloc;
+extern crate fatfs;
 
 use mpmc::Queue;
 use event_types::Event;
@@ -23,16 +24,15 @@ use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
+use storage_manager::StorageDeviceRef;
 
-/// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
+/// A randomly chosen IP address that must be outside of the DHCP range.
+/// TODO: use DHCP to acquire an IP address.
 const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
-// const DEFAULT_LOCAL_IP: &'static str = "192.168.1.252/24"; // home router reserved IP
-// const DEFAULT_LOCAL_IP: &'static str = "10.42.0.91/24"; // rice net IP
 
-/// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
+/// Standard home router address.
+/// TODO: use DHCP to acquire gateway IP
 const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
-// const DEFAULT_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1]; // the default gateway for our TAP-based bridge
-// const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 42, 0, 1]; // rice net gateway ip
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
@@ -70,11 +70,13 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
         // If this is a storage device, initialize it as such.
         match storage_manager::init_device(dev) {
-            // finished with this device, proceed to the next one.
-            Ok(true)  => continue,
-            // fall through, let another handler deal with it.
-            Ok(false) => { }
-            // error, so skip this device.
+            // Successfully initialized this storage device.
+            Ok(Some(_storage_controller)) => continue,
+
+            // Not a storage device, so fall through and let another handler deal with it.
+            Ok(None) => { }
+            
+            // Error initializing this device, so skip it.
             Err(e) => {
                 error!("Failed to initialize storage device, it will be unavailable.\n{:?}\nError: {}", dev, e);
                 continue;
@@ -139,5 +141,65 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         warn!("Note: no network devices found on this system.");
     }
 
+    // Discover filesystems from each storage device on the storage controllers initialized above
+    // and mount each filesystem to the root directory by default.
+    for storage_controller in storage_manager::STORAGE_CONTROLLERS.lock().iter() {
+        for storage_device in storage_controller.lock().devices() {
+            let disk = FatFsStorageDisk {
+                disk: storage_device,
+                offset: 0,
+            };
+            fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
+        }
+    }
+
     Ok(())
+}
+
+
+
+/// An adapter that implements traits required by the `fatfs` crate
+/// for any `StorageDevice` that wants to be usable by `fatfs`.
+struct FatFsStorageDisk {
+    disk: BlockIo,
+    offset: usize,
+}
+
+impl fatfs::Read for FatFsStorageDisk {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+
+    }
+}
+
+impl fatfs::Write for FatFsStorageDisk {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+
+    }
+}
+
+use fatfs::SeekFrom;
+impl fatfs::Seek for FatFsStorageDisk {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, Self::Error> {
+
+    }
+}
+
+
+// TODO: when `StorageDevice` returns better error types (e.g., an enum),
+//       we'll need to implement this `IoError` trait for those error types.
+impl fatfs::IoError for &str {
+    fn is_interrupted(&self) -> bool {
+        false // no concept of interrupted storage device requests in Theseus yet
+    }
+
+    fn new_unexpected_eof_error() -> Self {
+        "Read operation hit an unexpected EOF (end of file)"
+    }
+
+    fn new_write_zero_error() -> Self {
+        "Write operation failed to write more than zero bytes"
+    }
+}
+impl fatfs::IoBase for FatFsStorageDisk {
+    type Error = &'static str;
 }

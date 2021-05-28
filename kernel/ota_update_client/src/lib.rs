@@ -44,7 +44,6 @@ use http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_req
 use smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
 
 /// The IP address of the update server.
-// const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84]; // the static IP of `kevin.recg.rice.edu`
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [10, 0, 2, 2]; // the IP of the host machine when running on QEMU.
 
 /// The TCP port on the update server that listens for update requests 

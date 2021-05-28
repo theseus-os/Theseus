@@ -159,6 +159,25 @@ enum BusDriveSelect {
 }
 
 
+/// TODO: support DMA like so: <https://wiki.osdev.org/ATA/ATAPI_using_DMA#The_Bus_Master_Register>
+/// There is one instance of this struct for each `AtaBus`.
+/// 
+/// Note: TODO: depending on whether BAR4 is a Port I/O address or MMIO address, this could also be mapped into memory.
+///             We need to have an abstraction either above or beneath `Volatile` that allows reads/writes from port I/O and memory addresses similarly.
+#[allow(unused)]
+struct AtaBusMaster {
+	/// For the primary bus, this exists at BAR4 + 0.
+	/// For the secondary,   this exists at BAR4 + 8.
+	command:      Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 2.
+	/// For the secondary,   this exists at BAR4 + 10.
+	status:       Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 4.
+	/// For the secondary,   this exists at BAR4 + 12.
+	prdt_address: Port<u32>,
+}
+
+
 /// There are two ATA buses on an IDE controller,
 /// and each one can have two drives attached to it:
 /// one master drive and one slave drive. 
@@ -737,7 +756,7 @@ impl IdeController {
 		
 		let drive_fmt = |drive: &Result<AtaDrive, &str>| -> String {
 			match drive {
-				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_sectors()),
+				Ok(d)  => format!("drive initialized, size: {} sectors, {} bytes", d.size_in_sectors(), d.size_in_sectors() * d.sector_size_in_bytes()),
 				Err(e) => format!("{}", e),
 			}
 		};

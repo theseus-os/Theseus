@@ -7,6 +7,12 @@ build = "../../build.rs"
 
 [dependencies]
 
+[dependencies.fatfs]
+version = "0.4"
+git = "https://github.com/rafalh/rust-fatfs"
+default-features = false
+features = [ " alloc", "lfn", "unicode" ]
+
 [dependencies.log]
 version = "0.4.8"
 
