@@ -30,6 +30,9 @@ use block_cache::BlockCache;
 /// 
 /// It also contains a cache for the blocks in the backing storage device,
 /// in order to improve performance by avoiding actual storage device access.
+///
+/// TODO: separate out `BlockCache` from `BlockIo` so they can optionally be nested
+///       rather than forbicly. This'll be similar to BufferedReader-like wrapper types.
 pub struct BlockIo {
     /// The cache of blocks (sectors) read from the storage device,
     /// a map from sector number to data byte array.
@@ -39,17 +42,21 @@ pub struct BlockIo {
 impl BlockIo {
     /// Creates a new `BlockIo` device 
     pub fn new(storage_device: StorageDeviceRef) -> BlockIo {
-        let device_ref = storage_device.clone();
-        let locked_device = device_ref.lock();
+        let (size_in_bytes, size_in_blocks, block_size_in_bytes) = {
+            let d = storage_device.lock();
+            (d.size_in_bytes(), d.size_in_sectors(), d.sector_size_in_bytes())
+        };
         BlockIo {
             cache: BlockCache::new(storage_device),
             block_size: BlockSize {
-                size_in_bytes: locked_device.size_in_bytes(),
-                size_in_blocks: locked_device.size_in_sectors(),
-                block_size_in_bytes: locked_device.sector_size_in_bytes()
+                size_in_bytes,
+                size_in_blocks,
+                block_size_in_bytes,
             },
         }
     }
+
+    pub fn block_size(&self) -> &BlockSize { &self.block_size }
 
     /// Reads data from this block storage device and places it into the provided `buffer`.
     /// The length of the given `buffer` determines the maximum number of bytes to be read.

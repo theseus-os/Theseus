@@ -17,6 +17,7 @@ extern crate mpmc;
 extern crate ixgbe;
 extern crate alloc;
 extern crate fatfs;
+extern crate block_io;
 
 use mpmc::Queue;
 use event_types::Event;
@@ -25,6 +26,7 @@ use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
 use storage_manager::StorageDeviceRef;
+use block_io::BlockIo;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -146,7 +148,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     for storage_controller in storage_manager::STORAGE_CONTROLLERS.lock().iter() {
         for storage_device in storage_controller.lock().devices() {
             let disk = FatFsStorageDisk {
-                disk: storage_device,
+                block_io: BlockIo::new(storage_device),
                 offset: 0,
             };
             fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
@@ -161,26 +163,32 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 /// An adapter that implements traits required by the `fatfs` crate
 /// for any `StorageDevice` that wants to be usable by `fatfs`.
 struct FatFsStorageDisk {
-    disk: BlockIo,
+    block_io: BlockIo,
     offset: usize,
 }
 
 impl fatfs::Read for FatFsStorageDisk {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-
+        let bytes_read = self.block_io.read(buf, self.offset)?;
+        self.offset += bytes_read;
     }
 }
 
 impl fatfs::Write for FatFsStorageDisk {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-
+        let bytes_written = self.block_io.write(buf, self.offset)?;
+        self.offset += bytes_written;
     }
 }
 
 use fatfs::SeekFrom;
 impl fatfs::Seek for FatFsStorageDisk {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, Self::Error> {
-
+        match pos {
+            SeekFrom::Start(new_pos) => self.offset = new_pos,
+            SeekFrom::Current(addend) => self.offset += addend,
+            SeekFrom::End(addend) => self.offset = self.block_io.block_size().size_in_bytes + addend,
+        }
     }
 }
 
