@@ -269,9 +269,9 @@ checksum = "980479e6fde23246dfb54d47580d66b4e99202e7579c5eaa9fe10ecb5ebd2182"
 
 [[package]]
 name = "byteorder"
-version = "1.3.4"
+version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
+checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "captain"
@@ -1356,8 +1356,11 @@ name = "mellanox_ethernet"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
+ "byteorder",
+ "kernel_config",
  "log",
  "memory",
+ "nic_initialization",
  "owning_ref",
  "static_assertions",
  "volatile",

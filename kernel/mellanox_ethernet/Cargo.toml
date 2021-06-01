@@ -11,10 +11,16 @@ bit_field = "0.7.0"
 zerocopy = "0.3.0"
 static_assertions = "1.1.0"
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
-
+byteorder = { version = "1.4.3", default-features = false }
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.nic_initialization]
+path = "../nic_initialization"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
 
 [dependencies.log]
 version = "0.4.8"

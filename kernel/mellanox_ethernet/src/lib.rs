@@ -10,43 +10,54 @@ extern crate zerocopy;
 extern crate alloc;
 #[macro_use] extern crate static_assertions;
 extern crate owning_ref;
+extern crate byteorder;
+extern crate nic_initialization;
+extern crate kernel_config;
+
+use core::num;
 
 use alloc::vec::Vec;
-use memory::{PhysicalAddress, PhysicalMemoryRegion, MappedPages};
+use memory::{PhysicalAddress, PhysicalMemoryRegion, MappedPages, create_contiguous_mapping};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use bit_field::BitField;
-use zerocopy::FromBytes;
+use zerocopy::*;
+// {FromBytes, AsBytes, Unaligned};
+use byteorder::BigEndian;
 use owning_ref:: BoxRefMut;
+use nic_initialization::NIC_MAPPING_FLAGS;
+use kernel_config::memory::PAGE_SIZE;
 
 // Taken from HCA BAR 
 const MAX_CMND_QUEUE_ENTRIES: usize = 64;
 #[derive(FromBytes)]
 #[repr(C,packed)]
+/// The fields are stored in BE ordering, so that's why every 32 bits field seems to be opposite to the diagram in the manual
 pub struct InitializationSegment {
-    fw_rev_major:               ReadOnly<u16>,
-    fw_rev_minor:               ReadOnly<u16>,
-    fw_rev_subminor:            ReadOnly<u16>,
-    cmd_interface_rev:          ReadOnly<u16>,
+    fw_rev_minor:               ReadOnly<U16<BigEndian>>,
+    fw_rev_major:               ReadOnly<U16<BigEndian>>,
+    cmd_interface_rev:          ReadOnly<U16<BigEndian>>,
+    fw_rev_subminor:            ReadOnly<U16<BigEndian>>,
     _padding1:                  [u8; 8],
-    cmdq_phy_addr_high:         Volatile<u32>,
-    cmdq_phy_addr_low:          Volatile<u32>,
-    command_doorbell_vector:    Volatile<u32>,
+    cmdq_phy_addr_high:         Volatile<U32<BigEndian>>,
+    cmdq_phy_addr_low:          Volatile<U32<BigEndian>>,
+    command_doorbell_vector:    Volatile<U32<BigEndian>>,
     _padding2a:                 [u8; 256],
     _padding2b:                 [u8; 128],
-    _padding2c:                 [u8; 98],
-    initializing_state:         ReadOnly<u16>,
+    _padding2c:                 [u8; 6],
+    initializing_state:         ReadOnly<U32<BigEndian>>,
     health_buffer:              Volatile<[u8; 64]>,
-    no_dram_nic_offset:         ReadOnly<u32>,
+    no_dram_nic_offset:         ReadOnly<U32<BigEndian>>,
     _padding3a:                 [u8; 2048],
     _padding3b:                 [u8; 1024],
     _padding3c:                 [u8; 256],
     _padding3d:                 [u8; 128],
     _padding3e:                 [u8; 60],
-    internal_timer:             ReadOnly<u64>,
+    internal_timer_h:           ReadOnly<U32<BigEndian>>,
+    internal_timer_l:           ReadOnly<U32<BigEndian>>,
     _padding4:                  [u8; 8],
-    health_counter:             ReadOnly<u32>,
+    health_counter:             ReadOnly<U32<BigEndian>>,
     _padding5:                  [u8; 44],
-    real_time:                  ReadOnly<u64>,
+    real_time:                  ReadOnly<U64<BigEndian>>,
     _padding6a:                 [u8; 8192],
     _padding6b:                 [u8; 2048],
     _padding6c:                 [u8; 1024],
@@ -61,44 +72,39 @@ pub struct InitializationSegment {
 
 impl InitializationSegment {
     pub fn num_cmdq_entries(&self) -> u8 {
-        (self.cmdq_phy_addr_low.read() >> 4) as u8 & 0x0F
+        let log = (self.cmdq_phy_addr_low.read().get() >> 4) & 0x0F;
+        2_u8.pow(log)
     }
 
     pub fn cmdq_entry_stride(&self) -> u8 {
-        (self.cmdq_phy_addr_low.read()) as u8 & 0x0F
+        let val = self.cmdq_phy_addr_low.read().get() & 0x0F;
+        2_u8.pow(val)
     }
-    pub fn set_physical_address_of_cmdq(&mut self, pa: PhysicalAddress) {
-        self.cmdq_phy_addr_high.write((pa.value() >> 32) as u32);
-        self.cmdq_phy_addr_low.write(pa.value() as u32);
+    pub fn set_physical_address_of_cmdq(&mut self, pa: PhysicalAddress) -> Result<(), &'static str> {
+        if pa.value() & 0xFFF != 0 {
+            return Err("cmdq physical address lower 12 bits must be zero.");
+        }
+
+        self.cmdq_phy_addr_high.write(U32::new((pa.value() >> 32) as u32));
+        let val = self.cmdq_phy_addr_low.read().get() & 0xFFF;
+        self.cmdq_phy_addr_low.write(U32::new(pa.value() as u32 | val));
+        Ok(())
     }
-
-    // pub fn set_doorbell(command_no: u8) {
-
-    // }
 
     pub fn device_is_initializing(&self) -> bool {
-        self.initializing_state.read().get_bit(15)
+        self.initializing_state.read().get().get_bit(31)
     }
-
-    pub fn pf_reset(&mut self) {
-        let val = self.cmdq_phy_addr_low.read();
-        self.cmdq_phy_addr_low.write(val | (0x7 << 8));
-    }
-
-    // pub fn initializing_state() -> InitializingState {
-
-    // }
 
     pub fn post_command(&mut self, command_bit: usize) {
-        let val = self.command_doorbell_vector.read();
-        self.command_doorbell_vector.write(val | (1 << command_bit));
+        let val = self.command_doorbell_vector.read().get();
+        self.command_doorbell_vector.write(U32::new(val | (1 << command_bit)));
     }
 
     pub fn print(&self) {
-        trace!("{:#X} {:#X} {:#X} {:#X}",self.fw_rev_major.read(), self.fw_rev_minor.read(), self.fw_rev_subminor.read(), self.cmd_interface_rev.read());
-        trace!("{:#X} {:#X}",self.cmdq_phy_addr_high.read(), self.cmdq_phy_addr_low.read());
-        trace!("{:#X}",self.command_doorbell_vector.read());
-        trace!("{:#X}",self.initializing_state.read());
+        trace!("{}.{}.{}, {}", self.fw_rev_major.read().get(), self.fw_rev_minor.read().get(), self.fw_rev_subminor.read().get(), self.cmd_interface_rev.read().get());
+        trace!("{:#X} {:#X}", self.cmdq_phy_addr_high.read().get(), self.cmdq_phy_addr_low.read().get());
+        trace!("{:#X}", self.command_doorbell_vector.read().get());
+        trace!("{:#X}", self.initializing_state.read().get());
     }
 }
 
@@ -109,76 +115,127 @@ pub enum InitializingState {
     Abort = 3
 }
 
-/// Section 8.24.1
-/// A buffer of fixed-size entries that is used to pass commands to the HCA.
-/// The number of enties and the entry stride is retrieved from the initialization segment of the HCA BAR.
-/// It resides in a physically contiguous 4 KiB memory chunk.
-#[repr(C)]
-pub struct CommandQueue {
-    pub entries: BoxRefMut<MappedPages, [CommandQueueEntry]>,
-    pub current_entry: usize
-}
-
 #[derive(FromBytes, Default)]
 #[repr(C)]
 pub struct CommandQueueEntry {
-    type_of_transport:              Volatile<u32>,
-    input_length:                   Volatile<u32>,
-    input_mailbox_pointer:          Volatile<u64>,
-    padding1:                       WriteOnly<u16>,
-    command_input_opcode:           Volatile<u16>,
-    command_input_op_mod:           Volatile<u16>,
-    padding2:                       WriteOnly<u16>,
-    command_input_inline_data:      Volatile<u64>,
-    padding3:                       WriteOnly<u16>,
-    padding4:                       WriteOnly<u8>,
-    command_output_status:          Volatile<u8>,
-    command_output_syndrome:        Volatile<u32>,
-    command_output_inline_data:     Volatile<u64>,
-    output_mailbox_pointer:         Volatile<u64>,
-    output_length:                  Volatile<u32>,
-    status:                         Volatile<u8>,
-    padding5:                       WriteOnly<u8>,
-    signature:                      Volatile<u8>,
-    token:                          Volatile<u8>
+    type_of_transport:              Volatile<U32<BigEndian>>,
+    input_length:                   Volatile<U32<BigEndian>>,
+    input_mailbox_pointer_h:        Volatile<U32<BigEndian>>,
+    input_mailbox_pointer_l:        Volatile<U32<BigEndian>>,
+    command_input_opcode:           Volatile<U32<BigEndian>>,
+    command_input_op_mod:           Volatile<U32<BigEndian>>,
+    command_input_inline_data_0:    Volatile<U32<BigEndian>>,
+    command_input_inline_data_1:    Volatile<U32<BigEndian>>,
+    command_output_status:          Volatile<U32<BigEndian>>,
+    command_output_syndrome:        Volatile<U32<BigEndian>>,
+    command_output_inline_data_0:   Volatile<U32<BigEndian>>,
+    command_output_inline_data_1:   Volatile<U32<BigEndian>>,
+    output_mailbox_pointer_h:       Volatile<U32<BigEndian>>,
+    output_mailbox_pointer_l:       Volatile<U32<BigEndian>>,
+    output_length:                  Volatile<U32<BigEndian>>,
+    token_signature_status_own:     Volatile<U32<BigEndian>>
 }
 
 
 const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
 
+pub enum CommandTransportType {
+    PCIe = 0x7 << 24
+}
+
 impl CommandQueueEntry {
-    pub fn init_cmdq_entry(&mut self, command: CommandOpcode) {
-        match command {
-            CommandOpcode::EnableHca => {
-                let mut init_hca = CommandQueueEntry::default();
-                init_hca.type_of_transport.write(0x7 << 24);
-                init_hca.input_length.write(12);
-                init_hca.command_input_opcode.write(CommandOpcode::EnableHca as u16);
-                init_hca.change_ownership_to_hw();
-                core::mem::swap(&mut init_hca, self);
-            }
-            CommandOpcode::InitHca => {
-                let mut init_hca = CommandQueueEntry::default();
-                init_hca.type_of_transport.write(0x7 << 24);
-                init_hca.input_length.write(16);
-                init_hca.command_input_opcode.write(CommandOpcode::InitHca as u16);
-                init_hca.change_ownership_to_hw();
-                core::mem::swap(&mut init_hca, self);
-            }
-            _=> {
-                debug!("unimplemented opcode");
-            }
+    fn set_type_of_transport(&mut self, transport: CommandTransportType) {
+        self.type_of_transport.write(U32::new(CommandTransportType::PCIe as u32));
+    }
+
+    fn set_input_length_in_bytes(&mut self, length: u32) {
+        self.input_length.write(U32::new(length))
+    }
+
+    fn set_input_mailbox_pointer(&mut self, pa: PhysicalAddress) -> Result<(), &'static str> {
+        error!("Don't use this function yet! We don't fill out the mailbox fields");
+        
+        if pa.value() & 0x1FF != 0 {
+            return Err("input mailbox pointer physical address lower 9 bits must be zero.");
+        }
+
+        self.input_mailbox_pointer_h.write(U32::new((pa.value() >> 32) as u32));
+        let val = self.input_mailbox_pointer_l.read().get() & 0x1FF;
+        self.input_mailbox_pointer_l.write(U32::new(pa.value() as u32 | val));
+        Ok(())
+    }
+
+    // right now assume only 8 bytes of commands are passed
+    fn set_input_inline_data(&mut self, opcode: CommandOpcode, op_mod: Option<u16>, command0: Option<u32>, command1: Option<u32>) {
+        self.command_input_opcode.write(U32::new((opcode as u32) << 16));
+        self.command_input_op_mod.write(U32::new(op_mod.unwrap_or(0) as u32));
+        self.command_input_inline_data_0.write(U32::new(command0.unwrap_or(0)));
+        self.command_input_inline_data_1.write(U32::new(command1.unwrap_or(0)));
+
+    }
+
+    fn get_command_opcode(&self) -> CommandOpcode {
+        match self.command_input_opcode.read().get() >> 16 {
+            0x100 => {CommandOpcode::QueryHcaCap},
+            0x101 => {CommandOpcode::QueryAdapter}, 
+            0x102 => {CommandOpcode::InitHca}, 
+            0x103 => {CommandOpcode::TeardownHca}, 
+            0x104 => {CommandOpcode::EnableHca}, 
+            0x105 => {CommandOpcode::DisableHca}, 
+            0x107 => {CommandOpcode::QueryPages}, 
+            0x108 => {CommandOpcode::ManagePages}, 
+            0x10A => {CommandOpcode::QueryIssi}, 
+            0x10B => {CommandOpcode::SetIssi}, 
+            _ => {CommandOpcode::Unknown}
         }
     }
 
-    pub fn change_ownership_to_hw(&mut self) {
-        self.status.write(1);
+    // right now assume only 8 bytes of commands are passed
+    fn get_output_inline_data(&self) -> (u8, u32, u32, u32) {
+        (
+            (self.command_output_status.read().get() >> 24) as u8,
+            self.command_output_syndrome.read().get(),
+            self.command_output_inline_data_0.read().get(),
+            self.command_output_inline_data_1.read().get()
+        )
     }
-    pub fn owned_by_hw(&self) -> bool {
-        self.status.read().get_bit(0)
+
+    fn set_output_mailbox_pointer(&mut self, mp: &mut MappedPages, pa: PhysicalAddress) -> Result<(), &'static str> {
+        error!("Don't use this function yet! We don't fill out the mailbox fields");
+
+        if pa.value() & 0x1FF != 0 {
+            return Err("output mailbox pointer physical address lower 9 bits must be zero.");
+        }
+
+        self.output_mailbox_pointer_h.write(U32::new((pa.value() >> 32) as u32));
+        let val = self.output_mailbox_pointer_l.read().get() & 0x1FF;
+        self.output_mailbox_pointer_l.write(U32::new(pa.value() as u32 | val));
+        Ok(())
     }
-    pub fn status(&self) -> CommandDeliveryStatus {
-        let status = self.status.read() & 0xFE;
+    
+    fn set_output_length_in_bytes(&mut self, length: u32) {
+        self.output_length.write(U32::new(length));
+    }
+
+    fn get_output_length_in_bytes(&self) -> u32 {
+        self.output_length.read().get()
+    }
+
+    fn set_token(&mut self, token: u8) {
+        let val = self.token_signature_status_own.read().get();
+        self.token_signature_status_own.write(U32::new(val | ((token as u32) << 24)));
+    }
+
+    fn get_token(&self) -> u8 {
+        (self.token_signature_status_own.read().get() >> 24) as u8
+    }
+
+    fn get_signature(&self) -> u8 {
+        (self.token_signature_status_own.read().get() >> 16) as u8
+    }
+
+    pub fn get_status(&self) -> CommandDeliveryStatus {
+        let status = self.token_signature_status_own.read().get() & 0xFE;
         if status == 0 {
             CommandDeliveryStatus::Success
         } else if status == 1 {
@@ -205,7 +262,28 @@ impl CommandQueueEntry {
             CommandDeliveryStatus::Unknown
         }
     }
+
+    pub fn change_ownership_to_hw(&mut self) {
+        let ownership = self.token_signature_status_own.read().get() | 0x1;
+        self.token_signature_status_own.write(U32::new(ownership));
+    }
+
+    pub fn owned_by_hw(&self) -> bool {
+        self.token_signature_status_own.read().get().get_bit(0)
+    }
 }
+
+#[derive(FromBytes)]
+#[repr(C)]
+struct CommandInterfaceMailbox {
+    mailbox_data:           Volatile<[u8; 512]>,
+    _padding1:              ReadOnly<[u8; 48]>,
+    next_pointer_h:         Volatile<U32<BigEndian>>,
+    next_pointer_l:         Volatile<U32<BigEndian>>,
+    bock_number:            Volatile<U32<BigEndian>>,
+    token_ctrl_signature:   Volatile<U32<BigEndian>>
+}
+const_assert_eq!(core::mem::size_of::<CommandInterfaceMailbox>(), 576);
 
 #[derive(Debug)]
 pub enum CommandDeliveryStatus {
@@ -223,6 +301,7 @@ pub enum CommandDeliveryStatus {
     Unknown,
 }
 
+#[derive(PartialEq)]
 pub enum CommandOpcode {
     QueryHcaCap = 0x100,
     QueryAdapter = 0x101,
@@ -231,35 +310,161 @@ pub enum CommandOpcode {
     EnableHca = 0x104,
     DisableHca = 0x105,
     QueryPages = 0x107,
-    ManagePages = 0x108
+    ManagePages = 0x108,
+    QueryIssi = 0x10A,
+    SetIssi = 0x10B,
+    QuerySpecialContexts = 0x203,
+    Unknown
 }
-#[derive(FromBytes)]
+
+/// Section 8.24.1
+/// A buffer of fixed-size entries that is used to pass commands to the HCA.
+/// The number of enties and the entry stride is retrieved from the initialization segment of the HCA BAR.
+/// It resides in a physically contiguous 4 KiB memory chunk.
 #[repr(C)]
-pub struct CommandInterfaceMailbox {
-    mailbox_data:       Volatile<[u8; 512]>,
-    _padding1:          [u8; 48],
-    next_pointer:       Volatile<u64>,
-    block_number:       Volatile<u32>,
-    signature:          Volatile<u8>,
-    ctrl_signature:     Volatile<u8>,
-    token:              Volatile<u8>,
-    _passing2:          u8
+pub struct CommandQueue {
+    entries: BoxRefMut<MappedPages, [CommandQueueEntry]>,
+    available_entries: [bool; MAX_CMND_QUEUE_ENTRIES],
+    token: u8, //taken from snabb, my assumption is that it is a random number that needs to be different for every command
+    mailbox_buffers_input: Vec<(MappedPages, PhysicalAddress)>, // A page, physical address of the page, and if it's in use
+    mailbox_buffers_output: Vec<(MappedPages, PhysicalAddress)> // A page, physical address of the page, and if it's in use
 }
 
-const_assert_eq!(core::mem::size_of::<CommandInterfaceMailbox>(), 576);
+const MAILBOX_SIZE_IN_BYTES: usize = 576;
+const MAILBOX_DATA_SIZE_IN_BYTES: usize = 512;
+const MAX_MAILBOX_BUFFERS: usize = PAGE_SIZE / MAILBOX_SIZE_IN_BYTES;
 
-pub fn init_cmdq_entry(entry: &mut CommandQueueEntry, command: CommandOpcode) {
-    match command {
-        CommandOpcode::InitHca => {
-            let mut init_hca = CommandQueueEntry::default();
-            init_hca.command_input_opcode.write(CommandOpcode::InitHca as u16);
-            core::mem::swap(&mut init_hca, entry);
+impl CommandQueue {
+
+    pub fn create(entries: BoxRefMut<MappedPages, [CommandQueueEntry]>, num_cmdq_entries: usize) -> Result<CommandQueue, &'static str> {
+        let mut available_entries = [false; MAX_CMND_QUEUE_ENTRIES];
+        for i in 0..num_cmdq_entries { available_entries[i] = true; }
+
+        // allocate one page to be the mailbox buffer per entry
+        let mut mailbox_buffers_input = Vec::with_capacity(num_cmdq_entries);
+        let mut mailbox_buffers_output = Vec::with_capacity(num_cmdq_entries);
+        for _ in 0..num_cmdq_entries {
+            let (mailbox_mp, mailbox_pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
+            mailbox_buffers_input.push((mailbox_mp, mailbox_pa));
+
+            let (mailbox_mp, mailbox_pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
+            mailbox_buffers_output.push((mailbox_mp, mailbox_pa));
         }
-        _=> {
-            debug!("unimplemented opcode");
+
+        Ok(CommandQueue{ entries, available_entries, token: 0xAA, mailbox_buffers_input, mailbox_buffers_output })
+    }
+
+    fn find_free_command_entry(&self) -> Option<usize> {
+        self.available_entries.iter().position(|&x| x == true)
+    }
+
+    pub fn create_command(&mut self, opcode: CommandOpcode, op_mod: Option<u16>, allocated_pages: Option<Vec<PhysicalAddress>>) -> Result<usize, &'static str> {
+        let entry_num = self.find_free_command_entry().ok_or("No command entry available")?; 
+
+        let mut cmdq_entry = CommandQueueEntry::default();
+        cmdq_entry.set_type_of_transport(CommandTransportType::PCIe);
+        cmdq_entry.set_token(self.token);
+        cmdq_entry.change_ownership_to_hw();
+
+        match opcode {
+            CommandOpcode::EnableHca => {
+                cmdq_entry.set_input_length_in_bytes(12);
+                cmdq_entry.set_output_length_in_bytes(8);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            }
+            CommandOpcode::QueryIssi => {
+                warn!("running query issi with smaller output length, may be an error");
+                cmdq_entry.set_input_length_in_bytes(8);
+                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            }
+            CommandOpcode::SetIssi => {
+                warn!("setting to 1 by default, could be wrong");
+                cmdq_entry.set_input_length_in_bytes(12);
+                cmdq_entry.set_output_length_in_bytes(8);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, Some(1), None);
+            }
+            CommandOpcode::InitHca => {
+                cmdq_entry.set_input_length_in_bytes(12);
+                cmdq_entry.set_output_length_in_bytes(8);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            }
+            CommandOpcode::QuerySpecialContexts => {
+                cmdq_entry.set_input_length_in_bytes(8);
+                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            }
+            CommandOpcode::QueryPages => {
+                cmdq_entry.set_input_length_in_bytes(12);
+                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            }
+            CommandOpcode::ManagePages => {
+                let pages_pa = allocated_pages.ok_or("No pages were passed to the manage pages command")?;
+                cmdq_entry.set_input_length_in_bytes(8);
+                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_inline_data(
+                    opcode, 
+                    op_mod, 
+                    None, 
+                    Some(pages_pa.len() as u32)
+                );
+            }
+            _=> {
+                debug!("unimplemented opcode");
+            }
         }
+        
+        core::mem::swap(&mut cmdq_entry, &mut self.entries[entry_num]);
+        self.token = self.token.wrapping_add(1);
+        self.available_entries[entry_num] = false;
+        Ok(entry_num)
+    }
+
+    fn init_manage_pages_input_mailbox_buffers(&mut self, entry_num: usize, pages: Vec<PhysicalAddress>) -> Result<(), &'static str>{
+        
+        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
+        const SIZE_PADDR_IN_BYTES: usize = 8; // each physical address takes 8 bytes in the mailbox
+        let num_mailboxes = (pages.len() * SIZE_PADDR_IN_BYTES) / MAILBOX_DATA_SIZE_IN_BYTES;
+
+        if num_mailboxes > MAX_MAILBOX_BUFFERS {
+            return Err("Too many maiboxes required, TODO: allocate more than a page for mailboxes");
+        }
+
+        for mb_num in 0..num_mailboxes {
+            // let mailbox = mailbox_page.0.as_type_mut(mb_num * MAILBOX_SIZE_IN_BYTES)?;
+            
+            // let mailbox = CommandInterfaceMailbox::Default();
+
+        }
+
+        Ok(())
+
+    }
+
+    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> CommandDeliveryStatus {
+        while self.entries[entry_num].owned_by_hw() {}
+        self.available_entries[entry_num] = true;
+        self.entries[entry_num].get_status()
+    }
+
+    pub fn get_query_issi_command_output(&self, entry_num: usize) -> Result<u16, &'static str> {
+        if self.entries[entry_num].owned_by_hw() {
+            error!("the command hasn't completed yet!");
+            return Err("the command hasn't completed yet!");
+        }
+
+        let opcode = self.entries[entry_num].get_command_opcode();
+        if opcode != CommandOpcode::QueryIssi {
+            error!("Incorrect Command!");
+            return Err("Incorrect Command!");
+        }
+
+        let (_status, _syndrome, current_issi , _command1) = self.entries[entry_num].get_output_inline_data();
+        Ok(current_issi as u16)
     }
 }
+
 // #[derive(FromBytes)]
 // #[repr(C)]
 // struct UARPageFormat {
