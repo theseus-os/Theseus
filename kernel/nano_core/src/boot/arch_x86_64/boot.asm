@@ -14,7 +14,7 @@
 %ifndef INITIAL_STACK_SIZE
 %ifdef DEBUG
 	INITIAL_STACK_SIZE equ 32 ; 32 pages for debug builds
-%elif 
+%else 
 	INITIAL_STACK_SIZE equ 16 ; 16 pages for release builds
 %endif 
 %endif
