@@ -6,6 +6,8 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+bare-io = "0.2.1"
+derive_more = "0.99.0"
 
 [dependencies.log]
 default-features = false

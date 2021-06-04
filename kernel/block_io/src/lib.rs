@@ -6,7 +6,7 @@
 //! Furthermore, these reads and writes are cached using the `block_cache` crate.
 //! 
 //! # Limitations
-//! Currently, the `BlockIo` struct is hardcoded to use a `StorageDevice` reference,
+//! Currently, the `BlockIoWrapper` struct is hardcoded to use a `StorageDevice` reference,
 //! when in reality it should just use anything that implements traits like `BlockReader + BlockWriter`. 
 //! 
 //! The read and write functions are implemented such that if the backing storage device
@@ -16,12 +16,287 @@
 #![no_std]
 
 #[macro_use] extern crate log;
+#[macro_use] extern crate alloc;
+#[macro_use] extern crate derive_more;
 extern crate storage_device;
 extern crate block_cache;
+extern crate bare_io;
 
 use core::ops::Range;
+use alloc::vec::Vec;
 use storage_device::StorageDeviceRef;
 use block_cache::BlockCache;
+
+
+/// The set of errors that can be returned from I/O operations.
+pub enum IoError {
+    /// An input parameter or argument was incorrect or invalid.
+    InvalidInput,
+    /// The I/O operation attempted to access data beyond the bounds of this I/O stream.
+    OutOfBounds,
+    /// The I/O operationg timed out and was canceled.
+    TimedOut,
+}
+
+impl From<IoError> for bare_io::Error {
+    fn from(io_error: IoError) -> Self {
+        use bare_io::{ErrorKind, Error};
+        match io_error {
+            IoError::InvalidInput => ErrorKind::InvalidInput.into(),
+            IoError::OutOfBounds  => Error::new(ErrorKind::Other, "out of bounds"),
+            IoError::TimedOut     => ErrorKind::TimedOut.into(),
+        }
+    }
+}
+
+
+/// A parent trait that is used to specify the block size (in bytes)
+/// of I/O transfers (read and write operations). 
+/// See its use in `BlockReader` and `BlockWriter`.
+pub trait BlockIo {
+    /// The size in bytes of a block transferred during an I/O operation.
+    const BLOCK_SIZE: usize;
+}
+
+
+/// A trait that represents an I/O stream (e.g., an I/O device) that can be read from in block-size chunks.
+/// The granularity of each transfer is given by the `BLOCK_SIZE` constant.
+///
+/// A `BlockReader` is not aware of the current block offset into the stream;
+/// thus, each read operation requires a starting offset: 
+/// the number of blocks from the beginning of the I/O stream at which the read should start.
+pub trait BlockReader: BlockIo {
+    /// Reads blocks of data from this reader into the given `buffer`.
+    ///
+    /// The number of blocks read is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer into which data will be copied. 
+    ///    The length of this buffer must be a multiple of `BLOCK_SIZE`.
+    /// * `block_offset`: the offset in number of blocks from the beginning of this reader.
+    ///
+    /// # Return
+    /// If successful, returns the number of blocks read into the given `buffer`. 
+    /// Otherwise, returns an error.
+    fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>;
+}
+
+
+/// A trait that represents an I/O stream (e.g., an I/O device) that can be written to in block-size chunks. 
+/// The granularity of each transfer is given by the `BLOCK_SIZE` constant.
+///
+/// A `BlockWriter` is not aware of the current block offset into the stream;
+/// thus, each write operation requires a starting offset: 
+/// the number of blocks from the beginning of the I/O stream at which the write should start.
+pub trait BlockWriter: BlockIo {
+    /// Writes blocks of data from the given `buffer` to this writer.
+    ///
+    /// The number of blocks written is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer from which data will be copied. 
+    ///    The length of this buffer must be a multiple of `BLOCK_SIZE`.
+    /// * `block_offset`: the offset in number of blocks from the beginning of this writer.
+    ///
+    /// # Return
+    /// If successful, returns the number of blocks written to this writer. 
+    /// Otherwise, returns an error.
+    fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>;
+
+    /// Flushes this entire writer's output stream, 
+    /// ensuring all contents in intermediate buffers are fully written out. 
+    fn flush(&mut self) -> Result<(), IoError>;
+}
+
+
+/// A trait that represents an I/O stream that can be read from,
+/// but which does not track the current offset into the stream.
+///
+/// This trait is auto-implemented for any type that implements the `BlockReader` trait,
+/// allowing it to be easily wrapped around a `BlockReader` for byte-wise access to a block-based I/O stream.
+pub trait ByteReader {
+    /// Reads bytes of data from this reader into the given `buffer`.
+    ///
+    /// The number of bytes read is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer into which data will be copied.
+    /// * `offset`: the offset in bytes from the beginning of this reader where the read operation begins.
+    ///
+    /// # Return
+    /// If successful, returns the number of bytes read into the given `buffer`. 
+    /// Otherwise, returns an error.
+    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; 
+}
+
+impl<R: BlockReader> ByteReader for R {
+    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+
+        let mut total_bytes_read = 0;
+
+        let mut block_to_read = offset / R::BLOCK_SIZE;
+        let offset_into_first_block = offset % R::BLOCK_SIZE;
+
+        let end_offset = offset + buffer.len();
+        let last_block = end_offset / R::BLOCK_SIZE;
+        let offset_into_last_block = end_offset % R::BLOCK_SIZE;
+        
+
+        // There are three possible ranges of bytes that we need to read from the block reader:
+        // 1. The leading partial block, before the beginning of the first whole block. in which the byte-wise offset is not aligned on a block boundary.
+        // 2. The first whole block through the end of the last whole block.
+        // 3. The trailing partial block, after the end of the last whole block in the byte offset  end of the last full block 
+        // 
+        // We avoid the need to copy between intermediate buffers by issuing up to 3 `read_block()` operations.
+        // We issue the reads sequentially in ascending order to hopefully preserve locality of memory access
+        // and accessing (seeking) the underlying I/O stream.
+
+        let mut src_offset  = offset_into_first_block;
+        let mut dest_offset = 0;
+
+        let mut tmp_block_bytes: Vec<u8> = Vec::new();
+
+        if offset_into_first_block != 0 {
+            // The offset is NOT block-aligned, so we need to perform an initial read of the first block separately.
+            if tmp_block_bytes.is_empty() {
+                tmp_block_bytes = vec![0; R::BLOCK_SIZE];
+            }
+            let _blocks_read = self.read_blocks(&mut tmp_block_bytes, block_to_read)?;
+            let num_bytes_to_copy = R::BLOCK_SIZE - offset_into_first_block;
+            let dest_range = dest_offset .. (dest_offset + num_bytes_to_copy);
+            let src_range  =  src_offset .. (src_offset  + num_bytes_to_copy);
+            buffer[dest_range].copy_from_slice(&tmp_block_bytes[src_range]);
+            dest_offset += num_bytes_to_copy;
+            total_bytes_read += num_bytes_to_copy;
+            block_to_read += 1;
+        }
+
+        let last_contiguous_block = if offset_into_last_block == 0 {
+            // The end offset IS block-aligned, so we can simply perform one more read that covers all remaining blocks.
+            last_block
+        } else {
+            // The end offset is NOT block-aligned, so we must perform a final read of the last block separately.
+            last_block - 1
+        };
+        // Perform the read of contiguously whole blocks. 
+        {
+            let num_bytes_to_copy = R::BLOCK_SIZE * (last_contiguous_block - block_to_read);
+            let dest_range = dest_offset .. (dest_offset + num_bytes_to_copy);
+            let blocks_read = self.read_blocks(&mut buffer[dest_range], block_to_read)?;
+            total_bytes_read += blocks_read * R::BLOCK_SIZE;
+            dest_offset += num_bytes_to_copy;
+            block_to_read = last_contiguous_block;
+        }
+        
+
+        
+        if offset_into_last_block != 0 {
+            // The end offset is NOT block-aligned, so we must perform a final read of the last block separately.
+            if tmp_block_bytes.is_empty() {
+                tmp_block_bytes = vec![0; R::BLOCK_SIZE];
+            }
+            let _blocks_read = self.read_blocks(&mut tmp_block_bytes, block_to_read)?;
+            let num_bytes_to_copy = offset_into_last_block;
+            let dest_range = dest_offset .. (dest_offset + num_bytes_to_copy);
+            let src_range  =  src_offset .. (src_offset  + num_bytes_to_copy);
+            buffer[dest_range].copy_from_slice(&tmp_block_bytes[src_range]);
+            dest_offset += num_bytes_to_copy;
+            total_bytes_read += num_bytes_to_copy;
+        }
+
+        Ok(total_bytes_read)
+    }
+}
+
+/// A trait that represents an I/O stream that can be written to,
+/// but which does not track the current offset into the stream.
+///
+/// This trait is auto-implemented for any type that implements the `BlockWriter` trait,
+/// allowing it to be easily wrapped around a `BlockWriter` for byte-wise access to a block-based I/O stream.
+pub trait ByteWriter {
+    /// Writes bytes of data from the given `buffer` to this writer.
+    ///
+    /// The number of bytes written is dictated by the length of the given `buffer`.
+    ///
+    /// # Arguments
+    /// * `buffer`: the buffer from which data will be copied. 
+    /// * `offset`: the offset in number of bytes from the beginning of this writer.
+    ///
+    /// # Return
+    /// If successful, returns the number of bytes written to this writer. 
+    /// Otherwise, returns an error.
+    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
+
+    /// Flushes this entire writer's output stream, 
+    /// ensuring all contents in intermediate buffers are fully written out.
+    fn flush(&mut self) -> Result<(), IoError>;
+}
+impl<W: BlockWriter> ByteWriter for W {
+    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
+        todo!()
+    }
+
+    fn flush(&mut self) -> Result<(), IoError> {
+        self.flush()
+    }
+}
+
+
+/// A stateful reader that keeps track of its current offset
+/// within the internal stateless `ByteReader` I/O stream.
+#[derive(Deref, DerefMut, Constructor)]
+pub struct Reader<R: ByteReader>(IoWithOffset<R>);
+
+/// A stateful writer that keeps track of its current offset
+/// within the internal stateless `ByteWriter` I/O stream.
+#[derive(Deref, DerefMut, Constructor)]
+pub struct Writer<W: ByteWriter>(IoWithOffset<W>);
+
+/// A stateful reader and writer that keeps track of its current offset
+/// within the internal stateless `ByteReader + ByteWriter` I/O stream.
+#[derive(Deref, DerefMut, Constructor)]
+pub struct ReaderWriter<RW: ByteReader + ByteWriter>(IoWithOffset<RW>);
+
+
+/// A stateful I/O stream (reader, writer, or both) that keeps track
+/// of its current offset within its internal stateless I/O stream.
+///
+/// Hint: don't use this type directly, use its wrapper types:
+///`Reader`, `Writer`, or `ReaderWriter`.
+pub struct IoWithOffset<IO> {
+    io: IO,
+    offset: usize,
+}
+impl<IO> IoWithOffset<IO> {
+    /// Creates a new IO stream with an initial offset of 0.
+    pub fn new(io: IO) -> Self {
+        IoWithOffset { io, offset: 0 }
+    }
+}
+impl<IO: ByteReader> bare_io::Read for IoWithOffset<IO> {
+    fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize> {
+        let bytes_read = self.io.read(buf, self.offset)
+            .map_err(Into::<bare_io::Error>::into)?;
+        self.offset += bytes_read;
+        Ok(bytes_read)
+    }
+}
+impl<IO: ByteWriter> bare_io::Write for IoWithOffset<IO> {
+    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+        let bytes_written = self.io.write(buf, self.offset)
+            .map_err(Into::<bare_io::Error>::into)?;
+        self.offset += bytes_written;
+        Ok(bytes_written)
+    }
+
+    fn flush(&mut self) -> bare_io::Result<()> {
+        self.io.flush().map_err(Into::into)
+    }    
+}
+
+
+
+
 
 /// A wrapper around a `StorageDevice` that supports reads and writes of arbitrary byte lengths
 /// (down to a single byte) by issuing commands to the underlying storage device.
@@ -30,18 +305,18 @@ use block_cache::BlockCache;
 /// 
 /// It also contains a cache for the blocks in the backing storage device,
 /// in order to improve performance by avoiding actual storage device access.
-pub struct BlockIo {
+pub struct BlockIoWrapper {
     /// The cache of blocks (sectors) read from the storage device,
     /// a map from sector number to data byte array.
     cache: BlockCache, 
     block_size: BlockSize,
 }
-impl BlockIo {
-    /// Creates a new `BlockIo` device 
-    pub fn new(storage_device: StorageDeviceRef) -> BlockIo {
+impl BlockIoWrapper {
+    /// Creates a new `BlockIoWrapper` device 
+    pub fn new(storage_device: StorageDeviceRef) -> BlockIoWrapper {
         let device_ref = storage_device.clone();
         let locked_device = device_ref.lock();
-        BlockIo {
+        BlockIoWrapper {
             cache: BlockCache::new(storage_device),
             block_size: BlockSize {
                 size_in_bytes: locked_device.size_in_bytes(),
@@ -57,7 +332,7 @@ impl BlockIo {
 	/// Returns the number of bytes that were successfully read from the drive
 	/// and copied into the given `buffer`.
     /// 
-    /// The read blocks will be cached in this `BlockIo` struct to accelerate future storage device access.
+    /// The read blocks will be cached in this `BlockIoWrapper` struct to accelerate future storage device access.
     pub fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
         let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, buffer.len(), &self.block_size)?;
         let block_size_in_bytes = self.block_size.block_size_in_bytes;
@@ -70,7 +345,7 @@ impl BlockIo {
 			let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - src_offset, buffer.len() - dest_offset);
             let block_bytes = BlockCache::read_block(&mut self.cache, block_num)?;
 			buffer[dest_offset .. (dest_offset + num_bytes_to_copy)].copy_from_slice(&block_bytes[src_offset .. (src_offset + num_bytes_to_copy)]);
-			trace!("BlockIo::read(): for block {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
+			trace!("BlockIoWrapper::read(): for block {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
 				block_num, dest_offset, dest_offset + num_bytes_to_copy, src_offset, src_offset + num_bytes_to_copy,
 			);
 			dest_offset += num_bytes_to_copy;
@@ -85,7 +360,7 @@ impl BlockIo {
 	/// 
 	/// Returns the number of bytes that were successfully written to the storage device.
     /// 
-    /// The written blocks will be cached in this `BlockIo` struct to accelerate future storage device access.
+    /// The written blocks will be cached in this `BlockIoWrapper` struct to accelerate future storage device access.
     /// Currently, we use a *write-through* cache policy,
     /// in which the blocks are written directly to the cache and the backing storage device immediately.
     pub fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
@@ -119,7 +394,7 @@ impl BlockIo {
             };
 
             self.cache.write_block(block_num, buffer_to_write.into())?;
-            trace!("BlockIo::write(): for block {}, copied bytes from buffer[{}..{}] to block[{}..{}]",
+            trace!("BlockIoWrapper::write(): for block {}, copied bytes from buffer[{}..{}] to block[{}..{}]",
 				block_num, src_offset, src_offset + num_bytes_to_copy, dest_offset, dest_offset + num_bytes_to_copy,
 			);
 
