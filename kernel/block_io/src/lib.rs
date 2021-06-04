@@ -244,19 +244,36 @@ impl<W: BlockWriter> ByteWriter for W {
 
 /// A stateful reader that keeps track of its current offset
 /// within the internal stateless `ByteReader` I/O stream.
-#[derive(Deref, DerefMut, Constructor)]
+#[derive(Deref, DerefMut)]
 pub struct Reader<R: ByteReader>(IoWithOffset<R>);
+impl<R: ByteReader> Reader<R> {
+    /// Creates a new Reader with an initial offset of 0.
+    pub fn new(reader: R) -> Self {
+        Reader(IoWithOffset { io: reader, offset: 0 })
+    }
+}
 
 /// A stateful writer that keeps track of its current offset
 /// within the internal stateless `ByteWriter` I/O stream.
-#[derive(Deref, DerefMut, Constructor)]
+#[derive(Deref, DerefMut)]
 pub struct Writer<W: ByteWriter>(IoWithOffset<W>);
+impl<W: ByteWriter> Writer<W> {
+    /// Creates a new Writer with an initial offset of 0.
+    pub fn new(writer: W) -> Self {
+        Writer(IoWithOffset { io: writer, offset: 0 })
+    }
+}
 
 /// A stateful reader and writer that keeps track of its current offset
 /// within the internal stateless `ByteReader + ByteWriter` I/O stream.
-#[derive(Deref, DerefMut, Constructor)]
+#[derive(Deref, DerefMut)]
 pub struct ReaderWriter<RW: ByteReader + ByteWriter>(IoWithOffset<RW>);
-
+impl<RW: ByteReader + ByteWriter> ReaderWriter<RW> {
+    /// Creates a new ReaderWriter with an initial offset of 0.
+    pub fn new(reader_writer: RW) -> Self {
+        ReaderWriter(IoWithOffset { io: reader_writer, offset: 0 })
+    }
+}
 
 /// A stateful I/O stream (reader, writer, or both) that keeps track
 /// of its current offset within its internal stateless I/O stream.
