@@ -508,3 +508,199 @@ impl BlockBounds {
         })
     }
 }
+
+
+
+/// Calculates block-wise bounds for an I/O transfer based on a byte-wise range into a block-wise stream.
+/// 
+/// There are up to three transfer operations that can possibly occur, depending on the alignment of the byte-wise range:
+/// 1. A partial single-block transfer of some bytes in the first block, 
+///    only if the start of `byte_range` is not aligned to `block_size`.
+/// 2. A multi-block transfer of contiguous whole blocks, 
+///    only if `byte_range` spans more than 2 blocks.  
+/// 3. A partial single-block transfer of some bytes in the last block,
+///    only if the end of `byte_range` is not aligned to `block_size`.
+/// 
+/// ## Example
+/// Given a read request for a `byte_range` of `1500..3950` and a `block_size` of `512` bytes, we calculate:
+/// 1. Read 1 block (block 2) and transfer the last 36 bytes of that block (`476..512`) into the byte range `1500..1536`.
+/// 2. Read 4 blocks (blocks `3..7`) and transfer all of those 2048 bytes into the byte range `1536..3584`.
+/// 3. Read 1 block (block 7) and transfer the first 366 bytes of that block (`0..366`) into the byte range `3584..3950`.
+///
+/// # Arguments
+/// * `byte_range`: the absolute byte-wise range (from the beginning of the block-wise stream)
+///    at which the I/O transfer starts and ends.
+/// * `block_size`: the size of each block in the block-wise I/O stream.
+/// 
+/// # Return
+/// Returns a list of the three above transfer operations, 
+/// enclosed in `Option`s to convey that some may not be necessary.
+/// 
+pub fn blockwise_from_bytewise(
+    byte_range: Range<usize>,
+    block_size: usize
+) -> [Option<BlockByteTransfer>; 3] {
+
+    let mut transfers = [None, None, None];
+    let mut transfer_idx = 0;
+
+    let mut curr_byte = byte_range.start;
+    let mut curr_block = curr_byte / block_size;
+
+    let offset_into_first_block = byte_range.start % block_size;
+    let offset_into_last_block  = byte_range.end % block_size; 
+
+    while curr_byte < byte_range.end {
+        let offset_into_curr_block = 
+
+    }
+
+    transfers
+}
+
+
+
+    /*
+    
+/// Calculates block-wise bounds for an I/O transfer based on a byte-wise range into a block-wise stream.
+/// 
+/// There are up to three transfer operations that can possibly occur, depending on the alignment of the byte-wise range:
+/// 1. A partial single-block transfer of some bytes in the first block, 
+///    only if the start of `byte_range` is not aligned to `block_size`.
+/// 2. A multi-block transfer of contiguous whole blocks, 
+///    only if `byte_range` spans more than 2 blocks.  
+/// 3. A partial single-block transfer of some bytes in the last block,
+///    only if the end of `byte_range` is not aligned to `block_size`.
+/// 
+/// ## Example
+/// Given a read request for a `byte_range` of `1500..3950` and a `block_size` of `512` bytes, we calculate:
+/// 1. Read 1 block (block 2) and transfer the last 36 bytes of that block (`476..512`) into the byte range `1500..1536`.
+/// 2. Read 4 blocks (blocks `3..7`) and transfer all of those 2048 bytes into the byte range `1536..3584`.
+/// 3. Read 1 block (block 7) and transfer the first 366 bytes of that block (`0..366`) into the byte range `3584..3950`.
+///
+/// # Arguments
+/// * `byte_range`: the absolute byte-wise range (from the beginning of the block-wise stream)
+///    at which the I/O transfer starts and ends.
+/// * `block_size`: the size of each block in the block-wise I/O stream.
+/// 
+/// # Return
+/// Returns a list of the three above transfer operations, 
+/// enclosed in `Option`s to convey that some may not be necessary.
+/// 
+pub fn blockwise_from_bytewise(
+    byte_range: Range<usize>,
+    block_size: usize
+) -> [Option<BlockByteTransfer>; 3] {
+
+    let mut curr_byte = byte_range.start;
+    let mut curr_block = curr_byte / block_size;
+
+    let offset_into_first_block = byte_range.start % block_size;
+    let offset_into_last_block  = byte_range.end % block_size; 
+
+    let first_transfer = {
+
+        let (end_byte, end_block) = if offset_into_first_block == 0 {
+            if offset_into_last_block == 0 {
+                // Both the start and end of the byte_range are block-aligned,
+                // a special case in which we can cover the whole range with just one transfer.
+                (byte_range.end, byte_range.end / block_size)
+            } else {
+                // The start is block-aligned, but the end is not. 
+                // So we end this first transfer at the second-to-last block.
+                let end_block = byte_range.end / block_size; // block range is exclusive
+                (end_block * block_size, end_block)
+            }
+        } else {
+            // The start is NOT block-aligned, so we do a single-block transfer to the end of this block. 
+            (round_up(curr_block, block_size), curr_block + 1)
+        };
+        
+        let ft = Some(BlockByteTransfer {
+            byte_range_absolute: byte_range.start .. end_byte,
+            block_range: curr_block .. end_block,
+            bytes_in_block_range: offset_into_first_block .. block_size,
+        });
+        curr_byte = end_byte; 
+        curr_block = end_block;
+        ft
+    };
+
+
+    let second_transfer = 
+
+
+    //////////////////////////
+
+
+    let first_block = byte_range.start / block_size;
+    let start_offset_into_first_block = byte_range.start % block_size;
+
+    let first_block_map = if start_offset_into_first_block == 0 {
+        None
+    } else {
+        Some(BlockByteTransfer {
+            byte_range_absolute: byte_range.start .. round_up(byte_range.start, block_size),
+            block_range: first_block .. first_block + 1,
+            bytes_in_block_range: start_offset_into_first_block .. block_size,
+        })
+    };
+
+    let last_block = byte_range.end / block_size;
+    let end_offset_into_last_block = byte_range.end % block_size;
+    let last_block_map = if end_offset_into_last_block == 0 {
+        None
+    } else {
+        Some(BlockByteTransfer {
+            byte_range_absolute: (last_block - 1) * block_size .. byte_range.end,
+            block_range: last_block - 1 .. last_block,
+            bytes_in_block_range: 0 .. end_offset_into_last_block,
+        })
+    };
+
+
+    let middle_blocks_map = match (first_block_map, last_block_map) {
+        (None, None) => {
+            Some(BlockByteTransfer {
+                byte_range_absolute: round_up(byte_range.start, block_size) .. 
+                block_range: first_block + 1 .. last_block - 1,
+                bytes_in_block_range: 0 .. end_offset_into_last_block,
+            })
+        }
+
+    };
+    
+    else {
+        Some(BlockByteTransfer {
+            byte_range_absolute: round_up(byte_range.start, block_size) .. 
+            block_range: first_block + 1 .. last_block - 1,
+            bytes_in_block_range: 0 .. end_offset_into_last_block,
+        })
+    }
+
+
+
+
+    [first_transfer, second_transfer, third_transfer]
+}
+*/
+
+
+pub struct BlockByteTransfer { // <const BLOCK_SIZE: usize> {
+    /// The byte-wise range 
+    /// The size of this range should equal the size of `bytes_in_block_range`.
+    pub byte_range_absolute: Range<usize>,
+    /// The range of blocks to transfer.
+    pub block_range: Range<usize>,
+    /// The range of bytes relative to the blocks specified by `block_range`.
+    /// So, a range of `0..10` specifies the first 10 bytes of the `block_range`
+    /// The size of this range should equal the size of `bytes_in_block_range`.
+    pub bytes_in_block_range: Range<usize>,
+}
+
+
+/// Rounds the given `value` up to the nearest `multiple`.
+#[inline]
+pub fn round_up(value: usize, multiple: usize) -> usize {
+    ((value + multiple - 1) / multiple) * multiple
+}
