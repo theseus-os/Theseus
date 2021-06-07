@@ -1,7 +1,6 @@
 //! This crate contains common types used for memory mapping. 
 
 #![no_std]
-#![feature(const_fn)]
 #![feature(step_trait, step_trait_ext)]
 
 extern crate kernel_config;

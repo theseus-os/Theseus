@@ -30,6 +30,7 @@ extern crate nic_initialization;
 extern crate mellanox_ethernet;
 
 
+use memory::allocate_pages;
 use spin::Once; 
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
@@ -46,7 +47,7 @@ use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool, i
 use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
-use mellanox_ethernet::{CommandQueueEntry, InitializationSegment, CommandQueue, CommandOpcode};
+use mellanox_ethernet::{CommandQueueEntry, InitializationSegment, CommandQueue, CommandOpcode, ManagePagesOpmod, QueryPagesOpmod};
 
 
 pub const MLX_VEND:           u16 = 0x15B3;  // Vendor ID for Mellanox
@@ -58,7 +59,7 @@ static CONNECTX5_NIC: Once<MutexIrqSafe<ConnectX5Nic>> = Once::new();
 /// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
 pub fn get_mlx5_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
-    CONNECTX5_NIC.try()
+    CONNECTX5_NIC.get()
 }
 
 // /// How many ReceiveBuffers are preallocated for this driver to use. 
@@ -142,10 +143,45 @@ impl ConnectX5Nic {
 
         
         // Execute ENABLE_HCA command
-        let cmdq_entry = cmdq.create_command(CommandOpcode::EnableHca)?;
+        let cmdq_entry = cmdq.create_command(CommandOpcode::EnableHca, None, None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("EnableHCA: {:?}", status);
+
+        // execute query ISSI
+        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryIssi, None, None)?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
+        let issi = cmdq.get_query_issi_command_output(cmdq_entry)?;
+        trace!("SetISSI: {:?}, issi version :{}", status, issi);
+
+        // execute set ISSI
+        let cmdq_entry = cmdq.create_command(CommandOpcode::SetIssi, None, None)?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
+        trace!("SetISSI: {:?}", status);
+
+        // Query pages for boot
+        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::BootPages as u16), None)?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
+        let num_boot_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
+        trace!("Query pages status: {:?}, Boot pages: {:?}", status, num_boot_pages);
+
+        // Allocate pages for boot
+        let mut boot_mp = Vec::with_capacity(num_boot_pages as usize);
+        let mut boot_pa = Vec::with_capacity(num_boot_pages as usize);
+        for _ in 0..num_boot_pages {
+            let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+            boot_mp.push(page);
+            boot_pa.push(pa);
+        }
+        let cmdq_entry = cmdq.create_command(CommandOpcode::ManagePages, Some(ManagePagesOpmod::AllocationSuccess as u16), Some(boot_pa))?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
+        trace!("Manage pages boot status: {:?}", status);
+
+
 
         Ok(())
 

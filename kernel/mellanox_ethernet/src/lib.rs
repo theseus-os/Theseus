@@ -1,6 +1,8 @@
  //! Note: Mellanox manual refers to the NIC as HCA.
 
  #![no_std]
+ #![feature(slice_pattern)]
+ #![feature(core_intrinsics)]
 
 #[macro_use]extern crate log;
 extern crate memory;
@@ -13,8 +15,9 @@ extern crate owning_ref;
 extern crate byteorder;
 extern crate nic_initialization;
 extern crate kernel_config;
+// extern crate libm;
 
-use core::num;
+use core::{num, slice::SlicePattern};
 
 use alloc::vec::Vec;
 use memory::{PhysicalAddress, PhysicalMemoryRegion, MappedPages, create_contiguous_mapping};
@@ -277,13 +280,23 @@ impl CommandQueueEntry {
 #[repr(C)]
 struct CommandInterfaceMailbox {
     mailbox_data:           Volatile<[u8; 512]>,
-    _padding1:              ReadOnly<[u8; 48]>,
+    _padding:               ReadOnly<[u8; 48]>,
     next_pointer_h:         Volatile<U32<BigEndian>>,
     next_pointer_l:         Volatile<U32<BigEndian>>,
-    bock_number:            Volatile<U32<BigEndian>>,
+    block_number:           Volatile<U32<BigEndian>>,
     token_ctrl_signature:   Volatile<U32<BigEndian>>
 }
 const_assert_eq!(core::mem::size_of::<CommandInterfaceMailbox>(), 576);
+
+impl CommandInterfaceMailbox {
+    fn clear_all_fields(&mut self) {
+        self. mailbox_data.write([0;512]);
+        self.next_pointer_h.write(U32::new(0));
+        self.next_pointer_l.write(U32::new(0));
+        self.block_number.write(U32::new(0));
+        self.token_ctrl_signature.write(U32::new(0));
+    }
+}
 
 #[derive(Debug)]
 pub enum CommandDeliveryStatus {
@@ -333,6 +346,18 @@ pub struct CommandQueue {
 const MAILBOX_SIZE_IN_BYTES: usize = 576;
 const MAILBOX_DATA_SIZE_IN_BYTES: usize = 512;
 const MAX_MAILBOX_BUFFERS: usize = PAGE_SIZE / MAILBOX_SIZE_IN_BYTES;
+
+pub enum ManagePagesOpmod {
+    AllocationFail = 0,
+    AllocationSuccess = 1,
+    HcaReturnPages = 2
+}
+
+pub enum QueryPagesOpmod {
+    BootPages = 1,
+    InitPages = 2,
+    RegularPages = 3
+}
 
 impl CommandQueue {
 
@@ -401,14 +426,19 @@ impl CommandQueue {
             }
             CommandOpcode::ManagePages => {
                 let pages_pa = allocated_pages.ok_or("No pages were passed to the manage pages command")?;
-                cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_length_in_bytes(24 + pages_pa.len() as u32 *8); // taken from snabb
+                cmdq_entry.set_output_length_in_bytes(12);
                 cmdq_entry.set_input_inline_data(
                     opcode, 
                     op_mod, 
                     None, 
                     Some(pages_pa.len() as u32)
                 );
+
+                self.init_manage_pages_input_mailbox_buffers(entry_num, pages_pa)?;
+                let mailbox_ptr = self.mailbox_buffers_input[entry_num].1.value();
+                cmdq_entry.output_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+                cmdq_entry.output_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
             }
             _=> {
                 debug!("unimplemented opcode");
@@ -421,25 +451,60 @@ impl CommandQueue {
         Ok(entry_num)
     }
 
-    fn init_manage_pages_input_mailbox_buffers(&mut self, entry_num: usize, pages: Vec<PhysicalAddress>) -> Result<(), &'static str>{
+    fn init_manage_pages_input_mailbox_buffers(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>) -> Result<(), &'static str> {
         
         let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
+        let mailbox_starting_addr = mailbox_page.1;
         const SIZE_PADDR_IN_BYTES: usize = 8; // each physical address takes 8 bytes in the mailbox
-        let num_mailboxes = (pages.len() * SIZE_PADDR_IN_BYTES) / MAILBOX_DATA_SIZE_IN_BYTES;
+        const SIZE_PADDR_H_IN_BYTES: usize = 4; // each physical address takes 8 bytes in the mailbox
+        const SIZE_PADDR_L_IN_BYTES: usize = 4; // each physical address takes 8 bytes in the mailbox
+
+        let num_mailboxes = 1; //libm::ceilf((pages.len() * SIZE_PADDR_IN_BYTES) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+        let pages_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
 
         if num_mailboxes > MAX_MAILBOX_BUFFERS {
             return Err("Too many maiboxes required, TODO: allocate more than a page for mailboxes");
         }
 
-        for mb_num in 0..num_mailboxes {
-            // let mailbox = mailbox_page.0.as_type_mut(mb_num * MAILBOX_SIZE_IN_BYTES)?;
-            
-            // let mailbox = CommandInterfaceMailbox::Default();
+        for block_num in 0..num_mailboxes {
+            let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
+            mailbox.clear_all_fields();
 
+            if block_num != (num_mailboxes - 1){
+                let mailbox_next_addr = mailbox_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
+                mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
+                mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
+            }
+            mailbox.block_number.write(U32::new(block_num as u32));
+            mailbox.token_ctrl_signature.write(U32::new((self.token as u32) << 16));
+
+            let mut data = [0; 512];
+
+            for page in 0..pages_per_mailbox {
+                let paddr = pages.pop();
+                match paddr {
+                    Some(paddr) => {
+                        let start_offset_h = page * SIZE_PADDR_IN_BYTES;
+                        let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
+                        let addr = (paddr.value() >> 32) as u32;
+                        data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
+
+                        let start_offset_l = end_offset_h;
+                        let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
+                        let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
+                        data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
+                    },
+                    None => { 
+                        trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
+                        break; 
+                    }
+                }
+            }
+
+            mailbox.mailbox_data.write(data);
         }
 
         Ok(())
-
     }
 
     pub fn wait_for_command_completion(&mut self, entry_num: usize) -> CommandDeliveryStatus {
@@ -462,6 +527,22 @@ impl CommandQueue {
 
         let (_status, _syndrome, current_issi , _command1) = self.entries[entry_num].get_output_inline_data();
         Ok(current_issi as u16)
+    }
+
+    pub fn get_query_pages_command_output(&self, entry_num: usize) -> Result<u32, &'static str> {
+        if self.entries[entry_num].owned_by_hw() {
+            error!("the command hasn't completed yet!");
+            return Err("the command hasn't completed yet!");
+        }
+
+        let opcode = self.entries[entry_num].get_command_opcode();
+        if opcode != CommandOpcode::QueryPages {
+            error!("Incorrect Command!");
+            return Err("Incorrect Command!");
+        }
+
+        let (_status, _syndrome, _function_id, num_pages) = self.entries[entry_num].get_output_inline_data();
+        Ok(num_pages)
     }
 }
 

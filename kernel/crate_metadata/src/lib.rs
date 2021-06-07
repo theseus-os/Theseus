@@ -561,11 +561,15 @@ impl LoadedCrate {
 /// The possible types of sections that can be loaded from a crate object file.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SectionType {
+    /// A `text` section contains executable code, i.e., functions. 
     Text,
+    /// An `rodata` section contains read-only data, i.e., constants.
     Rodata,
+    /// A `data` section contains data that is both readable and writable, i.e., static variables. 
     Data,
+    /// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.
     Bss,
-    /// The ".gcc_except_table" contains landing pads for exception handling,
+    /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process
     /// (e.g., "catching" an exception). 
@@ -577,7 +581,7 @@ pub enum SectionType {
     /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
     /// 
     GccExceptTable,
-    /// The ".eh_frame" contains information about stack unwinding and destructor functions
+    /// The `.eh_frame` section contains information about stack unwinding and destructor functions
     /// that should be called when traversing up the stack for cleanup. 
     /// 
     /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>

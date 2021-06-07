@@ -6,5 +6,5 @@ description = "Support for ACPI SDT and other descriptor tables"
 build = "../../build.rs"
 
 [dependencies]
-zerocopy = "0.3.0"
+zerocopy = "0.5.0"
 

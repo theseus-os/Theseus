@@ -1,5 +1,5 @@
 # Application Support and Development
-One of the unusual features of Theseus, compared to mainstream operating systems like Linux, is that safe applications are loaded into the same single address space as the kernel and run at the same kernel privilege level. Below, we provide information about how such apps are supported by Theseus and how you can develop a new app.
+One of the unusual features of Theseus, compared to mainstream operating systems like Linux, is that safe applications are loaded into the same single address space as the rest of the OS and run at the same kernel privilege level. Below, we provide information about how such apps are supported by Theseus and how you can develop a new app.
 
 
 ## Dynamic Linking and Loading of Application Crates
@@ -15,6 +15,8 @@ pub fn main(args: Vec<String>) -> isize { ... }
 
 Note that application-level *libraries* do not need to expose a `main` function;
 only applications that intend to be run as binary executables do. 
+
+If you forget to include a `main()` function in your application, the crate manager in Theseus will load and link it successfully but fail to run it; a runtime error will be thrown. 
 
 
 ## Creating and building a new application
@@ -32,7 +34,7 @@ applications/
 ```
 
 The `applications/my_app/src/lib.rs` file contains the application code with at least a `fn main()` body (as shown above). 
-The `applications/my_app/Cargo.toml` file must specify the same name:
+The `applications/my_app/Cargo.toml` file **must specify the same name as the containing directory**:
 ```toml
 [package]
 name = "my_app"

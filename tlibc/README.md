@@ -7,7 +7,7 @@ It requires a cross-compiled version of `gcc` and `binutils` that will compile C
 [Read more about how to build those here](../book/src/building_c_cross_compiler.md).
 
 ### Manual build fixes
-Currently, to get everything to build from scratch properly,  we need to add the following manual steps to ensure the build process works:
+Currently, to get everything to build from scratch properly, we need to add the following manual steps to ensure the build process works:
  1. Copy the `[patch.crates-io]` section from the top-level Theseus `Cargo.toml` file to the local `tlibc/Cargo.toml` file. 
  2. Attempt to build the tlibc project by running `cargo clean && ./build.sh`.
  3. Adjust the contents of the `Cargo.lock` file to ensure that all of the crate dependencies have the same version as what's being used by the main Theseus build. For example:

@@ -114,7 +114,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs
+		gdb doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -245,9 +245,9 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(DEPS_DIR)
 
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
-## run "readelf" on the nano_core binary, remove irrelevant LOCAL or WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
+## run "readelf" on the nano_core binary, remove irrelevant LOCAL symbols from the ELF file, and then demangle it, and then output to a sym file
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
-		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;/WEAK   /d') \
+		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
@@ -476,7 +476,7 @@ view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
-	@cmd.exe /C start "$(shell wslpath -w $(RUSTDOC_OUT))" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT)")" &
 else
 	@xdg-open $(RUSTDOC_OUT) > /dev/null 2>&1 || open $(RUSTDOC_OUT) &
 endif
@@ -490,9 +490,9 @@ BOOK_OUT := $(BOOK_DIR)/book/html/index.html
 book: $(wildcard $(BOOK_DIR)/src/*) $(BOOK_DIR)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
-	@echo -e "    cargo +stable install mdbook"
+	@echo -e "    cargo +stable install mdbook --force"
 	@echo -e "You can optionally install linkcheck too:"
-	@echo -e "    cargo +stable install mdbook-linkcheck"
+	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
 	@(cd $(BOOK_DIR) && mdbook build)
@@ -503,9 +503,9 @@ endif
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
 ifneq ($(IS_WSL), )
-	cmd.exe /C start "$(shell wslpath -w $(BOOK_OUT))" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT)")" &
 else
-	xdg-open $(BOOK_OUT) > /dev/null 2>&1 || open $(BOOK_OUT) &
+	@xdg-open $(BOOK_OUT) > /dev/null 2>&1 || open $(BOOK_OUT) &
 endif
 
 

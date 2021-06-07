@@ -3,7 +3,6 @@
 //! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
 
 #![no_std]
-#![feature(const_fn)]
 #![feature(ptr_internals)]
 
 extern crate kernel_config;
