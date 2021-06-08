@@ -44,7 +44,7 @@ Currently, we support building Theseus on the following platforms:
  * MacOS, tested on versions High Sierra (10.13) and Catalina (10.15.2).
  * Docker, atop any host OS that can run a Docker container.
 
-`
+
 ## Setting up the build environment
 
 First, install Rust by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html). On Linux, just run:
@@ -199,7 +199,7 @@ GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run
 
 
 ## IDE Setup  
-Our personal preference is to use Visual Studio Code (VS Code), which has excellent cross-platform support for Rust. Other options are available [here](https://areweideyet.com/).
+Our personal preference is to use VS Code, which has excellent cross-platform support for Rust. Other options are available [here](https://areweideyet.com/).
 
 For VS Code, recommended plugins are:
  * **rust-analyzer**, by matklad
