@@ -388,7 +388,7 @@ preserve_old_modules:
 arm:
 	cargo build -p nano_core --target thumbv7em-none-eabi --release
 	arm-none-eabi-ld \
-		-T target/thumbv7em-none-eabi/release/build/cortex-m-rt*/out/link.x \
+		-T kernellink.ld \
 		--nmagic \
 		-o target/thumbv7em-none-eabi/theseus.bin \
 		target/thumbv7em-none-eabi/release/libnano_core.a

@@ -6,93 +6,94 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.logger]
-path = "../logger"
-
-[dependencies.window_manager]
-path = "../window_manager"
-
-[dependencies.first_application]
-path = "../first_application"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.exceptions_full]
-path = "../exceptions_full"
-
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.spawn]
-path = "../spawn"
-
-[dependencies.tsc]
-path = "../tsc"
+cfg-if = "1.0.0"
 
 [dependencies.interrupts]
 path = "../interrupts"
 
-[dependencies.acpi]
+[target.'cfg(target_arch = "x86_64")'.dependencies.log]
+version = "0.4.8"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.kernel_config]
+path = "../kernel_config"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.logger]
+path = "../logger"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.window_manager]
+path = "../window_manager"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.first_application]
+path = "../first_application"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.memory]
+path = "../memory"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.stack]
+path = "../stack"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.exceptions_full]
+path = "../exceptions_full"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.apic]
+path = "../apic"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.spawn]
+path = "../spawn"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.tsc]
+path = "../tsc"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.acpi]
 path = "../acpi"
 
-[dependencies.multicore_bringup]
+[target.'cfg(target_arch = "x86_64")'.dependencies.multicore_bringup]
 path = "../multicore_bringup"
 
-[dependencies.device_manager]
+[target.'cfg(target_arch = "x86_64")'.dependencies.device_manager]
 path = "../device_manager"
 
-[dependencies.e1000]
+[target.'cfg(target_arch = "x86_64")'.dependencies.e1000]
 path = "../e1000"
 
-[dependencies.task]
+[target.'cfg(target_arch = "x86_64")'.dependencies.task]
 path = "../task"
 
-[dependencies.scheduler]
+[target.'cfg(target_arch = "x86_64")'.dependencies.scheduler]
 path = "../scheduler"
 
-[dependencies.keycodes_ascii]
+[target.'cfg(target_arch = "x86_64")'.dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.print]
+[target.'cfg(target_arch = "x86_64")'.dependencies.print]
 path = "../print"
 
-[dependencies.network_manager]
+[target.'cfg(target_arch = "x86_64")'.dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.ota_update_client]
+[target.'cfg(target_arch = "x86_64")'.dependencies.ota_update_client]
 path = "../ota_update_client"
 
 ## This should be dependent upon 'cfg(simd_personality)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
 ## Therefore, it has to be unconditionally included.
-[dependencies.simd_personality]
+[target.'cfg(target_arch = "x86_64")'.dependencies.simd_personality]
 path = "../simd_personality"
 
-[dependencies.task_fs]
+[target.'cfg(target_arch = "x86_64")'.dependencies.task_fs]
 path = "../task_fs"
 
-[dependencies.multiple_heaps]
+[target.'cfg(target_arch = "x86_64")'.dependencies.multiple_heaps]
 path = "../multiple_heaps"
 
 [lib]
