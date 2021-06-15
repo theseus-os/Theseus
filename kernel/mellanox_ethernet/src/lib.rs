@@ -15,7 +15,7 @@ extern crate owning_ref;
 extern crate byteorder;
 extern crate nic_initialization;
 extern crate kernel_config;
-// extern crate libm;
+extern crate libm;
 
 use core::{num, slice::SlicePattern};
 
@@ -29,6 +29,7 @@ use byteorder::BigEndian;
 use owning_ref:: BoxRefMut;
 use nic_initialization::NIC_MAPPING_FLAGS;
 use kernel_config::memory::PAGE_SIZE;
+use core::fmt;
 
 // Taken from HCA BAR 
 const MAX_CMND_QUEUE_ENTRIES: usize = 64;
@@ -144,6 +145,27 @@ const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
 
 pub enum CommandTransportType {
     PCIe = 0x7 << 24
+}
+
+impl fmt::Debug for CommandQueueEntry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CQE:type of transport: {:#X} \n", self.type_of_transport.read().get())?;
+        write!(f, "CQE:input length: {} \n", self.input_length.read().get())?;
+        write!(f, "CQE:input_mailbox_ptr_h: {:#X} \n", self.input_mailbox_pointer_h.read().get())?;
+        write!(f, "CQE:input_mailbox_ptr_l: {:#X} \n", self.input_mailbox_pointer_l.read().get())?;
+        write!(f, "CQE:command_input_opcode: {:#X} \n", self.command_input_opcode.read().get())?;
+        write!(f, "CQE:command_input_op_mod: {:#X} \n", self.command_input_op_mod.read().get())?;
+        write!(f, "CQE:command_input_inline_data_0: {:#X} \n", self.command_input_inline_data_0.read().get())?;
+        write!(f, "CQE:command_input_inline_data_1: {:#X} \n", self.command_input_inline_data_1.read().get())?;
+        write!(f, "CQE:command_output_status: {:#X} \n", self.command_output_status.read().get())?;
+        write!(f, "CQE:command_output_syndrome: {:#X} \n", self.command_output_syndrome.read().get())?;
+        write!(f, "CQE:command_output_inline_data_0: {:#X} \n", self.command_output_inline_data_0.read().get())?;
+        write!(f, "CQE:command_output_inline_data_1: {:#X} \n", self.command_output_inline_data_1.read().get())?;
+        write!(f, "CQE:output_mailbox_pointer_h: {:#X} \n", self.output_mailbox_pointer_h.read().get())?;
+        write!(f, "CQE:output_mailbox_pointer_l: {:#X} \n", self.output_mailbox_pointer_l.read().get())?;
+        write!(f, "CQE:output_length: {} \n", self.output_length.read().get())?;
+        write!(f, "CQE:token_signature_status_own: {:#X} \n", self.token_signature_status_own.read().get())
+    }
 }
 
 impl CommandQueueEntry {
@@ -298,6 +320,20 @@ impl CommandInterfaceMailbox {
     }
 }
 
+impl fmt::Debug for CommandInterfaceMailbox {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for i in 0..(512/4) {
+            let data = self.mailbox_data.read();
+            write!(f, "mailbox data: {:#X} {:#X} {:#X} {:#X} \n", data[i*4], data[i*4+1], data[i*4+2], data[i*4 +3])?;
+        }
+        
+        // write!(f, "padding: {}", self._padding.read())?;
+        writeln!(f, "next pointer h: {:#X} \n", self.next_pointer_h.read().get())?;
+        writeln!(f, "next pointer l: {:#X} \n", self.next_pointer_l.read().get())?;
+        writeln!(f, "tokne ctrl signature: {:#X} \n", self.token_ctrl_signature.read().get())
+    }
+}
+
 #[derive(Debug)]
 pub enum CommandDeliveryStatus {
     Success = 0,
@@ -314,7 +350,7 @@ pub enum CommandDeliveryStatus {
     Unknown,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum CommandOpcode {
     QueryHcaCap = 0x100,
     QueryAdapter = 0x101,
@@ -327,6 +363,16 @@ pub enum CommandOpcode {
     QueryIssi = 0x10A,
     SetIssi = 0x10B,
     QuerySpecialContexts = 0x203,
+    CreateEq = 0x301,
+    AllocUar = 0x802,
+    AllocPd = 0x800,
+    AllocTransportDomain = 0x816,
+    CreateCq = 0x400,
+    CreateTis = 0x912,
+    CreateSq = 0x904,
+    ModifySq = 0x905,
+    CreateRq = 0x908,
+    ModifyRq = 0x909,
     Unknown
 }
 
@@ -347,6 +393,9 @@ const MAILBOX_SIZE_IN_BYTES: usize = 576;
 const MAILBOX_DATA_SIZE_IN_BYTES: usize = 512;
 const MAX_MAILBOX_BUFFERS: usize = PAGE_SIZE / MAILBOX_SIZE_IN_BYTES;
 
+const SIZE_PADDR_IN_BYTES: usize = 8; // each physical address takes 8 bytes in the mailbox
+const SIZE_PADDR_H_IN_BYTES: usize = 4; // each physical address takes 8 bytes in the mailbox
+const SIZE_PADDR_L_IN_BYTES: usize = 4; // each physical address takes 8 bytes in the mailbox
 pub enum ManagePagesOpmod {
     AllocationFail = 0,
     AllocationSuccess = 1,
@@ -383,7 +432,14 @@ impl CommandQueue {
         self.available_entries.iter().position(|&x| x == true)
     }
 
-    pub fn create_command(&mut self, opcode: CommandOpcode, op_mod: Option<u16>, allocated_pages: Option<Vec<PhysicalAddress>>) -> Result<usize, &'static str> {
+    pub fn create_command(
+        &mut self, opcode: CommandOpcode, 
+        op_mod: Option<u16>, 
+        allocated_pages: Option<Vec<PhysicalAddress>>,
+        uar: Option<u32>,
+        log_queue_size: Option<u8>
+    ) -> Result<usize, &'static str> 
+    {
         let entry_num = self.find_free_command_entry().ok_or("No command entry available")?; 
 
         let mut cmdq_entry = CommandQueueEntry::default();
@@ -426,8 +482,8 @@ impl CommandQueue {
             }
             CommandOpcode::ManagePages => {
                 let pages_pa = allocated_pages.ok_or("No pages were passed to the manage pages command")?;
-                cmdq_entry.set_input_length_in_bytes(24 + pages_pa.len() as u32 *8); // taken from snabb
-                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_length_in_bytes(0x10 + pages_pa.len() as u32 *8); // taken from snabb
+                cmdq_entry.set_output_length_in_bytes(16);
                 cmdq_entry.set_input_inline_data(
                     opcode, 
                     op_mod, 
@@ -437,15 +493,38 @@ impl CommandQueue {
 
                 self.init_manage_pages_input_mailbox_buffers(entry_num, pages_pa)?;
                 let mailbox_ptr = self.mailbox_buffers_input[entry_num].1.value();
-                cmdq_entry.output_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
-                cmdq_entry.output_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+                cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+                cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
             }
+            CommandOpcode::AllocUar => {
+                cmdq_entry.set_input_length_in_bytes(8);
+                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            },
+            CommandOpcode::CreateEq => {
+                let pages_pa = allocated_pages.ok_or("No pages were passed to the create EQ command")?;
+
+                cmdq_entry.set_input_length_in_bytes((0x110 + pages_pa.len()*8) as u32);
+                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+                
+                self.create_page_request_eq(
+                    entry_num, 
+                    pages_pa,
+                    uar.ok_or("uar not specified in EQ creation")?,
+                    log_queue_size.ok_or("queue size not specified in EQ creation")?
+                )?;
+                let mailbox_ptr = self.mailbox_buffers_input[entry_num].1.value();
+                cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+                cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+            },
             _=> {
                 debug!("unimplemented opcode");
             }
         }
         
         core::mem::swap(&mut cmdq_entry, &mut self.entries[entry_num]);
+        warn!("{:?}", &mut self.entries[entry_num]);
         self.token = self.token.wrapping_add(1);
         self.available_entries[entry_num] = false;
         Ok(entry_num)
@@ -455,11 +534,8 @@ impl CommandQueue {
         
         let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
         let mailbox_starting_addr = mailbox_page.1;
-        const SIZE_PADDR_IN_BYTES: usize = 8; // each physical address takes 8 bytes in the mailbox
-        const SIZE_PADDR_H_IN_BYTES: usize = 4; // each physical address takes 8 bytes in the mailbox
-        const SIZE_PADDR_L_IN_BYTES: usize = 4; // each physical address takes 8 bytes in the mailbox
 
-        let num_mailboxes = 1; //libm::ceilf((pages.len() * SIZE_PADDR_IN_BYTES) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+        let num_mailboxes = libm::ceilf((pages.len() * SIZE_PADDR_IN_BYTES) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         let pages_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
 
         if num_mailboxes > MAX_MAILBOX_BUFFERS {
@@ -502,6 +578,9 @@ impl CommandQueue {
             }
 
             mailbox.mailbox_data.write(data);
+            debug!("token: {}", self.token);
+            debug!("Mailbox {}", block_num);
+            debug!("{:?}", mailbox);
         }
 
         Ok(())
@@ -544,14 +623,172 @@ impl CommandQueue {
         let (_status, _syndrome, _function_id, num_pages) = self.entries[entry_num].get_output_inline_data();
         Ok(num_pages)
     }
+
+    pub fn get_uar(&self, entry_num: usize) -> Result<u32, &'static str> {
+        if self.entries[entry_num].owned_by_hw() {
+            error!("the command hasn't completed yet!");
+            return Err("the command hasn't completed yet!");
+        }
+
+        let opcode = self.entries[entry_num].get_command_opcode();
+        if opcode != CommandOpcode::AllocUar {
+            error!("Incorrect Command: {:?}!", opcode);
+            return Err("Incorrect Command!");
+        }
+
+        let (_status, _syndrome, uar, _reserved) = self.entries[entry_num].get_output_inline_data();
+        Ok(uar & 0xFF_FFFF)
+    }
+
+    fn create_page_request_eq(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>, uar: u32, log_eq_size: u8) -> Result<(), &'static str> {
+        
+        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
+        let mailbox_starting_addr = mailbox_page.1;
+
+        let size_of_mailbox_data = (0x110 - 0x10) + SIZE_PADDR_IN_BYTES * pages.len();
+
+        let num_mailboxes = libm::ceilf(size_of_mailbox_data as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+
+        if num_mailboxes > MAX_MAILBOX_BUFFERS {
+            return Err("Too many maiboxes required, TODO: allocate more than a page for mailboxes");
+        }
+
+        // In mailbox 0 we have to set up the eq_context and event_bitmask
+        // The Eq context lies at offset 0 of the first mailbox
+        let block_num=0;
+        // clear all fields of the mailbox
+        mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?.clear_all_fields();
+      
+        // initialize the event queue context
+        let eq_context = mailbox_page.0.as_type_mut::<EventQueueContext>(0)?;
+        eq_context.init(uar, log_eq_size);
+
+        // initialize the bitmask. this function only activates the page request event
+        let bitmask_offset_in_mailbox  = 0x58 - 0x10;
+        let eq_bitmask = mailbox_page.0.as_type_mut::<u64>(bitmask_offset_in_mailbox)?;
+        const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
+        *eq_bitmask = PAGE_REQUEST_BIT;
+
+        // set the next pointer if required
+        if block_num != (num_mailboxes - 1){
+            let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
+            let mailbox_next_addr = mailbox_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
+            mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
+            mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
+        }
+
+        // Now use the remainder of the mailbox for page entries
+        let eq_pa_offset = 0x110 - 0x10;
+        let data = mailbox_page.0.as_type_mut::<[u8;256]>(eq_pa_offset)?;
+        let pages_in_mailbox_0 = (MAILBOX_DATA_SIZE_IN_BYTES - eq_pa_offset) / SIZE_PADDR_IN_BYTES;
+
+        for page in 0..pages_in_mailbox_0 {
+            let paddr = pages.pop();
+            match paddr {
+                Some(paddr) => {
+                    let start_offset_h = page * SIZE_PADDR_IN_BYTES;
+                    let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
+                    let addr = (paddr.value() >> 32) as u32;
+                    data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
+
+                    let start_offset_l = end_offset_h;
+                    let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
+                    let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
+                    data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
+                },
+                None => { 
+                    trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
+                    break; 
+                }
+            }
+        }
+
+        for block_num in 1..num_mailboxes {
+            let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
+            mailbox.clear_all_fields();
+
+            if block_num != (num_mailboxes - 1){
+                let mailbox_next_addr = mailbox_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
+                mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
+                mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
+            }
+            mailbox.block_number.write(U32::new(block_num as u32));
+            mailbox.token_ctrl_signature.write(U32::new((self.token as u32) << 16));
+
+            let mut data = [0; 512];
+
+            let pages_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
+
+            for page in 0..pages_per_mailbox {
+                let paddr = pages.pop();
+                match paddr {
+                    Some(paddr) => {
+                        let start_offset_h = page * SIZE_PADDR_IN_BYTES;
+                        let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
+                        let addr = (paddr.value() >> 32) as u32;
+                        data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
+
+                        let start_offset_l = end_offset_h;
+                        let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
+                        let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
+                        data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
+                    },
+                    None => { 
+                        trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
+                        break; 
+                    }
+                }
+            }
+
+            mailbox.mailbox_data.write(data);
+            debug!("token: {}", self.token);
+            debug!("Mailbox {}", block_num);
+            debug!("{:?}", mailbox);
+        }
+
+        Ok(())
+    }
+
+    pub fn get_eq_number(&self, entry_num: usize) -> Result<u8, &'static str> {
+        if self.entries[entry_num].owned_by_hw() {
+            error!("the command hasn't completed yet!");
+            return Err("the command hasn't completed yet!");
+        }
+
+        let opcode = self.entries[entry_num].get_command_opcode();
+        if opcode != CommandOpcode::CreateEq {
+            error!("Incorrect Command!");
+            return Err("Incorrect Command!");
+        }
+
+        let (_status, _syndrome, eq_number, _reserved) = self.entries[entry_num].get_output_inline_data();
+        Ok(eq_number as u8)
+    }
 }
 
-// #[derive(FromBytes)]
-// #[repr(C)]
-// struct UARPageFormat {
-//     _padding1: u32, //0x00 - 0x1C
-//     cmds_cq_ci: u32,
-//     cqn: u32,
-//     _padding2: 
+#[derive(FromBytes)]
+#[repr(C)]
+struct EventQueueContext {
+    status:             Volatile<U32<BigEndian>>,
+    _padding1:          ReadOnly<u32>,
+    page_offset:        Volatile<U32<BigEndian>>,
+    uar_log_eq_size:    Volatile<U32<BigEndian>>,
+    _padding2:          ReadOnly<u32>,
+    intr:               Volatile<U32<BigEndian>>,
+    log_pg_size:        Volatile<U32<BigEndian>>,
+    _padding3:          ReadOnly<u64>,
+    consumer_counter:   Volatile<U32<BigEndian>>,
+    producer_counter:   Volatile<U32<BigEndian>>,
+    _padding4:          ReadOnly<[u8;12]>,
+}
 
-// }
+const_assert_eq!(core::mem::size_of::<EventQueueContext>(), 64);
+
+impl EventQueueContext {
+    pub fn init(&mut self, uar_page: u32, log_eq_size: u8) {
+        let uar = uar_page & 0xFF_FFFF;
+        let size = ((log_eq_size & 0x1F) as u32) << 24;
+        self.uar_log_eq_size.write(U32::new(uar | size));
+        self.log_pg_size.write(U32::new(0));
+    }
+}

@@ -1360,6 +1360,7 @@ dependencies = [
  "bit_field 0.7.0",
  "byteorder",
  "kernel_config",
+ "libm 0.2.1",
  "log",
  "memory",
  "nic_initialization",
