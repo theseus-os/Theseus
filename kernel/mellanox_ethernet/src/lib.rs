@@ -149,6 +149,7 @@ pub enum CommandTransportType {
 
 impl fmt::Debug for CommandQueueEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CQE\n")?;
         write!(f, "CQE:type of transport: {:#X} \n", self.type_of_transport.read().get())?;
         write!(f, "CQE:input length: {} \n", self.input_length.read().get())?;
         write!(f, "CQE:input_mailbox_ptr_h: {:#X} \n", self.input_mailbox_pointer_h.read().get())?;
@@ -200,6 +201,7 @@ impl CommandQueueEntry {
     }
 
     fn get_command_opcode(&self) -> CommandOpcode {
+        trace!("{}", self.command_input_opcode.read().get() >> 16);
         match self.command_input_opcode.read().get() >> 16 {
             0x100 => {CommandOpcode::QueryHcaCap},
             0x101 => {CommandOpcode::QueryAdapter}, 
@@ -259,7 +261,7 @@ impl CommandQueueEntry {
         (self.token_signature_status_own.read().get() >> 16) as u8
     }
 
-    pub fn get_status(&self) -> CommandDeliveryStatus {
+    pub fn get_delivery_status(&self) -> CommandDeliveryStatus {
         let status = self.token_signature_status_own.read().get() & 0xFE;
         if status == 0 {
             CommandDeliveryStatus::Success
@@ -295,6 +297,46 @@ impl CommandQueueEntry {
 
     pub fn owned_by_hw(&self) -> bool {
         self.token_signature_status_own.read().get().get_bit(0)
+    }
+
+    pub fn get_return_status(&self) -> CommandReturnStatus {
+        let (status, _syndrome, _, _) = self.get_output_inline_data();
+
+        if status == 0x0 {
+            CommandReturnStatus::OK
+        } else if status == 0x1 {
+            CommandReturnStatus::InternalError
+        } else if status == 0x2 {
+            CommandReturnStatus::BadOp
+        } else if status == 0x3 {
+            CommandReturnStatus::BadParam
+        } else if status == 0x4 {
+            CommandReturnStatus::BadSysState
+        } else if status == 0x5 {
+            CommandReturnStatus::BadResource
+        } else if status == 0x6 {
+            CommandReturnStatus::ResourceBusy
+        } else if status == 0x8 {
+            CommandReturnStatus::ExceedLim
+        } else if status == 0x9 {
+            CommandReturnStatus::BadResState
+        } else if status == 0xA {
+            CommandReturnStatus::BadIndex
+        } else if status == 0xF {
+            CommandReturnStatus::NoResources
+        } else if status == 0x50 {
+            CommandReturnStatus::BadInputLen
+        } else if status == 0x51 {
+            CommandReturnStatus::BadOutputLen
+        } else if status == 0x10 {
+            CommandReturnStatus::BadResourceState
+        } else if status == 0x30 {
+            CommandReturnStatus::BadPkt
+        } else if status == 0x40 {
+            CommandReturnStatus::BadSize
+        } else {
+            CommandReturnStatus::Unknown
+        }
     }
 }
 
@@ -376,6 +418,27 @@ pub enum CommandOpcode {
     Unknown
 }
 
+
+#[derive(Debug)]
+pub enum CommandReturnStatus {
+    OK = 0x00,
+    InternalError = 0x01,
+    BadOp = 0x02,
+    BadParam = 0x03,
+    BadSysState = 0x04,
+    BadResource = 0x05,
+    ResourceBusy = 0x06,
+    ExceedLim = 0x08,
+    BadResState = 0x09,
+    BadIndex = 0x0A,
+    NoResources = 0x0F,
+    BadInputLen = 0x50,
+    BadOutputLen = 0x51,
+    BadResourceState = 0x10,
+    BadPkt = 0x30,
+    BadSize = 0x40,
+    Unknown
+}
 /// Section 8.24.1
 /// A buffer of fixed-size entries that is used to pass commands to the HCA.
 /// The number of enties and the entry stride is retrieved from the initialization segment of the HCA BAR.
@@ -406,6 +469,12 @@ pub enum QueryPagesOpmod {
     BootPages = 1,
     InitPages = 2,
     RegularPages = 3
+}
+
+#[derive(PartialEq)]
+enum MailboxType {
+    Input,
+    Output
 }
 
 impl CommandQueue {
@@ -456,8 +525,12 @@ impl CommandQueue {
             CommandOpcode::QueryIssi => {
                 warn!("running query issi with smaller output length, may be an error");
                 cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_output_length_in_bytes(112);
                 cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+                
+                self.init_query_issi_output_mailbox_buffers(entry_num)?;
+                self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Output);
+
             }
             CommandOpcode::SetIssi => {
                 warn!("setting to 1 by default, could be wrong");
@@ -492,9 +565,7 @@ impl CommandQueue {
                 );
 
                 self.init_manage_pages_input_mailbox_buffers(entry_num, pages_pa)?;
-                let mailbox_ptr = self.mailbox_buffers_input[entry_num].1.value();
-                cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
-                cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+                self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
             }
             CommandOpcode::AllocUar => {
                 cmdq_entry.set_input_length_in_bytes(8);
@@ -514,14 +585,14 @@ impl CommandQueue {
                     uar.ok_or("uar not specified in EQ creation")?,
                     log_queue_size.ok_or("queue size not specified in EQ creation")?
                 )?;
-                let mailbox_ptr = self.mailbox_buffers_input[entry_num].1.value();
-                cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
-                cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+
+                self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
             },
             _=> {
                 debug!("unimplemented opcode");
             }
         }
+
         
         core::mem::swap(&mut cmdq_entry, &mut self.entries[entry_num]);
         warn!("{:?}", &mut self.entries[entry_num]);
@@ -530,29 +601,34 @@ impl CommandQueue {
         Ok(entry_num)
     }
 
+    fn set_mailbox_pointer_in_cmd_entry(&mut self, cmdq_entry: &mut CommandQueueEntry, entry_num: usize, mailbox_type: MailboxType) {
+        if mailbox_type == MailboxType::Input {
+            let mailbox_ptr = self.mailbox_buffers_input[entry_num].1.value();
+            cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+            cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+        } else {
+            let mailbox_ptr = self.mailbox_buffers_output[entry_num].1.value();
+            cmdq_entry.output_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+            cmdq_entry.output_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+        }
+    }
+
+    fn init_query_issi_output_mailbox_buffers(&mut self, entry_num: usize) -> Result<(), &'static str> {
+        const NUM_MAILBOXES_QUERY_ISSI: usize = 1;
+        self.initialize_mailboxes(entry_num, NUM_MAILBOXES_QUERY_ISSI, MailboxType::Output)?;
+        Ok(())
+    }
+
     fn init_manage_pages_input_mailbox_buffers(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>) -> Result<(), &'static str> {
         
-        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
-        let mailbox_starting_addr = mailbox_page.1;
-
         let num_mailboxes = libm::ceilf((pages.len() * SIZE_PADDR_IN_BYTES) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
-        let pages_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
+        self.initialize_mailboxes(entry_num, num_mailboxes, MailboxType::Input)?;
 
-        if num_mailboxes > MAX_MAILBOX_BUFFERS {
-            return Err("Too many maiboxes required, TODO: allocate more than a page for mailboxes");
-        }
+        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
+        let pages_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
 
         for block_num in 0..num_mailboxes {
             let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
-            mailbox.clear_all_fields();
-
-            if block_num != (num_mailboxes - 1){
-                let mailbox_next_addr = mailbox_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
-                mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
-                mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
-            }
-            mailbox.block_number.write(U32::new(block_num as u32));
-            mailbox.token_ctrl_signature.write(U32::new((self.token as u32) << 16));
 
             let mut data = [0; 512];
 
@@ -586,78 +662,66 @@ impl CommandQueue {
         Ok(())
     }
 
-    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> CommandDeliveryStatus {
+    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> (CommandDeliveryStatus, CommandReturnStatus) {
         while self.entries[entry_num].owned_by_hw() {}
         self.available_entries[entry_num] = true;
-        self.entries[entry_num].get_status()
+        debug!("{:?}", self.entries[entry_num]);
+        (self.entries[entry_num].get_delivery_status(), self.entries[entry_num].get_return_status())
     }
 
-    pub fn get_query_issi_command_output(&self, entry_num: usize) -> Result<u16, &'static str> {
+    fn check_command_output_validity(&self, entry_num: usize, cmd_opcode: CommandOpcode) -> Result<(), &'static str> {
         if self.entries[entry_num].owned_by_hw() {
             error!("the command hasn't completed yet!");
             return Err("the command hasn't completed yet!");
         }
 
-        let opcode = self.entries[entry_num].get_command_opcode();
-        if opcode != CommandOpcode::QueryIssi {
-            error!("Incorrect Command!");
+        if self.entries[entry_num].get_command_opcode() != cmd_opcode {
+            error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode());
             return Err("Incorrect Command!");
         }
 
+        Ok(())
+    }
+
+    pub fn get_query_issi_command_output(&self, entry_num: usize) -> Result<(u16, u8), &'static str> {
+        self.check_command_output_validity(entry_num, CommandOpcode::QueryIssi)?;
+
+        // This offset is not correct! need to check!
+        const DATA_OFFSET_IN_MAILBOX: usize = 0x20 - 0x10;
+        let mailbox = &self.mailbox_buffers_output[entry_num].0;
+        debug!("{:?}", mailbox.as_type::<CommandInterfaceMailbox>(0)?);
+        let supported_issi = (mailbox.as_type::<u32>(DATA_OFFSET_IN_MAILBOX)?).to_le();
+
         let (_status, _syndrome, current_issi , _command1) = self.entries[entry_num].get_output_inline_data();
-        Ok(current_issi as u16)
+        Ok((current_issi as u16, supported_issi as u8))
     }
 
     pub fn get_query_pages_command_output(&self, entry_num: usize) -> Result<u32, &'static str> {
-        if self.entries[entry_num].owned_by_hw() {
-            error!("the command hasn't completed yet!");
-            return Err("the command hasn't completed yet!");
-        }
-
-        let opcode = self.entries[entry_num].get_command_opcode();
-        if opcode != CommandOpcode::QueryPages {
-            error!("Incorrect Command!");
-            return Err("Incorrect Command!");
-        }
+        self.check_command_output_validity(entry_num, CommandOpcode::QueryPages)?;
 
         let (_status, _syndrome, _function_id, num_pages) = self.entries[entry_num].get_output_inline_data();
         Ok(num_pages)
     }
 
     pub fn get_uar(&self, entry_num: usize) -> Result<u32, &'static str> {
-        if self.entries[entry_num].owned_by_hw() {
-            error!("the command hasn't completed yet!");
-            return Err("the command hasn't completed yet!");
-        }
-
-        let opcode = self.entries[entry_num].get_command_opcode();
-        if opcode != CommandOpcode::AllocUar {
-            error!("Incorrect Command: {:?}!", opcode);
-            return Err("Incorrect Command!");
-        }
-
+        debug!("{:?}",self.entries[entry_num]);
+        self.check_command_output_validity(entry_num, CommandOpcode::AllocUar)?;
         let (_status, _syndrome, uar, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(uar & 0xFF_FFFF)
     }
 
     fn create_page_request_eq(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>, uar: u32, log_eq_size: u8) -> Result<(), &'static str> {
         
-        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
-        let mailbox_starting_addr = mailbox_page.1;
-
         let size_of_mailbox_data = (0x110 - 0x10) + SIZE_PADDR_IN_BYTES * pages.len();
 
         let num_mailboxes = libm::ceilf(size_of_mailbox_data as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+        self.initialize_mailboxes(entry_num, num_mailboxes, MailboxType::Input)?;
 
-        if num_mailboxes > MAX_MAILBOX_BUFFERS {
-            return Err("Too many maiboxes required, TODO: allocate more than a page for mailboxes");
-        }
-
+        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
+        
         // In mailbox 0 we have to set up the eq_context and event_bitmask
         // The Eq context lies at offset 0 of the first mailbox
         let block_num=0;
-        // clear all fields of the mailbox
-        mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?.clear_all_fields();
       
         // initialize the event queue context
         let eq_context = mailbox_page.0.as_type_mut::<EventQueueContext>(0)?;
@@ -668,14 +732,6 @@ impl CommandQueue {
         let eq_bitmask = mailbox_page.0.as_type_mut::<u64>(bitmask_offset_in_mailbox)?;
         const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
         *eq_bitmask = PAGE_REQUEST_BIT;
-
-        // set the next pointer if required
-        if block_num != (num_mailboxes - 1){
-            let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
-            let mailbox_next_addr = mailbox_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
-            mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
-            mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
-        }
 
         // Now use the remainder of the mailbox for page entries
         let eq_pa_offset = 0x110 - 0x10;
@@ -705,15 +761,6 @@ impl CommandQueue {
 
         for block_num in 1..num_mailboxes {
             let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
-            mailbox.clear_all_fields();
-
-            if block_num != (num_mailboxes - 1){
-                let mailbox_next_addr = mailbox_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
-                mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
-                mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
-            }
-            mailbox.block_number.write(U32::new(block_num as u32));
-            mailbox.token_ctrl_signature.write(U32::new((self.token as u32) << 16));
 
             let mut data = [0; 512];
 
@@ -750,19 +797,38 @@ impl CommandQueue {
     }
 
     pub fn get_eq_number(&self, entry_num: usize) -> Result<u8, &'static str> {
-        if self.entries[entry_num].owned_by_hw() {
-            error!("the command hasn't completed yet!");
-            return Err("the command hasn't completed yet!");
-        }
-
-        let opcode = self.entries[entry_num].get_command_opcode();
-        if opcode != CommandOpcode::CreateEq {
-            error!("Incorrect Command!");
-            return Err("Incorrect Command!");
-        }
+        self.check_command_output_validity(entry_num, CommandOpcode::CreateEq)?;
 
         let (_status, _syndrome, eq_number, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(eq_number as u8)
+    }
+
+    /// Clears all mailboxes, then sets the token, block number and next address fields for all mailboxes
+    fn initialize_mailboxes(&mut self, entry_num: usize, num_mailboxes: usize, mailbox_type: MailboxType) -> Result<(), &'static str> {
+        let (mb_page, mb_starting_addr) = if mailbox_type == MailboxType::Input{
+            &mut self.mailbox_buffers_input[entry_num]
+        } else {
+            &mut self.mailbox_buffers_output[entry_num]
+        };
+
+        if num_mailboxes > MAX_MAILBOX_BUFFERS {
+            return Err("Too many maiboxes required, TODO: allocate more than a page for mailboxes");
+        }
+
+        for block_num in 0..num_mailboxes {
+            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
+            mailbox.clear_all_fields();
+
+            if block_num != (num_mailboxes - 1){
+                let mailbox_next_addr = mb_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
+                mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
+                mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
+            }
+            mailbox.block_number.write(U32::new(block_num as u32));
+            mailbox.token_ctrl_signature.write(U32::new((self.token as u32) << 16));
+        }
+
+        Ok(())
     }
 }
 
