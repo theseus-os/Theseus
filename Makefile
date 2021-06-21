@@ -454,7 +454,7 @@ preserve_old_modules:
 ###################################################################################################
 
 ## The output directory for source-level documentation.
-DOC_BUILD := $(BUILD_DIR)/doc
+DOC_BUILD := $(ROOT_DIR)/docs/doc
 ## The top-level (root) documentation file built by `rustdoc` (`cargo doc`).
 RUSTDOC_OUT := $(DOC_BUILD)/___Theseus_Crates___/index.html
 
@@ -462,11 +462,11 @@ RUSTDOC_OUT := $(DOC_BUILD)/___Theseus_Crates___/index.html
 ## The entire project is built as normal using the `cargo doc` command.
 docs: doc
 doc: check_rustc
-	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(DOC_BUILD)
 	@mkdir -p $(DOC_BUILD)
-	@cp -rf target/doc $(BUILD_DIR)/
+	@cp -rf target/doc/* $(DOC_BUILD)
 	@echo -e "\nDocumentation is now available at: \"$(RUSTDOC_OUT)\"."
 
 
@@ -483,11 +483,12 @@ endif
 
 
 ### The location of Theseus's book-style documentation. 
-BOOK_DIR := $(ROOT_DIR)/book
-BOOK_OUT := $(BOOK_DIR)/book/html/index.html
+BOOK_SRC := $(ROOT_DIR)/book
+BOOK_OUT := $(ROOT_DIR)/docs/book
+BOOK_OUT_FILE := $(BOOK_OUT)/index.html
 
 ### Builds the Theseus book-style documentation using `mdbook`.
-book: $(wildcard $(BOOK_DIR)/src/*) $(BOOK_DIR)/book.toml
+book: $(wildcard $(BOOK_SRC)/src/*) $(BOOK_SRC)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
 	@echo -e "    cargo +stable install mdbook --force"
@@ -495,8 +496,11 @@ ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
-	@(cd $(BOOK_DIR) && mdbook build)
-	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT)\"."
+	@mdbook build $(BOOK_SRC)
+	@rm -rf $(BOOK_OUT)
+	@mkdir -p $(BOOK_OUT)
+	@cp -rf $(BOOK_SRC)/book/html/* $(BOOK_OUT)
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT_FILE)\"."
 
 
 ### Opens the Theseus book.
