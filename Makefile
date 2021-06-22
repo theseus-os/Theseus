@@ -147,7 +147,7 @@ $(iso): build
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
 		--output-deps $(DEPS_DIR) \
@@ -240,8 +240,8 @@ cargo: check_rustc
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	## If we remove the OBJECT_FILES_BUILD_DIR here, then the simd_personality_* builds do not work.
-	# @rm -rf $(OBJECT_FILES_BUILD_DIR)
+## If we remove the OBJECT_FILES_BUILD_DIR here, then the simd_personality_* builds do not work.
+# @rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(DEPS_DIR)
 
@@ -378,7 +378,7 @@ clean:
 ## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_sse : export TARGET := x86_64-theseus
 simd_personality_sse : export BUILD_MODE = release
-simd_personality_sse : export override THESEUS_CONFIG += simd_personality
+simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_personality_sse
 simd_personality_sse: build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
@@ -397,7 +397,7 @@ simd_personality_sse: build_sse build
 ## The "normal" target must come last ('build_avx', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_avx : export TARGET := x86_64-theseus
 simd_personality_avx : export BUILD_MODE = release
-simd_personality_avx : export override THESEUS_CONFIG += simd_personality
+simd_personality_avx : export override THESEUS_CONFIG += simd_personality simd_personality_avx
 simd_personality_avx : export override CFLAGS += -DENABLE_AVX
 simd_personality_avx: build_avx build
 ## after building all the modules, copy the kernel boot image files
@@ -419,9 +419,7 @@ build_sse : export override RUSTFLAGS += -C no-vectorize-slp
 build_sse : export KERNEL_PREFIX := ksse\#
 build_sse : export APP_PREFIX := asse\#
 build_sse:
-	@echo -e "YO, starting build_sse: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
 	$(MAKE) build
-	@echo -e "YO, done with build_sse: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
 
 
 ### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
@@ -432,9 +430,7 @@ build_avx : export override RUSTFLAGS += -C no-vectorize-slp
 build_avx : export KERNEL_PREFIX := kavx\#
 build_avx : export APP_PREFIX := aavx\#
 build_avx:
-	@echo -e "YO, starting build_avx: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
 	$(MAKE) build
-	@echo -e "YO, done with build_avx: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
 
 
 ### build_server is a target that builds Theseus into a regular ISO
