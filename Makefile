@@ -103,7 +103,7 @@ APP_CRATE_NAMES := $(filter-out build/. target/., $(APP_CRATE_NAMES))
 APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
 APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
-APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
+APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
