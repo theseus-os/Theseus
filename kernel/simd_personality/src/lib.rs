@@ -209,8 +209,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	// _task1.join()?;
 	// _task2.join()?;
 	// _task3.join()?;
-
-	Ok(())
+	// Ok(())
 }
 		
 }} // end of cfg_if block
