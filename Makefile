@@ -147,7 +147,7 @@ $(iso): build
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
 		--output-deps $(DEPS_DIR) \
@@ -208,7 +208,7 @@ cargo: check_rustc
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build  $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -412,25 +412,28 @@ simd_personality_avx: build_avx build
 
 ### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
 ### It can serve as part of the simd_personality_sse target.
-build_sse : export TARGET := x86_64-theseus-sse
+build_sse : export override TARGET := x86_64-theseus-sse
 build_sse : export override RUSTFLAGS += -C no-vectorize-loops
 build_sse : export override RUSTFLAGS += -C no-vectorize-slp
 build_sse : export KERNEL_PREFIX := ksse\#
 build_sse : export APP_PREFIX := asse\#
 build_sse:
-	@$(MAKE) build
+	@echo -e "YO, starting build_sse: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
+	$(MAKE) build
+	@echo -e "YO, done with build_sse: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
 
 
 ### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
 ### It can serve as part of the simd_personality_avx target.
-build_avx : export TARGET := x86_64-theseus-avx
+build_avx : export override TARGET := x86_64-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
 build_avx : export KERNEL_PREFIX := kavx\#
 build_avx : export APP_PREFIX := aavx\#
 build_avx:
-	@$(MAKE) build
-
+	@echo -e "YO, starting build_avx: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
+	$(MAKE) build
+	@echo -e "YO, done with build_avx: BUILD_MODE: $(BUILD_MODE), CARGOFLAGS: $(CARGOFLAGS)"
 
 
 ### build_server is a target that builds Theseus into a regular ISO
