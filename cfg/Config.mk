@@ -31,9 +31,12 @@ CARGOFLAGS ?=
 ifeq ($(BUILD_MODE),debug)
     ## "debug" builds are the default in cargo, so don't change cargo options. 
     ## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.
-	export override CFLAGS += -DDEBUG
+	export override CFLAGS+=-DDEBUG
 else ifeq ($(BUILD_MODE),release)
-	export override CARGOFLAGS += --release
+	## "release" builds require passing the `--release` flag, but it can only be passed once.
+	ifeq (,$(findstring --release,$(CARGOFLAGS)))
+		export override CARGOFLAGS+=--release
+	endif
 else 
 $(error 'BUILD_MODE' value of '$(BUILD_MODE)' is invalid, it must be either 'debug' or 'release')
 endif
