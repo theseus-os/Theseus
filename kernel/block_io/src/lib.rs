@@ -22,7 +22,10 @@ extern crate storage_device;
 extern crate block_cache;
 extern crate bare_io;
 
-use core::ops::Range;
+use core::{
+    cmp::{min, max},
+    ops::Range,
+};
 use alloc::vec::Vec;
 use storage_device::StorageDeviceRef;
 use block_cache::BlockCache;
@@ -510,6 +513,7 @@ impl BlockBounds {
 }
 
 
+#[cfg(test)] extern crate std;
 
 /// Calculates block-wise bounds for an I/O transfer based on a byte-wise range into a block-wise stream.
 /// 
@@ -530,7 +534,7 @@ impl BlockBounds {
 /// # Arguments
 /// * `byte_range`: the absolute byte-wise range (from the beginning of the block-wise stream)
 ///    at which the I/O transfer starts and ends.
-/// * `block_size`: the size of each block in the block-wise I/O stream.
+/// * `block_size`: the size in bytes of each block in the block-wise I/O stream.
 /// 
 /// # Return
 /// Returns a list of the three above transfer operations, 
@@ -540,22 +544,90 @@ pub fn blockwise_from_bytewise(
     byte_range: Range<usize>,
     block_size: usize
 ) -> [Option<BlockByteTransfer>; 3] {
-
+    
     let mut transfers = [None, None, None];
     let mut transfer_idx = 0;
 
-    let mut curr_byte = byte_range.start;
-    let mut curr_block = curr_byte / block_size;
-
-    let offset_into_first_block = byte_range.start % block_size;
+    let last_block = byte_range.end / block_size;
     let offset_into_last_block  = byte_range.end % block_size; 
 
+    let mut curr_byte = byte_range.start;
+
     while curr_byte < byte_range.end {
-        let offset_into_curr_block = 
+        #[cfg(test)] ::std::println!("TRANSFERS: {:?}", transfers);
+
+        let curr_block = curr_byte / block_size;
+        let offset_into_curr_block = curr_byte % block_size;
+
+        // If the curr_byte is block-aligned, then we can do a multi-block transfer.
+        if offset_into_curr_block == 0 {
+            // Determine what the last block of this transfer should be.
+            // Special case: if the last byte is block-aligned, this transfer can cover all remaining bytes. 
+            if offset_into_last_block == 0 {
+                transfers[transfer_idx] = Some(BlockByteTransfer {
+                    byte_range_absolute: curr_byte .. byte_range.end,
+                    block_range: curr_block .. last_block,
+                    bytes_in_block_range: 0 .. (last_block - curr_block) * block_size,
+                });
+                break; // this is the final transfer
+            }
+            // Otherwise, if the last byte is NOT block-aligned, this transfer can only extend up until the beginning of the last block 
+            // (through the end of the second-to-last block).
+            // Unless, that is, it's the final transfer because the end of the byte range is within the current block.  
+            else {
+                let end_byte = if byte_range.end - curr_byte > block_size {
+                    round_down(byte_range.end, block_size) 
+                } else {
+                    byte_range.end
+                };
+                transfers[transfer_idx] = Some(BlockByteTransfer {
+                    byte_range_absolute: curr_byte .. end_byte,
+                    block_range: curr_block .. (round_up(end_byte, block_size) / block_size),
+                    bytes_in_block_range: 0 .. (end_byte - curr_byte),
+                });
+                transfer_idx += 1;
+                curr_byte = end_byte;
+            }
+        }
+        // Otherwise, if the curr_byte is NOT block-aligned, then we can only do a single-block transfer.
+        else {
+            let end_byte = min(byte_range.end, round_up(curr_byte, block_size));
+            transfers[transfer_idx] = Some(BlockByteTransfer {
+                byte_range_absolute: curr_byte .. end_byte,
+                block_range: curr_block .. curr_block + 1, // just one block
+                bytes_in_block_range: offset_into_curr_block .. (offset_into_curr_block + (end_byte - curr_byte)),
+            });
+            transfer_idx += 1;
+            curr_byte = end_byte;
+        }
 
     }
 
     transfers
+}
+
+/// A test vector for `blockwise_from_bytewise()` where both the starting byte and ending byte
+/// are not block-aligned.
+#[test]
+fn test_blockwise_bytewise_both_unaligned() {
+    let transfers = blockwise_from_bytewise(1500..3950, 512);
+    assert_eq!(transfers, [
+        Some(BlockByteTransfer {
+            byte_range_absolute: 1500..1536,
+            block_range: 2..3,
+            bytes_in_block_range: 476..512,
+        }),
+        Some(BlockByteTransfer {
+            byte_range_absolute: 1536..3584,
+            block_range: 3..7,
+            bytes_in_block_range: 0..2048,
+        }),
+        Some(BlockByteTransfer {
+            byte_range_absolute: 3584..3950,
+            block_range: 7..8,
+            bytes_in_block_range: 0..366,
+        }),
+    ]);
 }
 
 
@@ -686,15 +758,19 @@ pub fn blockwise_from_bytewise(
 */
 
 
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct BlockByteTransfer { // <const BLOCK_SIZE: usize> {
-    /// The byte-wise range 
+    /// The byte-wise range specified in absolute bytes from the beginning of an I/O stream.
     /// The size of this range should equal the size of `bytes_in_block_range`.
     pub byte_range_absolute: Range<usize>,
     /// The range of blocks to transfer.
     pub block_range: Range<usize>,
     /// The range of bytes relative to the blocks specified by `block_range`.
-    /// So, a range of `0..10` specifies the first 10 bytes of the `block_range`
-    /// The size of this range should equal the size of `bytes_in_block_range`.
+    /// The size of this range should equal the size of `byte_range_absolute`.
+    ///
+    /// For example, a range of `0..10` specifies that the first 10 bytes of the `block_range`
+    /// are what should be transferred to/from the `byte_range_absolute`.
     pub bytes_in_block_range: Range<usize>,
 }
 
@@ -703,4 +779,10 @@ pub struct BlockByteTransfer { // <const BLOCK_SIZE: usize> {
 #[inline]
 pub fn round_up(value: usize, multiple: usize) -> usize {
     ((value + multiple - 1) / multiple) * multiple
+}
+
+/// Rounds the given `value` down to the nearest `multiple`.
+#[inline]
+pub fn round_down(value: usize, multiple: usize) -> usize {
+    (value / multiple) * multiple
 }
