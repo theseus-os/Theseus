@@ -23,7 +23,7 @@ extern crate block_cache;
 extern crate bare_io;
 
 use core::{
-    cmp::{min, max},
+    cmp::min,
     ops::Range,
 };
 use alloc::vec::Vec;
@@ -513,7 +513,6 @@ impl BlockBounds {
 }
 
 
-#[cfg(test)] extern crate std;
 
 /// Calculates block-wise bounds for an I/O transfer based on a byte-wise range into a block-wise stream.
 /// 
@@ -554,8 +553,6 @@ pub fn blockwise_from_bytewise(
     let mut curr_byte = byte_range.start;
 
     while curr_byte < byte_range.end {
-        #[cfg(test)] ::std::println!("TRANSFERS: {:?}", transfers);
-
         let curr_block = curr_byte / block_size;
         let offset_into_curr_block = curr_byte % block_size;
 
@@ -606,158 +603,8 @@ pub fn blockwise_from_bytewise(
     transfers
 }
 
-/// A test vector for `blockwise_from_bytewise()` where both the starting byte and ending byte
-/// are not block-aligned.
-#[test]
-fn test_blockwise_bytewise_both_unaligned() {
-    let transfers = blockwise_from_bytewise(1500..3950, 512);
-    assert_eq!(transfers, [
-        Some(BlockByteTransfer {
-            byte_range_absolute: 1500..1536,
-            block_range: 2..3,
-            bytes_in_block_range: 476..512,
-        }),
-        Some(BlockByteTransfer {
-            byte_range_absolute: 1536..3584,
-            block_range: 3..7,
-            bytes_in_block_range: 0..2048,
-        }),
-        Some(BlockByteTransfer {
-            byte_range_absolute: 3584..3950,
-            block_range: 7..8,
-            bytes_in_block_range: 0..366,
-        }),
-    ]);
-}
 
-
-
-    /*
-    
-/// Calculates block-wise bounds for an I/O transfer based on a byte-wise range into a block-wise stream.
-/// 
-/// There are up to three transfer operations that can possibly occur, depending on the alignment of the byte-wise range:
-/// 1. A partial single-block transfer of some bytes in the first block, 
-///    only if the start of `byte_range` is not aligned to `block_size`.
-/// 2. A multi-block transfer of contiguous whole blocks, 
-///    only if `byte_range` spans more than 2 blocks.  
-/// 3. A partial single-block transfer of some bytes in the last block,
-///    only if the end of `byte_range` is not aligned to `block_size`.
-/// 
-/// ## Example
-/// Given a read request for a `byte_range` of `1500..3950` and a `block_size` of `512` bytes, we calculate:
-/// 1. Read 1 block (block 2) and transfer the last 36 bytes of that block (`476..512`) into the byte range `1500..1536`.
-/// 2. Read 4 blocks (blocks `3..7`) and transfer all of those 2048 bytes into the byte range `1536..3584`.
-/// 3. Read 1 block (block 7) and transfer the first 366 bytes of that block (`0..366`) into the byte range `3584..3950`.
-///
-/// # Arguments
-/// * `byte_range`: the absolute byte-wise range (from the beginning of the block-wise stream)
-///    at which the I/O transfer starts and ends.
-/// * `block_size`: the size of each block in the block-wise I/O stream.
-/// 
-/// # Return
-/// Returns a list of the three above transfer operations, 
-/// enclosed in `Option`s to convey that some may not be necessary.
-/// 
-pub fn blockwise_from_bytewise(
-    byte_range: Range<usize>,
-    block_size: usize
-) -> [Option<BlockByteTransfer>; 3] {
-
-    let mut curr_byte = byte_range.start;
-    let mut curr_block = curr_byte / block_size;
-
-    let offset_into_first_block = byte_range.start % block_size;
-    let offset_into_last_block  = byte_range.end % block_size; 
-
-    let first_transfer = {
-
-        let (end_byte, end_block) = if offset_into_first_block == 0 {
-            if offset_into_last_block == 0 {
-                // Both the start and end of the byte_range are block-aligned,
-                // a special case in which we can cover the whole range with just one transfer.
-                (byte_range.end, byte_range.end / block_size)
-            } else {
-                // The start is block-aligned, but the end is not. 
-                // So we end this first transfer at the second-to-last block.
-                let end_block = byte_range.end / block_size; // block range is exclusive
-                (end_block * block_size, end_block)
-            }
-        } else {
-            // The start is NOT block-aligned, so we do a single-block transfer to the end of this block. 
-            (round_up(curr_block, block_size), curr_block + 1)
-        };
-        
-        let ft = Some(BlockByteTransfer {
-            byte_range_absolute: byte_range.start .. end_byte,
-            block_range: curr_block .. end_block,
-            bytes_in_block_range: offset_into_first_block .. block_size,
-        });
-        curr_byte = end_byte; 
-        curr_block = end_block;
-        ft
-    };
-
-
-    let second_transfer = 
-
-
-    //////////////////////////
-
-
-    let first_block = byte_range.start / block_size;
-    let start_offset_into_first_block = byte_range.start % block_size;
-
-    let first_block_map = if start_offset_into_first_block == 0 {
-        None
-    } else {
-        Some(BlockByteTransfer {
-            byte_range_absolute: byte_range.start .. round_up(byte_range.start, block_size),
-            block_range: first_block .. first_block + 1,
-            bytes_in_block_range: start_offset_into_first_block .. block_size,
-        })
-    };
-
-    let last_block = byte_range.end / block_size;
-    let end_offset_into_last_block = byte_range.end % block_size;
-    let last_block_map = if end_offset_into_last_block == 0 {
-        None
-    } else {
-        Some(BlockByteTransfer {
-            byte_range_absolute: (last_block - 1) * block_size .. byte_range.end,
-            block_range: last_block - 1 .. last_block,
-            bytes_in_block_range: 0 .. end_offset_into_last_block,
-        })
-    };
-
-
-    let middle_blocks_map = match (first_block_map, last_block_map) {
-        (None, None) => {
-            Some(BlockByteTransfer {
-                byte_range_absolute: round_up(byte_range.start, block_size) .. 
-                block_range: first_block + 1 .. last_block - 1,
-                bytes_in_block_range: 0 .. end_offset_into_last_block,
-            })
-        }
-
-    };
-    
-    else {
-        Some(BlockByteTransfer {
-            byte_range_absolute: round_up(byte_range.start, block_size) .. 
-            block_range: first_block + 1 .. last_block - 1,
-            bytes_in_block_range: 0 .. end_offset_into_last_block,
-        })
-    }
-
-
-
-
-    [first_transfer, second_transfer, third_transfer]
-}
-*/
-
-
+/// Describes an operation for performing byte-wise I/O on a block-based I/O stream. 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct BlockByteTransfer { // <const BLOCK_SIZE: usize> {
@@ -785,4 +632,156 @@ pub fn round_up(value: usize, multiple: usize) -> usize {
 #[inline]
 pub fn round_down(value: usize, multiple: usize) -> usize {
     (value / multiple) * multiple
+}
+
+
+#[cfg(test)] 
+mod test {
+    extern crate std;
+    use super::*;
+    
+    /// A test vector for `blockwise_from_bytewise()` where both the starting byte and ending byte
+    /// are not block-aligned.
+    #[test]
+    fn test_blockwise_bytewise_multiple_both_unaligned() {
+        let transfers = blockwise_from_bytewise(1500..3950, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 1500..1536,
+                block_range: 2..3,
+                bytes_in_block_range: 476..512,
+            }),
+            Some(BlockByteTransfer {
+                byte_range_absolute: 1536..3584,
+                block_range: 3..7,
+                bytes_in_block_range: 0..2048,
+            }),
+            Some(BlockByteTransfer {
+                byte_range_absolute: 3584..3950,
+                block_range: 7..8,
+                bytes_in_block_range: 0..366,
+            }),
+        ]);
+    }
+
+
+
+    /// A test vector for `blockwise_from_bytewise()` where 
+    /// multiple blocks are transferred, with an unaligned start and an aligned end. 
+    #[test]
+    fn test_blockwise_bytewise_multiple_unaligned_to_aligned() {
+        let transfers = blockwise_from_bytewise(1693..6144, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 1693..2048,
+                block_range: 3..4,
+                bytes_in_block_range: 157..512,
+            }),
+            Some(BlockByteTransfer {
+                byte_range_absolute: 2048..6144,
+                block_range: 4..12,
+                bytes_in_block_range: 0..4096,
+            }),
+            None,
+        ]);
+    }
+
+
+
+    /// A test vector for `blockwise_from_bytewise()` where 
+    /// multiple blocks are transferred, with an aligned start and an unaligned end. 
+    #[test]
+    fn test_blockwise_bytewise_multiple_aligned_to_unaligned() {
+        let transfers = blockwise_from_bytewise(1536..6100, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 1536..5632,
+                block_range: 3..11,
+                bytes_in_block_range: 0..4096,
+            }),
+            Some(BlockByteTransfer {
+                byte_range_absolute: 5632..6100,
+                block_range: 11..12,
+                bytes_in_block_range: 0..468,
+            }),
+            None,
+        ]);
+    }
+
+
+
+    /// A test vector for `blockwise_from_bytewise()` where the byte range is within one block.
+    /// This tests all four combinations of byte alignment within one block:
+    /// 1. unalighed start, unaligned end
+    /// 2. aligned start, unaligned end
+    /// 3. unaligned start, aligned end
+    /// 4. aligned start, aligned end
+    #[test]
+    fn test_blockwise_bytewise_one_block() {
+        // 1. unalighed start, unaligned end
+        let transfers = blockwise_from_bytewise(555..900, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 555..900,
+                block_range: 1..2,
+                bytes_in_block_range: 43..388,
+            }),
+            None,
+            None,
+        ]);
+
+        // 2. aligned start, unaligned end
+        let transfers = blockwise_from_bytewise(512..890, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 512..890,
+                block_range: 1..2,
+                bytes_in_block_range: 0..378,
+            }),
+            None,
+            None,
+        ]);
+
+        // 3. unaligned start, aligned end
+        let transfers = blockwise_from_bytewise(671..1024, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 671..1024,
+                block_range: 1..2,
+                bytes_in_block_range: 159..512,
+            }),
+            None,
+            None,
+        ]);
+
+        // 4. aligned start, aligned end
+        let transfers = blockwise_from_bytewise(1024..1536, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 1024..1536,
+                block_range: 2..3,
+                bytes_in_block_range: 0..512,
+            }),
+            None,
+            None,
+        ]);
+    }
+
+
+
+    /// A test vector for `blockwise_from_bytewise()` where
+    /// the byte range is several blocks, perfectly aligned on both sides. 
+    #[test]
+    fn test_blockwise_bytewise_multiple_both_aligned() {
+        let transfers = blockwise_from_bytewise(1024..3072, 512);
+        assert_eq!(transfers, [
+            Some(BlockByteTransfer {
+                byte_range_absolute: 1024..3072,
+                block_range: 2..6,
+                bytes_in_block_range: 0..2048,
+            }),
+            None,
+            None,
+        ]);
+    }
 }
