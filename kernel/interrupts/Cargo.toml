@@ -6,67 +6,70 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+cfg-if = "1.0.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
 spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 
-[dependencies.log]
+[target.'cfg(target_arch = "x86_64")'.dependencies.log]
 version = "0.4.8"
 
-[dependencies.lazy_static]
+[target.'cfg(target_arch = "x86_64")'.dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
-[dependencies.irq_safety]
+[target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.port_io]
+[target.'cfg(target_arch = "x86_64")'.dependencies.port_io]
 path = "../../libs/port_io"
 
-[dependencies.memory]
+[target.'cfg(target_arch = "x86_64")'.dependencies.memory]
 path = "../memory"
 
-[dependencies.kernel_config]
+[target.'cfg(target_arch = "x86_64")'.dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.apic]
+[target.'cfg(target_arch = "x86_64")'.dependencies.apic]
 path = "../apic"
 
-[dependencies.tlb_shootdown]
+[target.'cfg(target_arch = "x86_64")'.dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
-[dependencies.tss]
+[target.'cfg(target_arch = "x86_64")'.dependencies.tss]
 path = "../tss"
 
-[dependencies.gdt]
+[target.'cfg(target_arch = "x86_64")'.dependencies.gdt]
 path = "../gdt"
 
-[dependencies.pic]
+[target.'cfg(target_arch = "x86_64")'.dependencies.pic]
 path = "../pic"
 
-[dependencies.exceptions_early]
+[target.'cfg(target_arch = "x86_64")'.dependencies.exceptions_early]
 path = "../exceptions_early"
 
-[dependencies.task]
+[target.'cfg(target_arch = "x86_64")'.dependencies.task]
 path = "../task"
 
-[dependencies.pit_clock]
+[target.'cfg(target_arch = "x86_64")'.dependencies.pit_clock]
 path = "../pit_clock"
 
-[dependencies.keyboard]
+[target.'cfg(target_arch = "x86_64")'.dependencies.keyboard]
 path = "../keyboard"
 
-[dependencies.mouse]
+[target.'cfg(target_arch = "x86_64")'.dependencies.mouse]
 path = "../mouse"
 
-[dependencies.ps2]
+[target.'cfg(target_arch = "x86_64")'.dependencies.ps2]
 path = "../ps2"
 
-[dependencies.scheduler]
+[target.'cfg(target_arch = "x86_64")'.dependencies.scheduler]
 path = "../scheduler"
 
-[dependencies.vga_buffer]
+[target.'cfg(target_arch = "x86_64")'.dependencies.vga_buffer]
 path = "../vga_buffer"
 
 [lib]

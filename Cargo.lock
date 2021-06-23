@@ -319,6 +319,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "cfg-if 1.0.0",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -467,15 +468,15 @@ dependencies = [
  "aligned",
  "bare-metal",
  "bitfield",
- "cortex-m 0.7.1",
+ "cortex-m 0.7.2",
  "volatile-register",
 ]
 
 [[package]]
 name = "cortex-m"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0b756a8bffc56025de45218a48ff9b801180440c0ee49a722b32d49dcebc771"
+checksum = "643a210c1bdc23d0db511e2a576082f4ff4dcae9d0c37f50b431b8f8439d6d6b"
 dependencies = [
  "bare-metal",
  "bitfield",
@@ -484,33 +485,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "cortex-m-rt"
-version = "0.6.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "980c9d0233a909f355ed297ef122f257942de5e0a2cb1c39f60684b65bcb90fb"
-dependencies = [
- "cortex-m-rt-macros",
- "r0",
-]
-
-[[package]]
-name = "cortex-m-rt-macros"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4717562afbba06e760d34451919f5c3bf3ac15c7bb897e8b04862a7428378647"
-dependencies = [
- "proc-macro2 1.0.24",
- "quote 1.0.7",
- "syn 1.0.48",
-]
-
-[[package]]
 name = "cortex-m-semihosting"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bffa6c1454368a6aa4811ae60964c38e6996d397ff8095a8b9211b1c1f749bc"
 dependencies = [
- "cortex-m 0.7.1",
+ "cortex-m 0.6.7",
 ]
 
 [[package]]
@@ -1116,6 +1096,7 @@ name = "interrupts"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cfg-if 1.0.0",
  "exceptions_early",
  "gdt",
  "irq_safety",
@@ -1479,7 +1460,6 @@ version = "0.1.0"
 dependencies = [
  "alloc-cortex-m",
  "cfg-if 1.0.0",
- "cortex-m-rt",
  "heap",
  "irq_safety",
  "kernel_config",
@@ -1659,8 +1639,7 @@ dependencies = [
  "alloc-cortex-m",
  "captain",
  "cfg-if 1.0.0",
- "cortex-m 0.6.7",
- "cortex-m-rt",
+ "cortex-m 0.7.2",
  "exceptions_early",
  "irq_safety",
  "kernel_config",
@@ -2088,12 +2067,6 @@ checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
  "proc-macro2 1.0.24",
 ]
-
-[[package]]
-name = "r0"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2a38df5b15c8d5c7e8654189744d8e396bddc18ad48041a500ce52d6948941f"
 
 [[package]]
 name = "rand"

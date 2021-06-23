@@ -17,15 +17,17 @@ path = "../memory_initialization"
 [dependencies.log]
 version = "0.4.8"
 
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.captain]
+path = "../captain"
+
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 spin = "0.4.10"
 multiboot2 = "0.7.1"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
-
-[target.'cfg(target_arch = "x86_64")'.dependencies.kernel_config]
-path = "../kernel_config"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
@@ -45,9 +47,6 @@ path = "../mod_mgmt"
 [target.'cfg(target_arch = "x86_64")'.dependencies.exceptions_early]
 path = "../exceptions_early"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies.captain]
-path = "../captain"
-
 [target.'cfg(target_arch = "x86_64")'.dependencies.panic_entry]
 path = "../panic_entry"
 
@@ -55,13 +54,12 @@ path = "../panic_entry"
 path = "../vga_buffer"
 
 [target.'cfg(target_arch = "arm")'.dependencies]
-cortex-m-rt = "0.6.13"
 panic-halt = "0.2.0"
 alloc-cortex-m = "0.4.1"
 
 [target.'cfg(target_arch = "arm")'.dependencies.cortex-m]
 features = ["inline-asm"]
-version = "0.6.4"
+version = "0.7.2"
 
 [target.'cfg(target_arch = "arm")'.dependencies.memfs]
 path = "../memfs"

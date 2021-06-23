@@ -7,7 +7,7 @@ version = "0.1.0"
 [dependencies]
 cfg-if = "1.0.0"
 
-[dependencies.kernel_config]
+[target.'cfg(target_arch = "x86_64")'.dependencies.kernel_config]
 path = "../kernel_config"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
@@ -29,5 +29,4 @@ git = "https://github.com/kevinaboos/irq_safety"
 path = "../heap"
 
 [target.'cfg(target_arch = "arm")'.dependencies]
-cortex-m-rt = "0.6.13"
 alloc-cortex-m = "0.4.1"

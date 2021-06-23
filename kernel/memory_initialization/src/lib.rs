@@ -44,13 +44,11 @@ else if #[cfg(target_arch="arm")] {
 
 extern crate alloc;
 extern crate alloc_cortex_m;
-extern crate cortex_m_rt;
-extern crate kernel_config;
 
 mod armv7em;
 
-pub fn init_memory_management() {
-    armv7em::init_memory_management()
+pub fn init_memory_management(heap_start: usize, heap_end: usize) {
+    armv7em::init_memory_management(heap_start, heap_end)
 }
 
 }

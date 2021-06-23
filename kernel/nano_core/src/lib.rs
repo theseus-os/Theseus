@@ -16,6 +16,7 @@
 //! 
 
 #![no_std]
+#![feature(asm)]
 
 #[macro_use] extern crate cfg_if;
 #[macro_use] extern crate log;
@@ -267,14 +268,17 @@ extern crate root;
 extern crate cortex_m;
 extern crate panic_halt;
 extern crate memory_initialization;
-#[macro_use] extern crate cortex_m_rt;
+extern crate captain;
+
+mod boot;
 
 use alloc::string::String;
 use memfs::MemFile;
 
-#[entry]
-fn main() -> ! {
-    memory_initialization::init_memory_management();
+
+extern "C" fn main() -> ! {
+    let heap_start = boot::heap_start();
+    memory_initialization::init_memory_management(heap_start, kernel_config::memory::KERNEL_HEAP_INITIAL_SIZE + heap_start);
     logger::init().unwrap();
 
     info!("memory and logging initialized");
@@ -291,7 +295,7 @@ fn main() -> ! {
     info!("heap: {}", &heap_hello);
     info!("memfile: {}", &memfile_hello);
 
-    loop {}
+    captain::init()
 }
 
 } // End of architecture dependent code for thumbv7em.
