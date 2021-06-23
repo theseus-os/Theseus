@@ -17,11 +17,5 @@ version = "0.4.8"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
-[dependencies.storage_device]
-path = "../storage_device"
-
-[dependencies.block_cache]
-path = "../block_cache"
-
 [lib]
 crate-type = ["rlib"]

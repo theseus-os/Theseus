@@ -1,25 +1,38 @@
-//! Wrappers for converting block I/O operations from one block size to another.
+//! Traits and types for expressing I/O transfers, both byte-wise and block-wise granularity.
 //! 
-//! For example, these wrappers can expose a storage device that transfers 512-byte blocks at a time
-//! as a device that can transfer arbitrary bytes at a time (as little as one byte). 
+//! The important items are summarized below:
+//! * `BlockReader`, `BlockWriter`: traits that represent I/O streams which can be read from
+//!    or written to at the granularity of a single block.
+//! * `ByteReader`, `ByteWriter`: traits that represent I/O streams which can be read from
+//!    or written to at the granularity of an individual bytes.
+//!    * The `ByteReader` trait is implemented for all types that implement `BlockReader`,
+//!    * The `ByteWriter` trait is implemented for all types that implement both
+//!      `BlockWriter` **and** `BlockReader`.
 //! 
-//! Furthermore, these reads and writes are cached using the `block_cache` crate.
-//! 
-//! # Limitations
-//! Currently, the `BlockIoWrapper` struct is hardcoded to use a `StorageDevice` reference,
-//! when in reality it should just use anything that implements traits like `BlockReader + BlockWriter`. 
-//! 
-//! The read and write functions are implemented such that if the backing storage device
-//! needs to be accessed, it is done so by transferring only one block at a time. 
-//! This is quite inefficient, and we should instead transfer multiple blocks at once. 
+//! Note that the above traits represent "stateless" access into I/O streams or devices,
+//! in that successive read/write operations will not advance any kind of "offset".
+//!
+//! To read or write while tracking the current offset into the I/O stream, we provide the
+//! `Reader`, `Writer`, and `ReaderWriter` types. 
+//! These types act as stateful wrappers around I/O streams that track the current offset 
+//! into that stream, i.e., where the next read or write operation will start.
+//!
+//! For example, a storage device like a hard drive that transfers 512-byte blocks at a time
+//! should implement the `BlockReader` and `BlockWriter` traits.
+//! A user can then use those traits directly to transfer whole blocks to/from the device,
+//! or wrap the storage device in one of the byte-wise reader/writer types 
+//! in order to transfer arbitrary bytes (as little as one byte) at a time to/from the device. 
+//!
+//! Notably, the [`blocks_from_bytes()`](fn.blocks_from_bytes.html) function is useful for
+//! determining the set of block-based I/O transfers needed to satisfy an arbitrary
+//! byte-granular transfer.
+//!
 
 #![no_std]
 
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate derive_more;
-extern crate storage_device;
-extern crate block_cache;
 extern crate bare_io;
 
 use core::{
@@ -27,17 +40,15 @@ use core::{
     ops::Range,
 };
 use alloc::vec::Vec;
-use storage_device::StorageDeviceRef;
-use block_cache::BlockCache;
 
 
-/// The set of errors that can be returned from I/O operations.
+/// Errors that can be returned from I/O operations.
 pub enum IoError {
     /// An input parameter or argument was incorrect or invalid.
     InvalidInput,
     /// The I/O operation attempted to access data beyond the bounds of this I/O stream.
     OutOfBounds,
-    /// The I/O operationg timed out and was canceled.
+    /// The I/O operation timed out and was canceled.
     TimedOut,
 }
 
@@ -53,7 +64,7 @@ impl From<IoError> for bare_io::Error {
 }
 
 
-/// A parent trait that is used to specify the block size (in bytes)
+/// A parent trait used to specify the block size (in bytes)
 /// of I/O transfers (read and write operations). 
 /// See its use in `BlockReader` and `BlockWriter`.
 pub trait BlockIo {
@@ -73,12 +84,12 @@ pub trait BlockReader: BlockIo {
     ///
     /// The number of blocks read is dictated by the length of the given `buffer`.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `buffer`: the buffer into which data will be copied. 
     ///    The length of this buffer must be a multiple of `BLOCK_SIZE`.
     /// * `block_offset`: the offset in number of blocks from the beginning of this reader.
     ///
-    /// # Return
+    /// ## Return
     /// If successful, returns the number of blocks read into the given `buffer`. 
     /// Otherwise, returns an error.
     fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>;
@@ -96,12 +107,12 @@ pub trait BlockWriter: BlockIo {
     ///
     /// The number of blocks written is dictated by the length of the given `buffer`.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `buffer`: the buffer from which data will be copied. 
     ///    The length of this buffer must be a multiple of `BLOCK_SIZE`.
     /// * `block_offset`: the offset in number of blocks from the beginning of this writer.
     ///
-    /// # Return
+    /// ## Return
     /// If successful, returns the number of blocks written to this writer. 
     /// Otherwise, returns an error.
     fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>;
@@ -122,94 +133,44 @@ pub trait ByteReader {
     ///
     /// The number of bytes read is dictated by the length of the given `buffer`.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `buffer`: the buffer into which data will be copied.
     /// * `offset`: the offset in bytes from the beginning of this reader where the read operation begins.
     ///
-    /// # Return
+    /// ## Return
     /// If successful, returns the number of bytes read into the given `buffer`. 
     /// Otherwise, returns an error.
     fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; 
 }
 
+// Implement a byte-wise reader atop a block-based reader. 
 impl<R: BlockReader> ByteReader for R {
     fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+        let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
 
-        let mut total_bytes_read = 0;
+        let transfers = blocks_from_bytes(offset .. offset + buffer.len(), R::BLOCK_SIZE);
+        for transfer in transfers.iter().flatten() {
+            let BlockByteTransfer { byte_range_absolute, block_range, bytes_in_block_range } = transfer;
+            let buffer_range = byte_range_absolute.start - offset .. byte_range_absolute.end - offset;
 
-        let mut block_to_read = offset / R::BLOCK_SIZE;
-        let offset_into_first_block = offset % R::BLOCK_SIZE;
-
-        let end_offset = offset + buffer.len();
-        let last_block = end_offset / R::BLOCK_SIZE;
-        let offset_into_last_block = end_offset % R::BLOCK_SIZE;
-        
-
-        // There are three possible ranges of bytes that we need to read from the block reader:
-        // 1. The leading partial block, before the beginning of the first whole block. in which the byte-wise offset is not aligned on a block boundary.
-        // 2. The first whole block through the end of the last whole block.
-        // 3. The trailing partial block, after the end of the last whole block in the byte offset  end of the last full block 
-        // 
-        // We avoid the need to copy between intermediate buffers by issuing up to 3 `read_block()` operations.
-        // We issue the reads sequentially in ascending order to hopefully preserve locality of memory access
-        // and accessing (seeking) the underlying I/O stream.
-
-        let mut src_offset  = offset_into_first_block;
-        let mut dest_offset = 0;
-
-        let mut tmp_block_bytes: Vec<u8> = Vec::new();
-
-        if offset_into_first_block != 0 {
-            // The offset is NOT block-aligned, so we need to perform an initial read of the first block separately.
-            if tmp_block_bytes.is_empty() {
-                tmp_block_bytes = vec![0; R::BLOCK_SIZE];
+            // If the transfer is block-aligned on both sides, then we can copy it directly into the `buffer`. 
+            if bytes_in_block_range.start % R::BLOCK_SIZE == 0 && bytes_in_block_range.end % R::BLOCK_SIZE == 0 {
+                let _blocks_read = self.read_blocks(&mut buffer[buffer_range], block_range.start);
+            } 
+            // Otherwise, we transfer a single block into a temp buffer and copy a sub-range of those bytes into `buffer`.
+            else {
+                if tmp_block_bytes.is_empty() {
+                    tmp_block_bytes = vec![0; R::BLOCK_SIZE * block_range.len()];
+                }
+                let _blocks_read = self.read_blocks(&mut tmp_block_bytes, block_range.start)?;
+                buffer[buffer_range].copy_from_slice(&tmp_block_bytes[bytes_in_block_range.clone()]);
             }
-            let _blocks_read = self.read_blocks(&mut tmp_block_bytes, block_to_read)?;
-            let num_bytes_to_copy = R::BLOCK_SIZE - offset_into_first_block;
-            let dest_range = dest_offset .. (dest_offset + num_bytes_to_copy);
-            let src_range  =  src_offset .. (src_offset  + num_bytes_to_copy);
-            buffer[dest_range].copy_from_slice(&tmp_block_bytes[src_range]);
-            dest_offset += num_bytes_to_copy;
-            total_bytes_read += num_bytes_to_copy;
-            block_to_read += 1;
         }
 
-        let last_contiguous_block = if offset_into_last_block == 0 {
-            // The end offset IS block-aligned, so we can simply perform one more read that covers all remaining blocks.
-            last_block
-        } else {
-            // The end offset is NOT block-aligned, so we must perform a final read of the last block separately.
-            last_block - 1
-        };
-        // Perform the read of contiguously whole blocks. 
-        {
-            let num_bytes_to_copy = R::BLOCK_SIZE * (last_contiguous_block - block_to_read);
-            let dest_range = dest_offset .. (dest_offset + num_bytes_to_copy);
-            let blocks_read = self.read_blocks(&mut buffer[dest_range], block_to_read)?;
-            total_bytes_read += blocks_read * R::BLOCK_SIZE;
-            dest_offset += num_bytes_to_copy;
-            block_to_read = last_contiguous_block;
-        }
-        
-
-        
-        if offset_into_last_block != 0 {
-            // The end offset is NOT block-aligned, so we must perform a final read of the last block separately.
-            if tmp_block_bytes.is_empty() {
-                tmp_block_bytes = vec![0; R::BLOCK_SIZE];
-            }
-            let _blocks_read = self.read_blocks(&mut tmp_block_bytes, block_to_read)?;
-            let num_bytes_to_copy = offset_into_last_block;
-            let dest_range = dest_offset .. (dest_offset + num_bytes_to_copy);
-            let src_range  =  src_offset .. (src_offset  + num_bytes_to_copy);
-            buffer[dest_range].copy_from_slice(&tmp_block_bytes[src_range]);
-            dest_offset += num_bytes_to_copy;
-            total_bytes_read += num_bytes_to_copy;
-        }
-
-        Ok(total_bytes_read)
+        Ok(buffer.len())
     }
 }
+
 
 /// A trait that represents an I/O stream that can be written to,
 /// but which does not track the current offset into the stream.
@@ -221,22 +182,55 @@ pub trait ByteWriter {
     ///
     /// The number of bytes written is dictated by the length of the given `buffer`.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `buffer`: the buffer from which data will be copied. 
     /// * `offset`: the offset in number of bytes from the beginning of this writer.
     ///
-    /// # Return
+    /// ## Return
     /// If successful, returns the number of bytes written to this writer. 
     /// Otherwise, returns an error.
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
 
-    /// Flushes this entire writer's output stream, 
+    /// Flushes this writer's output stream, 
     /// ensuring all contents in intermediate buffers are fully written out.
     fn flush(&mut self) -> Result<(), IoError>;
 }
-impl<W: BlockWriter> ByteWriter for W {
+
+// We can only implement a byte-wise writer atop a block-wise writer AND reader together,
+// because we may need to read partial blocks from the underlying device before writing them.
+// This is needed to ensure that bytes that aren't written 
+// 
+// Note that other implementations of `ByteWriter` may not have this requirement,
+// e.g., when the underlying writer supports writing individual bytes.
+impl<RW: BlockReader + BlockWriter> ByteWriter for RW {
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
-        todo!()
+        let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
+
+        let transfers = blocks_from_bytes(offset .. offset + buffer.len(), RW::BLOCK_SIZE);
+        for transfer in transfers.iter().flatten() {
+            let BlockByteTransfer { byte_range_absolute, block_range, bytes_in_block_range } = transfer;
+            let buffer_range = byte_range_absolute.start - offset .. byte_range_absolute.end - offset;
+
+            // If the transfer is block-aligned on both sides, then we can write it directly 
+            // from the `buffer` to the underlying block writer without reading any bytes first.
+            if bytes_in_block_range.start % RW::BLOCK_SIZE == 0 && bytes_in_block_range.end % RW::BLOCK_SIZE == 0 {
+                let _blocks_written = self.write_blocks(&buffer[buffer_range], block_range.start);
+            } 
+            // Otherwise, to transfer only *part* of a block (a sub-range of its bytes), we must:
+            // 1. Read that whole block into a temporary buffer,
+            // 2. Overwrite (copy) the sub-range of new bytes into that temp buffer,
+            // 3. Write that whole block back to the underlying writer.
+            else {
+                if tmp_block_bytes.is_empty() {
+                    tmp_block_bytes = vec![0; RW::BLOCK_SIZE * block_range.len()];
+                }
+                let _blocks_read = self.read_blocks(&mut tmp_block_bytes, block_range.start)?;
+                tmp_block_bytes[bytes_in_block_range.clone()].copy_from_slice(&buffer[buffer_range]);
+                let _blocks_written = self.write_blocks(&tmp_block_bytes[..], block_range.start)?;
+            }
+        }
+
+        Ok(buffer.len())
     }
 
     fn flush(&mut self) -> Result<(), IoError> {
@@ -316,207 +310,11 @@ impl<IO: ByteWriter> bare_io::Write for IoWithOffset<IO> {
 
 
 
-
-
-/// A wrapper around a `StorageDevice` that supports reads and writes of arbitrary byte lengths
-/// (down to a single byte) by issuing commands to the underlying storage device.
-/// This is needed because most storage devices only allow reads/writes of larger blocks, 
-/// e.g., a 512-byte sector or 4KB cluster.  
+/// Calculates block-wise bounds for an I/O transfer 
+/// based on a byte-wise range into a block-wise stream.
 /// 
-/// It also contains a cache for the blocks in the backing storage device,
-/// in order to improve performance by avoiding actual storage device access.
-pub struct BlockIoWrapper {
-    /// The cache of blocks (sectors) read from the storage device,
-    /// a map from sector number to data byte array.
-    cache: BlockCache, 
-    block_size: BlockSize,
-}
-impl BlockIoWrapper {
-    /// Creates a new `BlockIoWrapper` device 
-    pub fn new(storage_device: StorageDeviceRef) -> BlockIoWrapper {
-        let device_ref = storage_device.clone();
-        let locked_device = device_ref.lock();
-        BlockIoWrapper {
-            cache: BlockCache::new(storage_device),
-            block_size: BlockSize {
-                size_in_bytes: locked_device.size_in_bytes(),
-                size_in_blocks: locked_device.size_in_sectors(),
-                block_size_in_bytes: locked_device.sector_size_in_bytes()
-            },
-        }
-    }
-
-    /// Reads data from this block storage device and places it into the provided `buffer`.
-    /// The length of the given `buffer` determines the maximum number of bytes to be read.
-	/// 
-	/// Returns the number of bytes that were successfully read from the drive
-	/// and copied into the given `buffer`.
-    /// 
-    /// The read blocks will be cached in this `BlockIoWrapper` struct to accelerate future storage device access.
-    pub fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
-        let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, buffer.len(), &self.block_size)?;
-        let block_size_in_bytes = self.block_size.block_size_in_bytes;
-
-        // Read the actual data, one block at a time.
-		let mut src_offset = first_block_offset; 
-		let mut dest_offset = 0;
-		for block_num in range {
-			// don't copy past the end of `buffer`
-			let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - src_offset, buffer.len() - dest_offset);
-            let block_bytes = BlockCache::read_block(&mut self.cache, block_num)?;
-			buffer[dest_offset .. (dest_offset + num_bytes_to_copy)].copy_from_slice(&block_bytes[src_offset .. (src_offset + num_bytes_to_copy)]);
-			trace!("BlockIoWrapper::read(): for block {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
-				block_num, dest_offset, dest_offset + num_bytes_to_copy, src_offset, src_offset + num_bytes_to_copy,
-			);
-			dest_offset += num_bytes_to_copy;
-			src_offset = 0;
-		}
-
-        Ok(dest_offset)
-    }
-
-    /// Write data from the given `buffer` into this block storage device starting at the given `offset` in bytes.
-    /// The length of the given `buffer` determines the maximum number of bytes to be written.
-	/// 
-	/// Returns the number of bytes that were successfully written to the storage device.
-    /// 
-    /// The written blocks will be cached in this `BlockIoWrapper` struct to accelerate future storage device access.
-    /// Currently, we use a *write-through* cache policy,
-    /// in which the blocks are written directly to the cache and the backing storage device immediately.
-    pub fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
-
-        let block_bounds = BlockBounds::block_bounds(offset, buffer.len(), &self.block_size)?;
-        let block_size_in_bytes = self.block_size.block_size_in_bytes;
-
-        // // A write transfer (and a read too) can be broken down into three parts: 
-        // // (1) Beginning: the first block, which may only be partially included in the transfer.
-        // // (2) Middle: the second block to the second-to-last block, which will be full blocks.
-        // // (3) End: the last block, which might be partially covered by the byte buffer.
-        // // Only the middle blocks can be blindly written to without first reading the existing blocks' contents.
-        // // If the first block or last block is aligned to a block boundary, it can be handled as a middle block.
-		let mut src_offset = 0;
-		let mut dest_offset = block_bounds.first_block_offset;
-
-		for block_num in block_bounds.range {
-			let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - dest_offset, buffer.len() - src_offset);
-
-            let buffer_to_write = if num_bytes_to_copy == block_size_in_bytes {
-                // We're overwriting the entire block, so no need to read it first
-                (&buffer[src_offset .. (src_offset + num_bytes_to_copy)]).to_vec()
-            } else {
-                // We're only partially writing to this block, so we need to read the old block first.
-                let old_block = BlockCache::read_block(&mut self.cache, block_num)?;
-                let mut new_block_contents = old_block.to_vec();
-                let overwrite_offset = dest_offset % block_size_in_bytes;
-                new_block_contents[overwrite_offset .. (overwrite_offset + num_bytes_to_copy)]
-                    .copy_from_slice(&buffer[src_offset .. (src_offset + num_bytes_to_copy)]);
-                new_block_contents
-            };
-
-            self.cache.write_block(block_num, buffer_to_write.into())?;
-            trace!("BlockIoWrapper::write(): for block {}, copied bytes from buffer[{}..{}] to block[{}..{}]",
-				block_num, src_offset, src_offset + num_bytes_to_copy, dest_offset, dest_offset + num_bytes_to_copy,
-			);
-
-			src_offset += num_bytes_to_copy;
-			dest_offset = 0;
-		}
-
-        Ok(src_offset)
-    }
-
-    /// Flushes the given block to the backing storage device. 
-    /// If the `block_to_flush` is None, all blocks in the entire cache
-    /// will be written back to the storage device.
-    pub fn flush(&mut self, block_num: Option<usize>) -> Result<(), &'static str> {
-        self.cache.flush(block_num)
-    }
-}
-
-/// Information used to track the size of a block device. Primarily used to construct `BlockBounds` objects.
-pub struct BlockSize {
-    /// Size of the block device in bytes (may not be a multiple of `block_size_in_bytes`)
-    pub size_in_bytes: usize,
-    /// Number of blocks in the device. Rounds up to include partial blocks.
-    pub size_in_blocks: usize,
-    /// Number of bytes per block.
-    pub block_size_in_bytes: usize,
-}
-
-/// Block-wise bounds information for a data transfer (read or write)
-/// that has been calculated from a byte-wise offset and buffer length. 
-/// 
-/// See the [`block_bounds()`](trait.StorageDevice.html#method.block_bounds) method.
-pub struct BlockBounds {
-    /// A `Range` from the first block to the last block of the transfer.
-    pub range: Range<usize>,
-    /// The offset into the first block (beginning bound) where the transfer starts.
-    pub first_block_offset: usize,
-    /// The offset into the last block (ending bound) where the transfer ends.
-    pub last_block_offset: usize,
-}
-impl BlockBounds {
-    /// The total number of blocks to be transferred, i.e., `last block - first block`.
-    pub fn block_count(&self) -> usize {
-        self.range.end - self.range.start
-    }
-
-    /// Returns true if the first block of the transfer is aligned to a block boundary.
-    pub fn is_first_block_aligned(&self) -> bool {
-        self.first_block_offset == 0
-    }
-
-    /// Returns true if the last block of the transfer is aligned to a block boundary.
-    pub fn is_last_block_aligned(&self) -> bool {
-        self.last_block_offset == 0
-    }
-
-    /// Calculates block-wise bounds based on a byte-wise offset and buffer length for some block based device.
-    /// 
-    /// # Arguments
-    /// * `offset`: the absolute byte offset from the beginning of the block storage device
-    ///    at which the read/write starts.
-    /// * `length`: the number of bytes to be read/written.
-    /// * `block_size`: the relevant size information for the underlying block device.
-    /// 
-    /// # Return
-    /// Returns a `BlockBounds` object.
-    /// 
-    /// If `offset + length` extends past the bounds, the `Range` will be truncated
-    /// to the last block of the storage device (all the way to the end), 
-    /// and the `last_block_offset` will be `0`.
-    /// 
-    /// Returns an error if the `offset` extends past the bounds of this block device.
-    pub fn block_bounds(offset: usize, length: usize, block_size: &BlockSize) 
-            -> Result<BlockBounds, &'static str> {
-        
-        let block_size_in_bytes = block_size.block_size_in_bytes;
-        if offset > block_size.size_in_bytes {
-            return Err("offset was out of bounds");
-        }
-        let first_block = offset / block_size_in_bytes;
-        let first_block_offset = offset % block_size_in_bytes;
-        let last_block = core::cmp::min(
-            block_size.size_in_blocks,
-            (offset + length + block_size_in_bytes - 1) / block_size_in_bytes, // round up to next sector
-        );
-        let last_block_offset = (first_block_offset + length) % block_size_in_bytes;
-        trace!("block_bounds: offset: {}, length: {}, first_block: {}, last_block: {}",
-            offset, length, first_block, last_block
-        );
-        Ok(BlockBounds {
-            range: first_block..last_block,
-            first_block_offset,
-            last_block_offset,
-        })
-    }
-}
-
-
-
-/// Calculates block-wise bounds for an I/O transfer based on a byte-wise range into a block-wise stream.
-/// 
-/// There are up to three transfer operations that can possibly occur, depending on the alignment of the byte-wise range:
+/// There are up to three transfer operations that can possibly occur,
+/// depending on the alignment of the byte-wise range:
 /// 1. A partial single-block transfer of some bytes in the first block, 
 ///    only if the start of `byte_range` is not aligned to `block_size`.
 /// 2. A multi-block transfer of contiguous whole blocks, 
@@ -525,21 +323,25 @@ impl BlockBounds {
 ///    only if the end of `byte_range` is not aligned to `block_size`.
 /// 
 /// ## Example
-/// Given a read request for a `byte_range` of `1500..3950` and a `block_size` of `512` bytes, we calculate:
-/// 1. Read 1 block (block 2) and transfer the last 36 bytes of that block (`476..512`) into the byte range `1500..1536`.
-/// 2. Read 4 blocks (blocks `3..7`) and transfer all of those 2048 bytes into the byte range `1536..3584`.
-/// 3. Read 1 block (block 7) and transfer the first 366 bytes of that block (`0..366`) into the byte range `3584..3950`.
+/// Given a read request for a `byte_range` of `1500..3950` and a `block_size` of `512` bytes,
+/// this function will return the following three transfer operations:
+/// 1. Read 1 block (block `2`) and transfer the last 36 bytes of that block (`476..512`)
+///    into the byte range `1500..1536`.
+/// 2. Read 4 blocks (blocks `3..7`) and transfer all of those 2048 bytes
+///    into the byte range `1536..3584`.
+/// 3. Read 1 block (block `7`) and transfer the first 366 bytes of that block (`0..366`)
+///    into the byte range `3584..3950`.
 ///
-/// # Arguments
+/// ## Arguments
 /// * `byte_range`: the absolute byte-wise range (from the beginning of the block-wise stream)
 ///    at which the I/O transfer starts and ends.
 /// * `block_size`: the size in bytes of each block in the block-wise I/O stream.
 /// 
-/// # Return
+/// ## Return
 /// Returns a list of the three above transfer operations, 
 /// enclosed in `Option`s to convey that some may not be necessary.
 /// 
-pub fn blockwise_from_bytewise(
+pub fn blocks_from_bytes(
     byte_range: Range<usize>,
     block_size: usize
 ) -> [Option<BlockByteTransfer>; 3] {
@@ -640,11 +442,11 @@ mod test {
     extern crate std;
     use super::*;
     
-    /// A test vector for `blockwise_from_bytewise()` where both the starting byte and ending byte
+    /// A test vector for `blocks_from_bytes()` where both the starting byte and ending byte
     /// are not block-aligned.
     #[test]
     fn test_blockwise_bytewise_multiple_both_unaligned() {
-        let transfers = blockwise_from_bytewise(1500..3950, 512);
+        let transfers = blocks_from_bytes(1500..3950, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 1500..1536,
@@ -664,13 +466,11 @@ mod test {
         ]);
     }
 
-
-
-    /// A test vector for `blockwise_from_bytewise()` where 
+    /// A test vector for `blocks_from_bytes()` where 
     /// multiple blocks are transferred, with an unaligned start and an aligned end. 
     #[test]
     fn test_blockwise_bytewise_multiple_unaligned_to_aligned() {
-        let transfers = blockwise_from_bytewise(1693..6144, 512);
+        let transfers = blocks_from_bytes(1693..6144, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 1693..2048,
@@ -686,13 +486,11 @@ mod test {
         ]);
     }
 
-
-
-    /// A test vector for `blockwise_from_bytewise()` where 
+    /// A test vector for `blocks_from_bytes()` where 
     /// multiple blocks are transferred, with an aligned start and an unaligned end. 
     #[test]
     fn test_blockwise_bytewise_multiple_aligned_to_unaligned() {
-        let transfers = blockwise_from_bytewise(1536..6100, 512);
+        let transfers = blocks_from_bytes(1536..6100, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 1536..5632,
@@ -708,9 +506,7 @@ mod test {
         ]);
     }
 
-
-
-    /// A test vector for `blockwise_from_bytewise()` where the byte range is within one block.
+    /// A test vector for `blocks_from_bytes()` where the byte range is within one block.
     /// This tests all four combinations of byte alignment within one block:
     /// 1. unalighed start, unaligned end
     /// 2. aligned start, unaligned end
@@ -719,7 +515,7 @@ mod test {
     #[test]
     fn test_blockwise_bytewise_one_block() {
         // 1. unalighed start, unaligned end
-        let transfers = blockwise_from_bytewise(555..900, 512);
+        let transfers = blocks_from_bytes(555..900, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 555..900,
@@ -731,7 +527,7 @@ mod test {
         ]);
 
         // 2. aligned start, unaligned end
-        let transfers = blockwise_from_bytewise(512..890, 512);
+        let transfers = blocks_from_bytes(512..890, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 512..890,
@@ -743,7 +539,7 @@ mod test {
         ]);
 
         // 3. unaligned start, aligned end
-        let transfers = blockwise_from_bytewise(671..1024, 512);
+        let transfers = blocks_from_bytes(671..1024, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 671..1024,
@@ -755,7 +551,7 @@ mod test {
         ]);
 
         // 4. aligned start, aligned end
-        let transfers = blockwise_from_bytewise(1024..1536, 512);
+        let transfers = blocks_from_bytes(1024..1536, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 1024..1536,
@@ -767,13 +563,11 @@ mod test {
         ]);
     }
 
-
-
-    /// A test vector for `blockwise_from_bytewise()` where
+    /// A test vector for `blocks_from_bytes()` where
     /// the byte range is several blocks, perfectly aligned on both sides. 
     #[test]
     fn test_blockwise_bytewise_multiple_both_aligned() {
-        let transfers = blockwise_from_bytewise(1024..3072, 512);
+        let transfers = blocks_from_bytes(1024..3072, 512);
         assert_eq!(transfers, [
             Some(BlockByteTransfer {
                 byte_range_absolute: 1024..3072,

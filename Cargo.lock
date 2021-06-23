@@ -240,11 +240,9 @@ name = "block_io"
 version = "0.1.0"
 dependencies = [
  "bare-io",
- "block_cache",
  "derive_more",
  "lazy_static",
  "log",
- "storage_device",
 ]
 
 [[package]]
