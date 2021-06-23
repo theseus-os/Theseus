@@ -7,9 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-
-[dependencies.log]
-version = "0.4.8"
+cfg-if = "1.0.0"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
@@ -22,6 +20,9 @@ path = "../page_allocator"
 
 [dependencies.memory]
 path = "../memory"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.log]
+version = "0.4.8"
 
 [lib]
 crate-type = ["rlib"]
