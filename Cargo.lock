@@ -490,7 +490,7 @@ version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bffa6c1454368a6aa4811ae60964c38e6996d397ff8095a8b9211b1c1f749bc"
 dependencies = [
- "cortex-m 0.6.7",
+ "cortex-m 0.7.2",
 ]
 
 [[package]]
@@ -1355,6 +1355,7 @@ dependencies = [
  "log",
  "serial_port",
  "spin",
+ "uart",
 ]
 
 [[package]]
@@ -2632,6 +2633,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "stm32f4"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da3d56009c8f32e4f208dbea17df72484154d1040a8969b75d8c73eb7b18fe8f"
+dependencies = [
+ "bare-metal",
+ "cortex-m 0.7.2",
+ "vcell",
+]
+
+[[package]]
+name = "stm32f4_discovery"
+version = "0.1.0"
+dependencies = [
+ "cortex-m 0.6.7",
+ "lazy_static",
+ "stm32f4",
+]
+
+[[package]]
 name = "storage_device"
 version = "0.1.0"
 dependencies = [
@@ -2866,6 +2887,15 @@ name = "typenum"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
+
+[[package]]
+name = "uart"
+version = "0.1.0"
+dependencies = [
+ "cortex-m 0.6.7",
+ "stm32f4",
+ "stm32f4_discovery",
+]
 
 [[package]]
 name = "unicode-width"
