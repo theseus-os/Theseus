@@ -144,6 +144,7 @@ name = "ata"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "block_io",
  "log",
  "pci",
  "port_io",
@@ -2561,11 +2562,11 @@ dependencies = [
 name = "storage_device"
 version = "0.1.0"
 dependencies = [
+ "block_io",
  "downcast-rs",
  "lazy_static",
  "log",
  "owning_ref",
- "pci",
  "spin 0.9.0",
 ]
 

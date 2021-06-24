@@ -41,7 +41,7 @@ use alloc::borrow::{Cow, ToOwned};
 /// A cache to store read and written blocks from a storage device.
 pub struct BlockCache {
     /// The cache of blocks (sectors) read from the storage device,
-    /// a map from sector number to data byte array.
+    /// a map from block number to data byte array.
     cache: InternalCache,
     /// The underlying storage device from where the blocks are read/written.
     storage_device: StorageDeviceRef,
@@ -92,7 +92,7 @@ impl BlockCache {
                 match cached_block.state {
                     CacheState::Modified | CacheState::Shared => Ok(&cached_block.block),
                     CacheState::Invalid => {
-                        locked_device.read_sectors(&mut cached_block.block, block)?;
+                        locked_device.read_blocks(&mut cached_block.block, block)?;
                         cached_block.state = CacheState::Shared;
                         Ok(&cached_block.block)
                     }
@@ -101,8 +101,8 @@ impl BlockCache {
             Entry::Vacant(vacant) => {
                 // A vacant entry will be read from the backing storage device,
                 // so it will always start out in the `Shared` state.
-                let mut v = vec![0; locked_device.sector_size_in_bytes()];
-                locked_device.read_sectors(&mut v, block)?;
+                let mut v = vec![0; locked_device.block_size()];
+                locked_device.read_blocks(&mut v, block)?;
                 let cb = CachedBlock {
                     block: v,
                     state: CacheState::Shared,
@@ -142,7 +142,7 @@ impl BlockCache {
         match cached_block.state {
             CacheState::Shared | CacheState::Invalid => { },
             CacheState::Modified => {
-                locked_device.write_sectors(&cached_block.block, block_num)?;
+                locked_device.write_blocks(&cached_block.block, block_num)?;
                 cached_block.state = CacheState::Shared;
             }
         }

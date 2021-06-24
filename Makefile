@@ -599,7 +599,7 @@ help:
 ###################################################################################################
 
 QEMU_MEMORY ?= 512M
-QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
+QEMU_FLAGS := -cdrom $(iso) -boot d -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 
 ## multicore 
 QEMU_CPUS ?= 4
@@ -609,9 +609,10 @@ QEMU_FLAGS += -smp $(QEMU_CPUS)
 MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
-# QEMU_FLAGS += -drive format=raw,file=DISK_IMAGE.img,if=ide
-## Add a disk drive, a SATA drive over the AHCI interface.
-# QEMU_FLAGS += -drive id=my_disk,file=DISK_IMAGE.img,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
+QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+
+## We don't yet support SATA in Theseus, but this is how to add a SATA drive over the AHCI interface.
+# QEMU_FLAGS += -drive id=my_disk,file=<DISK_IMAGE.img>,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)

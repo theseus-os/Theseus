@@ -56,6 +56,7 @@
 extern crate alloc;
 extern crate spin;
 #[macro_use] extern crate downcast_rs;
+extern crate block_io;
 
 use alloc::{
     boxed::Box,
@@ -63,6 +64,7 @@ use alloc::{
 };
 use spin::Mutex;
 use downcast_rs::Downcast;
+use block_io::{BlockReader, BlockWriter};
 
 
 /// A trait that represents a storage controller,
@@ -87,43 +89,21 @@ pub type StorageControllerRef = Arc<Mutex<dyn StorageController + Send>>;
 /// A trait that represents a storage device,
 /// such as hard disks, removable drives, SSDs, etc.
 /// 
-/// It offers functions to read and write at sector granularity,
-/// as well as basic functions to query device info.
-pub trait StorageDevice: Downcast {
-    /// Reads content from the storage device into the given `buffer`.
-    /// 
-    /// # Arguments 
-    /// * `buffer`: the destination buffer. The length of the `buffer` governs how many sectors are read, 
-    ///   and must be an even multiple of the storage device's [`sector size`](#tymethod.sector_size_in_bytes). 
-    /// 
-    /// * `offset_in_sectors`: an absolute offset from the beginning of the storage device, given in number of sectors. 
-    ///   This is sometimes referred to as the starting logical block address (LBA).
-    /// 
-    /// Returns the number of sectors (*not bytes*) read into the `buffer`.
-    fn read_sectors(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str>;
-
-    /// Writes content from the given `buffer` to the storage device starting at the given `offset_in_sectors`.
-    /// 
-    /// # Arguments 
-    /// * `buffer`: the source buffer. The length of the `buffer` governs how many sectors are written, 
-    ///   and must be an even multiple of the storage device's [`sector size`](#tymethod.sector_size_in_bytes). 
-    /// 
-    /// * `offset_in_sectors`: an absolute offset from the beginning of the storage device, given in number of sectors. 
-    ///   This is sometimes referred to as the starting logical block address (LBA).
-    /// 
-    /// Returns the number of sectors (*not bytes*) written to the storage device.
-    fn write_sectors(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str>;
-
-	/// Returns the size of a single sector in bytes, as defined by this drive.
-    fn sector_size_in_bytes(&self) -> usize; 
-
-	/// Returns the number of sectors in this drive.
-    fn size_in_sectors(&self) -> usize;
+/// A `StorageDevice` must implement functions from the `BlockReader` and `BlockWriter` traits
+/// to read and write data from/to the device at block granularity. 
+/// It must also specify its block size by implementing the `BlockIo` trait.
+///
+/// It also includes functions to query device info, e.g.,
+/// the device's total size and inherent block size.
+pub trait StorageDevice: BlockReader + BlockWriter + Downcast {
+	/// Returns the number of blocks (sectors) in this device.
+    fn size_in_blocks(&self) -> usize;
     
-    /// Returns the size of this drive in bytes, rounded up to the nearest sector size.
-    /// This is nothing more than [`sector_size_in_bytes()`](#tymethod.sector_size_in_bytes)` * `[`size_in_sectors()`](#tymethod.size_in_sectors).
+    /// Returns the size of this device in bytes, rounded up to the nearest block (sector) size.
+    ///
+    /// This is simply [`block_size()`]` * `[`size_in_blocks()`].
     fn size_in_bytes(&self) -> usize {
-        self.sector_size_in_bytes() * self.size_in_sectors()
+        self.block_size() * self.size_in_blocks()
     }
 }
 impl_downcast!(StorageDevice);

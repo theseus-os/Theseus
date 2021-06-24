@@ -11,6 +11,7 @@ extern crate port_io;
 extern crate pci;
 #[macro_use] extern crate bitflags;
 extern crate storage_device;
+extern crate block_io;
 
 use core::fmt;
 use spin::Mutex;
@@ -22,6 +23,7 @@ use alloc::{
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
+use block_io::{BlockIo, BlockReader, BlockWriter, IoError};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -111,10 +113,10 @@ enum AtaCommand {
 	CacheFlushExt   = 0xEA,
 	/// Sends a packet, for ATAPI devices using the packet interface (PI).
 	Packet          = 0xA0,
-	/// Get identifying details of an ATA drive.
-	IdentifyDevice  = 0xEC,
 	/// Get identifying details of an ATAPI drive.
 	IdentifyPacket  = 0xA1,
+	/// Get identifying details of an ATA drive.
+	IdentifyDevice  = 0xEC,
 }
 
 
@@ -655,27 +657,32 @@ impl AtaDrive {
 }
 
 impl StorageDevice for AtaDrive {
-	fn read_sectors(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		self.read_pio(buffer, offset_in_sectors)
-	}
-
-    fn write_sectors(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		self.write_pio(buffer, offset_in_sectors)
-	}
-
-	/// Returns the number of sectors in this drive.
-	fn size_in_sectors(&self) -> usize {
+	fn size_in_blocks(&self) -> usize {
 		if self.identify_data.user_addressable_sectors != 0 {
 			self.identify_data.user_addressable_sectors as usize
 		} else {
 			self.identify_data.max_48_bit_lba as usize
 		}
 	}
-
-    fn sector_size_in_bytes(&self) -> usize {
+}
+impl BlockIo for AtaDrive {
+	fn block_size(&self) -> usize {
 		SECTOR_SIZE_IN_BYTES
 	}
+}
+impl BlockReader for AtaDrive {
+	fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
+		// TODO: emit an IoError from the read_pio function itself instead of a blind conversion here
+		self.read_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
+	}
+}
+impl BlockWriter for AtaDrive {
+	fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
+		// TODO: emit an IoError from the read_pio function itself instead of a blind conversion here
+		self.write_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
+	}
 
+	fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
 }
 
 
@@ -737,7 +744,7 @@ impl IdeController {
 		
 		let drive_fmt = |drive: &Result<AtaDrive, &str>| -> String {
 			match drive {
-				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_sectors()),
+				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_blocks()),
 				Err(e) => format!("{}", e),
 			}
 		};
