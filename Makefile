@@ -103,7 +103,7 @@ APP_CRATE_NAMES := $(filter-out build/. target/., $(APP_CRATE_NAMES))
 APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
 APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
-APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
+APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
@@ -142,7 +142,7 @@ $(iso): build
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
 ## This also classifies crate object files into either "application" or "kernel" crates:
 ## -- an application crate is any executable application in the `applications/` directory, or a library crate that is ONLY used by other applications,
-## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used 
+## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used by kernel crates.
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
@@ -208,7 +208,7 @@ cargo: check_rustc
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build  $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -240,7 +240,8 @@ cargo: check_rustc
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	@rm -rf $(OBJECT_FILES_BUILD_DIR)
+## If we remove the OBJECT_FILES_BUILD_DIR here, then the simd_personality_* builds do not work.
+# @rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(DEPS_DIR)
 
@@ -377,7 +378,7 @@ clean:
 ## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_sse : export TARGET := x86_64-theseus
 simd_personality_sse : export BUILD_MODE = release
-simd_personality_sse : export override THESEUS_CONFIG += simd_personality
+simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_personality_sse
 simd_personality_sse: build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
@@ -396,7 +397,7 @@ simd_personality_sse: build_sse build
 ## The "normal" target must come last ('build_avx', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_avx : export TARGET := x86_64-theseus
 simd_personality_avx : export BUILD_MODE = release
-simd_personality_avx : export override THESEUS_CONFIG += simd_personality
+simd_personality_avx : export override THESEUS_CONFIG += simd_personality simd_personality_avx
 simd_personality_avx : export override CFLAGS += -DENABLE_AVX
 simd_personality_avx: build_avx build
 ## after building all the modules, copy the kernel boot image files
@@ -412,25 +413,24 @@ simd_personality_avx: build_avx build
 
 ### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
 ### It can serve as part of the simd_personality_sse target.
-build_sse : export TARGET := x86_64-theseus-sse
+build_sse : export override TARGET := x86_64-theseus-sse
 build_sse : export override RUSTFLAGS += -C no-vectorize-loops
 build_sse : export override RUSTFLAGS += -C no-vectorize-slp
 build_sse : export KERNEL_PREFIX := ksse\#
 build_sse : export APP_PREFIX := asse\#
 build_sse:
-	@$(MAKE) build
+	$(MAKE) build
 
 
 ### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
 ### It can serve as part of the simd_personality_avx target.
-build_avx : export TARGET := x86_64-theseus-avx
+build_avx : export override TARGET := x86_64-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
 build_avx : export KERNEL_PREFIX := kavx\#
 build_avx : export APP_PREFIX := aavx\#
 build_avx:
-	@$(MAKE) build
-
+	$(MAKE) build
 
 
 ### build_server is a target that builds Theseus into a regular ISO

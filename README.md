@@ -80,14 +80,22 @@ If you're on WSL, also do the following steps:
   * **NOTE**: WSL and WSL2 do not currently support using KVM.
 
 ### Building on MacOS
-  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/). 
-  * run the MacOS build setup script:
+  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/), then run the MacOS build setup script:
     ```
-    ./scripts/mac_os_build_setup.sh
+    sh ./scripts/mac_os_build_setup.sh
     ```
-  * If things later go wrong, run the following and then start over.
+    If things go wrong, remove the following build directories and try to run the script again.
     ```
     rm -rf $HOME/theseus_tools_src $HOME/theseus_tools_opt /opt/local/bin/make
+    ```
+
+  * If you're building Theseus on an M1-based Mac, you may need to use x86 emulation
+    ```sh
+    arch -x86_64 bash   # or another shell of your choice
+    ```
+    and possibly adjust your system `PATH` if both x86 and ARM homebrew binaries are installed:
+    ```sh
+    export PATH=/usr/local/Homebrew/bin:$PATH
     ```
 
 ### Building using Docker

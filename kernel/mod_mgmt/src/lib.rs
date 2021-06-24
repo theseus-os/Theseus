@@ -646,7 +646,7 @@ impl CrateNamespace {
     /// 
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
-    fn method_get_crate_object_files_starting_with(
+    pub fn method_get_crate_object_files_starting_with(
         &self,
         file_name_prefix: &str
     ) -> Vec<(FileRef, &CrateNamespace)> { 
@@ -673,7 +673,7 @@ impl CrateNamespace {
     /// 
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
-    fn method_get_crate_object_file_starting_with(
+    pub fn method_get_crate_object_file_starting_with(
         &self,
         file_name_prefix: &str
     ) -> Option<(FileRef, &CrateNamespace)> { 

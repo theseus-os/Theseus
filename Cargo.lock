@@ -435,6 +435,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "core_simd"
+version = "0.1.0"
+source = "git+https://github.com/rust-lang/stdsimd#57e67c905fe9fb3d45a1714d25baa5dfc143299c"
+
+[[package]]
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
@@ -1208,12 +1213,6 @@ checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
 
 [[package]]
 name = "libm"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
-
-[[package]]
-name = "libm"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
@@ -1250,7 +1249,7 @@ dependencies = [
  "bit_field 0.10.0",
  "hashbrown",
  "hpet",
- "libm 0.2.1",
+ "libm",
  "log",
  "memory",
  "pmu_x86",
@@ -1467,7 +1466,7 @@ dependencies = [
  "getopts",
  "hpet",
  "kernel_config",
- "libm 0.2.1",
+ "libm",
  "libtest",
  "log",
  "mapper_spillful",
@@ -1727,16 +1726,6 @@ source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e7
 dependencies = [
  "spin 0.9.0",
  "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
-]
-
-[[package]]
-name = "packed_simd_2"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3278e0492f961fd4ae70909f56b2723a7e8d01a228427294e19cdfdebda89a17"
-dependencies = [
- "cfg-if",
- "libm 0.1.4",
 ]
 
 [[package]]
@@ -2368,8 +2357,8 @@ name = "simd_test"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
+ "core_simd",
  "log",
- "packed_simd_2",
  "pit_clock",
 ]
 

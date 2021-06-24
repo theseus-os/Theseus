@@ -75,9 +75,11 @@ extern crate apic;
 extern crate fs_node;
 
 
-use alloc::string::String;
-use mod_mgmt::{CrateNamespace, get_initial_kernel_namespace, get_namespaces_directory, NamespaceDirectorySet};
-use fs_node::FileOrDir; 
+use alloc::{
+	string::String,
+	sync::Arc,
+};
+use mod_mgmt::{CrateNamespace, CrateType, NamespaceDir, get_initial_kernel_namespace, get_namespaces_directory};
 use task::SimdExt;
 
 
@@ -97,7 +99,7 @@ pub fn setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str> {
 
 
 fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str> {
-	let namespace_name = match simd_ext {
+	let namespace_prefix = match simd_ext {
 		SimdExt::AVX => "avx",
 		SimdExt::SSE => "sse",
 		SimdExt::None => return Err("Cannot create a new SIMD personality with SimdExt::None!"),
@@ -108,85 +110,88 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 
 	// The `mod_mgmt::init()` function should have initialized the following directories, 
 	// for example, if 'sse' was the prefix used to build the SSE versions of each crate:
-	//     .../namespaces/sse/
-	//     .../namespaces/sse/kernel
-	//     .../namespaces/sse/application
-	//     .../namespaces/sse/userspace
+	//     .../namespaces/sse_kernel
+	//     .../namespaces/sse_application
 	let namespaces_dir = get_namespaces_directory().ok_or("top-level namespaces directory wasn't yet initialized")?;
-	let base_dir = namespaces_dir.lock().get_dir(namespace_name).ok_or("couldn't find directory at given path")?;
-	let mut simd_namespace = CrateNamespace::new(
-		String::from(namespace_name), 
-		NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| {
-			error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
-			e
-		})?,
-	);
+	
+	// Create the SIMD kernel namespace
+	let simd_kernel_namespace = {
+		let namespace_name = format!("{}{}", namespace_prefix, CrateType::Kernel.default_namespace_name());
+		let dir = namespaces_dir.lock().get_dir(&namespace_name).ok_or("couldn't find SIMD kernel namespace directory at given path")?;
+		Arc::new(CrateNamespace::new(
+			String::from(namespace_name), 
+			NamespaceDir::new(dir),
+			None,
+		))
+	};
+
+	// Then create the SIMD application namespace that is recursively backed by the simd_kernel_namespace
+	let mut simd_app_namespace = {
+		let namespace_name = format!("{}{}", namespace_prefix, CrateType::Application.default_namespace_name());
+		let dir = namespaces_dir.lock().get_dir(&namespace_name).ok_or("couldn't find SIMD application namespace directory at given path")?;
+		CrateNamespace::new(
+			String::from(namespace_name), 
+			NamespaceDir::new(dir),
+			Some(Arc::clone(&simd_kernel_namespace)),
+		)
+	};
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
-	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
+	let (compiler_builtins_simd, _ns) = CrateNamespace::get_crate_object_file_starting_with(&simd_kernel_namespace, "compiler_builtins-")
 		.ok_or_else(|| "couldn't find a single 'compiler_builtins' object file in simd_personality")?;
-	let core_lib_simd = simd_namespace.get_kernel_file_starting_with("core-")
+	let (core_lib_simd, _ns) = CrateNamespace::get_crate_object_file_starting_with(&simd_kernel_namespace, "core-")
 		.ok_or_else(|| "couldn't find a single 'core' object file in simd_personality")?;
-	let crate_files = vec![compiler_builtins_simd, core_lib_simd];
-	simd_namespace.load_crates(crate_files.iter(), Some(backup_namespace), &kernel_mmi_ref, false)?;
-
+	let crate_files = [compiler_builtins_simd, core_lib_simd];
+	simd_kernel_namespace.load_crates(crate_files.iter(), Some(backup_namespace), &kernel_mmi_ref, false)?;
+	
 
 	// load the actual crate that we want to run in the simd namespace, "simd_test"
-	let simd_test_file = simd_namespace.get_kernel_file_starting_with("simd_test-")
+	let (simd_test_file, _ns) = simd_app_namespace.method_get_crate_object_file_starting_with("simd_test-")
 		.ok_or_else(|| "couldn't find a single 'simd_test' object file in simd_personality")?;
-	simd_namespace.enable_fuzzy_symbol_matching();
-	simd_namespace.load_crate(&simd_test_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
-	simd_namespace.disable_fuzzy_symbol_matching();
+	simd_app_namespace.enable_fuzzy_symbol_matching();
+	simd_app_namespace.load_crate(&simd_test_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
+	simd_app_namespace.disable_fuzzy_symbol_matching();
 
 
 	let this_core = apic::get_my_apic_id();
 	
 	type SimdTestFunc = fn(());
-	let section_ref1 = simd_namespace.get_symbol_starting_with("simd_test::test1::")
+	let section_ref1 = simd_app_namespace.get_symbol_starting_with("simd_test::test1::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test1\"")?;
 	let mut space1 = 0;	
-	let (mapped_pages1, mapped_pages_offset1) = { 
-		let section = section_ref1.lock();
-		(section.mapped_pages.clone(), section.mapped_pages_offset)
-	};
+	let (mapped_pages1, mapped_pages_offset1) = (section_ref1.mapped_pages.clone(), section_ref1.mapped_pages_offset);
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
-	let task1 = spawn::new_task_builder(func1, ())
-		.name(format!("simd_test_1-{}", namespace_name))
+	let _task1 = spawn::new_task_builder(func1, ())
+		.name(format!("simd_test_1-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test1 task");
 
 
-	let section_ref2 = simd_namespace.get_symbol_starting_with("simd_test::test2::")
+	let section_ref2 = simd_app_namespace.get_symbol_starting_with("simd_test::test2::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test2\"")?;
 	let mut space2 = 0;	
-	let (mapped_pages2, mapped_pages_offset2) = { 
-		let section = section_ref2.lock();
-		(section.mapped_pages.clone(), section.mapped_pages_offset)
-	};
+	let (mapped_pages2, mapped_pages_offset2) = (section_ref2.mapped_pages.clone(), section_ref2.mapped_pages_offset);
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
-	let task2 = spawn::new_task_builder(func, ())
-		.name(format!("simd_test_2-{}", namespace_name))
+	let _task2 = spawn::new_task_builder(func, ())
+		.name(format!("simd_test_2-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test2 task");
 
 
-	let section_ref3 = simd_namespace.get_symbol_starting_with("simd_test::test_short::")
+	let section_ref3 = simd_app_namespace.get_symbol_starting_with("simd_test::test_short::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test_short\"")?;
 	let mut space3 = 0;	
-	let (mapped_pages3, mapped_pages_offset3) = { 
-		let section = section_ref3.lock();
-		(section.mapped_pages.clone(), section.mapped_pages_offset)
-	};
+	let (mapped_pages3, mapped_pages_offset3) = (section_ref3.mapped_pages.clone(), section_ref3.mapped_pages_offset);
 	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
-	let task3 = spawn::new_task_builder(func, ())
-		.name(format!("simd_test_short-{}", namespace_name))
+	let _task3 = spawn::new_task_builder(func, ())
+		.name(format!("simd_test_short-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
 		.spawn()?;
@@ -201,11 +206,10 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 
 	loop { }
 	
-	task1.join()?;
-	task2.join()?;
-	task3.join()?;
-
-	Ok(())
+	// _task1.join()?;
+	// _task2.join()?;
+	// _task3.join()?;
+	// Ok(())
 }
 		
 }} // end of cfg_if block
