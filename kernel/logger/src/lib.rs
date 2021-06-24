@@ -16,6 +16,8 @@ pub use x86_64::*;
 } else if #[cfg(target_arch="arm")] {
 
 extern crate cortex_m_semihosting;
+#[macro_use]
+extern crate uart;
 
 mod armv7em;
 pub use armv7em::*;

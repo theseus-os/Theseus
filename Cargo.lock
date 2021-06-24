@@ -1761,6 +1761,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "once"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60bfe75a40f755f162b794140436c57845cb106fd1467598631c76c6fff08e28"
+
+[[package]]
 name = "opaque-debug"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2893,6 +2899,7 @@ name = "uart"
 version = "0.1.0"
 dependencies = [
  "cortex-m 0.6.7",
+ "once",
  "stm32f4",
  "stm32f4_discovery",
 ]

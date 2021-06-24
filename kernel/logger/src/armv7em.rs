@@ -1,8 +1,7 @@
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use cortex_m_semihosting::hprintln;
-#[macro_use]
-use uart;
-
+use uart::{SerialPort};
+use core::fmt::{Write};
 
 /// The static logger instance, an empty struct that implements the `Log` trait.
 static LOGGER: Logger = Logger { };
@@ -33,7 +32,7 @@ impl Log for Logger {
 
         let file_loc = record.file().unwrap_or("??");
         let line_loc = record.line().unwrap_or(0);
-        let serial = uart::get_uart();
+        let mut serial = SerialPort::get_uart();
         let _result = uprintln!(serial, "{}{}:{}: {}",
             level_str,
             file_loc,
@@ -50,7 +49,6 @@ impl Log for Logger {
 
 /// Initialize the Theseus system logger, which writes log messages through semihosting.
 pub fn init() -> Result<(), SetLoggerError> {
-    uart::uart_init();
     log::set_logger(&LOGGER)?;
     set_log_level(DEFAULT_LOG_LEVEL);
     Ok(())

@@ -1,9 +1,10 @@
 #![no_std]
 
-use cortex_m::interrupt;
+use cortex_m::interrupt::{self, CriticalSection};
 use stm32f4::stm32f407::usart1;
 use stm32f4_discovery::STM_PERIPHERALS;
 use core::fmt::{self, Write};
+
 
 pub fn uart_init() {
     interrupt::free(|cs| {
@@ -43,7 +44,7 @@ pub fn uart_init() {
 
         // Initialize uart for reading and writing
         uart.cr1.modify(|_,w| w.te().bit(true).re().bit(true));
-    })
+    });
 }
 
 // implementation of uprintln! inspired by Rust Embedded Discovery Book
@@ -64,26 +65,26 @@ macro_rules! uprintln {
     };
 }
 
-struct SerialPort {
-    usart: &'static mut usart1::RegisterBlock,
-}
+pub struct SerialPort; 
 
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for byte in s.as_bytes().iter() {
-            while self.usart.sr.read().txe().bit_is_clear() {} 
+        interrupt::free(|cs| {
+            let p = STM_PERIPHERALS.borrow(cs).borrow();
+            let usart = &p.USART2;
+            for byte in s.as_bytes().iter() {
+                while usart.sr.read().txe().bit_is_clear() {} 
 
-            self.usart.dr.write(|w| w.dr().bits(u16::from(*byte)));
-        }
+                usart.dr.write(|w| w.dr().bits(u16::from(*byte)));
+            }
+        });
         Ok(())
     }
 }
 
 impl SerialPort {
-    pub fn get_uart() -> Self {
-        let usart = unsafe {
-            &mut (*STM_PERIPHERALS.USART2)
-        };
-        SerialPort { usart }
+    pub fn get_uart() ->  SerialPort {
+        uart_init();
+        SerialPort
     }
 }
