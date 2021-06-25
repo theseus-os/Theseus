@@ -9,20 +9,20 @@
 //! and usage of the `StorageDevice` trait methods, as well as how to downcast it
 //! into a specific concrete type, such as an `AtaDrive`.
 //! ```rust
-//! if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
+//! if let Some(controller) = storage_manager::storage_controllers().next() {
 //!     if let Some(sd) = controller.lock().devices().next() {
 //!         {
 //!             // Call `StorageDevice` trait methods directly
 //!             let mut locked_sd = sd.lock();
-//!             debug!("Found drive with size {}, {} sectors", locked_sd.size_in_bytes(), locked_sd.size_in_sectors());
+//!             debug!("Found drive with size {}, {} sectors", locked_sd.size_in_bytes(), locked_sd.size_in_blocks());
 //! 
 //!             // Here we downcast the `StorageDevice` into an `AtaDrive` so we can call `AtaDrive` methods.
 //!             if let Some(ata_drive) = locked_sd.as_any_mut().downcast_mut() {
 //!                 debug!("      drive was master? {}", ata_drive.is_master());
 //! 
-//!                 // Read 10 sectors from the drive
+//!                 // Read 10 sectors from the beginning of the drive (at offset 0)
 //!                 let mut initial_buf: [u8; 5120] = [0; 5120]; // 10 sectors of bytes
-//!                 let sectors_read = ata_drive.read_pio(&mut initial_buf[..], 0);
+//!                 let sectors_read = ata_drive.read_pio(&mut initial_buf[..], 0).unwrap();
 //!                 debug!("[SUCCESS] sectors_read: {:?}", sectors_read);
 //!                 debug!("{:?}", core::str::from_utf8(&initial_buf));
 //! 
@@ -31,16 +31,16 @@
 //!                 for b in write_buf.chunks_exact_mut(16) {
 //!                     b.copy_from_slice(b"QWERTYUIOPASDFJK");
 //!                 }
-//!                 let bytes_written = ata_drive.write_pio(&write_buf[..], 2);
+//!                 let bytes_written = ata_drive.write_pio(&write_buf[..], 2).unwrap();
 //!                 debug!("WRITE_PIO {:?}", bytes_written);
 //!             }
 //!         }
 //!         // Read 10 sectors from the drive using the `StorageDevice` trait methods.
 //!         let mut after_buf: [u8; 5120] = [0; 5120];
-//!         let sectors_read = sd.lock().read_sectors(&mut after_buf[..], 0)?;
+//!         let sectors_read = sd.lock().read_blocks(&mut after_buf[..], 0).unwrap();
 //!         debug!("{:X?}", &after_buf[..]);
 //!         debug!("{:?}", core::str::from_utf8(&after_buf));
-//!         trace!("POST-WRITE READ_SECTORS {} sectors", sectors_read);
+//!         trace!("POST-WRITE READ_BLOCKS {} sectors", sectors_read);
 //!     }
 //! }
 //! ```

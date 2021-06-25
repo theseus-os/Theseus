@@ -25,7 +25,28 @@ pub use storage_device::*;
 
 lazy_static! {
     /// A list of all of the available and initialized storage controllers that exist on this system.
-    pub static ref STORAGE_CONTROLLERS: Mutex<Vec<StorageControllerRef>> = Mutex::new(Vec::new());
+    static ref STORAGE_CONTROLLERS: Mutex<Vec<StorageControllerRef>> = Mutex::new(Vec::new());
+}
+
+/// Returns an iterator over all initialized storage controllers on this system.
+/// 
+/// This function requires allocation, as it currently clones the list of storage controllers,\
+/// effectively a `Vec<Arc<StorageController>>`.
+pub fn storage_controllers() -> impl Iterator<Item = StorageControllerRef> {
+    STORAGE_CONTROLLERS.lock().clone().into_iter()
+}
+
+/// Returns an iterator over all storage devices attached to the storage controllers on this system.
+///
+/// This function requires allocation, as it currently clones the list of storage devices (lazily)
+/// within each storage controller, effectively a `Vec<Arc<Vec<Arc<StorageDevice>>>>`.
+pub fn storage_devices() -> impl Iterator<Item = StorageDeviceRef> {
+    storage_controllers()
+        .flat_map(|c| c.lock()
+            .devices()
+            .collect::<Vec<StorageDeviceRef>>()
+            .into_iter()
+    )
 }
 
 

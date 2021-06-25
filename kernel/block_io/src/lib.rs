@@ -43,6 +43,7 @@ use alloc::vec::Vec;
 
 
 /// Errors that can be returned from I/O operations.
+#[derive(Debug)]
 pub enum IoError {
     /// An input parameter or argument was incorrect or invalid.
     InvalidInput,
@@ -156,7 +157,7 @@ pub trait ByteReader {
 }
 
 // Implement a byte-wise reader atop a block-based reader. 
-impl<R: BlockReader> ByteReader for R {
+impl<R> ByteReader for R where R: BlockReader + ?Sized {
     fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
 
@@ -214,7 +215,7 @@ pub trait ByteWriter {
 // 
 // Note that other implementations of `ByteWriter` may not have this requirement,
 // e.g., when the underlying writer supports writing individual bytes.
-impl<RW: BlockReader + BlockWriter> ByteWriter for RW {
+impl<RW> ByteWriter for RW where RW: BlockWriter + BlockReader + ?Sized {
     fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
 
@@ -246,7 +247,7 @@ impl<RW: BlockReader + BlockWriter> ByteWriter for RW {
     }
 
     fn flush(&mut self) -> Result<(), IoError> {
-        self.flush()
+        BlockWriter::flush(self)
     }
 }
 
@@ -319,7 +320,36 @@ impl<IO: ByteWriter> bare_io::Write for IoWithOffset<IO> {
         self.io.flush().map_err(Into::into)
     }    
 }
-
+/*
+use bare_io::{Seek, SeekFrom};
+impl<IO> Seek for IoWithOffset<IO> {
+    fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64> {
+        let (base_pos, offset) = match position {
+            SeekFrom::Start(n) => {
+                self.offset = n as usize;
+                return Ok(n);
+            }
+            SeekFrom::Current(n) => (self.offset, n),
+            SeekFrom::End(n) => (self.inner.as_ref().len() as u64, n),
+        };
+        let new_pos = if offset >= 0 {
+            base_pos.checked_add(offset as u64)
+        } else {
+            base_pos.checked_sub((offset.wrapping_neg()) as u64)
+        };
+        match new_pos {
+            Some(n) => {
+                self.pos = n;
+                Ok(self.pos)
+            }
+            None => Err(Error::new(
+                ErrorKind::InvalidInput,
+                "invalid seek to a negative or overflowing position",
+            )),
+        }
+    }
+}
+*/
 
 
 /// Calculates block-wise bounds for an I/O transfer 

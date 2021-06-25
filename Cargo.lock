@@ -2658,6 +2658,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_block_io"
+version = "0.1.0"
+dependencies = [
+ "ata",
+ "block_io",
+ "log",
+ "storage_manager",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
 name = "test_channel"
 version = "0.1.0"
 dependencies = [

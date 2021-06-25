@@ -303,6 +303,7 @@ impl AtaBus {
 				chunk[1] = (word >> 8) as u8;
 			}
 			buffer_offset += SECTOR_SIZE_IN_BYTES;
+			warn!("ata::read_pio(): read sector {} (end {})", _lba, lba_start + &sector_count);
 		}
 		self.wait_for_data_done().map_err(|_| "error after data read")?;
 		Ok(sector_count)
@@ -370,6 +371,7 @@ impl AtaBus {
 				unsafe { self.data.write(word); }
 			}
 			buffer_offset += SECTOR_SIZE_IN_BYTES;
+			warn!("ata::write_pio(): wrote sector {} (end {})", _lba, lba_start + &sector_count);
 		}
 		self.wait_for_data_done().map_err(|_| "error after data write")?;
 
