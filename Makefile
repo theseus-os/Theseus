@@ -114,7 +114,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs book view-book
+		gdb doc docs view-doc view-docs book view-book clean_doc
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -334,7 +334,7 @@ $(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
 
 
 
-### Removes all build files
+### Removes all built source files
 clean:
 	cargo clean
 	@rm -rf build
@@ -454,20 +454,19 @@ preserve_old_modules:
 ###################################################################################################
 
 ## The output directory for source-level documentation.
-DOC_BUILD := $(ROOT_DIR)/docs/doc
-## The top-level (root) documentation file built by `rustdoc` (`cargo doc`).
-RUSTDOC_OUT := $(DOC_BUILD)/___Theseus_Crates___/index.html
+RUSTDOC_OUT      := $(ROOT_DIR)/docs/doc
+RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
-## The entire project is built as normal using the `cargo doc` command.
+## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
 doc: check_rustc
 	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
-	@rm -rf $(DOC_BUILD)
-	@mkdir -p $(DOC_BUILD)
-	@cp -rf target/doc/* $(DOC_BUILD)
-	@echo -e "\nDocumentation is now available at: \"$(RUSTDOC_OUT)\"."
+	@rm -rf $(RUSTDOC_OUT)
+	@mkdir -p $(RUSTDOC_OUT)
+	@cp -rf target/doc/. $(RUSTDOC_OUT)
+	@echo -e "\nTheseus source docs are now available at: \"$(RUSTDOC_OUT_FILE)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
@@ -476,16 +475,16 @@ view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT)")" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT_FILE)")" &
 else
-	@xdg-open $(RUSTDOC_OUT) > /dev/null 2>&1 || open $(RUSTDOC_OUT) &
+	@xdg-open $(RUSTDOC_OUT_FILE) > /dev/null 2>&1 || open $(RUSTDOC_OUT_FILE) &
 endif
 
 
-### The location of Theseus's book-style documentation. 
-BOOK_SRC := $(ROOT_DIR)/book
-BOOK_OUT := $(ROOT_DIR)/docs/book
-BOOK_OUT_FILE := $(BOOK_OUT)/index.html
+### The locations of Theseus's book-style documentation.
+BOOK_SRC      := $(ROOT_DIR)/book
+BOOK_OUT      := $(ROOT_DIR)/docs/book
+BOOK_OUT_FILE := $(BOOK_OUT)/html/index.html
 
 ### Builds the Theseus book-style documentation using `mdbook`.
 book: $(wildcard $(BOOK_SRC)/src/*) $(BOOK_SRC)/book.toml
@@ -496,10 +495,7 @@ ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
-	@mdbook build $(BOOK_SRC)
-	@rm -rf $(BOOK_OUT)
-	@mkdir -p $(BOOK_OUT)
-	@cp -rf $(BOOK_SRC)/book/html/* $(BOOK_OUT)
+	@mdbook build $(BOOK_SRC) -d $(BOOK_OUT)
 	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT_FILE)\"."
 
 
@@ -507,11 +503,16 @@ endif
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
 ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT)")" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT_FILE)")" &
 else
-	@xdg-open $(BOOK_OUT) > /dev/null 2>&1 || open $(BOOK_OUT) &
+	@xdg-open $(BOOK_OUT_FILE) > /dev/null 2>&1 || open $(BOOK_OUT_FILE) &
 endif
 
+
+### Removes all built documentation
+clean_doc:
+	@rm -rf $(RUSTDOC_OUT) $(BOOK_OUT)
+	
 
 ### The primary documentation for this makefile itself.
 help: 

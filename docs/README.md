@@ -1,9 +1,9 @@
-# Published Documentation Root
+# Published Documentation
 
-The documentation for Theseus is published using GitHub Pages at [https://theseus-os.github.io/Theseus](https://theseus-os.github.io/Theseus).
+This directory contains files used to publish Theseus's documentation online, which is realized using GitHub Pages at [https://theseus-os.github.io/Theseus](https://theseus-os.github.io/Theseus).
 
-Any file included in this directory is included in the published output. The `./index.html` file is an example of this.
+Any file in this directory is included in the published output, for example, `index.html`.
 
 ## Automatically Generated Directories
 
-The `book/` and `doc/` directories are automatically generated and overridden when building the documentation.
+When building Theseus's book and source code documentation (rustdoc), the `book/` and `doc/` directories are automatically generated and outputted here. Those directories are ignored by git.
