@@ -1,0 +1,273 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>How to Contribute - The Theseus OS Book</title>
+                
+
+        <!-- Custom HTML head -->
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="Describes the design principles and implementation details of Theseus, a companion to its source-level docs.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+                <link rel="icon" href="favicon.svg">
+                        <link rel="shortcut icon" href="favicon.png">
+                <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+                <link rel="stylesheet" href="css/print.css" media="print">
+        
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="fonts/fonts.css">
+        
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+            </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="ch00-00-introduction.html"><strong aria-hidden="true">1.</strong> Introduction to Theseus OS</a></li><li class="chapter-item expanded "><a href="design.html"><strong aria-hidden="true">2.</strong> Design and Structure of Theseus</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="source_code_organization.html"><strong aria-hidden="true">2.1.</strong> Source Code Repository Organization</a></li><li class="chapter-item expanded "><a href="booting.html"><strong aria-hidden="true">2.2.</strong> Boot-up Procedure</a></li><li class="chapter-item expanded "><a href="idea.html"><strong aria-hidden="true">2.3.</strong> Safe-language OS Principles</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> Intralingual Design</div></li></ol></li><li class="chapter-item expanded "><a href="app.html"><strong aria-hidden="true">3.</strong> Developing a Theseus Application</a></li><li class="chapter-item expanded "><a href="build_process.html"><strong aria-hidden="true">4.</strong> The Theseus Build Process</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="configuration.html"><strong aria-hidden="true">4.1.</strong> Configuring Theseus</a></li><li class="chapter-item expanded "><a href="rust_builds_out_of_tree.html"><strong aria-hidden="true">4.2.</strong> theseus_cargo: Building Rust Crates Out-of-Tree</a></li></ol></li><li class="chapter-item expanded "><a href="c_program.html"><strong aria-hidden="true">5.</strong> Experimental Support for C programs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="building_c_cross_compiler.html"><strong aria-hidden="true">5.1.</strong> Building a C cross compiler for Theseus</a></li><li class="chapter-item expanded "><a href="c_compilation_tlibc.html"><strong aria-hidden="true">5.2.</strong> tlibc: Theseus's libc and how it works</a></li><li class="chapter-item expanded "><a href="c_compiler_linker.html"><strong aria-hidden="true">5.3.</strong> Compiling and linking C programs</a></li></ol></li><li class="chapter-item expanded "><a href="subsystems.html"><strong aria-hidden="true">6.</strong> Overview of Key Subsystems</a></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">6.1.</strong> Memory Management</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.2.</strong> Task Management</div></li><li class="chapter-item expanded "><a href="display.html"><strong aria-hidden="true">6.3.</strong> Display and Window Management</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="window_manager.html"><strong aria-hidden="true">6.3.1.</strong> The Window Manager</a></li><li class="chapter-item expanded "><a href="window_tutorial.html"><strong aria-hidden="true">6.3.2.</strong> Creating and Displaying Windows</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="real_hardware.html"><strong aria-hidden="true">7.</strong> Running Theseus on VMs &amp; Real Hardware</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="virtual_machines.html"><strong aria-hidden="true">7.1.</strong> Running Theseus in a Virtual Machine</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="pci_passthrough.html"><strong aria-hidden="true">7.1.1.</strong> Using PCI device Passthrough on QEMU</a></li></ol></li><li class="chapter-item expanded "><a href="booting_usb.html"><strong aria-hidden="true">7.2.</strong> Booting via USB drive</a></li><li class="chapter-item expanded "><a href="pxe.html"><strong aria-hidden="true">7.3.</strong> Booting over the network (PXE)</a></li></ol></li><li class="chapter-item expanded "><a href="ch01.html" class="active"><strong aria-hidden="true">8.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="git.html"><strong aria-hidden="true">8.1.</strong> git Guidlines</a></li><li class="spacer"></li></ol></li><li class="chapter-item expanded "><a href="papers_presentations.html">Papers and Presentations/Slides</a></li><li class="chapter-item expanded affix "><a href="_root_readme.html">Theseus README + Quick Start ↗️</a></li></ol>            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                                            </div>
+
+                    <h1 class="menu-title">The Theseus OS Book</h1>
+
+                    <div class="right-buttons">
+                                                <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                                                                        
+                    </div>
+                </div>
+
+                                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="the-golden-rule-of-software-development"><a class="header" href="#the-golden-rule-of-software-development">The Golden Rule of Software Development</a></h1>
+<p><em>Code for others how you wish they would code for you.</em></p>
+<p>What does this mean? You should adhere to the following principles.</p>
+<ul>
+<li>
+<p><strong>Good abstractions.</strong> Another developer using your code should never have to study the internals of the code itself,
+but rather be able to fully understand how to use your code simply from its struct/function names and documentation.
+Use intuitive names and try to design an interface that makes sense, is simple and easy to use, and doesn't surprise anyone with unnecessary trickery.</p>
+</li>
+<li>
+<p><strong>Be clean.</strong> Write well-crafted, concise code with sufficient features to be useful, but without bloat.
+Adhere to code style conventions, including proper spacing, doc comments, naming conventions, etc.</p>
+</li>
+<li>
+<p><strong>Foolproof code.</strong> Think carefully about how others will use your code,
+and design it thoughtfully to prevent others from making mistakes when using your code,
+ideally prevented at compile time instead of runtime.</p>
+</li>
+<li>
+<p><strong>Errors are important!</strong>  Handle errors gracefully and thoroughly,
+and return detailed error messages that clearly describe the issue. <em>Don't ever let something fail silently!</em></p>
+</li>
+</ul>
+<p>Below are some other good practices.</p>
+<ul>
+<li>
+<p><strong>Accurate metadata.</strong>  In addition to good code and documentation, make sure to fill in additional metadata,
+such as the details present in each crate's <code>Cargo.toml</code> file: description, keywords, authors, etc.</p>
+</li>
+<li>
+<p><strong>No &quot;magic&quot; numbers.</strong> Do not use literal number values that have no documentation or explanation of why they exist.
+For example, instead of just writing a value like 4096 in the code, create a <code>const</code> that accurately describes the semantic meaning of that value, e.g., <code>const PAGE_SIZE: usize = 4096;</code>.
+Magic numbers are terrible to maintain and don't help anyone who looks at your code in the future.</p>
+</li>
+<li>
+<p><strong>Minimize global states.</strong> Remove static (global) states as much as possible, and rethink how the same data sharing can be done without globals.</p>
+</li>
+</ul>
+<h2 id="rust-specific-guidelines"><a class="header" href="#rust-specific-guidelines">Rust-specific Guidelines</a></h2>
+<ul>
+<li>
+<p><strong>Rust style.</strong> Follow proper Rust coding style and naming conventions. Use correct spacing, indentation, and alignment that matches the existing style.
+Make your code visually appealing, with spaces between operators like equal signs, addition, spaces after a comma, etc. Punctuation is important for legibility!</p>
+</li>
+<li>
+<p><strong>Rust documentation.</strong> Use proper rustdoc-style documentation <em>for all structs, functions, and types.</em>
+Make sure all of your documentation links are correct, and that you're using the correct rustdoc formatting for doc comments.
+Triple slashes <code>///</code> should be used above function and struct definitions, double slashes <code>//</code> for C-style inline comments (or block comments like <code>/* */</code>), and <code>//! </code> for crate top-level documentation.
+Use Markdown formatting to describe function arguments, return values, and include usage examples, in a way consistent with Rust's official libraries.</p>
+</li>
+<li>
+<p><strong><code>Option</code>s and <code>Result</code>s.</strong> Use Options and Results properly. Don't use special values that have overloaded meanings, e.g., an integer in which <code>0</code> means no value, or something like that.
+<a href="https://blog.burntsushi.net/rust-error-handling/">Here's a good resource</a> for better understanding error handling in Rust.</p>
+<p><code>Option</code>s should be returned when an operation might fail, but that failure condition doesn't affect the rest of the system.
+For example, if you're searching for an element in a list, then an <code>Option</code> is the suitable choice because the caller of your getter function would only call it in order to get and use the return value.</p>
+<p><code>Result</code>s should be returned if something can fail or succeed, and the caller needs to know whether it succeeded, but potentially need the actual return value, e.g., an init function that returns void.
+In this case, <code>Result</code> is the best choice because we want to force the caller to acknowledge that the init function succeeded, or handle its error if it failed.
+In Theseus, <code>Results</code> are mandatory when a function has some side effect, such as setting a parameter or value that might not exist or be initialized yet.
+In that case, a result must be used to indicate whether the function succeeded.</p>
+</li>
+</ul>
+<h2 id="theseus-specific-guidelines"><a class="header" href="#theseus-specific-guidelines">Theseus-specific Guidelines</a></h2>
+<ul>
+<li>
+<p><strong>Handle <code>Result</code>s properly and fully.</strong> Don't ignore a result error, instead, log that error and then handle it if possible.
+If you cannot handle it, return that error to the caller so they can attempt to handle it. <strong>NEVER SILENCE OR LAZILY HIDE ERRORS</strong>.</p>
+</li>
+<li>
+<p><strong>Never use unsafe code.</strong> If you absolutely cannot avoid it, then you should review your case on an individual basis with the maintainers of Theseus. In most cases, unsafe code is not necessary and can be rewritten in safe code.</p>
+</li>
+</ul>
+<h2 id="adding-new-functionality-to-theseus"><a class="header" href="#adding-new-functionality-to-theseus">Adding New Functionality to Theseus</a></h2>
+<p>The easiest way to add new functionality is just to create a new crate by duplicating an existing crate and changing the details in its new <code>Cargo.toml</code> file.
+At the very least, you'll need to change the <code>name</code> entry under the <code>[package]</code> heading at the top of the <code>Cargo.toml</code> file, and you'll need to change the dependencies for your new crate.</p>
+<p>If your new kernel crate needs to be initialized, you can invoke it from the <a href="https://theseus-os.github.io/Theseus/doc/captain/index.html"><code>captain::init()</code> function</a>,
+although there may be more appropriate places to do so, such as the <a href="https://theseus-os.github.io/Theseus/doc/device_manager/index.html"><code>device_manager</code>'s functions</a> for initializing device drivers.</p>
+<p>If you want to create a new application for Theseus, see <a href="app.html">those instructions here</a>.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                                                    <a rel="prev" href="pxe.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+                                                    <a rel="next" href="git.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                                    <a rel="prev" href="pxe.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+                                    <a rel="next" href="git.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                            </nav>
+
+        </div>
+
+        
+        
+        
+                <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+        
+                <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        
+    </body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/nic_queues/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../nic_queues/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+</pre><pre class="rust">
+<span class="doccomment">//! Defines the receive and transmit queues that store a ring of DMA descriptors and related information.</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! Receive and transmit queues are used across all NICs to keep track of incoming and outgoing packets.</span>
+<span class="doccomment">//! HW queues used by the NIC only consist of the ring of DMA descriptors.</span>
+<span class="doccomment">//! The SW queues defined here hold the ring of DMA descriptors that it shares with the HW,</span>
+<span class="doccomment">//! as well as other information such as the buffers received from the queues,</span>
+<span class="doccomment">//! the tail register for each queue and the cpu the queue is mapped to.</span>
+
+<span class="attribute">#![<span class="ident">no_std</span>]</span>
+
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">intel_ethernet</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">nic_buffers</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
+
+<span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
+<span class="kw">use</span> <span class="ident">alloc</span>::{
+    <span class="ident">vec::Vec</span>,
+    <span class="ident">collections::VecDeque</span>
+};
+<span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MappedPages</span>, <span class="ident">create_contiguous_mapping</span>, <span class="ident">EntryFlags</span>};
+<span class="kw">use</span> <span class="ident">intel_ethernet::descriptors</span>::{<span class="ident">RxDescriptor</span>, <span class="ident">TxDescriptor</span>};
+<span class="kw">use</span> <span class="ident">nic_buffers</span>::{<span class="ident">ReceiveBuffer</span>, <span class="ident">ReceivedFrame</span>, <span class="ident">TransmitBuffer</span>};
+
+<span class="doccomment">/// The mapping flags used for pages that the NIC will map.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NIC_MAPPING_FLAGS</span>: <span class="ident">EntryFlags</span> <span class="op">=</span> <span class="ident">EntryFlags::from_bits_truncate</span>(
+    <span class="ident">EntryFlags::PRESENT</span>.<span class="ident">bits</span>() <span class="op">|</span>
+    <span class="ident">EntryFlags::WRITABLE</span>.<span class="ident">bits</span>() <span class="op">|</span>
+    <span class="ident">EntryFlags::NO_CACHE</span>.<span class="ident">bits</span>() <span class="op">|</span>
+    <span class="ident">EntryFlags::NO_EXECUTE</span>.<span class="ident">bits</span>()
+);
+
+<span class="doccomment">/// The register trait that gives access to only those registers required for receiving a packet.</span>
+<span class="doccomment">/// The Rx queue control registers can only be accessed by the physical NIC.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RxQueueRegisters</span> {
+    <span class="kw">fn</span> <span class="ident">set_rdbal</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_rdbah</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_rdlen</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_rdh</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_rdt</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+}
+
+<span class="doccomment">/// The register trait that gives access to only those registers required for sending a packet.</span>
+<span class="doccomment">/// The Tx queue control registers can only be accessed by the physical NIC.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TxQueueRegisters</span> {
+    <span class="kw">fn</span> <span class="ident">set_tdbal</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_tdbah</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_tdlen</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_tdh</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+    <span class="kw">fn</span> <span class="ident">set_tdt</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>);
+}
+
+<span class="doccomment">/// A struct that holds all information for one receive queue.</span>
+<span class="doccomment">/// There should be one such object per queue.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RxQueue</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">RxQueueRegisters</span>, <span class="ident">T</span>: <span class="ident">RxDescriptor</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The number of the queue, stored here for our convenience.</span>
+    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">u8</span>,
+    <span class="doccomment">/// Registers for this receive queue</span>
+    <span class="kw">pub</span> <span class="ident">regs</span>: <span class="ident">S</span>,
+    <span class="doccomment">/// Receive descriptors</span>
+    <span class="kw">pub</span> <span class="ident">rx_descs</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">T</span>]<span class="op">&gt;</span>,
+    <span class="doccomment">/// The number of receive descriptors in the descriptor ring</span>
+    <span class="kw">pub</span> <span class="ident">num_rx_descs</span>: <span class="ident">u16</span>,
+    <span class="doccomment">/// Current receive descriptor index</span>
+    <span class="kw">pub</span> <span class="ident">rx_cur</span>: <span class="ident">u16</span>,
+    <span class="doccomment">/// The list of rx buffers, in which the index in the vector corresponds to the index in `rx_descs`.</span>
+    <span class="doccomment">/// For example, `rx_bufs_in_use[2]` is the receive buffer that will be used when `rx_descs[2]` is the current rx descriptor (rx_cur = 2).</span>
+    <span class="kw">pub</span> <span class="ident">rx_bufs_in_use</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">rx_buffer_size_bytes</span>: <span class="ident">u16</span>,
+    <span class="doccomment">/// The queue of received Ethernet frames, ready for consumption by a higher layer.</span>
+    <span class="doccomment">/// Just like a regular FIFO queue, newly-received frames are pushed onto the back</span>
+    <span class="doccomment">/// and frames are popped off of the front.</span>
+    <span class="doccomment">/// Each frame is represented by a Vec&lt;ReceiveBuffer&gt;, because a single frame can span multiple receive buffers.</span>
+    <span class="doccomment">/// TODO: improve this? probably not the best cleanest way to expose received frames to higher layers   </span>
+    <span class="kw">pub</span> <span class="ident">received_frames</span>: <span class="ident">VecDeque</span><span class="op">&lt;</span><span class="ident">ReceivedFrame</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The cpu which this queue is mapped to. </span>
+    <span class="doccomment">/// This in itself doesn&#39;t guarantee anything, but we use this value when setting the cpu id for interrupts and DCA.</span>
+    <span class="kw">pub</span> <span class="ident">cpu_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Pool where `ReceiveBuffer`s are stored.</span>
+    <span class="kw">pub</span> <span class="ident">rx_buffer_pool</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">mpmc::Queue</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The filter id for the physical NIC filter that is set for this queue</span>
+    <span class="kw">pub</span> <span class="ident">filter_num</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">RxQueueRegisters</span>, <span class="ident">T</span>: <span class="ident">RxDescriptor</span><span class="op">&gt;</span> <span class="ident">RxQueue</span><span class="op">&lt;</span><span class="ident">S</span>,<span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Polls the queue and removes all received packets from it.</span>
+    <span class="doccomment">/// The received packets are stored in the receive queue&#39;s `received_frames` FIFO queue.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">poll_queue_and_store_received_packets</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rx_cur</span> <span class="kw">as</span> <span class="ident">usize</span>;
+       
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">receive_buffers_in_frame</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">_total_packet_length</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">0</span>;
+
+        <span class="kw">while</span> <span class="self">self</span>.<span class="ident">rx_descs</span>[<span class="ident">cur</span>].<span class="ident">descriptor_done</span>() {
+            <span class="comment">// get information about the current receive buffer</span>
+            <span class="kw">let</span> <span class="ident">length</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rx_descs</span>[<span class="ident">cur</span>].<span class="ident">length</span>();
+            <span class="ident">_total_packet_length</span> <span class="op">+</span><span class="op">=</span> <span class="ident">length</span> <span class="kw">as</span> <span class="ident">u16</span>;
+            <span class="comment">// error!(&quot;poll_queue_and_store_received_packets {}: received descriptor of length {}&quot;, self.id, length);</span>
+            
+            <span class="comment">// Now that we are &quot;removing&quot; the current receive buffer from the list of receive buffers that the NIC can use,</span>
+            <span class="comment">// (because we&#39;re saving it for higher layers to use),</span>
+            <span class="comment">// we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.</span>
+            <span class="kw">let</span> <span class="ident">new_receive_buf</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">rx_buffer_pool</span>.<span class="ident">pop</span>() {
+                <span class="prelude-val">Some</span>(<span class="ident">rx_buf</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">rx_buf</span>,
+                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="macro">warn!</span>(<span class="string">&quot;NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.&quot;</span>);
+                    <span class="comment">// if the pool was empty, then we allocate a new receive buffer</span>
+                    <span class="kw">let</span> <span class="ident">len</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rx_buffer_size_bytes</span>;
+                    <span class="kw">let</span> (<span class="ident">mp</span>, <span class="ident">phys_addr</span>) <span class="op">=</span> <span class="ident">create_contiguous_mapping</span>(<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">NIC_MAPPING_FLAGS</span>)<span class="question-mark">?</span>;
+                    <span class="ident">ReceiveBuffer::new</span>(<span class="ident">mp</span>, <span class="ident">phys_addr</span>, <span class="ident">len</span>, <span class="self">self</span>.<span class="ident">rx_buffer_pool</span>)
+                }
+            };
+
+            <span class="comment">// actually tell the NIC about the new receive buffer, and that it&#39;s ready for use now</span>
+            <span class="self">self</span>.<span class="ident">rx_descs</span>[<span class="ident">cur</span>].<span class="ident">set_packet_address</span>(<span class="ident">new_receive_buf</span>.<span class="ident">phys_addr</span>);
+
+            <span class="comment">// Swap in the new receive buffer at the index corresponding to this current rx_desc&#39;s receive buffer,</span>
+            <span class="comment">// getting back the receive buffer that is part of the received ethernet frame</span>
+            <span class="self">self</span>.<span class="ident">rx_bufs_in_use</span>.<span class="ident">push</span>(<span class="ident">new_receive_buf</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">current_rx_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rx_bufs_in_use</span>.<span class="ident">swap_remove</span>(<span class="ident">cur</span>); 
+            <span class="ident">current_rx_buf</span>.<span class="ident">length</span> <span class="op">=</span> <span class="ident">length</span> <span class="kw">as</span> <span class="ident">u16</span>; <span class="comment">// set the ReceiveBuffer&#39;s length to the size of the actual packet received</span>
+            <span class="ident">receive_buffers_in_frame</span>.<span class="ident">push</span>(<span class="ident">current_rx_buf</span>);
+
+            <span class="comment">// move on to the next receive buffer to see if it&#39;s ready for us to take</span>
+            <span class="self">self</span>.<span class="ident">rx_cur</span> <span class="op">=</span> (<span class="ident">cur</span> <span class="kw">as</span> <span class="ident">u16</span> <span class="op">+</span> <span class="number">1</span>) <span class="op">%</span> <span class="self">self</span>.<span class="ident">num_rx_descs</span>;
+            <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">set_rdt</span>(<span class="ident">cur</span> <span class="kw">as</span> <span class="ident">u32</span>); 
+
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">rx_descs</span>[<span class="ident">cur</span>].<span class="ident">end_of_packet</span>() {
+                <span class="kw">let</span> <span class="ident">buffers</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">receive_buffers_in_frame</span>, <span class="ident">Vec::new</span>());
+                <span class="self">self</span>.<span class="ident">received_frames</span>.<span class="ident">push_back</span>(<span class="ident">ReceivedFrame</span>(<span class="ident">buffers</span>));
+            } <span class="kw">else</span> {
+                <span class="macro">warn!</span>(<span class="string">&quot;NIC::poll_queue_and_store_received_packets(): Received multi-rxbuffer frame, this scenario not fully tested!&quot;</span>);
+            }
+            <span class="self">self</span>.<span class="ident">rx_descs</span>[<span class="ident">cur</span>].<span class="ident">reset_status</span>();
+            <span class="ident">cur</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rx_cur</span> <span class="kw">as</span> <span class="ident">usize</span>;
+        }
+
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Returns the earliest received ethernet frame.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">return_frame</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReceivedFrame</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">received_frames</span>.<span class="ident">pop_front</span>()
+    }
+}
+
+<span class="doccomment">/// A struct that holds all information for a transmit queue. </span>
+<span class="doccomment">/// There should be one such object per queue.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TxQueue</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">TxQueueRegisters</span>, <span class="ident">T</span>: <span class="ident">TxDescriptor</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The number of the queue, stored here for our convenience.</span>
+    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">u8</span>,
+    <span class="doccomment">/// Registers for this transmit queue</span>
+    <span class="kw">pub</span> <span class="ident">regs</span>: <span class="ident">S</span>,
+    <span class="doccomment">/// Transmit descriptors </span>
+    <span class="kw">pub</span> <span class="ident">tx_descs</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">T</span>]<span class="op">&gt;</span>,
+    <span class="doccomment">/// The number of transmit descriptors in the descriptor ring</span>
+    <span class="kw">pub</span> <span class="ident">num_tx_descs</span>: <span class="ident">u16</span>,
+    <span class="doccomment">/// Current transmit descriptor index</span>
+    <span class="kw">pub</span> <span class="ident">tx_cur</span>: <span class="ident">u16</span>,
+    <span class="doccomment">/// The cpu which this queue is mapped to. </span>
+    <span class="doccomment">/// This in itself doesn&#39;t guarantee anything but we use this value when setting the cpu id for interrupts and DCA.</span>
+    <span class="kw">pub</span> <span class="ident">cpu_id</span> : <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">S</span>: <span class="ident">TxQueueRegisters</span>, <span class="ident">T</span>: <span class="ident">TxDescriptor</span><span class="op">&gt;</span> <span class="ident">TxQueue</span><span class="op">&lt;</span><span class="ident">S</span>,<span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Sends a packet on the transmit queue</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">/// * `transmit_buffer`: buffer containing the packet to be sent</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">send_on_queue</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer</span>: <span class="ident">TransmitBuffer</span>) {
+        <span class="self">self</span>.<span class="ident">tx_descs</span>[<span class="self">self</span>.<span class="ident">tx_cur</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">send</span>(<span class="ident">transmit_buffer</span>.<span class="ident">phys_addr</span>, <span class="ident">transmit_buffer</span>.<span class="ident">length</span>);  
+        <span class="comment">// update the tx_cur value to hold the next free descriptor</span>
+        <span class="kw">let</span> <span class="ident">old_cur</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">tx_cur</span>;
+        <span class="self">self</span>.<span class="ident">tx_cur</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">tx_cur</span> <span class="op">+</span> <span class="number">1</span>) <span class="op">%</span> <span class="self">self</span>.<span class="ident">num_tx_descs</span>;
+        <span class="comment">// update the tdt register by 1 so that it knows the previous descriptor has been used</span>
+        <span class="comment">// and has a packet to be sent</span>
+        <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">set_tdt</span>(<span class="self">self</span>.<span class="ident">tx_cur</span> <span class="kw">as</span> <span class="ident">u32</span>);
+        <span class="comment">// Wait for the packet to be sent</span>
+        <span class="self">self</span>.<span class="ident">tx_descs</span>[<span class="ident">old_cur</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">wait_for_packet_tx</span>();
+    }
+}
+
+</pre></div>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="nic_queues" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

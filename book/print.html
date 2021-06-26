@@ -1,0 +1,1304 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Theseus OS Book</title>
+                <meta name="robots" content="noindex" />
+                
+
+        <!-- Custom HTML head -->
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="Describes the design principles and implementation details of Theseus, a companion to its source-level docs.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+                <link rel="icon" href="favicon.svg">
+                        <link rel="shortcut icon" href="favicon.png">
+                <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+                <link rel="stylesheet" href="css/print.css" media="print">
+        
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="fonts/fonts.css">
+        
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+            </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="ch00-00-introduction.html"><strong aria-hidden="true">1.</strong> Introduction to Theseus OS</a></li><li class="chapter-item expanded "><a href="design.html"><strong aria-hidden="true">2.</strong> Design and Structure of Theseus</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="source_code_organization.html"><strong aria-hidden="true">2.1.</strong> Source Code Repository Organization</a></li><li class="chapter-item expanded "><a href="booting.html"><strong aria-hidden="true">2.2.</strong> Boot-up Procedure</a></li><li class="chapter-item expanded "><a href="idea.html"><strong aria-hidden="true">2.3.</strong> Safe-language OS Principles</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> Intralingual Design</div></li></ol></li><li class="chapter-item expanded "><a href="app.html"><strong aria-hidden="true">3.</strong> Developing a Theseus Application</a></li><li class="chapter-item expanded "><a href="build_process.html"><strong aria-hidden="true">4.</strong> The Theseus Build Process</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="configuration.html"><strong aria-hidden="true">4.1.</strong> Configuring Theseus</a></li><li class="chapter-item expanded "><a href="rust_builds_out_of_tree.html"><strong aria-hidden="true">4.2.</strong> theseus_cargo: Building Rust Crates Out-of-Tree</a></li></ol></li><li class="chapter-item expanded "><a href="c_program.html"><strong aria-hidden="true">5.</strong> Experimental Support for C programs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="building_c_cross_compiler.html"><strong aria-hidden="true">5.1.</strong> Building a C cross compiler for Theseus</a></li><li class="chapter-item expanded "><a href="c_compilation_tlibc.html"><strong aria-hidden="true">5.2.</strong> tlibc: Theseus's libc and how it works</a></li><li class="chapter-item expanded "><a href="c_compiler_linker.html"><strong aria-hidden="true">5.3.</strong> Compiling and linking C programs</a></li></ol></li><li class="chapter-item expanded "><a href="subsystems.html"><strong aria-hidden="true">6.</strong> Overview of Key Subsystems</a></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">6.1.</strong> Memory Management</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.2.</strong> Task Management</div></li><li class="chapter-item expanded "><a href="display.html"><strong aria-hidden="true">6.3.</strong> Display and Window Management</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="window_manager.html"><strong aria-hidden="true">6.3.1.</strong> The Window Manager</a></li><li class="chapter-item expanded "><a href="window_tutorial.html"><strong aria-hidden="true">6.3.2.</strong> Creating and Displaying Windows</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="real_hardware.html"><strong aria-hidden="true">7.</strong> Running Theseus on VMs &amp; Real Hardware</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="virtual_machines.html"><strong aria-hidden="true">7.1.</strong> Running Theseus in a Virtual Machine</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="pci_passthrough.html"><strong aria-hidden="true">7.1.1.</strong> Using PCI device Passthrough on QEMU</a></li></ol></li><li class="chapter-item expanded "><a href="booting_usb.html"><strong aria-hidden="true">7.2.</strong> Booting via USB drive</a></li><li class="chapter-item expanded "><a href="pxe.html"><strong aria-hidden="true">7.3.</strong> Booting over the network (PXE)</a></li></ol></li><li class="chapter-item expanded "><a href="ch01.html"><strong aria-hidden="true">8.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="git.html"><strong aria-hidden="true">8.1.</strong> git Guidlines</a></li><li class="spacer"></li></ol></li><li class="chapter-item expanded "><a href="papers_presentations.html">Papers and Presentations/Slides</a></li><li class="chapter-item expanded affix "><a href="_root_readme.html">Theseus README + Quick Start ↗️</a></li></ol>            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                                            </div>
+
+                    <h1 class="menu-title">The Theseus OS Book</h1>
+
+                    <div class="right-buttons">
+                                                <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                                                                        
+                    </div>
+                </div>
+
+                                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="introduction-to-theseus"><a class="header" href="#introduction-to-theseus">Introduction to Theseus</a></h1>
+<p><em>Note: for general info about Theseus and a quick start guide, see the <a href="https://github.com/theseus-os/Theseus#readme">top-level README</a>.</em></p>
+<p>Theseus is a new OS written from scratch in <a href="https://www.rust-lang.org/">Rust</a> to experiment with novel OS structure, better state management, and how to leverage <strong>intralingual design</strong> principles to shift OS responsibilities like resource management into the compiler.</p>
+<p>Continue to the next chapter to learn more about Theseus, or feel free to check out our <a href="papers_presentations.html">published academic papers</a> for a deep dive into the research and design concept behind Theseus.</p>
+<h3 id="whats-in-a-name"><a class="header" href="#whats-in-a-name">What's in a name?</a></h3>
+<blockquote>
+<p>The ship wherein Theseus and the youth of Athens returned from Crete had thirty oars, and was preserved by the Athenians down even to the time of Demetrius Phalereus, for they took away the old planks as they decayed, putting in new and stronger timber in their places, in so much that this ship became a standing example among the philosophers, for the logical question of things that grow; one side holding that the ship remained the same, and the other contending that it was not the same.
+  —   <em>Plutarch, Theseus</em></p>
+</blockquote>
+<p>The name &quot;Theseus&quot; was inspired by <em>The Ship of Theseus</em>, an ancient Greek metaphysical paradox and thought experiment that pondered: &quot;if you iteratively replace every individual piece of an object, is that re-built object still the same object?&quot;</p>
+<p>Though we do not attempt to answer this question, we do wish to enable any and every OS component to be replaced,  across all layers of the system, at runtime without rebooting. This goal of easy and arbitrary <em>live evolution</em> was (and still is) one of the original motivating factors behind Theseus.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="theseuss-design-and-structure"><a class="header" href="#theseuss-design-and-structure">Theseus's Design and Structure</a></h1>
+<p>Theseus is a safe-language OS, in which everything runs in a single address space (SAS) and single privilege level (SPL). 
+This includes everything from low-level kernel components to higher-level OS services, drivers, libraries, and more, all the way up to user applications.
+Protection and isolation are provided by means of compiler- and language-ensured type safety and memory safety, as explained in a <a href="idea.html">later section</a>.</p>
+<h2 id="structure-of-many-small-cells"><a class="header" href="#structure-of-many-small-cells">Structure of many small <em>Cells</em></a></h2>
+<p>Theseus is implemented as a collection of many small entities called <em><strong>cells</strong></em>, a software-defined unit of modularity that acts as the core building block of Theseus.
+The cell concept is a term we coined to represent an individual entity of code and/or data that can be loaded into Theseus.
+A cell is <em>not</em> a thread of execution, nor is it related to Rust's <code>std::cell</code> types. </p>
+<h3 id="the-biological-cell-analogy"><a class="header" href="#the-biological-cell-analogy">The Biological Cell Analogy</a></h3>
+<p>Cells in Theseus are inspired by and akin to biological cells in an organism, as they both have many attributes in common:</p>
+<ul>
+<li>Cells are the basic structural unit</li>
+<li>Cells are tiny parts of a greater whole, yet remain distinct despite complex interactions and hierarchies</li>
+<li>Cells each have widely differing roles, but can all be viewed under a single uniform abstraction</li>
+<li>Cells have an identifiable boundary (<em>cell membrane</em> = public interface) that explicitly regulates what enters and exits (<em>selective permeability</em> = naming visibility)</li>
+<li>Cells can be arbitrarily &quot;refactored&quot; into multiple different units (<em>meiosis</em>/<em>mitosis</em> = live evolution)</li>
+<li>Cells can be replaced independently after failing or dying (<em>cell motility</em> = fault recovery)</li>
+</ul>
+<p>As such, we sometimes refer to Theseus as a <em><strong>cytokernel</strong></em>, in that it is composed of cells. This reinforces the distinction between the design of Theseus and that of other kernels, e.g., monolithic kernels, microkernels, multikernels, etc. <a href="design.html#comparison-with-other-os-designs">Read more here</a>. </p>
+<h3 id="cell--crate"><a class="header" href="#cell--crate">Cell ≈ Crate</a></h3>
+<p>Currently, there is a one-to-one relationship between a <em>cell</em> and a Rust <em>crate</em>. The <a href="https://doc.rust-lang.org/book/ch07-01-packages-and-crates.html">crate</a> is Rust's project container that consists of source code and a <a href="https://doc.rust-lang.org/cargo/reference/manifest.html">dependency manifest</a> file. The crate also serves as Rust's translation unit (elementary unit of compilation); in Theseus we configure each Rust crate to be built into a single <code>.o</code> object file (a relocatable ELF file). </p>
+<p>Thus, the <em>cell</em> abstraction is always present in Theseus, but takes different forms as shown in the below diagram. </p>
+<ul>
+<li>At implementation time, a cell is a crate.</li>
+<li>After compile (build) time, a cell is a single <code>.o</code> object file.</li>
+<li>At runtime, a cell 🄲 is a structure that contains the set of sections 🅂 from its crate object file, which have been dynamically loaded and linked into memory, as well as metadata about the inter-dependencies between it and others.</li>
+</ul>
+<p><img src="images/cell_consistency.svg" alt="Theseus's cell abstraction is present across implementation, build, and runtime" /></p>
+<p>In Theseus, the metadata stored for each cell is defined by <a href="https://theseus-os.github.io/Theseus/doc/crate_metadata/index.html">the <code>kernel/crate_metadata</code> crate</a>, which includes two main types:</p>
+<ul>
+<li><code>LoadedCrate</code>, which represents a single crate loaded into memory and linked against other loaded crates. The <code>LoadedCrate</code> owns the memory regions holding its sections, along with other metadata about sections and symbols in that crate.</li>
+<li><code>LoadedSection</code>, which represents an individual section within a loaded crate, as specified in its object file. A <code>LoadedSection</code> comprises several main items:
+<ul>
+<li>The section <em>type</em>, e.g., <code>.text</code> (an executable function), <code>.rodata</code> (constant data), <code>.data</code>/<code>.bss</code> (read-write data)</li>
+<li>Outgoing dependencies: the list of other sections from other crates that this section depends on (and links against).</li>
+<li>Incoming dependencies: the list of other sections from other crates that depend on (link against) this section. </li>
+<li>References to its containing &quot;parent&quot; crate and location within that crate's memory region where this section is loaded.</li>
+</ul>
+</li>
+</ul>
+<p>Note that dependencies are tracked on a fine-grained, per-section basis in order to facilitate challenging OS goals like live evolution at runtime, system flexibility, fault recovery, and more. 
+Dependencies are derived from relocation entries specified in the <code>.rela.*</code> sections in the ELF object file. This is much more precise than deriving dependencies from crate-level <code>Cargo.toml</code> manifests.</p>
+<p>Each cell is loaded and linked into a <em>namespace</em>, which we refer to as a <code>CellNamespace</code> or <code>CrateNamespace</code>, which represents a true namespace of all of the publicly-visible symbols that are exposed by the cells within it. Namespaces are useful for quick dependency (symbol) resolution during dynamic linking, and also play a key role in the above system goals, especially flexibility, as they can be used to efficiently realize multiple distinct <em>OS personalities</em> to serve different applications with disparate needs.</p>
+<p><img src="images/metadata_tree.svg" alt="A simple CrateNamespace showing three crates with sections that depend on each other" /></p>
+<p>The above diagram depicts a simple set of three crates whose sections depend upon each other and are thus linked into a single namespace. The <code>MappedPages</code> (MP) objects are Theseus's abstraction of owned memory regions.  <!-- TODO: link to memory.md --></p>
+<h2 id="comparison-with-other-os-designs"><a class="header" href="#comparison-with-other-os-designs">Comparison with other OS designs</a></h2>
+<p>The below figure shows the distinction between the structure of existing OS/kernel designs and Theseus. </p>
+<p><img src="images/kernel_structure.svg" alt="Existing OS designs vs. Theseus" /></p>
+<p><strong>Monolithic OSes</strong> are the most common, including Linux and other Unix-like OSes and most commercial systems like Windows and macOS. 
+In a monolithic OS, all kernel components exist and run in a single kernel address space, meaning that intra-kernel communication is fast and efficient: simply use function calls and shared memory accesses. 
+However, monolithic OSes are less resilient to failures in the kernel, as any crash in kernel space (such as a buggy driver) can bring down the entire system. 
+Applications must use system calls to ask the kernel to perform privileged operations on their behalf, requiring a privilege mode switch. </p>
+<p><strong>Microkernel OSes</strong> are less common, but still widespread in certain computing domains where reliability is key, such as embedded systems. 
+Microkernels move as much kernel functionality as possible into separate userspace &quot;system server&quot; processes, leaving the kernel itself very small. 
+This improves resiliency, as each kernel entity executes in userspace in its own address space; if one crashes, the rest of the system can continue execution by restarting the failed system process. 
+However, microkernels are less efficient: all inter-entity functionality requires Inter-Process Communication (IPC), requiring costly context switches and mode switches. </p>
+<p><strong>Multikernel OSes</strong> offer high scalability to manycore hardware architectures by running a separate instance of a small kernel replicated across each hardware core. Depending on the underlying hardware, system service processes may also be replicated redundantly across (subsets of) cores to improve performance by reducing contention. They typically borrow standard OS interfaces and abstractions from monolithic and microkernel systems, though presenting a standard shared memory abstraction can harm performance.</p>
+<p><strong>Theseus OS</strong> does not base its structure on any aspect of the underlying hardware, unlike the three above system designs. Everything, including applications, system services, and core kernel components, exists and runs in a single address space and a single privilege level (in &quot;kernelspace&quot;). 
+The structure of Theseus is purely software-defined and based on the modularity concept of cells.
+Thus, communication and shared memory access is efficient because isolation and protection are ensured by the compiler.
+However, everything must be written in a safe language like Rust.
+See <a href="idea.html">this section</a> for more about Theseus's safe-language OS design.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="source-code-organization"><a class="header" href="#source-code-organization">Source code organization</a></h1>
+<p>Source code in the Theseus repository is categorized into three main folders:</p>
+<ol>
+<li><code>kernel/</code>: components that implement the core functionality of the OS</li>
+<li><code>applications/</code>: user applications, tests, benchmarks, etc that can be invoked to run in Theseus.</li>
+<li><code>libs/</code>: components that act as standalone libraries usable outside of Theseus.</li>
+</ol>
+<h3 id="1-kernel"><a class="header" href="#1-kernel">1. Kernel</a></h3>
+<p>Crates in the <code>kernel/</code> folder are considered to be &quot;first-party&quot; or &quot;privileged&quot; components that can use <a href="https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html">unsafe code</a> if necessary, e.g., for directly interacting with hardware at the lowest levels of the OS. That being said, we go to great lengths to avoid unsafe code throughout all of Theseus. </p>
+<p>Kernel crates cannot depend on any application crates; if they did, the application crate would be erroneously included and built into the kernel image. Kernel crates can depend on libs crates.</p>
+<h3 id="2-applications"><a class="header" href="#2-applications">2. Applications</a></h3>
+<p>Crates in the <code>applications/</code> folder are user applications that cannot use any unsafe code. 
+Currently this consists mostly of simple utilities and command-line tools that are developed specifically for Theseus, as well as various small apps used to test functionality or run benchmarks for performance measurements.</p>
+<p>Application crates can depend on both kernel crates, libs crates, and even other application crates, though the latter is not recommended. 
+See <a href="app.html">this section</a> for more details about how applications work and how to develop one.</p>
+<p>In the future, we expect to restrict applications to depend only upon functions and types explicitly exposed through a dedicated library, i.e., <code>libtheseus</code>, but this is a future development.</p>
+<h3 id="3-libs"><a class="header" href="#3-libs">3. Libs</a></h3>
+<p>Crates in the <code>libs/</code> folder are standalone projects that <em>must not</em> depend on anything else in Theseus, such as kernel or application crates. They are intended to be re-used by other software projects and may eventually be refactored out of the Theseus repository. The <code>libs/</code> folder also includes some other repositories that we may have forked and modified for use by Theseus, often included as <a href="https://git-scm.com/book/en/v2/Git-Tools-Submodules">git submodules</a>. </p>
+<h3 id="other-folders"><a class="header" href="#other-folders">Other folders</a></h3>
+<p>The other folders in the root of the repository are mostly build/configuration tools and scripts. Here's a quick rundown:</p>
+<ul>
+<li><code>book</code>: contains the source code of this Theseus book, which you're currently reading.</li>
+<li><code>cfg</code>: contains a project-wide configuration Makefile <code>Config.mk</code> and JSON files that specify the compiler target platform for various Theseus builds.</li>
+<li><code>docker</code>: contains scripts and config files required to set up a basic Docker image that can be used to build and run Theseus.</li>
+<li><code>scripts</code>: contains miscellaneous scripts for setting up a build environment, testing, debugging, etc.</li>
+<li><code>tools</code>: contains custom Rust programs that run as part of Theseus's build process. See the <a href="https://github.com/theseus-os/Theseus/tree/theseus_main/tools#readme">tools/README</a> file for more.</li>
+</ul>
+<h2 id="project-workspace"><a class="header" href="#project-workspace">Project Workspace</a></h2>
+<p>All of the crates in the main <code>kernel</code> and <code>applications</code> folders are organized into a single-top level <em>workspace</em>, a way of using cargo (Rust's package manager and build tool) to build them all together into the same <code>target/</code> directory.
+This ensures they can all be directly linked together against each other and that the dependencies between them will be resolved properly by the compiler and linker toolchains.</p>
+<p>You can see how the members of this workspace are defined in the root <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/Cargo.toml">Cargo.toml</a> file, and how all other folders are ignored. This uses cargo's <a href="https://doc.rust-lang.org/cargo/reference/workspaces.html">virtual manifest</a> feature.</p>
+<p>Read more about Theseus's <a href="build_process.html">build process here</a>.</p>
+<h2 id="external-dependencies"><a class="header" href="#external-dependencies">External dependencies</a></h2>
+<p>Theseus does depend on many external, third-party crates that are hosted on the official <a href="https://crates.io/">crates.io</a> registry or on GitHub. This is currently allowed for all crates, no matter whether they are kernel, application, or libs crates. In the future, we may restrict or forbid which kinds of crates can be used by applications and whether they can expose unsafe code or certain underlying assembly instructions. </p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="booting-process-and-flow-of-execution"><a class="header" href="#booting-process-and-flow-of-execution">Booting Process and Flow of Execution</a></h1>
+<h2 id="initial-assembly-code"><a class="header" href="#initial-assembly-code">Initial assembly code</a></h2>
+<p>The Theseus kernel takes over from the bootloader and first executes code in <em>32-bit protected mode</em>, which corresponds to the <code>start</code> function in <code>kernel/nano_core/src/boot/arch_x86_64/boot.asm</code>.
+Currently we use GRUB configured as a legacy bootloader (non-UEFI) and Theseus expects to be booted by a <em>multiboot2</em>-compliant bootloader.
+In the future, we intend to add support for booting via the UEFI standard, especially on other architectures without a legacy BIOS.</p>
+<p>After initializing a very simple page table and other miscellaneous hardware features, the assembly file <code>boot.asm</code> jumps to <code>long_mode_start</code>, which now runs <em>64-bit code</em> in long mode.
+Then, it jumps to <code>start_high</code>, such that we're not running the base kernel image in the higher half (see more about <a href="https://wiki.osdev.org/Higher_Half_Kernel">higher-half kernels here</a>).
+We then set up a new Global Descriptor Table (GDT), segmentation registers, and finally call the Rust code entry point <a href="https://theseus-os.github.io/Theseus/doc/nano_core/index.html"><code>nano_core_start()</code></a> with the proper arguments. 
+After calling <code>nano_core_start</code>, the assembly files are no longer used, and <code>nano_core_start</code> should never return.</p>
+<h2 id="initial-rust-code-the-nano_core"><a class="header" href="#initial-rust-code-the-nano_core">Initial Rust code: the <code>nano_core</code></a></h2>
+<p>The <code>nano_core</code>, specifically <code>nano_core_start()</code>, is the first Rust code to run in Theseus. 
+It performs a very minimal bootstrap/setup procedure, in which it performs the following duties:</p>
+<ul>
+<li>Initializes logging and a basic VGA text display, for the purpose of debugging.</li>
+<li>Sets up simple CPU exception handlers, for the purpose of catching early errors. </li>
+<li>Sets up a basic virtual memory environment.
+<ul>
+<li>This creates the first and only virtual address space and remaps all of the bootloader-loaded sections into that new single address space. </li>
+<li>Importantly, Theseus doesn't depend on anything else from the bootloader after this point.</li>
+</ul>
+</li>
+<li>Initializes the <code>mod_mgmt</code> subsystem, which creates the first <code>CrateNamespace</code> and allows other crates to be dynamically loaded. </li>
+<li>Loads the invokes the <code>captain</code>, which handles the rest of the OS initialization procedures. </li>
+</ul>
+<p>The <code>nano_core</code> is quite general and minimalistic; it rarely needs to change. The majority of the OS-specific configuration and initialization happens in the <code>captain</code>, so changes should likely be made there.</p>
+<h2 id="main-initialization-routine-the-captain"><a class="header" href="#main-initialization-routine-the-captain">Main Initialization routine: the <code>captain</code></a></h2>
+<p>The <code>captain</code> &quot;steers the ship&quot; of Theseus, meaning that it contains basic logic for initializing all of the other subsystems in the proper order and with the proper flow of data between them.</p>
+<p>Currently, there is a single <code>captain</code> implementation in Theseus (for a standard x86_64 machine), which does the following:</p>
+<ul>
+<li>Initializes ACPI and APIC to discover multicore and other hardware configuration,</li>
+<li>Sets up interrupt and exception handlers,</li>
+<li>Sets up basic device drivers,</li>
+<li>Spawns event handling threads,</li>
+<li>Initializes the window manager and graphics subsystem,</li>
+<li>Starts the first user application, which is currently a single terminal window.</li>
+</ul>
+<p>At the end, the <code>captain</code> must enable interrupts to allow the system to schedule other tasks. 
+It then falls into an idle loop that does nothing and will never be run again by the scheduler.</p>
+<blockquote>
+<p>Note: in the future, Theseus will add additional architecture-specific <code>captain</code>s for different platforms.</p>
+</blockquote>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="theseus-ideas-and-inspiration"><a class="header" href="#theseus-ideas-and-inspiration">Theseus Ideas and Inspiration</a></h1>
+<p>Theseus is a safe-language OS, meaning that it relies on type safety and memory safety guarantees from the Rust language and compiler to enforce protection and isolation between tasks and components. 
+As such, it foregoes hardware protection, which generally results in higher efficiency due to the ability to bypass overhead stemming from switching privilege modes and address spaces. </p>
+<p>This is possible only when all applications are written in safe Rust, which prevents them from circumventing any type-based restrictions to cause unintended or undefined behavior.</p>
+<p>Check out <a href="https://docs.google.com/presentation/d/e/2PACX-1vSa0gp8sbq8S9MB4V-FYjs6xJGIPm0fsZSVdtZ9U2bQWRX9gngwztXTIJiRwxtAosLWPk0v60abDMTU/pub?start=false&amp;loop=false">this presentation slide deck</a> to learn more about how we ensure protection and isolation in Theseus based on the foundation of Rust's type and memory safety guarantees.</p>
+<p>For more details about Theseus's research merit and novel design principles, see our <a href="papers_presentations.html">selected list of papers and presentations here</a>.</p>
+<h2 id="pie-principle"><a class="header" href="#pie-principle">P.I.E. Principle</a></h2>
+<p>The P.I.E. principle is one of the guiding lights in the design of Theseus and much of our other systems software research.
+The main idea is that there are three pillars of computing goals, of which only 2 of 3 can be achieved simultaneously:</p>
+<ol>
+<li><strong>P</strong> erformance</li>
+<li><strong>I</strong> solation</li>
+<li><strong>E</strong> fficiency</li>
+</ol>
+<p>Traditionally, systems software designers have looked to hardware to provide all three -- high performance, strong isolation, and efficiency (low overhead). 
+We believe that hardware cannot fully realize all three:</p>
+<ul>
+<li>Hardware can realize high performance with high efficiency, but only in the absence of hardware-provided isolation (protection).</li>
+<li>Hardware can realize high performance with strong isolation, but is inefficient, e.g., due to switching between privilege modes and address spaces.</li>
+<li>Hardware can realize strong isolation at the cost of lower efficiency, which reduces performance.</li>
+</ul>
+<p>We assert that hardware should <em>only</em> be responsible for increasing performance, i.e., via various accelerators and dedicated improvements, but should have <em>no role</em> (or a minimal role) in providing isolation, safety, and security.
+Isolation and efficiency should be the responsibility of software alone.</p>
+<p>We sometimes refer to this as the <strong>PHIS</strong> principle: <strong>Performance</strong> in <strong>Hardware</strong>, <strong>Isolation</strong> in <strong>Software</strong>.</p>
+<p><em>But why?</em></p>
+<p>For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted userspace applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where we have the ability to verify the OS, compiler, language libraries, and more. </p>
+<p>In addition, modern languages like Rust are able to ensure type safety and memory safety at compile time, without the overhead of traditional safe/managed languages that rely upon inefficient garbage collection and transparent heap-based object management.
+Thus, we can leverage these safety guarantees to ensure that compiled code does not violation isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.</p>
+<p>Theseus transcends the reliance on hardware to provide isolation, and completely foregoes hardware privilege levels (x86's Ring 0 vs. Ring 3 distinction) and multiple address spaces.
+Instead, we run all code at Ring 0 in a single virtual address space, including user applications that are written in purely safe Rust.
+This maximizes efficiency whilst preserving protection, because we can guarantee at compile time that a given application or kernel component cannot violate isolation between modules, rendering hardware privilege levels obsolete.
+Theseus still does use virtual memory translation provided by the MMU, but simply for convenience and ease of memory management; it can be very difficult and inefficient to directly handle and allocate physical memory for applications, and also to find large contiguous chunks of physical memory. </p>
+<h2 id="going-beyond-safety"><a class="header" href="#going-beyond-safety">Going beyond safety</a></h2>
+<p>We show that it's possible to leverage safe languages and compilers to go much further than just basic isolation and memory safety. 
+For more details, read about Theseus's novel concept of intralingual design (coming soon). <!-- TODO [intralingual design here](intralingual.md). --></p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="application-support-and-development"><a class="header" href="#application-support-and-development">Application Support and Development</a></h1>
+<p>One of the unusual features of Theseus, compared to mainstream operating systems like Linux, is that safe applications are loaded into the same single address space as the rest of the OS and run at the same kernel privilege level. Below, we provide information about how such apps are supported by Theseus and how you can develop a new app.</p>
+<h2 id="dynamic-linking-and-loading-of-application-crates"><a class="header" href="#dynamic-linking-and-loading-of-application-crates">Dynamic Linking and Loading of Application Crates</a></h2>
+<p>Applications are simply object files that are loaded into the  address space, just like any other kernel crate.
+The only real distinction is that they must use only safe code (unsafe code is forbidden),
+and they must expose a <strong>public</strong> entry point function named <code>main</code>, shown below.
+If the <code>main</code> function is not <code>pub</code>, it may be removed by compiler optimizations or undiscoverable by the application loader code, 
+causing the application crate to be non-runnable.</p>
+<pre><pre class="playground"><code class="language-rust no_run no_playground">pub fn main(args: Vec&lt;String&gt;) -&gt; isize { ... }
+</code></pre></pre>
+<p>Note that application-level <em>libraries</em> do not need to expose a <code>main</code> function;
+only applications that intend to be run as binary executables do. </p>
+<p>If you forget to include a <code>main()</code> function in your application, the crate manager in Theseus will load and link it successfully but fail to run it; a runtime error will be thrown. </p>
+<h2 id="creating-and-building-a-new-application"><a class="header" href="#creating-and-building-a-new-application">Creating and building a new application</a></h2>
+<p>Theseus's build system will automatically build any crates in the <code>applications/</code> directory, so all you have to do is place your new application crate there. 
+The name of the directory holding your crate files <strong>must be the same</strong> as the name of the crate as specified in its Cargo.toml <code>name</code> field. </p>
+<p>So, for example, you could create a new application crate called <code>my_app</code> with the following file structure:</p>
+<pre><code>applications/
+├── my_app
+│   ├── Cargo.toml
+│   └── src
+│       └── lib.rs
+├── ...
+</code></pre>
+<p>The <code>applications/my_app/src/lib.rs</code> file contains the application code with at least a <code>fn main()</code> body (as shown above). 
+The <code>applications/my_app/Cargo.toml</code> file <strong>must specify the same name as the containing directory</strong>:</p>
+<pre><code class="language-toml">[package]
+name = &quot;my_app&quot;
+...
+</code></pre>
+<p>After building and running Theseus, you can type <code>my_app</code> into the Theseus shell to run the application as expected.</p>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<p>See the many examples in the <code>applications/</code> directory. The <code>example</code> application is designed to serve as a starting point for your new application that you can easily duplicate. We offer a ported version of <code>getopts</code> to help parse command-line arguments. </p>
+<h2 id="dependencies-how-to-use-os-functionality"><a class="header" href="#dependencies-how-to-use-os-functionality">Dependencies: how to use OS functionality</a></h2>
+<p>Currently, applications can use any Theseus kernel crate as a direct dependency (via its <code>Cargo.toml</code> file). This is a temporary design choice to bridge the lack of a real standard library. </p>
+<p>In the future, this will be replaced with <code>libtheseus</code> in combination with Rust's standard library, in which applications can <em>only</em> access the kernel functionality re-exported by <code>libtheseus</code> and any functionality offered by the Rust standard library, which has two benefits:</p>
+<ul>
+<li>Applications will not be able to access public but &quot;sensitive&quot; kernel functions unless they are explicitly made visible to applications via the <code>libtheseus</code> library.</li>
+<li>Applications will not have to know which kernel crate provides a specific feature; they can simply depend on the single <code>libtheseus</code> crate to access any OS feature. Their dependency management will be very simple. </li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="theseuss-build-process"><a class="header" href="#theseuss-build-process">Theseus's Build Process</a></h1>
+<h3 id="cargo"><a class="header" href="#cargo">Cargo</a></h3>
+<p>Theseus uses <a href="https://doc.rust-lang.org/cargo/index.html">cargo</a>, Rust's package manager and build tool, to automatically manage dependencies and invoke the actual Rust compiler for us.
+We utilize cargo's <a href="https://doc.rust-lang.org/cargo/reference/workspaces.html">workspace feature</a> with a virtual manifest to group all of the main crates together into a single top-level meta project, which significantly speeds up build times.
+As such, the crates from the main repository folders (<code>kernel/</code> and <code>applications/</code>) and all of their dependencies are all compiled into a single <code>target/</code> folder.</p>
+<p>The members of this workspace are defined in the root <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/Cargo.toml">Cargo.toml</a> manifest file, plus the list of other folders that should be ignored by cargo.</p>
+<h3 id="makefiles"><a class="header" href="#makefiles">Makefiles</a></h3>
+<p>Although we use cargo to build all Rust code, we still use <code>make</code> and Makefiles to handle high-level build tasks. You should never need to directly run <code>cargo</code> or <code>rustc</code> commands; go through <code>make</code> instead. </p>
+<p>The top-level <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/Makefile">Makefile</a> essentially just invokes the Rust toolchain and compiler via <code>cargo</code>, then copies the compiled object files from the appropriate <code>target/</code> directory into the top-level <code>build/</code> directory, and finally generates a bootable <code>.iso</code> image using various bootloader tools, e.g., GRUB.</p>
+<p>The only special build action the Makefile takes is to use the <code>nasm</code> assembler to compile the  architecture-specific assembly code in <code>nano_core/boot/</code>, and then fully link that against the <code>nano_core</code> into a separate static binary.</p>
+<h3 id="configuring-theseus"><a class="header" href="#configuring-theseus">Configuring Theseus</a></h3>
+<p>Continue on to <a href="configuration.html">the next section</a> to read more about configuring Theseus's build.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="configuring-theseus-1"><a class="header" href="#configuring-theseus-1">Configuring Theseus</a></h1>
+<p>Theseus source code uses the standard Rust-provided <code>cfg</code> options for conditional compilation via build-time configuration. </p>
+<p>We expose the ability to set this via the <code>THESEUS_CONFIG</code> environment variable, which can be set on the command line, in the Makefile itself, or in a Rust build script. </p>
+<p>To set one or more cfg options on the command line, all cfg options must be specified in one quoted string, with each individual cfg option separated by whitespace. For example:</p>
+<pre><code class="language-sh">make run THESEUS_CONFIG=&quot;cfg_option_1 cfg_option_2&quot;
+</code></pre>
+<p>Here's how you would set cfg options in the Makefile. In this case, we set the same <code>cfg_option_1</code> whenever <code>make my_target</code> is executed:</p>
+<pre><code class="language-mk">my_target : export override THESEUS_CONFIG += cfg_option_1
+my_target:
+    $(MAKE) run
+</code></pre>
+<h2 id="using-cfg-options-in-rust-source-code"><a class="header" href="#using-cfg-options-in-rust-source-code">Using cfg options in Rust source code</a></h2>
+<p>In Rust, you can use cfg statements in one of two main ways:</p>
+<ol>
+<li>
+<p>As attributes on code blocks, which enable conditional compilation.</p>
+<ul>
+<li>Below, <code>foo()</code> will be compiled as the top block if <code>cfg_option_1</code> was set, otherwise <code>foo()</code> will be compiled as the bottom block. 
+<pre><pre class="playground"><code class="language-rust no_run no_playground">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(cfg_option_1)]
+fn foo() {
+  println!(&quot;cfg_option_1 was enabled!&quot;);
+}
+
+#[cfg(not(cfg_option_1))]
+fn foo() {
+  println!(&quot;cfg_option_1 was disabled!&quot;);
+}
+<span class="boring">}
+</span></code></pre></pre>
+</li>
+</ul>
+</li>
+<li>
+<p>As runtime if-conditionals, which enable runtime use and checking of a statically-known cfg option via the <code>cfg!()</code> macro, which returns a boolean value.</p>
+<pre><pre class="playground"><code class="language-rust no_run no_playground">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn foo() {
+   if cfg!(&quot;cfg_option_1&quot;) {
+      println!(&quot;cfg_option_1 was enabled!&quot;);
+   } else {
+      println!(&quot;cfg_option_1 was disabled!&quot;);
+   }
+}
+<span class="boring">}
+</span></code></pre></pre>
+</li>
+</ol>
+<p>Follow the links below to read more about how Rust supports cfg options:</p>
+<ul>
+<li><a href="https://doc.rust-lang.org/reference/conditional-compilation.html">Overview of conditional compilation in Rust</a></li>
+<li><a href="https://doc.rust-lang.org/rust-by-example/attribute/cfg.html">Rust by example: <code>cfg</code></a></li>
+<li><a href="https://doc.rust-lang.org/std/macro.cfg.html">Rust's cfg!() macro</a></li>
+</ul>
+<h2 id="how-theseus_config-and-cfg-work-together"><a class="header" href="#how-theseus_config-and-cfg-work-together">How <code>THESEUS_CONFIG</code> and <code>cfg</code> work together</a></h2>
+<p>Theseus provides a single top-level <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/build.rs"><code>build.rs</code></a> file that converts the cfg options specified by <code>THESEUS_CONFIG</code> into Rust-known <code>cfg</code> values that can be used with the standard Rust cfg attributes. 
+This is a standard approach that uses <a href="https://doc.rust-lang.org/cargo/reference/build-scripts.html">Rust's build script functionality</a>.</p>
+<p>If you want the Rust source code in a given crate to depend on any cfg values specified via <code>THESEUS_CONFIG</code>, you must include this <code>build.rs</code> file in that crate's <code>Cargo.toml</code> file. 
+This typically looks like so:</p>
+<pre><code class="language-toml">[package]
+authors = [&quot;Kevin Boos &lt;kevinaboos@gmail.com&gt;&quot;]
+name = &quot;my_crate&quot;
+description = &quot;brief description of my_crate here&quot;
+version = &quot;0.1.0&quot;
+build = &quot;../../build.rs&quot;
+</code></pre>
+<p>The last line in the above TOML snippet is what informs cargo that it should run Theseus's top-level <code>build.rs</code> script before compiling <code>your_crate</code>, which ensures the cfg values specified in <code>THESEUS_CONFIG</code> will actually be activated.</p>
+<blockquote>
+<p><strong>Warning:</strong> if you do not include the <code>build = &quot;../../build.rs&quot;</code> line in a crate's <code>Cargo.toml</code> manifest file, then the source code of that crate <em>will not see</em> cfg values set by the <code>THESEUS_CONFIG</code> environment variable.</p>
+</blockquote>
+<h1 id="other-configuration-options"><a class="header" href="#other-configuration-options">Other Configuration Options</a></h1>
+<h2 id="debug-vs-release-mode"><a class="header" href="#debug-vs-release-mode">Debug vs. Release Mode</a></h2>
+<p>Theseus can be built in a variety of modes, but offers two presets: <strong>debug</strong> and <strong>release</strong> build modes.
+By default, Theseus is built in release mode for usable performance within an emulator like QEMU.
+To build in debug mode, set the <code>BUILD_MODE</code> environment variable when running <code>make</code>, like so:</p>
+<pre><code class="language-sh">make run  BUILD_MODE=debug  [host=yes]
+</code></pre>
+<p>As with most languages, release mode in Rust is <em>way</em> faster, but can be difficult to debug with GDB.</p>
+<blockquote>
+<p>Note: Theseus runs <em>extremely</em> slowly when built in debug mode; only use it when necessary to debug tricky problems. You will definitely want to run debug builds of Theseus in QEMU using KVM, e.g., by using the above <code>host=yes</code> argument on the <code>make</code> command.</p>
+</blockquote>
+<p>There is a special Makefile <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/cfg/Config.mk"><code>cfg/Config.mk</code></a> that contains the build mode options as well as other configuration options used in the kernel Makefile.</p>
+<h2 id="static-build-time-linking-vs-dynamic-runtime-linking"><a class="header" href="#static-build-time-linking-vs-dynamic-runtime-linking">Static Build-time Linking vs. Dynamic Runtime Linking</a></h2>
+<p>Theseus offers two primary forms of linking and packaging its compiled crates into an ISO image.
+As depicted in the image below, the first (left side) is a conventional fully staticaly-linked build, as used in all other OSes,
+while the second (right side) is a novel dynamic linking approach used for Theseus research. </p>
+<p><img src="images/boot_image.svg" alt="Standard Build-time Static Linking (left) vs. Theseus Dynamic Linking (right)" /></p>
+<h3 id="standard-build-time-static-linking"><a class="header" href="#standard-build-time-static-linking">Standard build-time (static) linking</a></h3>
+<p>By default, Theseus is built into a single kernel binary just like a regular OS, in which all <code>kernel</code> crates are linked into a single static library and then packaged into a bootable .iso file.
+This is what happens when you run <code>make</code> as usual. </p>
+<h3 id="dynamic-runtime-linking-loadable-mode"><a class="header" href="#dynamic-runtime-linking-loadable-mode">Dynamic runtime linking (<code>loadable</code> mode)</a></h3>
+<p>However, the research version of Theseus uses full dynamic loading and linking for all crates (except the <code>nano_core</code>) to achieve its various goals of live evolution, availability through fault tolerance, flexibility, etc. 
+Loading and linking of crates at runtime is precisely how Theseus achieves <em>runtime-persistent bounds</em>; the crate management subsystem knows where it loaded a given crate into memory and can therefore maintain metadata about each loaded crate to track its bounds and dependencies. </p>
+<p>We refer to this as <code>loadable</code> mode, because crates are loaded at runtime (as cells) instead of being linked into a single static kernel binary.</p>
+<p>To enable this, set the <code>THESEUS_CONFIG=&quot;loadable&quot;</code> option (or run <code>make loadable</code>, which sets this for you). This causes the following to occur:</p>
+<ul>
+<li>Builds each crate into its own separate object file as normal, but does not link them all together. </li>
+<li>Copies each crate's object file into the top-level build directory's module subdirectory (<code>build/grub-isofiles/modules</code>) such that each crate is a separate object file in the final <code>.iso</code> image.
+<ul>
+<li>The bootloader loads these object files into memory for us, which we discover and map into memory when initializing the crate management subsystem from the <code>nano_core</code>. This allows Theseus to see and load available crate object files at the very beginning of the OS boot-up without needing full support for a filesystem. </li>
+</ul>
+</li>
+<li>Sets the <code>loadable</code> config option, which as seen in the <code>nano_core</code> (and other crates), will enable the <code>#![cfg(loadable)]</code> code blocks that dynamically load other crates rather than include them as static dependencies.
+<ul>
+<li>In <code>loadable</code> code blocks, the caller dynamically looks up the symbol for a given callee function and invokes it dynamically instead of directly calling it via a regular function call. This produces a &quot;soft dependency&quot; in the source code rather than a &quot;hard dependency&quot; that actually requires the callee crate to be statically linked to the caller crate.
+<ul>
+<li>This is somewhat similar to <code>dlopen()</code> and <code>dlsym()</code> for <a href="https://man7.org/linux/man-pages/man3/dlsym.3.html">loading shared objects on Linux</a>, at least conceptually.</li>
+</ul>
+</li>
+<li>Search the code base for <code>cfg(loadable)</code> and <code>cfg(not(loadable))</code> to see where else it is used. </li>
+</ul>
+</li>
+</ul>
+<h2 id="built-in-rust-cfg-and-target-options"><a class="header" href="#built-in-rust-cfg-and-target-options">Built-in Rust cfg and target options</a></h2>
+<p>The <code>#[cfg()]</code> attribute and <code>cfg!()</code> macro can also be used with built-in cfg options set by the Rust compiler, for example, target-specific values. </p>
+<p>For example, Theseus frequently uses options like:</p>
+<ul>
+<li><code>#[cfg(target_arch = &quot;x86_64&quot;)]</code></li>
+<li><code>#[cfg(target_feature = &quot;sse2&quot;)]</code></li>
+</ul>
+<p>The advantage of these features is that they can also be used in <code>Cargo.toml</code> manifest files to conditionally set dependencies. For example:</p>
+<pre><code class="language-toml">## Only include the `core_simd` crate as a dependency when &quot;sse2&quot; is enabled.
+[target.'cfg(target_feature = &quot;sse2&quot;)'.dependencies.core_simd]
+...
+</code></pre>
+<p>Unfortunately, you cannot use non-built-in cfg options to conditionally specify dependencies in <code>Cargo.toml</code> files, such as anything that comes from <code>THESEUS_CONFIG</code> values. </p>
+<h2 id="using-cargo-features"><a class="header" href="#using-cargo-features">Using cargo <code>features</code></a></h2>
+<p>Another option for configuration is to expose <code>features</code> from a given crate; <a href="https://doc.rust-lang.org/cargo/reference/features.html">read more about features here</a>. </p>
+<p>Theseus does not use features extensively because it is structured as many small crates in one overarching virtual workspace. In this form, you cannot easily set one feature for a target crate across multiple dependent crates at the same time, e.g., using a single command-line argument; instead, you must individually change the Cargo.toml specification of <em>every single crate</em> that depends on that target crate. </p>
+<p>Thus, we use the <code>cfg</code> blocks instead of <code>features</code>. </p>
+<p>That being said, Theseus does choose which features it wants to use when bringing in dependencies on third-party crates, but this is minimal and only occurs for a few dependencies. Typically, features are only specified in order to choose a <code>no_std</code> version of a crate, i.e., telling that crate to use the Rust <code>core</code> library instead of the standard library.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="building-out-of-tree-rust-crates-safely"><a class="header" href="#building-out-of-tree-rust-crates-safely">Building Out-of-Tree Rust Crates Safely</a></h1>
+<h2 id="background-the-problem"><a class="header" href="#background-the-problem">Background: The Problem</a></h2>
+<p>Because Rust currently <a href="https://slightknack.github.io/rust-abi-wiki/intro/intro.html">lacks a stable ABI</a>, there is no easy, stable, or safe way to integrate two or more separately-compiled Rust binaries together. 
+By <em>integrate</em>, we mean the ability to have one binary depend upon or invoke another pre-built binary, such as an executable, statically-linked library, dynamically-linked shared object, etc. </p>
+<p>There is another related problem that stems from how the Rust compiler appends unique IDs (metadata used by the compiler) to each compiled crate and each (non-mangled) symbol in those crates; this issue presents itself even in unlinked object files.</p>
+<p>As an example, the <code>page_allocator</code> crate in Theseus will be compiled into an object file with a name like <code>page_allocator-c55b593144fe8446.o</code>, and the function <code>page_allocator::allocate_pages_at()</code> implemented and exposed by that crate will be emitted as the symbol <code>_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE</code>. </p>
+<p>The values of both the crate's unique ID (<code>c55b593144fe8446</code>) and every symbol's unique ID (e.g., <code>heb9fd5c4948b3ccfE</code>) are deterministic, but depend on many factors. 
+Those factors include the compiler version, the source directory, the target directory, and more. 
+We sometimes refer to both of these unique IDs as a <em>hash</em> value since the compiler creates them by hashing together these various factors; how this hash is generated is considered opaque and liable to change, thus we treat it as a black box. </p>
+<p>Theseus loads and links crate object files dynamically at runtime. 
+When we build all of the Theseus kernel crates together into a single target directory (<a href="build_process.html#cargo">read more here</a>), the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
+A running instance of Theseus will have a single instance of the <code>page_allocator</code> crate loaded into memory and expect all other crates to depend upon that instance, meaning that they should be compiled to expect linkage against its specifically-hashed symbols, e.g., <code>_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE</code>.</p>
+<p>If you separately compile another crate <code>my_crate</code> that depends on the exact same set of Theseus kernel crates, cargo will recompile all Theseus crates <em>from source</em> into that new target directory, resulting in the recompiled object files and their symbols having completely different unique ID hashes from the original Theseus instance. 
+As such, when attempting to load <code>my_crate</code> into that already-running prebuilt instance of Theseus, it will fail to load and link because that version of <code>my_crate</code> will depend on differently-hashed crates/symbols, e.g., it may depend upon the symbol <code>_ZN14page_allocator17allocate_pages_at17hd64cba3bd66ea729E</code> instead of <code>_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE</code> (note the different appended hash values).</p>
+<p>Therefore, the <strong>real problem</strong> is that there is no supported method to tell cargo that it should build a crate against a prebuilt set of dependencies. <a href="https://github.com/rust-lang/cargo/issues/1139">See this GitHub issue for more</a> about why this feature would be useful, but why it still isn't supported (hint: no stable Rust ABI).</p>
+<h3 id="a-bad-unsafe-solution"><a class="header" href="#a-bad-unsafe-solution">A Bad, Unsafe Solution</a></h3>
+<p>Technically, we could solve this by using an existing non-Rust stable ABI, like the C language ABI. 
+This would entail defining/exposing Rust functions, data, and types in a C-compatible way such that they can are comaptible with the C ABI (its expected struct memory layout and calling convention).
+Unfortunately, this necessitates the usage of unsafe FFI code blocks (via C-style extern functions) to connect two separate bodies of fully-safe Rust code, which is both dumb and tedious. </p>
+<p>In the above example, instead of simply invoking <code>page_allocator::allocate_pages_at()</code> directly, we would need to export the appropriate wrapper functions like so:</p>
+<pre><pre class="playground"><code class="language-rust no_run no_playground">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// in `page_allocator`
+#[no_mangle]
+pub extern &quot;C&quot; fn allocate_pages_at(num_pages: usize, ...) -&gt; ... {
+    page_allocator::allocate_pages_at(num_pages, ...)
+    ...
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>and then invoke it using unsafe FFI code blocks like so:</p>
+<pre><pre class="playground"><code class="language-rust no_run no_playground">// in `my_crate` 
+extern &quot;C&quot; {
+    fn allocate_pages_at(num_pages: usize, ...);
+}
+fn main() {
+    unsafe {
+        allocate_pages_at(15, ...);
+        ...
+    }
+}
+</code></pre></pre>
+<p>Note that many details are omitted above; while these code wrappers and bindings can be autogenerated, unsafety cannot be avoided. </p>
+<p>Surely we can do better!</p>
+<h2 id="solution-theseus_cargo-for-out-of-tree-builds"><a class="header" href="#solution-theseus_cargo-for-out-of-tree-builds">Solution: <code>theseus_cargo</code> for out-of-tree builds</a></h2>
+<p>A superior solution is to &quot;trick&quot; the Rust compiler into using the prebuilt crates from an existing build of Theseus.
+To this end, we've created <code>theseus_cargo</code>, a custom build tool and wrapper around cargo that resolves an out-of-tree crate's dependencies on in-tree Theseus crates using their prebuilt objects instead of rebuiling them from source.</p>
+<p>This is realized in two parts:</p>
+<ol>
+<li>Generating the prebuilt dependencies while building Theseus's (in-tree) kernel crates,</li>
+<li>Correctly building the out-of-tree crate(s) against those prebuilt Theseus crates. </li>
+</ol>
+<h3 id="1-generating-the-set-of-prebuilt-dependencies"><a class="header" href="#1-generating-the-set-of-prebuilt-dependencies">1. Generating the set of prebuilt dependencies</a></h3>
+<p>To create a set of dependency files understood by Rust's compiler toolchain, the main top-level Makefile invokes another custom build tool, a Rust program called <code>copy_latest_crate_objects</code> found in the <code>tools/</code> directory. 
+It is invoked like so (details omitted):</p>
+<pre><code class="language-mk">cargo run ... tools/copy_latest_crate_objects --  \
+    --input  &quot;target/.../deps&quot;                    \
+    --output-deps  &quot;build/deps/&quot;                  \
+    --output-sysroot  &quot;build/deps/sysroot/&quot;       \
+    ...
+</code></pre>
+<p>The arguments above specify that we wish to</p>
+<ol>
+<li>Use the Rust-produced build artifacts (compiled crates) in the <code>target/.../deps</code> directory as input, and then</li>
+<li>Copy them into the <code>build/deps/</code> output directory.</li>
+<li>Also, copy the prebuilt Rust fundamental libraries (<code>core</code>, <code>alloc</code>) that were cross-compiled into the Theseus platform-specific sysroot folder into <code>build/deps/sysroot/</code>.</li>
+</ol>
+<p>Afterwards, the <code>build/deps/</code> directory contains all prebuilt dependencies needed to compile an out-of-tree crate against the existing build of Theseus, with all the properly versioned (correctly hashed) crates and symbols.
+This tool also generates a <code>TheseusBuild.toml</code> file that describes the parameters of this build of Theseus, such that it can be replicated by <code>theseus_cargo</code>. For example:</p>
+<pre><code class="language-toml">target = &quot;x86_64-theseus&quot;
+rustflags = &quot;--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled -Z share-generics=no&quot;
+cargoflags = &quot;--release&quot;
+host_deps = &quot;./host_deps&quot;
+</code></pre>
+<h3 id="2-building-other-rust-code-against-the-prebuilt-theseus-dependencies"><a class="header" href="#2-building-other-rust-code-against-the-prebuilt-theseus-dependencies">2. Building other Rust code against the prebuilt Theseus dependencies</a></h3>
+<p>With the contents of <code>build/deps/</code> described above, we can invoke <code>theseus_cargo</code> to build the new out-of-tree crate in a separate compilation instance. 
+The <code>theseus_cargo</code> tool is a Rust program that invokes cargo, captures its verbose output, and then modifies and re-runs the <code>rustc</code> commands issued by cargo to use the prebuilt crates to fulfill the out-of-tree crate's dependencies. 
+Those prebuilt crates are a set of dependencies, namely <code>.rmeta</code> and <code>.rlib</code> files, that are understood by the Rust compiler's internal metadata parsers.</p>
+<p>The main modifications <code>theseus_cargo</code> makes to rustc commands is to replace the <code>&lt;values&gt;</code> of the following arguments with the paths and names of the prebuilt Theseus crates in <code>/build/deps/</code>:</p>
+<ul>
+<li><code>-L dependency=&lt;dir&gt;</code></li>
+<li><code>--extern &lt;crate_name&gt;=&lt;crate_file&gt;.rmeta</code></li>
+</ul>
+<p>If a given rustc command has any arguments that need to be changed, <code>theseus_cargo</code> reissues that command.</p>
+<p>Currently, to use <code>theseus_cargo</code>, it must be compiled and installed from source:</p>
+<pre><code class="language-sh">cargo install --path=&quot;tools/theseus_cargo&quot; --root=$INSTALL_DIR
+</code></pre>
+<p>Then, it can be invoked just like <code>cargo build</code>, e.g., to build a crate against the prebuilt dependencies in the input folder:</p>
+<pre><code class="language-sh">$INSTALL_DIR/theseus_cargo --input &quot;build/deps/&quot;  build
+</code></pre>
+<p>Currently, <code>theseus_cargo</code> prints <em><strong>very verbose</strong></em> output and will show a lot of irrelevant warning and log statements describing what it is doing. If the out-of-tree crate was successfully built, it will finally print something like &quot;Ran rustc command (modified for Theseus) successfully&quot; before exiting successfully with exit code 0.</p>
+<p>See the <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/tools/theseus_cargo/src/main.rs"><code>tools/theseus_cargo</code> source code</a> for more details.</p>
+<p>The approach of capturing and modifying rustc commands using verbose output from cargo is obviously not ideal, but there is currently no other supported way to obtain this info because <a href="https://github.com/rust-lang/cargo/issues/5579">cargo is removing its <code>--build-plan</code> option</a>.</p>
+<h2 id="related-links-discussions-alternative-approaches"><a class="header" href="#related-links-discussions-alternative-approaches">Related Links, Discussions, Alternative Approaches</a></h2>
+<ul>
+<li><a href="https://internals.rust-lang.org/t/a-stable-modular-abi-for-rust/12347/69">A Stable Modular ABI for Rust (Rust Internals Forum)</a></li>
+<li><a href="https://slightknack.github.io/rust-abi-wiki/">The Rust ABI wiki</a></li>
+<li>The <a href="https://crates.io/crates/abi_stable">abi_stable</a> crate, which provides &quot;safe&quot; traits, macros, and wrappers around underlying Rust-to-Rust FFI.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="building-and-running-c-programs-on-theseus"><a class="header" href="#building-and-running-c-programs-on-theseus">Building and Running C programs on Theseus</a></h1>
+<blockquote>
+<p><em>Warning:</em> Support for building C programs atop Theseus is experimental and liable to change at any moment.</p>
+</blockquote>
+<p>As Theseus is a safe-language OS that runs all code in a single address space (SAS) and single privilege level (SPL),
+<strong>there is no guarantee</strong> of safety, protection, or isolation when running any other unsafe or non-Rust code directly atop Theseus. </p>
+<p>Nevertheless, we have introduced experimental support for building C programs atop Theseus; proceed at your own risk. </p>
+<h2 id="preqrequisites"><a class="header" href="#preqrequisites">Preqrequisites</a></h2>
+<p>You must have a version of GCC and Binutils cross-compiled for Theseus, e.g., the <code>x86_64-elf</code> target with <code>red-zone</code> usage disabled. </p>
+<p>To make things easy, we have written <a href="building_c_cross_compiler.html">an automated script and a guide</a> on how to build and install all necessary tools.</p>
+<p>Note that the <code>x86_64-elf-*</code> binaries must be on your system PATH before running any of the following gcc commands. </p>
+<h2 id="quickstart-building-a-c-program"><a class="header" href="#quickstart-building-a-c-program">Quickstart: Building a C program</a></h2>
+<p>See the <code>c_test</code> directory for an example dummy C program. All it does is run a simple <code>main()</code> function that returns a constant value. </p>
+<p>In short, building a C program requires the following steps:</p>
+<pre><code class="language-sh">make         # 1. Build Theseus OS itself
+make tlibc   # 2. Build tlibc, Theseus's libc
+make c_test  # 3. Build a sample C program
+make orun    # 4. Run Theseus in QEMU (without rebuilding anything)
+</code></pre>
+<h2 id="running-a-c-program"><a class="header" href="#running-a-c-program">Running a C program</a></h2>
+<p>Once the C program's executable ELF file has been packaged into Theseus's ISO image, you can execute it in Theseus using the <code>loadc</code> application. Executables are automatically placed in the <code>_executable</code> namespace folder by default, so run the following in Theseus's shell:</p>
+<pre><code>loadc /namespaces/_executable/dummy_works
+</code></pre>
+<p>You should observe the return value displayed on the shell GUI, as well as various log messages that show output from tlibc alongside those from Theseus's kernel. </p>
+<h1 id="how-does-it-all-work"><a class="header" href="#how-does-it-all-work">How does it all work?</a></h1>
+<p>The following sections describe how to set up the toolchain, how <code>tlibc</code> is built, and how C programs are compiled and linked.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="building-gcc-and-binutils-to-target-theseus-x86_64-elf"><a class="header" href="#building-gcc-and-binutils-to-target-theseus-x86_64-elf">Building GCC and Binutils to target Theseus (x86_64-elf)</a></h1>
+<p><strong>We provide a script that does all of this for you;</strong> see <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/scripts/install_x86_64-elf-gcc.sh">scripts/install_x86_64-elf-gcc.sh</a>, </p>
+<pre><code class="language-sh">./scripts/install_x86_64-elf-gcc.sh $HOME/src $HOME/opt
+</code></pre>
+<hr />
+<p>In this document, we refer to two directories, both of which can be set to the location of your choice:</p>
+<ol>
+<li><code>$SRC</code>: the directory that contains the source for gcc and binutils
+<ul>
+<li>For example, <code>$HOME/src/</code></li>
+</ul>
+</li>
+<li><code>$DEST</code>: the directory that will hold our compiled gcc and binutils packages and libraries (where they will be installed)
+<ul>
+<li>For example, <code>$HOME/opt/</code></li>
+</ul>
+</li>
+</ol>
+<p>(Instructions were taken from <a href="https://wiki.osdev.org/Building_GCC">this tutorial on the OS dev wiki</a>.)</p>
+<h2 id="1-build-a-standalone-version-of-gcc--binutils"><a class="header" href="#1-build-a-standalone-version-of-gcc--binutils">1. Build a standalone version of GCC &amp; Binutils</a></h2>
+<p>Install the required packages:</p>
+<pre><code class="language-sh">sudo apt-get install gcc build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo gcc-multilib
+</code></pre>
+<h3 id="download-and-build-gccbinutils"><a class="header" href="#download-and-build-gccbinutils">Download and build GCC/Binutils</a></h3>
+<p>For this tutorial, we'll use <code>gcc</code> version <code>10.2.0</code>, released July 20, 2020,
+and <code>binutils</code> version <code>2.35.1</code>, released September 19, 2020.</p>
+<p>You can obtain it from many mirrors online, such as these:</p>
+<ul>
+<li>gcc: <a href="https://mirrors.kernel.org/gnu/gcc/gcc-10.2.0/">https://mirrors.kernel.org/gnu/gcc/gcc-10.2.0/</a></li>
+<li>binultis: <a href="https://mirrors.kernel.org/gnu/binutils/">https://mirrors.kernel.org/gnu/binutils/</a></li>
+</ul>
+<p>Create a destination directory for the newly-built packages to be installed into:</p>
+<pre><code class="language-sh">mkdir $DEST
+export PREFIX=&quot;$DEST/gcc-10.2.0&quot;
+</code></pre>
+<p>Extract each source code package into the directory of your choice (<code>$SRC</code>), and then build binutils:</p>
+<pre><code class="language-sh">mkdir build-binutils
+cd build-binutils
+../binutils-2.35.1/configure --prefix=&quot;$PREFIX&quot; --disable-nls --disable-werror
+make -j$(nproc)
+make install
+</code></pre>
+<p>Then go back to the <code>$SRC</code> directory and build gcc:</p>
+<pre><code class="language-sh"># Use a GCC script to download all necessary prerequisites
+cd gcc-10.2.0
+./contrib/download_prerequisites
+cd ../
+
+mkdir build-gcc
+cd build-gcc
+../gcc-10.2.0/configure --prefix=&quot;$PREFIX&quot; --disable-nls --enable-languages=c,c++
+make -j$(nproc)
+make install
+</code></pre>
+<h2 id="2-build-gcc-and-binutils-again-to-cross-target-theseus-x86_64-elf"><a class="header" href="#2-build-gcc-and-binutils-again-to-cross-target-theseus-x86_64-elf">2. Build GCC and Binutils again, to cross-target Theseus (x86_64-elf)</a></h2>
+<p>Now that we have a standalone build of gcc/binutils that is independent from the one installed by your host system's package manager, we can use that to build a version of gcc that inherently performs cross-compilation for a specific target, in this case, our Theseus <code>x86_64-elf</code> target.</p>
+<p>Note: these instructions are based on <a href="https://wiki.osdev.org/GCC_Cross-Compiler#The_Build">this tutorial from the OS dev wiki</a>.</p>
+<p>First, create a directory for the cross compiler to be built and installed into, e.g., <code>$DEST/cross</code>.</p>
+<pre><code class="language-sh">mkdir $DEST/cross
+export PREFIX=&quot;$DEST/cross&quot;
+export TARGET=x86_64-elf
+export PATH=&quot;$PREFIX/bin:$PATH&quot;
+</code></pre>
+<p>Second, re-build the same binutils package as above, but in a way that configures it to target Theseus. </p>
+<pre><code class="language-sh">../binutils-2.35.1/configure --target=$TARGET --prefix=&quot;$PREFIX&quot; --with-sysroot --disable-nls --disable-werror
+make -j$(nproc)
+make install
+</code></pre>
+<p>Confirm that your new cross-compiler binutils package exists and is on your system PATH:</p>
+<pre><code class="language-sh">which --$TARGET-as 
+</code></pre>
+<p>should output something like:</p>
+<blockquote>
+<pre><code>/home/my_username/opt/cross/bin/x86_64-elf-as
+</code></pre>
+</blockquote>
+<p>Then go back to the <code>$SRC</code> directory and build a version of gcc that cross compiles C/C++ programs to Theseus.</p>
+<pre><code class="language-sh">mkdir cross-build-gcc
+cd cross-build-gcc
+../gcc-10.2.0/configure --target=$TARGET --prefix=&quot;$PREFIX&quot; --disable-nls --enable-languages=c,c++ --without-headers
+make all-gcc -j$(nproc)
+make all-target-libgcc -j$(nproc) 
+make install-gcc
+make install-target-libgcc
+</code></pre>
+<p>Before moving on, let's check to make sure our cross-compiled gcc is working.</p>
+<pre><code class="language-sh">$DEST/cross/bin/$TARGET-gcc --version
+</code></pre>
+<p>This should print out some information about your newly-built gcc. Add the <code>-v</code> flag to dump out even more info. </p>
+<h2 id="3-re-building-gcc-without-the-default-red-zone-usage"><a class="header" href="#3-re-building-gcc-without-the-default-red-zone-usage">3. Re-building GCC without the default <code>red-zone</code> usage</a></h2>
+<p>Importantly, we must disable the <a href="https://en.wikipedia.org/wiki/Red_zone_(computing)">red zone</a> in gcc entirely. When invoking gcc itself, we can simply pass the <code>-mno-red-zone</code> argument on the command line, but that doesn't affect the cross-compiled version of <code>libgcc</code> itself. Thus, in order to avoid <code>libgcc</code> functions invalidly using the non-existing red zone in Theseus, we have to build a no-red-zone version of <code>libgcc</code> in order to successfully build and link C programs for Theseus,  without <code>libgcc</code>'s methods trying to write to the red zone. </p>
+<p>Note: instructions were adapted from <a href="https://wiki.osdev.org/Libgcc_without_red_zone">this tutorial</a>.</p>
+<h3 id="adjusting-the-gcc-config"><a class="header" href="#adjusting-the-gcc-config">Adjusting the GCC config</a></h3>
+<p>First, create a new file within the gcc source tree at <code>$SRC/gcc-10.2.0/gcc/config/i386</code>.<br />
+Add the following lines to that new file and save it:</p>
+<pre><code>MULTILIB_OPTIONS += mno-red-zone
+MULTILIB_DIRNAMES += no-red-zone
+</code></pre>
+<p>Yes, even though we're building for <code>x86_64</code>, we put it in the original x86 architecture config folder called <code>i386</code>.</p>
+<p>Then, instruct gcc's build process to use that new multilib configuration. Open the file <code>$SRC/gcc-10.2.0/gcc/config</code> and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):</p>
+<pre><code>x86_64-*-elf*)
+	tm_file=&quot;${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h&quot;
+	;;
+</code></pre>
+<p>Add a line such that it looks like this:</p>
+<pre><code>x86_64-*-elf*)
+	tmake_file=&quot;${tmake_file} i386/t-x86_64-elf&quot;
+	tm_file=&quot;${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h&quot;
+	;;
+</code></pre>
+<p><strong>Note</strong>: the indentation before <code>tmake_file</code> must be a TAB, not spaces. </p>
+<h3 id="building-gcc-again-with-no-red-zone"><a class="header" href="#building-gcc-again-with-no-red-zone">Building GCC again with no red zone</a></h3>
+<p>Go back to the build directory and reconfigure and re-make libgcc:</p>
+<pre><code class="language-sh">cd $SRC/cross-build-gcc
+../gcc-10.2.0/configure --target=$TARGET --prefix=&quot;$PREFIX&quot; --disable-nls --enable-languages=c,c++ --without-headers
+make all-gcc -j$(nproc)
+make all-target-libgcc -j$(nproc) 
+make install-gcc
+make install-target-libgcc
+</code></pre>
+<p>To check that it worked, run the following two commands:</p>
+<pre><code class="language-sh">x86_64-elf-gcc -print-libgcc-file-name
+x86_64-elf-gcc -mno-red-zone -print-libgcc-file-name
+</code></pre>
+<p>The first one should output a path to <code>libgcc.a</code>, and the second should output a similar path with <code>no-red-zone</code> as the containing directory:</p>
+<blockquote>
+<pre><code>$DEST/cross/lib/gcc/x86_64-elf/10.2.0/libgcc.a
+$DEST/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone/libgcc.a
+</code></pre>
+</blockquote>
+<h2 id="appendix-how-to-use-the-no-red-zone-version-of-gcc"><a class="header" href="#appendix-how-to-use-the-no-red-zone-version-of-gcc">Appendix: How to use the no-red-zone version of GCC</a></h2>
+<p>To properly use this new version of GCC that cross-compiles to the Theseus target and disables the red zone, make sure you:</p>
+<ol>
+<li>use the <code>x86_64-elf-gcc</code> executable that now resides in <code>$DEST/cross</code> </li>
+<li>specify the <code>-mno-red-zone</code> flag, either on the command line or as part of <code>LDFLAGS</code></li>
+</ol>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="tlibc-compiling-and-linking-theseuss-libc"><a class="header" href="#tlibc-compiling-and-linking-theseuss-libc"><code>tlibc</code>: Compiling and Linking Theseus's libc</a></h1>
+<blockquote>
+<p><em>Warning:</em> Support for building C programs atop Theseus is experimental and liable to change at any moment.</p>
+</blockquote>
+<p>Theseus's libc implementation, <code>tlibc</code>, is a work in progress and currently a proof-of-concept library that's missing most standard libc functionality. </p>
+<h2 id="building-tlibc-in-a-theseus-compatible-way"><a class="header" href="#building-tlibc-in-a-theseus-compatible-way">Building tlibc in a Theseus-compatible way</a></h2>
+<p>Most standard library and libc implementations are built as fully-linked static or dynamic libraries; in Rust terms, this corresponds to the <code>staticlib</code> or <code>cdylib</code> crate type (<a href="https://doc.rust-lang.org/reference/linkage.html">see more about crate types and linkage here</a>).</p>
+<p>This doesn't work well for Theseus for a few reasons. 
+First, because Theseus runs everything in a single privilege level, there is no clear point of separation between the lowest level of user code and the highest level of kernel code.
+In conventional OSes, standard libraries use the <em>system call</em> interface to separate their code from the rest of the OS. 
+Therein, building against a specific OS platform is easy -- you simply define the system call interface and compile against any necessary header files.
+There is no complex linking that needs to occur, since the lowest level of the dependency chain ends at the <code>syscall</code> assembly instruction, which makes the library self-contained from the linker's point of view.</p>
+<p>Second, Theseus dynamically links raw object files at runtime, so we cannot easily create a fully statically-linked binary for a standalone C library because it won't know where its dependencies will exist in memory.
+Again, this is not a problem for standard libc implementations since it doesn't need to directly link against each specific syscall handler function. </p>
+<p>Thus, we use the standard <code>rlib</code> crate type for <code>tlibc</code> and perform partial linking of the raw compiled object files ourselves. </p>
+<pre><code class="language-sh">ld -r -o tlibc/target/.../tlibc.o  tlibc/target/.../deps/*.o
+</code></pre>
+<p>Alternatively, we could also use <code>ar</code> to create an archive of all of the object files, as shown below; there's not much of a functional difference between the two approaches, but some build tools prefer <code>.a</code> archives instead of a <code>.o</code> object files. </p>
+<pre><code class="language-sh">ar -rcs tlibc/target/.../libtlibc.a  tlibc/target/.../deps/*.o 
+</code></pre>
+<p>We use the <code>theseus_cargo</code> tool (<a href="rust_builds_out_of_tree.html">as described here</a>) to ensure that <code>tlibc</code> is compiled against and depends on the correct version of crates and symbols from an existing Theseus build. </p>
+<h2 id="using-tlibc"><a class="header" href="#using-tlibc">Using tlibc</a></h2>
+<p>Once we have the <code>tlibc.o</code> (or <code>.a</code>) file, we can use that to satisfy any C program's dependencies on basic libc functions/data.</p>
+<p><a href="c_compiler_linker.html">The next section</a> describes how we use the <code>tlibc</code> file to build a standalone C executable that can run atop Theseus.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="compiling-and-linking-c-programs"><a class="header" href="#compiling-and-linking-c-programs">Compiling and Linking C programs</a></h1>
+<blockquote>
+<p><em>Warning:</em> Support for building C programs atop Theseus is experimental and liable to change at any moment.</p>
+</blockquote>
+<p>Currently, we use a custom form of &quot;split&quot; linking that is both fully-static at compile time <em>and</em> partially-dynamic at runtime.</p>
+<h2 id="1-full-static-linking-at-build-time"><a class="header" href="#1-full-static-linking-at-build-time">1. Full static linking at build time</a></h2>
+<p>This procedure can be broken down into the following steps:</p>
+<ol>
+<li>Compile <code>tlibc</code> as a standard Rust crate into a series of object files, </li>
+<li>Combine or link those tlibc-related as a single archive or object file,</li>
+<li>Compile the basic C program, e.g., <code>dummy.c</code>,</li>
+<li>Statically link the C program to the prebuilt <code>tlibc</code> object to produce a standalone executable.</li>
+</ol>
+<p>The first two steps were <a href="c_compilation_tlibc.html">described previously</a>; the latter two are described below.</p>
+<p>To build and link a dummy C program to tlibc, the invocation of <code>gcc</code> currently requires several arguments to customize the compiler's behavior as well as its usage of the <code>ld</code> linker. The key arguments are shown and described below:</p>
+<pre><code class="language-sh">x86_64-elf-gcc -o dummy_works              \
+    -mno-red-zone -nostdlib -nostartfiles  \
+    -ffunction-sections -fdata-sections    \
+    -mcmodel=large                         \
+    -Wl,-gc-sections                       \
+    -Wl,--emit-relocs                      \
+    -o dummy_works                         \
+    path/to/crtbegin.o                     \
+    dummy.c                                \
+    path/to/tlibc.o                        \
+    path/to/crtend.o
+</code></pre>
+<p>The most important arguments are:</p>
+<ul>
+<li><code>-mno-red-zone</code>, <code>-mcmodel=large</code>:  match Theseus's Rust-side compiler configuration so the C code can properly invoke the Rust code.</li>
+<li><code>-Wl,--emit-relocs</code>: include details in the ELF executable (<code>.rela</code> sections) about the specific relocation actions the linker performed.</li>
+</ul>
+<p>After the above gcc command, we have a standalone executable ELF file <code>dummy_works</code>.</p>
+<h2 id="2-partial-dynamic-re-linking-at-runtime"><a class="header" href="#2-partial-dynamic-re-linking-at-runtime">2. Partial dynamic re-linking at runtime</a></h2>
+<p>The ELF executable <code>dummy_works</code> can immediately be loaded and executed atop Theseus, but it won't necessarily work properly and execute as expected. 
+This is because it was fully statically linked, meaning that the executable includes duplicate instances of the same data and function sections that already exist in the loaded instances of Theseus crates in memory (cells).</p>
+<p>Most importantly, those data sections represent system-wide singleton states (<code>static</code> variables in Rust) that have <em>already been initialized</em> and are in active use by all other Theseus components. 
+Thus, the data instances packaged into the executable have <em>not</em> been initialized and can't safely be used. 
+Using those sections would result in multiple copies of data that's supposed to be a system-wide singleton; this would be bad news for most Theseus components, e.g., frame allocator's system-wide list of free physical memory. </p>
+<p>To solve this problem, we re-perform (overwrite) all of the relocations in the executable ELF file such that they refer to the <em>existing sections</em> already loaded into Theseus instead of the new unitialized/unused ones in the executable itself. 
+This only applies for sections that already exist in Theseus; references to new sections that are unique to the executable are kept intact, of course.
+The relocation information is encoded into the ELF file itself as standard <code>.rela.*</code> sections via the <code>--emit-relocs</code> linker argument shown above.</p>
+<p>This procedure is currently performed by the <code>loadc</code> application; it also handles loading the ELF executable segments (program headers) and managing their metadata. </p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="overview-of-key-subsystems"><a class="header" href="#overview-of-key-subsystems">Overview of Key Subsystems</a></h1>
+<p>TODO: coming soon!</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="display-subsystem"><a class="header" href="#display-subsystem">Display Subsystem</a></h1>
+<p><em>Warning:</em> the display subsystem in Theseus is in need of complete redesign. It is inefficient and poorly implemented, as it was simply a means to the end of being able to interact with the system, and unfortunately has not been a focus of any significant effort.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="how-the-window-manager-works"><a class="header" href="#how-the-window-manager-works">How the Window Manager works</a></h1>
+<h2 id="design"><a class="header" href="#design">Design</a></h2>
+<p>Typically, both the application that owns/creates a window and the window manager that controls that window need to access it jointly. The application needs to display its content into the main part of the window, and the window manager needs information about the location and depth ordering of all windows to render them. </p>
+<p>To share a window between an application and the window manager, the application holds a strong reference (<code>Arc</code>) to the window, while the window manager holds a weak reference (<code>Weak</code>) to that same window. This allows the window manager to control an manage a window without conceptually owning it.</p>
+<p>We use a <code>Mutex</code> to wrap each window to allow the application task and window manager task to safely access it jointly. However, <code>Mutex</code> introduces the possibility of deadlock: when an application wants toaccess its window, it must acquire the Mutex lock, operate on the window, and then release the lock. If the application doesn't release the lock on its window, the window manager will be forced to block until the lock is released, preventing it from performing typical operations like switching between windows, delivering events, or deleting windows.</p>
+<p>To solve this problem, we define two structures: <code>Window</code> and <code>WindowInner</code>. <code>WindowInner</code> only contains the information required by the window manager. The window manager holds a list of references to <code>WindowInner</code> objects, while only the application owns the outer <code>Window</code> object (which itself does contain a reference to the underlying WM-owned <code>WindowInner</code> object. The <code>Window</code> struct also contains other application-relevant states that describe the window.</p>
+<h2 id="the-windowinner-structure"><a class="header" href="#the-windowinner-structure">The <code>WindowInner</code> structure</a></h2>
+<p>The <code>window_inner</code> crate defines a <code>WindowInner</code> structure. It has states and methods of displaying the window on the screen.</p>
+<p>A <code>WindowInner</code> has a framebuffer to which it can display the content of the window. The framebuffer takes a type parameter of pixels it consists of. When the window is rendered to the screen, a compositor may composite every pixel with different principles according to the type. Currently, we have implemented a normal RGB pixel and a pixel of an alpha channel.</p>
+<p>Both an application's window and the window manager has a reference to the same <code>WindowInner</code> object. The application can configure and draw in the framebuffer and the manager can display and composite the window with others.</p>
+<p>This structure also has an event producer. The window manager gets events from I/O devices such as keyboards and push them to the corresponding producer.</p>
+<h2 id="window"><a class="header" href="#window">Window</a></h2>
+<p>A <code>Window</code> object represents a window and is owned by an application. It contains its profile, a title, a consumer and a list of displayables. The consumer can get events pushed to the producer in its profile by the manager.</p>
+<p>A <code>Window</code> provides methods to display the displayables in it and render itself to the screen. The window manager is responsible for compositing it with other windows through a framebuffer compositor.</p>
+<h2 id="displayables"><a class="header" href="#displayables">Displayables</a></h2>
+<p>The <code>displayable</code> crate defines a <code>Displayable</code> trait. A <code>Displayable</code> is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a <code>TextDisplay</code> which is a block of text. In the future, we will implement other kinds of displayables.</p>
+<p>An application can own multiple displayables and display any type of <code>Displayable</code> in its window.</p>
+<h2 id="the-windowmanager"><a class="header" href="#the-windowmanager">The WindowManager</a></h2>
+<p>The <code>window_manager</code> crate defines a <code>WindowManager</code> structure. This structure consists of the profiles of an active window, a list of shown windows and a list of hidden windows. The hidden ones are totally overlapped by others. The structure implements basic methods to manipulate the list such as adding or deleting a window.</p>
+<p>The <code>WindowManager</code> structure contains a bottom framebuffer which represents the background image and a final framebuffer of a floating window border and a mouse arrow. In refreshing an area, it renders the framebuffers in order background -&gt; hidden list -&gt; shown list -&gt; active -&gt; top. It provides several methods to update a rectangle area or several pixels for better performance.</p>
+<p>The structure defines a loop for generic events, a loop for keyboard events and a loop for mouse events. Theseus will initialize them as tasks to handle inputs. The window manager structure provides methods to operate on the window list as reactions to these inputs. It can move a window when we drag it with mouse or pass other events to the active window. The owner application of the active window can handle these events.</p>
+<p>The <code>window_manager</code> crate owns a <code>WINDOW_MANAGER</code> instance which contains all the existing windows. It invokes the methods of <code>WindowManager</code> to manage these windows.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="how-to-create-windows-and-display-content"><a class="header" href="#how-to-create-windows-and-display-content">How to Create Windows and Display Content</a></h1>
+<h2 id="create-a-window"><a class="header" href="#create-a-window">Create a Window</a></h2>
+<p>An application invokes the <code>Window::new()</code> function in the <code>window</code> crate to create a new window. The function would create a new <code>Window</code> object and add a weak reference of its <code>WindowInner</code> to the <code>WINDOW_MANAGER</code> instance in <code>window_manager</code>. It then returns the window to the application. Once the application terminates, the window it owns would be dropped automatically, and the weak reference in the window manager would be deleted.</p>
+<h2 id="display-in-a-window"><a class="header" href="#display-in-a-window">Display in a Window</a></h2>
+<p>An application can create a <code>Displayable</code> and invoke <code>Window.display()</code> to display it. This method is generic and works for all kinds of displayables.</p>
+<p>After display a displayable in its framebuffer, the window would invoke its <code>render()</code> method to render the updates to the screen. A framebuffer compositor will composite a list of framebuffers and forward the result to a final framebuffer which is mapped to the screen.</p>
+<h2 id="handle-key-inputs"><a class="header" href="#handle-key-inputs">Handle Key Inputs</a></h2>
+<p>An application invokes <code>Window.handle_event()</code> to handle the events sent to it. For example, an active window will receive all the key input events. An application can invoke <code>Window.handle_event()</code> in a loop to handle these inputs from the keyboard.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="running-theseus-on-virtual-or-real-hardware"><a class="header" href="#running-theseus-on-virtual-or-real-hardware">Running Theseus on Virtual or Real Hardware</a></h1>
+<p>We have tested whether Theseus runs properly in a variety of environments, currently on x86_64 only:</p>
+<ul>
+<li>Virtual machine emulators: QEMU, bochs, VirtualBox, VMware Workstation Player.</li>
+<li>Real hardware: Intel NUC devices, Supermicro servers, various Thinkpad laptops, PCs with Gigabyte motherboards.</li>
+</ul>
+<p>Currently, the primary limiting factor is that the device support booting via USB or PXE using traditional BIOS rather than UEFI; support for UEFI is a work-in-progress. </p>
+<p>Note that as Theseus is not fully mature, booting on your own hardware is done at your own risk. Be sure that you have a backup of all of your important files before doing so. </p>
+<p>If you experience a problem booting Theseus on any virtual or real hardware platform, please take a look at <a href="https://github.com/theseus-os/Theseus/issues/">the open issues on GitHub</a> to see if someone has already reported your problem or attempted to fix it. 
+If so, leave a comment describing your experience or open a new issue to help the Theseus developers work towards supporting your hardware environment!</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="running-theseus-in-a-virtual-machine"><a class="header" href="#running-theseus-in-a-virtual-machine">Running Theseus in a Virtual Machine</a></h1>
+<p>Using a virtual machine emulator is by far the easiest way to develop, test, and run Theseus. </p>
+<h2 id="qemu"><a class="header" href="#qemu">QEMU</a></h2>
+<p>Our primary test environment and recommended emulator is <a href="https://www.qemu.org/">QEMU</a>, which is the default choice for running Theseus using our built-in Makefile commands. 
+For example, the <code>make run</code> target automatically runs Theseus in a QEMU virtual machine after it finishes the build process. </p>
+<p>The top-level Makefile specifies the configuration parameters for Theseus in QEMU, such as system memory, attached storage devices, serial log output, and more. 
+All of these parameters start with <code>QEMU_</code> and can be overridden on the command line, or indirectly by setting environment variables such as <code>net</code> or <code>host</code>, or by editing the Makefile itself.</p>
+<h2 id="bochs"><a class="header" href="#bochs">Bochs</a></h2>
+<p>In older versions of Theseus, we used both both <a href="https://bochs.sourceforge.io/">Bochs</a> and QEMU for testing. Bochs is supported but its configuration may be out of date; the configuration is found in the <code>bochsrc.txt</code> (<a href="https://github.com/theseus-os/Theseus/blob/theseus_main/bochsrc.txt">direct link</a>) file in the root repository directory.</p>
+<p>Bochs runs quite slowly and supports virtualization of far fewer hardware devices than QEMU; thus, we do not recommend using it. However, you can try running Theseus in Bochs using the Makefile target for it:</p>
+<pre><code class="language-sh">make bochs
+</code></pre>
+<h2 id="vmware-workstation-player"><a class="header" href="#vmware-workstation-player">VMware Workstation Player</a></h2>
+<p>We have tested Theseus on VMWare Workstation and it generally works out of the box. However, there are some options that you may wish to enable to improve performance and offer access to more devices in Theseus. </p>
+<p>First, <a href="https://www.vmware.com/products/workstation-player/workstation-player-evaluation.html">download VMware Workstation Player here</a>, which can be installed and used for free for non-commercial work. </p>
+<p>On Linux, you will download a <code>.bundle</code> file, which then needs to executed in a terminal. For example:</p>
+<pre><code class="language-sh">chmod +x VMware-Player-&lt;...&gt;.bundle
+sudo ./VMware-Player-&lt;...&gt;.bundle
+</code></pre>
+<p>After opening VMware Workstation Player, do the following:</p>
+<ol>
+<li>Click <code>Create A New Virtual Machine</code>.</li>
+<li>In the New Virtual Machine Wizard window, choose <code>Use ISO image:</code> and browse to select the Theseus ISO image, which should be located in the <code>build</code> directory, e.g., <code>build/theseus-x86_64.iso</code>. Then, click <code>Next</code>.</li>
+<li>Under <code>Guest Operating System</code>, choose the <code>Other</code> button and then <code>Other 64-bit</code> from the drop-down menu. Then, click <code>Next</code>.</li>
+<li>Set the <code>Name:</code> field to &quot;Theseus&quot; or whatever you prefer. Click <code>Next</code>.</li>
+<li>Disk size doesn't matter; click <code>Next</code>.</li>
+<li>Click <code>Customize Hardware</code>, and then select the following settings:
+<ul>
+<li>512MB of memory (less may work, but the minimum is on the order of 10-20 MB).</li>
+<li>2 or more processor cores.</li>
+<li>Select <code>Virtualize CPU performance counters</code> if you want to use them (not required).</li>
+<li>If you want to obtain Theseus's log output, then you need to add a serial port connection:
+<ol>
+<li>Click <code>Add...</code> on the bottom left to add a new hardware type, then <code>Serial Port</code>.</li>
+<li>Under <code>Connection</code>, select <code>Use output file:</code> and then choose a destination file name for the serial log to be written to. For example, <code>/home/your_user/theseus_vmware.log</code>.</li>
+<li>Click <code>Save</code>. </li>
+</ol>
+</li>
+</ul>
+</li>
+<li>Click <code>Finish</code>, and then <code>Close</code>.</li>
+</ol>
+<p>Theseus should boot up after a few seconds. You can view the serial log output by <code>cat</code>ting or opening the file:</p>
+<pre><code class="language-sh">cat /home/your_user/theseus_vmware.log
+</code></pre>
+<h2 id="virtualbox"><a class="header" href="#virtualbox">VirtualBox</a></h2>
+<p>We have tested Theseus on VirtualBox and it generally works out of the box. However, there are some options that you may wish to enable to improve performance and offer access to more devices in Theseus. </p>
+<p>First, <a href="https://www.virtualbox.org/wiki/Downloads">download VirtualBox here</a> and install it on your system. On Ubuntu and other Debian-based Linux distributions, you will download a <code>.deb</code> file that you can open in the Software Installer or install on the command line like so:</p>
+<pre><code class="language-sh">sudo dpkg -i virtualbox-&lt;...&gt;.deb
+</code></pre>
+<p>After opening VirtualBox, do the following:</p>
+<ol>
+<li>Click <code>New</code>.</li>
+<li>In the Create Virtual Machine window, set <code>Type</code> to <code>Other</code> and <code>Version</code> to <code>Other/Unknown (64-bit)</code>, choose a name, and then click <code>Next</code>. </li>
+<li>In the next window, choose 512MB of memory (less may work, but the minimum is on the order of 10-20 MB).</li>
+<li>Continue clicking next through all of the storage disk options, those do not matter. </li>
+<li>Back at the main window, right click on your new Theseus machine and choose <code>Settings</code>. </li>
+<li>In the left sidebar, click <code>Storage</code> and then select the <code>💿 Empty</code> option to choose an image for the optical disk.<br />
+Click on the <code>💿▾</code> button on the right side of the <code>Optical Drive: </code> option, select <code>Choose a disk file</code>, and then navigate to the Theseus ISO image in the <code>build/</code> directory, e.g., <code>build/theseus-x86_64.iso</code>.</li>
+<li>Under <code>System</code> in the left sidebar, go to the <code>Processor</code> tab and select 2 (or more) processors.</li>
+<li>If you want to obtain Theseus's log output, then you need to add a serial port connection:
+<ol>
+<li>Click <code>Serial Ports</code> in the left sidebar, under the <code>Port 1</code> tab, select the <code>Enable Serial Port</code> checkbox.</li>
+<li>Under the <code>Port Mode</code> drop-down menu, select <code>Raw File</code> option.</li>
+<li>In the <code>Path/Address</code> text box, type the destination file name for the serial log to be written to. For example, <code>/home/your_user/theseus_vbox.log</code>.</li>
+<li>Click <code>Ok</code>.</li>
+</ol>
+</li>
+<li>In the main window, select the Theseus VM entry from the left sidebar and then click <code>Start</code> on the top bar. </li>
+</ol>
+<p>Theseus should boot up after a few seconds. You can view the serial log output by <code>cat</code>ting or opening the file:</p>
+<pre><code class="language-sh">cat /home/your_user/theseus_vbox.log
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="pci-passthrough-of-devices-with-qemu"><a class="header" href="#pci-passthrough-of-devices-with-qemu">PCI passthrough of devices with QEMU</a></h1>
+<p>PCI passthrough can be used to allow a guest OS to directly access a physical device.
+The following instructions are a combination of <a href="https://www.ibm.com/docs/en/linux-on-systems?topic=vfio-host-setup">this</a> guide on host setup for VFIO passthrough devices and <a href="https://www.kernel.org/doc/Documentation/vfio.txt">this</a> kernel documentation on VFIO.</p>
+<p>There are three main steps to prepare a device for PCI passthrough:</p>
+<ol>
+<li>Find device information</li>
+<li>Detach device from current driver</li>
+<li>Attach device to VFIO driver</li>
+</ol>
+<p>Once these steps are completed, the device slot information can be passed to QEMU using the <strong>vfio</strong> flag. For example, for device 59:00.0, we run:</p>
+<pre><code class="language-sh">make run vfio=59:00.0
+</code></pre>
+<h3 id="finding-device-information"><a class="header" href="#finding-device-information">Finding device information</a></h3>
+<p>First, run <code>lspci -vnn</code> to find the slot information, the kernel driver in use for the device, and the vendor ID and device code for the device you want to use.
+Below is sample output for a Mellanox ethernet card we'd like to access using PCI passthrough:</p>
+<pre><code>59:00.0 Ethernet controller [0200]: Mellanox Technologies MT28800 Family [ConnectX-5 Ex] [15b3:1019]
+	Subsystem: Mellanox Technologies MT28800 Family [ConnectX-5 Ex] [15b3:0008]
+	Flags: bus master, fast devsel, latency 0, IRQ 719, NUMA node 1
+	Memory at 39bffe000000 (64-bit, prefetchable) [size=32M]
+	Expansion ROM at bf200000 [disabled] [size=1M]
+	Capabilities: &lt;access denied&gt;
+	Kernel driver in use: mlx5_core
+	Kernel modules: mlx5_core
+</code></pre>
+<h3 id="detach-device-from-current-driver"><a class="header" href="#detach-device-from-current-driver">Detach device from current driver</a></h3>
+<p>To detach the device from the kernel driver, run the following command, filling in the <code>slot_info</code> and <code>driver_name</code> with values you retrieved in the previous step.</p>
+<pre><code class="language-sh">echo $slot_info &gt; /sys/bus/pci/drivers/$driver_name/unbind
+</code></pre>
+<p>In the above example, this would look like:</p>
+<pre><code class="language-sh">echo 0000:59:00.0 &gt; /sys/bus/pci/drivers/mlx5_core/unbind
+</code></pre>
+<p>If you run <code>lspci -v</code> now, you'll see that a kernel driver is longer attached to this device.</p>
+<h3 id="attach-device-to-vfio-driver"><a class="header" href="#attach-device-to-vfio-driver">Attach device to VFIO driver</a></h3>
+<p>First, load the VFIO driver by doing:</p>
+<pre><code class="language-sh">modprobe vfio-pci
+</code></pre>
+<p>To attach the new driver, run the following command, filling in the <code>vendor_id</code> and <code>device_code</code> with values you retrieved in the first step.</p>
+<pre><code class="language-sh">echo $vendor_id $device_code &gt; /sys/bus/pci/drivers/vfio-pci/new_id
+</code></pre>
+<p>e.g. <code>echo 15b3 1019 &gt; /sys/bus/pci/drivers/vfio-pci/new_id</code></p>
+<p>Now, QEMU can be launched with direct access to the device.</p>
+<h3 id="note-access-for-unprivileged-users"><a class="header" href="#note-access-for-unprivileged-users">Note: access for unprivileged users</a></h3>
+<p>To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:</p>
+<pre><code class="language-sh">readlink /sys/bus/pci/devices/$slot_info/iommu_group
+</code></pre>
+<p>for example:</p>
+<pre><code class="language-sh">readlink /sys/bus/pci/devices/0000:59:00.0/iommu_group
+</code></pre>
+<p>for which we obtain the output below, in which <code>74</code> is the group number:</p>
+<blockquote>
+<pre><code>../../../../kernel/iommu_groups/74
+</code></pre>
+</blockquote>
+<p>Finally, give access to the current user via this command:</p>
+<pre><code class="language-sh">chown $USER /dev/vfio/$group_number
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="booting-theseus-from-a-usb-drive"><a class="header" href="#booting-theseus-from-a-usb-drive">Booting Theseus from a USB drive</a></h1>
+<p>To boot over USB, simply run</p>
+<pre><code class="language-sh">make boot usb=sdc
+</code></pre>
+<p>in which <code>sdc</code> is the device node for the USB disk itself <em>(<strong>not a partition</strong> like sdc2)</em>.
+The OS image (.iso file) will be written to that USB drive.</p>
+<p>On WSL or other host environments where <code>/dev</code> device nodes don't exist, you can simply run <code>make iso</code> and burn the <code>.iso</code> file in the <code>build/</code> directory to a USB drive. 
+For example, on Windows we recommend using <a href="https://rufus.ie/">Rufus</a> to burn ISOs.</p>
+<p>Then, once the bootable USB is ready, plug it into your PC, restart or power on the machine, and choose that USB device from the BIOS or legacy boot device screen.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="booting-theseus-on-real-hardware-via-pxe"><a class="header" href="#booting-theseus-on-real-hardware-via-pxe">Booting Theseus on Real Hardware via PXE</a></h1>
+<p>The following instructions are a combination of <a href="https://www.ostechnix.com/how-to-install-pxe-server-on-ubuntu-16-04/">this guide on OSTechNix</a> to set up PXE for Ubuntu and <a href="https://wellsie.net/p/286/">this guide by Andrew Wells</a> on how to use any ISO with PXE.</p>
+<p>PXE can be used to load Rust onto a target computer that is connected by LAN to the host machine used for development. To set up the host machine for PXE, first make the Theseus ISO by navigating to the directory Theseus is in and running:
+<code>make iso</code></p>
+<p>Then, you will need to set up a TFTP and DHCP server which the test machine will access.</p>
+<h2 id="setting-up-the-tftp-server"><a class="header" href="#setting-up-the-tftp-server">Setting up the TFTP Server</a></h2>
+<p>First, install all necessary packages and dependencies for TFTP:
+<code>sudo apt-get install apache2 tftpd-hpa inetutils-inetd nasm</code>
+Edit the tftp-hpa configuration file:
+<code>sudo nano /etc/default/tftpd-hpa</code>
+Add the following lines:</p>
+<pre><code>RUN_DAEMON=&quot;yes&quot;
+OPTIONS=&quot;-l -s /var/lib/tftpboot&quot;
+</code></pre>
+<p>Then, edit the inetd configuration file by opening the editor:
+<code>sudo nano /etc/inetd.conf</code>
+And adding:
+<code>tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot</code></p>
+<p>Restart the TFTP server and check to see if it's running:
+<code>sudo systemctl restart tftpd-hpa</code>
+<code>sudo systemctl status tftpd-hpa</code></p>
+<p>If the TFTP server is unable to start and mentions an in-use socket, reopen the tftp-hpa configuration file,set the line that has <code>TFTP_ADDRESS=&quot;:69&quot;</code> to be equal to <code>6969</code> instead and restart the TFTP server.</p>
+<h2 id="setting-up-the-dhcp-server"><a class="header" href="#setting-up-the-dhcp-server">Setting up the DHCP Server</a></h2>
+<p>First, install package for DHCP server:
+<code>sudo apt-get install isc-dhcp-server</code></p>
+<p>Then run <code>ifconfig</code> to view available networking devices and find the network device name, e.g., <code>eth0</code>.</p>
+<p>Edit the <code>/etc/default/isc-dhcp-server</code> configuration file and add the network device name from the step above to &quot;INTERFACES&quot;. For me, this looks like <code>INTERFACES=&quot;eth0&quot;</code>.</p>
+<p>Configure an arbitrary IP address that will be used in the next step:
+<code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code>
+This command might have to be done each time the computer being used as a server is restarted.</p>
+<p>Edit the <code>/etc/dhcp/dhcpd.conf</code> file by uncommenting the line <code>authoritative;</code> and adding a subnet configuration such as the one below:</p>
+<pre><code>subnet 192.168.1.0 netmask 255.255.255.0 {
+  range 192.168.1.20 192.168.1.30;
+  option routers 192.168.1.1;
+  option broadcast-address 192.168.1.255;
+  default-lease-time 600;
+  max-lease-time 7200;
+}
+
+allow booting;
+allow bootp;
+option option-128 code 128 = string;
+option option-129 code 129 = text;
+next-server 192.168.1.105;
+filename &quot;pxelinux.0&quot;;
+</code></pre>
+<p>Restart the DHCP server and check to see if it's running:
+<code>sudo systemctl restart isc-dhcp-server</code>
+<code>sudo systemctl status isc-dhcp-server</code></p>
+<h2 id="loading-the-theseus-iso-into-the-tftp-server"><a class="header" href="#loading-the-theseus-iso-into-the-tftp-server">Loading the Theseus ISO Into the TFTP Server</a></h2>
+<p>In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.
+<code>wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz</code>
+<code>tar -xzvf syslinux-*.tar.gz</code></p>
+<p>Then navigate to the memdisk folder and compile.
+<code>cd syslinux-*/memdisk</code>
+<code>make memdisk</code></p>
+<p>Next, make a TFTP boot folder for Theseus and copy the memdisk binary into it along with the Theseus ISO:
+<code>sudo mkdir /var/lib/tftpboot/theseus</code>
+<code>sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/</code>
+<code>sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/</code></p>
+<p>Navigate to the PXE configuration file:
+<code>sudo nano /var/lib/tftpboot/pxelinux.cfg/default</code>
+And add Theseus as a menu option by adding the following:</p>
+<pre><code>label theseus
+    menu label Theseus
+    root (hd0,0)
+    kernel theseus/memdisk
+    append iso initrd=theseus/theseus-x86_64.iso raw
+</code></pre>
+<p>Finally, restart the DHCP server one more time and make sure it's running:
+<code>sudo systemctl restart isc-dhcp-server</code>
+<code>sudo systemctl status isc-dhcp-server</code></p>
+<p>On the target computer, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the target computer is restarted, it should boot into a menu which displays booting into Theseus as an option.</p>
+<h2 id="subsequent-pxe-uses"><a class="header" href="#subsequent-pxe-uses">Subsequent PXE Uses</a></h2>
+<p>After setting up PXE the first time, you can run <code>make pxe</code> to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier:
+<code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code></p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="the-golden-rule-of-software-development"><a class="header" href="#the-golden-rule-of-software-development">The Golden Rule of Software Development</a></h1>
+<p><em>Code for others how you wish they would code for you.</em></p>
+<p>What does this mean? You should adhere to the following principles.</p>
+<ul>
+<li>
+<p><strong>Good abstractions.</strong> Another developer using your code should never have to study the internals of the code itself,
+but rather be able to fully understand how to use your code simply from its struct/function names and documentation.
+Use intuitive names and try to design an interface that makes sense, is simple and easy to use, and doesn't surprise anyone with unnecessary trickery.</p>
+</li>
+<li>
+<p><strong>Be clean.</strong> Write well-crafted, concise code with sufficient features to be useful, but without bloat.
+Adhere to code style conventions, including proper spacing, doc comments, naming conventions, etc.</p>
+</li>
+<li>
+<p><strong>Foolproof code.</strong> Think carefully about how others will use your code,
+and design it thoughtfully to prevent others from making mistakes when using your code,
+ideally prevented at compile time instead of runtime.</p>
+</li>
+<li>
+<p><strong>Errors are important!</strong>  Handle errors gracefully and thoroughly,
+and return detailed error messages that clearly describe the issue. <em>Don't ever let something fail silently!</em></p>
+</li>
+</ul>
+<p>Below are some other good practices.</p>
+<ul>
+<li>
+<p><strong>Accurate metadata.</strong>  In addition to good code and documentation, make sure to fill in additional metadata,
+such as the details present in each crate's <code>Cargo.toml</code> file: description, keywords, authors, etc.</p>
+</li>
+<li>
+<p><strong>No &quot;magic&quot; numbers.</strong> Do not use literal number values that have no documentation or explanation of why they exist.
+For example, instead of just writing a value like 4096 in the code, create a <code>const</code> that accurately describes the semantic meaning of that value, e.g., <code>const PAGE_SIZE: usize = 4096;</code>.
+Magic numbers are terrible to maintain and don't help anyone who looks at your code in the future.</p>
+</li>
+<li>
+<p><strong>Minimize global states.</strong> Remove static (global) states as much as possible, and rethink how the same data sharing can be done without globals.</p>
+</li>
+</ul>
+<h2 id="rust-specific-guidelines"><a class="header" href="#rust-specific-guidelines">Rust-specific Guidelines</a></h2>
+<ul>
+<li>
+<p><strong>Rust style.</strong> Follow proper Rust coding style and naming conventions. Use correct spacing, indentation, and alignment that matches the existing style.
+Make your code visually appealing, with spaces between operators like equal signs, addition, spaces after a comma, etc. Punctuation is important for legibility!</p>
+</li>
+<li>
+<p><strong>Rust documentation.</strong> Use proper rustdoc-style documentation <em>for all structs, functions, and types.</em>
+Make sure all of your documentation links are correct, and that you're using the correct rustdoc formatting for doc comments.
+Triple slashes <code>///</code> should be used above function and struct definitions, double slashes <code>//</code> for C-style inline comments (or block comments like <code>/* */</code>), and <code>//! </code> for crate top-level documentation.
+Use Markdown formatting to describe function arguments, return values, and include usage examples, in a way consistent with Rust's official libraries.</p>
+</li>
+<li>
+<p><strong><code>Option</code>s and <code>Result</code>s.</strong> Use Options and Results properly. Don't use special values that have overloaded meanings, e.g., an integer in which <code>0</code> means no value, or something like that.
+<a href="https://blog.burntsushi.net/rust-error-handling/">Here's a good resource</a> for better understanding error handling in Rust.</p>
+<p><code>Option</code>s should be returned when an operation might fail, but that failure condition doesn't affect the rest of the system.
+For example, if you're searching for an element in a list, then an <code>Option</code> is the suitable choice because the caller of your getter function would only call it in order to get and use the return value.</p>
+<p><code>Result</code>s should be returned if something can fail or succeed, and the caller needs to know whether it succeeded, but potentially need the actual return value, e.g., an init function that returns void.
+In this case, <code>Result</code> is the best choice because we want to force the caller to acknowledge that the init function succeeded, or handle its error if it failed.
+In Theseus, <code>Results</code> are mandatory when a function has some side effect, such as setting a parameter or value that might not exist or be initialized yet.
+In that case, a result must be used to indicate whether the function succeeded.</p>
+</li>
+</ul>
+<h2 id="theseus-specific-guidelines"><a class="header" href="#theseus-specific-guidelines">Theseus-specific Guidelines</a></h2>
+<ul>
+<li>
+<p><strong>Handle <code>Result</code>s properly and fully.</strong> Don't ignore a result error, instead, log that error and then handle it if possible.
+If you cannot handle it, return that error to the caller so they can attempt to handle it. <strong>NEVER SILENCE OR LAZILY HIDE ERRORS</strong>.</p>
+</li>
+<li>
+<p><strong>Never use unsafe code.</strong> If you absolutely cannot avoid it, then you should review your case on an individual basis with the maintainers of Theseus. In most cases, unsafe code is not necessary and can be rewritten in safe code.</p>
+</li>
+</ul>
+<h2 id="adding-new-functionality-to-theseus"><a class="header" href="#adding-new-functionality-to-theseus">Adding New Functionality to Theseus</a></h2>
+<p>The easiest way to add new functionality is just to create a new crate by duplicating an existing crate and changing the details in its new <code>Cargo.toml</code> file.
+At the very least, you'll need to change the <code>name</code> entry under the <code>[package]</code> heading at the top of the <code>Cargo.toml</code> file, and you'll need to change the dependencies for your new crate.</p>
+<p>If your new kernel crate needs to be initialized, you can invoke it from the <a href="https://theseus-os.github.io/Theseus/doc/captain/index.html"><code>captain::init()</code> function</a>,
+although there may be more appropriate places to do so, such as the <a href="https://theseus-os.github.io/Theseus/doc/device_manager/index.html"><code>device_manager</code>'s functions</a> for initializing device drivers.</p>
+<p>If you want to create a new application for Theseus, see <a href="app.html">those instructions here</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="advice-for-contributing-and-using-git"><a class="header" href="#advice-for-contributing-and-using-git">Advice for Contributing and using git</a></h1>
+<p>The main Theseus repository, <a href="https://github.com/theseus-os/Theseus"><code>theseus-os/Theseus</code></a> is what we call the <em>upstream</em>.
+To contribute, you should create your own fork of that repository through the GitHub website, and then check out your own fork.
+That way, your fork will be the <code>origin</code> remote by default, and then you can add the upstream as another remote by running:</p>
+<pre><code class="language-sh">git remote add upstream https://github.com/theseus-os/Theseus
+</code></pre>
+<h3 id="never-push-to-the-main-branch"><a class="header" href="#never-push-to-the-main-branch">Never push to the main branch</a></h3>
+<p>Currently, the main branch on the upstream <code>theseus-os/Theseus/theseus_main</code> is protected from a direct push. 
+This is true even for GitHub users who are in the <code>theseus-os</code> organization and have write access to the Theseus repo.
+The only way to contribute to it is by merging a pull request into the main branch, which only authorized users can do.
+Instead, checkout your own fork as above, create a new branch with a descriptive name, e.g., <code>kevin/logging_typo</code>,
+develop your feature on that branch, and then submit a pull request.
+This is a standard Git workflow that allows people can review your code, check for pitfalls and compatibility problems,
+and make comments and suggestions before the code makes its way into the main branch.
+<em>You must do this for all changes, even tiny ones that may seem insignificant.</em></p>
+<h3 id="submitting-a-pull-request"><a class="header" href="#submitting-a-pull-request">Submitting a pull request</a></h3>
+<p>To submit a pull request (PR), go to the GitHub page of your forked Theseus repo,
+select the branch that you created from the drop down menu, and then click &quot;New pull request&quot;.
+By default, GitHub will create a new PR that wants to merge your branch into the upstream <code>theseus_main</code> branch,
+which is usually what you want to do.
+Now, give your PR a good title and description, scroll down to review the commits and files changed,
+and if everything looks good, click &quot;Create pull request&quot; to notify the maintainers that you have contributions that they should review.</p>
+<h3 id="review-your-own-work"><a class="header" href="#review-your-own-work">Review your own work</a></h3>
+<p>Perform an initial review of your own code before submitting a pull request.
+Kindly don't place the whole burden of fixing a bunch of tiny problems on others that must review your code too.
+This includes building the documentation and reviewing it in HTML form in a browser (<code>make view-doc</code>)
+to make sure everything is formatted correctly and that hyperlinks work correctly.</p>
+<h3 id="double-check-commit-contents"><a class="header" href="#double-check-commit-contents">Double-check commit contents</a></h3>
+<p>When making a commit, review your changes with <code>git status</code> and <code>git diff</code>, as well as on the GitHub comparison page, to ensure that you're not committing accidental modifications or editing files that you shouldn't be.
+This makes the maintainers' lives a lot easier, meaning your PR is more likely to be accepted.</p>
+<p>You don't need to worry about having too many small commits, as we will squash (combine) all of your PR's commits into a single large commit when merging it into the upstream main branch.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="papers-and-presentations-about-theseus"><a class="header" href="#papers-and-presentations-about-theseus">Papers and Presentations about Theseus</a></h1>
+<p>Over the years, Kevin Boos and other Theseus collaborators have given many presentations about Theseus OS and related topics.
+This page offers a selected collection of the slide decks from those talks (including some video recordings), as well as a list of selected peer-reviewed academic publications and theses.</p>
+<h2 id="selected-papers-and-theses"><a class="header" href="#selected-papers-and-theses">Selected Papers and Theses</a></h2>
+<ul>
+<li>[OSDI 2020] <strong><a href="https://www.usenix.org/conference/osdi20/presentation/boos">Theseus: an Experiment in Operating System Structure and State Management</a></strong>
+<ul>
+<li>The main paper describing Theseus's design principles, implementation, evaluation, and limitations.</li>
+<li><a href="https://www.usenix.org/system/files/osdi20-boos.pdf">Paper (PDF)</a>   —   
+<a href="https://www.youtube.com/watch?v=i1pLDZKtlBI">OSDI 2020 Video Talk</a>   —   
+<a href="https://www.youtube.com/watch?v=T0Du5vps9aU">OSDI 2020 Short Video</a>   —   
+<a href="https://www.usenix.org/sites/default/files/conference/protected-files/osdi20_slides_boos.pdf">Slide deck (PDF)</a></li>
+</ul>
+</li>
+<li>Kevin Boos PhD Dissertation: <a href="https://scholarship.rice.edu/handle/1911/109201">Theseus: Rethinking Operating Systems Structure and State Management</a></li>
+<li>Ramla Ijaz Master's Thesis: <a href="https://scholarship.rice.edu/handle/1911/109609">Exploring Intralingual Design in Operating Systems</a></li>
+</ul>
+<h3 id="older-papers"><a class="header" href="#older-papers">Older papers</a></h3>
+<ul>
+<li>[PLOS 2017] <a href="">Theseus: A State Spill-free Operating System</a>
+<ul>
+<li>A shorter, outdated ideas paper about early Theseus design. Superseded by the OSDI 2020 paper. </li>
+</ul>
+</li>
+<li>[EuroSys 2017] <a href="https://dl.acm.org/doi/10.1145/3064176.3064205">A Characterization of State Spill in Modern Operating Systems</a>
+<ul>
+<li>Introduces and studies the concept of state spill. Motivation for our future work on Theseus.</li>
+</ul>
+</li>
+</ul>
+<h2 id="selected-presentations-and-slide-decks"><a class="header" href="#selected-presentations-and-slide-decks">Selected Presentations and Slide Decks</a></h2>
+<ul>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vSa0gp8sbq8S9MB4V-FYjs6xJGIPm0fsZSVdtZ9U2bQWRX9gngwztXTIJiRwxtAosLWPk0v60abDMTU/pub?start=false&amp;loop=false">How Safe-language OSes work (with Theseus examples)</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vR96Oh5iiV2XTPv5KfjGykxoqqo1auGfvxahkMXxQImZsO5B9sXl5h1BEmIzBbb8Pj8lr_NDx4WUr-y/pub?start=false&amp;loop=false">Overview of Theseus Design (Late 2020)</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vQuDoQq0mKf2r4m3xMeZ4LVao2Ngh6HPHWCdJASW9uasaRSbWaRvHc2LoZD2bTpIOHUkKeN6VjP8KJG/pub?start=false&amp;loop=false">A Programmer's Introduction to Theseus</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vTq5L-t1F8tSmIRiUaFLtcGSY6Bm8CSh7p4j8GuTqrUOu3OzUckXAW-TWiYCueAndunVpBgB51Hoamh/pub?start=false&amp;loop=false">Kevin Boos PhD Defense - Deep Dive into Theseus OS Research Concepts</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vR5zQMf3AQYMITczojVizQBd1JHtuKChIEVBoBPtnXu59EgFpCZKb1oxbMbO2oSxBm_5pC3foK3V-rK/pub?start=false&amp;loop=false">Ramla Ijaz Master's Defense -  Deep Dive into Intralingual Design in Theseus</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vSo0D-hnRljdp7DT19kyTv09RbE-4mnQKqe85ljoK9DeHIS8mCMpThQwcsEaAe6X9g0QGqGI0IahHwK/pub?start=false&amp;loop=false">Crate Loading/Management and Crate Namespaces in Theseus</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vSm-ybVzbGBeorvTeNfxzfKLV61CrYJgNk9K1seRESrthr9L7i5suPtpKfHBdqelJiN1X2LToGtr18T/pub?start=false&amp;loop=false">Supporting Unwinding and Exceptions/Panics in Theseus (Late 2019)</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vQEvnxBUM9PJgYYvxh0vj894rqnkeZBgH45-FijHMrXB-IgPIysbkiQTbn7LxHnkqDIGGrY_H9o42c9/pub?start=false&amp;loop=false">Implementing Basic Application Support for Theseus (mid-2018)</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vRBCZsC9QzZHX8rSSSVsLBJ9AcxvddRmeNZlkbzCkOnIfrOVxqnvkHlrTIZ_CAn_MOUGmxkaPVijkJP/pub?start=false&amp;loop=false">Supporting Multicore Processors on Theseus</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vSsuHSIU0Iq66FgbNldaDDRlvez4dOhz6fFvJXF5O885uxpUtbcbr7EpX2rxqDguVlGQziE6gMLwiDM/pub?start=false&amp;loop=false">Realizing Dynamic Loading and Linking of Crates (Late 2017)</a></li>
+</ul>
+<hr />
+<ul>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vRUvgprQ69r1JYypkswcWVrv_18BidWKrKgKVn4wiMmAHJUDz4Dhx7qv7Dozw2ljU9sllKqsRIHJNlJ/pub?start=false&amp;loop=false">Idea: Verifying Intralingual Invariants</a></li>
+<li><a href="https://docs.google.com/presentation/d/e/2PACX-1vQYomAnfTNucuCqYgNkPaxpIdrhPxil9Qzle_6-xd7TYfdEBlgML0B3vztdNC2odwc25dLzW3XsithZ/pub?start=false&amp;loop=false">Rust vs. C, with short Rust intro</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="theseus-readme--quick-start"><a class="header" href="#theseus-readme--quick-start">Theseus README + Quick Start</a></h1>
+<p><a href="https://github.com/theseus-os/Theseus/blob/theseus_main/README.md">Click here to see the main Theseus README for quick start instructions.</a></p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                        
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                            </nav>
+
+        </div>
+
+        
+        
+        
+                <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+        
+                <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+                        <script type="text/javascript">
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+                
+    </body>
+</html>

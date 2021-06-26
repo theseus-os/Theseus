@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["create_virtual_nic","Create a virtual NIC from the ixgbe device."]]});

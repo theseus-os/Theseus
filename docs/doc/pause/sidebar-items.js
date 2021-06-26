@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["spin_loop_hint","A wrapper around the `pause` x86 ASM function.  On non-x86 architectures, this is a no-op (empty function)."]]});

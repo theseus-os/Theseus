@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["get_acpi_tables","Returns a reference to the singleton instance of all ACPI tables  that have been discovered, mapped, and parsed so far."],["init","Parses the system's ACPI tables "]]});

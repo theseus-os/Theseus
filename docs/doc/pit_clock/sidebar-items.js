@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["handle_timer_interrupt","this occurs on every PIT timer tick. Called by the PIT's interrupt handler"],["init",""],["pit_wait","Wait a certain number of microseconds, max 55555 microseconds. Uses a separate PIT clock channel, so it doesn't affect the regular PIT interrupts on PIT channel 0."]]});

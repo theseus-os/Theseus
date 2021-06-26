@@ -1,0 +1,231 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Safe-language OS Principles - The Theseus OS Book</title>
+                
+
+        <!-- Custom HTML head -->
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="Describes the design principles and implementation details of Theseus, a companion to its source-level docs.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+                <link rel="icon" href="favicon.svg">
+                        <link rel="shortcut icon" href="favicon.png">
+                <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+                <link rel="stylesheet" href="css/print.css" media="print">
+        
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="fonts/fonts.css">
+        
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+            </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="ch00-00-introduction.html"><strong aria-hidden="true">1.</strong> Introduction to Theseus OS</a></li><li class="chapter-item expanded "><a href="design.html"><strong aria-hidden="true">2.</strong> Design and Structure of Theseus</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="source_code_organization.html"><strong aria-hidden="true">2.1.</strong> Source Code Repository Organization</a></li><li class="chapter-item expanded "><a href="booting.html"><strong aria-hidden="true">2.2.</strong> Boot-up Procedure</a></li><li class="chapter-item expanded "><a href="idea.html" class="active"><strong aria-hidden="true">2.3.</strong> Safe-language OS Principles</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> Intralingual Design</div></li></ol></li><li class="chapter-item expanded "><a href="app.html"><strong aria-hidden="true">3.</strong> Developing a Theseus Application</a></li><li class="chapter-item expanded "><a href="build_process.html"><strong aria-hidden="true">4.</strong> The Theseus Build Process</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="configuration.html"><strong aria-hidden="true">4.1.</strong> Configuring Theseus</a></li><li class="chapter-item expanded "><a href="rust_builds_out_of_tree.html"><strong aria-hidden="true">4.2.</strong> theseus_cargo: Building Rust Crates Out-of-Tree</a></li></ol></li><li class="chapter-item expanded "><a href="c_program.html"><strong aria-hidden="true">5.</strong> Experimental Support for C programs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="building_c_cross_compiler.html"><strong aria-hidden="true">5.1.</strong> Building a C cross compiler for Theseus</a></li><li class="chapter-item expanded "><a href="c_compilation_tlibc.html"><strong aria-hidden="true">5.2.</strong> tlibc: Theseus's libc and how it works</a></li><li class="chapter-item expanded "><a href="c_compiler_linker.html"><strong aria-hidden="true">5.3.</strong> Compiling and linking C programs</a></li></ol></li><li class="chapter-item expanded "><a href="subsystems.html"><strong aria-hidden="true">6.</strong> Overview of Key Subsystems</a></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">6.1.</strong> Memory Management</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.2.</strong> Task Management</div></li><li class="chapter-item expanded "><a href="display.html"><strong aria-hidden="true">6.3.</strong> Display and Window Management</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="window_manager.html"><strong aria-hidden="true">6.3.1.</strong> The Window Manager</a></li><li class="chapter-item expanded "><a href="window_tutorial.html"><strong aria-hidden="true">6.3.2.</strong> Creating and Displaying Windows</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="real_hardware.html"><strong aria-hidden="true">7.</strong> Running Theseus on VMs &amp; Real Hardware</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="virtual_machines.html"><strong aria-hidden="true">7.1.</strong> Running Theseus in a Virtual Machine</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="pci_passthrough.html"><strong aria-hidden="true">7.1.1.</strong> Using PCI device Passthrough on QEMU</a></li></ol></li><li class="chapter-item expanded "><a href="booting_usb.html"><strong aria-hidden="true">7.2.</strong> Booting via USB drive</a></li><li class="chapter-item expanded "><a href="pxe.html"><strong aria-hidden="true">7.3.</strong> Booting over the network (PXE)</a></li></ol></li><li class="chapter-item expanded "><a href="ch01.html"><strong aria-hidden="true">8.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="git.html"><strong aria-hidden="true">8.1.</strong> git Guidlines</a></li><li class="spacer"></li></ol></li><li class="chapter-item expanded "><a href="papers_presentations.html">Papers and Presentations/Slides</a></li><li class="chapter-item expanded affix "><a href="_root_readme.html">Theseus README + Quick Start ↗️</a></li></ol>            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                                            </div>
+
+                    <h1 class="menu-title">The Theseus OS Book</h1>
+
+                    <div class="right-buttons">
+                                                <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                                                                        
+                    </div>
+                </div>
+
+                                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="theseus-ideas-and-inspiration"><a class="header" href="#theseus-ideas-and-inspiration">Theseus Ideas and Inspiration</a></h1>
+<p>Theseus is a safe-language OS, meaning that it relies on type safety and memory safety guarantees from the Rust language and compiler to enforce protection and isolation between tasks and components. 
+As such, it foregoes hardware protection, which generally results in higher efficiency due to the ability to bypass overhead stemming from switching privilege modes and address spaces. </p>
+<p>This is possible only when all applications are written in safe Rust, which prevents them from circumventing any type-based restrictions to cause unintended or undefined behavior.</p>
+<p>Check out <a href="https://docs.google.com/presentation/d/e/2PACX-1vSa0gp8sbq8S9MB4V-FYjs6xJGIPm0fsZSVdtZ9U2bQWRX9gngwztXTIJiRwxtAosLWPk0v60abDMTU/pub?start=false&amp;loop=false">this presentation slide deck</a> to learn more about how we ensure protection and isolation in Theseus based on the foundation of Rust's type and memory safety guarantees.</p>
+<p>For more details about Theseus's research merit and novel design principles, see our <a href="papers_presentations.html">selected list of papers and presentations here</a>.</p>
+<h2 id="pie-principle"><a class="header" href="#pie-principle">P.I.E. Principle</a></h2>
+<p>The P.I.E. principle is one of the guiding lights in the design of Theseus and much of our other systems software research.
+The main idea is that there are three pillars of computing goals, of which only 2 of 3 can be achieved simultaneously:</p>
+<ol>
+<li><strong>P</strong> erformance</li>
+<li><strong>I</strong> solation</li>
+<li><strong>E</strong> fficiency</li>
+</ol>
+<p>Traditionally, systems software designers have looked to hardware to provide all three -- high performance, strong isolation, and efficiency (low overhead). 
+We believe that hardware cannot fully realize all three:</p>
+<ul>
+<li>Hardware can realize high performance with high efficiency, but only in the absence of hardware-provided isolation (protection).</li>
+<li>Hardware can realize high performance with strong isolation, but is inefficient, e.g., due to switching between privilege modes and address spaces.</li>
+<li>Hardware can realize strong isolation at the cost of lower efficiency, which reduces performance.</li>
+</ul>
+<p>We assert that hardware should <em>only</em> be responsible for increasing performance, i.e., via various accelerators and dedicated improvements, but should have <em>no role</em> (or a minimal role) in providing isolation, safety, and security.
+Isolation and efficiency should be the responsibility of software alone.</p>
+<p>We sometimes refer to this as the <strong>PHIS</strong> principle: <strong>Performance</strong> in <strong>Hardware</strong>, <strong>Isolation</strong> in <strong>Software</strong>.</p>
+<p><em>But why?</em></p>
+<p>For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted userspace applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where we have the ability to verify the OS, compiler, language libraries, and more. </p>
+<p>In addition, modern languages like Rust are able to ensure type safety and memory safety at compile time, without the overhead of traditional safe/managed languages that rely upon inefficient garbage collection and transparent heap-based object management.
+Thus, we can leverage these safety guarantees to ensure that compiled code does not violation isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.</p>
+<p>Theseus transcends the reliance on hardware to provide isolation, and completely foregoes hardware privilege levels (x86's Ring 0 vs. Ring 3 distinction) and multiple address spaces.
+Instead, we run all code at Ring 0 in a single virtual address space, including user applications that are written in purely safe Rust.
+This maximizes efficiency whilst preserving protection, because we can guarantee at compile time that a given application or kernel component cannot violate isolation between modules, rendering hardware privilege levels obsolete.
+Theseus still does use virtual memory translation provided by the MMU, but simply for convenience and ease of memory management; it can be very difficult and inefficient to directly handle and allocate physical memory for applications, and also to find large contiguous chunks of physical memory. </p>
+<h2 id="going-beyond-safety"><a class="header" href="#going-beyond-safety">Going beyond safety</a></h2>
+<p>We show that it's possible to leverage safe languages and compilers to go much further than just basic isolation and memory safety. 
+For more details, read about Theseus's novel concept of intralingual design (coming soon). <!-- TODO [intralingual design here](intralingual.md). --></p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                                                    <a rel="prev" href="booting.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+                                                    <a rel="next" href="app.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                                    <a rel="prev" href="booting.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+                                    <a rel="next" href="app.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                            </nav>
+
+        </div>
+
+        
+        
+        
+                <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+        
+                <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        
+    </body>
+</html>

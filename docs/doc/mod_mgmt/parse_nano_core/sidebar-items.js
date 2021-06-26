@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["parse_nano_core","Parses the nano_core object file that represents the already loaded (and currently running) nano_core code. Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata."]]});

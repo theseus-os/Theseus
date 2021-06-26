@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["COM1_BASE_PORT",""],["COM2_BASE_PORT",""],["COM3_BASE_PORT",""],["COM4_BASE_PORT",""]],"struct":[["SerialPort","A serial port and its various data and control registers."]]});
