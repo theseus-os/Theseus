@@ -14,9 +14,8 @@ target/
 build/
 
 # Generated documentation, used for GitHub Pages
-book/book/
-docs/book/
-docs/doc/
+github_pages/book/
+github_pages/doc/
 
 # patched GDB directory
 /rust-os-gdb/

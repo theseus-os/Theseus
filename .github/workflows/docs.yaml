@@ -56,16 +56,16 @@ jobs:
     - name: Build book
       run: |
         make book
-        rm -rf ./docs/book
-        mkdir -p ./docs/book
-        cp -rf ./build/book/html/* ./docs/book/
+        rm -rf ./github_pages/book
+        mkdir -p ./github_pages/book
+        cp -rf ./build/book/html/* ./github_pages/book/
 
     - name: Build source documentation
       run: |
         make doc
-        rm -rf ./docs/doc
-        mkdir -p ./docs/doc
-        cp -rf ./build/doc/* ./docs/doc/
+        rm -rf ./github_pages/doc
+        mkdir -p ./github_pages/doc
+        cp -rf ./build/doc/* ./github_pages/doc/
 
     # Deploy on push to main branch.
     - name: Deploy
@@ -75,4 +75,4 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         commit_message: ${{ github.event.head_commit.message }}
         publish_branch: github_pages
-        publish_dir: ./docs
+        publish_dir: ./github_pages

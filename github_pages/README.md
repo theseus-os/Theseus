@@ -6,4 +6,4 @@ Any file in this directory is included in the published output (e.g., `index.htm
 
 ## Automatically Generated Directories
 
-When building Theseus's book and source code documentation (rustdoc), the `book/` and `doc/` directories are automatically generated and outputted here. Those directories are ignored by git.
+When building Theseus's book and source code documentation (rustdoc) automtically using GitHub Actions, the `book/` and `doc/` directories are  generated here. Those directories are ignored by git in the top-level `.gitignore` file.
