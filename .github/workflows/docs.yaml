@@ -54,10 +54,18 @@ jobs:
         mdbook-linkcheck --version
 
     - name: Build book
-      run: make book
+      run: |
+        make book
+        rm -rf ./docs/book
+        mkdir -p ./docs/book
+        cp -rf ./build/book/html/* ./docs/book/
 
     - name: Build source documentation
-      run: make doc
+      run: |
+        make doc
+        rm -rf ./docs/doc
+        mkdir -p ./docs/doc
+        cp -rf ./build/doc/* ./docs/doc/
 
     # Deploy on push to main branch.
     - name: Deploy

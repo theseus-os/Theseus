@@ -114,7 +114,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs book view-book clean_doc
+		gdb doc docs view-doc view-docs book view-book clean-doc
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -337,7 +337,7 @@ $(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
 ### Removes all built source files
 clean:
 	cargo clean
-	@rm -rf build
+	@rm -rf $(BUILD_DIR)
 	
 
 
@@ -454,7 +454,7 @@ preserve_old_modules:
 ###################################################################################################
 
 ## The output directory for source-level documentation.
-RUSTDOC_OUT      := $(ROOT_DIR)/docs/doc
+RUSTDOC_OUT      := $(BUILD_DIR)/doc
 RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
@@ -483,7 +483,7 @@ endif
 
 ### The locations of Theseus's book-style documentation.
 BOOK_SRC      := $(ROOT_DIR)/book
-BOOK_OUT      := $(ROOT_DIR)/docs/book
+BOOK_OUT      := $(BUILD_DIR)/book
 BOOK_OUT_FILE := $(BOOK_OUT)/html/index.html
 
 ### Builds the Theseus book-style documentation using `mdbook`.
@@ -510,7 +510,8 @@ endif
 
 
 ### Removes all built documentation
-clean_doc:
+clean-doc:
+	@cargo clean --doc
 	@rm -rf $(RUSTDOC_OUT) $(BOOK_OUT)
 	
 
@@ -594,6 +595,8 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "   clean-doc:"
+	@echo -e "\t Remove all generated documentation files."
 	@echo ""
 
 

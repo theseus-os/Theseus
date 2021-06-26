@@ -13,6 +13,11 @@ target/
 # Build directory
 build/
 
+# Generated documentation, used for GitHub Pages
+book/book/
+docs/book/
+docs/doc/
+
 # patched GDB directory
 /rust-os-gdb/
 
