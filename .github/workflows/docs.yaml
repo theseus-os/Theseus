@@ -54,18 +54,19 @@ jobs:
         mdbook-linkcheck --version
 
     - name: Build book
-      run: |
-        make book
-        rm -rf ./github_pages/book
-        mkdir -p ./github_pages/book
-        cp -rf ./build/book/html/* ./github_pages/book/
+      run: make book
 
     - name: Build source documentation
+      run: make doc
+
+    # Move build artifacts to publish directory on push to main branch.
+    - name: Move build artifacts
+      if: github.event_name == 'push' && github.ref == 'refs/heads/theseus_main'
       run: |
-        make doc
+        rm -rf ./github_pages/book
         rm -rf ./github_pages/doc
-        mkdir -p ./github_pages/doc
-        cp -rf ./build/doc/* ./github_pages/doc/
+        mv ./build/book/html/ ./github_pages/book/
+        mv ./build/doc/ ./github_pages/doc/
 
     # Deploy on push to main branch.
     - name: Deploy
