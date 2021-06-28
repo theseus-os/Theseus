@@ -1,0 +1,12 @@
+{
+    "version": "0.1",
+    "language": "en",
+    "words": [
+        "intralingual",
+        "microkernel"
+    ],
+    "ignoreWords": [
+        "mdbook",
+        "rustc"
+    ]
+}
