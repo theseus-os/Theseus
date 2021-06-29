@@ -188,8 +188,6 @@ impl ConnectX5Nic {
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         let mut num_init_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
         trace!("Query pages status: {:?}, init pages: {:?}", status, num_init_pages);
-        num_init_pages = 50;
-
         // Allocate pages for init
         if num_init_pages != 0 {
             let mut boot_mp = Vec::with_capacity(num_init_pages as usize);
@@ -236,13 +234,13 @@ impl ConnectX5Nic {
         // }
 
         // allocate uar
-        let cmdq_entry = cmdq.create_command(CommandOpcode::AllocUar, None, None, None, None)?;
-        init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry);
-        trace!("UAR status: {:?}", status);        
+        // let cmdq_entry = cmdq.create_command(CommandOpcode::AllocUar, None, None, None, None)?;
+        // init_segment.post_command(cmdq_entry);
+        // let status = cmdq.wait_for_command_completion(cmdq_entry);
+        // trace!("UAR status: {:?}", status);        
 
-        let uar = cmdq.get_uar(cmdq_entry)?;
-        trace!("UAR status: {:?}, UAR: {}", status, uar);        
+        // let uar = cmdq.get_uar(cmdq_entry)?;
+        // trace!("UAR status: {:?}, UAR: {}", status, uar);        
 
         // // create EQ for a Page Request Event
         // // Allocate pages for EQ

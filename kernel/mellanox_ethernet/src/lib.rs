@@ -9,7 +9,7 @@ extern crate memory;
 extern crate volatile;
 extern crate bit_field;
 extern crate zerocopy;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate static_assertions;
 extern crate owning_ref;
 extern crate byteorder;
@@ -45,31 +45,18 @@ pub struct InitializationSegment {
     cmdq_phy_addr_high:         Volatile<U32<BigEndian>>,
     cmdq_phy_addr_low:          Volatile<U32<BigEndian>>,
     command_doorbell_vector:    Volatile<U32<BigEndian>>,
-    _padding2a:                 [u8; 256],
-    _padding2b:                 [u8; 128],
-    _padding2c:                 [u8; 6],
+    _padding2:                  [u8; 390],
     initializing_state:         ReadOnly<U32<BigEndian>>,
     health_buffer:              Volatile<[u8; 64]>,
     no_dram_nic_offset:         ReadOnly<U32<BigEndian>>,
-    _padding3a:                 [u8; 2048],
-    _padding3b:                 [u8; 1024],
-    _padding3c:                 [u8; 256],
-    _padding3d:                 [u8; 128],
-    _padding3e:                 [u8; 60],
+    _padding3:                  [u8; 3516],
     internal_timer_h:           ReadOnly<U32<BigEndian>>,
     internal_timer_l:           ReadOnly<U32<BigEndian>>,
     _padding4:                  [u8; 8],
     health_counter:             ReadOnly<U32<BigEndian>>,
     _padding5:                  [u8; 44],
     real_time:                  ReadOnly<U64<BigEndian>>,
-    _padding6a:                 [u8; 8192],
-    _padding6b:                 [u8; 2048],
-    _padding6c:                 [u8; 1024],
-    _padding6d:                 [u8; 512],
-    _padding6e:                 [u8; 256],
-    _padding6f:                 [u8; 128],
-    _padding6g:                 [u8; 64],
-    _padding6h:                 [u8; 4],
+    _padding6:                  [u8; 12228],
 }
 
 // const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16400);
@@ -84,6 +71,7 @@ impl InitializationSegment {
         let val = self.cmdq_phy_addr_low.read().get() & 0x0F;
         2_u8.pow(val)
     }
+    
     pub fn set_physical_address_of_cmdq(&mut self, pa: PhysicalAddress) -> Result<(), &'static str> {
         if pa.value() & 0xFFF != 0 {
             return Err("cmdq physical address lower 12 bits must be zero.");
@@ -201,7 +189,6 @@ impl CommandQueueEntry {
     }
 
     fn get_command_opcode(&self) -> CommandOpcode {
-        trace!("{}", self.command_input_opcode.read().get() >> 16);
         match self.command_input_opcode.read().get() >> 16 {
             0x100 => {CommandOpcode::QueryHcaCap},
             0x101 => {CommandOpcode::QueryAdapter}, 
@@ -372,7 +359,8 @@ impl fmt::Debug for CommandInterfaceMailbox {
         // write!(f, "padding: {}", self._padding.read())?;
         writeln!(f, "next pointer h: {:#X} \n", self.next_pointer_h.read().get())?;
         writeln!(f, "next pointer l: {:#X} \n", self.next_pointer_l.read().get())?;
-        writeln!(f, "tokne ctrl signature: {:#X} \n", self.token_ctrl_signature.read().get())
+        writeln!(f, "block number: {:#X} \n", self.block_number.read().get())?;
+        writeln!(f, "token ctrl signature: {:#X} \n", self.token_ctrl_signature.read().get())
     }
 }
 
@@ -406,10 +394,12 @@ pub enum CommandOpcode {
     SetIssi = 0x10B,
     QuerySpecialContexts = 0x203,
     CreateEq = 0x301,
+    CreateCq = 0x400,
+    QueryVportState = 0x751,
+    QueryNicVportContext = 0x754,
     AllocUar = 0x802,
     AllocPd = 0x800,
     AllocTransportDomain = 0x816,
-    CreateCq = 0x400,
     CreateTis = 0x912,
     CreateSq = 0x904,
     ModifySq = 0x905,
@@ -448,13 +438,12 @@ pub struct CommandQueue {
     entries: BoxRefMut<MappedPages, [CommandQueueEntry]>,
     available_entries: [bool; MAX_CMND_QUEUE_ENTRIES],
     token: u8, //taken from snabb, my assumption is that it is a random number that needs to be different for every command
-    mailbox_buffers_input: Vec<(MappedPages, PhysicalAddress)>, // A page, physical address of the page, and if it's in use
-    mailbox_buffers_output: Vec<(MappedPages, PhysicalAddress)> // A page, physical address of the page, and if it's in use
+    mailbox_buffers_input: Vec<Vec<(MappedPages, PhysicalAddress)>>, // A page, physical address of the page, and if it's in use
+    mailbox_buffers_output: Vec<Vec<(MappedPages, PhysicalAddress)>> // A page, physical address of the page, and if it's in use
 }
 
 const MAILBOX_SIZE_IN_BYTES: usize = 576;
 const MAILBOX_DATA_SIZE_IN_BYTES: usize = 512;
-const MAX_MAILBOX_BUFFERS: usize = PAGE_SIZE / MAILBOX_SIZE_IN_BYTES;
 
 const SIZE_PADDR_IN_BYTES: usize = 8; // each physical address takes 8 bytes in the mailbox
 const SIZE_PADDR_H_IN_BYTES: usize = 4; // each physical address takes 8 bytes in the mailbox
@@ -477,6 +466,12 @@ enum MailboxType {
     Output
 }
 
+enum QueryVportStateOpMod {
+    VnicVport = 0,
+    EswVport = 1,
+    Uplink = 2
+}
+
 impl CommandQueue {
 
     pub fn create(entries: BoxRefMut<MappedPages, [CommandQueueEntry]>, num_cmdq_entries: usize) -> Result<CommandQueue, &'static str> {
@@ -488,10 +483,10 @@ impl CommandQueue {
         let mut mailbox_buffers_output = Vec::with_capacity(num_cmdq_entries);
         for _ in 0..num_cmdq_entries {
             let (mailbox_mp, mailbox_pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
-            mailbox_buffers_input.push((mailbox_mp, mailbox_pa));
+            mailbox_buffers_input.push(vec!((mailbox_mp, mailbox_pa)));
 
             let (mailbox_mp, mailbox_pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
-            mailbox_buffers_output.push((mailbox_mp, mailbox_pa));
+            mailbox_buffers_output.push(vec!((mailbox_mp, mailbox_pa)));
         }
 
         Ok(CommandQueue{ entries, available_entries, token: 0xAA, mailbox_buffers_input, mailbox_buffers_output })
@@ -579,7 +574,7 @@ impl CommandQueue {
                 cmdq_entry.set_output_length_in_bytes(12);
                 cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
                 
-                self.create_page_request_eq(
+                self.create_page_request_event_queue(
                     entry_num, 
                     pages_pa,
                     uar.ok_or("uar not specified in EQ creation")?,
@@ -588,12 +583,38 @@ impl CommandQueue {
 
                 self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
             },
+            CommandOpcode::QueryVportState => { // only accesses your own vport
+                cmdq_entry.set_input_length_in_bytes(12);
+                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            },
+            CommandOpcode::QueryNicVportContext => { // only accesses your own vport
+                cmdq_entry.set_input_length_in_bytes(16);
+                cmdq_entry.set_output_length_in_bytes(16 + 0x100);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+
+                self.init_nic_vport_context_output_mailbox_buffers(entry_num)?;
+                self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Output);
+            },
+            CommandOpcode::AllocPd => { 
+                cmdq_entry.set_input_length_in_bytes(8);
+                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            },
+            CommandOpcode::AllocTransportDomain => { 
+                cmdq_entry.set_input_length_in_bytes(8);
+                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            },
+            CommandOpcode::QuerySpecialContexts => { 
+                cmdq_entry.set_input_length_in_bytes(8);
+                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_inline_data(opcode, op_mod, None, None);
+            },
             _=> {
                 debug!("unimplemented opcode");
             }
-        }
-
-        
+        }        
         core::mem::swap(&mut cmdq_entry, &mut self.entries[entry_num]);
         warn!("{:?}", &mut self.entries[entry_num]);
         self.token = self.token.wrapping_add(1);
@@ -603,11 +624,12 @@ impl CommandQueue {
 
     fn set_mailbox_pointer_in_cmd_entry(&mut self, cmdq_entry: &mut CommandQueueEntry, entry_num: usize, mailbox_type: MailboxType) {
         if mailbox_type == MailboxType::Input {
-            let mailbox_ptr = self.mailbox_buffers_input[entry_num].1.value();
+            let mailbox_ptr = self.mailbox_buffers_input[entry_num][0].1.value();
+            warn!("mailbox ptr in command entry: {:#X}", mailbox_ptr);
             cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
             cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
         } else {
-            let mailbox_ptr = self.mailbox_buffers_output[entry_num].1.value();
+            let mailbox_ptr = self.mailbox_buffers_output[entry_num][0].1.value();
             cmdq_entry.output_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
             cmdq_entry.output_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
         }
@@ -624,37 +646,30 @@ impl CommandQueue {
         let num_mailboxes = libm::ceilf((pages.len() * SIZE_PADDR_IN_BYTES) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         self.initialize_mailboxes(entry_num, num_mailboxes, MailboxType::Input)?;
 
-        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
-        let pages_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
+        let mailbox_pages = &mut self.mailbox_buffers_input[entry_num];
+        let paddr_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
 
-        for block_num in 0..num_mailboxes {
-            let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
+        for block_num in 0..num_mailboxes {  
+            let (mb_page, mb_page_starting_addr) = &mut mailbox_pages[block_num];
+
+            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(0)?;
 
             let mut data = [0; 512];
 
-            for page in 0..pages_per_mailbox {
+            for page in 0..paddr_per_mailbox {
                 let paddr = pages.pop();
                 match paddr {
                     Some(paddr) => {
-                        let start_offset_h = page * SIZE_PADDR_IN_BYTES;
-                        let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
-                        let addr = (paddr.value() >> 32) as u32;
-                        data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
-
-                        let start_offset_l = end_offset_h;
-                        let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
-                        let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
-                        data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
+                        Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, &mut data);
                     },
                     None => { 
-                        trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
+                        trace!("breaking out of loop on mailbox: {} and paddr: {}", block_num, page);
                         break; 
                     }
                 }
             }
 
             mailbox.mailbox_data.write(data);
-            debug!("token: {}", self.token);
             debug!("Mailbox {}", block_num);
             debug!("{:?}", mailbox);
         }
@@ -688,8 +703,8 @@ impl CommandQueue {
 
         // This offset is not correct! need to check!
         const DATA_OFFSET_IN_MAILBOX: usize = 0x20 - 0x10;
-        let mailbox = &self.mailbox_buffers_output[entry_num].0;
-        debug!("{:?}", mailbox.as_type::<CommandInterfaceMailbox>(0)?);
+        let mailbox = &self.mailbox_buffers_output[entry_num][0].0;
+        debug!("Query ISSI mailbox {:?}", mailbox.as_type::<CommandInterfaceMailbox>(0)?);
         let supported_issi = (mailbox.as_type::<u32>(DATA_OFFSET_IN_MAILBOX)?).to_le();
 
         let (_status, _syndrome, current_issi , _command1) = self.entries[entry_num].get_output_inline_data();
@@ -710,89 +725,74 @@ impl CommandQueue {
         Ok(uar & 0xFF_FFFF)
     }
 
-    fn create_page_request_eq(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>, uar: u32, log_eq_size: u8) -> Result<(), &'static str> {
+    fn create_page_request_event_queue(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>, uar: u32, log_eq_size: u8) -> Result<(), &'static str> {
         
         let size_of_mailbox_data = (0x110 - 0x10) + SIZE_PADDR_IN_BYTES * pages.len();
 
         let num_mailboxes = libm::ceilf(size_of_mailbox_data as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         self.initialize_mailboxes(entry_num, num_mailboxes, MailboxType::Input)?;
 
-        let mailbox_page = &mut self.mailbox_buffers_input[entry_num];
+        let mailbox_pages = &mut self.mailbox_buffers_input[entry_num];
         
-        // In mailbox 0 we have to set up the eq_context and event_bitmask
-        // The Eq context lies at offset 0 of the first mailbox
-        let block_num=0;
-      
-        // initialize the event queue context
-        let eq_context = mailbox_page.0.as_type_mut::<EventQueueContext>(0)?;
-        eq_context.init(uar, log_eq_size);
+        for block_num in 0..num_mailboxes {
+            let (mb_page, _mb_page_starting_addr) = &mut mailbox_pages[block_num];
+            
+            if block_num == 0 {
+                // initialize the event queue context
+                let eq_context = mb_page.as_type_mut::<EventQueueContext>(0)?;
+                eq_context.init(uar, log_eq_size);
 
-        // initialize the bitmask. this function only activates the page request event
-        let bitmask_offset_in_mailbox  = 0x58 - 0x10;
-        let eq_bitmask = mailbox_page.0.as_type_mut::<u64>(bitmask_offset_in_mailbox)?;
-        const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
-        *eq_bitmask = PAGE_REQUEST_BIT;
+                // initialize the bitmask. this function only activates the page request event
+                let bitmask_offset_in_mailbox  = 0x58 - 0x10;
+                let eq_bitmask = mb_page.as_type_mut::<u64>(bitmask_offset_in_mailbox)?;
+                const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
+                *eq_bitmask = PAGE_REQUEST_BIT;
 
-        // Now use the remainder of the mailbox for page entries
-        let eq_pa_offset = 0x110 - 0x10;
-        let data = mailbox_page.0.as_type_mut::<[u8;256]>(eq_pa_offset)?;
-        let pages_in_mailbox_0 = (MAILBOX_DATA_SIZE_IN_BYTES - eq_pa_offset) / SIZE_PADDR_IN_BYTES;
-
-        for page in 0..pages_in_mailbox_0 {
-            let paddr = pages.pop();
-            match paddr {
-                Some(paddr) => {
-                    let start_offset_h = page * SIZE_PADDR_IN_BYTES;
-                    let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
-                    let addr = (paddr.value() >> 32) as u32;
-                    data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
-
-                    let start_offset_l = end_offset_h;
-                    let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
-                    let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
-                    data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
-                },
-                None => { 
-                    trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
-                    break; 
-                }
-            }
-        }
-
-        for block_num in 1..num_mailboxes {
-            let mailbox = mailbox_page.0.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
-
-            let mut data = [0; 512];
-
-            let pages_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
-
-            for page in 0..pages_per_mailbox {
-                let paddr = pages.pop();
-                match paddr {
-                    Some(paddr) => {
-                        let start_offset_h = page * SIZE_PADDR_IN_BYTES;
-                        let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
-                        let addr = (paddr.value() >> 32) as u32;
-                        data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
-
-                        let start_offset_l = end_offset_h;
-                        let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
-                        let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
-                        data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
-                    },
-                    None => { 
-                        trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
-                        break; 
+                // Now use the remainder of the mailbox for page entries
+                let eq_pa_offset = 0x110 - 0x10;
+                let data = mb_page.as_type_mut::<[u8;256]>(eq_pa_offset)?;
+                let pages_in_mailbox_0 = (MAILBOX_DATA_SIZE_IN_BYTES - eq_pa_offset) / SIZE_PADDR_IN_BYTES;
+ 
+                for page in 0..pages_in_mailbox_0 {
+                    let paddr = pages.pop();
+                    match paddr {
+                        Some(paddr) => {
+                            Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, data);
+                        },
+                        None => { 
+                            trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
+                            break; 
+                        }
                     }
                 }
+
+                debug!("Mailbox {}", block_num);
+                debug!("{:?}", mb_page.as_type_mut::<CommandInterfaceMailbox>(0)?);
+                    
+            } else {
+                let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(0)?;
+                let paddr_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
+                let mut data = [0; 512];
+
+                for page in 0..paddr_per_mailbox {
+                    let paddr = pages.pop();
+                    match paddr {
+                        Some(paddr) => {
+                            Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, &mut data);
+                        },
+                        None => { 
+                            trace!("breaking out of loop on mailbox: {} and paddr: {}", block_num, page);
+                            break; 
+                        }
+                    }
+                }
+
+                mailbox.mailbox_data.write(data);
+
+                debug!("Mailbox {}", block_num);
+                debug!("{:?}", mailbox);
             }
-
-            mailbox.mailbox_data.write(data);
-            debug!("token: {}", self.token);
-            debug!("Mailbox {}", block_num);
-            debug!("{:?}", mailbox);
         }
-
         Ok(())
     }
 
@@ -803,29 +803,114 @@ impl CommandQueue {
         Ok(eq_number as u8)
     }
 
+    fn get_vport_state(&self, entry_num: usize)-> Result<(u16, u8, u8), &'static str> {
+        self.check_command_output_validity(entry_num, CommandOpcode::QueryVportState)?;
+
+        let (_status, _syndrome, _reserved, output) = self.entries[entry_num].get_output_inline_data();
+        let max_tx_speed = (output >> 16) as u16;
+        let admin_state = (output as u8 & 0xF0) >> 4;
+        let state = (output as u8) & 0xF;
+
+        Ok((max_tx_speed, admin_state, state))      
+    }
+
+    fn init_nic_vport_context_output_mailbox_buffers(&mut self, entry_num: usize) -> Result<(), &'static str> {
+        const NUM_MAILBOXES_NIC_VPORT_CONTEXT: usize = 1;
+        self.initialize_mailboxes(entry_num, NUM_MAILBOXES_NIC_VPORT_CONTEXT, MailboxType::Output)?;
+        Ok(())
+    }
+
+    fn get_vport_context(&self, entry_num: usize)-> Result<(u16, [u8;6]), &'static str> {
+        self.check_command_output_validity(entry_num, CommandOpcode::QueryNicVportContext)?;
+
+        let context = self.mailbox_buffers_output[entry_num][0].0.as_type::<NicVportContext>(0)?;
+        let mac_addr_h = context.permanent_address_h.read().get();
+        let mac_addr_l = context.permanent_address_l.read().get();
+
+        let mut mac_addr = [0; 6]; 
+        mac_addr[0] =  mac_addr_l as u8;
+        mac_addr[1] = (mac_addr_l >> 8) as u8;
+        mac_addr[2] = (mac_addr_l >> 16) as u8;
+        mac_addr[3] = (mac_addr_l >> 24) as u8;
+        mac_addr[4] =  mac_addr_h as u8;
+        mac_addr[5] = (mac_addr_h >> 8) as u8;
+
+
+        Ok((context.mtu.read().get() as u16, mac_addr))
+    }
+
+    pub fn get_protection_domain(&self, entry_num: usize) -> Result<u32, &'static str> {
+        self.check_command_output_validity(entry_num, CommandOpcode::AllocPd)?;
+        let (_status, _syndrome, pd, _reserved) = self.entries[entry_num].get_output_inline_data();
+
+        Ok(pd & 0xFF_FFFF)
+    }
+
+    pub fn get_transport_domain(&self, entry_num: usize) -> Result<u32, &'static str> {
+        self.check_command_output_validity(entry_num, CommandOpcode::AllocTransportDomain)?;
+        let (_status, _syndrome, td, _reserved) = self.entries[entry_num].get_output_inline_data();
+
+        Ok(td & 0xFF_FFFF)
+    }
+
+    pub fn get_reserved_lkey(&self, entry_num: usize) -> Result<u32, &'static str> {
+        self.check_command_output_validity(entry_num, CommandOpcode::QuerySpecialContexts)?;
+        let (_status, _syndrome, _dump_fill_mkey, resd_lkey) = self.entries[entry_num].get_output_inline_data();
+
+        Ok(resd_lkey)
+    }
+
+    fn write_paddr_in_mailbox_data(start_offset: usize, paddr: PhysicalAddress, data: &mut [u8]) {
+        let start_offset_h = start_offset;
+        let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
+        let addr = (paddr.value() >> 32) as u32;
+        data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
+
+        let start_offset_l = end_offset_h;
+        let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
+        let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
+        data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
+    }
+
     /// Clears all mailboxes, then sets the token, block number and next address fields for all mailboxes
     fn initialize_mailboxes(&mut self, entry_num: usize, num_mailboxes: usize, mailbox_type: MailboxType) -> Result<(), &'static str> {
-        let (mb_page, mb_starting_addr) = if mailbox_type == MailboxType::Input{
+        let mailbox_pages = if mailbox_type == MailboxType::Input{
             &mut self.mailbox_buffers_input[entry_num]
         } else {
             &mut self.mailbox_buffers_output[entry_num]
         };
 
-        if num_mailboxes > MAX_MAILBOX_BUFFERS {
-            return Err("Too many maiboxes required, TODO: allocate more than a page for mailboxes");
+        // Adding extra mailbox pages
+        let available_mailboxes = mailbox_pages.len(); 
+        if num_mailboxes > available_mailboxes {
+            let num_mailbox_pages_required = num_mailboxes - available_mailboxes;
+            trace!("Adding {} mailbox pages", num_mailbox_pages_required);
+            
+            for _ in 0..num_mailbox_pages_required {
+                mailbox_pages.push(create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?);
+            }
         }
 
         for block_num in 0..num_mailboxes {
-            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(block_num * MAILBOX_SIZE_IN_BYTES)?;
+            // record the next page address to set pointer for last mailbox (can't have two borrows in the same loop)
+            let next_mb_addr = if block_num < (num_mailboxes - 1) {
+                mailbox_pages[block_num + 1].1.value()
+            } else {
+                0
+            };
+
+            let (mb_page, mb_page_starting_addr) = &mut mailbox_pages[block_num];
+
+            trace!("Initializing mb: {}", block_num);
+            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(0)?;
             mailbox.clear_all_fields();
 
-            if block_num != (num_mailboxes - 1){
-                let mailbox_next_addr = mb_starting_addr.value() + ((block_num + 1) * MAILBOX_SIZE_IN_BYTES);
-                mailbox.next_pointer_h.write(U32::new((mailbox_next_addr >> 32) as u32));
-                mailbox.next_pointer_l.write(U32::new((mailbox_next_addr & 0xFFFF_FFFF) as u32));
-            }
             mailbox.block_number.write(U32::new(block_num as u32));
             mailbox.token_ctrl_signature.write(U32::new((self.token as u32) << 16));
+
+            mailbox.next_pointer_h.write(U32::new((next_mb_addr >> 32) as u32));
+            mailbox.next_pointer_l.write(U32::new((next_mb_addr & 0xFFFF_FFFF) as u32));
+               
         }
 
         Ok(())
@@ -858,3 +943,26 @@ impl EventQueueContext {
         self.log_pg_size.write(U32::new(0));
     }
 }
+
+#[derive(FromBytes)]
+#[repr(C)]
+struct NicVportContext {
+    data1:                  Volatile<U32<BigEndian>>,
+    data2:                  Volatile<U32<BigEndian>>,
+    data3:                  Volatile<U32<BigEndian>>,
+    _padding0:              ReadOnly<[u8; 24]>,
+    mtu:                    Volatile<U32<BigEndian>>,
+    system_image_guid:      Volatile<U64<BigEndian>>,
+    port_guid:              Volatile<U64<BigEndian>>,
+    node_guid:              Volatile<U64<BigEndian>>,
+    max_qp_retry:           Volatile<U32<BigEndian>>,
+    _padding1:              ReadOnly<[u8; 36]>,
+    qkey_violation_counter: Volatile<U32<BigEndian>>,
+    _padding2:              ReadOnly<[u8; 132]>,
+    list_info:              Volatile<U32<BigEndian>>,
+    permanent_address_h:    Volatile<U32<BigEndian>>,
+    permanent_address_l:    Volatile<U32<BigEndian>>,
+    sw_network_metadata:    Volatile<U32<BigEndian>>,
+}
+
+const_assert_eq!(core::mem::size_of::<NicVportContext>(), 256);
