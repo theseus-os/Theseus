@@ -26,9 +26,9 @@ Alternatively, we could also use `ar` to create an archive of all of the object 
 ar -rcs tlibc/target/.../libtlibc.a  tlibc/target/.../deps/*.o 
 ```
 
-We use the `theseus_cargo` tool ([as described here](rust_builds_out_of_tree.md)) to ensure that `tlibc` is compiled against and depends on the correct version of crates and symbols from an existing Theseus build. 
+We use the `theseus_cargo` tool ([as described here](../building/rust_builds_out_of_tree.md)) to ensure that `tlibc` is compiled against and depends on the correct version of crates and symbols from an existing Theseus build. 
 
 ## Using tlibc
 Once we have the `tlibc.o` (or `.a`) file, we can use that to satisfy any C program's dependencies on basic libc functions/data.
 
-[The next section](c_compiler_linker.md) describes how we use the `tlibc` file to build a standalone C executable that can run atop Theseus.
+[The next section](compiler_linker.md) describes how we use the `tlibc` file to build a standalone C executable that can run atop Theseus.

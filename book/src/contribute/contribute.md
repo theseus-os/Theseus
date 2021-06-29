@@ -69,4 +69,4 @@ At the very least, you'll need to change the `name` entry under the `[package]` 
 If your new kernel crate needs to be initialized, you can invoke it from the [`captain::init()` function](https://theseus-os.github.io/Theseus/doc/captain/index.html),
 although there may be more appropriate places to do so, such as the [`device_manager`'s functions](https://theseus-os.github.io/Theseus/doc/device_manager/index.html) for initializing device drivers.
 
-If you want to create a new application for Theseus, see [those instructions here](app.md).
+If you want to create a new application for Theseus, see [those instructions here](../app/app.md).
