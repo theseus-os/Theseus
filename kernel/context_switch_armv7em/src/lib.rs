@@ -3,6 +3,11 @@
 #![no_std]
 #![feature(llvm_asm, naked_functions)]
 
+#[macro_use] extern crate cfg_if;
+
+cfg_if!{
+if #[cfg(target_arch="arm")] {
+
 extern crate zerocopy;
 
 use zerocopy::FromBytes;
@@ -113,4 +118,7 @@ pub unsafe fn context_switch_armv7em(_prev_stack_pointer: *mut usize, _next_stac
     save_registers_regular!();
     switch_stacks!();
     restore_registers_regular!();
+}
+
+}
 }

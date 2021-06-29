@@ -12,6 +12,7 @@
 // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
 cfg_if! {
 if #[cfg(target_arch="x86_64")] {
+    cfg_if!{
     if #[cfg(simd_personality)] {
         #[macro_use(save_registers_regular, switch_stacks, restore_registers_regular)]
         extern crate context_switch_regular;
@@ -167,6 +168,7 @@ if #[cfg(target_arch="x86_64")] {
         extern crate context_switch_regular;
         pub use context_switch_regular::ContextRegular as Context;
         pub use context_switch_regular::context_switch_regular as context_switch;
+    }
     }
 }
 
