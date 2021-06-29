@@ -22,6 +22,12 @@ version = "0.4.10"
 [target.'cfg(target_arch = "arm")'.dependencies.owning_ref]
 git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
+[target.'cfg(target_arch = "arm")'.dependencies.stable_deref_trait]
+git = "https://github.com/kevinaboos/stable_deref_trait.git"
+branch = "spin"
+default-features = false
+features = [ "alloc", "spin" ]
+
 
 [lib]
 doctest = false

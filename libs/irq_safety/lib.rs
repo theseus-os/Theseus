@@ -18,6 +18,7 @@ else if #[cfg(target_arch="arm")] {
 extern crate spin;
 extern crate cortex_m;
 extern crate owning_ref;
+extern crate stable_deref_trait;
 
 mod arch_armv7em;
 pub use arch_armv7em::*;
