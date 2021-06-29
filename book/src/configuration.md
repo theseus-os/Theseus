@@ -132,9 +132,9 @@ For example, Theseus frequently uses options like:
 
 The advantage of these features is that they can also be used in `Cargo.toml` manifest files to conditionally set dependencies. For example:
 ```toml
-## Only include the `packed_simd` crate as a dependency when "sse2" is enabled.
-[target.'cfg(target_feature = "sse2")'.dependencies.packed_simd]
-version = "0.3.4"
+## Only include the `core_simd` crate as a dependency when "sse2" is enabled.
+[target.'cfg(target_feature = "sse2")'.dependencies.core_simd]
+...
 ```
 
 Unfortunately, you cannot use non-built-in cfg options to conditionally specify dependencies in `Cargo.toml` files, such as anything that comes from `THESEUS_CONFIG` values. 
