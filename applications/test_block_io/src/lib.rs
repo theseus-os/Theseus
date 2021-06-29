@@ -102,7 +102,9 @@ pub fn main(_args: Vec<String>) -> isize {
 
         }
     }
-    // let rw = Reader::new(&mut locked_sd);
+
+    // TODO: fix the `Reader` struct's trait bounds to accept a `ByteReader` or a `&mut ByteReader`
+    // let rw = Reader::new(&mut locked_sd); // THIS DOESN'T COMPILE
 
     0
 }

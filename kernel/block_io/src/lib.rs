@@ -228,6 +228,7 @@ pub trait ByteWriter {
     fn flush(&mut self) -> Result<(), IoError>;
 }
 
+// Implement a byte-wise writer atop a block-based reader AND writer.
 impl<RW> ByteWriter for RW where RW: BlockWriter + BlockReader + ?Sized {
     fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
