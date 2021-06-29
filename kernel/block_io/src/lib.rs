@@ -35,10 +35,7 @@
 #[macro_use] extern crate derive_more;
 extern crate bare_io;
 
-use core::{
-    cmp::min,
-    ops::Range,
-};
+use core::{cmp::min, ops::Range};
 use alloc::vec::Vec;
 
 
@@ -82,6 +79,16 @@ pub trait BlockIo {
     /// Returns the size in bytes of a single block (i.e., sector),
     /// the minimum granularity of I/O transfers.
     fn block_size(&self) -> usize;
+}
+
+
+/// A trait that should be implemented for I/O streams or devices
+/// that have a known length, e.g., disk drives. 
+///
+/// This trait exists to enable seeking to an offset from the end of the stream.
+pub trait KnownLength {
+    /// Returns the length (size in bytes) of this I/O stream or device.
+    fn len(&self) -> usize;
 }
 
 
@@ -139,8 +146,9 @@ pub trait BlockWriter: BlockIo {
 /// A trait that represents an I/O stream that can be read from at the granularity of individual bytes,
 /// but which does not track the current offset into the stream.
 ///
-/// This trait is auto-implemented for any type that implements the `BlockReader` trait,
-/// allowing it to be easily wrapped around a `BlockReader` for byte-wise access to a block-based I/O stream.
+/// ## Auto-implementation atop `BlockReader`
+/// This trait is auto-implemented for any type that implements the [`BlockReader`] trait,
+/// allowing easy byte-wise access to a block-based I/O stream.
 pub trait ByteReader {
     /// Reads bytes of data from this reader into the given `buffer`.
     ///
@@ -148,18 +156,20 @@ pub trait ByteReader {
     ///
     /// ## Arguments
     /// * `buffer`: the buffer into which data will be copied.
-    /// * `offset`: the offset in bytes from the beginning of this reader where the read operation begins.
+    /// * `offset`: the offset in bytes from the beginning of this reader 
+    ///    where the read operation will begin.
     ///
     /// ## Return
     /// If successful, returns the number of bytes read into the given `buffer`. 
     /// Otherwise, returns an error.
-    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; 
+    fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; 
 }
 
 // Implement a byte-wise reader atop a block-based reader. 
 impl<R> ByteReader for R where R: BlockReader + ?Sized {
-    fn read(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+    fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
+        let offset = offset as usize;
 
         let transfers = blocks_from_bytes(offset .. offset + buffer.len(), self.block_size());
         for transfer in transfers.iter().flatten() {
@@ -188,8 +198,16 @@ impl<R> ByteReader for R where R: BlockReader + ?Sized {
 /// A trait that represents an I/O stream that can be written to,
 /// but which does not track the current offset into the stream.
 ///
-/// This trait is auto-implemented for any type that implements the `BlockWriter` trait,
-/// allowing it to be easily wrapped around a `BlockWriter` for byte-wise access to a block-based I/O stream.
+/// ## Auto-implementation atop `BlockWriter`
+/// This trait is auto-implemented for any type that implements both 
+/// the [`BlockWriter`] **and** [`BlockReader`] traits,
+/// allowing easy byte-wise access to a block-based I/O stream.
+/// It is only possible to implement a byte-wise writer atop a block-wise writer AND reader together,
+/// because it is often necessary to read an original block of data from the underlying stream
+/// before writing a partial block back to the device, in order to avoid accidental overwrites.
+/// 
+/// Note that other implementations of `ByteWriter` may not have this restriction,
+/// e.g., when the underlying writer supports writing individual bytes.
 pub trait ByteWriter {
     /// Writes bytes of data from the given `buffer` to this writer.
     ///
@@ -197,26 +215,21 @@ pub trait ByteWriter {
     ///
     /// ## Arguments
     /// * `buffer`: the buffer from which data will be copied. 
-    /// * `offset`: the offset in number of bytes from the beginning of this writer.
+    /// * `offset`: the offset in number of bytes from the beginning of this writer
+    ///    where the write operation will begin.
     ///
     /// ## Return
     /// If successful, returns the number of bytes written to this writer. 
     /// Otherwise, returns an error.
-    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
+    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
 
     /// Flushes this writer's output stream, 
     /// ensuring all contents in intermediate buffers are fully written out.
     fn flush(&mut self) -> Result<(), IoError>;
 }
 
-// We can only implement a byte-wise writer atop a block-wise writer AND reader together,
-// because we may need to read partial blocks from the underlying device before writing them.
-// This is needed to ensure that bytes that aren't written 
-// 
-// Note that other implementations of `ByteWriter` may not have this requirement,
-// e.g., when the underlying writer supports writing individual bytes.
 impl<RW> ByteWriter for RW where RW: BlockWriter + BlockReader + ?Sized {
-    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
+    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
 
         let transfers = blocks_from_bytes(offset .. offset + buffer.len(), self.block_size());
@@ -253,66 +266,69 @@ impl<RW> ByteWriter for RW where RW: BlockWriter + BlockReader + ?Sized {
 
 
 /// A stateful reader that keeps track of its current offset
-/// within the internal stateless `ByteReader` I/O stream.
+/// within the internal stateless [`ByteReader`] I/O stream.
 #[derive(Deref, DerefMut)]
 pub struct Reader<R: ByteReader>(IoWithOffset<R>);
-impl<R: ByteReader> Reader<R> {
-    /// Creates a new Reader with an initial offset of 0.
+impl<R> Reader<R> where R: ByteReader {
+    /// Creates a new `Reader` with an initial offset of 0.
     pub fn new(reader: R) -> Self {
-        Reader(IoWithOffset { io: reader, offset: 0 })
+        Reader(IoWithOffset::new(reader))
     }
 }
 
 /// A stateful writer that keeps track of its current offset
-/// within the internal stateless `ByteWriter` I/O stream.
+/// within the internal stateless [`ByteWriter`] I/O stream.
 #[derive(Deref, DerefMut)]
 pub struct Writer<W: ByteWriter>(IoWithOffset<W>);
 impl<W: ByteWriter> Writer<W> {
-    /// Creates a new Writer with an initial offset of 0.
+    /// Creates a new `Writer` with an initial offset of 0.
     pub fn new(writer: W) -> Self {
-        Writer(IoWithOffset { io: writer, offset: 0 })
+        Writer(IoWithOffset::new(writer))
     }
 }
 
 /// A stateful reader and writer that keeps track of its current offset
-/// within the internal stateless `ByteReader + ByteWriter` I/O stream.
+/// within the internal stateless [`ByteReader`] + [`ByteWriter`] I/O stream.
 #[derive(Deref, DerefMut)]
 pub struct ReaderWriter<RW: ByteReader + ByteWriter>(IoWithOffset<RW>);
 impl<RW: ByteReader + ByteWriter> ReaderWriter<RW> {
-    /// Creates a new ReaderWriter with an initial offset of 0.
+    /// Creates a new `ReaderWriter` with an initial offset of 0.
     pub fn new(reader_writer: RW) -> Self {
-        ReaderWriter(IoWithOffset { io: reader_writer, offset: 0 })
+        ReaderWriter(IoWithOffset::new(reader_writer))
     }
 }
 
 /// A stateful I/O stream (reader, writer, or both) that keeps track
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// Hint: don't use this type directly, use its wrapper types:
-///`Reader`, `Writer`, or `ReaderWriter`.
+/// Don't use this type directly, use its wrapper types:
+/// [`Reader`], [`Writer`], or [`ReaderWriter`].
+///
+/// This type permits seeking through the I/O stream if it has a known length,
+/// i.e., if it implements the [`KnownLength`] trait.
 pub struct IoWithOffset<IO> {
     io: IO,
-    offset: usize,
+    offset: u64,
 }
 impl<IO> IoWithOffset<IO> {
     /// Creates a new IO stream with an initial offset of 0.
-    pub fn new(io: IO) -> Self {
+    fn new(io: IO) -> Self {
         IoWithOffset { io, offset: 0 }
     }
 }
-impl<IO: ByteReader> bare_io::Read for IoWithOffset<IO> {
+impl<IO> bare_io::Read for IoWithOffset<IO> where IO: ByteReader {
     fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize> {
-        let bytes_read = self.io.read(buf, self.offset)
+        let bytes_read = self.io.read_at(buf, self.offset as usize)
             .map_err(Into::<bare_io::Error>::into)?;
-        self.offset += bytes_read;
+        self.offset += bytes_read as u64;
         Ok(bytes_read)
     }
 }
-impl<IO: ByteWriter> bare_io::Write for IoWithOffset<IO> {
+impl<IO> bare_io::Write for IoWithOffset<IO> where IO: ByteWriter {
     fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
-        let bytes_written = self.io.write(buf, self.offset)
+        let bytes_written = self.io.write_at(buf, self.offset as usize)
             .map_err(Into::<bare_io::Error>::into)?;
-        self.offset += bytes_written;
+        self.offset += bytes_written as u64;
         Ok(bytes_written)
     }
 
@@ -320,36 +336,34 @@ impl<IO: ByteWriter> bare_io::Write for IoWithOffset<IO> {
         self.io.flush().map_err(Into::into)
     }    
 }
-/*
+
 use bare_io::{Seek, SeekFrom};
-impl<IO> Seek for IoWithOffset<IO> {
+impl<IO> Seek for IoWithOffset<IO> where IO: KnownLength {
     fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64> {
         let (base_pos, offset) = match position {
             SeekFrom::Start(n) => {
-                self.offset = n as usize;
+                self.offset = n;
                 return Ok(n);
             }
             SeekFrom::Current(n) => (self.offset, n),
-            SeekFrom::End(n) => (self.inner.as_ref().len() as u64, n),
+            SeekFrom::End(n) => (self.io.len() as u64, n),
         };
         let new_pos = if offset >= 0 {
             base_pos.checked_add(offset as u64)
         } else {
             base_pos.checked_sub((offset.wrapping_neg()) as u64)
         };
-        match new_pos {
-            Some(n) => {
-                self.pos = n;
-                Ok(self.pos)
-            }
-            None => Err(Error::new(
-                ErrorKind::InvalidInput,
+        if let Some(n) = new_pos {
+            self.offset = n;
+            Ok(self.offset)
+        } else {
+            Err(bare_io::Error::new(
+                bare_io::ErrorKind::InvalidInput,
                 "invalid seek to a negative or overflowing position",
-            )),
+            ))
         }
     }
 }
-*/
 
 
 /// Calculates block-wise bounds for an I/O transfer 

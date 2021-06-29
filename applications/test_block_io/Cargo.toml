@@ -6,11 +6,10 @@ description = "a simple app for testing block_io transfers"
 build = "../../build.rs"
 
 [dependencies]
-
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
 
 [dependencies.log]
 version = "0.4.8"
-
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"

@@ -2662,6 +2662,7 @@ name = "test_block_io"
 version = "0.1.0"
 dependencies = [
  "ata",
+ "bare-io",
  "block_io",
  "log",
  "storage_manager",

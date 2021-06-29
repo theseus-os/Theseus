@@ -23,7 +23,7 @@ use alloc::{
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
-use block_io::{BlockIo, BlockReader, BlockWriter, IoError};
+use block_io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -587,7 +587,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn read_pio(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.size_in_bytes() {
+		if offset_in_sectors > self.len() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -623,7 +623,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn write_pio(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.size_in_bytes() {
+		if offset_in_sectors > self.len() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -668,19 +668,20 @@ impl StorageDevice for AtaDrive {
 	}
 }
 impl BlockIo for AtaDrive {
-	fn block_size(&self) -> usize {
-		SECTOR_SIZE_IN_BYTES
-	}
+	fn block_size(&self) -> usize { SECTOR_SIZE_IN_BYTES }
+}
+impl KnownLength for AtaDrive {
+	fn len(&self) -> usize { self.block_size() * self.size_in_blocks() }
 }
 impl BlockReader for AtaDrive {
 	fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
-		// TODO: emit an IoError from the read_pio function itself instead of a blind conversion here
+		// TODO: emit a more specific IoError from the read_pio function itself instead of a blind conversion here
 		self.read_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
 	}
 }
 impl BlockWriter for AtaDrive {
 	fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
-		// TODO: emit an IoError from the read_pio function itself instead of a blind conversion here
+		// TODO: emit a more specific IoError from the read_pio function itself instead of a blind conversion here
 		self.write_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
 	}
 

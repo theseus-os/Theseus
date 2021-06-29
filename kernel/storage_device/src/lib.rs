@@ -64,7 +64,7 @@ use alloc::{
 };
 use spin::Mutex;
 use downcast_rs::Downcast;
-use block_io::{BlockReader, BlockWriter};
+use block_io::{BlockIo, KnownLength, BlockReader, BlockWriter};
 
 
 /// A trait that represents a storage controller,
@@ -89,22 +89,17 @@ pub type StorageControllerRef = Arc<Mutex<dyn StorageController + Send>>;
 /// A trait that represents a storage device,
 /// such as hard disks, removable drives, SSDs, etc.
 /// 
-/// A `StorageDevice` must implement functions from the `BlockReader` and `BlockWriter` traits
-/// to read and write data from/to the device at block granularity. 
-/// It must also specify its block size by implementing the `BlockIo` trait.
+/// A `StorageDevice` must implement the following traits:
+/// * `BlockIo`: to specify its block size.
+/// * `BlockReader` and `BlockWriter`: to enable reading and writing data 
+///   from/to the device at block granularity. 
+/// * `KnownLength`: to specify the size in bytes (length) of the entire device. 
 ///
-/// It also includes functions to query device info, e.g.,
-/// the device's total size and inherent block size.
-pub trait StorageDevice: BlockReader + BlockWriter + Downcast {
-	/// Returns the number of blocks (sectors) in this device.
+/// This trait includes additional functions to query device info, e.g.,
+/// the device's total size in number of blocks.
+pub trait StorageDevice: BlockIo + BlockReader + BlockWriter + KnownLength + Downcast {
+	/// Returns the total size of this device, given in number of blocks (sectors).
     fn size_in_blocks(&self) -> usize;
-    
-    /// Returns the size of this device in bytes, rounded up to the nearest block (sector) size.
-    ///
-    /// This is simply [`block_size()`]` * `[`size_in_blocks()`].
-    fn size_in_bytes(&self) -> usize {
-        self.block_size() * self.size_in_blocks()
-    }
 }
 impl_downcast!(StorageDevice);
 
