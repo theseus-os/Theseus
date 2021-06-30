@@ -15,15 +15,11 @@ extern crate block_io;
 
 use core::fmt;
 use spin::Mutex;
-use alloc::{
-	string::String,
-	boxed::Box,
-	sync::Arc,
-};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
-use block_io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
+use block_io::{BlockByteTransfer, BlockIo, BlockReader, BlockWriter, ByteReader, IoError, KnownLength, blocks_from_bytes};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -687,6 +683,35 @@ impl BlockWriter for AtaDrive {
 
 	fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
 }
+
+// // Implement a byte-wise reader atop a block-based reader. 
+// impl ByteReader for AtaDrive {
+//     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+//         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
+//         let offset = offset as usize;
+
+//         let transfers = blocks_from_bytes(offset .. offset + buffer.len(), self.block_size());
+//         for transfer in transfers.iter().flatten() {
+//             let BlockByteTransfer { byte_range_absolute, block_range, bytes_in_block_range } = transfer;
+//             let buffer_range = byte_range_absolute.start - offset .. byte_range_absolute.end - offset;
+
+//             // If the transfer is block-aligned on both sides, then we can copy it directly into the `buffer`. 
+//             if bytes_in_block_range.start % self.block_size() == 0 && bytes_in_block_range.end % self.block_size() == 0 {
+//                 let _blocks_read = self.read_blocks(&mut buffer[buffer_range], block_range.start);
+//             } 
+//             // Otherwise, we transfer a single block into a temp buffer and copy a sub-range of those bytes into `buffer`.
+//             else {
+//                 if tmp_block_bytes.is_empty() {
+//                     tmp_block_bytes = vec![0; self.block_size() * block_range.len()];
+//                 }
+//                 let _blocks_read = self.read_blocks(&mut tmp_block_bytes, block_range.start)?;
+//                 buffer[buffer_range].copy_from_slice(&tmp_block_bytes[bytes_in_block_range.clone()]);
+//             }
+//         }
+
+//         Ok(buffer.len())
+//     }
+// }
 
 
 pub type AtaDriveRef = Arc<Mutex<AtaDrive>>;

@@ -36,7 +36,10 @@
 extern crate bare_io;
 
 use core::{cmp::min, ops::Range};
-use alloc::vec::Vec;
+use alloc::{
+    boxed::Box,
+    vec::Vec,
+};
 
 
 /// Errors that can be returned from I/O operations.
@@ -81,6 +84,16 @@ pub trait BlockIo {
     fn block_size(&self) -> usize;
 }
 
+impl<B> BlockIo for Box<B> where B: BlockIo + ?Sized {
+    fn block_size(&self) -> usize { (**self).block_size() }
+}
+impl<B> BlockIo for &B where B: BlockIo + ?Sized {
+    fn block_size(&self) -> usize { (**self).block_size() }
+}
+impl<B> BlockIo for &mut B where B: BlockIo + ?Sized {
+    fn block_size(&self) -> usize { (**self).block_size() }
+}
+
 
 /// A trait that should be implemented for I/O streams or devices
 /// that have a known length, e.g., disk drives. 
@@ -115,6 +128,17 @@ pub trait BlockReader: BlockIo {
     fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>;
 }
 
+impl<R> BlockReader for Box<R> where R: BlockReader + ?Sized {
+    fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
+        (**self).read_blocks(buffer, block_offset)
+    }
+}
+impl<R> BlockReader for &mut R where R: BlockReader + ?Sized {
+    fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
+        (**self).read_blocks(buffer, block_offset)
+    }
+}
+
 /// A trait that represents an I/O stream (e.g., an I/O device) that can be written to in blocks.
 /// The block size specifies the minimum granularity of each transfer, 
 /// as given by the [`BlockIo::block_size()`] function.
@@ -142,13 +166,29 @@ pub trait BlockWriter: BlockIo {
     fn flush(&mut self) -> Result<(), IoError>;
 }
 
+impl<R> BlockWriter for Box<R> where R: BlockWriter + ?Sized {
+    fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
+        (**self).write_blocks(buffer, block_offset)
+    }
+    fn flush(&mut self) -> Result<(), IoError> { (**self).flush() }
+}
+impl<R> BlockWriter for &mut R where R: BlockWriter + ?Sized {
+    fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
+        (**self).write_blocks(buffer, block_offset)
+    }
+    fn flush(&mut self) -> Result<(), IoError> { (**self).flush() }
+}
+
 
 /// A trait that represents an I/O stream that can be read from at the granularity of individual bytes,
 /// but which does not track the current offset into the stream.
 ///
-/// ## Auto-implementation atop `BlockReader`
-/// This trait is auto-implemented for any type that implements the [`BlockReader`] trait,
-/// allowing easy byte-wise access to a block-based I/O stream.
+/// ## `ByteReader` implementation atop `BlockReader`
+/// The [`ByteReader`] trait ideally _should be_ auto-implemented for any type
+/// that implements the [`BlockReader`] trait,
+/// to allow easy byte-wise access to a block-based I/O stream.
+/// However, Rust does not allow trait specialization yet, so we cannot do this;
+/// instead, use the [`ByteReaderWrapper`] type to accomplish this.
 pub trait ByteReader {
     /// Reads bytes of data from this reader into the given `buffer`.
     ///
@@ -165,8 +205,88 @@ pub trait ByteReader {
     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; 
 }
 
-// Implement a byte-wise reader atop a block-based reader. 
-impl<R> ByteReader for R where R: BlockReader + ?Sized {
+impl<R> ByteReader for Box<R> where R: ByteReader + ?Sized {
+    fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+        (**self).read_at(buffer, offset)
+    }
+}
+impl<R> ByteReader for &mut R where R: ByteReader + ?Sized {
+    fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+        (**self).read_at(buffer, offset)
+    }
+}
+
+
+/// A trait that represents an I/O stream that can be written to,
+/// but which does not track the current offset into the stream.
+///
+/// ## `ByteWriter` implementation atop `BlockWriter`
+/// The [`ByteWriter`] trait ideally _should be_ auto-implemented for any type 
+/// that implements both the [`BlockWriter`] **and** [`BlockReader`] traits
+/// to allow easy byte-wise access to a block-based I/O stream.
+/// However, Rust does not allow trait specialization yet, so we cannot do this;
+/// instead, use the [`ByteWriterWrapper`] type to accomplish this.
+///
+/// It is only possible to implement a byte-wise writer atop a block-wise writer AND reader together,
+/// because it is often necessary to read an original block of data from the underlying stream
+/// before writing a partial block back to the device.
+/// This is required to avoid incorrectly overwriting unrelated byte ranges.
+/// 
+/// Note that other implementations of `ByteWriter` may not have this restriction,
+/// e.g., when the underlying writer supports writing individual bytes.
+pub trait ByteWriter {
+    /// Writes bytes of data from the given `buffer` to this writer.
+    ///
+    /// The number of bytes written is dictated by the length of the given `buffer`.
+    ///
+    /// ## Arguments
+    /// * `buffer`: the buffer from which data will be copied. 
+    /// * `offset`: the offset in number of bytes from the beginning of this writer
+    ///    where the write operation will begin.
+    ///
+    /// ## Return
+    /// If successful, returns the number of bytes written to this writer. 
+    /// Otherwise, returns an error.
+    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
+
+    /// Flushes this writer's output stream, 
+    /// ensuring all contents in intermediate buffers are fully written out.
+    fn flush(&mut self) -> Result<(), IoError>;
+}
+
+impl<R> ByteWriter for Box<R> where R: ByteWriter + ?Sized {
+    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
+        (**self).write_at(buffer, offset)
+    }
+    fn flush(&mut self) -> Result<(), IoError> { (**self).flush() }
+}
+impl<R> ByteWriter for &mut R where R: ByteWriter + ?Sized {
+    fn write_at(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
+        (**self).write_at(buffer, block_offset)
+    }
+    fn flush(&mut self) -> Result<(), IoError> { (**self).flush() }
+}
+
+
+/// A wrapper struct that implements a byte-wise reader atop a block-based reader.
+///
+/// This ideally _should_ be realized via automatic trait implementations, 
+/// in which all types that implement `BlockReader` also implement `ByteReader`, 
+/// but we can't do that because Rust currently does not support specialization.
+/// 
+/// ## Example
+/// Use the `From` implementation around a `BlockReader` instance, such as:
+/// ```rust
+/// let bytes_read = ByteReaderWrapper::from(storage_dev.lock().deref_mut()).read_at(...);
+/// ```
+#[derive(Deref, DerefMut)]
+pub struct ByteReaderWrapper<R: BlockReader>(R);
+impl<R> From<R> for ByteReaderWrapper<R> where R: BlockReader {
+    fn from(block_reader: R) -> Self {
+        ByteReaderWrapper(block_reader)
+    }
+} 
+impl<R> ByteReader for ByteReaderWrapper<R> where R: BlockReader {
     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
         let offset = offset as usize;
@@ -195,41 +315,34 @@ impl<R> ByteReader for R where R: BlockReader + ?Sized {
 }
 
 
-/// A trait that represents an I/O stream that can be written to,
-/// but which does not track the current offset into the stream.
+/// A wrapper struct that implements a byte-wise reader and writer
+/// atop a block-based reader and writer.
 ///
-/// ## Auto-implementation atop `BlockWriter`
-/// This trait is auto-implemented for any type that implements both 
-/// the [`BlockWriter`] **and** [`BlockReader`] traits,
-/// allowing easy byte-wise access to a block-based I/O stream.
-/// It is only possible to implement a byte-wise writer atop a block-wise writer AND reader together,
-/// because it is often necessary to read an original block of data from the underlying stream
-/// before writing a partial block back to the device, in order to avoid accidental overwrites.
+/// This ideally _should_ be realized via automatic trait implementations, 
+/// in which all types that implement `BlockReader + BlockWriter` 
+/// also implement `ByteReader + ByteWriter`, 
+/// but we cannot do that because Rust currently does not support specialization.
 /// 
-/// Note that other implementations of `ByteWriter` may not have this restriction,
-/// e.g., when the underlying writer supports writing individual bytes.
-pub trait ByteWriter {
-    /// Writes bytes of data from the given `buffer` to this writer.
-    ///
-    /// The number of bytes written is dictated by the length of the given `buffer`.
-    ///
-    /// ## Arguments
-    /// * `buffer`: the buffer from which data will be copied. 
-    /// * `offset`: the offset in number of bytes from the beginning of this writer
-    ///    where the write operation will begin.
-    ///
-    /// ## Return
-    /// If successful, returns the number of bytes written to this writer. 
-    /// Otherwise, returns an error.
-    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
-
-    /// Flushes this writer's output stream, 
-    /// ensuring all contents in intermediate buffers are fully written out.
-    fn flush(&mut self) -> Result<(), IoError>;
+/// ## Example
+/// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
+/// ```rust
+/// let mut reader_writer = ByteReaderWriterWrapper::from(storage_dev.lock().deref_mut()); 
+/// let bytes_read = reader_writer.read_at(...);
+/// let bytes_written = reader_writer.write_at(...);
+/// ```
+#[derive(Deref, DerefMut)]
+pub struct ByteReaderWriterWrapper<RW: BlockReader + BlockWriter>(RW);
+impl<RW> From<RW> for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
+    fn from(block_reader_writer: RW) -> Self {
+        ByteReaderWriterWrapper(block_reader_writer)
+    }
 }
-
-// Implement a byte-wise writer atop a block-based reader AND writer.
-impl<RW> ByteWriter for RW where RW: BlockWriter + BlockReader + ?Sized {
+impl<RW> ByteReader for ByteReaderWriterWrapper<RW> where RW: BlockWriter + BlockReader {
+    fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+        ByteReaderWrapper::from(&mut self.0).read_at(buffer, offset)
+    }
+}
+impl<RW> ByteWriter for ByteReaderWriterWrapper<RW> where RW: BlockWriter + BlockReader {
     fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
 
@@ -261,7 +374,41 @@ impl<RW> ByteWriter for RW where RW: BlockWriter + BlockReader + ?Sized {
     }
 
     fn flush(&mut self) -> Result<(), IoError> {
-        BlockWriter::flush(self)
+        (**self).flush()
+    }
+}
+
+
+
+/// A wrapper struct that implements a byte-wise writer
+/// atop a block-based reader and writer.
+///
+/// This is effectively a thin wrapper around [`ByteReaderWriterWrapper`]
+/// that allows only byte-wise writing to the underlying I/O stream.
+/// 
+/// See the [`ByteWriter`] trait docs for an explanation of why both 
+/// `BlockReader + BlockWriter` are required.
+///
+/// ## Example
+/// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
+/// ```rust
+/// /* Assume `storage_dev` implements `BlockReader + BlockWriter` */
+/// let mut reader_writer = ByteReaderWriterWrapper::from(storage_dev); 
+/// let bytes_written = reader_writer.write_at(...);
+/// ```
+#[derive(Deref, DerefMut)]
+pub struct ByteWriterWrapper<RW: BlockReader + BlockWriter>(RW);
+impl<RW> From<RW> for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
+    fn from(block_reader_writer: RW) -> Self {
+        ByteWriterWrapper(block_reader_writer)
+    }
+}
+impl<RW> ByteWriter for ByteWriterWrapper<RW> where RW: BlockWriter + BlockReader {
+    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
+        ByteReaderWriterWrapper::from(&mut self.0).write_at(buffer, offset)
+    }
+    fn flush(&mut self) -> Result<(), IoError> {
+        ByteReaderWriterWrapper::from(&mut self.0).flush()
     }
 }
 
@@ -302,7 +449,7 @@ impl<RW: ByteReader + ByteWriter> ReaderWriter<RW> {
 /// A stateful I/O stream (reader, writer, or both) that keeps track
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// Don't use this type directly, use its wrapper types:
+/// Don't use this type directly (you cannot construct one); use its wrapper types:
 /// [`Reader`], [`Writer`], or [`ReaderWriter`].
 ///
 /// This type permits seeking through the I/O stream if it has a known length,

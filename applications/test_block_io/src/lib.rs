@@ -11,12 +11,13 @@ extern crate storage_manager;
 extern crate ata;
 
 
-use core::ops::DerefMut;
+use core::ops::{DerefMut};
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::string::String;
 use ata::AtaDrive;
-use block_io::{ByteReader, ByteWriter, Reader, ReaderWriter};
+use block_io::{ByteReader, ByteReaderWrapper, ByteReaderWriterWrapper, ByteWriter, ByteWriterWrapper, Reader, ReaderWriter};
 
 
 pub fn main(_args: Vec<String>) -> isize {
@@ -49,7 +50,8 @@ pub fn main(_args: Vec<String>) -> isize {
 
     // Test the ByteReader traits
     let mut buf: [u8; 1699] = [0; 1699];
-    let bytes_read = dev.lock()
+    // let bytes_read = ByteReaderWrapper(&mut *dev.lock()).read_at(&mut buf[..], 345).unwrap();
+    let bytes_read = ByteReaderWrapper::from(dev.lock().deref_mut())
         .read_at(&mut buf[..], 345).unwrap();
     trace!("After ByteReader test: read {} bytes starting at {}:\n{:X?}", bytes_read, 345, &buf[..]);
 
@@ -61,9 +63,9 @@ pub fn main(_args: Vec<String>) -> isize {
 
     // Test the ByteWriter trait, then read it back to confirm
     let buf_to_write = b"HELLO WORLD!";
-    let bytes_written = dev.lock().write_at(buf_to_write, 720).unwrap();
+    let bytes_written = ByteWriterWrapper::from(&mut *dev.lock()).write_at(buf_to_write, 720).unwrap();
     let mut new_buf: [u8; 1000] = [0; 1000];
-    let bytes_read = dev.lock().read_at(&mut new_buf, 600).unwrap();
+    let bytes_read = ByteReaderWrapper::from(dev.lock().deref_mut()).read_at(&mut new_buf, 600).unwrap();
     trace!("After ByteWriter test: read {} bytes at {} after writing {} bytes:\n{:X?}", bytes_read, 600, bytes_written, &new_buf[..]);
     if &new_buf[120..132] == buf_to_write {
         info!("ByteWriter example worked");
@@ -73,38 +75,48 @@ pub fn main(_args: Vec<String>) -> isize {
 
 
     // TODO: here test the Reader, Writer, ReaderWriter stuff (with offsets)
+    use bare_io::Read;
     let mut locked_sd = dev.lock();
     // let dev_mut = locked_sd.deref_mut();
     {
         let downcasted: Option<&mut ata::AtaDrive> = locked_sd.as_any_mut().downcast_mut();
         if let Some(ata_drive) = downcasted {
             let mut my_buf: [u8; 10] = [0; 10];
-            ByteReader::read_at(ata_drive, &mut my_buf, 0x20).unwrap();
+            let mut ata_drive = ByteReaderWrapper::from(ata_drive);
+            ByteReader::read_at(&mut ata_drive, &mut my_buf, 0x20).unwrap();
             trace!("Here1: my_buf: {:X?}", my_buf);
             ata_drive.read_at(&mut my_buf[5..], 0x30).unwrap();
             trace!("Here2: my_buf: {:X?}", my_buf);
             
-            let mut owned_drive: AtaDrive = unsafe { core::ptr::read(ata_drive as *mut _ as *const _) };
+            FIXME THIS LINE BROKEN let owned_drive: AtaDrive = unsafe { core::ptr::read(&mut ata_drive as *mut _ as *mut AtaDrive as *const _) };
+            let mut owned_drive = ByteReaderWrapper::from(owned_drive);
             owned_drive.read_at(&mut my_buf, 0x50).unwrap();
             trace!("Here3: my_buf: {:X?}", my_buf);
             let mut reader = Reader::new(owned_drive);
-            use bare_io::Read;
             let bytes_read  = reader.read(&mut my_buf[1..5]).unwrap();
             assert_eq!(bytes_read, 4);
             trace!("Here4: my_buf: {:X?}", my_buf);
-
+            
             let bytes_read2 = reader.read(&mut my_buf[5..9]).unwrap();
             assert_eq!(bytes_read2, 4);
             trace!("Here5: my_buf: {:X?}", my_buf);
+            
 
-
-            // let reader = Reader::new(ata_drive);
-
+            // test accepting a boxed reader
+            let owned_drive2: AtaDrive = unsafe { core::ptr::read(&mut ata_drive as *mut _ as *mut AtaDrive as *const _) };
+            let mut reader = Reader::new(Box::new(ByteReaderWrapper::from(owned_drive2)) as Box<dyn ByteReader>);
+            let bytes_read3 = reader.read(&mut my_buf[5..]).unwrap();
+            assert_eq!(bytes_read3, 5);
+            trace!("Here6: my_buf: {:X?}", my_buf);
+            
         }
     }
 
-    // TODO: fix the `Reader` struct's trait bounds to accept a `ByteReader` or a `&mut ByteReader`
-    // let rw = Reader::new(&mut locked_sd); // THIS DOESN'T COMPILE
+    let mut io = ReaderWriter::new(ByteReaderWriterWrapper::from(&mut *locked_sd));
+    let mut bb = [0u8; 100];
+    let bread = io.read(&mut bb).unwrap();
+    info!("Final IoRefWithOffset test: read {} bytes into bb: {:X?}", bread, bb);
+
 
     0
 }
