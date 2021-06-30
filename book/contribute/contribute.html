@@ -14,21 +14,21 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-                <link rel="icon" href="favicon.svg">
-                        <link rel="shortcut icon" href="favicon.png">
-                <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-                <link rel="stylesheet" href="css/print.css" media="print">
+                <link rel="icon" href="../favicon.svg">
+                        <link rel="shortcut icon" href="../favicon.png">
+                <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+                <link rel="stylesheet" href="../css/print.css" media="print">
         
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-                <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="../fonts/fonts.css">
         
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="highlight.css">
-        <link rel="stylesheet" href="tomorrow-night.css">
-        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
         
@@ -36,7 +36,7 @@
     <body>
         <!-- Provide site root to javascript -->
         <script type="text/javascript">
-            var path_to_root = "";
+            var path_to_root = "../";
             var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
 
@@ -82,7 +82,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="ch00-00-introduction.html"><strong aria-hidden="true">1.</strong> Introduction to Theseus OS</a></li><li class="chapter-item expanded "><a href="design.html"><strong aria-hidden="true">2.</strong> Design and Structure of Theseus</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="source_code_organization.html"><strong aria-hidden="true">2.1.</strong> Source Code Repository Organization</a></li><li class="chapter-item expanded "><a href="booting.html"><strong aria-hidden="true">2.2.</strong> Boot-up Procedure</a></li><li class="chapter-item expanded "><a href="idea.html"><strong aria-hidden="true">2.3.</strong> Safe-language OS Principles</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.4.</strong> Intralingual Design</div></li></ol></li><li class="chapter-item expanded "><a href="app.html"><strong aria-hidden="true">3.</strong> Developing a Theseus Application</a></li><li class="chapter-item expanded "><a href="build_process.html"><strong aria-hidden="true">4.</strong> The Theseus Build Process</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="configuration.html"><strong aria-hidden="true">4.1.</strong> Configuring Theseus</a></li><li class="chapter-item expanded "><a href="rust_builds_out_of_tree.html"><strong aria-hidden="true">4.2.</strong> theseus_cargo: Building Rust Crates Out-of-Tree</a></li></ol></li><li class="chapter-item expanded "><a href="c_program.html"><strong aria-hidden="true">5.</strong> Experimental Support for C programs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="building_c_cross_compiler.html"><strong aria-hidden="true">5.1.</strong> Building a C cross compiler for Theseus</a></li><li class="chapter-item expanded "><a href="c_compilation_tlibc.html"><strong aria-hidden="true">5.2.</strong> tlibc: Theseus's libc and how it works</a></li><li class="chapter-item expanded "><a href="c_compiler_linker.html"><strong aria-hidden="true">5.3.</strong> Compiling and linking C programs</a></li></ol></li><li class="chapter-item expanded "><a href="subsystems.html"><strong aria-hidden="true">6.</strong> Overview of Key Subsystems</a></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">6.1.</strong> Memory Management</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.2.</strong> Task Management</div></li><li class="chapter-item expanded "><a href="display.html"><strong aria-hidden="true">6.3.</strong> Display and Window Management</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="window_manager.html"><strong aria-hidden="true">6.3.1.</strong> The Window Manager</a></li><li class="chapter-item expanded "><a href="window_tutorial.html"><strong aria-hidden="true">6.3.2.</strong> Creating and Displaying Windows</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="real_hardware.html"><strong aria-hidden="true">7.</strong> Running Theseus on VMs &amp; Real Hardware</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="virtual_machines.html"><strong aria-hidden="true">7.1.</strong> Running Theseus in a Virtual Machine</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="pci_passthrough.html"><strong aria-hidden="true">7.1.1.</strong> Using PCI device Passthrough on QEMU</a></li></ol></li><li class="chapter-item expanded "><a href="booting_usb.html"><strong aria-hidden="true">7.2.</strong> Booting via USB drive</a></li><li class="chapter-item expanded "><a href="pxe.html"><strong aria-hidden="true">7.3.</strong> Booting over the network (PXE)</a></li></ol></li><li class="chapter-item expanded "><a href="ch01.html" class="active"><strong aria-hidden="true">8.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="git.html"><strong aria-hidden="true">8.1.</strong> git Guidlines</a></li><li class="spacer"></li></ol></li><li class="chapter-item expanded "><a href="papers_presentations.html">Papers and Presentations/Slides</a></li><li class="chapter-item expanded affix "><a href="_root_readme.html">Theseus README + Quick Start ↗️</a></li></ol>            </div>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../intro.html">Introduction to Theseus OS</a></li><li class="chapter-item expanded "><a href="../design/design.html"><strong aria-hidden="true">1.</strong> Design and Structure of Theseus</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../design/source_code_organization.html"><strong aria-hidden="true">1.1.</strong> Source Code Repository Organization</a></li><li class="chapter-item expanded "><a href="../design/booting.html"><strong aria-hidden="true">1.2.</strong> Boot-up Procedure</a></li><li class="chapter-item expanded "><a href="../design/idea.html"><strong aria-hidden="true">1.3.</strong> Safe-language OS Principles</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.4.</strong> Intralingual Design</div></li></ol></li><li class="chapter-item expanded "><a href="../app/app.html"><strong aria-hidden="true">2.</strong> Developing a Theseus Application</a></li><li class="chapter-item expanded "><a href="../building/building.html"><strong aria-hidden="true">3.</strong> The Theseus Build Process</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../building/configuration.html"><strong aria-hidden="true">3.1.</strong> Configuring Theseus</a></li><li class="chapter-item expanded "><a href="../building/rust_builds_out_of_tree.html"><strong aria-hidden="true">3.2.</strong> theseus_cargo: Building Rust Crates Out-of-Tree</a></li></ol></li><li class="chapter-item expanded "><a href="../c/programs.html"><strong aria-hidden="true">4.</strong> Experimental Support for C programs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../c/cross_compiler.html"><strong aria-hidden="true">4.1.</strong> Building a C cross compiler for Theseus</a></li><li class="chapter-item expanded "><a href="../c/tlibc.html"><strong aria-hidden="true">4.2.</strong> tlibc: Theseus's libc and how it works</a></li><li class="chapter-item expanded "><a href="../c/compiler_linker.html"><strong aria-hidden="true">4.3.</strong> Compiling and linking C programs</a></li></ol></li><li class="chapter-item expanded "><a href="../subsystems/subsystems.html"><strong aria-hidden="true">5.</strong> Overview of Key Subsystems</a></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">5.1.</strong> Memory Management</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Task Management</div></li><li class="chapter-item expanded "><a href="../subsystems/display/display.html"><strong aria-hidden="true">5.3.</strong> Display and Window Management</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../subsystems/display/window_manager.html"><strong aria-hidden="true">5.3.1.</strong> The Window Manager</a></li><li class="chapter-item expanded "><a href="../subsystems/display/window_tutorial.html"><strong aria-hidden="true">5.3.2.</strong> Creating and Displaying Windows</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../running/running.html"><strong aria-hidden="true">6.</strong> Running Theseus on VMs &amp; Real Hardware</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../running/virtual_machine/virtual_machine.html"><strong aria-hidden="true">6.1.</strong> Running Theseus in a Virtual Machine</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../running/virtual_machine/pci_passthrough.html"><strong aria-hidden="true">6.1.1.</strong> Using PCI device Passthrough on QEMU</a></li></ol></li><li class="chapter-item expanded "><a href="../running/usb.html"><strong aria-hidden="true">6.2.</strong> Booting via USB drive</a></li><li class="chapter-item expanded "><a href="../running/pxe.html"><strong aria-hidden="true">6.3.</strong> Booting over the network (PXE)</a></li></ol></li><li class="chapter-item expanded "><a href="../contribute/contribute.html" class="active"><strong aria-hidden="true">7.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../contribute/git.html"><strong aria-hidden="true">7.1.</strong> git Guidlines</a></li><li class="spacer"></li></ol></li><li class="chapter-item expanded "><a href="../misc/papers_presentations.html">Papers and Presentations/Slides</a></li><li class="chapter-item expanded affix "><a href="../misc/quick_start.html">Theseus README + Quick Start ↗️</a></li></ol>            </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
 
@@ -114,7 +114,7 @@
                     <h1 class="menu-title">The Theseus OS Book</h1>
 
                     <div class="right-buttons">
-                                                <a href="print.html" title="Print this book" aria-label="Print this book">
+                                                <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
                                                                         
@@ -219,17 +219,17 @@ If you cannot handle it, return that error to the caller so they can attempt to 
 At the very least, you'll need to change the <code>name</code> entry under the <code>[package]</code> heading at the top of the <code>Cargo.toml</code> file, and you'll need to change the dependencies for your new crate.</p>
 <p>If your new kernel crate needs to be initialized, you can invoke it from the <a href="https://theseus-os.github.io/Theseus/doc/captain/index.html"><code>captain::init()</code> function</a>,
 although there may be more appropriate places to do so, such as the <a href="https://theseus-os.github.io/Theseus/doc/device_manager/index.html"><code>device_manager</code>'s functions</a> for initializing device drivers.</p>
-<p>If you want to create a new application for Theseus, see <a href="app.html">those instructions here</a>.</p>
+<p>If you want to create a new application for Theseus, see <a href="../app/app.html">those instructions here</a>.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                                                    <a rel="prev" href="pxe.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                                    <a rel="prev" href="../running/pxe.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
-                                                    <a rel="next" href="git.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                                    <a rel="next" href="../contribute/git.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -239,11 +239,11 @@ although there may be more appropriate places to do so, such as the <a href="htt
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                                    <a rel="prev" href="pxe.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                    <a rel="prev" href="../running/pxe.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
-                                    <a rel="next" href="git.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                    <a rel="next" href="../contribute/git.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                             </nav>
@@ -258,13 +258,13 @@ although there may be more appropriate places to do so, such as the <a href="htt
         </script>
         
         
-                <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
+                <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
         
-        <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
-        <script src="book.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
 
         <!-- Custom JS scripts -->
         
