@@ -40,6 +40,7 @@ use alloc::{
     boxed::Box,
     vec::Vec,
 };
+use bare_io::{Seek, SeekFrom};
 
 
 /// Errors that can be returned from I/O operations.
@@ -102,6 +103,16 @@ impl<B> BlockIo for &mut B where B: BlockIo + ?Sized {
 pub trait KnownLength {
     /// Returns the length (size in bytes) of this I/O stream or device.
     fn len(&self) -> usize;
+}
+
+impl<KL> KnownLength for Box<KL> where KL: KnownLength + ?Sized {
+    fn len(&self) -> usize { (**self).len() }
+}
+impl<KL> KnownLength for &KL where KL: KnownLength + ?Sized {
+    fn len(&self) -> usize { (**self).len() }
+}
+impl<KL> KnownLength for &mut KL where KL: KnownLength + ?Sized {
+    fn len(&self) -> usize { (**self).len() }
 }
 
 
@@ -313,6 +324,9 @@ impl<R> ByteReader for ByteReaderWrapper<R> where R: BlockReader {
         Ok(buffer.len())
     }
 }
+impl<RW> KnownLength for ByteReaderWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
+    fn len(&self) -> usize { self.0.len() }
+}
 
 
 /// A wrapper struct that implements a byte-wise reader and writer
@@ -337,12 +351,12 @@ impl<RW> From<RW> for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockW
         ByteReaderWriterWrapper(block_reader_writer)
     }
 }
-impl<RW> ByteReader for ByteReaderWriterWrapper<RW> where RW: BlockWriter + BlockReader {
+impl<RW> ByteReader for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
         ByteReaderWrapper::from(&mut self.0).read_at(buffer, offset)
     }
 }
-impl<RW> ByteWriter for ByteReaderWriterWrapper<RW> where RW: BlockWriter + BlockReader {
+impl<RW> ByteWriter for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
     fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
 
@@ -377,7 +391,9 @@ impl<RW> ByteWriter for ByteReaderWriterWrapper<RW> where RW: BlockWriter + Bloc
         (**self).flush()
     }
 }
-
+impl<RW> KnownLength for ByteReaderWriterWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
+    fn len(&self) -> usize { self.0.len() }
+}
 
 
 /// A wrapper struct that implements a byte-wise writer
@@ -403,13 +419,16 @@ impl<RW> From<RW> for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter 
         ByteWriterWrapper(block_reader_writer)
     }
 }
-impl<RW> ByteWriter for ByteWriterWrapper<RW> where RW: BlockWriter + BlockReader {
+impl<RW> ByteWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
     fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
         ByteReaderWriterWrapper::from(&mut self.0).write_at(buffer, offset)
     }
     fn flush(&mut self) -> Result<(), IoError> {
         ByteReaderWriterWrapper::from(&mut self.0).flush()
     }
+}
+impl<RW> KnownLength for ByteWriterWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
+    fn len(&self) -> usize { self.0.len() }
 }
 
 
@@ -485,7 +504,6 @@ impl<IO> bare_io::Write for IoWithOffset<IO> where IO: ByteWriter {
     }    
 }
 
-use bare_io::{Seek, SeekFrom};
 impl<IO> Seek for IoWithOffset<IO> where IO: KnownLength {
     fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64> {
         let (base_pos, offset) = match position {

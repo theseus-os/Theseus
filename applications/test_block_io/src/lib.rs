@@ -74,13 +74,17 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 
 
-    // TODO: here test the Reader, Writer, ReaderWriter stuff (with offsets)
-    use bare_io::Read;
+    // Test the Reader, Writer, ReaderWriter stuff (with offsets)
+    use bare_io::{Read, Write, Seek, SeekFrom};
     let mut locked_sd = dev.lock();
     // let dev_mut = locked_sd.deref_mut();
     {
         let downcasted: Option<&mut ata::AtaDrive> = locked_sd.as_any_mut().downcast_mut();
         if let Some(ata_drive) = downcasted {
+            // a quick unsafe cheater method to obtain an owned storage drive instance.
+            let owned_drive:  AtaDrive = unsafe { core::ptr::read(ata_drive as *mut AtaDrive as *const AtaDrive) };
+            let owned_drive2: AtaDrive = unsafe { core::ptr::read(ata_drive as *mut AtaDrive as *const AtaDrive) };
+
             let mut my_buf: [u8; 10] = [0; 10];
             let mut ata_drive = ByteReaderWrapper::from(ata_drive);
             ByteReader::read_at(&mut ata_drive, &mut my_buf, 0x20).unwrap();
@@ -88,7 +92,6 @@ pub fn main(_args: Vec<String>) -> isize {
             ata_drive.read_at(&mut my_buf[5..], 0x30).unwrap();
             trace!("Here2: my_buf: {:X?}", my_buf);
             
-            FIXME THIS LINE BROKEN let owned_drive: AtaDrive = unsafe { core::ptr::read(&mut ata_drive as *mut _ as *mut AtaDrive as *const _) };
             let mut owned_drive = ByteReaderWrapper::from(owned_drive);
             owned_drive.read_at(&mut my_buf, 0x50).unwrap();
             trace!("Here3: my_buf: {:X?}", my_buf);
@@ -103,7 +106,6 @@ pub fn main(_args: Vec<String>) -> isize {
             
 
             // test accepting a boxed reader
-            let owned_drive2: AtaDrive = unsafe { core::ptr::read(&mut ata_drive as *mut _ as *mut AtaDrive as *const _) };
             let mut reader = Reader::new(Box::new(ByteReaderWrapper::from(owned_drive2)) as Box<dyn ByteReader>);
             let bytes_read3 = reader.read(&mut my_buf[5..]).unwrap();
             assert_eq!(bytes_read3, 5);
@@ -115,7 +117,16 @@ pub fn main(_args: Vec<String>) -> isize {
     let mut io = ReaderWriter::new(ByteReaderWriterWrapper::from(&mut *locked_sd));
     let mut bb = [0u8; 100];
     let bread = io.read(&mut bb).unwrap();
-    info!("Final IoRefWithOffset test: read {} bytes into bb: {:X?}", bread, bb);
+    info!("Final ReaderWriter test: read {} bytes into bb: {:X?}", bread, bb);
+    let start_offset = io.deref_mut().seek(SeekFrom::Current(0)).unwrap();
+    let bwritten = io.write(b"YO WHAT IS UP").unwrap();
+    let end_offset = io.seek(SeekFrom::Current(0)).unwrap();
+    info!("Final ReaderWriter test: wrote {} bytes from offset {}..{}", bwritten, start_offset, end_offset);
+    
+    let mut read_buf = [0u8; 50];
+    let pos = io.seek(SeekFrom::Current(-50)).unwrap();
+    let bread = io.read(&mut read_buf).unwrap();
+    info!("Final ReaderWriter test: read back {} bytes from offset {} into read_buf: {:X?}", bread, pos, read_buf);
 
 
     0
