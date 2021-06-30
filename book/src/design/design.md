@@ -18,7 +18,7 @@ Cells in Theseus are inspired by and akin to biological cells in an organism, as
 * Cells can be arbitrarily "refactored" into multiple different units (*meiosis*/*mitosis* = live evolution)
 * Cells can be replaced independently after failing or dying (*cell motility* = fault recovery)
 
-As such, we sometimes refer to Theseus as a ***cytokernel***, in that it is composed of cells. This reinforces the distinction between the design of Theseus and that of other kernels, e.g., monolithic kernels, microkernels, multikernels, etc. [Read more here](design.md#comparison-with-other-os-designs). 
+As such, we sometimes refer to Theseus as a ***cytokernel***, in that it is composed of cells. This reinforces the distinction between the design of Theseus and that of other kernels, e.g., monolithic kernels, microkernels, multikernels, etc. [Read more here](#comparison-with-other-os-designs). 
 
 ### Cell ≈ Crate 
 Currently, there is a one-to-one relationship between a *cell* and a Rust *crate*. The [crate](https://doc.rust-lang.org/book/ch07-01-packages-and-crates.html) is Rust's project container that consists of source code and a [dependency manifest](https://doc.rust-lang.org/cargo/reference/manifest.html) file. The crate also serves as Rust's translation unit (elementary unit of compilation); in Theseus we configure each Rust crate to be built into a single `.o` object file (a relocatable ELF file). 
@@ -28,7 +28,7 @@ Thus, the *cell* abstraction is always present in Theseus, but takes different f
 * After compile (build) time, a cell is a single `.o` object file.
 * At runtime, a cell 🄲 is a structure that contains the set of sections 🅂 from its crate object file, which have been dynamically loaded and linked into memory, as well as metadata about the inter-dependencies between it and others.
 
-![Theseus's cell abstraction is present across implementation, build, and runtime](images/cell_consistency.svg)
+![Theseus's cell abstraction is present across implementation, build, and runtime](../images/cell_consistency.svg)
 
 In Theseus, the metadata stored for each cell is defined by [the `kernel/crate_metadata` crate](https://theseus-os.github.io/Theseus/doc/crate_metadata/index.html), which includes two main types:
 * `LoadedCrate`, which represents a single crate loaded into memory and linked against other loaded crates. The `LoadedCrate` owns the memory regions holding its sections, along with other metadata about sections and symbols in that crate.
@@ -44,7 +44,7 @@ Dependencies are derived from relocation entries specified in the `.rela.*` sect
 Each cell is loaded and linked into a *namespace*, which we refer to as a `CellNamespace` or `CrateNamespace`, which represents a true namespace of all of the publicly-visible symbols that are exposed by the cells within it. Namespaces are useful for quick dependency (symbol) resolution during dynamic linking, and also play a key role in the above system goals, especially flexibility, as they can be used to efficiently realize multiple distinct *OS personalities* to serve different applications with disparate needs.
 
 
-![A simple CrateNamespace showing three crates with sections that depend on each other](images/metadata_tree.svg)
+![A simple CrateNamespace showing three crates with sections that depend on each other](../images/metadata_tree.svg)
 
 The above diagram depicts a simple set of three crates whose sections depend upon each other and are thus linked into a single namespace. The `MappedPages` (MP) objects are Theseus's abstraction of owned memory regions.  <!-- TODO: link to memory.md -->
 
@@ -52,7 +52,7 @@ The above diagram depicts a simple set of three crates whose sections depend upo
 ## Comparison with other OS designs
 The below figure shows the distinction between the structure of existing OS/kernel designs and Theseus. 
 
-![Existing OS designs vs. Theseus](images/kernel_structure.svg)
+![Existing OS designs vs. Theseus](../images/kernel_structure.svg)
 
 
 **Monolithic OSes** are the most common, including Linux and other Unix-like OSes and most commercial systems like Windows and macOS. 

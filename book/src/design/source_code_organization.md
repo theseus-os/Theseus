@@ -14,7 +14,7 @@ Crates in the `applications/` folder are user applications that cannot use any u
 Currently this consists mostly of simple utilities and command-line tools that are developed specifically for Theseus, as well as various small apps used to test functionality or run benchmarks for performance measurements.
 
 Application crates can depend on both kernel crates, libs crates, and even other application crates, though the latter is not recommended. 
-See [this section](app.md) for more details about how applications work and how to develop one.
+See [this section](../app/app.md) for more details about how applications work and how to develop one.
 
 In the future, we expect to restrict applications to depend only upon functions and types explicitly exposed through a dedicated library, i.e., `libtheseus`, but this is a future development.
 
@@ -37,7 +37,7 @@ This ensures they can all be directly linked together against each other and tha
 
 You can see how the members of this workspace are defined in the root [Cargo.toml](https://github.com/theseus-os/Theseus/blob/theseus_main/Cargo.toml) file, and how all other folders are ignored. This uses cargo's [virtual manifest](https://doc.rust-lang.org/cargo/reference/workspaces.html) feature.
 
-Read more about Theseus's [build process here](build_process.md).
+Read more about Theseus's [build process here](../building/building.md).
 
 
 ## External dependencies

@@ -99,7 +99,7 @@ Theseus offers two primary forms of linking and packaging its compiled crates in
 As depicted in the image below, the first (left side) is a conventional fully staticaly-linked build, as used in all other OSes,
 while the second (right side) is a novel dynamic linking approach used for Theseus research. 
 
-![Standard Build-time Static Linking (left) vs. Theseus Dynamic Linking (right)](images/boot_image.svg)
+![Standard Build-time Static Linking (left) vs. Theseus Dynamic Linking (right)](../images/boot_image.svg)
 
 
 ### Standard build-time (static) linking

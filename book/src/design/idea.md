@@ -7,7 +7,7 @@ This is possible only when all applications are written in safe Rust, which prev
 
 Check out [this presentation slide deck](https://docs.google.com/presentation/d/e/2PACX-1vSa0gp8sbq8S9MB4V-FYjs6xJGIPm0fsZSVdtZ9U2bQWRX9gngwztXTIJiRwxtAosLWPk0v60abDMTU/pub?start=false&loop=false) to learn more about how we ensure protection and isolation in Theseus based on the foundation of Rust's type and memory safety guarantees.
 
-For more details about Theseus's research merit and novel design principles, see our [selected list of papers and presentations here](papers_presentations.md).
+For more details about Theseus's research merit and novel design principles, see our [selected list of papers and presentations here](../misc/papers_presentations.md).
 
 
 ## P.I.E. Principle
