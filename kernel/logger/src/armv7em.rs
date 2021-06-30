@@ -1,6 +1,7 @@
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use cortex_m_semihosting::hprintln;
-
+use uart::{SerialPort};
+use core::fmt::{Write};
 
 /// The static logger instance, an empty struct that implements the `Log` trait.
 static LOGGER: Logger = Logger { };
@@ -31,7 +32,8 @@ impl Log for Logger {
 
         let file_loc = record.file().unwrap_or("??");
         let line_loc = record.line().unwrap_or(0);
-        let _result = hprintln!("{}{}:{}: {}",
+        let mut serial = SerialPort::get_uart();
+        let _result = uprintln!(serial, "{}{}:{}: {}",
             level_str,
             file_loc,
             line_loc,

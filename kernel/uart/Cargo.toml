@@ -1,0 +1,22 @@
+[package]
+name = "uart"
+version = "0.1.0"
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[target.'cfg(target_arch = "arm")'.dependencies.cortex-m]
+version = "0.6.7"
+
+[target.'cfg(target_arch = "arm")'.dependencies.stm32f4]
+features = ["stm32f407"]
+version = "0.13.0"
+
+[target.'cfg(target_arch = "arm")'.dependencies.stm32f4_discovery]
+path = "../stm32f4_discovery"
+
+[lib]
+crate-type = ["rlib"]
