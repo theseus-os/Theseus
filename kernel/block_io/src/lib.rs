@@ -1,31 +1,32 @@
-//! Traits and types for expressing I/O transfers, both byte-wise and block-wise granularity.
+//! Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity.
 //! 
 //! The important items are summarized below:
-//! * `BlockReader`, `BlockWriter`: traits that represent I/O streams which can be read from
-//!    or written to at the granularity of a single block.
-//! * `ByteReader`, `ByteWriter`: traits that represent I/O streams which can be read from
-//!    or written to at the granularity of an individual bytes.
-//!    * The `ByteReader` trait is implemented for all types that implement `BlockReader`,
-//!    * The `ByteWriter` trait is implemented for all types that implement both
-//!      `BlockWriter` **and** `BlockReader`.
-//! 
+//! * [`BlockReader`], [`BlockWriter`]: traits that represent I/O streams which can be read from
+//!   or written to at the granularity of a single block.
+//! * [`BlockIo`]: a parent trait that specifies the size in bytes of each block 
+//!   in a block-based I/O stream.
+//! * [`KnownLength`]: a trait that represents an I/O stream with a known length, 
+//!   such as a disk drive.
+//! * [`ByteReader`], [`ByteWriter`]: traits that represent I/O streams which can be read from
+//!   or written to at the granularity of an individual bytes.
+//! * Wrapper types that allow byte-granular I/O access atop block-based streams:
+//!   [`ByteReaderWrapper`], [`ByteWriterWrapper`], [`ByteReaderWriterWrapper`].
+//!    * Notably, the [`blocks_from_bytes()`] function is useful for calculating which
+//!      block-based I/O transfers are needed to satisfy an arbitrary byte-wise transfer.
+//!
 //! Note that the above traits represent "stateless" access into I/O streams or devices,
 //! in that successive read/write operations will not advance any kind of "offset".
 //!
-//! To read or write while tracking the current offset into the I/O stream, we provide the
-//! `Reader`, `Writer`, and `ReaderWriter` types. 
+//! To read or write while tracking the current offset into the I/O stream, 
+//! we provide the [`Reader`], [`Writer`], and [`ReaderWriter`] types. 
 //! These types act as stateful wrappers around I/O streams that track the current offset 
 //! into that stream, i.e., where the next read or write operation will start.
 //!
 //! For example, a storage device like a hard drive that transfers 512-byte blocks at a time
-//! should implement the `BlockReader` and `BlockWriter` traits.
+//! should implement `BlockReader`, `BlockWriter`, `BlockIo`, and `KnownLength` traits.
 //! A user can then use those traits directly to transfer whole blocks to/from the device,
 //! or wrap the storage device in one of the byte-wise reader/writer types 
 //! in order to transfer arbitrary bytes (as little as one byte) at a time to/from the device. 
-//!
-//! Notably, the [`blocks_from_bytes()`](fn.blocks_from_bytes.html) function is useful for
-//! determining the set of block-based I/O transfers needed to satisfy an arbitrary
-//! byte-granular transfer.
 //!
 
 #![no_std]
@@ -78,7 +79,7 @@ impl From<IoError> for &'static str {
 
 /// A parent trait used to specify the block size (in bytes)
 /// of I/O transfers (read and write operations). 
-/// See its use in `BlockReader` and `BlockWriter`.
+/// See its use in [`BlockReader`] and [`BlockWriter`].
 pub trait BlockIo {
     /// Returns the size in bytes of a single block (i.e., sector),
     /// the minimum granularity of I/O transfers.
@@ -96,8 +97,7 @@ impl<B> BlockIo for &mut B where B: BlockIo + ?Sized {
 }
 
 
-/// A trait that should be implemented for I/O streams or devices
-/// that have a known length, e.g., disk drives. 
+/// A trait that represents an I/O stream that has a known length, e.g., a disk drive.
 ///
 /// This trait exists to enable seeking to an offset from the end of the stream.
 pub trait KnownLength {
@@ -434,6 +434,9 @@ impl<RW> KnownLength for ByteWriterWrapper<RW> where RW: KnownLength + BlockRead
 
 /// A stateful reader that keeps track of its current offset
 /// within the internal stateless [`ByteReader`] I/O stream.
+///
+/// This implements the [`bare_io::Read`] trait,
+/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 #[derive(Deref, DerefMut)]
 pub struct Reader<R: ByteReader>(IoWithOffset<R>);
 impl<R> Reader<R> where R: ByteReader {
@@ -445,6 +448,9 @@ impl<R> Reader<R> where R: ByteReader {
 
 /// A stateful writer that keeps track of its current offset
 /// within the internal stateless [`ByteWriter`] I/O stream.
+///
+/// This implements the [`bare_io::Write`] trait,
+/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 #[derive(Deref, DerefMut)]
 pub struct Writer<W: ByteWriter>(IoWithOffset<W>);
 impl<W: ByteWriter> Writer<W> {
@@ -456,6 +462,9 @@ impl<W: ByteWriter> Writer<W> {
 
 /// A stateful reader and writer that keeps track of its current offset
 /// within the internal stateless [`ByteReader`] + [`ByteWriter`] I/O stream.
+///
+/// This implements both the [`bare_io::Read`] and [`bare_io::Write`] traits,
+/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 #[derive(Deref, DerefMut)]
 pub struct ReaderWriter<RW: ByteReader + ByteWriter>(IoWithOffset<RW>);
 impl<RW: ByteReader + ByteWriter> ReaderWriter<RW> {
@@ -468,11 +477,12 @@ impl<RW: ByteReader + ByteWriter> ReaderWriter<RW> {
 /// A stateful I/O stream (reader, writer, or both) that keeps track
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// Don't use this type directly (you cannot construct one); use its wrapper types:
-/// [`Reader`], [`Writer`], or [`ReaderWriter`].
+/// Don't use this type directly (you cannot construct one).
+/// Instead, use its wrapper types: [`Reader`], [`Writer`], or [`ReaderWriter`].
 ///
 /// This type permits seeking through the I/O stream if it has a known length,
 /// i.e., if it implements the [`KnownLength`] trait.
+#[doc(hidden)]
 pub struct IoWithOffset<IO> {
     io: IO,
     offset: u64,
@@ -534,6 +544,13 @@ impl<IO> Seek for IoWithOffset<IO> where IO: KnownLength {
 
 /// Calculates block-wise bounds for an I/O transfer 
 /// based on a byte-wise range into a block-wise stream.
+///
+/// This function returns transfer operations that prioritize using
+/// fewer temporary buffers and fewer data copy operations between those buffers
+/// instead of prioritizing issuing fewer I/O transfer operations.
+/// If you prefer to issue a single I/O transfer to cover the whole range of byte
+/// (which may be faster depending on the underlying I/O device),
+/// then you should not use this function.
 /// 
 /// There are up to three transfer operations that can possibly occur,
 /// depending on the alignment of the byte-wise range:
@@ -555,13 +572,13 @@ impl<IO> Seek for IoWithOffset<IO> where IO: KnownLength {
 ///    into the byte range `3584..3950`.
 ///
 /// ## Arguments
-/// * `byte_range`: the absolute byte-wise range (from the beginning of the block-wise stream)
-///    at which the I/O transfer starts and ends.
+/// * `byte_range`: the absolute range of bytes where the I/O transfer starts and ends,
+///    specified as absolute offsets from the beginning of the block-wise I/O stream.
 /// * `block_size`: the size in bytes of each block in the block-wise I/O stream.
 /// 
 /// ## Return
 /// Returns a list of the three above transfer operations, 
-/// enclosed in `Option`s to convey that some may not be necessary.
+/// enclosed in `Option`s to convey that not all operations may be necessary.
 /// 
 pub fn blocks_from_bytes(
     byte_range: Range<usize>,
@@ -628,7 +645,9 @@ pub fn blocks_from_bytes(
 }
 
 
-/// Describes an operation for performing byte-wise I/O on a block-based I/O stream. 
+/// Describes an operation for performing byte-wise I/O on a block-based I/O stream.
+/// 
+/// See [`blocks_from_bytes()`] for more details.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct BlockByteTransfer {

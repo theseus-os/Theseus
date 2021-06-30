@@ -1,5 +1,8 @@
-#![no_std]
+//! Simple tests for block-wise and byte-wise I/O traits and wrappers.
+//!
+//! Currently only the [`ata::AtaDrive`] implementation is available, so that's what is tested.
 
+#![no_std]
 
 extern crate alloc;
 #[macro_use] extern crate log;

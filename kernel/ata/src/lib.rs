@@ -15,11 +15,11 @@ extern crate block_io;
 
 use core::fmt;
 use spin::Mutex;
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use alloc::{boxed::Box, string::String, sync::Arc};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
-use block_io::{BlockByteTransfer, BlockIo, BlockReader, BlockWriter, ByteReader, IoError, KnownLength, blocks_from_bytes};
+use block_io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -299,7 +299,6 @@ impl AtaBus {
 				chunk[1] = (word >> 8) as u8;
 			}
 			buffer_offset += SECTOR_SIZE_IN_BYTES;
-			warn!("ata::read_pio(): read sector {} (end {})", _lba, lba_start + &sector_count);
 		}
 		self.wait_for_data_done().map_err(|_| "error after data read")?;
 		Ok(sector_count)
@@ -367,7 +366,6 @@ impl AtaBus {
 				unsafe { self.data.write(word); }
 			}
 			buffer_offset += SECTOR_SIZE_IN_BYTES;
-			warn!("ata::write_pio(): wrote sector {} (end {})", _lba, lba_start + &sector_count);
 		}
 		self.wait_for_data_done().map_err(|_| "error after data write")?;
 
@@ -851,7 +849,7 @@ impl<'c> Iterator for IdeControllerIter<'c> {
 /// obtained from the response to an identify command.
 /// 
 /// Fuller documentation is available here:
-/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members
+/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members>
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(packed)]
 pub struct AtaIdentifyData {

@@ -1,12 +1,12 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "block_io"
-description = "A generic layer for reading/writing IO streams of different block sizes."
+description = "Traits and types for reading/writing IO streams of differing block sizes."
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-bare-io = "0.2.1"
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
 derive_more = "0.99.0"
 
 [dependencies.log]
