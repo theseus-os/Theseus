@@ -287,7 +287,7 @@ impl<R> ByteWriter for &mut R where R: ByteWriter + ?Sized {
 /// 
 /// ## Example
 /// Use the `From` implementation around a `BlockReader` instance, such as:
-/// ```rust
+/// ```ignore
 /// let bytes_read = ByteReaderWrapper::from(storage_dev.lock().deref_mut()).read_at(...);
 /// ```
 #[derive(Deref, DerefMut)]
@@ -339,7 +339,7 @@ impl<RW> KnownLength for ByteReaderWrapper<RW> where RW: KnownLength + BlockRead
 /// 
 /// ## Example
 /// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
-/// ```rust
+/// ```ignore
 /// let mut reader_writer = ByteReaderWriterWrapper::from(storage_dev.lock().deref_mut()); 
 /// let bytes_read = reader_writer.read_at(...);
 /// let bytes_written = reader_writer.write_at(...);
@@ -407,7 +407,7 @@ impl<RW> KnownLength for ByteReaderWriterWrapper<RW> where RW: KnownLength + Blo
 ///
 /// ## Example
 /// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
-/// ```rust
+/// ```ignore
 /// /* Assume `storage_dev` implements `BlockReader + BlockWriter` */
 /// let mut reader_writer = ByteReaderWriterWrapper::from(storage_dev); 
 /// let bytes_written = reader_writer.write_at(...);
