@@ -607,7 +607,7 @@ help:
 ###################################################################################################
 
 QEMU_MEMORY ?= 512M
-QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
+QEMU_FLAGS := -cdrom $(iso) -boot d -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
 
 ## multicore 
 QEMU_CPUS ?= 4
@@ -617,9 +617,13 @@ QEMU_FLAGS += -smp $(QEMU_CPUS)
 MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
-# QEMU_FLAGS += -drive format=raw,file=DISK_IMAGE.img,if=ide
-## Add a disk drive, a SATA drive over the AHCI interface.
-# QEMU_FLAGS += -drive id=my_disk,file=DISK_IMAGE.img,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
+DISK_IMAGE ?= fat32.img
+ifneq ($(wildcard $(DISK_IMAGE)),) 
+	QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+endif
+
+## We don't yet support SATA in Theseus, but this is how to add a SATA drive over the AHCI interface.
+# QEMU_FLAGS += -drive id=my_disk,file=$(DISK_IMAGE),if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)
@@ -671,12 +675,12 @@ endif
 
 ### Old Run: runs the most recent build without rebuilding
 orun:
-	@qemu-system-x86_64 $(QEMU_FLAGS)
+	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
 ### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
 orun_pause:
-	@qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
@@ -691,7 +695,7 @@ run: $(iso)
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 run_pause: $(iso)
-	@qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
 ### Runs a gdb instance on the host machine. 
