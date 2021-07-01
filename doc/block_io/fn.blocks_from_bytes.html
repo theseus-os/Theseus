@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Calculates block-wise bounds for an I/O transfer  based on a byte-wise range into a block-wise stream."><meta name="keywords" content="rust, rustlang, rust-lang, blocks_from_bytes"><title>blocks_from_bytes in block_io - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../ayu.css" disabled ><script id="default-settings"></script><script src="../storage.js"></script><script src="../crates.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../block_io/index.html'><div class='logo-container rust-logo'><img src='../rust-logo.png' alt='logo'></div></a><div class="sidebar-elems"><p class="location"><a href="index.html">block_io</a></p><div id="sidebar-vars" data-name="blocks_from_bytes" data-ty="fn" data-relpath=""></div><script defer src="sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
+                <a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Function <a href="index.html">block_io</a>::<wbr><a class="fn" href="">blocks_from_bytes</a><button id="copy-path" onclick="copy_path(this)"><img src="../clipboard.svg" width="19" height="18" alt="Copy item import"></button></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../src/block_io/lib.rs.html#586-648" title="goto source code">[src]</a></span></h1><pre class="rust fn">pub fn blocks_from_bytes(<br>&nbsp;&nbsp;&nbsp;&nbsp;byte_range: <a class="struct" href="https://doc.rust-lang.org/nightly/core/ops/range/struct.Range.html" title="struct core::ops::range::Range">Range</a>&lt;usize&gt;, <br>&nbsp;&nbsp;&nbsp;&nbsp;block_size: usize<br>) -&gt; [<a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;<a class="struct" href="struct.BlockByteTransfer.html" title="struct block_io::BlockByteTransfer">BlockByteTransfer</a>&gt;; 3]</pre><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Calculates block-wise bounds for an I/O transfer 
+based on a byte-wise range into a block-wise stream.</p>
+<p>This function returns transfer operations that prioritize using
+fewer temporary buffers and fewer data copy operations between those buffers
+instead of prioritizing issuing fewer I/O transfer operations.
+If you prefer to issue a single I/O transfer to cover the whole range of byte
+(which may be faster depending on the underlying I/O device),
+then you should not use this function.</p>
+<p>There are up to three transfer operations that can possibly occur,
+depending on the alignment of the byte-wise range:</p>
+<ol>
+<li>A partial single-block transfer of some bytes in the first block, 
+only if the start of <code>byte_range</code> is not aligned to <code>block_size</code>.</li>
+<li>A multi-block transfer of contiguous whole blocks, 
+only if <code>byte_range</code> spans more than 2 blocks.</li>
+<li>A partial single-block transfer of some bytes in the last block,
+only if the end of <code>byte_range</code> is not aligned to <code>block_size</code>.</li>
+</ol>
+<h2 id="example" class="section-header"><a href="#example">Example</a></h2>
+<p>Given a read request for a <code>byte_range</code> of <code>1500..3950</code> and a <code>block_size</code> of <code>512</code> bytes,
+this function will return the following three transfer operations:</p>
+<ol>
+<li>Read 1 block (block <code>2</code>) and transfer the last 36 bytes of that block (<code>476..512</code>)
+into the byte range <code>1500..1536</code>.</li>
+<li>Read 4 blocks (blocks <code>3..7</code>) and transfer all of those 2048 bytes
+into the byte range <code>1536..3584</code>.</li>
+<li>Read 1 block (block <code>7</code>) and transfer the first 366 bytes of that block (<code>0..366</code>)
+into the byte range <code>3584..3950</code>.</li>
+</ol>
+<h2 id="arguments" class="section-header"><a href="#arguments">Arguments</a></h2>
+<ul>
+<li><code>byte_range</code>: the absolute range of bytes where the I/O transfer starts and ends,
+specified as absolute offsets from the beginning of the block-wise I/O stream.</li>
+<li><code>block_size</code>: the size in bytes of each block in the block-wise I/O stream.</li>
+</ul>
+<h2 id="return" class="section-header"><a href="#return">Return</a></h2>
+<p>Returns a list of the three above transfer operations, 
+enclosed in <code>Option</code>s to convey that not all operations may be necessary.</p>
+</div></details></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../" data-current-crate="block_io" data-search-index-js="../search-index.js" data-search-js="../search.js"></div>
+    <script src="../main.js"></script></body></html>

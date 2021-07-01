@@ -109,31 +109,6 @@
 <span id="106">106</span>
 <span id="107">107</span>
 <span id="108">108</span>
-<span id="109">109</span>
-<span id="110">110</span>
-<span id="111">111</span>
-<span id="112">112</span>
-<span id="113">113</span>
-<span id="114">114</span>
-<span id="115">115</span>
-<span id="116">116</span>
-<span id="117">117</span>
-<span id="118">118</span>
-<span id="119">119</span>
-<span id="120">120</span>
-<span id="121">121</span>
-<span id="122">122</span>
-<span id="123">123</span>
-<span id="124">124</span>
-<span id="125">125</span>
-<span id="126">126</span>
-<span id="127">127</span>
-<span id="128">128</span>
-<span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
-<span id="132">132</span>
-<span id="133">133</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Trait definitions for storage devices and storage controllers. </span>
 <span class="doccomment">//! </span>
@@ -146,20 +121,20 @@
 <span class="doccomment">//! and usage of the `StorageDevice` trait methods, as well as how to downcast it</span>
 <span class="doccomment">//! into a specific concrete type, such as an `AtaDrive`.</span>
 <span class="doccomment">//! ```rust</span>
-<span class="doccomment">//! if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {</span>
+<span class="doccomment">//! if let Some(controller) = storage_manager::storage_controllers().next() {</span>
 <span class="doccomment">//!     if let Some(sd) = controller.lock().devices().next() {</span>
 <span class="doccomment">//!         {</span>
 <span class="doccomment">//!             // Call `StorageDevice` trait methods directly</span>
 <span class="doccomment">//!             let mut locked_sd = sd.lock();</span>
-<span class="doccomment">//!             debug!(&quot;Found drive with size {}, {} sectors&quot;, locked_sd.size_in_bytes(), locked_sd.size_in_sectors());</span>
+<span class="doccomment">//!             debug!(&quot;Found drive with size {}, {} sectors&quot;, locked_sd.size_in_bytes(), locked_sd.size_in_blocks());</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//!             // Here we downcast the `StorageDevice` into an `AtaDrive` so we can call `AtaDrive` methods.</span>
 <span class="doccomment">//!             if let Some(ata_drive) = locked_sd.as_any_mut().downcast_mut() {</span>
 <span class="doccomment">//!                 debug!(&quot;      drive was master? {}&quot;, ata_drive.is_master());</span>
 <span class="doccomment">//! </span>
-<span class="doccomment">//!                 // Read 10 sectors from the drive</span>
+<span class="doccomment">//!                 // Read 10 sectors from the beginning of the drive (at offset 0)</span>
 <span class="doccomment">//!                 let mut initial_buf: [u8; 5120] = [0; 5120]; // 10 sectors of bytes</span>
-<span class="doccomment">//!                 let sectors_read = ata_drive.read_pio(&amp;mut initial_buf[..], 0);</span>
+<span class="doccomment">//!                 let sectors_read = ata_drive.read_pio(&amp;mut initial_buf[..], 0).unwrap();</span>
 <span class="doccomment">//!                 debug!(&quot;[SUCCESS] sectors_read: {:?}&quot;, sectors_read);</span>
 <span class="doccomment">//!                 debug!(&quot;{:?}&quot;, core::str::from_utf8(&amp;initial_buf));</span>
 <span class="doccomment">//! </span>
@@ -168,16 +143,16 @@
 <span class="doccomment">//!                 for b in write_buf.chunks_exact_mut(16) {</span>
 <span class="doccomment">//!                     b.copy_from_slice(b&quot;QWERTYUIOPASDFJK&quot;);</span>
 <span class="doccomment">//!                 }</span>
-<span class="doccomment">//!                 let bytes_written = ata_drive.write_pio(&amp;write_buf[..], 2);</span>
+<span class="doccomment">//!                 let bytes_written = ata_drive.write_pio(&amp;write_buf[..], 2).unwrap();</span>
 <span class="doccomment">//!                 debug!(&quot;WRITE_PIO {:?}&quot;, bytes_written);</span>
 <span class="doccomment">//!             }</span>
 <span class="doccomment">//!         }</span>
 <span class="doccomment">//!         // Read 10 sectors from the drive using the `StorageDevice` trait methods.</span>
 <span class="doccomment">//!         let mut after_buf: [u8; 5120] = [0; 5120];</span>
-<span class="doccomment">//!         let sectors_read = sd.lock().read_sectors(&amp;mut after_buf[..], 0)?;</span>
+<span class="doccomment">//!         let sectors_read = sd.lock().read_blocks(&amp;mut after_buf[..], 0).unwrap();</span>
 <span class="doccomment">//!         debug!(&quot;{:X?}&quot;, &amp;after_buf[..]);</span>
 <span class="doccomment">//!         debug!(&quot;{:?}&quot;, core::str::from_utf8(&amp;after_buf));</span>
-<span class="doccomment">//!         trace!(&quot;POST-WRITE READ_SECTORS {} sectors&quot;, sectors_read);</span>
+<span class="doccomment">//!         trace!(&quot;POST-WRITE READ_BLOCKS {} sectors&quot;, sectors_read);</span>
 <span class="doccomment">//!     }</span>
 <span class="doccomment">//! }</span>
 <span class="doccomment">//! ```</span>
@@ -193,6 +168,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">downcast_rs</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">block_io</span>;
 
 <span class="kw">use</span> <span class="ident">alloc</span>::{
     <span class="ident">boxed::Box</span>,
@@ -200,6 +176,7 @@
 };
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
+<span class="kw">use</span> <span class="ident">block_io</span>::{<span class="ident">BlockIo</span>, <span class="ident">KnownLength</span>, <span class="ident">BlockReader</span>, <span class="ident">BlockWriter</span>};
 
 
 <span class="doccomment">/// A trait that represents a storage controller,</span>
@@ -224,44 +201,17 @@
 <span class="doccomment">/// A trait that represents a storage device,</span>
 <span class="doccomment">/// such as hard disks, removable drives, SSDs, etc.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// It offers functions to read and write at sector granularity,</span>
-<span class="doccomment">/// as well as basic functions to query device info.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">StorageDevice</span>: <span class="ident">Downcast</span> {
-    <span class="doccomment">/// Reads content from the storage device into the given `buffer`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments </span>
-    <span class="doccomment">/// * `buffer`: the destination buffer. The length of the `buffer` governs how many sectors are read, </span>
-    <span class="doccomment">///   and must be an even multiple of the storage device&#39;s [`sector size`](#tymethod.sector_size_in_bytes). </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// * `offset_in_sectors`: an absolute offset from the beginning of the storage device, given in number of sectors. </span>
-    <span class="doccomment">///   This is sometimes referred to as the starting logical block address (LBA).</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns the number of sectors (*not bytes*) read into the `buffer`.</span>
-    <span class="kw">fn</span> <span class="ident">read_sectors</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>], <span class="ident">offset_in_sectors</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
-
-    <span class="doccomment">/// Writes content from the given `buffer` to the storage device starting at the given `offset_in_sectors`.</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// # Arguments </span>
-    <span class="doccomment">/// * `buffer`: the source buffer. The length of the `buffer` governs how many sectors are written, </span>
-    <span class="doccomment">///   and must be an even multiple of the storage device&#39;s [`sector size`](#tymethod.sector_size_in_bytes). </span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// * `offset_in_sectors`: an absolute offset from the beginning of the storage device, given in number of sectors. </span>
-    <span class="doccomment">///   This is sometimes referred to as the starting logical block address (LBA).</span>
-    <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns the number of sectors (*not bytes*) written to the storage device.</span>
-    <span class="kw">fn</span> <span class="ident">write_sectors</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">offset_in_sectors</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
-
-	<span class="doccomment">/// Returns the size of a single sector in bytes, as defined by this drive.</span>
-    <span class="kw">fn</span> <span class="ident">sector_size_in_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>; 
-
-	<span class="doccomment">/// Returns the number of sectors in this drive.</span>
-    <span class="kw">fn</span> <span class="ident">size_in_sectors</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
-    
-    <span class="doccomment">/// Returns the size of this drive in bytes, rounded up to the nearest sector size.</span>
-    <span class="doccomment">/// This is nothing more than [`sector_size_in_bytes()`](#tymethod.sector_size_in_bytes)` * `[`size_in_sectors()`](#tymethod.size_in_sectors).</span>
-    <span class="kw">fn</span> <span class="ident">size_in_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">sector_size_in_bytes</span>() <span class="op">*</span> <span class="self">self</span>.<span class="ident">size_in_sectors</span>()
-    }
+<span class="doccomment">/// A `StorageDevice` must implement the following traits:</span>
+<span class="doccomment">/// * `BlockIo`: to specify its block size.</span>
+<span class="doccomment">/// * `BlockReader` and `BlockWriter`: to enable reading and writing data </span>
+<span class="doccomment">///   from/to the device at block granularity. </span>
+<span class="doccomment">/// * `KnownLength`: to specify the size in bytes (length) of the entire device. </span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This trait includes additional functions to query device info, e.g.,</span>
+<span class="doccomment">/// the device&#39;s total size in number of blocks.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">StorageDevice</span>: <span class="ident">BlockIo</span> <span class="op">+</span> <span class="ident">BlockReader</span> <span class="op">+</span> <span class="ident">BlockWriter</span> <span class="op">+</span> <span class="ident">KnownLength</span> <span class="op">+</span> <span class="ident">Downcast</span> {
+	<span class="doccomment">/// Returns the total size of this device, given in number of blocks (sectors).</span>
+    <span class="kw">fn</span> <span class="ident">size_in_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
 }
 <span class="macro">impl_downcast!</span>(<span class="ident">StorageDevice</span>);
 
