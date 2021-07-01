@@ -114,7 +114,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs book view-book
+		gdb doc docs view-doc view-docs book view-book clean-doc
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -334,10 +334,10 @@ $(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
 
 
 
-### Removes all build files
+### Removes all built source files
 clean:
 	cargo clean
-	@rm -rf build
+	@rm -rf $(BUILD_DIR)
 	
 
 
@@ -454,20 +454,19 @@ preserve_old_modules:
 ###################################################################################################
 
 ## The output directory for source-level documentation.
-DOC_BUILD := $(BUILD_DIR)/doc
-## The top-level (root) documentation file built by `rustdoc` (`cargo doc`).
-RUSTDOC_OUT := $(DOC_BUILD)/___Theseus_Crates___/index.html
+RUSTDOC_OUT      := $(BUILD_DIR)/doc
+RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
-## The entire project is built as normal using the `cargo doc` command.
+## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
 doc: check_rustc
-	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
-	@rm -rf $(DOC_BUILD)
-	@mkdir -p $(DOC_BUILD)
-	@cp -rf target/doc $(BUILD_DIR)/
-	@echo -e "\nDocumentation is now available at: \"$(RUSTDOC_OUT)\"."
+	@rm -rf $(RUSTDOC_OUT)
+	@mkdir -p $(RUSTDOC_OUT)
+	@cp -rf target/doc/. $(RUSTDOC_OUT)
+	@echo -e "\nTheseus source docs are now available at: \"$(RUSTDOC_OUT_FILE)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
@@ -476,18 +475,19 @@ view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT)")" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT_FILE)")" &
 else
-	@xdg-open $(RUSTDOC_OUT) > /dev/null 2>&1 || open $(RUSTDOC_OUT) &
+	@xdg-open $(RUSTDOC_OUT_FILE) > /dev/null 2>&1 || open $(RUSTDOC_OUT_FILE) &
 endif
 
 
-### The location of Theseus's book-style documentation. 
-BOOK_DIR := $(ROOT_DIR)/book
-BOOK_OUT := $(BOOK_DIR)/book/html/index.html
+### The locations of Theseus's book-style documentation.
+BOOK_SRC      := $(ROOT_DIR)/book
+BOOK_OUT      := $(BUILD_DIR)/book
+BOOK_OUT_FILE := $(BOOK_OUT)/html/index.html
 
 ### Builds the Theseus book-style documentation using `mdbook`.
-book: $(wildcard $(BOOK_DIR)/src/*) $(BOOK_DIR)/book.toml
+book: $(wildcard $(BOOK_SRC)/src/*) $(BOOK_SRC)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
 	@echo -e "    cargo +stable install mdbook --force"
@@ -495,19 +495,25 @@ ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
-	@(cd $(BOOK_DIR) && mdbook build)
-	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT)\"."
+	@mdbook build $(BOOK_SRC) -d $(BOOK_OUT)
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT_FILE)\"."
 
 
 ### Opens the Theseus book.
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
 ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT)")" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT_FILE)")" &
 else
-	@xdg-open $(BOOK_OUT) > /dev/null 2>&1 || open $(BOOK_OUT) &
+	@xdg-open $(BOOK_OUT_FILE) > /dev/null 2>&1 || open $(BOOK_OUT_FILE) &
 endif
 
+
+### Removes all built documentation
+clean-doc:
+	@cargo clean --doc
+	@rm -rf $(RUSTDOC_OUT) $(BOOK_OUT)
+	
 
 ### The primary documentation for this makefile itself.
 help: 
@@ -589,6 +595,8 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "   clean-doc:"
+	@echo -e "\t Remove all generated documentation files."
 	@echo ""
 
 
