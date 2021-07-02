@@ -1,168 +1,142 @@
-#![no_std]
+//! A mlx5 driver for a ConnectX-5 100GbE Network Interface Card.
+//! 
+//! Currently we only support reading the device PCI space, mapping the initialization segment,
+//! and setting up a command queue to pass commands to the NIC.
 
+#![no_std]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
-#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
-#![feature(rustc_private)]
-#![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate static_assertions;
-extern crate volatile;
-extern crate zerocopy;
 extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
-extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
 extern crate owning_ref;
-extern crate interrupts;
-extern crate pic;
-extern crate x86_64;
-extern crate mpmc;
-extern crate network_interface_card;
-extern crate apic;
-extern crate intel_ethernet;
-extern crate nic_buffers;
-extern crate nic_queues;
 extern crate nic_initialization;
 extern crate mellanox_ethernet;
+extern crate kernel_config;
 
-
-use memory::allocate_pages;
 use spin::Once; 
-use alloc::vec::Vec;
-use alloc::collections::VecDeque;
+use alloc::{
+    vec::Vec,
+    boxed::Box
+};
 use irq_safety::MutexIrqSafe;
-use alloc::boxed::Box;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
-use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
-use kernel_config::memory::PAGE_SIZE;
+use pci::PciDevice;
 use owning_ref::BoxRefMut;
-use interrupts::{eoi,register_interrupt};
-use x86_64::structures::idt::{ExceptionStackFrame};
-use network_interface_card:: NetworkInterfaceCard;
-use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
-use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
-use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
-use mellanox_ethernet::{CommandQueueEntry, InitializationSegment, CommandQueue, CommandOpcode, ManagePagesOpmod, QueryPagesOpmod};
+use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
+use mellanox_ethernet::{
+    InitializationSegment, 
+    command_queue::{CommandQueueEntry, CommandQueue, CommandOpcode, ManagePagesOpmod, QueryPagesOpmod}
+};
+use kernel_config::memory::PAGE_SIZE;
 
 
 pub const MLX_VEND:           u16 = 0x15B3;  // Vendor ID for Mellanox
 pub const CONNECTX5_DEV:      u16 = 0x1019;  // Device ID for the ConnectX-5 NIC
 
-/// Assuming one of these nics for now
+/// The singleton connectx-5 NIC.
+/// TODO: Allow for multiple NICs
 static CONNECTX5_NIC: Once<MutexIrqSafe<ConnectX5Nic>> = Once::new();
 
-/// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
+/// Returns a reference to the NIC wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
 pub fn get_mlx5_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
     CONNECTX5_NIC.get()
 }
 
-// /// How many ReceiveBuffers are preallocated for this driver to use. 
-// const RX_BUFFER_POOL_SIZE: usize = 256; 
-// lazy_static! {
-//     /// The pool of pre-allocated receive buffers that are used by the E1000 NIC
-//     /// and temporarily given to higher layers in the networking stack.
-//     static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
-// }
-
-
-/// Struct representing a connectx-5 network interface card.
+/// Struct representing a ConnectX-5 network interface card.
 pub struct ConnectX5Nic {
-    /// Type of BAR0
-    bar_type: u8,
-    /// MMIO Base Address
+    /// Initialization segment base address
     mem_base: PhysicalAddress,
+    /// Initialization Segment
+    init_segment: BoxRefMut<MappedPages, InitializationSegment>,
+    /// Command Queue
+    command_queue: CommandQueue,
+    /// Boot pages passed to the NIC. Once transferred, they should not be accessed by the driver.
+    boot_pages: Vec<MappedPages>,
+    /// Init pages passed to the NIC. Once transferred, they should not be accessed by the driver.
+    init_pages: Vec<MappedPages>,
 }
 
 
-/// Functions that setup the NIC struct and handle the sending and receiving of packets.
+/// Functions that setup the NIC struct.
 impl ConnectX5Nic {
-    /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    pub fn init(mlx5_pci_dev: &PciDevice) -> Result<(), &'static str> { //Result<&'static MutexIrqSafe<ConnectX5Nic>, &'static str> {
-        use pic::PIC_MASTER_OFFSET;
 
-        let bar0 = mlx5_pci_dev.bars[0];
-        // Determine the access mechanism from the base address register's bit 0
-        let bar_type = (bar0 as u8) & 0x1;    
-
-        // If the base address is not memory mapped then exit
-        if bar_type == PciConfigSpaceAccessMechanism::IoPort as u8 {
-            error!("mlx5::init(): BAR0 is of I/O type");
-            return Err("mlx5::init(): BAR0 is of I/O type")
-        }
-        trace!("init segment size = {}", core::mem::size_of::<mellanox_ethernet::InitializationSegment>());
-  
+    /// Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.
+    /// (steps taken from Section 7.2: HCA Driver Start-up)
+    pub fn init(mlx5_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<ConnectX5Nic>, &'static str> {
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         mlx5_pci_dev.pci_set_command_bus_master_bit();
 
-        // memory mapped base address
+        // retrieve the memory-mapped base address of the initialization segment
         let mem_base = mlx5_pci_dev.determine_mem_base(0)?;
         trace!("mlx5 mem base = {}", mem_base);
-        // map pages to the physical address given by mem_base as that is the intialization segment
-        let mut init_segment = ConnectX5Nic::mapped_init_segment(mem_base)?;
 
-        // init_segment.pf_reset();
-        init_segment.print();
+        // map pages to the physical address given by mem_base as that is the intialization segment
+        let mut init_segment = ConnectX5Nic::map_init_segment(mem_base)?;
+
+        trace!("{:?}", init_segment);
         
         // find number of entries in command queue and stride
-        let cmdq_entries = init_segment.num_cmdq_entries() as usize;
-        trace!("mlx5 cmdq entries = {}", cmdq_entries);
+        let num_cmdq_entries = init_segment.num_cmdq_entries() as usize;
+        trace!("mlx5 cmdq entries = {}", num_cmdq_entries);
+
+        // find command queue entry stride, the number of bytes between the start of two adjacent entries.
         let cmdq_stride = init_segment.cmdq_entry_stride() as usize;
         trace!("mlx5 cmdq stride = {}", cmdq_stride);
         
-        if cmdq_stride != core::mem::size_of::<mellanox_ethernet::CommandQueueEntry>() {
+        // We assume that the stride is equal to the size of the entry.
+        if cmdq_stride != core::mem::size_of::<CommandQueueEntry>() {
             error!("Command Queue layout is no longer accurate due to invalid assumption.");
             return Err("Command Queue layout is no longer accurate due to invalid assumption.");
         }
+
         // create command queue
-        let size_in_bytes_of_cmdq = cmdq_entries * cmdq_stride;
+        let size_in_bytes_of_cmdq = num_cmdq_entries * cmdq_stride;
         trace!("total size in bytes of cmdq = {}", size_in_bytes_of_cmdq);
     
-        // cmdp needs to be aligned, check??
+        // allocate mapped pages for the command queue
         let (cmdq_mapped_pages, cmdq_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_cmdq, NIC_MAPPING_FLAGS)?;
         trace!("cmdq mem base = {}", cmdq_starting_phys_addr);
     
         // cast our physically-contiguous MappedPages into a slice of command queue entries
         let mut cmdq = CommandQueue::create(
-            BoxRefMut::new(Box::new(cmdq_mapped_pages)).try_map_mut(|mp| mp.as_slice_mut::<CommandQueueEntry>(0, cmdq_entries))?,
-            cmdq_entries
+            BoxRefMut::new(Box::new(cmdq_mapped_pages)).try_map_mut(|mp| mp.as_slice_mut::<CommandQueueEntry>(0, num_cmdq_entries))?,
+            num_cmdq_entries
         )?;
 
-        // write physical location of command queues to initialization segment
+        // write physical location of command queue to initialization segment
         init_segment.set_physical_address_of_cmdq(cmdq_starting_phys_addr)?;
 
         // Read initalizing field from initialization segment until it is cleared
-        while init_segment.device_is_initializing() { trace!("device is initializing");}
+        while init_segment.device_is_initializing() { trace!("device is initializing"); }
         trace!("initializing field is cleared.");
 
-        
         // Execute ENABLE_HCA command
-        let cmdq_entry = cmdq.create_command(CommandOpcode::EnableHca, None, None, None, None)?;
+        let cmdq_entry = cmdq.create_command(CommandOpcode::EnableHca, None, None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("EnableHCA: {:?}", status);
 
-        // execute query ISSI
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryIssi, None, None,None, None)?;
+        // execute QUERY_ISSI
+        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryIssi, None, None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         let (current_issi, available_issi) = cmdq.get_query_issi_command_output(cmdq_entry)?;
         trace!("QueryISSI: {:?}, issi version :{}, available: {:#X}", status, current_issi, available_issi);
 
-        // execute set ISSI
-        let cmdq_entry = cmdq.create_command(CommandOpcode::SetIssi, None, None,None, None)?;
+        // execute SET_ISSI
+        let cmdq_entry = cmdq.create_command(CommandOpcode::SetIssi, None, None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("SetISSI: {:?}", status);
 
         // Query pages for boot
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::BootPages as u16), None, None, None)?;
+        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::BootPages as u16), None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         let num_boot_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
@@ -172,99 +146,69 @@ impl ConnectX5Nic {
         let mut boot_mp = Vec::with_capacity(num_boot_pages as usize);
         let mut boot_pa = Vec::with_capacity(num_boot_pages as usize);
         for _ in 0..num_boot_pages {
-            let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+            let (page, pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
             boot_mp.push(page);
-            error!("pa: {:#X}", pa.value());
             boot_pa.push(pa);
         }
-        let cmdq_entry = cmdq.create_command(CommandOpcode::ManagePages, Some(ManagePagesOpmod::AllocationSuccess as u16), Some(boot_pa), None, None)?;
+
+        // execute MANAGE_PAGES command to transfer boot pages to device
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::ManagePages, 
+            Some(ManagePagesOpmod::AllocationSuccess as u16), 
+            Some(boot_pa)
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("Manage pages boot status: {:?}", status);
 
         // Query pages for init
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::InitPages as u16), None, None, None)?;
+        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::InitPages as u16), None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
-        let mut num_init_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
+        let num_init_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
         trace!("Query pages status: {:?}, init pages: {:?}", status, num_init_pages);
-        // Allocate pages for init
+
+        let mut init_mp = Vec::with_capacity(num_init_pages as usize);
         if num_init_pages != 0 {
-            let mut boot_mp = Vec::with_capacity(num_init_pages as usize);
-            let mut boot_pa = Vec::with_capacity(num_init_pages as usize);
+            // Allocate pages for init
+            let mut init_pa = Vec::with_capacity(num_init_pages as usize);
             for _ in 0..num_init_pages {
-                let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
-                boot_mp.push(page);
-                error!("pa: {:#X}", pa.value());
-                boot_pa.push(pa);
+                let (page, pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
+                init_mp.push(page);
+                init_pa.push(pa);
             }
-            let cmdq_entry = cmdq.create_command(CommandOpcode::ManagePages, Some(ManagePagesOpmod::AllocationSuccess as u16), Some(boot_pa), None, None)?;
+
+            // execute MANAGE_PAGES command to transfer init pages to device
+            let cmdq_entry = cmdq.create_command(
+                CommandOpcode::ManagePages, 
+                Some(ManagePagesOpmod::AllocationSuccess as u16), 
+                Some(init_pa)
+            )?;
             init_segment.post_command(cmdq_entry);
             let status = cmdq.wait_for_command_completion(cmdq_entry);
             trace!("Manage pages init status: {:?}", status);
         }
 
-        // init_hca
-        let cmdq_entry = cmdq.create_command(CommandOpcode::InitHca, None, None, None, None)?;
+        // execute INIT_HCA
+        let cmdq_entry = cmdq.create_command(CommandOpcode::InitHca, None, None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("Init HCA status: {:?}", status);
 
-        // // Query pages for regular
-        // let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::RegularPages as u16), None, None, None)?;
-        // init_segment.post_command(cmdq_entry);
-        // let status = cmdq.wait_for_command_completion(cmdq_entry);
-        // let num_regular_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
-        // trace!("Query pages status: {:?}, Regular pages: {:?}", status, num_regular_pages);
-
-        // // Allocate regular pages
-        // if num_regular_pages != 0 {
-        //     let mut boot_mp = Vec::with_capacity(num_init_pages as usize);
-        //     let mut boot_pa = Vec::with_capacity(num_init_pages as usize);
-        //     for _ in 0..num_regular_pages {
-        //         let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
-        //         boot_mp.push(page);
-        //         error!("pa: {:#X}", pa.value());
-        //         boot_pa.push(pa);
-        //     }
-        //     let cmdq_entry = cmdq.create_command(CommandOpcode::ManagePages, Some(ManagePagesOpmod::AllocationSuccess as u16), Some(boot_pa), None, None)?;
-        //     init_segment.post_command(cmdq_entry);
-        //     let status = cmdq.wait_for_command_completion(cmdq_entry);
-        //     trace!("Manage pages regular status: {:?}", status);
-        // }
-
-        // allocate uar
-        // let cmdq_entry = cmdq.create_command(CommandOpcode::AllocUar, None, None, None, None)?;
-        // init_segment.post_command(cmdq_entry);
-        // let status = cmdq.wait_for_command_completion(cmdq_entry);
-        // trace!("UAR status: {:?}", status);        
-
-        // let uar = cmdq.get_uar(cmdq_entry)?;
-        // trace!("UAR status: {:?}, UAR: {}", status, uar);        
-
-        // // create EQ for a Page Request Event
-        // // Allocate pages for EQ
-        // let num_eq_pages = 1;
-        // let mut eq_mp = Vec::with_capacity(num_eq_pages as usize);
-        // let mut eq_pa = Vec::with_capacity(num_eq_pages as usize);
-        // for _ in 0..num_eq_pages {
-        //     let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
-        //     eq_mp.push(page);
-        //     error!("pa: {:#X}", pa.value());
-        //     eq_pa.push(pa);
-        // }
-        // let cmdq_entry = cmdq.create_command(CommandOpcode::CreateEq, None, Some(eq_pa), Some(uar), Some(7))?;
-        // init_segment.post_command(cmdq_entry);
-        // let status = cmdq.wait_for_command_completion(cmdq_entry);
-        // let eq_number = cmdq.get_eq_number(cmdq_entry)?;
-        // trace!("Create EQ status: {:?}, number: {}", status, eq_number);
-
-        Ok(())
-
-
+        let mlx5_nic = ConnectX5Nic {
+            mem_base: mem_base,
+            init_segment: init_segment,
+            command_queue: cmdq, 
+            boot_pages: boot_mp,
+            init_pages: init_mp
+        };
+        
+        let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
+        Ok(nic_ref)
     }
     
-    fn mapped_init_segment(mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, InitializationSegment>, &'static str> {
+    /// Returns the memory-mapped initialization segment of the NIC
+    fn map_init_segment(mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, InitializationSegment>, &'static str> {
         let mp = allocate_memory(mem_base, core::mem::size_of::<InitializationSegment>())?;
         BoxRefMut::new(Box::new(mp)).try_map_mut(|mp| mp.as_type_mut::<InitializationSegment>(0))
     }

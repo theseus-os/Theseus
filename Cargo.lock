@@ -1359,7 +1359,7 @@ dependencies = [
  "bit_field 0.7.0",
  "byteorder",
  "kernel_config",
- "libm 0.2.1",
+ "libm",
  "log",
  "memory",
  "nic_initialization",
@@ -1472,28 +1472,15 @@ dependencies = [
 name = "mlx5"
 version = "0.1.0"
 dependencies = [
- "apic",
- "intel_ethernet",
- "interrupts",
  "irq_safety",
  "kernel_config",
- "lazy_static",
  "log",
  "mellanox_ethernet",
  "memory",
- "mpmc",
- "network_interface_card",
- "nic_buffers",
  "nic_initialization",
- "nic_queues",
  "owning_ref",
  "pci",
- "pic",
  "spin 0.9.0",
- "static_assertions",
- "volatile",
- "x86_64",
- "zerocopy",
 ]
 
 [[package]]

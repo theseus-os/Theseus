@@ -7,61 +7,28 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"
-volatile = "0.2.7"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
-zerocopy = "0.5.0"
-static_assertions = "1.1.0"
-
 
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
 
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.pic]
-path = "../pic"
-
 [dependencies.pci]
 path = "../pci"
-
-[dependencies.interrupts]
-path = "../interrupts"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
-
-[dependencies.network_interface_card]
-path = "../network_interface_card"
-
-[dependencies.intel_ethernet]
-path = "../intel_ethernet" 
-
-[dependencies.nic_buffers]
-path = "../nic_buffers"
-
-[dependencies.nic_queues]
-path = "../nic_queues"
 
 [dependencies.nic_initialization]
 path = "../nic_initialization"
 
 [dependencies.mellanox_ethernet]
 path = "../mellanox_ethernet"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
 
 [lib]
 crate-type = ["rlib"]
