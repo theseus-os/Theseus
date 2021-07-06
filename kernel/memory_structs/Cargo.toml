@@ -10,11 +10,7 @@ multiboot2 = "0.10.1"
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 bit_field = "0.7.0"
 zerocopy = "0.5.0"
-
-[dependencies.derive_more]
-version = "0.14.0"
-default-features = false
-features = [ "no_std" ]
+derive_more = "0.99.0"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

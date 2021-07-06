@@ -1,11 +1,13 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "block_io"
-description = "A generic layer for reading/writing IO streams of different block sizes."
+description = "Traits and types for reading/writing IO streams of differing block sizes."
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
+derive_more = "0.99.0"
 
 [dependencies.log]
 default-features = false
@@ -14,12 +16,6 @@ version = "0.4.8"
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
-
-[dependencies.storage_device]
-path = "../storage_device"
-
-[dependencies.block_cache]
-path = "../block_cache"
 
 [lib]
 crate-type = ["rlib"]

@@ -14,7 +14,7 @@ Those factors include the compiler version, the source directory, the target dir
 We sometimes refer to both of these unique IDs as a *hash* value since the compiler creates them by hashing together these various factors; how this hash is generated is considered opaque and liable to change, thus we treat it as a black box. 
 
 Theseus loads and links crate object files dynamically at runtime. 
-When we build all of the Theseus kernel crates together into a single target directory ([read more here](build_process.md#cargo)), the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
+When we build all of the Theseus kernel crates together into a single target directory ([read more here](building.md#cargo)), the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
 A running instance of Theseus will have a single instance of the `page_allocator` crate loaded into memory and expect all other crates to depend upon that instance, meaning that they should be compiled to expect linkage against its specifically-hashed symbols, e.g., `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE`.
 
 If you separately compile another crate `my_crate` that depends on the exact same set of Theseus kernel crates, cargo will recompile all Theseus crates *from source* into that new target directory, resulting in the recompiled object files and their symbols having completely different unique ID hashes from the original Theseus instance. 

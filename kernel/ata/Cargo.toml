@@ -21,6 +21,9 @@ path = "../pci"
 [dependencies.storage_device]
 path = "../storage_device"
 
+[dependencies.block_io]
+path = "../block_io"
+
 
 [lib]
 crate-type = ["rlib"]

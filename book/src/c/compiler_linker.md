@@ -12,7 +12,7 @@ This procedure can be broken down into the following steps:
 3. Compile the basic C program, e.g., `dummy.c`,
 4. Statically link the C program to the prebuilt `tlibc` object to produce a standalone executable.
 
-The first two steps were [described previously](c_compilation_tlibc.md); the latter two are described below.
+The first two steps were [described previously](tlibc.md); the latter two are described below.
 
 To build and link a dummy C program to tlibc, the invocation of `gcc` currently requires several arguments to customize the compiler's behavior as well as its usage of the `ld` linker. The key arguments are shown and described below:
 ```sh
