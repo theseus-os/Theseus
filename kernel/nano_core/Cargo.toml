@@ -67,6 +67,8 @@ path = "../memfs"
 [target.'cfg(target_arch = "arm")'.dependencies.root]
 path = "../root"
 
+[target.'cfg(target_arch = "arm")'.dependencies.task]
+path = "../task"
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

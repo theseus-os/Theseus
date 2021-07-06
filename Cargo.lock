@@ -11,7 +11,7 @@ dependencies = [
  "fadt",
  "hpet",
  "ioapic",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -74,7 +74,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -93,7 +93,7 @@ dependencies = [
  "atomic",
  "atomic_linked_list",
  "bit_field 0.7.0",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -326,7 +326,7 @@ dependencies = [
  "exceptions_full",
  "first_application",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "keycodes_ascii",
  "log",
@@ -431,9 +431,18 @@ name = "context_switch"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
+ "context_switch_armv7em",
  "context_switch_avx",
  "context_switch_regular",
  "context_switch_sse",
+]
+
+[[package]]
+name = "context_switch_armv7em"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 1.0.0",
+ "zerocopy",
 ]
 
 [[package]]
@@ -684,7 +693,7 @@ dependencies = [
  "apic",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -741,7 +750,7 @@ dependencies = [
 name = "ethernet_smoltcp_device"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "memory",
@@ -835,7 +844,7 @@ name = "fault_log"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "memory",
@@ -1000,7 +1009,7 @@ name = "heap"
 version = "0.1.0"
 dependencies = [
  "block_allocator",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "log",
  "memory",
@@ -1012,7 +1021,7 @@ name = "heapfile"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1",
  "log",
  "memory",
  "spin",
@@ -1099,7 +1108,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "exceptions_early",
  "gdt",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "keyboard",
  "lazy_static",
@@ -1144,6 +1153,18 @@ dependencies = [
 
 [[package]]
 name = "irq_safety"
+version = "0.0.1"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cortex-m 0.7.2",
+ "irq_safety 0.1.1",
+ "owning_ref",
+ "spin",
+ "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
+]
+
+[[package]]
+name = "irq_safety"
 version = "0.1.1"
 source = "git+https://github.com/kevinaboos/irq_safety#b80ccd4f0c8428c968e9be2e39901c22f13f10ed"
 dependencies = [
@@ -1172,7 +1193,7 @@ dependencies = [
  "hpet",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1376,7 +1397,7 @@ dependencies = [
  "acpi_table",
  "apic",
  "ioapic",
- "irq_safety",
+ "irq_safety 0.1.1",
  "log",
  "memory",
  "pic",
@@ -1395,7 +1416,7 @@ name = "mapper_spillful"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1440,7 +1461,7 @@ dependencies = [
  "bit_field 0.7.0",
  "bitflags",
  "cfg-if 1.0.0",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1461,7 +1482,7 @@ dependencies = [
  "alloc-cortex-m",
  "cfg-if 1.0.0",
  "heap",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "log",
  "memory",
@@ -1528,6 +1549,7 @@ dependencies = [
 name = "mod_mgmt"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 1.0.0",
  "cow_arc",
  "crate_metadata",
  "crate_name_utils",
@@ -1585,7 +1607,7 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "log",
  "madt",
@@ -1608,7 +1630,7 @@ dependencies = [
  "hashbrown",
  "heap",
  "intrusive-collections",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "log",
  "memory",
@@ -1641,7 +1663,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "cortex-m 0.7.2",
  "exceptions_early",
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "log",
  "logger",
@@ -1656,6 +1678,7 @@ dependencies = [
  "spin",
  "stack",
  "state_store",
+ "task",
  "vga_buffer",
  "x86_64",
 ]
@@ -1772,7 +1795,7 @@ dependencies = [
  "hpet",
  "http_client",
  "httparse",
- "irq_safety",
+ "irq_safety 0.1.1",
  "itertools",
  "log",
  "network_manager",
@@ -1961,7 +1984,7 @@ dependencies = [
  "apic",
  "atomic",
  "bit_field 0.10.0",
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "memory",
@@ -2161,7 +2184,7 @@ version = "0.1.0"
 dependencies = [
  "debugit",
  "hpet",
- "irq_safety",
+ "irq_safety 0.1.1",
  "log",
  "scheduler",
  "spin",
@@ -2229,7 +2252,7 @@ dependencies = [
 name = "rtc"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -2244,7 +2267,7 @@ name = "runqueue"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "runqueue_priority",
@@ -2258,7 +2281,7 @@ name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2270,7 +2293,7 @@ name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2297,7 +2320,7 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1",
  "log",
  "runqueue",
  "scheduler_priority",
@@ -2380,7 +2403,7 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1",
  "port_io",
 ]
 
@@ -2526,7 +2549,7 @@ dependencies = [
  "fault_crate_swap",
  "fault_log",
  "fs_node",
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "memory",
@@ -2563,6 +2586,7 @@ dependencies = [
 name = "stack"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 1.0.0",
  "kernel_config",
  "log",
  "memory",
@@ -2605,7 +2629,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "hpet",
- "irq_safety",
+ "irq_safety 0.1.1",
  "lazy_static",
  "log",
  "memory",
@@ -2710,9 +2734,10 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 1.0.0",
  "context_switch",
  "environment",
- "irq_safety",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -2832,7 +2857,7 @@ name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety",
+ "irq_safety 0.1.1",
  "log",
  "memory",
  "pause",
@@ -2991,7 +3016,7 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "irq_safety",
+ "irq_safety 0.1.1",
  "network_interface_card",
  "nic_buffers",
  "nic_queues",
@@ -3033,7 +3058,7 @@ dependencies = [
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "irq_safety 0.1.1",
  "log",
  "scheduler",
  "task",
@@ -3100,7 +3125,7 @@ version = "0.1.2"
 dependencies = [
  "bit_field 0.7.0",
  "bitflags",
- "irq_safety",
+ "irq_safety 0.1.1",
 ]
 
 [[package]]
