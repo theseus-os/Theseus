@@ -1,11 +1,14 @@
- //! This crate defines the layout of objects that make up the software interface between the Mellanox hardware and the driver,
- //! as well as functions to access different fields of these objects.
- //!
- //! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54], unless otherwise specified. 
+//! This crate defines the layout of memory objects that make up the software interface between the Mellanox hardware and the driver,
+//! as well as functions to access different fields of these objects.
+//!
+//! The Mellanox ethernet card is referred to as both the NIC (Network Interface Card) and the HCA (Host Channel Adapter).
+//!
+//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54], unless otherwise specified. 
 
  #![no_std]
  #![feature(slice_pattern)]
  #![feature(core_intrinsics)]
+ #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 
 #[macro_use]extern crate log;
 #[macro_use] extern crate alloc;
@@ -74,20 +77,21 @@ pub struct InitializationSegment {
 // const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16400);
 
 impl InitializationSegment {
-    /// Returns the number of entries in the command queue
+    /// Returns the maximum number of entries that can be in the command queue
     pub fn num_cmdq_entries(&self) -> u8 {
         let log = (self.cmdq_phy_addr_low.read().get() >> 4) & 0x0F;
         2_u8.pow(log)
     }
 
-    /// Returns the stride of command queue entries (bytes between the start of consecutive entries)
+    /// Returns the required stride of command queue entries (bytes between the start of consecutive entries)
     pub fn cmdq_entry_stride(&self) -> u8 {
         let val = self.cmdq_phy_addr_low.read().get() & 0x0F;
         2_u8.pow(val)
     }
     
     /// Sets the physical address of the command queue within the initialization segment.
-    /// Arguments
+    ///
+    /// # Arguments
     /// * `cmdq_physical_addr`: the starting physical address of the command queue, the lower 12 bits of which must be zero. 
     pub fn set_physical_address_of_cmdq(&mut self, cmdq_physical_addr: PhysicalAddress) -> Result<(), &'static str> {
         if cmdq_physical_addr.value() & 0xFFF != 0 {
@@ -100,14 +104,14 @@ impl InitializationSegment {
         Ok(())
     }
 
-    /// Returns true if the device is still initializing and driver should not pass any commands to the device.
+    /// Returns true if the device is still initializing, and driver should not pass any commands to the device.
     pub fn device_is_initializing(&self) -> bool {
         self.initializing_state.read().get().get_bit(31)
     }
 
-    /// Sets a bit in the command doorbell vector to inform HW that command needs to be executed.
+    /// Sets a bit in the command doorbell vector to inform HW that the command needs to be executed.
     ///
-    /// Arguments
+    /// # Arguments
     /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
     pub fn post_command(&mut self, command_bit: usize) {
         let val = self.command_doorbell_vector.read().get();
@@ -125,10 +129,10 @@ impl fmt::Debug for InitializationSegment {
     }
 }
 
-/// The possible values of the initialization state of the device
+/// The possible values of the initialization state of the device as taken from the intialization segment.
 pub enum InitializingState {
     NotAllowed = 0,
-    WaitingPermetion = 1, // Is this a typo?
+    WaitingPermetion = 1, // Is this a typo in the PRM?
     WaitingResources = 2,
     Abort = 3
 }

@@ -1,6 +1,4 @@
  //! Defines the Command Queue that is used to pass commands from the driver to the NIC.
- //!
- //! Most information is taken from the PRM, Section 8.24: Command Interface and Chapter 23: Command Reference.
 
 use alloc::vec::Vec;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
@@ -180,7 +178,7 @@ impl CommandQueue {
     ///
     /// # Arguments
     /// * `opcode`: opcode for command that the driver wants to execute
-    /// * `opmod`: opcode modifer, only applicable for certan commands
+    /// * `opmod`: opcode modifer, only applicable for certain commands
     /// * `allocated_pages`: physical address of pages that need to be passed to the NIC. Only used in the MANAGE_PAGES command.
     pub fn create_command(
         &mut self, 

@@ -2,6 +2,9 @@
 //! 
 //! Currently we only support reading the device PCI space, mapping the initialization segment,
 //! and setting up a command queue to pass commands to the NIC.
+//! 
+//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54],
+//! unless otherwise specified. 
 
 #![no_std]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
@@ -33,9 +36,10 @@ use mellanox_ethernet::{
 };
 use kernel_config::memory::PAGE_SIZE;
 
-
-pub const MLX_VEND:           u16 = 0x15B3;  // Vendor ID for Mellanox
-pub const CONNECTX5_DEV:      u16 = 0x1019;  // Device ID for the ConnectX-5 NIC
+/// Vendor ID for Mellanox
+pub const MLX_VEND:           u16 = 0x15B3;
+/// Device ID for the ConnectX-5 NIC
+pub const CONNECTX5_DEV:      u16 = 0x1019;
 
 /// The singleton connectx-5 NIC.
 /// TODO: Allow for multiple NICs
@@ -66,7 +70,7 @@ pub struct ConnectX5Nic {
 impl ConnectX5Nic {
 
     /// Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.
-    /// (steps taken from Section 7.2: HCA Driver Start-up)
+    /// (steps taken from the PRM, Section 7.2: HCA Driver Start-up)
     pub fn init(mlx5_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<ConnectX5Nic>, &'static str> {
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
