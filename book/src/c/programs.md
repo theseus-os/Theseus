@@ -7,7 +7,7 @@ As Theseus is a safe-language OS that runs all code in a single address space (S
 
 Nevertheless, we have introduced experimental support for building C programs atop Theseus; proceed at your own risk. 
 
-## Preqrequisites
+## Prerequisites
 You must have a version of GCC and Binutils cross-compiled for Theseus, e.g., the `x86_64-elf` target with `red-zone` usage disabled. 
 
 To make things easy, we have written [an automated script and a guide](cross_compiler.md) on how to build and install all necessary tools.

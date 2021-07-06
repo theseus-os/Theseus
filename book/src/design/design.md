@@ -62,15 +62,15 @@ Applications must use system calls to ask the kernel to perform privileged opera
 
 
 **Microkernel OSes** are less common, but still widespread in certain computing domains where reliability is key, such as embedded systems. 
-Microkernels move as much kernel functionality as possible into separate userspace "system server" processes, leaving the kernel itself very small. 
-This improves resiliency, as each kernel entity executes in userspace in its own address space; if one crashes, the rest of the system can continue execution by restarting the failed system process. 
+Microkernels move as much kernel functionality as possible into separate user space "system server" processes, leaving the kernel itself very small. 
+This improves resiliency, as each kernel entity executes in user space in its own address space; if one crashes, the rest of the system can continue execution by restarting the failed system process. 
 However, microkernels are less efficient: all inter-entity functionality requires Inter-Process Communication (IPC), requiring costly context switches and mode switches. 
 
 
 **Multikernel OSes** offer high scalability to manycore hardware architectures by running a separate instance of a small kernel replicated across each hardware core. Depending on the underlying hardware, system service processes may also be replicated redundantly across (subsets of) cores to improve performance by reducing contention. They typically borrow standard OS interfaces and abstractions from monolithic and microkernel systems, though presenting a standard shared memory abstraction can harm performance.
 
 
-**Theseus OS** does not base its structure on any aspect of the underlying hardware, unlike the three above system designs. Everything, including applications, system services, and core kernel components, exists and runs in a single address space and a single privilege level (in "kernelspace"). 
+**Theseus OS** does not base its structure on any aspect of the underlying hardware, unlike the above three system designs. Everything, including applications, system services, and core kernel components, exists and runs in a single address space and a single privilege level (in "kernel space"). 
 The structure of Theseus is purely software-defined and based on the modularity concept of cells.
 Thus, communication and shared memory access is efficient because isolation and protection are ensured by the compiler.
 However, everything must be written in a safe language like Rust.
