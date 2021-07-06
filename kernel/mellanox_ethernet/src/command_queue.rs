@@ -294,15 +294,13 @@ impl CommandQueue {
 
     /// Sets the mailbox pointer in a command entry with the physical address of the first mailbox.
     fn set_mailbox_pointer_in_cmd_entry(&mut self, cmdq_entry: &mut CommandQueueEntry, entry_num: usize, mailbox_type: MailboxType) {
-        if mailbox_type == MailboxType::Input {
-            let mailbox_ptr = self.mailbox_buffers_input[entry_num][0].1.value();
-            cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
-            cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+        let mailbox_ptr = if mailbox_type == MailboxType::Input {
+            self.mailbox_buffers_input[entry_num][0].1.value()
         } else {
-            let mailbox_ptr = self.mailbox_buffers_output[entry_num][0].1.value();
-            cmdq_entry.output_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
-            cmdq_entry.output_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
-        }
+            self.mailbox_buffers_output[entry_num][0].1.value()
+        };
+        cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+        cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
     }
 
     /// Initialize output mailboxes for the QUERY_ISSI command.
@@ -692,7 +690,7 @@ impl CommandQueueEntry {
 
 #[derive(FromBytes)]
 #[repr(C)]
-/// Layout of mailbox used to pass extra input and output command data that desn't fit into the command entry.
+/// Layout of mailbox used to pass extra input and output command data that doesn't fit into the command entry.
 struct CommandInterfaceMailbox {
     /// Data in the mailbox
     mailbox_data:           Volatile<[u8; 512]>,
