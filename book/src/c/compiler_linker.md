@@ -44,8 +44,10 @@ Most importantly, those data sections represent system-wide singleton states (`s
 Thus, the data instances packaged into the executable have *not* been initialized and can't safely be used. 
 Using those sections would result in multiple copies of data that's supposed to be a system-wide singleton; this would be bad news for most Theseus components, e.g., frame allocator's system-wide list of free physical memory. 
 
-To solve this problem, we re-perform (overwrite) all of the relocations in the executable ELF file such that they refer to the *existing sections* already loaded into Theseus instead of the new unitialized/unused ones in the executable itself. 
+To solve this problem, we re-perform (overwrite) all of the relocations in the executable ELF file such that they refer to the *existing sections* already loaded into Theseus instead of the new uninitialized/unused ones in the executable itself. 
 This only applies for sections that already exist in Theseus; references to new sections that are unique to the executable are kept intact, of course.
 The relocation information is encoded into the ELF file itself as standard `.rela.*` sections via the `--emit-relocs` linker argument shown above.
 
 This procedure is currently performed by the `loadc` application; it also handles loading the ELF executable segments (program headers) and managing their metadata. 
+
+<!-- cspell:ignore crtbegin, crtend, fdata, ffunction, mcmodel, nostartfiles, nostdlib   -->
