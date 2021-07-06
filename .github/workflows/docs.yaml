@@ -64,6 +64,7 @@ jobs:
       with:
         config: 'tools/spellcheck/cspell.json'
         files: 'book/**'
+        incremental_files_only: false
         # Enforce strict spell check except on push to main branch.
         strict: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/theseus_main') }}
 
