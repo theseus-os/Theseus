@@ -62,7 +62,7 @@ jobs:
     - name: Run spell check
       uses: streetsidesoftware/cspell-action@v1.2.4
       with:
-        config: 'tools/spellcheck/cspell.json'
+        config: 'book/cspell.json'
         files: 'book/**'
         incremental_files_only: false
         # Enforce strict spell check except on push to main branch.
