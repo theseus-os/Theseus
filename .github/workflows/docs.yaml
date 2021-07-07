@@ -59,6 +59,15 @@ jobs:
     - name: Build source documentation
       run: make doc
 
+    - name: Run spell check
+      uses: streetsidesoftware/cspell-action@v1.2.4
+      with:
+        config: 'book/cspell.json'
+        files: 'book/**'
+        incremental_files_only: false
+        # Enforce strict spell check except on push to main branch.
+        strict: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/theseus_main') }}
+
     # Move build artifacts to publish directory on push to main branch.
     - name: Move build artifacts
       if: github.event_name == 'push' && github.ref == 'refs/heads/theseus_main'
