@@ -12,7 +12,7 @@
 //! which is useful for obtaining specific, developer-oriented implementation details about types and functions in each crate. 
 //! 
 //! For a more general description of Theseus's concepts, organization, build process, contributing guidelines, and more,
-//! please build and view the Theseus Book (currently not hosted online anywhere, but available in the `book` directory).
+//! please see the [Theseus Book](https://theseus-os.github.io/Theseus/book/).
 //! 
 //! ## Basic Overview of All Crates
 //! 
