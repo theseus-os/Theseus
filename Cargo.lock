@@ -144,6 +144,7 @@ name = "ata"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "block_io",
  "log",
  "pci",
  "port_io",
@@ -239,10 +240,10 @@ dependencies = [
 name = "block_io"
 version = "0.1.0"
 dependencies = [
- "block_cache",
+ "bare-io",
+ "derive_more",
  "lazy_static",
  "log",
- "storage_device",
 ]
 
 [[package]]
@@ -428,6 +429,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
+
+[[package]]
 name = "core_simd"
 version = "0.1.0"
 source = "git+https://github.com/rust-lang/stdsimd#57e67c905fe9fb3d45a1714d25baa5dfc143299c"
@@ -555,14 +562,14 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "0.14.0"
+version = "0.99.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbe9f11be34f800b3ecaaed0ec9ec2e015d1d0ba0c8644c1310f73d6e8994615"
+checksum = "5cc7b9cef1e351660e5443924e4f43ab25fbbed3e9a5f052df3677deb4d6b320"
 dependencies = [
- "proc-macro2 0.4.29",
- "quote 0.6.12",
- "rustc_version",
- "syn 0.15.33",
+ "convert_case",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1916,20 +1923,11 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "0.4.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64c827cea7a7ab30ce4593e5e04d7a11617ad6ece2fa230605a78b00ff965316"
-dependencies = [
- "unicode-xid 0.1.0",
-]
-
-[[package]]
-name = "proc-macro2"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0704ee1a7e00d7bb417d0770ea303c1bccbabf0ef1667dae92b5967f5f8a71"
 dependencies = [
- "unicode-xid 0.2.1",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -1971,20 +1969,11 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "0.6.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faf4799c5d274f3868a4aae320a0a182cbd2baee377b378f080e16a23e9d80db"
-dependencies = [
- "proc-macro2 0.4.29",
-]
-
-[[package]]
-name = "quote"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
- "proc-macro2 1.0.24",
+ "proc-macro2",
 ]
 
 [[package]]
@@ -2562,11 +2551,11 @@ dependencies = [
 name = "storage_device"
 version = "0.1.0"
 dependencies = [
+ "block_io",
  "downcast-rs",
  "lazy_static",
  "log",
  "owning_ref",
- "pci",
  "spin 0.9.0",
 ]
 
@@ -2601,24 +2590,13 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "0.15.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec52cd796e5f01d0067225a5392e70084acc4c0013fa71d55166d38a8b307836"
-dependencies = [
- "proc-macro2 0.4.29",
- "quote 0.6.12",
- "unicode-xid 0.1.0",
-]
-
-[[package]]
-name = "syn"
 version = "1.0.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cc371affeffc477f42a221a1e4297aedcea33d47d19b61455588bd9d8f6b19ac"
 dependencies = [
- "proc-macro2 1.0.24",
- "quote 1.0.7",
- "unicode-xid 0.2.1",
+ "proc-macro2",
+ "quote",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -2627,10 +2605,10 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b834f2d66f734cb897113e34aaff2f1ab4719ca946f9a7358dba8f8064148701"
 dependencies = [
- "proc-macro2 1.0.24",
- "quote 1.0.7",
- "syn 1.0.48",
- "unicode-xid 0.2.1",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -2677,6 +2655,19 @@ dependencies = [
  "spin 0.9.0",
  "task",
  "x86_64",
+]
+
+[[package]]
+name = "test_block_io"
+version = "0.1.0"
+dependencies = [
+ "ata",
+ "bare-io",
+ "block_io",
+ "log",
+ "storage_manager",
+ "task",
+ "terminal_print",
 ]
 
 [[package]]
@@ -2799,12 +2790,6 @@ name = "unicode-width"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
-
-[[package]]
-name = "unicode-xid"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
 
 [[package]]
 name = "unicode-xid"
@@ -3038,7 +3023,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0af017aca1fa6181f5dd7a802456fe6f7666ecdcc18d0910431f0fc89d474e51"
 dependencies = [
- "proc-macro2 1.0.24",
- "syn 1.0.48",
+ "proc-macro2",
+ "syn",
  "synstructure",
 ]

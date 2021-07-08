@@ -95,3 +95,4 @@ On the target computer, boot into the BIOS, turn on Legacy boot mode, and select
 After setting up PXE the first time, you can run `make pxe` to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier:
 `sudo ifconfig <network-device-name> 192.168.1.105`
 
+<!-- cspell:ignore bootp, dgram, dhcpd, inetd, inetutils, initrd, memdisk, netmask, pxelinux, tftpboot, tftpd, xzvf -->

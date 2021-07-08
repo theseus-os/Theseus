@@ -27,8 +27,8 @@ For this tutorial, we'll use `gcc` version `10.2.0`, released July 20, 2020,
 and `binutils` version `2.35.1`, released September 19, 2020.
 
 You can obtain it from many mirrors online, such as these:
- * gcc: <https://mirrors.kernel.org/gnu/gcc/gcc-10.2.0/>
- * binultis: <https://mirrors.kernel.org/gnu/binutils/>
+* gcc: <https://mirrors.kernel.org/gnu/gcc/gcc-10.2.0/>
+* binutils: <https://mirrors.kernel.org/gnu/binutils/>
 
 Create a destination directory for the newly-built packages to be installed into:
 ```sh
@@ -163,3 +163,5 @@ The first one should output a path to `libgcc.a`, and the second should output a
 To properly use this new version of GCC that cross-compiles to the Theseus target and disables the red zone, make sure you:
  1. use the `x86_64-elf-gcc` executable that now resides in `$DEST/cross` 
  2. specify the `-mno-red-zone` flag, either on the command line or as part of `LDFLAGS`
+
+<!-- cspell:ignore dbxelf, elfos, ldflags, libgcc, libgmp, libmpc, libmpfr, multilib, newlib, nproc, stdint, texinfo, tmake, werror -->
