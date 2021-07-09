@@ -1,5 +1,6 @@
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use cortex_m_semihosting::hprintln;
+#[cfg(target = "thumbv7em-none-eabi")]
 use uart::{SerialPort};
 use core::fmt::{Write};
 
@@ -32,13 +33,17 @@ impl Log for Logger {
 
         let file_loc = record.file().unwrap_or("??");
         let line_loc = record.line().unwrap_or(0);
-        let mut serial = SerialPort::get_uart();
-        let _result = uprintln!(serial, "{}{}:{}: {}",
-            level_str,
-            file_loc,
-            line_loc,
-            record.args(),
-        );
+        cfg_if!{
+            if #[cfg(target = "thumbv7em-none-eabi")] {
+                let mut serial = SerialPort::get_uart();
+                let _result = uprintln!(serial, "{}{}:{}: {}",
+                    level_str,
+                    file_loc,
+                    line_loc,
+                    record.args(),
+                );
+            }
+        }
     }
 
     fn flush(&self) {
