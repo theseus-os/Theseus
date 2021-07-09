@@ -285,9 +285,9 @@ checksum = "980479e6fde23246dfb54d47580d66b4e99202e7579c5eaa9fe10ecb5ebd2182"
 
 [[package]]
 name = "byteorder"
-version = "1.3.4"
+version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
+checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "captain"
@@ -585,6 +585,7 @@ dependencies = [
  "keyboard",
  "log",
  "memory",
+ "mlx5",
  "mouse",
  "mpmc",
  "network_manager",
@@ -1359,6 +1360,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mellanox_ethernet"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "byteorder",
+ "kernel_config",
+ "libm",
+ "log",
+ "memory",
+ "nic_initialization",
+ "owning_ref",
+ "static_assertions",
+ "volatile",
+ "zerocopy",
+]
+
+[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1455,6 +1473,21 @@ dependencies = [
  "task",
  "terminal_print",
  "vfs_node",
+]
+
+[[package]]
+name = "mlx5"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "kernel_config",
+ "log",
+ "mellanox_ethernet",
+ "memory",
+ "nic_initialization",
+ "owning_ref",
+ "pci",
+ "spin 0.9.0",
 ]
 
 [[package]]
