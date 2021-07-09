@@ -39,3 +39,5 @@ This page offers a selected collection of the slide decks from those talks (incl
 
 * [Idea: Verifying Intralingual Invariants](https://docs.google.com/presentation/d/e/2PACX-1vRUvgprQ69r1JYypkswcWVrv_18BidWKrKgKVn4wiMmAHJUDz4Dhx7qv7Dozw2ljU9sllKqsRIHJNlJ/pub?start=false&loop=false)
 * [Rust vs. C, with short Rust intro](https://docs.google.com/presentation/d/e/2PACX-1vQYomAnfTNucuCqYgNkPaxpIdrhPxil9Qzle_6-xd7TYfdEBlgML0B3vztdNC2odwc25dLzW3XsithZ/pub?start=false&loop=false)
+
+<!-- cspell:ignore OSDI, PLOS, Ramla Ijaz -->

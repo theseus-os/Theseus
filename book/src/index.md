@@ -5,7 +5,7 @@
 
 Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
-Continue to the next chapter to learn more about Theseus, or feel free to check out our [published academic papers](papers_presentations.md) for a deep dive into the research and design concept behind Theseus.
+Continue to the next chapter to learn more about Theseus, or feel free to check out our [published academic papers](misc/papers_presentations.md) for a deep dive into the research and design concept behind Theseus.
 
 
 ### What's in a name? 

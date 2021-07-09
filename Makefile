@@ -103,7 +103,7 @@ APP_CRATE_NAMES := $(filter-out build/. target/., $(APP_CRATE_NAMES))
 APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
 APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
-APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
+APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
@@ -114,7 +114,7 @@ APP_CRATE_NAMES += EXTRA_APP_CRATE_NAMES
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs book view-book
+		gdb doc docs view-doc view-docs book view-book clean-doc
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -142,7 +142,7 @@ $(iso): build
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
 ## This also classifies crate object files into either "application" or "kernel" crates:
 ## -- an application crate is any executable application in the `applications/` directory, or a library crate that is ONLY used by other applications,
-## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used 
+## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used by kernel crates.
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
@@ -208,7 +208,7 @@ cargo: check_rustc
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build  $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -240,7 +240,8 @@ cargo: check_rustc
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	@rm -rf $(OBJECT_FILES_BUILD_DIR)
+## If we remove the OBJECT_FILES_BUILD_DIR here, then the simd_personality_* builds do not work.
+# @rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(DEPS_DIR)
 
@@ -333,10 +334,10 @@ $(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
 
 
 
-### Removes all build files
+### Removes all built source files
 clean:
 	cargo clean
-	@rm -rf build
+	@rm -rf $(BUILD_DIR)
 	
 
 
@@ -377,7 +378,7 @@ clean:
 ## The "normal" target must come last ('build_sse', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_sse : export TARGET := x86_64-theseus
 simd_personality_sse : export BUILD_MODE = release
-simd_personality_sse : export override THESEUS_CONFIG += simd_personality
+simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_personality_sse
 simd_personality_sse: build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
@@ -396,7 +397,7 @@ simd_personality_sse: build_sse build
 ## The "normal" target must come last ('build_avx', THEN the regular 'build') to ensure that the final nano_core_binary is non-SIMD.
 simd_personality_avx : export TARGET := x86_64-theseus
 simd_personality_avx : export BUILD_MODE = release
-simd_personality_avx : export override THESEUS_CONFIG += simd_personality
+simd_personality_avx : export override THESEUS_CONFIG += simd_personality simd_personality_avx
 simd_personality_avx : export override CFLAGS += -DENABLE_AVX
 simd_personality_avx: build_avx build
 ## after building all the modules, copy the kernel boot image files
@@ -412,25 +413,24 @@ simd_personality_avx: build_avx build
 
 ### build_sse builds the kernel and applications with the x86_64-theseus-sse target.
 ### It can serve as part of the simd_personality_sse target.
-build_sse : export TARGET := x86_64-theseus-sse
+build_sse : export override TARGET := x86_64-theseus-sse
 build_sse : export override RUSTFLAGS += -C no-vectorize-loops
 build_sse : export override RUSTFLAGS += -C no-vectorize-slp
 build_sse : export KERNEL_PREFIX := ksse\#
 build_sse : export APP_PREFIX := asse\#
 build_sse:
-	@$(MAKE) build
+	$(MAKE) build
 
 
 ### build_avx builds the kernel and applications with the x86_64-theseus-avx target.
 ### It can serve as part of the simd_personality_avx target.
-build_avx : export TARGET := x86_64-theseus-avx
+build_avx : export override TARGET := x86_64-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
 build_avx : export KERNEL_PREFIX := kavx\#
 build_avx : export APP_PREFIX := aavx\#
 build_avx:
-	@$(MAKE) build
-
+	$(MAKE) build
 
 
 ### build_server is a target that builds Theseus into a regular ISO
@@ -454,20 +454,19 @@ preserve_old_modules:
 ###################################################################################################
 
 ## The output directory for source-level documentation.
-DOC_BUILD := $(BUILD_DIR)/doc
-## The top-level (root) documentation file built by `rustdoc` (`cargo doc`).
-RUSTDOC_OUT := $(DOC_BUILD)/___Theseus_Crates___/index.html
+RUSTDOC_OUT      := $(BUILD_DIR)/doc
+RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
-## The entire project is built as normal using the `cargo doc` command.
+## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
 doc: check_rustc
-	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
-	@rm -rf $(DOC_BUILD)
-	@mkdir -p $(DOC_BUILD)
-	@cp -rf target/doc $(BUILD_DIR)/
-	@echo -e "\nDocumentation is now available at: \"$(RUSTDOC_OUT)\"."
+	@rm -rf $(RUSTDOC_OUT)
+	@mkdir -p $(RUSTDOC_OUT)
+	@cp -rf target/doc/. $(RUSTDOC_OUT)
+	@echo -e "\nTheseus source docs are now available at: \"$(RUSTDOC_OUT_FILE)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
@@ -476,18 +475,19 @@ view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT)")" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(RUSTDOC_OUT_FILE)")" &
 else
-	@xdg-open $(RUSTDOC_OUT) > /dev/null 2>&1 || open $(RUSTDOC_OUT) &
+	@xdg-open $(RUSTDOC_OUT_FILE) > /dev/null 2>&1 || open $(RUSTDOC_OUT_FILE) &
 endif
 
 
-### The location of Theseus's book-style documentation. 
-BOOK_DIR := $(ROOT_DIR)/book
-BOOK_OUT := $(BOOK_DIR)/book/html/index.html
+### The locations of Theseus's book-style documentation.
+BOOK_SRC      := $(ROOT_DIR)/book
+BOOK_OUT      := $(BUILD_DIR)/book
+BOOK_OUT_FILE := $(BOOK_OUT)/html/index.html
 
 ### Builds the Theseus book-style documentation using `mdbook`.
-book: $(wildcard $(BOOK_DIR)/src/*) $(BOOK_DIR)/book.toml
+book: $(wildcard $(BOOK_SRC)/src/*) $(BOOK_SRC)/book.toml
 ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "\nError: please install mdbook:"
 	@echo -e "    cargo +stable install mdbook --force"
@@ -495,19 +495,25 @@ ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
-	@(cd $(BOOK_DIR) && mdbook build)
-	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT)\"."
+	@mdbook build $(BOOK_SRC) -d $(BOOK_OUT)
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT_FILE)\"."
 
 
 ### Opens the Theseus book.
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
 ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT)")" &
+	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT_FILE)")" &
 else
-	@xdg-open $(BOOK_OUT) > /dev/null 2>&1 || open $(BOOK_OUT) &
+	@xdg-open $(BOOK_OUT_FILE) > /dev/null 2>&1 || open $(BOOK_OUT_FILE) &
 endif
 
+
+### Removes all built documentation
+clean-doc:
+	@cargo clean --doc
+	@rm -rf $(RUSTDOC_OUT) $(BOOK_OUT)
+	
 
 ### The primary documentation for this makefile itself.
 help: 
@@ -589,6 +595,8 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "   clean-doc:"
+	@echo -e "\t Remove all generated documentation files."
 	@echo ""
 
 
@@ -609,10 +617,13 @@ QEMU_FLAGS += -smp $(QEMU_CPUS)
 MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
-QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+DISK_IMAGE ?= fat32.img
+ifneq ($(wildcard $(DISK_IMAGE)),) 
+	QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+endif
 
 ## We don't yet support SATA in Theseus, but this is how to add a SATA drive over the AHCI interface.
-# QEMU_FLAGS += -drive id=my_disk,file=<DISK_IMAGE.img>,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
+# QEMU_FLAGS += -drive id=my_disk,file=$(DISK_IMAGE),if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)
@@ -664,12 +675,12 @@ endif
 
 ### Old Run: runs the most recent build without rebuilding
 orun:
-	@qemu-system-x86_64 $(QEMU_FLAGS)
+	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
 ### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
 orun_pause:
-	@qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
@@ -684,7 +695,7 @@ run: $(iso)
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 run_pause: $(iso)
-	@qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
 ### Runs a gdb instance on the host machine. 

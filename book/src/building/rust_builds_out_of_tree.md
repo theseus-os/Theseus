@@ -14,7 +14,7 @@ Those factors include the compiler version, the source directory, the target dir
 We sometimes refer to both of these unique IDs as a *hash* value since the compiler creates them by hashing together these various factors; how this hash is generated is considered opaque and liable to change, thus we treat it as a black box. 
 
 Theseus loads and links crate object files dynamically at runtime. 
-When we build all of the Theseus kernel crates together into a single target directory ([read more here](build_process.md#cargo)), the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
+When we build all of the Theseus kernel crates together into a single target directory ([read more here](building.md#cargo)), the unique IDs/hash values appended to every crate name and symbol are based on the build machine's source and target directories (among other factors). 
 A running instance of Theseus will have a single instance of the `page_allocator` crate loaded into memory and expect all other crates to depend upon that instance, meaning that they should be compiled to expect linkage against its specifically-hashed symbols, e.g., `_ZN14page_allocator17allocate_pages_at17heb9fd5c4948b3ccfE`.
 
 If you separately compile another crate `my_crate` that depends on the exact same set of Theseus kernel crates, cargo will recompile all Theseus crates *from source* into that new target directory, resulting in the recompiled object files and their symbols having completely different unique ID hashes from the original Theseus instance. 
@@ -26,7 +26,7 @@ Therefore, the **real problem** is that there is no supported method to tell car
 ### A Bad, Unsafe Solution
 
 Technically, we could solve this by using an existing non-Rust stable ABI, like the C language ABI. 
-This would entail defining/exposing Rust functions, data, and types in a C-compatible way such that they can are comaptible with the C ABI (its expected struct memory layout and calling convention).
+This would entail defining/exposing Rust functions, data, and types in a C-compatible way such that they are compatible with the C ABI (its expected struct memory layout and calling convention).
 Unfortunately, this necessitates the usage of unsafe FFI code blocks (via C-style extern functions) to connect two separate bodies of fully-safe Rust code, which is both dumb and tedious. 
 
 In the above example, instead of simply invoking `page_allocator::allocate_pages_at()` directly, we would need to export the appropriate wrapper functions like so:
@@ -60,7 +60,7 @@ Surely we can do better!
 ## Solution: `theseus_cargo` for out-of-tree builds
 
 A superior solution is to "trick" the Rust compiler into using the prebuilt crates from an existing build of Theseus.
-To this end, we've created `theseus_cargo`, a custom build tool and wrapper around cargo that resolves an out-of-tree crate's dependencies on in-tree Theseus crates using their prebuilt objects instead of rebuiling them from source.   
+To this end, we've created `theseus_cargo`, a custom build tool and wrapper around cargo that resolves an out-of-tree crate's dependencies on in-tree Theseus crates using their prebuilt objects instead of rebuilding them from source.   
 
 This is realized in two parts:
 1. Generating the prebuilt dependencies while building Theseus's (in-tree) kernel crates,

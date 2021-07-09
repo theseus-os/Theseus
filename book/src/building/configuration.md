@@ -96,10 +96,10 @@ There is a special Makefile [`cfg/Config.mk`](https://github.com/theseus-os/Thes
 ## Static Build-time Linking vs. Dynamic Runtime Linking
 
 Theseus offers two primary forms of linking and packaging its compiled crates into an ISO image.
-As depicted in the image below, the first (left side) is a conventional fully staticaly-linked build, as used in all other OSes,
+As depicted in the image below, the first (left side) is a conventional fully statically-linked build, as used in all other OSes,
 while the second (right side) is a novel dynamic linking approach used for Theseus research. 
 
-![Standard Build-time Static Linking (left) vs. Theseus Dynamic Linking (right)](images/boot_image.svg)
+![Standard Build-time Static Linking (left) vs. Theseus Dynamic Linking (right)](../images/boot_image.svg)
 
 
 ### Standard build-time (static) linking
@@ -132,9 +132,9 @@ For example, Theseus frequently uses options like:
 
 The advantage of these features is that they can also be used in `Cargo.toml` manifest files to conditionally set dependencies. For example:
 ```toml
-## Only include the `packed_simd` crate as a dependency when "sse2" is enabled.
-[target.'cfg(target_feature = "sse2")'.dependencies.packed_simd]
-version = "0.3.4"
+## Only include the `core_simd` crate as a dependency when "sse2" is enabled.
+[target.'cfg(target_feature = "sse2")'.dependencies.core_simd]
+...
 ```
 
 Unfortunately, you cannot use non-built-in cfg options to conditionally specify dependencies in `Cargo.toml` files, such as anything that comes from `THESEUS_CONFIG` values. 
