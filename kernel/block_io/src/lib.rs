@@ -34,16 +34,15 @@
 // #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate derive_more;
+extern crate spin;
 extern crate bare_io;
 
 #[cfg(test)]
 mod test;
 
 use core::{cmp::min, ops::Range};
-use alloc::{
-    boxed::Box,
-    vec::Vec,
-};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use spin::Mutex;
 use bare_io::{Seek, SeekFrom};
 
 
@@ -180,13 +179,13 @@ pub trait BlockWriter: BlockIo {
     fn flush(&mut self) -> Result<(), IoError>;
 }
 
-impl<R> BlockWriter for Box<R> where R: BlockWriter + ?Sized {
+impl<W> BlockWriter for Box<W> where W: BlockWriter + ?Sized {
     fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
         (**self).write_blocks(buffer, block_offset)
     }
     fn flush(&mut self) -> Result<(), IoError> { (**self).flush() }
 }
-impl<R> BlockWriter for &mut R where R: BlockWriter + ?Sized {
+impl<W> BlockWriter for &mut W where W: BlockWriter + ?Sized {
     fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
         (**self).write_blocks(buffer, block_offset)
     }
@@ -542,6 +541,46 @@ impl<IO> Seek for IoWithOffset<IO> where IO: KnownLength {
             ))
         }
     }
+}
+
+
+/// A newtype wrapper around `Arc<Mutex<IO>>` that offers
+/// forward implementations of various IO-related traits.
+///
+/// This allows a locked IO object (i.e., a `Arc<Mutex<IO>>`) 
+/// to be used within another wrapper object that requires an IO object
+/// that implements some IO-specific trait, 
+/// such as those listed in the crate-level documentation. 
+#[derive(Debug, Clone, Deref)]
+pub struct LockedIo<IO: ?Sized>(Arc<Mutex<IO>>);
+impl<IO> LockedIo<IO> {
+    pub fn new(io: IO) -> LockedIo<IO> {
+        LockedIo(Arc::new(Mutex::new(io)))
+    }
+}
+impl<IO:? Sized> From<Arc<Mutex<IO>>> for LockedIo<IO> {
+    fn from(arc_mutex_io: Arc<Mutex<IO>>) -> Self {
+        LockedIo(arc_mutex_io)
+    }
+}
+
+// Implement the various I/O traits for the `LockedIo` wrapper around Mutex<trait>.
+impl<IO> BlockIo for LockedIo<IO> where IO: BlockIo + ?Sized {
+    fn block_size(&self) -> usize { self.0.lock().block_size() }
+}
+impl<IO> KnownLength for LockedIo<IO> where IO: KnownLength + ?Sized {
+    fn len(&self) -> usize { self.0.lock().len() }
+}
+impl<IO> BlockReader for LockedIo<IO> where IO: BlockReader + ?Sized {
+    fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
+        self.0.lock().read_blocks(buffer, block_offset)
+    }
+}
+impl<IO> BlockWriter for LockedIo<IO> where IO: BlockWriter + ?Sized {
+    fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
+        self.0.lock().write_blocks(buffer, block_offset)
+    }
+    fn flush(&mut self) -> Result<(), IoError> { self.0.lock().flush() }
 }
 
 

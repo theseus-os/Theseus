@@ -18,6 +18,8 @@ extern crate ixgbe;
 extern crate alloc;
 extern crate fatfs;
 extern crate block_io;
+extern crate bare_io;
+#[macro_use] extern crate derive_more;
 
 use mpmc::Queue;
 use event_types::Event;
@@ -25,8 +27,7 @@ use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
-use storage_manager::StorageDeviceRef;
-use block_io::BlockIo;
+use block_io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -145,14 +146,21 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
     // Discover filesystems from each storage device on the storage controllers initialized above
     // and mount each filesystem to the root directory by default.
-    for storage_controller in storage_manager::STORAGE_CONTROLLERS.lock().iter() {
-        for storage_device in storage_controller.lock().devices() {
-            let disk = FatFsStorageDisk {
-                block_io: BlockIo::new(storage_device),
-                offset: 0,
-            };
-            fatfs::FileSystem::new(disk, fatfs::FsOptions::new())
-        }
+    for storage_device in storage_manager::storage_devices() {
+        let disk = FatFsAdapter(
+            ReaderWriter::new(
+                ByteReaderWriterWrapper::from(
+                    LockedIo::from(storage_device)
+                )
+            ),
+        );
+
+        NOTE: the problem is that `ReaderWriter` doesn't actually IMPLEMENT bare_io::Read/Write,
+              but rather it only DEREFS to a type that does implement that. 
+              We should use either the `delegate` crate or `delegate-attr` crate for this.
+
+        let filesystem = fatfs::FileSystem::new(disk, fatfs::FsOptions::new());
+
     }
 
     Ok(())
@@ -160,54 +168,66 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
 
 
-/// An adapter that implements traits required by the `fatfs` crate
-/// for any `StorageDevice` that wants to be usable by `fatfs`.
-struct FatFsStorageDisk {
-    block_io: BlockIo,
-    offset: usize,
+/// An adapter (wrapper type) that implements traits required by the [`fatfs`] crate
+/// for any I/O device that wants to be usable by [`fatfs`].
+///
+/// To meet [`fatfs`]'s requirements, the underlying I/O stream must be able to 
+/// read, write, and seek while tracking its current offset. 
+/// We use traits from the [`bare_io`] crate to meet these requirements, 
+/// thus, the given `IO` parameter must implement those [`bare_io`] traits.
+///
+/// For example, this allows one to access a FAT filesystem 
+/// by reading from or writing to a storage device.
+pub struct FatFsAdapter<IO>(IO);
+impl<IO> FatFsAdapter<IO> {
+    pub fn new(io: IO) -> FatFsAdapter<IO> { FatFsAdapter(io) }
 }
-
-impl fatfs::Read for FatFsStorageDisk {
+/// This tells the `fatfs` crate that our read/write/seek functions
+/// may return errors of the type [`FatFsIoErrorAdapter`],
+/// which is a simple wrapper around [`bare_io::Error`].
+impl<IO> fatfs::IoBase for FatFsAdapter<IO> {
+    type Error = FatFsIoErrorAdapter;
+}
+impl<IO> fatfs::Read for FatFsAdapter<IO> where IO: bare_io::Read {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let bytes_read = self.block_io.read(buf, self.offset)?;
-        self.offset += bytes_read;
+        self.0.read(buf).map_err(Into::into)
     }
 }
-
-impl fatfs::Write for FatFsStorageDisk {
+impl<IO> fatfs::Write for FatFsAdapter<IO> where IO: bare_io::Write {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        let bytes_written = self.block_io.write(buf, self.offset)?;
-        self.offset += bytes_written;
+        self.0.write(buf).map_err(Into::into)
+    }
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        self.0.flush().map_err(Into::into)
+    }
+}
+impl<IO> fatfs::Seek for FatFsAdapter<IO> where IO: bare_io::Seek {
+    fn seek(&mut self, pos: fatfs::SeekFrom) -> Result<u64, Self::Error> {
+        let bare_io_pos = match pos {
+            fatfs::SeekFrom::Start(s)   => bare_io::SeekFrom::Start(s),
+            fatfs::SeekFrom::Current(c) => bare_io::SeekFrom::Current(c),
+            fatfs::SeekFrom::End(e)     => bare_io::SeekFrom::End(e),
+        };
+        self.0.seek(bare_io_pos).map_err(Into::into)
     }
 }
 
-use fatfs::SeekFrom;
-impl fatfs::Seek for FatFsStorageDisk {
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, Self::Error> {
-        match pos {
-            SeekFrom::Start(new_pos) => self.offset = new_pos,
-            SeekFrom::Current(addend) => self.offset += addend,
-            SeekFrom::End(addend) => self.offset = self.block_io.block_size().size_in_bytes + addend,
-        }
-    }
-}
-
-
-// TODO: when `StorageDevice` returns better error types (e.g., an enum),
-//       we'll need to implement this `IoError` trait for those error types.
-impl fatfs::IoError for &str {
+/// This struct exists so we can implement the [`fatfs::IoError`] trait
+/// for the [`bare_io::Error`] trait (albeit indirectly).
+/// 
+/// This is required because Rust prevents implementing foreign traits for foreign types.
+#[derive(Debug, From, Into)]
+struct FatFsIoErrorAdapter(bare_io::Error);
+impl fatfs::IoError for FatFsIoErrorAdapter {
     fn is_interrupted(&self) -> bool {
-        false // no concept of interrupted storage device requests in Theseus yet
+        self.0.kind() == bare_io::ErrorKind::Interrupted
     }
 
     fn new_unexpected_eof_error() -> Self {
-        "Read operation hit an unexpected EOF (end of file)"
+        FatFsIoErrorAdapter(bare_io::ErrorKind::UnexpectedEof.into())
     }
 
     fn new_write_zero_error() -> Self {
-        "Write operation failed to write more than zero bytes"
+        FatFsIoErrorAdapter(bare_io::ErrorKind::WriteZero.into())
     }
-}
-impl fatfs::IoBase for FatFsStorageDisk {
-    type Error = &'static str;
 }
