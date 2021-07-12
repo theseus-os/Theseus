@@ -556,6 +556,8 @@ impl<IO> ByteWriter for ReaderWriter<IO> where IO: ByteWriter {
 /// This implements the [`bare_io::Read`] trait for read-only access,
 /// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 /// It also forwards all other read-only I/O-related traits implemented by the underlying I/O stream.
+///
+/// Note: this is implemented as a thin wrapper around [`ReaderWriter`].
 pub struct Reader<R>(ReaderWriter<R>);
 impl<R> Reader<R> where R: ByteReader {
     /// Creates a new `Reader` with an initial offset of 0.
@@ -590,6 +592,8 @@ impl<IO> Seek for Reader<IO> where IO: KnownLength {
 /// This implements the [`bare_io::Write`] trait for write-only access,
 /// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 /// It also forwards all other write-only I/O-related traits implemented by the underlying I/O stream.
+///
+/// Note: this is implemented as a thin wrapper around [`ReaderWriter`].
 pub struct Writer<W>(ReaderWriter<W>);
 impl<W: ByteWriter> Writer<W> {
     /// Creates a new `Writer` with an initial offset of 0.
