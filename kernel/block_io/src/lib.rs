@@ -14,26 +14,34 @@
 //!    * Notably, the [`blocks_from_bytes()`] function is useful for calculating which
 //!      block-based I/O transfers are needed to satisfy an arbitrary byte-wise transfer.
 //!
+//! For example, a storage device like a hard drive that transfers 512-byte blocks at a time
+//! should implement `BlockIo`, `BlockReader`, `BlockWriter`, and `KnownLength` traits.
+//! A user can then use those traits directly to transfer whole blocks to/from the device,
+//! or wrap the storage device in one of the byte-wise reader/writer types 
+//! in order to transfer arbitrary bytes (as little as one byte) at a time to/from the device.
+//!
+//! We also provide the [`LockedIo`] type for convenient use with I/O streams or devices
+//! that exist behind a shared lock, i.e., `Arc<Mutex<IO>>`. 
+//! This allows you to access the I/O stream transparently through the lock by using traits
+//! that the interior `IO` object implements, such as the block-wise I/O traits listed above.
+//!
+//! ## Stateless vs. Stateful I/O
 //! Note that the above traits represent "stateless" access into I/O streams or devices,
 //! in that successive read/write operations will not advance any kind of "offset".
 //!
 //! To read or write while tracking the current offset into the I/O stream, 
-//! we provide the [`Reader`], [`Writer`], and [`ReaderWriter`] types. 
-//! These types act as stateful wrappers around I/O streams that track the current offset 
-//! into that stream, i.e., where the next read or write operation will start.
-//!
-//! For example, a storage device like a hard drive that transfers 512-byte blocks at a time
-//! should implement `BlockReader`, `BlockWriter`, `BlockIo`, and `KnownLength` traits.
-//! A user can then use those traits directly to transfer whole blocks to/from the device,
-//! or wrap the storage device in one of the byte-wise reader/writer types 
-//! in order to transfer arbitrary bytes (as little as one byte) at a time to/from the device. 
+//! we provide the [`ReaderWriter`], [`Reader`], and [`Writer`] types,
+//! which act as "stateful" wrappers around an underlying "stateless" I/O stream
+//! (such as a stateless `ByteReader` or `ByteWriter`).
+//! This offers a more convenient interface with more traditional I/O behavior,
+//! in which the next read or write operation will start where the prior one ended.
 //!
 
 #![no_std]
 
 // #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate derive_more;
+#[macro_use] extern crate delegate;
 extern crate spin;
 extern crate bare_io;
 
@@ -290,9 +298,9 @@ impl<R> ByteWriter for &mut R where R: ByteWriter + ?Sized {
 /// ## Example
 /// Use the `From` implementation around a `BlockReader` instance, such as:
 /// ```ignore
-/// let bytes_read = ByteReaderWrapper::from(storage_dev.lock().deref_mut()).read_at(...);
+/// // Assume `storage_dev` implements `BlockReader`
+/// let bytes_read = ByteReaderWrapper::from(storage_dev).read_at(...);
 /// ```
-#[derive(Deref, DerefMut)]
 pub struct ByteReaderWrapper<R: BlockReader>(R);
 impl<R> From<R> for ByteReaderWrapper<R> where R: BlockReader {
     fn from(block_reader: R) -> Self {
@@ -326,8 +334,14 @@ impl<R> ByteReader for ByteReaderWrapper<R> where R: BlockReader {
         Ok(buffer.len())
     }
 }
-impl<RW> KnownLength for ByteReaderWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
-    fn len(&self) -> usize { self.0.len() }
+impl<R> BlockIo for ByteReaderWrapper<R> where R: BlockReader {
+    delegate!{ to self.0 { fn block_size(&self) -> usize; } }
+}
+impl<R> KnownLength for ByteReaderWrapper<R> where R: KnownLength + BlockReader {
+    delegate!{ to self.0 { fn len(&self) -> usize; } }
+}
+impl<R> BlockReader for ByteReaderWrapper<R> where R: BlockReader {
+    delegate!{ to self.0 { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
 }
 
 
@@ -342,11 +356,11 @@ impl<RW> KnownLength for ByteReaderWrapper<RW> where RW: KnownLength + BlockRead
 /// ## Example
 /// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
 /// ```ignore
-/// let mut reader_writer = ByteReaderWriterWrapper::from(storage_dev.lock().deref_mut()); 
+/// // Assume `storage_dev` implements `BlockReader + BlockWriter`
+/// let mut reader_writer = ByteReaderWriterWrapper::from(storage_dev); 
 /// let bytes_read = reader_writer.read_at(...);
 /// let bytes_written = reader_writer.write_at(...);
 /// ```
-#[derive(Deref, DerefMut)]
 pub struct ByteReaderWriterWrapper<RW: BlockReader + BlockWriter>(RW);
 impl<RW> From<RW> for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
     fn from(block_reader_writer: RW) -> Self {
@@ -390,19 +404,31 @@ impl<RW> ByteWriter for ByteReaderWriterWrapper<RW> where RW: BlockReader + Bloc
     }
 
     fn flush(&mut self) -> Result<(), IoError> {
-        (**self).flush()
+        BlockWriter::flush(self)
     }
 }
+impl<RW> BlockIo for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
+    delegate!{ to self.0 { fn block_size(&self) -> usize; } }
+}
 impl<RW> KnownLength for ByteReaderWriterWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
-    fn len(&self) -> usize { self.0.len() }
+    delegate!{ to self.0 { fn len(&self) -> usize; } }
+}
+impl<RW> BlockReader for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
+    delegate!{ to self.0 { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
+}
+impl<RW> BlockWriter for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
+    delegate!{ to self.0 {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>;
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
 }
 
 
 /// A wrapper struct that implements a byte-wise writer
 /// atop a block-based reader and writer.
 ///
-/// This is effectively a thin wrapper around [`ByteReaderWriterWrapper`]
-/// that allows only byte-wise writing to the underlying I/O stream.
+/// This is effectively the same struct as [`ByteReaderWriterWrapper`],
+/// but it allows *only* writing to the underlying I/O stream, not reading.
 /// 
 /// See the [`ByteWriter`] trait docs for an explanation of why both 
 /// `BlockReader + BlockWriter` are required.
@@ -410,92 +436,48 @@ impl<RW> KnownLength for ByteReaderWriterWrapper<RW> where RW: KnownLength + Blo
 /// ## Example
 /// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
 /// ```ignore
-/// /* Assume `storage_dev` implements `BlockReader + BlockWriter` */
-/// let mut reader_writer = ByteReaderWriterWrapper::from(storage_dev); 
-/// let bytes_written = reader_writer.write_at(...);
+/// // Assume `storage_dev` implements `BlockReader + BlockWriter`
+/// ByteReaderWriterWrapper::from(storage_dev).write_at(...);
 /// ```
-#[derive(Deref, DerefMut)]
-pub struct ByteWriterWrapper<RW: BlockReader + BlockWriter>(RW);
+pub struct ByteWriterWrapper<RW: BlockReader + BlockWriter>(ByteReaderWriterWrapper<RW>);
 impl<RW> From<RW> for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
     fn from(block_reader_writer: RW) -> Self {
-        ByteWriterWrapper(block_reader_writer)
+        ByteWriterWrapper(ByteReaderWriterWrapper(block_reader_writer))
     }
 }
 impl<RW> ByteWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
-    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
-        ByteReaderWriterWrapper::from(&mut self.0).write_at(buffer, offset)
-    }
-    fn flush(&mut self) -> Result<(), IoError> {
-        ByteReaderWriterWrapper::from(&mut self.0).flush()
-    }
+    delegate!{ to self.0 { fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>; } }
+    fn flush(&mut self) -> Result<(), IoError> { ByteWriter::flush(&mut self.0) }
+}
+impl<RW> BlockIo for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
+    delegate!{ to self.0 { fn block_size(&self) -> usize; } }
 }
 impl<RW> KnownLength for ByteWriterWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
-    fn len(&self) -> usize { self.0.len() }
+    delegate!{ to self.0 { fn len(&self) -> usize; } }
+}
+impl<RW> BlockWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
+    delegate!{ to self.0 { fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; } }
+    fn flush(&mut self) -> Result<(), IoError> { BlockWriter::flush(&mut self.0) }
 }
 
 
-/// A stateful reader that keeps track of its current offset
-/// within the internal stateless [`ByteReader`] I/O stream.
-///
-/// This implements the [`bare_io::Read`] trait,
-/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
-#[derive(Deref, DerefMut)]
-pub struct Reader<R: ByteReader>(IoWithOffset<R>);
-impl<R> Reader<R> where R: ByteReader {
-    /// Creates a new `Reader` with an initial offset of 0.
-    pub fn new(reader: R) -> Self {
-        Reader(IoWithOffset::new(reader))
-    }
-}
-
-/// A stateful writer that keeps track of its current offset
-/// within the internal stateless [`ByteWriter`] I/O stream.
-///
-/// This implements the [`bare_io::Write`] trait,
-/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
-#[derive(Deref, DerefMut)]
-pub struct Writer<W: ByteWriter>(IoWithOffset<W>);
-impl<W: ByteWriter> Writer<W> {
-    /// Creates a new `Writer` with an initial offset of 0.
-    pub fn new(writer: W) -> Self {
-        Writer(IoWithOffset::new(writer))
-    }
-}
-
-/// A stateful reader and writer that keeps track of its current offset
-/// within the internal stateless [`ByteReader`] + [`ByteWriter`] I/O stream.
-///
-/// This implements both the [`bare_io::Read`] and [`bare_io::Write`] traits,
-/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
-#[derive(Deref, DerefMut)]
-pub struct ReaderWriter<RW: ByteReader + ByteWriter>(IoWithOffset<RW>);
-impl<RW: ByteReader + ByteWriter> ReaderWriter<RW> {
-    /// Creates a new `ReaderWriter` with an initial offset of 0.
-    pub fn new(reader_writer: RW) -> Self {
-        ReaderWriter(IoWithOffset::new(reader_writer))
-    }
-}
-
-/// A stateful I/O stream (reader, writer, or both) that keeps track
+/// A readable and writable "stateful" I/O stream that keeps track 
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// Don't use this type directly (you cannot construct one).
-/// Instead, use its wrapper types: [`Reader`], [`Writer`], or [`ReaderWriter`].
-///
-/// This type permits seeking through the I/O stream if it has a known length,
-/// i.e., if it implements the [`KnownLength`] trait.
-#[doc(hidden)]
-pub struct IoWithOffset<IO> {
+/// This implements the [`bare_io::Read`] and [`bare_io::Write`] traits for read and write access,
+/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// It also forwards all other I/O-related traits implemented by the underlying I/O stream.
+pub struct ReaderWriter<IO> {
     io: IO,
     offset: u64,
 }
-impl<IO> IoWithOffset<IO> {
-    /// Creates a new IO stream with an initial offset of 0.
-    fn new(io: IO) -> Self {
-        IoWithOffset { io, offset: 0 }
+impl<IO> ReaderWriter<IO> where IO: ByteReader + ByteWriter {
+    /// Creates a new `ReaderWriter` with an initial offset of 0.
+    pub fn new(io: IO) -> ReaderWriter<IO> {
+        ReaderWriter { io, offset: 0 }
     }
 }
-impl<IO> bare_io::Read for IoWithOffset<IO> where IO: ByteReader {
+impl<IO> bare_io::Read for ReaderWriter<IO> where IO: ByteReader {
     fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize> {
         let bytes_read = self.io.read_at(buf, self.offset as usize)
             .map_err(Into::<bare_io::Error>::into)?;
@@ -503,7 +485,7 @@ impl<IO> bare_io::Read for IoWithOffset<IO> where IO: ByteReader {
         Ok(bytes_read)
     }
 }
-impl<IO> bare_io::Write for IoWithOffset<IO> where IO: ByteWriter {
+impl<IO> bare_io::Write for ReaderWriter<IO> where IO: ByteWriter {
     fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
         let bytes_written = self.io.write_at(buf, self.offset as usize)
             .map_err(Into::<bare_io::Error>::into)?;
@@ -515,8 +497,7 @@ impl<IO> bare_io::Write for IoWithOffset<IO> where IO: ByteWriter {
         self.io.flush().map_err(Into::into)
     }    
 }
-
-impl<IO> Seek for IoWithOffset<IO> where IO: KnownLength {
+impl<IO> Seek for ReaderWriter<IO> where IO: KnownLength {
     fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64> {
         let (base_pos, offset) = match position {
             SeekFrom::Start(n) => {
@@ -542,45 +523,141 @@ impl<IO> Seek for IoWithOffset<IO> where IO: KnownLength {
         }
     }
 }
+// Implement (by delegation) various I/O traits for `ReaderWriter`.
+impl<IO> BlockIo for ReaderWriter<IO> where IO: BlockIo {
+    delegate!{ to self.io { fn block_size(&self) -> usize; } }
+}
+impl<IO> KnownLength for ReaderWriter<IO> where IO: KnownLength {
+    delegate!{ to self.io { fn len(&self) -> usize; } }
+}
+impl<IO> BlockReader for ReaderWriter<IO> where IO: BlockReader {
+    delegate!{ to self.io { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
+}
+impl<IO> BlockWriter for ReaderWriter<IO> where IO: BlockWriter {
+    delegate!{ to self.io {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<IO> ByteReader for ReaderWriter<IO> where IO: ByteReader {
+    delegate!{ to self.io { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
+}
+impl<IO> ByteWriter for ReaderWriter<IO> where IO: ByteWriter {
+    delegate!{ to self.io {
+        fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
 
 
-/// A newtype wrapper around `Arc<Mutex<IO>>` that offers
-/// forward implementations of various IO-related traits.
+/// A stateful reader that keeps track of its current offset
+/// within the internal stateless [`ByteReader`] I/O stream.
+///
+/// This implements the [`bare_io::Read`] trait for read-only access,
+/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// It also forwards all other read-only I/O-related traits implemented by the underlying I/O stream.
+pub struct Reader<R>(ReaderWriter<R>);
+impl<R> Reader<R> where R: ByteReader {
+    /// Creates a new `Reader` with an initial offset of 0.
+    pub fn new(reader: R) -> Reader<R> {
+        Reader(ReaderWriter { io: reader, offset: 0 } )
+    }
+}
+// Implement (by delegation) various I/O traits for `Reader`
+impl<IO> BlockIo for Reader<IO> where IO: BlockIo {
+    delegate!{ to self.0 { fn block_size(&self) -> usize; } }
+}
+impl<IO> KnownLength for Reader<IO> where IO: KnownLength {
+    delegate!{ to self.0 { fn len(&self) -> usize; } }
+}
+impl<IO> BlockReader for Reader<IO> where IO: BlockReader {
+    delegate!{ to self.0 { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
+}
+impl<IO> ByteReader for Reader<IO> where IO: ByteReader {
+    delegate!{ to self.0 { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
+}
+impl<IO> bare_io::Read for Reader<IO> where IO: ByteReader {
+    delegate!{ to self.0 { fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize>; } }
+}
+impl<IO> Seek for Reader<IO> where IO: KnownLength {
+    delegate!{ to self.0 { fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64>; } }
+}
+
+
+/// A stateful writer that keeps track of its current offset
+/// within the internal stateless [`ByteWriter`] I/O stream.
+///
+/// This implements the [`bare_io::Write`] trait for write-only access,
+/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// It also forwards all other write-only I/O-related traits implemented by the underlying I/O stream.
+pub struct Writer<W>(ReaderWriter<W>);
+impl<W: ByteWriter> Writer<W> {
+    /// Creates a new `Writer` with an initial offset of 0.
+    pub fn new(writer: W) -> Self {
+        Writer(ReaderWriter { io: writer, offset: 0 } )
+    }
+}
+// Implement (by delegation) various I/O traits for `Writer`.
+impl<IO> BlockIo for Writer<IO> where IO: BlockIo {
+    delegate!{ to self.0 { fn block_size(&self) -> usize; } }
+}
+impl<IO> KnownLength for Writer<IO> where IO: KnownLength {
+    delegate!{ to self.0 { fn len(&self) -> usize; } }
+}
+impl<IO> BlockWriter for Writer<IO> where IO: BlockWriter {
+    delegate!{ to self.0 {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<IO> ByteWriter for Writer<IO> where IO: ByteWriter {
+    delegate!{ to self.0 {
+        fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<IO> bare_io::Write for Writer<IO> where IO: ByteWriter {
+    delegate!{ to self.0 { fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize>; } }
+    fn flush(&mut self) -> bare_io::Result<()> { bare_io::Write::flush(&mut self.0) }
+}
+impl<IO> Seek for Writer<IO> where IO: KnownLength {
+    delegate!{ to self.0 { fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64>; } }
+}
+
+
+/// A newtype wrapper around `Arc<Mutex<IO>>` that implements 
+/// (delegates) various IO-related traits through the lock/mutex.
 ///
 /// This allows a locked IO object (i.e., a `Arc<Mutex<IO>>`) 
 /// to be used within another wrapper object that requires an IO object
 /// that implements some IO-specific trait, 
 /// such as those listed in the crate-level documentation. 
-#[derive(Debug, Clone, Deref)]
+///
+/// Because this is a wrapper around `Arc<...>`, it implements `Clone`
+/// cheaply via a standard shallow copy. 
+#[derive(Debug, Clone)]
 pub struct LockedIo<IO: ?Sized>(Arc<Mutex<IO>>);
-impl<IO> LockedIo<IO> {
-    pub fn new(io: IO) -> LockedIo<IO> {
-        LockedIo(Arc::new(Mutex::new(io)))
-    }
-}
-impl<IO:? Sized> From<Arc<Mutex<IO>>> for LockedIo<IO> {
+impl<IO: ?Sized> From<Arc<Mutex<IO>>> for LockedIo<IO> {
     fn from(arc_mutex_io: Arc<Mutex<IO>>) -> Self {
         LockedIo(arc_mutex_io)
     }
 }
 
-// Implement the various I/O traits for the `LockedIo` wrapper around Mutex<trait>.
+// Implement (by delegation) various I/O traits for the `LockedIo` wrapper around Mutex<trait>.
 impl<IO> BlockIo for LockedIo<IO> where IO: BlockIo + ?Sized {
-    fn block_size(&self) -> usize { self.0.lock().block_size() }
+    delegate!{ to self.0.lock() { fn block_size(&self) -> usize; } }
 }
 impl<IO> KnownLength for LockedIo<IO> where IO: KnownLength + ?Sized {
-    fn len(&self) -> usize { self.0.lock().len() }
+    delegate!{ to self.0.lock() { fn len(&self) -> usize; } }
 }
 impl<IO> BlockReader for LockedIo<IO> where IO: BlockReader + ?Sized {
-    fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
-        self.0.lock().read_blocks(buffer, block_offset)
-    }
+    delegate!{ to self.0.lock() { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
 }
 impl<IO> BlockWriter for LockedIo<IO> where IO: BlockWriter + ?Sized {
-    fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
-        self.0.lock().write_blocks(buffer, block_offset)
-    }
-    fn flush(&mut self) -> Result<(), IoError> { self.0.lock().flush() }
+    delegate!{ to self.0.lock() {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
 }
 
 

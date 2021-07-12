@@ -27,7 +27,7 @@ use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
-use block_io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter};
+use block_io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter, Reader, Writer};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -155,10 +155,6 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             ),
         );
 
-        NOTE: the problem is that `ReaderWriter` doesn't actually IMPLEMENT bare_io::Read/Write,
-              but rather it only DEREFS to a type that does implement that. 
-              We should use either the `delegate` crate or `delegate-attr` crate for this.
-
         let filesystem = fatfs::FileSystem::new(disk, fatfs::FsOptions::new());
 
     }
@@ -217,7 +213,7 @@ impl<IO> fatfs::Seek for FatFsAdapter<IO> where IO: bare_io::Seek {
 /// 
 /// This is required because Rust prevents implementing foreign traits for foreign types.
 #[derive(Debug, From, Into)]
-struct FatFsIoErrorAdapter(bare_io::Error);
+pub struct FatFsIoErrorAdapter(bare_io::Error);
 impl fatfs::IoError for FatFsIoErrorAdapter {
     fn is_interrupted(&self) -> bool {
         self.0.kind() == bare_io::ErrorKind::Interrupted

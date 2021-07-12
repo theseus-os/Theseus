@@ -241,7 +241,7 @@ name = "block_io"
 version = "0.1.0"
 dependencies = [
  "bare-io",
- "derive_more",
+ "delegate",
  "lazy_static",
  "log",
  "spin 0.9.0",
@@ -545,6 +545,17 @@ dependencies = [
 [[package]]
 name = "debugit"
 version = "0.1.0"
+
+[[package]]
+name = "delegate"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f76f9eae170d46f87b0c34cc3b29d411dbdef329e1afd85132cece3da62edd9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "deps"

@@ -121,7 +121,7 @@ pub fn main(_args: Vec<String>) -> isize {
     let mut bb = [0u8; 100];
     let bread = io.read(&mut bb).unwrap();
     info!("Final ReaderWriter test: read {} bytes into bb: {:X?}", bread, bb);
-    let start_offset = io.deref_mut().seek(SeekFrom::Current(0)).unwrap();
+    let start_offset = io.seek(SeekFrom::Current(0)).unwrap();
     let bwritten = io.write(b"YO WHAT IS UP").unwrap();
     let end_offset = io.seek(SeekFrom::Current(0)).unwrap();
     info!("Final ReaderWriter test: wrote {} bytes from offset {}..{}", bwritten, start_offset, end_offset);

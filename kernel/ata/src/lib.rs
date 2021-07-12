@@ -600,7 +600,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn read_pio(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.len() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -636,7 +636,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn write_pio(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.len() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
