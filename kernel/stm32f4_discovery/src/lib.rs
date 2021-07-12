@@ -1,7 +1,8 @@
 #![no_std]
+#[macro_use] extern crate cfg_if;
 
-#[cfg(device = "STM32F4DISCOVERY")] 
-{
+cfg_if!{
+if #[cfg(target = "thumbv7em-none-eabi")] {
     use stm32f4::stm32f407;
     use core::cell::RefCell;
     use cortex_m::interrupt::{self, Mutex};
@@ -13,4 +14,5 @@
             Mutex::new(RefCell::new(p))
         };
     }
+}
 }
