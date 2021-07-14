@@ -633,8 +633,9 @@ dependencies = [
 
 [[package]]
 name = "downcast-rs"
-version = "1.0.4"
-source = "git+https://github.com/theseus-os/downcast-rs#5d2c787a754b6d5aa44e7c91470d2bb160818617"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
 name = "e1000"

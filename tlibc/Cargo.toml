@@ -40,7 +40,5 @@ volatile = { git = "https://github.com/theseus-os/volatile" }
 getopts = { git = "https://github.com/theseus-os/getopts" }
 ### use our own no_std-compatible qp trie
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
-### use our own no_std-compatible downcast-rs
-downcast-rs = { git = "https://github.com/theseus-os/downcast-rs" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
