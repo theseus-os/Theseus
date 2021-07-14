@@ -241,9 +241,10 @@ name = "block_io"
 version = "0.1.0"
 dependencies = [
  "bare-io",
- "derive_more",
+ "delegate",
  "lazy_static",
  "log",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -546,6 +547,17 @@ name = "debugit"
 version = "0.1.0"
 
 [[package]]
+name = "delegate"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f76f9eae170d46f87b0c34cc3b29d411dbdef329e1afd85132cece3da62edd9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "deps"
 version = "0.1.0"
 dependencies = [
@@ -578,9 +590,13 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "bare-io",
+ "block_io",
+ "derive_more",
  "e1000",
  "ethernet_smoltcp_device",
  "event_types",
+ "fatfs",
  "ixgbe",
  "keyboard",
  "log",
@@ -752,6 +768,15 @@ name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
+
+[[package]]
+name = "fatfs"
+version = "0.4.0"
+source = "git+https://github.com/theseus-os/rust-fatfs?branch=config_log_features#cf9fa6a5315b78c0316d38c6fc60c915263e2281"
+dependencies = [
+ "bitflags",
+ "log",
+]
 
 [[package]]
 name = "fault_crate_swap"

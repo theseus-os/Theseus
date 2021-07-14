@@ -157,6 +157,25 @@ enum BusDriveSelect {
 }
 
 
+/// TODO: support DMA like so: <https://wiki.osdev.org/ATA/ATAPI_using_DMA#The_Bus_Master_Register>
+/// There is one instance of this struct for each `AtaBus`.
+/// 
+/// Note: TODO: depending on whether BAR4 is a Port I/O address or MMIO address, this could also be mapped into memory.
+///             We need to have an abstraction either above or beneath `Volatile` that allows reads/writes from port I/O and memory addresses similarly.
+#[allow(unused)]
+struct AtaBusMaster {
+	/// For the primary bus, this exists at BAR4 + 0.
+	/// For the secondary,   this exists at BAR4 + 8.
+	command:      Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 2.
+	/// For the secondary,   this exists at BAR4 + 10.
+	status:       Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 4.
+	/// For the secondary,   this exists at BAR4 + 12.
+	prdt_address: Port<u32>,
+}
+
+
 /// There are two ATA buses on an IDE controller,
 /// and each one can have two drives attached to it:
 /// one master drive and one slave drive. 
@@ -581,7 +600,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn read_pio(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.len() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -617,7 +636,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn write_pio(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.len() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
