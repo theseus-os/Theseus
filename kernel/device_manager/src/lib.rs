@@ -155,26 +155,27 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             ),
         );
 
-        let filesystem = fatfs::FileSystem::new(disk, fatfs::FsOptions::new()).unwrap();
-        debug!("FATFS data:
-            fat_type: {:?},
-            volume_id: {:X?},
-            volume_label: {:?},
-            cluster_size: {:?},
-            status_flags: {:?},
-            stats: {:?}",
-            filesystem.fat_type(),
-            filesystem.volume_id(),
-            filesystem.volume_label(),
-            filesystem.cluster_size(),
-            filesystem.read_status_flags(),
-            filesystem.stats(),
-        );
+        if let Ok(filesystem) = fatfs::FileSystem::new(disk, fatfs::FsOptions::new()) {
+            debug!("FATFS data:
+                fat_type: {:?},
+                volume_id: {:X?},
+                volume_label: {:?},
+                cluster_size: {:?},
+                status_flags: {:?},
+                stats: {:?}",
+                filesystem.fat_type(),
+                filesystem.volume_id(),
+                filesystem.volume_label(),
+                filesystem.cluster_size(),
+                filesystem.read_status_flags(),
+                filesystem.stats(),
+            );
 
-        let root = filesystem.root_dir();
-        debug!("Root directory contents:");
-        for f in root.iter() {
-            debug!("\t {:#X?}", f.map(|entry| (entry.file_name(), entry.attributes(), entry.len())));
+            let root = filesystem.root_dir();
+            debug!("Root directory contents:");
+            for f in root.iter() {
+                debug!("\t {:X?}", f.map(|entry| (entry.file_name(), entry.attributes(), entry.len())));
+            }
         }
 
     }
