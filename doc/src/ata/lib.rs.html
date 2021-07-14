@@ -1074,6 +1074,25 @@
 <span id="1071">1071</span>
 <span id="1072">1072</span>
 <span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for accessing ATA drives (IDE).</span>
 <span class="doccomment">//! </span>
@@ -1231,6 +1250,25 @@
 <span class="kw">enum</span> <span class="ident">BusDriveSelect</span> {
 	<span class="ident">Master</span> <span class="op">=</span> <span class="number">0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>,
 	<span class="ident">Slave</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>,
+}
+
+
+<span class="doccomment">/// TODO: support DMA like so: &lt;https://wiki.osdev.org/ATA/ATAPI_using_DMA#The_Bus_Master_Register&gt;</span>
+<span class="doccomment">/// There is one instance of this struct for each `AtaBus`.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// Note: TODO: depending on whether BAR4 is a Port I/O address or MMIO address, this could also be mapped into memory.</span>
+<span class="doccomment">///             We need to have an abstraction either above or beneath `Volatile` that allows reads/writes from port I/O and memory addresses similarly.</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
+<span class="kw">struct</span> <span class="ident">AtaBusMaster</span> {
+	<span class="doccomment">/// For the primary bus, this exists at BAR4 + 0.</span>
+	<span class="doccomment">/// For the secondary,   this exists at BAR4 + 8.</span>
+	<span class="ident">command</span>:      <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+	<span class="doccomment">/// For the primary bus, this exists at BAR4 + 2.</span>
+	<span class="doccomment">/// For the secondary,   this exists at BAR4 + 10.</span>
+	<span class="ident">status</span>:       <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+	<span class="doccomment">/// For the primary bus, this exists at BAR4 + 4.</span>
+	<span class="doccomment">/// For the secondary,   this exists at BAR4 + 12.</span>
+	<span class="ident">prdt_address</span>: <span class="ident">Port</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
 }
 
 
@@ -1658,7 +1696,7 @@
 	<span class="doccomment">/// # Note</span>
 	<span class="doccomment">/// This is slow, as it uses blocking port I/O instead of DMA. </span>
 	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_pio</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>], <span class="ident">offset_in_sectors</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-		<span class="kw">if</span> <span class="ident">offset_in_sectors</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">len</span>() {
+		<span class="kw">if</span> <span class="ident">offset_in_sectors</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_blocks</span>() {
 			<span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;offset_in_sectors was out of bounds&quot;</span>);
 		}
 		<span class="kw">let</span> <span class="ident">length_in_bytes</span> <span class="op">=</span> <span class="ident">buffer</span>.<span class="ident">len</span>();
@@ -1694,7 +1732,7 @@
 	<span class="doccomment">/// # Note</span>
 	<span class="doccomment">/// This is slow, as it uses blocking port I/O instead of DMA. </span>
 	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_pio</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">offset_in_sectors</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-		<span class="kw">if</span> <span class="ident">offset_in_sectors</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">len</span>() {
+		<span class="kw">if</span> <span class="ident">offset_in_sectors</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">size_in_blocks</span>() {
 			<span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;offset_in_sectors was out of bounds&quot;</span>);
 		}
 		<span class="kw">let</span> <span class="ident">length_in_bytes</span> <span class="op">=</span> <span class="ident">buffer</span>.<span class="ident">len</span>();

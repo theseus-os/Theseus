@@ -467,7 +467,6 @@
 <span id="464">464</span>
 <span id="465">465</span>
 <span id="466">466</span>
-<span id="467">467</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Functions to communicate with a network server that provides over-the-air live update functionality.</span>
 <span class="doccomment">//! </span>
@@ -515,7 +514,6 @@
 <span class="kw">use</span> <span class="ident">smoltcp_helper</span>::{<span class="ident">STARTING_FREE_PORT</span>, <span class="ident">connect</span>, <span class="ident">millis_since</span>, <span class="ident">poll_iface</span>};
 
 <span class="doccomment">/// The IP address of the update server.</span>
-<span class="comment">// const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84]; // the static IP of `kevin.recg.rice.edu`</span>
 <span class="kw">const</span> <span class="ident">DEFAULT_DESTINATION_IP_ADDR</span>: [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the IP of the host machine when running on QEMU.</span>
 
 <span class="doccomment">/// The TCP port on the update server that listens for update requests </span>
