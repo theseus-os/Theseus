@@ -146,44 +146,45 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
     // Discover filesystems from each storage device on the storage controllers initialized above
     // and mount each filesystem to the root directory by default.
-    for storage_device in storage_manager::storage_devices() {
-        let disk = FatFsAdapter(
-            ReaderWriter::new(
-                ByteReaderWriterWrapper::from(
-                    LockedIo::from(storage_device)
-                )
-            ),
-        );
-
-        if let Ok(filesystem) = fatfs::FileSystem::new(disk, fatfs::FsOptions::new()) {
-            debug!("FATFS data:
-                fat_type: {:?},
-                volume_id: {:X?},
-                volume_label: {:?},
-                cluster_size: {:?},
-                status_flags: {:?},
-                stats: {:?}",
-                filesystem.fat_type(),
-                filesystem.volume_id(),
-                filesystem.volume_label(),
-                filesystem.cluster_size(),
-                filesystem.read_status_flags(),
-                filesystem.stats(),
+    if false {
+        for storage_device in storage_manager::storage_devices() {
+            let disk = FatFsAdapter(
+                ReaderWriter::new(
+                    ByteReaderWriterWrapper::from(
+                        LockedIo::from(storage_device)
+                    )
+                ),
             );
 
-            let root = filesystem.root_dir();
-            debug!("Root directory contents:");
-            for f in root.iter() {
-                debug!("\t {:X?}", f.map(|entry| (entry.file_name(), entry.attributes(), entry.len())));
+            if let Ok(filesystem) = fatfs::FileSystem::new(disk, fatfs::FsOptions::new()) {
+                debug!("FATFS data:
+                    fat_type: {:?},
+                    volume_id: {:X?},
+                    volume_label: {:?},
+                    cluster_size: {:?},
+                    status_flags: {:?},
+                    stats: {:?}",
+                    filesystem.fat_type(),
+                    filesystem.volume_id(),
+                    filesystem.volume_label(),
+                    filesystem.cluster_size(),
+                    filesystem.read_status_flags(),
+                    filesystem.stats(),
+                );
+
+                let root = filesystem.root_dir();
+                debug!("Root directory contents:");
+                for f in root.iter() {
+                    debug!("\t {:X?}", f.map(|entry| (entry.file_name(), entry.attributes(), entry.len())));
+                }
             }
         }
-
     }
 
     Ok(())
 }
 
-
+// TODO: move the following `FatFsAdapter` stuff into a separate crate. 
 
 /// An adapter (wrapper type) that implements traits required by the [`fatfs`] crate
 /// for any I/O device that wants to be usable by [`fatfs`].
@@ -229,8 +230,8 @@ impl<IO> fatfs::Seek for FatFsAdapter<IO> where IO: bare_io::Seek {
     }
 }
 
-/// This struct exists so we can implement the [`fatfs::IoError`] trait
-/// for the [`bare_io::Error`] trait (albeit indirectly).
+/// This struct exists to enable us to implement the [`fatfs::IoError`] trait
+/// for the [`bare_io::Error`] trait.
 /// 
 /// This is required because Rust prevents implementing foreign traits for foreign types.
 #[derive(Debug, From, Into)]
@@ -239,11 +240,9 @@ impl fatfs::IoError for FatFsIoErrorAdapter {
     fn is_interrupted(&self) -> bool {
         self.0.kind() == bare_io::ErrorKind::Interrupted
     }
-
     fn new_unexpected_eof_error() -> Self {
         FatFsIoErrorAdapter(bare_io::ErrorKind::UnexpectedEof.into())
     }
-
     fn new_write_zero_error() -> Self {
         FatFsIoErrorAdapter(bare_io::ErrorKind::WriteZero.into())
     }
