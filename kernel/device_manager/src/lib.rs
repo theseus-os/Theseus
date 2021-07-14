@@ -27,7 +27,7 @@ use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
-use block_io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter, Reader, Writer};
+use block_io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -171,7 +171,6 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             filesystem.stats(),
         );
 
-        let indent = "    ";
         let root = filesystem.root_dir();
         debug!("Root directory contents:");
         for f in root.iter() {

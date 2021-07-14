@@ -12,7 +12,7 @@ derive_more = "0.99.0"
 [dependencies.fatfs]
 git = "https://github.com/rafalh/rust-fatfs"
 default-features = false
-features = [ "alloc", "lfn", "unicode" ]
+features = [ "alloc", "lfn", "unicode", "log_level_warn" ]
 
 [dependencies.log]
 version = "0.4.8"
