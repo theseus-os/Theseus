@@ -89,5 +89,3 @@ RUSTFLAGS += -Z share-generics=no
 
 ## TODO: Remove this later once we adress the various new rustc warnings
 RUSTFLAGS += -Aunsupported_naked_functions
-RUSTFLAGS += -Arenamed_and_removed_lints
-RUSTFLAGS += -Adeprecated

@@ -8,7 +8,7 @@
 #![no_std]
 #![feature(untagged_unions)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
-#![allow(safe_packed_borrows)] // temporary, just to suppress unsafe packed borrows 
+#![allow(unaligned_references)] // temporary, just to suppress unsafe packed borrows 
 #![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;

@@ -42,52 +42,50 @@ impl<T> AtomicLinkedList<T> {
     }
 
     /// add a new element to the front of the list.
-    pub fn push_front(&self, data: T) {
-        let _ = self.push_front_timeout(data, u64::max_value());
+    pub fn push_front(&self, data: T) -> Result<(), T> {
+        self.push_front_timeout(data, u64::max_value())
     }
 
     /// add a new element to the front of the list, but will abort
     /// if it fails to do so atomically after the given number of attempts. 
-    pub fn push_front_timeout(&self, data: T, max_attempts: u64) -> Result<(), ()> {
+    pub fn push_front_timeout(&self, data: T, max_attempts: u64) -> Result<(), T> {
 
-        let max_attempts = if max_attempts == 0 { 1 } else { max_attempts }; // ensure we try at least once 
+        let max_attempts = core::cmp::max(max_attempts, 1); // ensure we try at least once 
 
-        let node_ptr = Box::into_raw(Box::new(Node::new(data))); // we must wrap Nodes in Box to keep them around
+        let node_ptr = Box::into_raw(Box::new(Node::new(data)));
 
+        // start the first attempt by obtaining the current head pointer
+        let mut orig_head_ptr = self.head.load(Ordering::Acquire);
         for _attempt in 0..max_attempts {
-            // start the attempt by grabbing the head value
-            let orig_head_ptr = self.head.load(Ordering::Acquire);
 
-            // the new "node" will become the new head, so set the node's next pointer to orig_head_ptr
-            // SAFE: we know the node_ptr is valid since we just created it above
+            // the new "node" will become the new head, so set the node's `next` pointer to `orig_head_ptr`
+            // SAFE: we know the node_ptr is valid since we just created it above.
             unsafe {
                 (*node_ptr).next = AtomicPtr::new(orig_head_ptr);
             }
 
-            // now try to atomically swap the new node ptr into the current head ptr
-            let prev_stored_ptr = self.head.compare_and_swap(orig_head_ptr, node_ptr, Ordering::AcqRel); 
+            // now try to atomically swap the new `node_ptr` into the current `head` ptr
+            match self.head.compare_exchange_weak(orig_head_ptr, node_ptr, Ordering::AcqRel, Ordering::Acquire) {
+                // If compare_exchange succeeds, then the `head` ptr was properly updated, i.e.,
+                // no other thread was interleaved and snuck in to change `head` since we last loaded it.
+                Ok(_old_head_ptr) => return Ok(()),
+                Err(changed_head_ptr) => orig_head_ptr = changed_head_ptr,
+            }
             
-            // if compare_and_swap returns the same value we orig_head_ptr, then it was properly updated
-            // we do this so we can check if another process 
-            if prev_stored_ptr == orig_head_ptr {
-                // it worked! i.e., no other process snuck in and changed head while we were setting up node.next
-                return Ok(());
-            }
-            else {
-                // it didn't work, the head value wasn't updated, meaning that another process updated it before we could
-                // so we need to start over by reading the head ptr again and trying to swap it in again
-                #[cfg(test)] 
-                println!("        attempt {}", _attempt);
-            }
+            // Here, it didn't work, the head value wasn't updated, meaning that another process updated it before we could
+            // so we need to start over by reading the head ptr again and trying to swap it in again
+            #[cfg(test)] 
+            println!("        attempt {}", _attempt);
         }
 
-        // clean up the unboxed node and allow it to be dropped
-        // SAFE: no one has touched this node except for us when we created it above
-        unsafe {
-            let _ = Box::from_raw(node_ptr);
-        }
+        // Here, we exceeded the number of max attempts, so we failed. 
+        // Reclaim the Boxed `Node`, drop the Box, and return the inner data of type `T`.
+        // SAFE: no one has touched this node except for us when we created it above.
+        let reclaimed_node = unsafe {
+            Box::from_raw(node_ptr)
+        };
 
-        Err(())
+        Err(reclaimed_node.data)
     }
 
 
