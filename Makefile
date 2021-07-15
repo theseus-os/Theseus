@@ -502,11 +502,7 @@ endif
 ### Opens the Theseus book.
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
-ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT_FILE)")" &
-else
-	@xdg-open $(BOOK_OUT_FILE) > /dev/null 2>&1 || open $(BOOK_OUT_FILE) &
-endif
+	@mdbook build --open $(BOOK_SRC) -d $(BOOK_OUT)
 
 
 ### Removes all built documentation
