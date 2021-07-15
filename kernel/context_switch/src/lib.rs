@@ -2,7 +2,7 @@
 //! that helps to manage the complex configuration options involving SIMD and personalities.
 
 #![no_std]
-#![feature(llvm_asm, naked_functions)]
+#![feature(asm, naked_functions)]
 
 #[macro_use] extern crate cfg_if;
 
@@ -33,14 +33,17 @@ cfg_if! {
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
         #[inline(never)]
-        pub unsafe fn context_switch_regular_to_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+        pub unsafe extern "C" fn context_switch_regular_to_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
-            // you CANNOT place any log statements or other instructions here,
-            // or at any point before, in between, or after the following macros.
-            save_registers_regular!();
-            switch_stacks!();
-            restore_registers_sse!();
-            restore_registers_regular!();
+            // you CANNOT place any log statements or other instructions here
+            // before, in between, or after anything below.
+            asm!(
+                save_registers_regular!(),
+                switch_stacks!(),
+                restore_registers_sse!(),
+                restore_registers_regular!(),
+                options(noreturn)
+            );
         }
 
 
@@ -54,14 +57,17 @@ cfg_if! {
         /// This function is unsafe because it changes the content on both task's stacks.
         #[naked]
         #[inline(never)]
-        pub unsafe fn context_switch_sse_to_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+        pub unsafe extern "C" fn context_switch_sse_to_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
-            // you CANNOT place any log statements or other instructions here,
-            // or at any point before, in between, or after the following macros.
-            save_registers_regular!();
-            save_registers_sse!();
-            switch_stacks!();
-            restore_registers_regular!();
+            // you CANNOT place any log statements or other instructions here
+            // before, in between, or after anything below.
+            asm!(
+                save_registers_regular!(),
+                save_registers_sse!(),
+                switch_stacks!(),
+                restore_registers_regular!(),
+                options(noreturn)
+            );
         }
 
         /// Switches context from a regular Task to an AVX Task.
@@ -74,11 +80,17 @@ cfg_if! {
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
         #[inline(never)]
-        pub unsafe fn context_switch_regular_to_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
-            save_registers_regular!();
-            switch_stacks!();
-            restore_registers_avx!();
-            restore_registers_regular!();
+        pub unsafe extern "C" fn context_switch_regular_to_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+            // Since this is a naked function that expects its arguments in two registers,
+            // you CANNOT place any log statements or other instructions here
+            // before, in between, or after anything below.
+            asm!(
+                save_registers_regular!(),
+                switch_stacks!(),
+                restore_registers_avx!(),
+                restore_registers_regular!(),
+                options(noreturn)
+            );
         }
 
         /// Switches context from an SSE Task to an AVX regular Task.
@@ -91,15 +103,18 @@ cfg_if! {
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
         #[inline(never)]
-        pub unsafe fn context_switch_sse_to_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+        pub unsafe extern "C" fn context_switch_sse_to_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
-            // you CANNOT place any log statements or other instructions here,
-            // or at any point before, in between, or after the following macros.
-            save_registers_regular!();
-            save_registers_sse!();
-            switch_stacks!();
-            restore_registers_avx!();
-            restore_registers_regular!();
+            // you CANNOT place any log statements or other instructions here
+            // before, in between, or after anything below.
+            asm!(
+                save_registers_regular!(),
+                save_registers_sse!(),
+                switch_stacks!(),
+                restore_registers_avx!(),
+                restore_registers_regular!(),
+                options(noreturn)
+            );
         }
 
         /// Switches context from an AVX Task to a regular Task.
@@ -112,14 +127,17 @@ cfg_if! {
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
         #[inline(never)]
-        pub unsafe fn context_switch_avx_to_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+        pub unsafe extern "C" fn context_switch_avx_to_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
-            // you CANNOT place any log statements or other instructions here,
-            // or at any point before, in between, or after the following macros.
-            save_registers_regular!();
-            save_registers_avx!();
-            switch_stacks!();
-            restore_registers_regular!();
+            // you CANNOT place any log statements or other instructions here
+            // before, in between, or after anything below.
+            asm!(
+                save_registers_regular!(),
+                save_registers_avx!(),
+                switch_stacks!(),
+                restore_registers_regular!(),
+                options(noreturn)
+            );
         }
 
         /// Switches context from an AVX Task to an SSE Task.
@@ -132,15 +150,18 @@ cfg_if! {
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
         #[inline(never)]
-        pub unsafe fn context_switch_avx_to_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+        pub unsafe extern "C" fn context_switch_avx_to_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
-            // you CANNOT place any log statements or other instructions here,
-            // or at any point before, in between, or after the following macros.
-            save_registers_regular!();
-            save_registers_avx!();
-            switch_stacks!();
-            restore_registers_sse!();
-            restore_registers_regular!();
+            // you CANNOT place any log statements or other instructions here
+            // before, in between, or after anything below.
+            asm!(
+                save_registers_regular!(),
+                save_registers_avx!(),
+                switch_stacks!(),
+                restore_registers_sse!(),
+                restore_registers_regular!(),
+                options(noreturn)
+            );
         }
     }
 

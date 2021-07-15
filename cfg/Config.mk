@@ -84,8 +84,3 @@ RUSTFLAGS += -Z share-generics=no
 ## so it often results in slightly lowered performance. 
 ## By default, this is not enabled.
 # RUSTFLAGS += -C force-frame-pointers=yes
-
-
-
-## TODO: Remove this later once we adress the various new rustc warnings
-RUSTFLAGS += -Aunsupported_naked_functions

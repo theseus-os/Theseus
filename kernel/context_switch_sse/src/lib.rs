@@ -2,7 +2,7 @@
 //! when SSE extensions are enabled. 
 
 #![no_std]
-#![feature(llvm_asm, naked_functions)]
+#![feature(asm, naked_functions)]
 
 extern crate zerocopy;
 #[macro_use] extern crate context_switch_regular;
@@ -13,11 +13,12 @@ use zerocopy::FromBytes;
 
 /// The registers saved before a context switch and restored after a context switch
 /// for SSE-enabled Tasks.
+///
+/// Note: the order of the registers here MUST MATCH the order of 
+/// registers popped in the [`restore_registers_sse!`] macro. 
 #[derive(FromBytes)]
 #[repr(C, packed)]
 pub struct ContextSSE {
-    // The order of the registers here MUST MATCH the order of 
-    // registers popped in the context_switch() function below. 
     xmm15: u128,
     xmm14: u128,   
     xmm13: u128,   
@@ -64,14 +65,14 @@ impl ContextSSE {
 }
 
 
-/// An assembly macro for saving regular x86_64 registers.
+/// An assembly block for saving SSE registers
 /// by pushing them onto the stack.
 #[macro_export]
 macro_rules! save_registers_sse {
     () => (
-        llvm_asm!("
-            # save all of the xmm registers (for SSE)
-            # each register is 16 bytes (128 bits), and there are 16 of them
+        // Save all of the xmm registers (for SSE).
+        // Each register is 16 bytes (128 bits), and there are 16 of them.
+        r#"
             lea rsp, [rsp - 16*16]
             movdqu [rsp + 16*0],  xmm0   # push xmm0
             movdqu [rsp + 16*1],  xmm1   # push xmm1
@@ -89,20 +90,18 @@ macro_rules! save_registers_sse {
             movdqu [rsp + 16*13], xmm13  # push xmm13
             movdqu [rsp + 16*14], xmm14  # push xmm14
             movdqu [rsp + 16*15], xmm15  # push xmm15
-            "
-            : : : "memory" : "intel", "volatile"
-        );
+        "#
     );
 }
 
 
-/// An assembly macro for saving regular x86_64 registers.
-/// by pushing them onto the stack.
+/// An assembly block for restoring SSE registers
+/// by popping them off of the stack.
 #[macro_export]
 macro_rules! restore_registers_sse {
     () => (
-        llvm_asm!("
-            # restore all of the xmm registers
+        // restore all of the xmm registers
+        r#"
             movdqu xmm15, [rsp + 16*15]   # pop xmm15
             movdqu xmm14, [rsp + 16*14]   # pop xmm14
             movdqu xmm13, [rsp + 16*13]   # pop xmm13
@@ -120,9 +119,7 @@ macro_rules! restore_registers_sse {
             movdqu xmm1,  [rsp + 16*1]    # pop xmm1
             movdqu xmm0,  [rsp + 16*0]    # pop xmm0
             lea rsp, [rsp + 16*16]
-            "
-            : : : "memory" : "intel", "volatile"
-        );
+        "#
     );
 }
 
@@ -137,13 +134,16 @@ macro_rules! restore_registers_sse {
 /// This function is unsafe because it changes the content on both task's stacks. 
 #[naked]
 #[inline(never)]
-pub unsafe fn context_switch_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+pub unsafe extern "C" fn context_switch_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     // Since this is a naked function that expects its arguments in two registers,
-    // you CANNOT place any log statements or other instructions here,
-    // or at any point before, in between, or after the following macros.
-    save_registers_regular!();
-    save_registers_sse!();
-    switch_stacks!();
-    restore_registers_sse!();
-    restore_registers_regular!();
+    // you CANNOT place any log statements or other instructions here
+    // before, in between, or after anything below.
+    asm!(
+        save_registers_regular!(),
+        save_registers_sse!(),
+        switch_stacks!(),
+        restore_registers_sse!(),
+        restore_registers_regular!(),
+        options(noreturn)
+    );
 }
