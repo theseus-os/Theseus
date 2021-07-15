@@ -1,5 +1,9 @@
 # Theseus OS
 
+[![Documentation Action](https://img.shields.io/github/workflow/status/theseus-os/Theseus/Documentation?label=docs%20build)](https://github.com/theseus-os/Theseus/actions/workflows/docs.yaml)
+[![Documentation](https://img.shields.io/badge/open-docs-blue)](https://theseus-os.github.io/Theseus/doc/___Theseus_Crates___/index.html)
+[![Book](https://img.shields.io/badge/open-book-blueviolet)](https://theseus-os.github.io/Theseus/book/index.html)
+
 Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
 For more info, check out Theseus's [documentation](#Documentation) or our [published academic papers](https://theseus-os.github.io/Theseus/book/misc/papers_presentations.html), which describe Theseus's design and implementation. 
