@@ -120,23 +120,28 @@
 <span id="117">117</span>
 <span id="118">118</span>
 <span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate contains structures and routines for context switching </span>
 <span class="doccomment">//! when SSE/SIMD extensions are not active. </span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">llvm_asm</span>, <span class="ident">naked_functions</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>, <span class="ident">naked_functions</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
 
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 
 <span class="doccomment">/// The registers saved before a context switch and restored after a context switch.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note: the order of the registers here MUST MATCH the order of </span>
+<span class="doccomment">/// registers popped in the [`restore_registers_regular!`] macro. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ContextRegular</span> {
-    <span class="comment">// The order of the registers here MUST MATCH the order of </span>
-    <span class="comment">// registers popped in the restore_registers_regular!() macro below. </span>
     <span class="ident">r15</span>: <span class="ident">usize</span>, 
     <span class="ident">r14</span>: <span class="ident">usize</span>,
     <span class="ident">r13</span>: <span class="ident">usize</span>,
@@ -157,33 +162,31 @@
             <span class="ident">r12</span>: <span class="number">0</span>,
             <span class="ident">rbp</span>: <span class="number">0</span>,
             <span class="ident">rbx</span>: <span class="number">0</span>,
-            <span class="ident">rip</span>: <span class="ident">rip</span>,
+            <span class="ident">rip</span>,
         }
     }
 }
 
 
-<span class="doccomment">/// An assembly macro for saving regular x86_64 registers.</span>
+<span class="doccomment">/// An assembly block for saving regular x86_64 registers</span>
 <span class="doccomment">/// by pushing them onto the stack.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">save_registers_regular</span> {
     () <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # save all general purpose registers into the previous task
+        <span class="comment">// save all general purpose registers into the previous task</span>
+        <span class="string">r#&quot;
             push rbx
             push rbp
             push r12
             push r13
             push r14
             push r15
-            &quot;</span>
-            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
-        );
+        &quot;#</span>
     );
 }
 
 
-<span class="doccomment">/// An assembly macro for switching stacks,</span>
+<span class="doccomment">/// An assembly block for switching stacks,</span>
 <span class="doccomment">/// which is the integral part of the actual context switching routine.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// * The `rdi` register must contain a pointer to the previous task&#39;s stack pointer.</span>
@@ -191,33 +194,35 @@
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">switch_stacks</span> {
     () <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # switch the stack pointers
+        <span class="comment">// switch the stack pointers</span>
+        <span class="string">r#&quot;
             mov [rdi], rsp
             mov rsp, rsi
-            &quot;</span>
-            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
-        );
+        &quot;#</span>
     );
 }
 
 
-<span class="doccomment">/// An assembly macro for saving regular x86_64 registers.</span>
-<span class="doccomment">/// by pushing them onto the stack.</span>
+<span class="doccomment">/// An assembly block for restoring regular x86_64 registers</span>
+<span class="doccomment">/// by popping them off of the stack.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// This assembly statement ends with an explicit `ret` instruction at the end,</span>
+<span class="doccomment">/// which is the final component of a context switch operation. </span>
+<span class="doccomment">/// Note that this is intentional and required in order to accommodate </span>
+<span class="doccomment">/// the `noreturn` option is required by Rust&#39;s naked functions.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">restore_registers_regular</span> {
     () <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # restore the next task&#39;s general purpose registers
+        <span class="comment">// restore the next task&#39;s general purpose registers</span>
+        <span class="string">r#&quot; 
             pop r15
             pop r14
             pop r13
             pop r12
             pop rbp
             pop rbx
-            &quot;</span>
-            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
-        );
+            ret
+        &quot;#</span>
     );
 }
 
@@ -232,13 +237,16 @@
 <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
 <span class="attribute">#[<span class="ident">naked</span>]</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_regular</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_regular</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
     <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-    <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-    <span class="comment">// or at any point before, in between, or after the following macros.</span>
-    <span class="macro">save_registers_regular!</span>();
-    <span class="macro">switch_stacks!</span>();
-    <span class="macro">restore_registers_regular!</span>();
+    <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+    <span class="comment">// before, in between, or after anything below.</span>
+    <span class="macro">asm!</span>(
+        <span class="macro">save_registers_regular!</span>(),
+        <span class="macro">switch_stacks!</span>(),
+        <span class="macro">restore_registers_regular!</span>(),
+        <span class="ident">options</span>(<span class="ident">noreturn</span>)
+    );
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="context_switch_regular" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>

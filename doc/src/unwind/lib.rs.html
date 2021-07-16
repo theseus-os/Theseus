@@ -914,6 +914,12 @@
 <span id="911">911</span>
 <span id="912">912</span>
 <span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.</span>
 <span class="doccomment">//! </span>
@@ -951,7 +957,7 @@
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">panic_info_message</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">llvm_asm</span>, <span class="ident">naked_functions</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>, <span class="ident">naked_functions</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">unwind_attributes</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
 
@@ -1391,8 +1397,9 @@
         <span class="comment">// This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.</span>
         <span class="comment">// This is because we rely on the value of registers to stay the same as whatever the caller set them to.</span>
         <span class="comment">// DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.</span>
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # copy the stack pointer to RSI
+        <span class="macro">asm!</span>(
+            <span class="comment">// copy the stack pointer to RSI</span>
+            <span class="string">&quot;
             movq %rsp, %rsi
             pushq %rbp
             pushq %rbx
@@ -1400,13 +1407,17 @@
             pushq %r13
             pushq %r14
             pushq %r15
-            # To invoke `unwind_recorder`, we need to put: 
-            # (1) the func in RDI (it&#39;s already there, just don&#39;t overwrite it),
-            # (2) the stack in RSI,
-            # (3) a pointer to the saved registers in RDX.
+            &quot;</span>,
+            <span class="comment">// To invoke `unwind_recorder`, we need to put: </span>
+            <span class="comment">// (1) the func in RDI (it&#39;s already there, just don&#39;t overwrite it),</span>
+            <span class="comment">// (2) the stack in RSI,</span>
+            <span class="comment">// (3) a pointer to the saved registers in RDX.</span>
+            <span class="string">&quot;
             movq %rsp, %rdx   # pointer to saved regs (on the stack)
             call unwind_recorder
-            # restore saved registers
+            &quot;</span>,
+            <span class="comment">// Finally, restore saved registers</span>
+            <span class="string">&quot;
             popq %r15
             popq %r14
             popq %r13
@@ -1414,8 +1425,9 @@
             popq %rbx
             popq %rbp
             ret
-        &quot;</span>);
-        <span class="ident">core::hint::unreachable_unchecked</span>();
+            &quot;</span>,
+            <span class="ident">options</span>(<span class="ident">att_syntax</span>, <span class="ident">noreturn</span>)
+        );
     }
 
 
@@ -1496,8 +1508,8 @@
     <span class="doccomment">/// instead it returns (jumps to) that landing pad address.</span>
     <span class="attribute">#[<span class="ident">naked</span>]</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="kw">fn</span> <span class="ident">unwind_lander</span>(<span class="ident">_regs</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">LandingRegisters</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span>{
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
+    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">unwind_lander</span>(<span class="ident">_regs</span>: <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">LandingRegisters</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> {
+        <span class="macro">asm!</span>(<span class="string">&quot;
             movq %rdi, %rsp
             popq %rax
             popq %rbx
@@ -1515,10 +1527,10 @@
             popq %r14
             popq %r15
             movq 0(%rsp), %rsp
-            # now we jump to the actual landing pad function
-            ret
-        &quot;</span>);
-        <span class="ident">core::hint::unreachable_unchecked</span>();
+            ret  # jump to the actual landing pad function
+            &quot;</span>,
+            <span class="ident">options</span>(<span class="ident">att_syntax</span>, <span class="ident">noreturn</span>)
+        );
     }
 }
 

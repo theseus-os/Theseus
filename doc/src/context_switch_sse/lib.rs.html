@@ -155,7 +155,7 @@
 <span class="doccomment">//! when SSE extensions are enabled. </span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">llvm_asm</span>, <span class="ident">naked_functions</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>, <span class="ident">naked_functions</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">context_switch_regular</span>;
@@ -166,11 +166,12 @@
 
 <span class="doccomment">/// The registers saved before a context switch and restored after a context switch</span>
 <span class="doccomment">/// for SSE-enabled Tasks.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note: the order of the registers here MUST MATCH the order of </span>
+<span class="doccomment">/// registers popped in the [`restore_registers_sse!`] macro. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ContextSSE</span> {
-    <span class="comment">// The order of the registers here MUST MATCH the order of </span>
-    <span class="comment">// registers popped in the context_switch() function below. </span>
     <span class="ident">xmm15</span>: <span class="ident">u128</span>,
     <span class="ident">xmm14</span>: <span class="ident">u128</span>,   
     <span class="ident">xmm13</span>: <span class="ident">u128</span>,   
@@ -217,14 +218,14 @@
 }
 
 
-<span class="doccomment">/// An assembly macro for saving regular x86_64 registers.</span>
+<span class="doccomment">/// An assembly block for saving SSE registers</span>
 <span class="doccomment">/// by pushing them onto the stack.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">save_registers_sse</span> {
     () <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # save all of the xmm registers (for SSE)
-            # each register is 16 bytes (128 bits), and there are 16 of them
+        <span class="comment">// Save all of the xmm registers (for SSE).</span>
+        <span class="comment">// Each register is 16 bytes (128 bits), and there are 16 of them.</span>
+        <span class="string">r#&quot;
             lea rsp, [rsp - 16*16]
             movdqu [rsp + 16*0],  xmm0   # push xmm0
             movdqu [rsp + 16*1],  xmm1   # push xmm1
@@ -242,20 +243,18 @@
             movdqu [rsp + 16*13], xmm13  # push xmm13
             movdqu [rsp + 16*14], xmm14  # push xmm14
             movdqu [rsp + 16*15], xmm15  # push xmm15
-            &quot;</span>
-            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
-        );
+        &quot;#</span>
     );
 }
 
 
-<span class="doccomment">/// An assembly macro for saving regular x86_64 registers.</span>
-<span class="doccomment">/// by pushing them onto the stack.</span>
+<span class="doccomment">/// An assembly block for restoring SSE registers</span>
+<span class="doccomment">/// by popping them off of the stack.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">restore_registers_sse</span> {
     () <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # restore all of the xmm registers
+        <span class="comment">// restore all of the xmm registers</span>
+        <span class="string">r#&quot;
             movdqu xmm15, [rsp + 16*15]   # pop xmm15
             movdqu xmm14, [rsp + 16*14]   # pop xmm14
             movdqu xmm13, [rsp + 16*13]   # pop xmm13
@@ -273,9 +272,7 @@
             movdqu xmm1,  [rsp + 16*1]    # pop xmm1
             movdqu xmm0,  [rsp + 16*0]    # pop xmm0
             lea rsp, [rsp + 16*16]
-            &quot;</span>
-            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
-        );
+        &quot;#</span>
     );
 }
 
@@ -290,15 +287,18 @@
 <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
 <span class="attribute">#[<span class="ident">naked</span>]</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
     <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-    <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-    <span class="comment">// or at any point before, in between, or after the following macros.</span>
-    <span class="macro">save_registers_regular!</span>();
-    <span class="macro">save_registers_sse!</span>();
-    <span class="macro">switch_stacks!</span>();
-    <span class="macro">restore_registers_sse!</span>();
-    <span class="macro">restore_registers_regular!</span>();
+    <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+    <span class="comment">// before, in between, or after anything below.</span>
+    <span class="macro">asm!</span>(
+        <span class="macro">save_registers_regular!</span>(),
+        <span class="macro">save_registers_sse!</span>(),
+        <span class="macro">switch_stacks!</span>(),
+        <span class="macro">restore_registers_sse!</span>(),
+        <span class="macro">restore_registers_regular!</span>(),
+        <span class="ident">options</span>(<span class="ident">noreturn</span>)
+    );
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="context_switch_sse" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>

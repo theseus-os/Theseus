@@ -102,6 +102,11 @@
 <span id="99"> 99</span>
 <span id="100">100</span>
 <span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for broadcasting and handling TLB shootdown IPIs. </span>
 
@@ -181,7 +186,12 @@
 
     <span class="comment">// acquire lock</span>
     <span class="comment">// TODO: add timeout!!</span>
-    <span class="kw">while</span> <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">compare_and_swap</span>(<span class="bool-val">false</span>, <span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>) { 
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">old_lock_val</span> <span class="op">=</span> <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>);
+    <span class="kw">loop</span> {
+        <span class="kw">match</span> <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">compare_exchange_weak</span>(<span class="ident">old_lock_val</span>, <span class="bool-val">true</span>, <span class="ident">Ordering::AcqRel</span>, <span class="ident">Ordering::Relaxed</span>) { 
+            <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span>,
+            <span class="prelude-val">Err</span>(<span class="ident">v</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">old_lock_val</span> <span class="op">=</span> <span class="ident">v</span>,
+        }
         <span class="ident">spin_loop_hint</span>();
     }
 
@@ -194,7 +204,7 @@
     <span class="comment">// wait for all other cores to handle this IPI</span>
     <span class="comment">// it must be a blocking, synchronous operation to ensure stale TLB entries don&#39;t cause problems</span>
     <span class="comment">// TODO: add timeout!!</span>
-    <span class="kw">while</span> <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">&gt;</span> <span class="number">0</span> { 
+    <span class="kw">while</span> <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">&gt;</span> <span class="number">0</span> { 
         <span class="ident">spin_loop_hint</span>();
     }
 
@@ -202,7 +212,7 @@
     <span class="kw-2">*</span><span class="ident">TLB_SHOOTDOWN_IPI_PAGES</span>.<span class="ident">write</span>() <span class="op">=</span> <span class="prelude-val">None</span>;
 
     <span class="comment">// release lock</span>
-    <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>); 
+    <span class="ident">TLB_SHOOTDOWN_IPI_LOCK</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::Release</span>); 
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="tlb_shootdown" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>

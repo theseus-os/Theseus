@@ -155,7 +155,7 @@
 <span class="doccomment">//! when AVX extensions are enabled. </span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">llvm_asm</span>, <span class="ident">naked_functions</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>, <span class="ident">naked_functions</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">context_switch_regular</span>;
@@ -166,11 +166,12 @@
 
 <span class="doccomment">/// The registers saved before a context switch and restored after a context switch</span>
 <span class="doccomment">/// for AVX-enabled Tasks.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note: the order of the registers here MUST MATCH the order of </span>
+<span class="doccomment">/// registers popped in the [`restore_registers_avx!`] macro. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>, <span class="ident">packed</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ContextAVX</span> {
-    <span class="comment">// The order of the registers here MUST MATCH the order of </span>
-    <span class="comment">// registers popped in the context_switch() function below. </span>
     <span class="ident">ymm15</span>: [<span class="ident">u128</span>; <span class="number">2</span>],
     <span class="ident">ymm14</span>: [<span class="ident">u128</span>; <span class="number">2</span>],   
     <span class="ident">ymm13</span>: [<span class="ident">u128</span>; <span class="number">2</span>],   
@@ -217,14 +218,14 @@
 }
 
 
-<span class="doccomment">/// An assembly macro for saving AVX registers</span>
+<span class="doccomment">/// An assembly block for saving AVX registers</span>
 <span class="doccomment">/// by pushing them onto the stack.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">save_registers_avx</span> {
     () <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # save all of the ymm registers (for AVX)
-            # each register is 32 bytes (256 bits), and there are 16 of them
+        <span class="comment">// Save all of the ymm registers (for AVX).</span>
+        <span class="comment">// Each register is 32 bytes (256 bits), and there are 16 of them.</span>
+        <span class="string">r#&quot;
             lea rsp, [rsp - 32*16]
             vmovups [rsp + 32*0],  ymm0   # push ymm0
             vmovups [rsp + 32*1],  ymm1   # push ymm1
@@ -242,20 +243,18 @@
             vmovups [rsp + 32*13], ymm13  # push ymm13
             vmovups [rsp + 32*14], ymm14  # push ymm14
             vmovups [rsp + 32*15], ymm15  # push ymm15
-            &quot;</span>
-            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
-        );
+        &quot;#</span>
     );
 }
 
 
-<span class="doccomment">/// An assembly macro for restoring AVX registers</span>
+<span class="doccomment">/// An assembly block for restoring AVX registers</span>
 <span class="doccomment">/// by popping them off of the stack.</span>
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">restore_registers_avx</span> {
     () <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro">llvm_asm!</span>(<span class="string">&quot;
-            # restore all of the ymm registers
+        <span class="comment">// restore all of the ymm registers</span>
+        <span class="string">r#&quot;
             vmovups ymm15, [rsp + 32*15]   # pop ymm15
             vmovups ymm14, [rsp + 32*14]   # pop ymm14
             vmovups ymm13, [rsp + 32*13]   # pop ymm13
@@ -273,9 +272,7 @@
             vmovups ymm1,  [rsp + 32*1]    # pop ymm1
             vmovups ymm0,  [rsp + 32*0]    # pop ymm0
             lea rsp, [rsp + 32*16]
-            &quot;</span>
-            : : : <span class="string">&quot;memory&quot;</span> : <span class="string">&quot;intel&quot;</span>, <span class="string">&quot;volatile&quot;</span>
-        );
+        &quot;#</span>
     );
 }
 
@@ -290,15 +287,18 @@
 <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
 <span class="attribute">#[<span class="ident">naked</span>]</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_avx</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_avx</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
     <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-    <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-    <span class="comment">// or at any point before, in between, or after the following macros.</span>
-    <span class="macro">save_registers_regular!</span>();
-    <span class="macro">save_registers_avx!</span>();
-    <span class="macro">switch_stacks!</span>();
-    <span class="macro">restore_registers_avx!</span>();
-    <span class="macro">restore_registers_regular!</span>();
+    <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+    <span class="comment">// before, in between, or after anything below.</span>
+    <span class="macro">asm!</span>(
+        <span class="macro">save_registers_regular!</span>(),
+        <span class="macro">save_registers_avx!</span>(),
+        <span class="macro">switch_stacks!</span>(),
+        <span class="macro">restore_registers_avx!</span>(),
+        <span class="macro">restore_registers_regular!</span>(),
+        <span class="ident">options</span>(<span class="ident">noreturn</span>)
+    );
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="context_switch_avx" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>

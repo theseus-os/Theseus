@@ -171,12 +171,33 @@
 <span id="168">168</span>
 <span id="169">169</span>
 <span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This is a wrapper crate around all other context switch implementation crates</span>
 <span class="doccomment">//! that helps to manage the complex configuration options involving SIMD and personalities.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">llvm_asm</span>, <span class="ident">naked_functions</span>)]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">asm</span>, <span class="ident">naked_functions</span>)]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
 
@@ -207,14 +228,17 @@
         <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
         <span class="attribute">#[<span class="ident">naked</span>]</span>
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_regular_to_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_regular_to_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
             <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-            <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-            <span class="comment">// or at any point before, in between, or after the following macros.</span>
-            <span class="macro">save_registers_regular!</span>();
-            <span class="macro">switch_stacks!</span>();
-            <span class="macro">restore_registers_sse!</span>();
-            <span class="macro">restore_registers_regular!</span>();
+            <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+            <span class="comment">// before, in between, or after anything below.</span>
+            <span class="macro">asm!</span>(
+                <span class="macro">save_registers_regular!</span>(),
+                <span class="macro">switch_stacks!</span>(),
+                <span class="macro">restore_registers_sse!</span>(),
+                <span class="macro">restore_registers_regular!</span>(),
+                <span class="ident">options</span>(<span class="ident">noreturn</span>)
+            );
         }
 
 
@@ -228,14 +252,17 @@
         <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks.</span>
         <span class="attribute">#[<span class="ident">naked</span>]</span>
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_sse_to_regular</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_sse_to_regular</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
             <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-            <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-            <span class="comment">// or at any point before, in between, or after the following macros.</span>
-            <span class="macro">save_registers_regular!</span>();
-            <span class="macro">save_registers_sse!</span>();
-            <span class="macro">switch_stacks!</span>();
-            <span class="macro">restore_registers_regular!</span>();
+            <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+            <span class="comment">// before, in between, or after anything below.</span>
+            <span class="macro">asm!</span>(
+                <span class="macro">save_registers_regular!</span>(),
+                <span class="macro">save_registers_sse!</span>(),
+                <span class="macro">switch_stacks!</span>(),
+                <span class="macro">restore_registers_regular!</span>(),
+                <span class="ident">options</span>(<span class="ident">noreturn</span>)
+            );
         }
 
         <span class="doccomment">/// Switches context from a regular Task to an AVX Task.</span>
@@ -248,11 +275,17 @@
         <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
         <span class="attribute">#[<span class="ident">naked</span>]</span>
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_regular_to_avx</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
-            <span class="macro">save_registers_regular!</span>();
-            <span class="macro">switch_stacks!</span>();
-            <span class="macro">restore_registers_avx!</span>();
-            <span class="macro">restore_registers_regular!</span>();
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_regular_to_avx</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+            <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
+            <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+            <span class="comment">// before, in between, or after anything below.</span>
+            <span class="macro">asm!</span>(
+                <span class="macro">save_registers_regular!</span>(),
+                <span class="macro">switch_stacks!</span>(),
+                <span class="macro">restore_registers_avx!</span>(),
+                <span class="macro">restore_registers_regular!</span>(),
+                <span class="ident">options</span>(<span class="ident">noreturn</span>)
+            );
         }
 
         <span class="doccomment">/// Switches context from an SSE Task to an AVX regular Task.</span>
@@ -265,15 +298,18 @@
         <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
         <span class="attribute">#[<span class="ident">naked</span>]</span>
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_sse_to_avx</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_sse_to_avx</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
             <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-            <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-            <span class="comment">// or at any point before, in between, or after the following macros.</span>
-            <span class="macro">save_registers_regular!</span>();
-            <span class="macro">save_registers_sse!</span>();
-            <span class="macro">switch_stacks!</span>();
-            <span class="macro">restore_registers_avx!</span>();
-            <span class="macro">restore_registers_regular!</span>();
+            <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+            <span class="comment">// before, in between, or after anything below.</span>
+            <span class="macro">asm!</span>(
+                <span class="macro">save_registers_regular!</span>(),
+                <span class="macro">save_registers_sse!</span>(),
+                <span class="macro">switch_stacks!</span>(),
+                <span class="macro">restore_registers_avx!</span>(),
+                <span class="macro">restore_registers_regular!</span>(),
+                <span class="ident">options</span>(<span class="ident">noreturn</span>)
+            );
         }
 
         <span class="doccomment">/// Switches context from an AVX Task to a regular Task.</span>
@@ -286,14 +322,17 @@
         <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
         <span class="attribute">#[<span class="ident">naked</span>]</span>
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_avx_to_regular</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_avx_to_regular</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
             <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-            <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-            <span class="comment">// or at any point before, in between, or after the following macros.</span>
-            <span class="macro">save_registers_regular!</span>();
-            <span class="macro">save_registers_avx!</span>();
-            <span class="macro">switch_stacks!</span>();
-            <span class="macro">restore_registers_regular!</span>();
+            <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+            <span class="comment">// before, in between, or after anything below.</span>
+            <span class="macro">asm!</span>(
+                <span class="macro">save_registers_regular!</span>(),
+                <span class="macro">save_registers_avx!</span>(),
+                <span class="macro">switch_stacks!</span>(),
+                <span class="macro">restore_registers_regular!</span>(),
+                <span class="ident">options</span>(<span class="ident">noreturn</span>)
+            );
         }
 
         <span class="doccomment">/// Switches context from an AVX Task to an SSE Task.</span>
@@ -306,15 +345,18 @@
         <span class="doccomment">/// This function is unsafe because it changes the content on both task&#39;s stacks. </span>
         <span class="attribute">#[<span class="ident">naked</span>]</span>
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">context_switch_avx_to_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">context_switch_avx_to_sse</span>(<span class="ident">_prev_stack_pointer</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">_next_stack_pointer_value</span>: <span class="ident">usize</span>) {
             <span class="comment">// Since this is a naked function that expects its arguments in two registers,</span>
-            <span class="comment">// you CANNOT place any log statements or other instructions here,</span>
-            <span class="comment">// or at any point before, in between, or after the following macros.</span>
-            <span class="macro">save_registers_regular!</span>();
-            <span class="macro">save_registers_avx!</span>();
-            <span class="macro">switch_stacks!</span>();
-            <span class="macro">restore_registers_sse!</span>();
-            <span class="macro">restore_registers_regular!</span>();
+            <span class="comment">// you CANNOT place any log statements or other instructions here</span>
+            <span class="comment">// before, in between, or after anything below.</span>
+            <span class="macro">asm!</span>(
+                <span class="macro">save_registers_regular!</span>(),
+                <span class="macro">save_registers_avx!</span>(),
+                <span class="macro">switch_stacks!</span>(),
+                <span class="macro">restore_registers_sse!</span>(),
+                <span class="macro">restore_registers_regular!</span>(),
+                <span class="ident">options</span>(<span class="ident">noreturn</span>)
+            );
         }
     }
 
