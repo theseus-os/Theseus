@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity."><meta name="keywords" content="rust, rustlang, rust-lang, io"><title>io - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../ayu.css" disabled ><script id="default-settings"></script><script src="../storage.js"></script><script src="../crates.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../io/index.html'><div class='logo-container rust-logo'><img src='../rust-logo.png' alt='logo'></div></a><p class="location">Crate io</p><div class="block version"><p>Version 0.1.0</p></div><div class="sidebar-elems"><a id="all-types" href="all.html"><p>See all io's items</p></a><div class="block items"><ul><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li><li><a href="#traits">Traits</a></li><li><a href="#functions">Functions</a></li></ul></div><p class="location"></p><div id="sidebar-vars" data-name="io" data-ty="mod" data-relpath="../"></div><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
+                <a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Crate <a class="mod" href="">io</a><button id="copy-path" onclick="copy_path(this)"><img src="../clipboard.svg" width="19" height="18" alt="Copy item import"></button></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../src/io/lib.rs.html#1-801" title="goto source code">[src]</a></span></h1><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity.</p>
+<p>The important items are summarized below:</p>
+<ul>
+<li><a href="trait.BlockReader.html" title="BlockReader"><code>BlockReader</code></a>, <a href="trait.BlockWriter.html" title="BlockWriter"><code>BlockWriter</code></a>: traits that represent I/O streams which can be read from
+or written to at the granularity of a single block (as the smallest transferable chunk).</li>
+<li><a href="trait.BlockIo.html" title="BlockIo"><code>BlockIo</code></a>: a parent trait that specifies the size in bytes of each block 
+in a block-based I/O stream.</li>
+<li><a href="trait.KnownLength.html" title="KnownLength"><code>KnownLength</code></a>: a trait that represents an I/O stream with a known length, 
+such as a disk drive.</li>
+<li><a href="trait.ByteReader.html" title="ByteReader"><code>ByteReader</code></a>, <a href="trait.ByteWriter.html" title="ByteWriter"><code>ByteWriter</code></a>: traits that represent I/O streams which can be read from
+or written to at the granularity of an individual byte.</li>
+<li>Wrapper types that allow byte-wise access atop block-based I/O streams:
+<a href="struct.ByteReaderWrapper.html" title="ByteReaderWrapper"><code>ByteReaderWrapper</code></a>, <a href="struct.ByteWriterWrapper.html" title="ByteWriterWrapper"><code>ByteWriterWrapper</code></a>, <a href="struct.ByteReaderWriterWrapper.html" title="ByteReaderWriterWrapper"><code>ByteReaderWriterWrapper</code></a>.
+<ul>
+<li>Notably, the <a href="fn.blocks_from_bytes.html" title="blocks_from_bytes()"><code>blocks_from_bytes()</code></a> function is useful for calculating the set of
+block-based I/O transfers that are needed to satisfy an arbitrary byte-wise transfer.</li>
+</ul>
+</li>
+</ul>
+<p>For example, a storage device like a hard drive that supports transfers of 512-byte blocks
+should implement <code>BlockIo</code>, <code>BlockReader</code>, <code>BlockWriter</code>, and <code>KnownLength</code> traits.
+A user can then use those traits directly to transfer whole blocks to/from the device,
+or wrap the storage device in one of the byte-wise reader/writer types 
+in order to transfer arbitrary bytes (as little as one byte) at a time to/from the device.</p>
+<p>We also provide the <a href="struct.LockedIo.html" title="LockedIo"><code>LockedIo</code></a> type for convenient use with I/O streams or devices
+that exist behind a shared lock, i.e., <code>Arc&lt;Mutex&lt;IO&gt;&gt;</code>. 
+This allows you to access the I/O stream transparently through the lock by using traits
+that the interior <code>IO</code> object implements, such as the block-wise I/O traits listed above.</p>
+<h2 id="stateless-vs-stateful-io" class="section-header"><a href="#stateless-vs-stateful-io">Stateless vs. Stateful I/O</a></h2>
+<p>Note that the above traits represent “stateless” access into I/O streams or devices,
+in that successive read/write operations will not advance any kind of “offset” or cursor.</p>
+<p>To read or write while tracking the current offset into the I/O stream, 
+we provide the <a href="struct.ReaderWriter.html" title="ReaderWriter"><code>ReaderWriter</code></a>, <a href="struct.Reader.html" title="Reader"><code>Reader</code></a>, and <a href="struct.Writer.html" title="Writer"><code>Writer</code></a> structs,
+which act as “stateful” wrappers around an underlying “stateless” I/O stream
+(such as a stateless <code>ByteReader</code> or <code>ByteWriter</code>).
+This offers a more convenient interface with more traditional I/O behavior,
+in which the next read or write operation will start where the prior one ended.</p>
+</div></details><h2 id="structs" class="section-header"><a href="#structs">Structs</a></h2>
+<table><tr class="module-item"><td><a class="struct" href="struct.BlockByteTransfer.html" title="io::BlockByteTransfer struct">BlockByteTransfer</a></td><td class="docblock-short"><p>Describes an operation for performing byte-wise I/O on a block-based I/O stream.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.ByteReaderWrapper.html" title="io::ByteReaderWrapper struct">ByteReaderWrapper</a></td><td class="docblock-short"><p>A wrapper struct that implements a byte-wise reader atop a block-based reader.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.ByteReaderWriterWrapper.html" title="io::ByteReaderWriterWrapper struct">ByteReaderWriterWrapper</a></td><td class="docblock-short"><p>A wrapper struct that implements a byte-wise reader and writer
+atop a block-based reader and writer.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.ByteWriterWrapper.html" title="io::ByteWriterWrapper struct">ByteWriterWrapper</a></td><td class="docblock-short"><p>A wrapper struct that implements a byte-wise writer
+atop a block-based reader and writer.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.LockedIo.html" title="io::LockedIo struct">LockedIo</a></td><td class="docblock-short"><p>A newtype wrapper around <code>Arc&lt;Mutex&lt;IO&gt;&gt;</code> that implements 
+(delegates) various IO-related traits through the lock/mutex.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.Reader.html" title="io::Reader struct">Reader</a></td><td class="docblock-short"><p>A stateful reader that keeps track of its current offset
+within the internal stateless <a href="trait.ByteReader.html" title="ByteReader"><code>ByteReader</code></a> I/O stream.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.ReaderWriter.html" title="io::ReaderWriter struct">ReaderWriter</a></td><td class="docblock-short"><p>A readable and writable “stateful” I/O stream that keeps track 
+of its current offset within its internal stateless I/O stream.</p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.Writer.html" title="io::Writer struct">Writer</a></td><td class="docblock-short"><p>A stateful writer that keeps track of its current offset
+within the internal stateless <a href="trait.ByteWriter.html" title="ByteWriter"><code>ByteWriter</code></a> I/O stream.</p>
+</td></tr></table><h2 id="enums" class="section-header"><a href="#enums">Enums</a></h2>
+<table><tr class="module-item"><td><a class="enum" href="enum.IoError.html" title="io::IoError enum">IoError</a></td><td class="docblock-short"><p>Errors that can be returned from I/O operations.</p>
+</td></tr></table><h2 id="traits" class="section-header"><a href="#traits">Traits</a></h2>
+<table><tr class="module-item"><td><a class="trait" href="trait.BlockIo.html" title="io::BlockIo trait">BlockIo</a></td><td class="docblock-short"><p>A parent trait used to specify the block size (in bytes)
+of I/O transfers (read and write operations). 
+See its use in <a href="trait.BlockReader.html" title="BlockReader"><code>BlockReader</code></a> and <a href="trait.BlockWriter.html" title="BlockWriter"><code>BlockWriter</code></a>.</p>
+</td></tr><tr class="module-item"><td><a class="trait" href="trait.BlockReader.html" title="io::BlockReader trait">BlockReader</a></td><td class="docblock-short"><p>A trait that represents an I/O stream (e.g., an I/O device) that can be read from in blocks.
+The block size specifies the minimum granularity of each transfer, 
+as given by the <a href="trait.BlockIo.html#tymethod.block_size" title="BlockIo::block_size()"><code>BlockIo::block_size()</code></a> function.</p>
+</td></tr><tr class="module-item"><td><a class="trait" href="trait.BlockWriter.html" title="io::BlockWriter trait">BlockWriter</a></td><td class="docblock-short"><p>A trait that represents an I/O stream (e.g., an I/O device) that can be written to in blocks.
+The block size specifies the minimum granularity of each transfer, 
+as given by the <a href="trait.BlockIo.html#tymethod.block_size" title="BlockIo::block_size()"><code>BlockIo::block_size()</code></a> function.</p>
+</td></tr><tr class="module-item"><td><a class="trait" href="trait.ByteReader.html" title="io::ByteReader trait">ByteReader</a></td><td class="docblock-short"><p>A trait that represents an I/O stream that can be read from at the granularity of individual bytes,
+but which does not track the current offset into the stream.</p>
+</td></tr><tr class="module-item"><td><a class="trait" href="trait.ByteWriter.html" title="io::ByteWriter trait">ByteWriter</a></td><td class="docblock-short"><p>A trait that represents an I/O stream that can be written to,
+but which does not track the current offset into the stream.</p>
+</td></tr><tr class="module-item"><td><a class="trait" href="trait.KnownLength.html" title="io::KnownLength trait">KnownLength</a></td><td class="docblock-short"><p>A trait that represents an I/O stream that has a known length, e.g., a disk drive.</p>
+</td></tr></table><h2 id="functions" class="section-header"><a href="#functions">Functions</a></h2>
+<table><tr class="module-item"><td><a class="fn" href="fn.blocks_from_bytes.html" title="io::blocks_from_bytes fn">blocks_from_bytes</a></td><td class="docblock-short"><p>Calculates block-wise bounds for an I/O transfer 
+based on a byte-wise range into a block-wise stream.</p>
+</td></tr><tr class="module-item"><td><a class="fn" href="fn.round_down.html" title="io::round_down fn">round_down</a></td><td class="docblock-short"><p>Rounds the given <code>value</code> down to the nearest <code>multiple</code>.</p>
+</td></tr><tr class="module-item"><td><a class="fn" href="fn.round_up.html" title="io::round_up fn">round_up</a></td><td class="docblock-short"><p>Rounds the given <code>value</code> up to the nearest <code>multiple</code>.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../" data-current-crate="io" data-search-index-js="../search-index.js" data-search-js="../search.js"></div>
+    <script src="../main.js"></script></body></html>

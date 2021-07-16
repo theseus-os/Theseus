@@ -1,6 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/block_io/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/io/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
 <link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../block_io/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../io/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
                 <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
@@ -807,19 +807,19 @@
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The important items are summarized below:</span>
 <span class="doccomment">//! * [`BlockReader`], [`BlockWriter`]: traits that represent I/O streams which can be read from</span>
-<span class="doccomment">//!   or written to at the granularity of a single block.</span>
+<span class="doccomment">//!   or written to at the granularity of a single block (as the smallest transferable chunk).</span>
 <span class="doccomment">//! * [`BlockIo`]: a parent trait that specifies the size in bytes of each block </span>
 <span class="doccomment">//!   in a block-based I/O stream.</span>
 <span class="doccomment">//! * [`KnownLength`]: a trait that represents an I/O stream with a known length, </span>
 <span class="doccomment">//!   such as a disk drive.</span>
 <span class="doccomment">//! * [`ByteReader`], [`ByteWriter`]: traits that represent I/O streams which can be read from</span>
-<span class="doccomment">//!   or written to at the granularity of an individual bytes.</span>
-<span class="doccomment">//! * Wrapper types that allow byte-granular I/O access atop block-based streams:</span>
+<span class="doccomment">//!   or written to at the granularity of an individual byte.</span>
+<span class="doccomment">//! * Wrapper types that allow byte-wise access atop block-based I/O streams:</span>
 <span class="doccomment">//!   [`ByteReaderWrapper`], [`ByteWriterWrapper`], [`ByteReaderWriterWrapper`].</span>
-<span class="doccomment">//!    * Notably, the [`blocks_from_bytes()`] function is useful for calculating which</span>
-<span class="doccomment">//!      block-based I/O transfers are needed to satisfy an arbitrary byte-wise transfer.</span>
+<span class="doccomment">//!    * Notably, the [`blocks_from_bytes()`] function is useful for calculating the set of</span>
+<span class="doccomment">//!      block-based I/O transfers that are needed to satisfy an arbitrary byte-wise transfer.</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! For example, a storage device like a hard drive that transfers 512-byte blocks at a time</span>
+<span class="doccomment">//! For example, a storage device like a hard drive that supports transfers of 512-byte blocks</span>
 <span class="doccomment">//! should implement `BlockIo`, `BlockReader`, `BlockWriter`, and `KnownLength` traits.</span>
 <span class="doccomment">//! A user can then use those traits directly to transfer whole blocks to/from the device,</span>
 <span class="doccomment">//! or wrap the storage device in one of the byte-wise reader/writer types </span>
@@ -832,10 +832,10 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! ## Stateless vs. Stateful I/O</span>
 <span class="doccomment">//! Note that the above traits represent &quot;stateless&quot; access into I/O streams or devices,</span>
-<span class="doccomment">//! in that successive read/write operations will not advance any kind of &quot;offset&quot;.</span>
+<span class="doccomment">//! in that successive read/write operations will not advance any kind of &quot;offset&quot; or cursor.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! To read or write while tracking the current offset into the I/O stream, </span>
-<span class="doccomment">//! we provide the [`ReaderWriter`], [`Reader`], and [`Writer`] types,</span>
+<span class="doccomment">//! we provide the [`ReaderWriter`], [`Reader`], and [`Writer`] structs,</span>
 <span class="doccomment">//! which act as &quot;stateful&quot; wrappers around an underlying &quot;stateless&quot; I/O stream</span>
 <span class="doccomment">//! (such as a stateless `ByteReader` or `ByteWriter`).</span>
 <span class="doccomment">//! This offers a more convenient interface with more traditional I/O behavior,</span>
@@ -1605,5 +1605,5 @@
     (<span class="ident">value</span> <span class="op">/</span> <span class="ident">multiple</span>) <span class="op">*</span> <span class="ident">multiple</span>
 }
 </pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="block_io" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="io" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
     <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

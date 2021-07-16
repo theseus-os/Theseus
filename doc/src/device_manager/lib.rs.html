@@ -270,7 +270,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ixgbe</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fatfs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">block_io</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bare_io</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">derive_more</span>;
 
@@ -280,7 +280,7 @@
 <span class="kw">use</span> <span class="ident">ethernet_smoltcp_device::EthernetNetworkInterface</span>;
 <span class="kw">use</span> <span class="ident">network_manager::add_to_network_interfaces</span>;
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">block_io</span>::{<span class="ident">ByteReaderWriterWrapper</span>, <span class="ident">LockedIo</span>, <span class="ident">ReaderWriter</span>};
+<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReaderWriterWrapper</span>, <span class="ident">LockedIo</span>, <span class="ident">ReaderWriter</span>};
 
 <span class="doccomment">/// A randomly chosen IP address that must be outside of the DHCP range.</span>
 <span class="doccomment">/// TODO: use DHCP to acquire an IP address.</span>

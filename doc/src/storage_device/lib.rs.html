@@ -168,7 +168,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">downcast_rs</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">block_io</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
 
 <span class="kw">use</span> <span class="ident">alloc</span>::{
     <span class="ident">boxed::Box</span>,
@@ -176,7 +176,7 @@
 };
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
-<span class="kw">use</span> <span class="ident">block_io</span>::{<span class="ident">BlockIo</span>, <span class="ident">KnownLength</span>, <span class="ident">BlockReader</span>, <span class="ident">BlockWriter</span>};
+<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">BlockIo</span>, <span class="ident">KnownLength</span>, <span class="ident">BlockReader</span>, <span class="ident">BlockWriter</span>};
 
 
 <span class="doccomment">/// A trait that represents a storage controller,</span>

@@ -1093,10 +1093,11 @@
 <span id="1090">1090</span>
 <span id="1091">1091</span>
 <span id="1092">1092</span>
+<span id="1093">1093</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for accessing ATA drives (IDE).</span>
 <span class="doccomment">//! </span>
-<span class="doccomment">//! The primary struct of interest is [`AtaDrive`](struct.AtaDrive.html).</span>
+<span class="doccomment">//! The primary struct of interest is [`AtaDrive`].</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -1107,7 +1108,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bitflags</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">storage_device</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">block_io</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
 
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
@@ -1115,7 +1116,7 @@
 <span class="kw">use</span> <span class="ident">port_io</span>::{<span class="ident">Port</span>, <span class="ident">PortReadOnly</span>, <span class="ident">PortWriteOnly</span>};
 <span class="kw">use</span> <span class="ident">pci::PciDevice</span>;
 <span class="kw">use</span> <span class="ident">storage_device</span>::{<span class="ident">StorageDevice</span>, <span class="ident">StorageDeviceRef</span>, <span class="ident">StorageController</span>};
-<span class="kw">use</span> <span class="ident">block_io</span>::{<span class="ident">BlockIo</span>, <span class="ident">BlockReader</span>, <span class="ident">BlockWriter</span>, <span class="ident">IoError</span>, <span class="ident">KnownLength</span>};
+<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">BlockIo</span>, <span class="ident">BlockReader</span>, <span class="ident">BlockWriter</span>, <span class="ident">IoError</span>, <span class="ident">KnownLength</span>};
 
 
 <span class="kw">const</span> <span class="ident">SECTOR_SIZE_IN_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">512</span>;
@@ -1247,6 +1248,7 @@
 <span class="doccomment">/// The value is the bitmask used to select either master or slave</span>
 <span class="doccomment">/// in the ATA drive&#39;s `drive_select` port.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
 <span class="kw">enum</span> <span class="ident">BusDriveSelect</span> {
 	<span class="ident">Master</span> <span class="op">=</span> <span class="number">0</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>,
 	<span class="ident">Slave</span>  <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>,
