@@ -2,19 +2,19 @@
 //! 
 //! The important items are summarized below:
 //! * [`BlockReader`], [`BlockWriter`]: traits that represent I/O streams which can be read from
-//!   or written to at the granularity of a single block.
+//!   or written to at the granularity of a single block (as the smallest transferable chunk).
 //! * [`BlockIo`]: a parent trait that specifies the size in bytes of each block 
 //!   in a block-based I/O stream.
 //! * [`KnownLength`]: a trait that represents an I/O stream with a known length, 
 //!   such as a disk drive.
 //! * [`ByteReader`], [`ByteWriter`]: traits that represent I/O streams which can be read from
-//!   or written to at the granularity of an individual bytes.
-//! * Wrapper types that allow byte-granular I/O access atop block-based streams:
+//!   or written to at the granularity of an individual byte.
+//! * Wrapper types that allow byte-wise access atop block-based I/O streams:
 //!   [`ByteReaderWrapper`], [`ByteWriterWrapper`], [`ByteReaderWriterWrapper`].
-//!    * Notably, the [`blocks_from_bytes()`] function is useful for calculating which
-//!      block-based I/O transfers are needed to satisfy an arbitrary byte-wise transfer.
+//!    * Notably, the [`blocks_from_bytes()`] function is useful for calculating the set of
+//!      block-based I/O transfers that are needed to satisfy an arbitrary byte-wise transfer.
 //!
-//! For example, a storage device like a hard drive that transfers 512-byte blocks at a time
+//! For example, a storage device like a hard drive that supports transfers of 512-byte blocks
 //! should implement `BlockIo`, `BlockReader`, `BlockWriter`, and `KnownLength` traits.
 //! A user can then use those traits directly to transfer whole blocks to/from the device,
 //! or wrap the storage device in one of the byte-wise reader/writer types 
@@ -27,10 +27,10 @@
 //!
 //! ## Stateless vs. Stateful I/O
 //! Note that the above traits represent "stateless" access into I/O streams or devices,
-//! in that successive read/write operations will not advance any kind of "offset".
+//! in that successive read/write operations will not advance any kind of "offset" or cursor.
 //!
 //! To read or write while tracking the current offset into the I/O stream, 
-//! we provide the [`ReaderWriter`], [`Reader`], and [`Writer`] types,
+//! we provide the [`ReaderWriter`], [`Reader`], and [`Writer`] structs,
 //! which act as "stateful" wrappers around an underlying "stateless" I/O stream
 //! (such as a stateless `ByteReader` or `ByteWriter`).
 //! This offers a more convenient interface with more traditional I/O behavior,

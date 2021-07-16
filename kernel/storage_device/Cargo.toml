@@ -17,8 +17,8 @@ version = "0.4.8"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
-[dependencies.block_io]
-path = "../block_io"
+[dependencies.io]
+path = "../io"
 
 [lib]
 crate-type = ["rlib"]

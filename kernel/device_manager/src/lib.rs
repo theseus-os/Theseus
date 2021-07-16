@@ -17,7 +17,7 @@ extern crate mpmc;
 extern crate ixgbe;
 extern crate alloc;
 extern crate fatfs;
-extern crate block_io;
+extern crate io;
 extern crate bare_io;
 #[macro_use] extern crate derive_more;
 
@@ -27,7 +27,7 @@ use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
-use block_io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter};
+use io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.

@@ -1,6 +1,6 @@
 //! Support for accessing ATA drives (IDE).
 //! 
-//! The primary struct of interest is [`AtaDrive`](struct.AtaDrive.html).
+//! The primary struct of interest is [`AtaDrive`].
 
 #![no_std]
 
@@ -11,7 +11,7 @@ extern crate port_io;
 extern crate pci;
 #[macro_use] extern crate bitflags;
 extern crate storage_device;
-extern crate block_io;
+extern crate io;
 
 use core::fmt;
 use spin::Mutex;
@@ -19,7 +19,7 @@ use alloc::{boxed::Box, string::String, sync::Arc};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
-use block_io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
+use io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -151,6 +151,7 @@ impl AtaDeviceType {
 /// The value is the bitmask used to select either master or slave
 /// in the ATA drive's `drive_select` port.
 #[derive(Copy, Clone, Debug)]
+#[repr(u8)]
 enum BusDriveSelect {
 	Master = 0 << 4,
 	Slave  = 1 << 4,

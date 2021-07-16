@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "block_io"
-description = "Traits and types for reading/writing IO streams of differing block sizes."
+name = "io"
+description = "Traits and types for reading and writing IO streams, of both block-wise and byte-wise granularity."
 version = "0.1.0"
 build = "../../build.rs"
 
