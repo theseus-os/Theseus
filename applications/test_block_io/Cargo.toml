@@ -2,7 +2,7 @@
 name = "test_block_io"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-description = "a simple app for testing block_io transfers"
+description = "a simple app for testing IO transfers for block devices"
 build = "../../build.rs"
 
 [dependencies]
@@ -17,8 +17,8 @@ path = "../../kernel/terminal_print"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.block_io]
-path = "../../kernel/block_io"
+[dependencies.io]
+path = "../../kernel/io"
 
 [dependencies.storage_manager]
 path = "../../kernel/storage_manager"

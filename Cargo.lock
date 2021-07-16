@@ -144,7 +144,7 @@ name = "ata"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "block_io",
+ "io",
  "log",
  "pci",
  "port_io",
@@ -234,17 +234,6 @@ dependencies = [
  "lazy_static",
  "log",
  "storage_device",
-]
-
-[[package]]
-name = "block_io"
-version = "0.1.0"
-dependencies = [
- "bare-io",
- "delegate",
- "lazy_static",
- "log",
- "spin 0.9.0",
 ]
 
 [[package]]
@@ -591,12 +580,12 @@ dependencies = [
  "acpi",
  "apic",
  "bare-io",
- "block_io",
  "derive_more",
  "e1000",
  "ethernet_smoltcp_device",
  "event_types",
  "fatfs",
+ "io",
  "ixgbe",
  "keyboard",
  "log",
@@ -1083,6 +1072,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bca8c0bb831cd60d4dda79a58e3705ca6eb47efb65d665651a8d672213ec3db"
 dependencies = [
  "memoffset",
+]
+
+[[package]]
+name = "io"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "delegate",
+ "lazy_static",
+ "log",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -2577,8 +2577,8 @@ dependencies = [
 name = "storage_device"
 version = "0.1.0"
 dependencies = [
- "block_io",
  "downcast-rs",
+ "io",
  "lazy_static",
  "log",
  "owning_ref",
@@ -2689,7 +2689,7 @@ version = "0.1.0"
 dependencies = [
  "ata",
  "bare-io",
- "block_io",
+ "io",
  "log",
  "storage_manager",
  "task",

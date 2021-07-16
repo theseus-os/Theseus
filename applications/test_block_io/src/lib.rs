@@ -8,7 +8,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 // #[macro_use] extern crate terminal_print;
 extern crate task;
-extern crate block_io;
+extern crate io;
 extern crate bare_io;
 extern crate storage_manager;
 extern crate ata;
@@ -20,7 +20,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use alloc::string::String;
 use ata::AtaDrive;
-use block_io::{ByteReader, ByteReaderWrapper, ByteReaderWriterWrapper, ByteWriter, ByteWriterWrapper, Reader, ReaderWriter};
+use io::{ByteReader, ByteReaderWrapper, ByteReaderWriterWrapper, ByteWriter, ByteWriterWrapper, Reader, ReaderWriter};
 
 
 pub fn main(_args: Vec<String>) -> isize {
