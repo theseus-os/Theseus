@@ -271,7 +271,17 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 ### This target is currently rebuilt every time to accommodate changing CFLAGS.
 $(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 	@mkdir -p $(shell dirname $@)
-	@nasm -felf64 $< -o $@ $(CFLAGS)
+    ## If the user chose to enable VGA text mode by means of setting `THESEUS_CONFIG`,
+    ## then we need to set CFLAGS such that the assembly code can know about it.
+    ## TODO: move this whole part about invoking `nasm` into a dedicated build.rs script in the nano_core.
+ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
+	$(eval CFLAGS += -DVGA_TEXT_MODE)
+endif
+	@nasm -f elf64 \
+		-i "$(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/" \
+		$< \
+		-o $@ \
+		$(CFLAGS)
 
 
 
@@ -505,6 +515,8 @@ help:
 	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
+	@echo -e "   vfio=<pci_device_slot>:"
+	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
 
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
@@ -575,6 +587,13 @@ $(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead"
 	# QEMU_FLAGS += -accel kvm
 endif
 
+## Enable passthrough of a PCI device in QEMU by passing its slot information to VFIO.
+## Slot information is its bus, device, and function number assigned by the host OS, e.g., 'vfio=59:00.0'.
+ifdef vfio
+	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
+endif
+
+
 
 
 ###################################################################################################
@@ -591,9 +610,8 @@ orun_pause:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
-### Currently, loadable module mode requires release build mode
+### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
 loadable : export override THESEUS_CONFIG += loadable
-loadable : export BUILD_MODE = release
 loadable: run
 
 

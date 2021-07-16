@@ -3,6 +3,7 @@
 
 #![no_std]
 
+#[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;
 extern crate multicore_bringup;
@@ -31,6 +32,7 @@ pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
     let buffer_height: usize;
     {
         let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
+        info!("Using graphical framebuffer, {} x {}, at paddr {:#X}", graphic_info.width, graphic_info.height, graphic_info.physical_address);
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }

@@ -72,7 +72,7 @@ static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
 /// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
 pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
-    E1000_NIC.try()
+    E1000_NIC.get()
 }
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
@@ -196,7 +196,7 @@ impl E1000Nic {
         }
   
         // memory mapped base address
-        let mem_base = e1000_pci_dev.determine_mem_base()?;
+        let mem_base = e1000_pci_dev.determine_mem_base(0)?;
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         e1000_pci_dev.pci_set_command_bus_master_bit();
@@ -422,7 +422,7 @@ impl E1000Nic {
 }
 
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
-    if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
+    if let Some(ref e1000_nic_ref) = E1000_NIC.get() {
         let mut e1000_nic = e1000_nic_ref.lock();
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
