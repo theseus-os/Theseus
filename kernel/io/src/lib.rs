@@ -2,7 +2,7 @@
 //! 
 //! The important items are summarized below:
 //! * [`BlockReader`], [`BlockWriter`]: traits that represent I/O streams which can be read from
-//!   or written to at the granularity of a single block (but not a smaller chunk).
+//!   or written to at the granularity of a single block (as the smallest transferable chunk).
 //! * [`BlockIo`]: a parent trait that specifies the size in bytes of each block 
 //!   in a block-based I/O stream.
 //! * [`KnownLength`]: a trait that represents an I/O stream with a known length, 
