@@ -27,7 +27,7 @@ path = "../scheduler"
 path = "../wait_queue"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 
 [lib]

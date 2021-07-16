@@ -41,7 +41,7 @@ path = "../apic"
 path = "../ap_start"
 
 [dependencies.madt]
-path = "../madt"
+path = "../acpi/madt"
 
 [dependencies.pause]
 path = "../pause"

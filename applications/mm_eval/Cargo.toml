@@ -14,7 +14,7 @@ libm = "0.2.1"
 version = "0.4.8"
 
 [dependencies.hpet]
-path = "../../kernel/hpet"
+path = "../../kernel/acpi/hpet"
 
 [dependencies.tsc]
 path = "../../kernel/tsc"

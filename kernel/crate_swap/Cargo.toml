@@ -36,7 +36,7 @@ path = "../path"
 path = "../mod_mgmt"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [lib]
 crate-type = ["rlib"]
