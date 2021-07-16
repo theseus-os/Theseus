@@ -1,7 +1,7 @@
 [package]
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "mlx5"
-description = "Support for the Mellanox connectx-5 NIC and driver"
+description = "Driver for the Mellanox ConnectX-5 NIC"
 version = "0.1.0"
 build = "../../build.rs"
 

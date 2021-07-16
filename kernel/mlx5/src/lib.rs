@@ -32,7 +32,7 @@ use owning_ref::BoxRefMut;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
 use mellanox_ethernet::{
     InitializationSegment, 
-    command_queue::{CommandQueueEntry, CommandQueue, CommandOpcode, ManagePagesOpmod, QueryPagesOpmod}
+    command_queue::{CommandQueueEntry, CommandQueue, CommandOpcode, ManagePagesOpMod, QueryPagesOpMod}
 };
 use kernel_config::memory::PAGE_SIZE;
 
@@ -140,7 +140,7 @@ impl ConnectX5Nic {
         trace!("SetISSI: {:?}", status);
 
         // Query pages for boot
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::BootPages as u16), None)?;
+        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpMod::BootPages as u16), None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         let num_boot_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
@@ -158,7 +158,7 @@ impl ConnectX5Nic {
         // execute MANAGE_PAGES command to transfer boot pages to device
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::ManagePages, 
-            Some(ManagePagesOpmod::AllocationSuccess as u16), 
+            Some(ManagePagesOpMod::AllocationSuccess as u16), 
             Some(boot_pa)
         )?;
         init_segment.post_command(cmdq_entry);
@@ -166,7 +166,7 @@ impl ConnectX5Nic {
         trace!("Manage pages boot status: {:?}", status);
 
         // Query pages for init
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpmod::InitPages as u16), None)?;
+        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpMod::InitPages as u16), None)?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry);
         let num_init_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
@@ -185,7 +185,7 @@ impl ConnectX5Nic {
             // execute MANAGE_PAGES command to transfer init pages to device
             let cmdq_entry = cmdq.create_command(
                 CommandOpcode::ManagePages, 
-                Some(ManagePagesOpmod::AllocationSuccess as u16), 
+                Some(ManagePagesOpMod::AllocationSuccess as u16), 
                 Some(init_pa)
             )?;
             init_segment.post_command(cmdq_entry);

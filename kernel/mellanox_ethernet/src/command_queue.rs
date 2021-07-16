@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
-use volatile::{Volatile, ReadOnly};
+use volatile::Volatile;
 use bit_field::BitField;
 use zerocopy::*;
 use byteorder::BigEndian;
@@ -11,10 +11,6 @@ use nic_initialization::NIC_MAPPING_FLAGS;
 use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
 
-/// Maximum number of entries in the command queue.
-const MAX_CMND_QUEUE_ENTRIES:       usize = 64;
-/// Size of mailboxes, including both control fields and data.
-const MAILBOX_SIZE_IN_BYTES:        usize = 576;
 /// Number of bytes in the mailbox that are actually used to pass data.
 const MAILBOX_DATA_SIZE_IN_BYTES:   usize = 512;
 /// Mailboxes are aligned at 4 KiB, so they are always present at offset 0 in a page.
@@ -31,8 +27,8 @@ pub enum CommandTransportType {
     PCIe = 0x7 << 24
 }
 
+/// Return codes written by HW in the delivery status field [CommandQueueEntry::token_signature_status_own] of the command entry.
 #[derive(Debug)]
-/// Return codes written by HW in the delivery status field of the command entry.
 pub enum CommandDeliveryStatus {
     Success             = 0x0,
     SignatureErr        = 0x1,
@@ -44,12 +40,12 @@ pub enum CommandDeliveryStatus {
     InputLenErr         = 0x7,
     OutputLenErr        = 0x8,
     ReservedNotZero     = 0x9,
-    BadCommandType      = 0x10, //Should this be 10 or 16??
+    BadCommandType      = 0x10,
     Unknown,
 }
 
-#[derive(PartialEq, Debug)]
 /// Command opcode written by SW in opcode field of the input data in the command entry.
+#[derive(PartialEq, Debug)]
 pub enum CommandOpcode {
     QueryHcaCap             = 0x100,
     QueryAdapter            = 0x101,
@@ -77,8 +73,8 @@ pub enum CommandOpcode {
     Unknown
 }
 
-#[derive(Debug)]
 /// Command status written by HW in status field of the output data in the command entry.
+#[derive(Debug)]
 pub enum CommandReturnStatus {
     OK                  = 0x00,
     InternalError       = 0x01,
@@ -100,21 +96,21 @@ pub enum CommandReturnStatus {
 }
 
 /// Possible values of the opcode modifer when the opcode is ManagePages
-pub enum ManagePagesOpmod {
+pub enum ManagePagesOpMod {
     AllocationFail      = 0,
     AllocationSuccess   = 1,
     HcaReturnPages      = 2
 }
 
 /// Possible values of the opcode modifer when the opcode is QueryPages
-pub enum QueryPagesOpmod {
+pub enum QueryPagesOpMod {
     BootPages       = 1,
     InitPages       = 2,
     RegularPages    = 3
 }
 
-#[derive(PartialEq)]
 /// Mailboxes can be used for both input data passed to HW, and output data passed from HW to SW.
+#[derive(PartialEq)]
 enum MailboxType {
     Input,
     Output
@@ -141,14 +137,13 @@ impl CommandQueue {
 
     /// Create a command queue object.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `entries`: physically contiguous memory that is mapped as a slice of command queue entries.
     /// * `num_cmdq_entries`: number of entries in the queue.
     pub fn create(entries: BoxRefMut<MappedPages, [CommandQueueEntry]>, num_cmdq_entries: usize) -> Result<CommandQueue, &'static str> {
         
         // initially, all command entries are available
-        let mut available_entries = Vec::with_capacity(num_cmdq_entries);
-        for _ in 0..num_cmdq_entries { available_entries.push(true); }
+        let available_entries = vec![true; num_cmdq_entries];
 
         // start off by pre-allocating one page for input and output mailboxes per entry
         let mut mailbox_buffers_input = Vec::with_capacity(num_cmdq_entries);
@@ -176,10 +171,10 @@ impl CommandQueue {
     /// At the end of the function, the command is ready to be posted using the doorbell in the initialization segment. 
     /// Returns an error if no entry is available to use.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `opcode`: opcode for command that the driver wants to execute
     /// * `opmod`: opcode modifer, only applicable for certain commands
-    /// * `allocated_pages`: physical address of pages that need to be passed to the NIC. Only used in the MANAGE_PAGES command.
+    /// * `allocated_pages`: physical address of pages that need to be passed to the NIC. Only used in the [`CommandOpcode::ManagePages`] command.
     pub fn create_command(
         &mut self, 
         opcode: CommandOpcode, 
@@ -468,12 +463,12 @@ impl CommandQueue {
     }
 }
 
-#[derive(FromBytes, Default)]
-#[repr(C)]
 /// Layout of a command passed to the NIC.
 /// The fields include control information for the command as well as actual command input and output.
 /// The first 16 bytes of the actual command input are part of the entry. The remaining data is written in mailboxes.
 /// Similarly, the first 16 bytes of the command output are part of the entry and remaining data is written in mailboxes.
+#[derive(FromBytes, Default)]
+#[repr(C)]
 pub struct CommandQueueEntry {
     /// Type of transport that carries the command
     type_of_transport:              Volatile<U32<BigEndian>>,
@@ -516,22 +511,24 @@ const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
 
 impl fmt::Debug for CommandQueueEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CQE:type of transport: {:#X} \n", self.type_of_transport.read().get())?;
-        write!(f, "CQE:input length: {} \n", self.input_length.read().get())?;
-        write!(f, "CQE:input_mailbox_ptr_h: {:#X} \n", self.input_mailbox_pointer_h.read().get())?;
-        write!(f, "CQE:input_mailbox_ptr_l: {:#X} \n", self.input_mailbox_pointer_l.read().get())?;
-        write!(f, "CQE:command_input_opcode: {:#X} \n", self.command_input_opcode.read().get())?;
-        write!(f, "CQE:command_input_opmod: {:#X} \n", self.command_input_opmod.read().get())?;
-        write!(f, "CQE:command_input_inline_data_0: {:#X} \n", self.command_input_inline_data_0.read().get())?;
-        write!(f, "CQE:command_input_inline_data_1: {:#X} \n", self.command_input_inline_data_1.read().get())?;
-        write!(f, "CQE:command_output_status: {:#X} \n", self.command_output_status.read().get())?;
-        write!(f, "CQE:command_output_syndrome: {:#X} \n", self.command_output_syndrome.read().get())?;
-        write!(f, "CQE:command_output_inline_data_0: {:#X} \n", self.command_output_inline_data_0.read().get())?;
-        write!(f, "CQE:command_output_inline_data_1: {:#X} \n", self.command_output_inline_data_1.read().get())?;
-        write!(f, "CQE:output_mailbox_pointer_h: {:#X} \n", self.output_mailbox_pointer_h.read().get())?;
-        write!(f, "CQE:output_mailbox_pointer_l: {:#X} \n", self.output_mailbox_pointer_l.read().get())?;
-        write!(f, "CQE:output_length: {} \n", self.output_length.read().get())?;
-        write!(f, "CQE:token_signature_status_own: {:#X} \n", self.token_signature_status_own.read().get())
+        f.debug_struct("CommandQueueEntry")
+            .field("type of transport", &self.type_of_transport.read().get())
+            .field("input length", &self.input_length.read().get())
+            .field("input_mailbox_ptr_h", &self.input_mailbox_pointer_h.read().get())
+            .field("input_mailbox_ptr_l", &self.input_mailbox_pointer_l.read().get())
+            .field("command_input_opcode",&self.command_input_opcode.read().get())
+            .field("command_input_opmod",&self.command_input_opmod.read().get())
+            .field("command_input_inline_data_0",&self.command_input_inline_data_0.read().get())
+            .field("command_input_inline_data_1",&self.command_input_inline_data_1.read().get())
+            .field("command_output_status",&self.command_output_status.read().get())
+            .field("command_output_syndrome",&self.command_output_syndrome.read().get())
+            .field("command_output_inline_data_0",&self.command_output_inline_data_0.read().get())
+            .field("command_output_inline_data_1",&self.command_output_inline_data_1.read().get())
+            .field("output_mailbox_pointer_h",&self.output_mailbox_pointer_h.read().get())
+            .field("output_mailbox_pointer_l",&self.output_mailbox_pointer_l.read().get())
+            .field("output_length",&self.output_length.read().get())
+            .field("token_signature_status_own",&self.token_signature_status_own.read().get())
+            .finish()
     }
 }
 
@@ -550,7 +547,7 @@ impl CommandQueueEntry {
     /// Sets the first 16 bytes of input data that are written inline in the command.
     /// The valid values for each field are different for every command, and can be taken from Chapter 23 of the PRM.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `opcode`: value identifying which command has to be carried out
     /// * `opmod`: opcode modifier. If None, field will be set to zero.
     /// * `command0`: the first 4 bytes of actual command data. If None, field will be set to zero.
@@ -688,13 +685,13 @@ impl CommandQueueEntry {
 }
 
 
+/// Layout of mailbox used to pass extra input and output command data that doesn't fit into the command entry.
 #[derive(FromBytes)]
 #[repr(C)]
-/// Layout of mailbox used to pass extra input and output command data that doesn't fit into the command entry.
 struct CommandInterfaceMailbox {
     /// Data in the mailbox
     mailbox_data:           Volatile<[u8; 512]>,
-    _padding:               ReadOnly<[u8; 48]>,
+    _padding:               [u8; 48],
     /// MSBs of pointer to the next mailbox page (if needed). 
     /// If no additional block is needed, the pointer should be 0.
     next_pointer_h:         Volatile<U32<BigEndian>>,
@@ -723,15 +720,13 @@ impl CommandInterfaceMailbox {
 
 impl fmt::Debug for CommandInterfaceMailbox {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for i in 0..(512/4) {
-            let data = self.mailbox_data.read();
-            write!(f, "mailbox data: {:#X} {:#X} {:#X} {:#X} \n", data[i*4], data[i*4+1], data[i*4+2], data[i*4 +3])?;
-        }
-        
-        write!(f, "next pointer h: {:#X} \n", self.next_pointer_h.read().get())?;
-        write!(f, "next pointer l: {:#X} \n", self.next_pointer_l.read().get())?;
-        write!(f, "block number: {:#X} \n", self.block_number.read().get())?;
-        write!(f, "token ctrl signature: {:#X} \n", self.token_ctrl_signature.read().get())
+        f.debug_struct("CommandQueueEntry")
+            .field("mailbox_data", &self.mailbox_data.read())
+            .field("next pointer h", &self.next_pointer_h.read().get())
+            .field("next pointer l", &self.next_pointer_l.read().get())
+            .field("block number", &self.block_number.read().get())
+            .field("token ctrl signature", &self.token_ctrl_signature.read().get())
+            .finish()
     }
 }
 

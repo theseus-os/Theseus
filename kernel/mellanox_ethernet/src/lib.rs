@@ -3,12 +3,13 @@
 //!
 //! The Mellanox ethernet card is referred to as both the NIC (Network Interface Card) and the HCA (Host Channel Adapter).
 //!
-//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54], unless otherwise specified. 
+//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54], unless otherwise specified.
+//! While this version of the manual was acquired by directly contacting Nvidia through their support site (`<https://support.mellanox.com/s/>`),
+//! an older version of the manual can be found at `<http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf>`.
 
  #![no_std]
  #![feature(slice_pattern)]
  #![feature(core_intrinsics)]
- #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 
 #[macro_use]extern crate log;
 #[macro_use] extern crate alloc;
@@ -32,11 +33,11 @@ use core::fmt;
 
 pub mod command_queue;
 
-#[derive(FromBytes)]
-#[repr(C,packed)]
 /// The initialization segment is located at offset 0 of PCI BAR0.
 /// It is used in the initialization procedure of the device,
 /// and it contains the 32-bit command doorbell vector used to inform the HW when a command is ready to be processed.
+#[derive(FromBytes)]
+#[repr(C,packed)]
 pub struct InitializationSegment {
     /// Firmware Revision - Minor
     fw_rev_minor:               ReadOnly<U16<BigEndian>>,
@@ -91,7 +92,7 @@ impl InitializationSegment {
     
     /// Sets the physical address of the command queue within the initialization segment.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `cmdq_physical_addr`: the starting physical address of the command queue, the lower 12 bits of which must be zero. 
     pub fn set_physical_address_of_cmdq(&mut self, cmdq_physical_addr: PhysicalAddress) -> Result<(), &'static str> {
         if cmdq_physical_addr.value() & 0xFFF != 0 {
@@ -111,7 +112,7 @@ impl InitializationSegment {
 
     /// Sets a bit in the command doorbell vector to inform HW that the command needs to be executed.
     ///
-    /// # Arguments
+    /// ## Arguments
     /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
     pub fn post_command(&mut self, command_bit: usize) {
         let val = self.command_doorbell_vector.read().get();
@@ -121,11 +122,16 @@ impl InitializationSegment {
 
 impl fmt::Debug for InitializationSegment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Initialization Segment \n")?;
-        write!(f, "Firmware: {}.{}.{}, command interface: {} \n", self.fw_rev_major.read().get(), self.fw_rev_minor.read().get(), self.fw_rev_subminor.read().get(), self.cmd_interface_rev.read().get())?;
-        write!(f, "Command queue address: {:#X} {:#X} \n", self.cmdq_phy_addr_high.read().get(), self.cmdq_phy_addr_low.read().get())?;
-        write!(f, "Command doorbell vector: {:#X} \n", self.command_doorbell_vector.read().get())?;
-        write!(f, "Initializing state: {:#X} \n", self.initializing_state.read().get())
+        f.debug_struct("InitializationSegment")
+            .field("Firmware Rev Major", &self.fw_rev_major.read().get()) //,
+            .field("Firmware Rev Minor",&self.fw_rev_minor.read().get())
+            .field("Firmware Rev Subminor",&self.fw_rev_subminor.read().get())
+            .field("Command Interface Rev",&self.cmd_interface_rev.read().get())
+            .field("Command queue address high", &self.cmdq_phy_addr_high.read().get())
+            .field("Command queue address low", &self.cmdq_phy_addr_low.read().get())
+            .field("Command doorbell vector", &self.command_doorbell_vector.read().get())
+            .field("Initializing state", &self.initializing_state.read().get())
+            .finish()
     }
 }
 
