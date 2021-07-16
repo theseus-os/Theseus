@@ -2,7 +2,7 @@
 //! when AVX extensions are enabled. 
 
 #![no_std]
-#![feature(llvm_asm, naked_functions)]
+#![feature(asm, naked_functions)]
 
 extern crate zerocopy;
 #[macro_use] extern crate context_switch_regular;
@@ -13,11 +13,12 @@ use zerocopy::FromBytes;
 
 /// The registers saved before a context switch and restored after a context switch
 /// for AVX-enabled Tasks.
+///
+/// Note: the order of the registers here MUST MATCH the order of 
+/// registers popped in the [`restore_registers_avx!`] macro. 
 #[derive(FromBytes)]
 #[repr(C, packed)]
 pub struct ContextAVX {
-    // The order of the registers here MUST MATCH the order of 
-    // registers popped in the context_switch() function below. 
     ymm15: [u128; 2],
     ymm14: [u128; 2],   
     ymm13: [u128; 2],   
@@ -64,14 +65,14 @@ impl ContextAVX {
 }
 
 
-/// An assembly macro for saving AVX registers
+/// An assembly block for saving AVX registers
 /// by pushing them onto the stack.
 #[macro_export]
 macro_rules! save_registers_avx {
     () => (
-        llvm_asm!("
-            # save all of the ymm registers (for AVX)
-            # each register is 32 bytes (256 bits), and there are 16 of them
+        // Save all of the ymm registers (for AVX).
+        // Each register is 32 bytes (256 bits), and there are 16 of them.
+        r#"
             lea rsp, [rsp - 32*16]
             vmovups [rsp + 32*0],  ymm0   # push ymm0
             vmovups [rsp + 32*1],  ymm1   # push ymm1
@@ -89,20 +90,18 @@ macro_rules! save_registers_avx {
             vmovups [rsp + 32*13], ymm13  # push ymm13
             vmovups [rsp + 32*14], ymm14  # push ymm14
             vmovups [rsp + 32*15], ymm15  # push ymm15
-            "
-            : : : "memory" : "intel", "volatile"
-        );
+        "#
     );
 }
 
 
-/// An assembly macro for restoring AVX registers
+/// An assembly block for restoring AVX registers
 /// by popping them off of the stack.
 #[macro_export]
 macro_rules! restore_registers_avx {
     () => (
-        llvm_asm!("
-            # restore all of the ymm registers
+        // restore all of the ymm registers
+        r#"
             vmovups ymm15, [rsp + 32*15]   # pop ymm15
             vmovups ymm14, [rsp + 32*14]   # pop ymm14
             vmovups ymm13, [rsp + 32*13]   # pop ymm13
@@ -120,9 +119,7 @@ macro_rules! restore_registers_avx {
             vmovups ymm1,  [rsp + 32*1]    # pop ymm1
             vmovups ymm0,  [rsp + 32*0]    # pop ymm0
             lea rsp, [rsp + 32*16]
-            "
-            : : : "memory" : "intel", "volatile"
-        );
+        "#
     );
 }
 
@@ -137,13 +134,16 @@ macro_rules! restore_registers_avx {
 /// This function is unsafe because it changes the content on both task's stacks. 
 #[naked]
 #[inline(never)]
-pub unsafe fn context_switch_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+pub unsafe extern "C" fn context_switch_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     // Since this is a naked function that expects its arguments in two registers,
-    // you CANNOT place any log statements or other instructions here,
-    // or at any point before, in between, or after the following macros.
-    save_registers_regular!();
-    save_registers_avx!();
-    switch_stacks!();
-    restore_registers_avx!();
-    restore_registers_regular!();
+    // you CANNOT place any log statements or other instructions here
+    // before, in between, or after anything below.
+    asm!(
+        save_registers_regular!(),
+        save_registers_avx!(),
+        switch_stacks!(),
+        restore_registers_avx!(),
+        restore_registers_regular!(),
+        options(noreturn)
+    );
 }

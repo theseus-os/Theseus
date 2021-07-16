@@ -1,6 +1,6 @@
 //! Support for accessing ATA drives (IDE).
 //! 
-//! The primary struct of interest is [`AtaDrive`](struct.AtaDrive.html).
+//! The primary struct of interest is [`AtaDrive`].
 
 #![no_std]
 
@@ -11,17 +11,15 @@ extern crate port_io;
 extern crate pci;
 #[macro_use] extern crate bitflags;
 extern crate storage_device;
+extern crate io;
 
 use core::fmt;
 use spin::Mutex;
-use alloc::{
-	string::String,
-	boxed::Box,
-	sync::Arc,
-};
+use alloc::{boxed::Box, string::String, sync::Arc};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
+use io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -111,10 +109,10 @@ enum AtaCommand {
 	CacheFlushExt   = 0xEA,
 	/// Sends a packet, for ATAPI devices using the packet interface (PI).
 	Packet          = 0xA0,
-	/// Get identifying details of an ATA drive.
-	IdentifyDevice  = 0xEC,
 	/// Get identifying details of an ATAPI drive.
 	IdentifyPacket  = 0xA1,
+	/// Get identifying details of an ATA drive.
+	IdentifyDevice  = 0xEC,
 }
 
 
@@ -153,9 +151,29 @@ impl AtaDeviceType {
 /// The value is the bitmask used to select either master or slave
 /// in the ATA drive's `drive_select` port.
 #[derive(Copy, Clone, Debug)]
+#[repr(u8)]
 enum BusDriveSelect {
 	Master = 0 << 4,
 	Slave  = 1 << 4,
+}
+
+
+/// TODO: support DMA like so: <https://wiki.osdev.org/ATA/ATAPI_using_DMA#The_Bus_Master_Register>
+/// There is one instance of this struct for each `AtaBus`.
+/// 
+/// Note: TODO: depending on whether BAR4 is a Port I/O address or MMIO address, this could also be mapped into memory.
+///             We need to have an abstraction either above or beneath `Volatile` that allows reads/writes from port I/O and memory addresses similarly.
+#[allow(unused)]
+struct AtaBusMaster {
+	/// For the primary bus, this exists at BAR4 + 0.
+	/// For the secondary,   this exists at BAR4 + 8.
+	command:      Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 2.
+	/// For the secondary,   this exists at BAR4 + 10.
+	status:       Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 4.
+	/// For the secondary,   this exists at BAR4 + 12.
+	prdt_address: Port<u32>,
 }
 
 
@@ -583,7 +601,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn read_pio(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.size_in_bytes() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -619,7 +637,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn write_pio(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.size_in_bytes() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -655,29 +673,34 @@ impl AtaDrive {
 }
 
 impl StorageDevice for AtaDrive {
-	fn read_sectors(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		self.read_pio(buffer, offset_in_sectors)
-	}
-
-    fn write_sectors(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		self.write_pio(buffer, offset_in_sectors)
-	}
-
-	/// Returns the number of sectors in this drive.
-	fn size_in_sectors(&self) -> usize {
+	fn size_in_blocks(&self) -> usize {
 		if self.identify_data.user_addressable_sectors != 0 {
 			self.identify_data.user_addressable_sectors as usize
 		} else {
 			self.identify_data.max_48_bit_lba as usize
 		}
 	}
-
-    fn sector_size_in_bytes(&self) -> usize {
-		SECTOR_SIZE_IN_BYTES
+}
+impl BlockIo for AtaDrive {
+	fn block_size(&self) -> usize { SECTOR_SIZE_IN_BYTES }
+}
+impl KnownLength for AtaDrive {
+	fn len(&self) -> usize { self.block_size() * self.size_in_blocks() }
+}
+impl BlockReader for AtaDrive {
+	fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {
+		// TODO: emit a more specific IoError from the read_pio function itself instead of a blind conversion here
+		self.read_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
+	}
+}
+impl BlockWriter for AtaDrive {
+	fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError> {
+		// TODO: emit a more specific IoError from the read_pio function itself instead of a blind conversion here
+		self.write_pio(buffer, block_offset).map_err(|_e| IoError::InvalidInput)
 	}
 
+	fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
 }
-
 
 pub type AtaDriveRef = Arc<Mutex<AtaDrive>>;
 
@@ -737,7 +760,7 @@ impl IdeController {
 		
 		let drive_fmt = |drive: &Result<AtaDrive, &str>| -> String {
 			match drive {
-				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_sectors()),
+				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_blocks()),
 				Err(e) => format!("{}", e),
 			}
 		};
@@ -846,7 +869,7 @@ impl<'c> Iterator for IdeControllerIter<'c> {
 /// obtained from the response to an identify command.
 /// 
 /// Fuller documentation is available here:
-/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members
+/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members>
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(packed)]
 pub struct AtaIdentifyData {

@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-atomic = { version = "0.4.4", features = [ "nightly" ] }
+atomic = "0.5.0"
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 
 

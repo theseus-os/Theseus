@@ -22,7 +22,6 @@
 //! 
 
 #![no_std]
-#![feature(const_fn)]
 
 extern crate port_io;
 

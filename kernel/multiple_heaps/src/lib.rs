@@ -19,9 +19,7 @@
 //! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap
 //! [KERNEL_HEAP_START](../kernel_config/memory/constant.KERNEL_HEAP_START.html) and dynamically mapped to physical memory frames.
 
-#![feature(const_fn)]
 #![feature(allocator_api)]
-#![feature(const_in_array_repeat_expressions)]
 #![no_std]
 
 extern crate irq_safety; 

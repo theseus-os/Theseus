@@ -1,8 +1,12 @@
 # Theseus OS
 
+[![Documentation Action](https://img.shields.io/github/workflow/status/theseus-os/Theseus/Documentation?label=docs%20build)](https://github.com/theseus-os/Theseus/actions/workflows/docs.yaml)
+[![Documentation](https://img.shields.io/badge/open-docs-blue)](https://theseus-os.github.io/Theseus/doc/___Theseus_Crates___/index.html)
+[![Book](https://img.shields.io/badge/open-book-blueviolet)](https://theseus-os.github.io/Theseus/book/index.html)
+
 Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
-For more info, check out Theseus's [documentation](#Documentation) or our [published academic papers](book/src/papers_presentations.md), which describe Theseus's design and implementation. 
+For more info, check out Theseus's [documentation](#Documentation) or our [published academic papers](https://theseus-os.github.io/Theseus/book/misc/papers_presentations.html), which describe Theseus's design and implementation. 
 
 Theseus is under active development, and although it is not yet mature, we envision that Theseus will be useful in high-end embedded systems or edge datacenter environments. 
 We are continually working to improve the OS, including its fault recovery abilities for higher system availability without redundancy, as well as easier and more arbitrary live evolution and runtime flexbility.
@@ -23,7 +27,7 @@ On Linux (Debian-like distros), do the following:
     sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm
     ```
  4. Build and run (in QEMU):
-    ```
+    ```sh
      cd Theseus
      make run
      ```
@@ -44,7 +48,7 @@ Currently, we support building Theseus on the following platforms:
  * MacOS, tested on versions High Sierra (10.13) and Catalina (10.15.2).
  * Docker, atop any host OS that can run a Docker container.
 
-`
+
 ## Setting up the build environment
 
 First, install Rust by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html). On Linux, just run:
@@ -67,11 +71,11 @@ If you're on WSL, also do the following steps:
   * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
   * Setup an X display as follows:
     * on original WSL (version 1), run:
-      ```
+      ```sh
       export DISPLAY=:0
       ```
     * on WSL2 (version 2), run:
-      ```
+      ```sh
       export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
       ```
 
@@ -80,14 +84,22 @@ If you're on WSL, also do the following steps:
   * **NOTE**: WSL and WSL2 do not currently support using KVM.
 
 ### Building on MacOS
-  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/). 
-  * run the MacOS build setup script:
+  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/), then run the MacOS build setup script:
+    ```sh
+    sh ./scripts/mac_os_build_setup.sh
     ```
-    ./scripts/mac_os_build_setup.sh
-    ```
-  * If things later go wrong, run the following and then start over.
-    ```
+    If things go wrong, remove the following build directories and try to run the script again.
+    ```sh
     rm -rf $HOME/theseus_tools_src $HOME/theseus_tools_opt /opt/local/bin/make
+    ```
+
+  * If you're building Theseus on an M1-based Mac, you may need to use x86 emulation
+    ```sh
+    arch -x86_64 bash   # or another shell of your choice
+    ```
+    and possibly adjust your system `PATH` if both x86 and ARM homebrew binaries are installed:
+    ```sh
+    export PATH=/usr/local/Homebrew/bin:$PATH
     ```
 
 ### Building using Docker
@@ -130,12 +142,12 @@ To exit Theseus in QEMU, press `Ctrl+Alt+G` (or `Ctrl+Alt` on some systems), whi
 
 To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`. On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU menu bar.
 
-To access/expose a PCI device in QEMU using PCI passthrough via VFIO, see [these instructions](book/src/pci_passthrough.md).
+To access/expose a PCI device in QEMU using PCI passthrough via VFIO, see [these instructions](https://theseus-os.github.io/Theseus/book/running/virtual_machine/pci_passthrough.html).
 
 ### KVM Support
 While not strictly required, KVM will speed up the execution of QEMU.
 To install KVM, run the following command:    
-```
+```sh
 sudo apt-get install kvm
 ```  
 To enable KVM support, add `host=yes` to your make command, e.g.,    
@@ -150,17 +162,10 @@ Theseus includes two forms of documentation:
 2. The [book-style documentation](https://theseus-os.github.io/Theseus/book/index.html), written in Markdown.
     * Useful for high-level descriptions of design concepts and key components.
 
-The above links may be out of date, so it's best to build the docs yourself, as shown below. 
-The [latest version of the book is available here](book/src/SUMMARY.md).
-
-Once your build environment is fully set up, you can build and view Theseus's source-level docs:
-```
-make view-doc
-```
-
-To build the Theseus book:
-```
-make view-book
+To build the documentation yourself, set up your local build environment and then run the following:
+```sh
+make view-doc   ## for the source-level docs
+make view-book  ## for the Theseus book
 ```
 
 # Other
@@ -172,7 +177,7 @@ Currently, the only limiting factor is that the device support booting via USB o
 To boot over USB, simply run `make boot usb=sdc`, in which `sdc` is the device node for the USB disk itself *(**not a partition** like sdc2)* to which you want to write the OS image.
 On WSL or other host environments where `/dev` device nodes don't exist, you can simply run `make iso` and burn the `.iso` file in the `build/` directory to a USB, e.g., using [Rufus](https://rufus.ie/) on Windows.
 
-To boot Theseus over PXE (network boot), see [this set of separate instructions](book/src/pxe.md).
+To boot Theseus over PXE (network boot), see [this set of separate instructions](https://theseus-os.github.io/Theseus/book/running/pxe.html).
 
 
 ## Debugging Theseus on QEMU
@@ -199,7 +204,7 @@ GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run
 
 
 ## IDE Setup  
-Our personal preference is to use Visual Studio Code (VS Code), which has excellent cross-platform support for Rust. Other options are available [here](https://areweideyet.com/).
+Our personal preference is to use VS Code, which has excellent cross-platform support for Rust. Other options are available [here](https://areweideyet.com/).
 
 For VS Code, recommended plugins are:
  * **rust-analyzer**, by matklad
@@ -210,12 +215,12 @@ For VS Code, recommended plugins are:
 Sometimes things just don't want to behave, especially if there were issues with the currently-chosen Rust nightly version.
 In that case, try the following steps to fix it:
  * Set your default Rust toolchain to the one version in the `rust-toolchain` file, for example:
-    ```
+    ```sh
     rustup default $(cat rust-toolchain)
     ```
  * With your newly-set default toolchain, add the necessary components:    
     ```
-    rustup component add rls rust-analysis rust-src
+    rustup component add rust-src
     ```
  * In VS Code (or whatever IDE you're using), uninstall and reinstall the Rust-related extension(s), restarting the IDE each time.
  * Check your IDE's settings to make sure that no weird Rust settings have been selected; building Theseus doesn't require any special settings. 
@@ -231,6 +236,6 @@ Theseus's source code is licensed under the MIT License. See the [LICENSE-MIT](L
 
 
 ## Contributing
-We adhere to similar development and code style guidelines as the core Rust language project. See more [here](book/src/ch01.md)
+We adhere to similar development and code style guidelines as the core Rust language project. See more [here](https://theseus-os.github.io/Theseus/book/contribute/contribute.html).
 
 PRs and issues are welcome from anyone; because Theseus is an experimental OS, certain features may be deprioritized or excluded from the main branch. Don't hesitate to ask or mention something though! :smile:

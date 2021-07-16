@@ -27,12 +27,16 @@ EXECUTABLE_PREFIX   ?= e\#
 ## We build using release mode by default, because running in debug mode is quite slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
 BUILD_MODE ?= release
-ifeq ($(BUILD_MODE), debug)
+CARGOFLAGS ?=
+ifeq ($(BUILD_MODE),debug)
     ## "debug" builds are the default in cargo, so don't change cargo options. 
     ## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.
-	export override CFLAGS += -DDEBUG
-else ifeq ($(BUILD_MODE), release)
-	export override CARGOFLAGS += --release
+	export override CFLAGS+=-DDEBUG
+else ifeq ($(BUILD_MODE),release)
+	## "release" builds require passing the `--release` flag, but it can only be passed once.
+	ifeq (,$(findstring --release,$(CARGOFLAGS)))
+		export override CARGOFLAGS+=--release
+	endif
 else 
 $(error 'BUILD_MODE' value of '$(BUILD_MODE)' is invalid, it must be either 'debug' or 'release')
 endif

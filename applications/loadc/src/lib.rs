@@ -4,7 +4,6 @@
 //! likely as a separate crate that integrates well with the `mod_mgmt` crate.
 
 #![no_std]
-#![feature(slice_fill)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;

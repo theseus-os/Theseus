@@ -8,7 +8,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.9.0"
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
-downcast-rs = "1.0.4"
+downcast-rs = { version = "1.2.0", default-features = false }
 
 [dependencies.log]
 version = "0.4.8"
@@ -17,8 +17,8 @@ version = "0.4.8"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
-[dependencies.pci]
-path = "../pci"
+[dependencies.io]
+path = "../io"
 
 [lib]
 crate-type = ["rlib"]

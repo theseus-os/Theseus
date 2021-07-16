@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(rustc_private)]
-#![feature(const_fn)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -647,7 +646,7 @@ impl CrateNamespace {
     /// 
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
-    fn method_get_crate_object_files_starting_with(
+    pub fn method_get_crate_object_files_starting_with(
         &self,
         file_name_prefix: &str
     ) -> Vec<(FileRef, &CrateNamespace)> { 
@@ -674,7 +673,7 @@ impl CrateNamespace {
     /// 
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
-    fn method_get_crate_object_file_starting_with(
+    pub fn method_get_crate_object_file_starting_with(
         &self,
         file_name_prefix: &str
     ) -> Option<(FileRef, &CrateNamespace)> { 
@@ -1021,13 +1020,13 @@ impl CrateNamespace {
         // keeping track of the offset into each of their MappedPages as we go.
         let (mut rodata_offset, mut data_offset) = (0 , 0);
                     
-        const TEXT_PREFIX:           &'static str = ".text.";
-        const RODATA_PREFIX:         &'static str = ".rodata.";
-        const DATA_PREFIX:           &'static str = ".data.";
-        const BSS_PREFIX:            &'static str = ".bss.";
-        const RELRO_PREFIX:          &'static str = "rel.ro.";
-        const GCC_EXCEPT_TABLE_NAME: &'static str = ".gcc_except_table";
-        const EH_FRAME_NAME:         &'static str = ".eh_frame";
+        const TEXT_PREFIX:             &'static str = ".text.";
+        const RODATA_PREFIX:           &'static str = ".rodata.";
+        const DATA_PREFIX:             &'static str = ".data.";
+        const BSS_PREFIX:              &'static str = ".bss.";
+        const RELRO_PREFIX:            &'static str = "rel.ro.";
+        const GCC_EXCEPT_TABLE_PREFIX: &'static str = ".gcc_except_table.";
+        const EH_FRAME_NAME:           &'static str = ".eh_frame";
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              crate_name.clone(),
@@ -1054,7 +1053,9 @@ impl CrateNamespace {
 
         // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
-        for (shndx, sec) in elf_file.section_iter().enumerate() {
+        //
+        // Also, skip the first two sections, which correspond to the `NULL` and `.text` empty sections.
+        for (shndx, sec) in elf_file.section_iter().enumerate().skip(2) {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
@@ -1070,11 +1071,6 @@ impl CrateNamespace {
                     return Err("couldn't get section name");
                 }
             };
-
-            // ignore the empty .text section at the start
-            if sec_name == ".text" {
-                continue;    
-            }
 
             // This handles the rare case of a zero-sized section. 
             // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations;
@@ -1257,7 +1253,7 @@ impl CrateNamespace {
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
                     else {
-                        return Err("no rodata_pages were allocated");
+                        return Err("no rodata_pages were allocated when handling .rodata section");
                     }
                 }
                 else {
@@ -1266,45 +1262,53 @@ impl CrateNamespace {
                 }
             }
 
-            // Fourth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` section
-            else if sec_name == GCC_EXCEPT_TABLE_NAME {
-                // The gcc_except_table section is read-only, so we put it in the .rodata pages
-                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                    // here: we're ready to copy the rodata section to the proper address
-                    let dest_vaddr = rp.address_at_offset(rodata_offset)
-                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                    let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
-                    match sec.get_data(&elf_file) {
-                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                        Ok(SectionData::Empty) => {
-                            for b in dest_slice {
-                                *b = 0;
+            // Fourth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` sections
+            else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
+                if let Some(name) = sec_name.get(GCC_EXCEPT_TABLE_PREFIX.len() ..) {
+                    let demangled = demangle(name).to_string();
+
+                    // gcc_except_table sections are read-only, so we put them in the .rodata pages
+                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                        // here: we're ready to copy the rodata section to the proper address
+                        let dest_vaddr = rp.address_at_offset(rodata_offset)
+                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            Ok(SectionData::Empty) => {
+                                for b in dest_slice {
+                                    *b = 0;
+                                }
+                            },
+                            _ => {
+                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                                return Err("couldn't get section data in .gcc_except_table section");
                             }
-                        },
-                        _ => {
-                            error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                            return Err("couldn't get section data in .gcc_except_table section");
                         }
+
+                        loaded_sections.insert(
+                            shndx, 
+                            Arc::new(LoadedSection::new(
+                                SectionType::GccExceptTable,
+                                demangled,
+                                Arc::clone(rp_ref),
+                                rodata_offset,
+                                dest_vaddr,
+                                sec_size,
+                                false, // .gcc_except_table sections are not globally visible,
+                                new_crate_weak_ref.clone(),
+                            ))
+                        );
+
+                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
-
-                    loaded_sections.insert(
-                        shndx, 
-                        Arc::new(LoadedSection::new(
-                            SectionType::GccExceptTable,
-                            sec_name.to_string(),
-                            Arc::clone(rp_ref),
-                            rodata_offset,
-                            dest_vaddr,
-                            sec_size,
-                            false, // .gcc_except_table section is not globally visible,
-                            new_crate_weak_ref.clone(),
-                        ))
-                    );
-
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    else {
+                        return Err("no rodata_pages were allocated when handling .gcc_except_table");
+                    }
                 }
                 else {
-                    return Err("no rodata_pages were allocated when handling .gcc_except_table");
+                    error!("Failed to get the .gcc_except_table section's name after \".gcc_except_table.\": {:?}", sec_name);
+                    return Err("Failed to get the .gcc_except_table section's name after \".gcc_except_table.\"!");
                 }
             }
 
@@ -2130,13 +2134,13 @@ impl CrateNamespace {
 /// that can be allocated and mapped for a single `LoadedCrate`. 
 struct SectionPages {
     /// MappedPages that will hold any and all executable sections: `.text`
-    /// and their bounds express in `VirtualAddress`es.
+    /// and their bounds expressed as `VirtualAddress`es.
     executable_pages: Option<(MappedPages, Range<VirtualAddress>)>,
     /// MappedPages that will hold any and all read-only sections: `.rodata`, `.eh_frame`, `.gcc_except_table`
-    /// and their bounds express in `VirtualAddress`es.
+    /// and their bounds expressed as `VirtualAddress`es.
     read_only_pages: Option<(MappedPages, Range<VirtualAddress>)>,
     /// MappedPages that will hold any and all read-write sections: `.data` and `.bss`
-    /// and their bounds express in `VirtualAddress`es.
+    /// and their bounds expressed as `VirtualAddress`es.
     read_write_pages: Option<(MappedPages, Range<VirtualAddress>)>,
 }
 
