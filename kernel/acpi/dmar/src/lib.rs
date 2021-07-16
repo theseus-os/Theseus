@@ -1,4 +1,9 @@
-//! Definitions for FADT, the Fixed ACPI Description Table.
+//! Definitions for the DMAR, the Direct Memory Access (DMA) Remapping ACPI table.
+//!
+//! ## Resources for DMAR table
+//! * Redox commit that includes lots of DMAR-relevant code: <https://gitlab.redox-os.org/redox-os/kernel/-/commit/c4617c0bcef9f1488ef9697bf4ce272842e7943d#2799bd47bf7d1674eeb2dd0e28e41c82d1bfec4f>
+//!
+//!
 
 #![no_std]
 
@@ -13,10 +18,10 @@ use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 
 
-pub const FADT_SIGNATURE: &'static [u8; 4] = b"FACP";
+pub const DMAR_SIGNATURE: &'static [u8; 4] = b"DMAR";
 
 
-/// The handler for parsing the FADT table and adding it to the ACPI tables list.
+/// The handler for parsing the DMAR table and adding it to the ACPI tables list.
 pub fn handle(
     acpi_tables: &mut AcpiTables,
     signature: AcpiSignature,

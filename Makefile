@@ -606,10 +606,20 @@ help:
 ##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
 
+QEMU_FLAGS := -machine q35,kernel-irqchip=split 
+## Boot from the cd-rom drive
+QEMU_FLAGS += -cdrom $(iso) -boot d
+## Don't reboot or shutdown upon failure or a triple reset
+QEMU_FLAGS += -no-reboot -no-shutdown
+## Enable a GDB stub so we can connect GDB to the QEMU instance 
+QEMU_FLAGS += -s
+## Set the amount of system memory (RAM) provided to the QEMU guest OS
 QEMU_MEMORY ?= 512M
-QEMU_FLAGS := -cdrom $(iso) -boot d -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
+QEMU_FLAGS += -m $(QEMU_MEMORY) 
+## Enable the serial log to be redirected to the host terminal's stdio
+QEMU_FLAGS += -serial stdio 
 
-## multicore 
+## Enable multicore CPUs, i.e., SMP (Symmetric Multi-Processor)
 QEMU_CPUS ?= 4
 QEMU_FLAGS += -smp $(QEMU_CPUS)
 
@@ -665,6 +675,9 @@ endif
 ifdef vfio
 	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
 endif
+
+## Enable the IOMMU, e.g., Intel VT-d
+QEMU_FLAGS += -device intel-iommu,intremap=on
 
 
 
