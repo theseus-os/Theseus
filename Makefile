@@ -606,6 +606,8 @@ help:
 ##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
 
+## Specify a basic machine/platform, which currently is the `q35`
+## because it's the only one that supports a guest OS vIOMMU: <https://wiki.qemu.org/Features/VT-d>
 QEMU_FLAGS := -machine q35,kernel-irqchip=split 
 ## Boot from the cd-rom drive
 QEMU_FLAGS += -cdrom $(iso) -boot d
@@ -613,11 +615,12 @@ QEMU_FLAGS += -cdrom $(iso) -boot d
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 
 QEMU_FLAGS += -s
+## Enable the serial log to be redirected to the host terminal's stdio
+QEMU_FLAGS += -serial stdio 
+
 ## Set the amount of system memory (RAM) provided to the QEMU guest OS
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS += -m $(QEMU_MEMORY) 
-## Enable the serial log to be redirected to the host terminal's stdio
-QEMU_FLAGS += -serial stdio 
 
 ## Enable multicore CPUs, i.e., SMP (Symmetric Multi-Processor)
 QEMU_CPUS ?= 4
@@ -676,7 +679,8 @@ ifdef vfio
 	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
 endif
 
-## Enable the IOMMU, e.g., Intel VT-d
+## Enable the IOMMU, e.g., Intel VT-d. 
+## See more here: <https://wiki.qemu.org/Features/VT-d>
 QEMU_FLAGS += -device intel-iommu,intremap=on
 
 

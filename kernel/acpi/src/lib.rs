@@ -26,6 +26,7 @@ extern crate rsdp;
 extern crate rsdt;
 extern crate fadt;
 extern crate madt;
+extern crate dmar;
 
 
 use alloc::vec::Vec;
@@ -101,6 +102,16 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         let acpi_tables = ACPI_TABLES.lock();
         let madt = madt::Madt::get(&acpi_tables).ok_or("The required MADT ACPI table wasn't found (signature 'APIC')")?;
         madt.bsp_init(page_table)?;
+    }
+
+    // If we have a DMAR table, use it to obtain IOMMU info. 
+    {
+        let acpi_tables = ACPI_TABLES.lock();
+        if let Some(dmar_table) = dmar::DmarReporting::get(&acpi_tables) {
+            debug!("TODO: do something with DMAR table: {:X?}", dmar_table);
+        } else {
+            info!("This machine has no DMAR ACPI table (used for IOMMU).");
+        }
     }
 
     Ok(())

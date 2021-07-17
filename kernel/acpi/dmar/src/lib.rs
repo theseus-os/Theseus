@@ -1,8 +1,7 @@
 //! Definitions for the DMAR, the Direct Memory Access (DMA) Remapping ACPI table.
 //!
-//! ## Resources for DMAR table
-//! * Redox commit that includes lots of DMAR-relevant code: <https://gitlab.redox-os.org/redox-os/kernel/-/commit/c4617c0bcef9f1488ef9697bf4ce272842e7943d#2799bd47bf7d1674eeb2dd0e28e41c82d1bfec4f>
-//!
+//! The structures defined herein are based on Section 8 of Intel's VT Directed I/O Spec:
+//! <https://software.intel.com/content/www/us/en/develop/download/intel-virtualization-technology-for-directed-io-architecture-specification.html>
 //!
 
 #![no_std]
@@ -32,54 +31,167 @@ pub fn handle(
 }
 
 
+/// The top-level DMAR table, a DMA Remapping Reporting Structure
+/// (also called a DMA Remapping Description table).
 #[repr(packed)]
 #[derive(Clone, Copy, Debug, FromBytes)]
-pub struct Fadt {
+pub struct DmarReporting {
     pub header: Sdt,
-    pub firmware_ctrl: u32,
-    /// The physical address of the DSDT table
-    pub dsdt: u32,
-    _reserved: u8, 
-    pub preferred_power_managament: u8,
-    pub sci_interrupt: u16,
-    pub smi_command_port: u32,
-    pub acpi_enable: u8,
-    pub acpi_disable: u8,
-    pub s4_bios_req: u8,
-    pub pstate_control: u8,
-    pub pm1a_event_block: u32,
-    pub pm1b_event_block: u32,
-    pub pm1a_control_block: u32,
-    pub pm1b_control_block: u32,
-    pub pm2_control_block: u32,
-    pub pm_timer_block: u32,
-    pub gpe0_block: u32,
-    pub gpe1_block: u32,
-    pub pm1_event_length: u8,
-    pub pm1_control_length: u8,
-    pub pm2_control_length: u8,
-    pub pm_timer_length: u8,
-    pub gpe0_ength: u8,
-    pub gpe1_length: u8,
-    pub gpe1_base: u8,
-    pub c_state_control: u8,
-    pub worst_c2_latency: u16,
-    pub worst_c3_latency: u16,
-    pub flush_size: u16,
-    pub flush_stride: u16,
-    pub duty_offset: u8,
-    pub duty_width: u8,
-    pub day_alarm: u8,
-    pub month_alarm: u8,
-    pub century: u8,
-    pub boot_architecture_flags: u16,
-    _reserved2: u8,
-    pub flags: u32,
+    host_address_width: u8,
+    pub flags: u8,
+    _reserved: [u8; 10],
+    // Following this is a variable number of variable-sized DMAR table entries,
+    // so we cannot include them here in the static struct definition.
 }
 
-impl Fadt {
-    /// Finds the FADT in the given `AcpiTables` and returns a reference to it.
-    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t Fadt> {
-        acpi_tables.table(&FADT_SIGNATURE).ok()
+impl DmarReporting {
+    /// Finds the top-level DMAR table in the given `AcpiTables` and returns a reference to it.
+    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t DmarReporting> {
+        acpi_tables.table(&DMAR_SIGNATURE).ok()
     }
+
+    /// Returns the maximum DMA physical addressability (in number of bits) 
+    /// supported by this machine.
+    pub fn host_address_width(&self) -> u8 {
+        // The Host Address Width (HAW) of this machine is computed as (N+1),
+        // where N is the value reported in the `host_address_width` field.
+        self.host_address_width + 1
+    }
+}
+
+/// Represents the "header" of each dynamic table entry 
+/// in the [`DmarReporting`] table.
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarEntryRecord {
+    /// The type of a DMAR entry.
+    /// This should be of type [`DmarEntryTypes`], but it's incompatible with `FromBytes`.
+    typ: u16,
+    /// The length in bytes of a DMAR entry table.
+    length: u16,
+}
+
+/// The possible types of entries in the [`DmarReporting`] table.
+#[derive(Clone, Copy, Debug)]
+#[repr(u16)]
+enum DmarEntryTypes {
+    Drhd = 0,
+    Rmrr = 1,
+    Atsr = 2,
+    Rhsa = 3, 
+    Andd = 4,
+    Satc = 5,
+    /// Any entry type larger than 5 is reserved for future use.
+    Unknown,
+}
+impl From<u16> for DmarEntryTypes {
+    fn from(v: u16) -> Self {
+        match v {
+            0 => Self::Drhd,
+            1 => Self::Rmrr,
+            2 => Self::Atsr,
+            3 => Self::Rhsa,
+            4 => Self::Andd,
+            5 => Self::Satc,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+
+/// DRHD: DMAR Hardware Unit Definition Structure.
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarHardwareUnitDefinition {
+    header: DmarEntryRecord,
+    flags: u8,
+    _reserved: u8,
+    segment_number: u16,
+    register_base_address: u64,
+    // Following this is a variable number of variable-sized DMAR device scope table entries,
+    // so we cannot include them here in the static struct definition.
+}
+
+
+/// DMAR Device Scope Structure.
+///
+/// TODO: dealing with this structure is quite complicated. 
+///       See Section 8.3.1 of the VT Directed I/O Spec.
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarDeviceScope {
+    typ: u8,
+    length: u8,
+    _reserved: u16,
+    enumeration_id: u8,
+    start_bus_number: u8,
+    // Following this is a variable-sized `Path` field,
+    // so we cannot include it here in the static struct definition.
+    // It would look something like:
+    // path: [u16],
+}
+
+
+/// RMRR: DMAR Reserved Memory Region Reporting Structure. 
+///
+/// An instance of this struct describes a memory region
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarReservedMemoryRegionReporting {
+    header: DmarEntryRecord,
+    _reserved: u16,
+    segment_number: u16,
+    /// The base address of a 4KB-aligned reserved memory region. 
+    base_address: u64,
+    /// The upper limit (last address) of the reserved memory region. 
+    limit_address: u64,
+    // Following this is a variable number of variable-sized DMAR device scope table entries,
+    // so we cannot include them here in the static struct definition.
+}
+
+/// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. 
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarAtsr {
+    header: DmarEntryRecord,
+    flags: u8,
+    _reserved: u8,
+    segment_number: u16,
+    // Following this is a variable number of variable-sized DMAR device scope table entries,
+    // so we cannot include them here in the static struct definition.
+}
+
+/// RHSA: DMAR Remapping Hardware Static Affinity Structure. 
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarRhsa {
+    header: DmarEntryRecord,
+    _reserved: u32,
+    register_base_address: u64,
+    proximity_domain: u32,
+}
+
+/// ANDD: DMAR ACPI Name-space Device Declaration Structure. 
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarAndd {
+    header: DmarEntryRecord,
+    _reserved: [u8; 3],
+    acpi_device_number: u8,
+    // Following this is a variable-sized `ACPI Object Name` field,
+    // so we cannot include it here in the static struct definition.
+    // It's a C-style null-terminated string, which would look something like:
+    // acpi_object_name: [u8],
+}
+
+/// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. 
+#[derive(Clone, Copy, Debug, FromBytes)]
+#[repr(packed)]
+pub struct DmarSatc {
+    header: DmarEntryRecord,
+    flags: u8,
+    _reserved: u8,
+    segment_number: u16,
+    // Following this is a variable number of variable-sized DMAR device scope table entries,
+    // so we cannot include them here in the static struct definition.
 }
