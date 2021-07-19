@@ -11,6 +11,9 @@ use nic_initialization::NIC_MAPPING_FLAGS;
 use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
 
+/// Size of mailboxes, including both control fields and data.
+#[allow(dead_code)]
+const MAILBOX_SIZE_IN_BYTES:        usize = 576;
 /// Number of bytes in the mailbox that are actually used to pass data.
 const MAILBOX_DATA_SIZE_IN_BYTES:   usize = 512;
 /// Mailboxes are aligned at 4 KiB, so they are always present at offset 0 in a page.
@@ -27,7 +30,8 @@ pub enum CommandTransportType {
     PCIe = 0x7 << 24
 }
 
-/// Return codes written by HW in the delivery status field [CommandQueueEntry::token_signature_status_own] of the command entry.
+/// Return codes written by HW in the delivery status field of the command entry.
+/// See [`CommandQueueEntry::token_signature_status_own`].
 #[derive(Debug)]
 pub enum CommandDeliveryStatus {
     Success             = 0x0,
@@ -44,7 +48,27 @@ pub enum CommandDeliveryStatus {
     Unknown,
 }
 
+impl From<u32> for CommandDeliveryStatus {
+    fn from(status: u32) -> Self {
+        match status {
+            0 => Self::Success,
+            1 => Self::SignatureErr,
+            2 => Self::TokenErr,
+            3 => Self::BadBlockNumber,
+            4 => Self::BadOutputPointer,
+            5 => Self::BadInputPointer,
+            6 => Self::InternalErr,
+            7 => Self::InputLenErr,
+            8 => Self::OutputLenErr,
+            9 => Self::ReservedNotZero,
+            10 => Self::BadCommandType,
+            _ => Self::Unknown
+        }
+    }
+}
+
 /// Command opcode written by SW in opcode field of the input data in the command entry.
+/// See [`CommandQueueEntry::command_input_opcode`].
 #[derive(PartialEq, Debug)]
 pub enum CommandOpcode {
     QueryHcaCap             = 0x100,
@@ -62,18 +86,95 @@ pub enum CommandOpcode {
     CreateCq                = 0x400,
     QueryVportState         = 0x751,
     QueryNicVportContext    = 0x754,
-    AllocUar                = 0x802,
     AllocPd                 = 0x800,
+    AllocUar                = 0x802,
     AllocTransportDomain    = 0x816,
-    CreateTis               = 0x912,
     CreateSq                = 0x904,
     ModifySq                = 0x905,
     CreateRq                = 0x908,
     ModifyRq                = 0x909,
+    CreateTis               = 0x912,
     Unknown
 }
 
+impl CommandOpcode {
+    fn input_bytes(&self, num_pages: Option<usize>) -> Result<u32, &'static str> {
+        let len = match self {
+            Self::InitHca => 12,
+            Self::EnableHca => 12,
+            Self::QueryPages => 12,
+            Self::ManagePages => {
+                let num_pages = num_pages.ok_or("No pages passed to the manage pages command")? as u32;
+                0x10 + num_pages * SIZE_PADDR_IN_BYTES as u32
+            }
+            Self::QueryIssi => 8, 
+            Self::SetIssi => 12,    
+            Self::QuerySpecialContexts => 8,              
+            Self::QueryVportState => 12,        
+            Self::AllocUar => 8,              
+            Self::AllocPd => 8,               
+            Self::AllocTransportDomain => 8,
+            _ => {
+                return Err("Input length has not been set for this opcode.");
+            }            
+        };
+        Ok(len)
+    }
+
+    fn output_bytes(&self) -> Result<u32, &'static str> {
+        let len = match self {
+            Self::InitHca => 8,
+            Self::EnableHca => 8,
+            Self::QueryPages => 16,
+            Self::ManagePages => 16,
+            Self::QueryIssi => 112, 
+            Self::SetIssi => 8,    
+            Self::QuerySpecialContexts => 12,              
+            Self::QueryVportState => 16,        
+            Self::AllocUar => 12,              
+            Self::AllocPd => 12,               
+            Self::AllocTransportDomain => 12,
+            _ => {
+                return Err("Output length has not been set for this opcode.");
+            }            
+        };
+        Ok(len)
+    }
+}
+
+impl From<u32> for CommandOpcode {
+    fn from(opcode: u32) -> Self {
+        match opcode {
+            0x100   => Self::QueryHcaCap,
+            0x101   => Self::QueryAdapter, 
+            0x102   => Self::InitHca, 
+            0x103   => Self::TeardownHca, 
+            0x104   => Self::EnableHca, 
+            0x105   => Self::DisableHca, 
+            0x107   => Self::QueryPages, 
+            0x108   => Self::ManagePages, 
+            0x10A   => Self::QueryIssi, 
+            0x10B   => Self::SetIssi,
+            0x203   => Self::QuerySpecialContexts, 
+            0x301   => Self::CreateEq, 
+            0x400   => Self::CreateCq, 
+            0x751   => Self::QueryVportState, 
+            0x754   => Self::QueryNicVportContext, 
+            0x800   => Self::AllocPd, 
+            0x802   => Self::AllocUar, 
+            0x816   => Self::AllocTransportDomain, 
+            0x904   => Self::CreateSq, 
+            0x905   => Self::ModifySq, 
+            0x908   => Self::CreateRq, 
+            0x909   => Self::ModifyRq, 
+            0x912   => Self::CreateTis, 
+            _       => Self::Unknown
+        }
+    }
+}
+
 /// Command status written by HW in status field of the output data in the command entry.
+/// See [`CommandQueueEntry::command_output_status`].
 #[derive(Debug)]
 pub enum CommandReturnStatus {
     OK                  = 0x00,
@@ -95,14 +196,37 @@ pub enum CommandReturnStatus {
     Unknown
 }
 
-/// Possible values of the opcode modifer when the opcode is ManagePages
+impl From<u8> for CommandReturnStatus {
+    fn from(status: u8) -> Self {
+        match status{
+            0x0 => Self::OK,
+            0x1 => Self::InternalError,
+            0x2 => Self::BadOp,
+            0x3 => Self::BadParam,
+            0x4 => Self::BadSysState,
+            0x5 => Self::BadResource,
+            0x6 => Self::ResourceBusy,
+            0x8 => Self::ExceedLim,
+            0x9 => Self::BadResState,
+            0xA => Self::BadIndex,
+            0xF => Self::NoResources,
+            0x50 => Self::BadInputLen,
+            0x51 => Self::BadOutputLen,
+            0x10 => Self::BadResourceState,
+            0x30 => Self::BadPkt,
+            0x40 => Self::BadSize,
+            _ => Self::Unknown
+        }
+    }
+}
+/// Possible values of the opcode modifer when the opcode is [`CommandOpcode::ManagePages`].
 pub enum ManagePagesOpMod {
     AllocationFail      = 0,
     AllocationSuccess   = 1,
     HcaReturnPages      = 2
 }
 
-/// Possible values of the opcode modifer when the opcode is QueryPages
+/// Possible values of the opcode modifer when the opcode is [`CommandOpcode::QueryPages`].
 pub enum QueryPagesOpMod {
     BootPages       = 1,
     InitPages       = 2,
@@ -115,6 +239,8 @@ enum MailboxType {
     Input,
     Output
 }
+
+
 
 /// A buffer of fixed-size entries that is used to pass commands to the HCA.
 /// It resides in a physically contiguous 4 KiB memory chunk.
@@ -172,7 +298,7 @@ impl CommandQueue {
     /// Returns an error if no entry is available to use.
     ///
     /// ## Arguments
-    /// * `opcode`: opcode for command that the driver wants to execute
+    /// * `opcode`: [`CommandOpcode`] for the command that the driver wants to execute
     /// * `opmod`: opcode modifer, only applicable for certain commands
     /// * `allocated_pages`: physical address of pages that need to be passed to the NIC. Only used in the [`CommandOpcode::ManagePages`] command.
     pub fn create_command(
@@ -197,13 +323,13 @@ impl CommandQueue {
 
         match opcode {
             CommandOpcode::EnableHca => {
-                cmdq_entry.set_input_length_in_bytes(12);
-                cmdq_entry.set_output_length_in_bytes(8);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             }
             CommandOpcode::QueryIssi => {
-                cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(112);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
                 
                 self.init_query_issi_output_mailbox_buffers(entry_num)?;
@@ -211,29 +337,29 @@ impl CommandQueue {
             }
             CommandOpcode::SetIssi => {
                 warn!("setting to 1 by default, could be wrong");
-                cmdq_entry.set_input_length_in_bytes(12);
-                cmdq_entry.set_output_length_in_bytes(8);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, Some(1), None);
             }
             CommandOpcode::InitHca => {
-                cmdq_entry.set_input_length_in_bytes(12);
-                cmdq_entry.set_output_length_in_bytes(8);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             }
             CommandOpcode::QuerySpecialContexts => {
-                cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             }
             CommandOpcode::QueryPages => {
-                cmdq_entry.set_input_length_in_bytes(12);
-                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             }
             CommandOpcode::ManagePages => {
                 let pages_pa = allocated_pages.ok_or("No pages were passed to the manage pages command")?;
-                cmdq_entry.set_input_length_in_bytes(0x10 + pages_pa.len() as u32 * SIZE_PADDR_IN_BYTES as u32); 
-                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(Some(pages_pa.len()))?); 
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(
                     opcode, 
                     opmod, 
@@ -245,28 +371,23 @@ impl CommandQueue {
                 self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
             }
             CommandOpcode::AllocUar => {
-                cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             },
             CommandOpcode::QueryVportState => { // only accesses your own vport
-                cmdq_entry.set_input_length_in_bytes(12);
-                cmdq_entry.set_output_length_in_bytes(16);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             },
             CommandOpcode::AllocPd => { 
-                cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             },
             CommandOpcode::AllocTransportDomain => { 
-                cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(12);
-                cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
-            },
-            CommandOpcode::QuerySpecialContexts => { 
-                cmdq_entry.set_input_length_in_bytes(8);
-                cmdq_entry.set_output_length_in_bytes(12);
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             },
             _=> {
@@ -298,14 +419,14 @@ impl CommandQueue {
         cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
     }
 
-    /// Initialize output mailboxes for the QUERY_ISSI command.
+    /// Initialize output mailboxes for the [`CommandOpcode::QueryIssi`] command.
     fn init_query_issi_output_mailbox_buffers(&mut self, entry_num: usize) -> Result<(), &'static str> {
         const NUM_MAILBOXES_QUERY_ISSI: usize = 1;
         self.initialize_mailboxes(entry_num, NUM_MAILBOXES_QUERY_ISSI, MailboxType::Output)?;
         Ok(())
     }
 
-    /// Initialize input mailboxes for the MANAGE_PAGES command.
+    /// Initialize input mailboxes for the [`CommandOpcode::ManagePages`] command.
     /// We write that physical address of the pages passed to the NIC to the mailbox data field.
     fn init_manage_pages_input_mailbox_buffers(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>) -> Result<(), &'static str> {
         
@@ -344,7 +465,7 @@ impl CommandQueue {
         (self.entries[entry_num].get_delivery_status(), self.entries[entry_num].get_return_status())
     }
 
-    /// Get the current ISSI version and the supported ISSI versions, which is the output of the QUERY_ISSI command.  
+    /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
     pub fn get_query_issi_command_output(&self, entry_num: usize) -> Result<(u16, u8), &'static str> {
         self.check_command_output_validity(entry_num, CommandOpcode::QueryIssi)?;
 
@@ -357,28 +478,28 @@ impl CommandQueue {
         Ok((current_issi as u16, supported_issi as u8))
     }
 
-    /// Get the number of pages requested by the NIC, which is the output of the QUERY_PAGES command.  
+    /// Get the number of pages requested by the NIC, which is the output of the [`CommandOpcode::QueryPages`] command.  
     pub fn get_query_pages_command_output(&self, entry_num: usize) -> Result<u32, &'static str> {
         self.check_command_output_validity(entry_num, CommandOpcode::QueryPages)?;
         let (_status, _syndrome, _function_id, num_pages) = self.entries[entry_num].get_output_inline_data();
         Ok(num_pages)
     }
 
-    /// Get the User Access Region (UAR) number, which is the output of the ALLOC_UAR command.  
+    /// Get the User Access Region (UAR) number, which is the output of the [`CommandOpcode::AllocUar`] command.  
     pub fn get_uar(&self, entry_num: usize) -> Result<u32, &'static str> {
         self.check_command_output_validity(entry_num, CommandOpcode::AllocUar)?;
         let (_status, _syndrome, uar, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(uar & 0xFF_FFFF)
     }
 
-    /// Get the protection domain number, which is the output of the ALLOC_PD command.  
+    /// Get the protection domain number, which is the output of the [`CommandOpcode::AllocPd`] command.  
     pub fn get_protection_domain(&self, entry_num: usize) -> Result<u32, &'static str> {
         self.check_command_output_validity(entry_num, CommandOpcode::AllocPd)?;
         let (_status, _syndrome, pd, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(pd & 0xFF_FFFF)
     }
 
-    /// Get the transport domain number, which is the output of the ALLOC_TRANSPORT_DOMAIN command.  
+    /// Get the transport domain number, which is the output of the [`CommandOpcode::AllocTransportDomain`] command.  
     pub fn get_transport_domain(&self, entry_num: usize) -> Result<u32, &'static str> {
         self.check_command_output_validity(entry_num, CommandOpcode::AllocTransportDomain)?;
         let (_status, _syndrome, td, _reserved) = self.entries[entry_num].get_output_inline_data();
@@ -386,7 +507,7 @@ impl CommandQueue {
     }
 
     /// Get the value of the reserved Lkey for Base Memory Management Extension, which is used when we are using physical addresses.
-    /// It is taken as the output of the QUERY_SPECIAL_CONTEXTS command.
+    /// It is taken as the output of the [`CommandOpcode::QuerySpecialContexts`] command.
     pub fn get_reserved_lkey(&self, entry_num: usize) -> Result<u32, &'static str> {
         self.check_command_output_validity(entry_num, CommandOpcode::QuerySpecialContexts)?;
         let (_status, _syndrome, _dump_fill_mkey, resd_lkey) = self.entries[entry_num].get_output_inline_data();
@@ -561,19 +682,7 @@ impl CommandQueueEntry {
 
     /// Returns the value written to the input opcode field of the command
     fn get_command_opcode(&self) -> CommandOpcode {
-        match self.command_input_opcode.read().get() >> 16 {
-            0x100   => {CommandOpcode::QueryHcaCap},
-            0x101   => {CommandOpcode::QueryAdapter}, 
-            0x102   => {CommandOpcode::InitHca}, 
-            0x103   => {CommandOpcode::TeardownHca}, 
-            0x104   => {CommandOpcode::EnableHca}, 
-            0x105   => {CommandOpcode::DisableHca}, 
-            0x107   => {CommandOpcode::QueryPages}, 
-            0x108   => {CommandOpcode::ManagePages}, 
-            0x10A   => {CommandOpcode::QueryIssi}, 
-            0x10B   => {CommandOpcode::SetIssi}, 
-            _       => {CommandOpcode::Unknown}
-        }
+        (self.command_input_opcode.read().get() >> 16).into()
     }
 
     /// Returns the first 16 bytes of output data that are written inline in the command.
@@ -603,32 +712,7 @@ impl CommandQueueEntry {
     /// Returns the status of command delivery.
     /// This only informs us if the command was delivered to the NIC successfully, not if it was completed successfully.
     pub fn get_delivery_status(&self) -> CommandDeliveryStatus {
-        let status = self.token_signature_status_own.read().get() & 0xFE;
-        if status == 0 {
-            CommandDeliveryStatus::Success
-        } else if status == 1 {
-            CommandDeliveryStatus::SignatureErr
-        } else if status == 2 {
-            CommandDeliveryStatus::TokenErr
-        } else if status == 3 {
-            CommandDeliveryStatus::BadBlockNumber
-        } else if status == 4 {
-            CommandDeliveryStatus::BadOutputPointer
-        } else if status == 5 {
-            CommandDeliveryStatus::BadInputPointer
-        } else if status == 6 {
-            CommandDeliveryStatus::InternalErr
-        } else if status == 7 {
-            CommandDeliveryStatus::InputLenErr
-        } else if status == 8 {
-            CommandDeliveryStatus::OutputLenErr
-        } else if status == 9 {
-            CommandDeliveryStatus::ReservedNotZero
-        } else if status == 10 {
-            CommandDeliveryStatus::BadCommandType
-        } else {
-            CommandDeliveryStatus::Unknown
-        }
+        (self.token_signature_status_own.read().get() & 0xFE).into()
     }
 
     /// Sets the ownership bit so that HW can take control of the command entry
@@ -645,42 +729,7 @@ impl CommandQueueEntry {
     /// Returns the status of command execution.
     pub fn get_return_status(&self) -> CommandReturnStatus {
         let (status, _syndrome, _, _) = self.get_output_inline_data();
-
-        if status == 0x0 {
-            CommandReturnStatus::OK
-        } else if status == 0x1 {
-            CommandReturnStatus::InternalError
-        } else if status == 0x2 {
-            CommandReturnStatus::BadOp
-        } else if status == 0x3 {
-            CommandReturnStatus::BadParam
-        } else if status == 0x4 {
-            CommandReturnStatus::BadSysState
-        } else if status == 0x5 {
-            CommandReturnStatus::BadResource
-        } else if status == 0x6 {
-            CommandReturnStatus::ResourceBusy
-        } else if status == 0x8 {
-            CommandReturnStatus::ExceedLim
-        } else if status == 0x9 {
-            CommandReturnStatus::BadResState
-        } else if status == 0xA {
-            CommandReturnStatus::BadIndex
-        } else if status == 0xF {
-            CommandReturnStatus::NoResources
-        } else if status == 0x50 {
-            CommandReturnStatus::BadInputLen
-        } else if status == 0x51 {
-            CommandReturnStatus::BadOutputLen
-        } else if status == 0x10 {
-            CommandReturnStatus::BadResourceState
-        } else if status == 0x30 {
-            CommandReturnStatus::BadPkt
-        } else if status == 0x40 {
-            CommandReturnStatus::BadSize
-        } else {
-            CommandReturnStatus::Unknown
-        }
+        status.into()
     }
 }
 

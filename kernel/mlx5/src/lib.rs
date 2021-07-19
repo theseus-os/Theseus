@@ -7,7 +7,6 @@
 //! unless otherwise specified. 
 
 #![no_std]
-#![allow(dead_code)] //  to suppress warnings for unused functions/methods
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -52,6 +51,7 @@ pub fn get_mlx5_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
 }
 
 /// Struct representing a ConnectX-5 network interface card.
+#[allow(dead_code)]
 pub struct ConnectX5Nic {
     /// Initialization segment base address
     mem_base: PhysicalAddress,

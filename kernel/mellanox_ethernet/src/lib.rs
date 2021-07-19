@@ -37,7 +37,7 @@ pub mod command_queue;
 /// It is used in the initialization procedure of the device,
 /// and it contains the 32-bit command doorbell vector used to inform the HW when a command is ready to be processed.
 #[derive(FromBytes)]
-#[repr(C,packed)]
+#[repr(packed)]
 pub struct InitializationSegment {
     /// Firmware Revision - Minor
     fw_rev_minor:               ReadOnly<U16<BigEndian>>,
@@ -55,27 +55,27 @@ pub struct InitializationSegment {
     /// Bit per command in the cmdq.
     /// When the bit is set, that command entry in the queue is moved to HW ownership.
     command_doorbell_vector:    Volatile<U32<BigEndian>>,
-    _padding2:                  [u8; 390],
+    _padding2:                  [u8; 484],
     /// If bit 31 is set, the device is still initializing and driver should not post commands
     initializing_state:         ReadOnly<U32<BigEndian>>,
     /// Advanced debug information.
-    health_buffer:              Volatile<[u8; 64]>,
+    _health_buffer:              Volatile<[u8; 64]>,
     /// The offset in bytes, inside the initialization segment, where the NODNIC registers can be found.
-    no_dram_nic_offset:         ReadOnly<U32<BigEndian>>,
+    _no_dram_nic_offset:         ReadOnly<U32<BigEndian>>,
     _padding3:                  [u8; 3516],
     /// MSBs of the current internal timer value
-    internal_timer_h:           ReadOnly<U32<BigEndian>>,
+    _internal_timer_h:           ReadOnly<U32<BigEndian>>,
     /// LSBs of the current internal timer value
-    internal_timer_l:           ReadOnly<U32<BigEndian>>,
+    _internal_timer_l:           ReadOnly<U32<BigEndian>>,
     _padding4:                  [u8; 8],
     /// Advanced debug information
-    health_counter:             ReadOnly<U32<BigEndian>>,
+    _health_counter:             ReadOnly<U32<BigEndian>>,
     _padding5:                  [u8; 44],
-    real_time:                  ReadOnly<U64<BigEndian>>,
+    _real_time:                  ReadOnly<U64<BigEndian>>,
     _padding6:                  [u8; 12228],
 }
 
-// const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16400);
+const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16400);
 
 impl InitializationSegment {
     /// Returns the maximum number of entries that can be in the command queue
@@ -110,7 +110,7 @@ impl InitializationSegment {
         self.initializing_state.read().get().get_bit(31)
     }
 
-    /// Sets a bit in the command doorbell vector to inform HW that the command needs to be executed.
+    /// Sets a bit in the [`InitializationSegment::command_doorbell_vector`] to inform HW that the command needs to be executed.
     ///
     /// ## Arguments
     /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
@@ -123,7 +123,7 @@ impl InitializationSegment {
 impl fmt::Debug for InitializationSegment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("InitializationSegment")
-            .field("Firmware Rev Major", &self.fw_rev_major.read().get()) //,
+            .field("Firmware Rev Major", &self.fw_rev_major.read().get()) 
             .field("Firmware Rev Minor",&self.fw_rev_minor.read().get())
             .field("Firmware Rev Subminor",&self.fw_rev_subminor.read().get())
             .field("Command Interface Rev",&self.cmd_interface_rev.read().get())
@@ -138,7 +138,7 @@ impl fmt::Debug for InitializationSegment {
 /// The possible values of the initialization state of the device as taken from the intialization segment.
 pub enum InitializingState {
     NotAllowed = 0,
-    WaitingPermetion = 1, // Is this a typo in the PRM?
+    WaitingPermetion = 1,
     WaitingResources = 2,
     Abort = 3
 }
