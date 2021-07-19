@@ -1,7 +1,7 @@
 # The Theseus OS Book
 
 ## Introduction to Theseus
-[Introduction to Theseus OS](intro.md)
+[Introduction to Theseus OS](index.md)
 
 
 ## Design and Structure of Theseus 
@@ -25,7 +25,7 @@
 ## Experimental Support for C programs
 - [Experimental Support for C programs](c/programs.md)
     - [Building a C cross compiler for Theseus](c/cross_compiler.md)
-    - [`tlibc`: Theseus's libc and how it works](c/tlibc.md)
+    - [tlibc: Theseus's libc and how it works](c/tlibc.md)
     - [Compiling and linking C programs](c/compiler_linker.md)
 
 
@@ -39,7 +39,7 @@
 
 
 ## Running Theseus on Real Hardware
-- [Running Theseus on VMs & Real Hardware](running/running.md)
+- [Running Theseus on Virtual Machines & Real Hardware](running/running.md)
     - [Running Theseus in a Virtual Machine](running/virtual_machine/virtual_machine.md)
         - [Using PCI device Passthrough on QEMU](running/virtual_machine/pci_passthrough.md)
     - [Booting via USB drive](running/usb.md)
@@ -48,7 +48,7 @@
 
 ## How to Contribute
 - [How to Contribute](contribute/contribute.md)
-    - [`git` Guidlines](contribute/git.md)
+    - [Git Guidelines](contribute/git.md)
 
 
 -------------------

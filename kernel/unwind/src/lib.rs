@@ -34,7 +34,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(llvm_asm, naked_functions)]
+#![feature(asm, naked_functions)]
 #![feature(unwind_attributes)]
 #![feature(trait_alias)]
 
@@ -474,8 +474,9 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
         // This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.
         // This is because we rely on the value of registers to stay the same as whatever the caller set them to.
         // DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.
-        llvm_asm!("
-            # copy the stack pointer to RSI
+        asm!(
+            // copy the stack pointer to RSI
+            "
             movq %rsp, %rsi
             pushq %rbp
             pushq %rbx
@@ -483,13 +484,17 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
             pushq %r13
             pushq %r14
             pushq %r15
-            # To invoke `unwind_recorder`, we need to put: 
-            # (1) the func in RDI (it's already there, just don't overwrite it),
-            # (2) the stack in RSI,
-            # (3) a pointer to the saved registers in RDX.
+            ",
+            // To invoke `unwind_recorder`, we need to put: 
+            // (1) the func in RDI (it's already there, just don't overwrite it),
+            // (2) the stack in RSI,
+            // (3) a pointer to the saved registers in RDX.
+            "
             movq %rsp, %rdx   # pointer to saved regs (on the stack)
             call unwind_recorder
-            # restore saved registers
+            ",
+            // Finally, restore saved registers
+            "
             popq %r15
             popq %r14
             popq %r13
@@ -497,8 +502,9 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
             popq %rbx
             popq %rbp
             ret
-        ");
-        core::hint::unreachable_unchecked();
+            ",
+            options(att_syntax, noreturn)
+        );
     }
 
 
@@ -579,8 +585,8 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
     /// instead it returns (jumps to) that landing pad address.
     #[naked]
     #[inline(never)]
-    unsafe extern fn unwind_lander(_regs: *const LandingRegisters) -> !{
-        llvm_asm!("
+    unsafe extern "C" fn unwind_lander(_regs: *const LandingRegisters) -> ! {
+        asm!("
             movq %rdi, %rsp
             popq %rax
             popq %rbx
@@ -598,10 +604,10 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
             popq %r14
             popq %r15
             movq 0(%rsp), %rsp
-            # now we jump to the actual landing pad function
-            ret
-        ");
-        core::hint::unreachable_unchecked();
+            ret  # jump to the actual landing pad function
+            ",
+            options(att_syntax, noreturn)
+        );
     }
 }
 

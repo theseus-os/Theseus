@@ -1,6 +1,6 @@
 //! Support for accessing ATA drives (IDE).
 //! 
-//! The primary struct of interest is [`AtaDrive`](struct.AtaDrive.html).
+//! The primary struct of interest is [`AtaDrive`].
 
 #![no_std]
 
@@ -11,7 +11,7 @@ extern crate port_io;
 extern crate pci;
 #[macro_use] extern crate bitflags;
 extern crate storage_device;
-extern crate block_io;
+extern crate io;
 
 use core::fmt;
 use spin::Mutex;
@@ -19,7 +19,7 @@ use alloc::{boxed::Box, string::String, sync::Arc};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
-use block_io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
+use io::{BlockIo, BlockReader, BlockWriter, IoError, KnownLength};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -151,9 +151,29 @@ impl AtaDeviceType {
 /// The value is the bitmask used to select either master or slave
 /// in the ATA drive's `drive_select` port.
 #[derive(Copy, Clone, Debug)]
+#[repr(u8)]
 enum BusDriveSelect {
 	Master = 0 << 4,
 	Slave  = 1 << 4,
+}
+
+
+/// TODO: support DMA like so: <https://wiki.osdev.org/ATA/ATAPI_using_DMA#The_Bus_Master_Register>
+/// There is one instance of this struct for each `AtaBus`.
+/// 
+/// Note: TODO: depending on whether BAR4 is a Port I/O address or MMIO address, this could also be mapped into memory.
+///             We need to have an abstraction either above or beneath `Volatile` that allows reads/writes from port I/O and memory addresses similarly.
+#[allow(unused)]
+struct AtaBusMaster {
+	/// For the primary bus, this exists at BAR4 + 0.
+	/// For the secondary,   this exists at BAR4 + 8.
+	command:      Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 2.
+	/// For the secondary,   this exists at BAR4 + 10.
+	status:       Port<u8>,
+	/// For the primary bus, this exists at BAR4 + 4.
+	/// For the secondary,   this exists at BAR4 + 12.
+	prdt_address: Port<u32>,
 }
 
 
@@ -581,7 +601,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn read_pio(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.len() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();
@@ -617,7 +637,7 @@ impl AtaDrive {
 	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
 	pub fn write_pio(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
-		if offset_in_sectors > self.len() {
+		if offset_in_sectors > self.size_in_blocks() {
 			return Err("offset_in_sectors was out of bounds");
 		}
 		let length_in_bytes = buffer.len();

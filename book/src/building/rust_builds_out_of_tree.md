@@ -26,7 +26,7 @@ Therefore, the **real problem** is that there is no supported method to tell car
 ### A Bad, Unsafe Solution
 
 Technically, we could solve this by using an existing non-Rust stable ABI, like the C language ABI. 
-This would entail defining/exposing Rust functions, data, and types in a C-compatible way such that they can are comaptible with the C ABI (its expected struct memory layout and calling convention).
+This would entail defining/exposing Rust functions, data, and types in a C-compatible way such that they are compatible with the C ABI (its expected struct memory layout and calling convention).
 Unfortunately, this necessitates the usage of unsafe FFI code blocks (via C-style extern functions) to connect two separate bodies of fully-safe Rust code, which is both dumb and tedious. 
 
 In the above example, instead of simply invoking `page_allocator::allocate_pages_at()` directly, we would need to export the appropriate wrapper functions like so:
@@ -60,7 +60,7 @@ Surely we can do better!
 ## Solution: `theseus_cargo` for out-of-tree builds
 
 A superior solution is to "trick" the Rust compiler into using the prebuilt crates from an existing build of Theseus.
-To this end, we've created `theseus_cargo`, a custom build tool and wrapper around cargo that resolves an out-of-tree crate's dependencies on in-tree Theseus crates using their prebuilt objects instead of rebuiling them from source.   
+To this end, we've created `theseus_cargo`, a custom build tool and wrapper around cargo that resolves an out-of-tree crate's dependencies on in-tree Theseus crates using their prebuilt objects instead of rebuilding them from source.   
 
 This is realized in two parts:
 1. Generating the prebuilt dependencies while building Theseus's (in-tree) kernel crates,

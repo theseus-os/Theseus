@@ -96,7 +96,7 @@ There is a special Makefile [`cfg/Config.mk`](https://github.com/theseus-os/Thes
 ## Static Build-time Linking vs. Dynamic Runtime Linking
 
 Theseus offers two primary forms of linking and packaging its compiled crates into an ISO image.
-As depicted in the image below, the first (left side) is a conventional fully staticaly-linked build, as used in all other OSes,
+As depicted in the image below, the first (left side) is a conventional fully statically-linked build, as used in all other OSes,
 while the second (right side) is a novel dynamic linking approach used for Theseus research. 
 
 ![Standard Build-time Static Linking (left) vs. Theseus Dynamic Linking (right)](../images/boot_image.svg)

@@ -56,7 +56,7 @@
 extern crate alloc;
 extern crate spin;
 #[macro_use] extern crate downcast_rs;
-extern crate block_io;
+extern crate io;
 
 use alloc::{
     boxed::Box,
@@ -64,7 +64,7 @@ use alloc::{
 };
 use spin::Mutex;
 use downcast_rs::Downcast;
-use block_io::{BlockIo, KnownLength, BlockReader, BlockWriter};
+use io::{BlockIo, KnownLength, BlockReader, BlockWriter};
 
 
 /// A trait that represents a storage controller,

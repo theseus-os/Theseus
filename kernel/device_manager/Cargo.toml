@@ -6,6 +6,13 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
+derive_more = "0.99.0"
+
+[dependencies.fatfs]
+git = "https://github.com/rafalh/rust-fatfs"
+default-features = false
+features = [ "alloc", "lfn", "unicode", "log_level_warn" ]
 
 [dependencies.log]
 version = "0.4.8"
@@ -48,6 +55,9 @@ path = "../ethernet_smoltcp_device"
 
 [dependencies.ixgbe]
 path = "../ixgbe"
+
+[dependencies.io]
+path = "../io"
 
 [dependencies.mlx5]
 path = "../mlx5"

@@ -2,7 +2,7 @@
 
 ## Initial assembly code 
 The Theseus kernel takes over from the bootloader and first executes code in *32-bit protected mode*, which corresponds to the `start` function in `kernel/nano_core/src/boot/arch_x86_64/boot.asm`.
-Currently we use GRUB configured as a legacy bootloader (non-UEFI) and Theseus expects to be booted by a *multiboot2*-compliant bootloader.
+Currently we use GRUB configured as a legacy bootloader (non-UEFI) and Theseus expects to be booted by a *Multiboot2*-compliant bootloader.
 In the future, we intend to add support for booting via the UEFI standard, especially on other architectures without a legacy BIOS.
 
 After initializing a very simple page table and other miscellaneous hardware features, the assembly file `boot.asm` jumps to `long_mode_start`, which now runs *64-bit code* in long mode.

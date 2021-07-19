@@ -30,6 +30,44 @@ pub enum CommandTransportType {
     PCIe = 0x7 << 24
 }
 
+pub enum CommandQueueError {
+    /// All command entries are currently being used
+    NoCommandEntryAvailable,
+    /// Allocated pages are not passed to a command that requires them
+    MissingInputPages,
+    /// Any other input is not passed to a command that requires them
+    MissingInput,
+    /// Opcode value in the command entry is not what was expected
+    IncorrectCommandOpcode,
+    /// Trying to access the command entry before HW is done processing it
+    CommandNotCompleted,
+    /// Offset in a page is too large for mapping as a mailbox
+    InvalidMailboxOffset,
+    /// A call to create a [`MappedPages`] failed
+    PageAllocationFailed,
+    /// Initializing a comand entry for the given opcode has not been implemented
+    UnimplementedOpcode,
+    /// Some function has not been implemented for the given opcode
+    NotImplemented,
+}
+
+impl From<CommandQueueError> for &'static str {
+    fn from(error: CommandQueueError) -> Self {
+        match error {
+            CommandQueueError::NoCommandEntryAvailable => "No command entry is available",
+            CommandQueueError::MissingInputPages => "No pages were passed to the command",
+            CommandQueueError::MissingInput => "An input was not passed to a command that required it",
+            CommandQueueError::IncorrectCommandOpcode => "Incorrect command opcode",
+            CommandQueueError::CommandNotCompleted => "Command not complete yet",
+            CommandQueueError::InvalidMailboxOffset => "Invalid offset for mailbox in a page",
+            CommandQueueError::PageAllocationFailed => "Failed to allocate MappedPages",
+            CommandQueueError::UnimplementedOpcode => "Opcode is not implemented",
+            CommandQueueError::NotImplemented => "Function not implemented for the given opcode",
+        }
+    }
+}
+
+
 /// Return codes written by HW in the delivery status field of the command entry.
 /// See [`CommandQueueEntry::token_signature_status_own`].
 #[derive(Debug)]
@@ -98,13 +136,13 @@ pub enum CommandOpcode {
 }
 
 impl CommandOpcode {
-    fn input_bytes(&self, num_pages: Option<usize>) -> Result<u32, &'static str> {
+    fn input_bytes(&self, num_pages: Option<usize>) -> Result<u32, CommandQueueError> {
         let len = match self {
             Self::InitHca => 12,
             Self::EnableHca => 12,
             Self::QueryPages => 12,
             Self::ManagePages => {
-                let num_pages = num_pages.ok_or("No pages passed to the manage pages command")? as u32;
+                let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
                 0x10 + num_pages * SIZE_PADDR_IN_BYTES as u32
             }
             Self::QueryIssi => 8, 
@@ -115,13 +153,13 @@ impl CommandOpcode {
             Self::AllocPd => 8,               
             Self::AllocTransportDomain => 8,
             _ => {
-                return Err("Input length has not been set for this opcode.");
+                return Err(CommandQueueError::NotImplemented);
             }            
         };
         Ok(len)
     }
 
-    fn output_bytes(&self) -> Result<u32, &'static str> {
+    fn output_bytes(&self) -> Result<u32, CommandQueueError> {
         let len = match self {
             Self::InitHca => 8,
             Self::EnableHca => 8,
@@ -135,7 +173,7 @@ impl CommandOpcode {
             Self::AllocPd => 12,               
             Self::AllocTransportDomain => 12,
             _ => {
-                return Err("Output length has not been set for this opcode.");
+                return Err(CommandQueueError::NotImplemented);
             }            
         };
         Ok(len)
@@ -306,9 +344,9 @@ impl CommandQueue {
         opcode: CommandOpcode, 
         opmod: Option<u16>, 
         allocated_pages: Option<Vec<PhysicalAddress>>,
-    ) -> Result<usize, &'static str> 
+    ) -> Result<usize, CommandQueueError> 
     {
-        let entry_num = self.find_free_command_entry().ok_or("No command entry available")?; 
+        let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
         
         // clear the fields of the command
         let mut cmdq_entry = CommandQueueEntry::default();
@@ -357,7 +395,7 @@ impl CommandQueue {
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
             }
             CommandOpcode::ManagePages => {
-                let pages_pa = allocated_pages.ok_or("No pages were passed to the manage pages command")?;
+                let pages_pa = allocated_pages.ok_or(CommandQueueError::MissingInputPages)?;
                 cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(Some(pages_pa.len()))?); 
                 cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(
@@ -392,7 +430,7 @@ impl CommandQueue {
             },
             _=> {
                 error!("unimplemented opcode");
-                return Err("Unimplemented opcode!");
+                return Err(CommandQueueError::UnimplementedOpcode);
             }
         }        
 
@@ -420,7 +458,7 @@ impl CommandQueue {
     }
 
     /// Initialize output mailboxes for the [`CommandOpcode::QueryIssi`] command.
-    fn init_query_issi_output_mailbox_buffers(&mut self, entry_num: usize) -> Result<(), &'static str> {
+    fn init_query_issi_output_mailbox_buffers(&mut self, entry_num: usize) -> Result<(), CommandQueueError> {
         const NUM_MAILBOXES_QUERY_ISSI: usize = 1;
         self.initialize_mailboxes(entry_num, NUM_MAILBOXES_QUERY_ISSI, MailboxType::Output)?;
         Ok(())
@@ -428,7 +466,7 @@ impl CommandQueue {
 
     /// Initialize input mailboxes for the [`CommandOpcode::ManagePages`] command.
     /// We write that physical address of the pages passed to the NIC to the mailbox data field.
-    fn init_manage_pages_input_mailbox_buffers(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>) -> Result<(), &'static str> {
+    fn init_manage_pages_input_mailbox_buffers(&mut self, entry_num: usize, mut pages: Vec<PhysicalAddress>) -> Result<(), CommandQueueError> {
         
         let num_mailboxes = libm::ceilf((pages.len() * SIZE_PADDR_IN_BYTES) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         self.initialize_mailboxes(entry_num, num_mailboxes, MailboxType::Input)?;
@@ -438,7 +476,8 @@ impl CommandQueue {
 
         for block_num in 0..num_mailboxes {  
             let (mb_page, _mb_page_starting_addr) = &mut mailbox_pages[block_num];
-            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)?;
+            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)
+                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
 
             let mut data = [0; 512];
             for page in 0..paddr_per_mailbox {
@@ -466,41 +505,44 @@ impl CommandQueue {
     }
 
     /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
-    pub fn get_query_issi_command_output(&self, entry_num: usize) -> Result<(u16, u8), &'static str> {
+    pub fn get_query_issi_command_output(&self, entry_num: usize) -> Result<(u16, u8), CommandQueueError> {
         self.check_command_output_validity(entry_num, CommandOpcode::QueryIssi)?;
 
         // TODO: This offset is not correct! need to check!
         const DATA_OFFSET_IN_MAILBOX: usize = 0x20 - 0x10;
         let mailbox = &self.mailbox_buffers_output[entry_num][0].0;
-        let supported_issi = (mailbox.as_type::<u32>(DATA_OFFSET_IN_MAILBOX)?).to_le();
+        let supported_issi = (
+            mailbox.as_type::<u32>(DATA_OFFSET_IN_MAILBOX)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
+        ).to_le();
 
         let (_status, _syndrome, current_issi , _command1) = self.entries[entry_num].get_output_inline_data();
         Ok((current_issi as u16, supported_issi as u8))
     }
 
     /// Get the number of pages requested by the NIC, which is the output of the [`CommandOpcode::QueryPages`] command.  
-    pub fn get_query_pages_command_output(&self, entry_num: usize) -> Result<u32, &'static str> {
+    pub fn get_query_pages_command_output(&self, entry_num: usize) -> Result<u32, CommandQueueError> {
         self.check_command_output_validity(entry_num, CommandOpcode::QueryPages)?;
         let (_status, _syndrome, _function_id, num_pages) = self.entries[entry_num].get_output_inline_data();
         Ok(num_pages)
     }
 
     /// Get the User Access Region (UAR) number, which is the output of the [`CommandOpcode::AllocUar`] command.  
-    pub fn get_uar(&self, entry_num: usize) -> Result<u32, &'static str> {
+    pub fn get_uar(&self, entry_num: usize) -> Result<u32, CommandQueueError> {
         self.check_command_output_validity(entry_num, CommandOpcode::AllocUar)?;
         let (_status, _syndrome, uar, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(uar & 0xFF_FFFF)
     }
 
     /// Get the protection domain number, which is the output of the [`CommandOpcode::AllocPd`] command.  
-    pub fn get_protection_domain(&self, entry_num: usize) -> Result<u32, &'static str> {
+    pub fn get_protection_domain(&self, entry_num: usize) -> Result<u32, CommandQueueError> {
         self.check_command_output_validity(entry_num, CommandOpcode::AllocPd)?;
         let (_status, _syndrome, pd, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(pd & 0xFF_FFFF)
     }
 
     /// Get the transport domain number, which is the output of the [`CommandOpcode::AllocTransportDomain`] command.  
-    pub fn get_transport_domain(&self, entry_num: usize) -> Result<u32, &'static str> {
+    pub fn get_transport_domain(&self, entry_num: usize) -> Result<u32, CommandQueueError> {
         self.check_command_output_validity(entry_num, CommandOpcode::AllocTransportDomain)?;
         let (_status, _syndrome, td, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(td & 0xFF_FFFF)
@@ -508,21 +550,21 @@ impl CommandQueue {
 
     /// Get the value of the reserved Lkey for Base Memory Management Extension, which is used when we are using physical addresses.
     /// It is taken as the output of the [`CommandOpcode::QuerySpecialContexts`] command.
-    pub fn get_reserved_lkey(&self, entry_num: usize) -> Result<u32, &'static str> {
+    pub fn get_reserved_lkey(&self, entry_num: usize) -> Result<u32, CommandQueueError> {
         self.check_command_output_validity(entry_num, CommandOpcode::QuerySpecialContexts)?;
         let (_status, _syndrome, _dump_fill_mkey, resd_lkey) = self.entries[entry_num].get_output_inline_data();
         Ok(resd_lkey)
     }
 
     /// When retrieving the output data of a command, checks that the correct opcode is written and that the command has completed.
-    fn check_command_output_validity(&self, entry_num: usize, cmd_opcode: CommandOpcode) -> Result<(), &'static str> {
+    fn check_command_output_validity(&self, entry_num: usize, cmd_opcode: CommandOpcode) -> Result<(), CommandQueueError> {
         if self.entries[entry_num].owned_by_hw() {
             error!("the command hasn't completed yet!");
-            return Err("the command hasn't completed yet!");
+            return Err(CommandQueueError::CommandNotCompleted);
         }
         if self.entries[entry_num].get_command_opcode() != cmd_opcode {
             error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode());
-            return Err("Incorrect Command!");
+            return Err(CommandQueueError::IncorrectCommandOpcode);
         }
         Ok(())
     }
@@ -543,7 +585,7 @@ impl CommandQueue {
     }
 
     /// Clears fields of all mailboxes, then sets the token, block number and next address fields for all mailboxes.
-    fn initialize_mailboxes(&mut self, entry_num: usize, num_mailboxes: usize, mailbox_type: MailboxType) -> Result<(), &'static str> {
+    fn initialize_mailboxes(&mut self, entry_num: usize, num_mailboxes: usize, mailbox_type: MailboxType) -> Result<(), CommandQueueError> {
         let mailbox_pages = if mailbox_type == MailboxType::Input{
             &mut self.mailbox_buffers_input[entry_num]
         } else {
@@ -557,7 +599,10 @@ impl CommandQueue {
             trace!("Adding {} mailbox pages", num_mailbox_pages_required);
             
             for _ in 0..num_mailbox_pages_required {
-                mailbox_pages.push(create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?);
+                mailbox_pages.push(
+                    create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)
+                    .map_err(|_e| CommandQueueError::PageAllocationFailed)?
+                );
             }
         }
 
@@ -572,7 +617,8 @@ impl CommandQueue {
             let (mb_page, _mb_page_starting_addr) = &mut mailbox_pages[block_num];
             trace!("Initializing mb: {}", block_num);
 
-            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)?;
+            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)
+                            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
             mailbox.clear_all_fields();
             mailbox.block_number.write(U32::new(block_num as u32));
             mailbox.token_ctrl_signature.write(U32::new((self.token as u32) << 16));
@@ -588,7 +634,7 @@ impl CommandQueue {
 /// The fields include control information for the command as well as actual command input and output.
 /// The first 16 bytes of the actual command input are part of the entry. The remaining data is written in mailboxes.
 /// Similarly, the first 16 bytes of the command output are part of the entry and remaining data is written in mailboxes.
-#[derive(FromBytes, Default)]
+#[derive(FromBytes,Default)]
 #[repr(C)]
 pub struct CommandQueueEntry {
     /// Type of transport that carries the command
