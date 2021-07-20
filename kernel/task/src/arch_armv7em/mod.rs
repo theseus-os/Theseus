@@ -125,6 +125,9 @@ pub struct Task {
     drop_after_task_switch: Option<Box<dyn Any + Send>>,
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
+    /// Whether or not this task is pinned to a certain core.
+    /// The idle tasks (like idle_task) are always pinned to their respective cores.
+    pub pinned_core: Option<u8>,
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
@@ -140,8 +143,8 @@ pub struct Task {
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}}}", 
-               self.name, self.id, self.running_on_cpu, self.runstate)
+        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}}}", 
+               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core)
     }
 }
 
@@ -206,6 +209,7 @@ impl Task {
             drop_after_task_switch: None,
             name: format!("task_{}", task_id),
             kstack,
+            pinned_core: None,
             is_an_idle_task: false,
             app_crate,
             namespace,

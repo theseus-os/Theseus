@@ -1,9 +1,9 @@
 #![no_std]
 
+#[macro_use] extern crate cfg_if;
 extern crate alloc;
 // #[macro_use] extern crate log;
 extern crate irq_safety;
-extern crate apic;
 extern crate task;
 extern crate runqueue;
 #[cfg(priority_scheduler)] extern crate scheduler_priority;
@@ -12,10 +12,18 @@ extern crate runqueue;
 
 use core::ops::Deref;
 use irq_safety::hold_interrupts;
-use apic::get_my_apic_id;
 use task::{Task, get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
 #[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
+
+cfg_if!{
+    if #[cfg(target_arch="x86_64")] {
+        extern crate apic;
+        use apic::get_my_apic_id;
+    } else if #[cfg(target_arch="arm")] {
+        fn get_my_apic_id() -> u8 { 0 }
+    }
+}
 
 /// Yields the current CPU by selecting a new `Task` to run 
 /// and then performs a task switch to that new `Task`.
