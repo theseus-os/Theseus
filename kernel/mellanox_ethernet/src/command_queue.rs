@@ -30,6 +30,7 @@ pub enum CommandTransportType {
     PCIe = 0x7 << 24
 }
 
+/// Possible reasons for failure when executing a command
 pub enum CommandQueueError {
     /// All command entries are currently being used
     NoCommandEntryAvailable,
@@ -41,7 +42,7 @@ pub enum CommandQueueError {
     IncorrectCommandOpcode,
     /// Trying to access the command entry before HW is done processing it
     CommandNotCompleted,
-    /// Offset in a page is too large for mapping as a mailbox
+    /// Offset in a page is too large to map a [`CommandInterfaceMailbox`] to that offset
     InvalidMailboxOffset,
     /// A call to create a [`MappedPages`] failed
     PageAllocationFailed,

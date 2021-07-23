@@ -4,8 +4,8 @@
 //! The Mellanox ethernet card is referred to as both the NIC (Network Interface Card) and the HCA (Host Channel Adapter).
 //!
 //! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54], unless otherwise specified.
-//! While this version of the manual was acquired by directly contacting Nvidia through their support site (`<https://support.mellanox.com/s/>`),
-//! an older version of the manual can be found at `<http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf>`.
+//! While this version of the manual was acquired by directly contacting Nvidia through their support site (<https://support.mellanox.com/s/>),
+//! an older version of the manual can be found at <http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf>.
 
  #![no_std]
  #![feature(slice_pattern)]
