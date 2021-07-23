@@ -446,7 +446,6 @@ impl CommandQueue {
     pub fn get_query_issi_command_output(&self, entry_num: usize) -> Result<(u16, u8), CommandQueueError> {
         self.check_command_output_validity(entry_num, CommandOpcode::QueryIssi)?;
 
-        // TODO: This offset is not correct! need to check!
         const DATA_OFFSET_IN_MAILBOX: usize = 0x20 - 0x10;
         let mailbox = &self.mailbox_buffers_output[entry_num][0].0;
         let supported_issi = (
