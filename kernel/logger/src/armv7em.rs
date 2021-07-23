@@ -1,8 +1,7 @@
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use cortex_m_semihosting::hprintln;
-#[cfg(target = "thumbv7em-none-eabi")]
+#[cfg(target_vendor = "stm32f407")]
 use uart::{SerialPort};
-use core::fmt::{Write};
 
 /// The static logger instance, an empty struct that implements the `Log` trait.
 static LOGGER: Logger = Logger { };
@@ -34,13 +33,21 @@ impl Log for Logger {
         let file_loc = record.file().unwrap_or("??");
         let line_loc = record.line().unwrap_or(0);
         cfg_if!{
-            if #[cfg(target = "thumbv7em-none-eabi")] {
+            if #[cfg(target_vendor = "stm32f407")] {
                 let mut serial = SerialPort::get_uart();
                 let _result = uprintln!(serial, "{}{}:{}: {}",
                     level_str,
                     file_loc,
                     line_loc,
                     record.args(),
+                );
+            }
+            else {
+                let _result = hprintln!("{}{}:{}: {}",
+                    level_str,
+                    file_loc,
+                    line_loc,
+                    record.args()    
                 );
             }
         }

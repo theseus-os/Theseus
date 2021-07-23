@@ -1,0 +1,4 @@
+[target.stm32f4-discovery.cortex-m]
+rustc-link-lib = ["cortex-m"]
+rustc-link-search = ["../bin"]
+rustc-cfg = ['cortex_m', 'armv7m', 'armv7em']
