@@ -14,6 +14,10 @@ owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 byteorder = { version = "1.4.3", default-features = false }
 libm = "0.2.1"
 
+[dependencies.num_enum]
+version = "0.5.2"
+default-features = false
+
 [dependencies.memory]
 path = "../memory"
 

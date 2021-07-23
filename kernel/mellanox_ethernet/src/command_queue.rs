@@ -10,6 +10,8 @@ use owning_ref:: BoxRefMut;
 use nic_initialization::NIC_MAPPING_FLAGS;
 use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
+use num_enum::TryFromPrimitive;
+use core::convert::TryFrom;
 
 /// Size of mailboxes, including both control fields and data.
 #[allow(dead_code)]
@@ -40,6 +42,10 @@ pub enum CommandQueueError {
     MissingInput,
     /// Opcode value in the command entry is not what was expected
     IncorrectCommandOpcode,
+    /// Delivery status value in the command entry is not what was expected
+    InvalidCommandDeliveryStatus,
+    /// Return status value in the command entry is not what was expected
+    InvalidCommandReturnStatus,
     /// Trying to access the command entry before HW is done processing it
     CommandNotCompleted,
     /// Offset in a page is too large to map a [`CommandInterfaceMailbox`] to that offset
@@ -59,6 +65,8 @@ impl From<CommandQueueError> for &'static str {
             CommandQueueError::MissingInputPages => "No pages were passed to the command",
             CommandQueueError::MissingInput => "An input was not passed to a command that required it",
             CommandQueueError::IncorrectCommandOpcode => "Incorrect command opcode",
+            CommandQueueError::InvalidCommandDeliveryStatus => "Invalid command delivery status",
+            CommandQueueError::InvalidCommandReturnStatus => "Invalid command return status",
             CommandQueueError::CommandNotCompleted => "Command not complete yet",
             CommandQueueError::InvalidMailboxOffset => "Invalid offset for mailbox in a page",
             CommandQueueError::PageAllocationFailed => "Failed to allocate MappedPages",
@@ -71,7 +79,8 @@ impl From<CommandQueueError> for &'static str {
 
 /// Return codes written by HW in the delivery status field of the command entry.
 /// See [`CommandQueueEntry::token_signature_status_own`].
-#[derive(Debug)]
+#[derive(Debug, TryFromPrimitive)]
+#[repr(u32)]
 pub enum CommandDeliveryStatus {
     Success             = 0x0,
     SignatureErr        = 0x1,
@@ -87,28 +96,29 @@ pub enum CommandDeliveryStatus {
     Unknown,
 }
 
-impl From<u32> for CommandDeliveryStatus {
-    fn from(status: u32) -> Self {
-        match status {
-            0 => Self::Success,
-            1 => Self::SignatureErr,
-            2 => Self::TokenErr,
-            3 => Self::BadBlockNumber,
-            4 => Self::BadOutputPointer,
-            5 => Self::BadInputPointer,
-            6 => Self::InternalErr,
-            7 => Self::InputLenErr,
-            8 => Self::OutputLenErr,
-            9 => Self::ReservedNotZero,
-            10 => Self::BadCommandType,
-            _ => Self::Unknown
-        }
-    }
-}
+// impl From<u32> for CommandDeliveryStatus {
+//     fn from(status: u32) -> Self {
+//         match status {
+//             0 => Self::Success,
+//             1 => Self::SignatureErr,
+//             2 => Self::TokenErr,
+//             3 => Self::BadBlockNumber,
+//             4 => Self::BadOutputPointer,
+//             5 => Self::BadInputPointer,
+//             6 => Self::InternalErr,
+//             7 => Self::InputLenErr,
+//             8 => Self::OutputLenErr,
+//             9 => Self::ReservedNotZero,
+//             10 => Self::BadCommandType,
+//             _ => Self::Unknown
+//         }
+//     }
+// }
 
 /// Command opcode written by SW in opcode field of the input data in the command entry.
 /// See [`CommandQueueEntry::command_input_opcode`].
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, TryFromPrimitive)]
+#[repr(u32)]
 pub enum CommandOpcode {
     QueryHcaCap             = 0x100,
     QueryAdapter            = 0x101,
@@ -181,40 +191,41 @@ impl CommandOpcode {
     }
 }
 
-impl From<u32> for CommandOpcode {
-    fn from(opcode: u32) -> Self {
-        match opcode {
-            0x100   => Self::QueryHcaCap,
-            0x101   => Self::QueryAdapter, 
-            0x102   => Self::InitHca, 
-            0x103   => Self::TeardownHca, 
-            0x104   => Self::EnableHca, 
-            0x105   => Self::DisableHca, 
-            0x107   => Self::QueryPages, 
-            0x108   => Self::ManagePages, 
-            0x10A   => Self::QueryIssi, 
-            0x10B   => Self::SetIssi,
-            0x203   => Self::QuerySpecialContexts, 
-            0x301   => Self::CreateEq, 
-            0x400   => Self::CreateCq, 
-            0x751   => Self::QueryVportState, 
-            0x754   => Self::QueryNicVportContext, 
-            0x800   => Self::AllocPd, 
-            0x802   => Self::AllocUar, 
-            0x816   => Self::AllocTransportDomain, 
-            0x904   => Self::CreateSq, 
-            0x905   => Self::ModifySq, 
-            0x908   => Self::CreateRq, 
-            0x909   => Self::ModifyRq, 
-            0x912   => Self::CreateTis, 
-            _       => Self::Unknown
-        }
-    }
-}
+// impl From<u32> for CommandOpcode {
+//     fn from(opcode: u32) -> Self {
+//         match opcode {
+//             0x100   => Self::QueryHcaCap,
+//             0x101   => Self::QueryAdapter, 
+//             0x102   => Self::InitHca, 
+//             0x103   => Self::TeardownHca, 
+//             0x104   => Self::EnableHca, 
+//             0x105   => Self::DisableHca, 
+//             0x107   => Self::QueryPages, 
+//             0x108   => Self::ManagePages, 
+//             0x10A   => Self::QueryIssi, 
+//             0x10B   => Self::SetIssi,
+//             0x203   => Self::QuerySpecialContexts, 
+//             0x301   => Self::CreateEq, 
+//             0x400   => Self::CreateCq, 
+//             0x751   => Self::QueryVportState, 
+//             0x754   => Self::QueryNicVportContext, 
+//             0x800   => Self::AllocPd, 
+//             0x802   => Self::AllocUar, 
+//             0x816   => Self::AllocTransportDomain, 
+//             0x904   => Self::CreateSq, 
+//             0x905   => Self::ModifySq, 
+//             0x908   => Self::CreateRq, 
+//             0x909   => Self::ModifyRq, 
+//             0x912   => Self::CreateTis, 
+//             _       => Self::Unknown
+//         }
+//     }
+// }
 
 /// Command status written by HW in status field of the output data in the command entry.
 /// See [`CommandQueueEntry::command_output_status`].
-#[derive(Debug)]
+#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
 pub enum CommandReturnStatus {
     OK                  = 0x00,
     InternalError       = 0x01,
@@ -235,29 +246,30 @@ pub enum CommandReturnStatus {
     Unknown
 }
 
-impl From<u8> for CommandReturnStatus {
-    fn from(status: u8) -> Self {
-        match status{
-            0x0 => Self::OK,
-            0x1 => Self::InternalError,
-            0x2 => Self::BadOp,
-            0x3 => Self::BadParam,
-            0x4 => Self::BadSysState,
-            0x5 => Self::BadResource,
-            0x6 => Self::ResourceBusy,
-            0x8 => Self::ExceedLim,
-            0x9 => Self::BadResState,
-            0xA => Self::BadIndex,
-            0xF => Self::NoResources,
-            0x50 => Self::BadInputLen,
-            0x51 => Self::BadOutputLen,
-            0x10 => Self::BadResourceState,
-            0x30 => Self::BadPkt,
-            0x40 => Self::BadSize,
-            _ => Self::Unknown
-        }
-    }
-}
+// impl From<u8> for CommandReturnStatus {
+//     fn from(status: u8) -> Self {
+//         match status{
+//             0x0 => Self::OK,
+//             0x1 => Self::InternalError,
+//             0x2 => Self::BadOp,
+//             0x3 => Self::BadParam,
+//             0x4 => Self::BadSysState,
+//             0x5 => Self::BadResource,
+//             0x6 => Self::ResourceBusy,
+//             0x8 => Self::ExceedLim,
+//             0x9 => Self::BadResState,
+//             0xA => Self::BadIndex,
+//             0xF => Self::NoResources,
+//             0x50 => Self::BadInputLen,
+//             0x51 => Self::BadOutputLen,
+//             0x10 => Self::BadResourceState,
+//             0x30 => Self::BadPkt,
+//             0x40 => Self::BadSize,
+//             _ => Self::Unknown
+//         }
+//     }
+// }
+
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::ManagePages`].
 pub enum ManagePagesOpMod {
     AllocationFail      = 0,
@@ -499,10 +511,10 @@ impl CommandQueue {
     }
 
     /// Waits for ownership bit to be cleared, and then returns the command delivery status and the command return status.
-    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> (CommandDeliveryStatus, CommandReturnStatus) {
+    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> Result<(CommandDeliveryStatus, CommandReturnStatus), CommandQueueError> {
         while self.entries[entry_num].owned_by_hw() {}
         self.available_entries[entry_num] = true;
-        (self.entries[entry_num].get_delivery_status(), self.entries[entry_num].get_return_status())
+        Ok((self.entries[entry_num].get_delivery_status()?, self.entries[entry_num].get_return_status()?))
     }
 
     /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
@@ -563,8 +575,8 @@ impl CommandQueue {
             error!("the command hasn't completed yet!");
             return Err(CommandQueueError::CommandNotCompleted);
         }
-        if self.entries[entry_num].get_command_opcode() != cmd_opcode {
-            error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode());
+        if self.entries[entry_num].get_command_opcode()? != cmd_opcode {
+            error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode()?);
             return Err(CommandQueueError::IncorrectCommandOpcode);
         }
         Ok(())
@@ -728,8 +740,8 @@ impl CommandQueueEntry {
     }
 
     /// Returns the value written to the input opcode field of the command
-    fn get_command_opcode(&self) -> CommandOpcode {
-        (self.command_input_opcode.read().get() >> 16).into()
+    fn get_command_opcode(&self) -> Result<CommandOpcode, CommandQueueError> {
+        CommandOpcode::try_from(self.command_input_opcode.read().get() >> 16).map_err(|_e| CommandQueueError::IncorrectCommandOpcode)
     }
 
     /// Returns the first 16 bytes of output data that are written inline in the command.
@@ -758,8 +770,9 @@ impl CommandQueueEntry {
 
     /// Returns the status of command delivery.
     /// This only informs us if the command was delivered to the NIC successfully, not if it was completed successfully.
-    pub fn get_delivery_status(&self) -> CommandDeliveryStatus {
-        (self.token_signature_status_own.read().get() & 0xFE).into()
+    pub fn get_delivery_status(&self) -> Result<CommandDeliveryStatus, CommandQueueError> {
+        CommandDeliveryStatus::try_from(self.token_signature_status_own.read().get() & 0xFE)
+            .map_err(|_e| CommandQueueError::InvalidCommandDeliveryStatus)
     }
 
     /// Sets the ownership bit so that HW can take control of the command entry
@@ -774,9 +787,9 @@ impl CommandQueueEntry {
     }
 
     /// Returns the status of command execution.
-    pub fn get_return_status(&self) -> CommandReturnStatus {
+    pub fn get_return_status(&self) -> Result<CommandReturnStatus, CommandQueueError> {
         let (status, _syndrome, _, _) = self.get_output_inline_data();
-        status.into()
+        CommandReturnStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandReturnStatus)
     }
 }
 

@@ -23,6 +23,7 @@ extern crate byteorder;
 extern crate nic_initialization;
 extern crate kernel_config;
 extern crate libm;
+extern crate num_enum;
 
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
