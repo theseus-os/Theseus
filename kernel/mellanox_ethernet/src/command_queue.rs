@@ -117,7 +117,7 @@ pub enum CommandDeliveryStatus {
 
 /// Command opcode written by SW in opcode field of the input data in the command entry.
 /// See [`CommandQueueEntry::command_input_opcode`].
-#[derive(PartialEq, Debug, TryFromPrimitive)]
+#[derive(PartialEq, Debug, TryFromPrimitive, Copy, Clone)]
 #[repr(u32)]
 pub enum CommandOpcode {
     QueryHcaCap             = 0x100,
@@ -387,7 +387,7 @@ impl CommandQueue {
                 self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Output);
             }
             CommandOpcode::SetIssi => {
-                warn!("setting to 1 by default, could be wrong");
+                // setting to 1 by default
                 cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
                 cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, Some(1), None);
@@ -445,8 +445,8 @@ impl CommandQueue {
                 error!("unimplemented opcode");
                 return Err(CommandQueueError::UnimplementedOpcode);
             }
-        }        
-
+        }    
+        
         // write command to actual place in memory
         core::mem::swap(&mut cmdq_entry, &mut self.entries[entry_num]);
         
@@ -461,13 +461,16 @@ impl CommandQueue {
 
     /// Sets the mailbox pointer in a command entry with the physical address of the first mailbox.
     fn set_mailbox_pointer_in_cmd_entry(&mut self, cmdq_entry: &mut CommandQueueEntry, entry_num: usize, mailbox_type: MailboxType) {
-        let mailbox_ptr = if mailbox_type == MailboxType::Input {
-            self.mailbox_buffers_input[entry_num][0].1.value()
+        if mailbox_type == MailboxType::Input {
+            let mailbox_ptr = self.mailbox_buffers_input[entry_num][0].1.value();
+            cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+            cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
         } else {
-            self.mailbox_buffers_output[entry_num][0].1.value()
+            let mailbox_ptr = self.mailbox_buffers_output[entry_num][0].1.value();
+            cmdq_entry.output_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
+            cmdq_entry.output_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
         };
-        cmdq_entry.input_mailbox_pointer_h.write(U32::new((mailbox_ptr >> 32) as u32));
-        cmdq_entry.input_mailbox_pointer_l.write(U32::new((mailbox_ptr & 0xFFFF_FFFF) as u32));
+
     }
 
     /// Initialize output mailboxes for the [`CommandOpcode::QueryIssi`] command.
@@ -499,7 +502,7 @@ impl CommandQueue {
                         Self::write_paddr_in_mailbox_data(page * SIZE_PADDR_IN_BYTES, paddr, &mut data);
                     },
                     None => { 
-                        trace!("breaking out of loop on mailbox: {} and paddr: {}", block_num, page);
+                        // trace!("breaking out of loop on mailbox: {} and paddr: {}", block_num, page);
                         break; 
                     }
                 }
@@ -511,10 +514,10 @@ impl CommandQueue {
     }
 
     /// Waits for ownership bit to be cleared, and then returns the command delivery status and the command return status.
-    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> Result<(CommandDeliveryStatus, CommandReturnStatus), CommandQueueError> {
+    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> (CommandDeliveryStatus, CommandReturnStatus) {
         while self.entries[entry_num].owned_by_hw() {}
         self.available_entries[entry_num] = true;
-        Ok((self.entries[entry_num].get_delivery_status()?, self.entries[entry_num].get_return_status()?))
+        (self.entries[entry_num].get_delivery_status(), self.entries[entry_num].get_return_status())
     }
 
     /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
@@ -575,8 +578,8 @@ impl CommandQueue {
             error!("the command hasn't completed yet!");
             return Err(CommandQueueError::CommandNotCompleted);
         }
-        if self.entries[entry_num].get_command_opcode()? != cmd_opcode {
-            error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode()?);
+        if self.entries[entry_num].get_command_opcode() != cmd_opcode {
+            error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode());
             return Err(CommandQueueError::IncorrectCommandOpcode);
         }
         Ok(())
@@ -628,7 +631,7 @@ impl CommandQueue {
             };
 
             let (mb_page, _mb_page_starting_addr) = &mut mailbox_pages[block_num];
-            trace!("Initializing mb: {}", block_num);
+            // trace!("Initializing mb: {}", block_num);
 
             let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)
                             .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
@@ -740,10 +743,9 @@ impl CommandQueueEntry {
     }
 
     /// Returns the value written to the input opcode field of the command
-    fn get_command_opcode(&self) -> Result<CommandOpcode, CommandQueueError> {
+    fn get_command_opcode(&self) -> CommandOpcode {
         let opcode = self.command_input_opcode.read().get() >> 16;
-        debug!("command opcode: {:#X}", opcode);
-        CommandOpcode::try_from(opcode).map_err(|_e| CommandQueueError::IncorrectCommandOpcode)
+        CommandOpcode::try_from(opcode).unwrap_or(CommandOpcode::Unknown)
     }
 
     /// Returns the first 16 bytes of output data that are written inline in the command.
@@ -772,11 +774,9 @@ impl CommandQueueEntry {
 
     /// Returns the status of command delivery.
     /// This only informs us if the command was delivered to the NIC successfully, not if it was completed successfully.
-    pub fn get_delivery_status(&self) -> Result<CommandDeliveryStatus, CommandQueueError> {
-        let status = self.token_signature_status_own.read().get() & 0xFE;
-        debug!("delivery status: {:#X}", status);
-        CommandDeliveryStatus::try_from(status)
-            .map_err(|_e| CommandQueueError::InvalidCommandDeliveryStatus)
+    pub fn get_delivery_status(&self) -> CommandDeliveryStatus {
+        let status = (self.token_signature_status_own.read().get() & 0xFE) >> 1;
+        CommandDeliveryStatus::try_from(status).unwrap_or(CommandDeliveryStatus::Unknown)
     }
 
     /// Sets the ownership bit so that HW can take control of the command entry
@@ -791,10 +791,9 @@ impl CommandQueueEntry {
     }
 
     /// Returns the status of command execution.
-    pub fn get_return_status(&self) -> Result<CommandReturnStatus, CommandQueueError> {
+    pub fn get_return_status(&self) -> CommandReturnStatus {
         let (status, _syndrome, _, _) = self.get_output_inline_data();
-        debug!("return status: {:#X}", status);
-        CommandReturnStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandReturnStatus)
+        CommandReturnStatus::try_from(status).unwrap_or(CommandReturnStatus::Unknown)
     }
 }
 

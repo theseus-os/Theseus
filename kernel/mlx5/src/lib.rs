@@ -123,26 +123,26 @@ impl ConnectX5Nic {
         // Execute ENABLE_HCA command
         let cmdq_entry = cmdq.create_command(CommandOpcode::EnableHca, None, None)?;
         init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("EnableHCA: {:?}", status);
 
         // execute QUERY_ISSI
         let cmdq_entry = cmdq.create_command(CommandOpcode::QueryIssi, None, None)?;
         init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
         let (current_issi, available_issi) = cmdq.get_query_issi_command_output(cmdq_entry)?;
         trace!("QueryISSI: {:?}, issi version :{}, available: {:#X}", status, current_issi, available_issi);
 
         // execute SET_ISSI
         let cmdq_entry = cmdq.create_command(CommandOpcode::SetIssi, None, None)?;
         init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("SetISSI: {:?}", status);
 
         // Query pages for boot
         let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpMod::BootPages as u16), None)?;
         init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
         let num_boot_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
         trace!("Query pages status: {:?}, Boot pages: {:?}", status, num_boot_pages);
 
@@ -162,13 +162,13 @@ impl ConnectX5Nic {
             Some(boot_pa)
         )?;
         init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("Manage pages boot status: {:?}", status);
 
         // Query pages for init
         let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpMod::InitPages as u16), None)?;
         init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
         let num_init_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
         trace!("Query pages status: {:?}, init pages: {:?}", status, num_init_pages);
 
@@ -189,14 +189,14 @@ impl ConnectX5Nic {
                 Some(init_pa)
             )?;
             init_segment.post_command(cmdq_entry);
-            let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+            let status = cmdq.wait_for_command_completion(cmdq_entry);
             trace!("Manage pages init status: {:?}", status);
         }
 
         // execute INIT_HCA
         let cmdq_entry = cmdq.create_command(CommandOpcode::InitHca, None, None)?;
         init_segment.post_command(cmdq_entry);
-        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let status = cmdq.wait_for_command_completion(cmdq_entry);
         trace!("Init HCA status: {:?}", status);
 
         let mlx5_nic = ConnectX5Nic {
