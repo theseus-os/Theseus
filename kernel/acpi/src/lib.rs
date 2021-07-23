@@ -107,8 +107,11 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
     // If we have a DMAR table, use it to obtain IOMMU info. 
     {
         let acpi_tables = ACPI_TABLES.lock();
-        if let Some(dmar_table) = dmar::DmarReporting::get(&acpi_tables) {
+        if let Some(dmar_table) = dmar::Dmar::get(&acpi_tables) {
             debug!("TODO: do something with DMAR table: {:X?}", dmar_table);
+            for table in dmar_table.iter() {
+                trace!("{:X?}", table);
+            }
         } else {
             info!("This machine has no DMAR ACPI table (used for IOMMU).");
         }

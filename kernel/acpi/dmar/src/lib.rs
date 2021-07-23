@@ -50,6 +50,7 @@ struct DmarReporting {
 /// which contains details about IOMMU configuration.
 /// 
 /// You most likely only care about the [`Dmar::iter()`] method.
+#[derive(Debug)]
 pub struct Dmar<'t> {
     /// The fixed-size part of the actual DMAR ACPI table.
     table: &'t DmarReporting,
@@ -65,7 +66,7 @@ pub struct Dmar<'t> {
 
 impl<'t> Dmar<'t> {
     /// Finds the DMAR in the given `AcpiTables` and returns a reference to it.
-    pub fn get(acpi_tables: &'t AcpiTables) -> Option<Dmar<'t> {
+    pub fn get(acpi_tables: &'t AcpiTables) -> Option<Dmar<'t>> {
         let table: &DmarReporting = acpi_tables.table(&DMAR_SIGNATURE).ok()?;
         let total_length = table.header.length as usize;
         let dynamic_part_length = total_length - size_of::<DmarReporting>();
@@ -94,7 +95,7 @@ impl<'t> Dmar<'t> {
     }
 
     /// Returns the `flags` value in this DMAR table.
-    pub fn flags(&self) -> u32 {
+    pub fn flags(&self) -> u8 {
         self.table.flags
     }
 
@@ -103,9 +104,8 @@ impl<'t> Dmar<'t> {
     pub fn host_address_width(&self) -> u8 {
         // The Host Address Width (HAW) of this machine is computed as (N+1),
         // where N is the value reported in the `host_address_width` field.
-        self.host_address_width + 1
+        self.table.host_address_width + 1
     }
-}
 }
 
 
@@ -130,42 +130,16 @@ impl<'t> Iterator for DmarIter<'t> {
     fn next(&mut self) -> Option<Self::Item> {
         if (self.offset + size_of::<DmarEntryRecord>()) < self.end_of_entries {
             // First, we get the next entry record to get the type and size of the actual entry.
-            let (entry_type, entry_size) = { 
-                let entry_record: &EntryRecord = self.mapped_pages.as_type(self.offset).ok()?;
-                (entry_record.typ, entry_record.size as usize)
-            };
-            // Second, use that entry type and size to return the specific DMAR entry struct.
-            if (self.offset + entry_size) <= self.end_of_entries {
-                let entry: Option<DMAREntry> = match entry_type {
-                    ENTRY_TYPE_LOCAL_APIC if entry_size == size_of::<DMARLocalApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| DMAREntry::LocalApic(ent))
-                    },
-                    ENTRY_TYPE_IO_APIC if entry_size == size_of::<DMARIoApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| DMAREntry::IoApic(ent))
-                    },
-                    ENTRY_TYPE_INT_SRC_OVERRIDE if entry_size == size_of::<DMARIntSrcOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| DMAREntry::IntSrcOverride(ent))
-                    },
-                    ENTRY_TYPE_NON_MASKABLE_INTERRUPT if entry_size == size_of::<DMARNonMaskableInterrupt>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| DMAREntry::NonMaskableInterrupt(ent))
-                    },
-                    ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE if entry_size == size_of::<DMARLocalApicAddressOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| DMAREntry::LocalApicAddressOverride(ent))
-                    },
-                    _ => None,
-                };
+            let entry: &DmarEntryRecord = self.mapped_pages.as_type(self.offset).ok()?;
+            // Second, use that entry record to return the specific DMAR entry struct.
+            if (self.offset + entry.length as usize) <= self.end_of_entries {
+                let table = DmarEntry::from_entry(self.mapped_pages, self.offset, entry);
                 // move the offset to the end of this entry, i.e., the beginning of the next entry record
-                self.offset += entry_size;
-                // return the DMAR entry if properly formed, or if not, return an unknown/corrupt entry.
-                entry.or(Some(DMAREntry::UnknownOrCorrupt(entry_type)))
-            }
-            else {
-                None
+                self.offset += entry.length as usize;
+                return table.ok();
             }
         }
-        else {
-            None
-        }
+        None
     }
 }
 
@@ -182,35 +156,8 @@ pub struct DmarEntryRecord {
     length: u16,
 }
 
-/// The possible types of entries in the [`DmarReporting`] table.
-#[derive(Clone, Copy, Debug)]
-#[repr(u16)]
-enum DmarEntryTypes {
-    Drhd = 0,
-    Rmrr = 1,
-    Atsr = 2,
-    Rhsa = 3, 
-    Andd = 4,
-    Satc = 5,
-    /// Any entry type larger than 5 is reserved for future use.
-    Unknown,
-}
-impl From<u16> for DmarEntryTypes {
-    fn from(v: u16) -> Self {
-        match v {
-            0 => Self::Drhd,
-            1 => Self::Rmrr,
-            2 => Self::Atsr,
-            3 => Self::Rhsa,
-            4 => Self::Andd,
-            5 => Self::Satc,
-            _ => Self::Unknown,
-        }
-    }
-}
 
-
-/// The set of possible DMAR entries.
+/// The set of possible sub-tables that can exist in the top-level DMAR table.
 #[derive(Copy, Clone, Debug)]
 pub enum DmarEntry<'t> {
     Drhd(&'t DmarDrhd),
@@ -228,7 +175,7 @@ impl<'t> DmarEntry<'t> {
     fn from_entry(
         mp: &'t MappedPages,
         mp_offset: usize,
-        entry: DmarEntryRecord,
+        entry: &DmarEntryRecord,
     ) -> Result<DmarEntry<'t>, &'static str> {
         match entry.typ {
             0 => mp.as_type(mp_offset).map(|ent| Self::Drhd(ent)),
@@ -237,7 +184,7 @@ impl<'t> DmarEntry<'t> {
             3 => mp.as_type(mp_offset).map(|ent| Self::Rhsa(ent)),
             4 => mp.as_type(mp_offset).map(|ent| Self::Andd(ent)),
             5 => mp.as_type(mp_offset).map(|ent| Self::Satc(ent)),
-            _ => Self::Unknown(entry),
+            _ => Ok(Self::UnknownOrCorrupt(*entry)),
         }
     }
 }
