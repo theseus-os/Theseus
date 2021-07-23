@@ -2,7 +2,7 @@
 //! which includes interrupt and multicore info.
 
 #![no_std]
-#![allow(safe_packed_borrows)]
+#![allow(unaligned_references)]
 
 #[macro_use] extern crate log;
 extern crate irq_safety;

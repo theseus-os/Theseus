@@ -28,7 +28,7 @@ path = "../task"
 path = "../runqueue"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [dependencies.pmu_x86]
 path = "../pmu_x86"

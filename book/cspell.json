@@ -1,6 +1,16 @@
 {
     "version": "0.1",
     "language": "en",
+    "languageSettings": [
+        {
+            "languageId": "markdown",
+            "ignoreRegExpList": ["CodeBlock"],
+            "patterns": [{
+                "name": "CodeBlock",
+                "pattern": "^```[\\w\\W]+?^```$"
+            }]
+        }
+    ],
     "ignorePaths": [
         "*.svg"
     ],

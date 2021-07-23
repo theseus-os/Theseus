@@ -1,13 +1,14 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "block_io"
-description = "Traits and types for reading/writing IO streams of differing block sizes."
+name = "io"
+description = "Traits and types for reading and writing IO streams, of both block-wise and byte-wise granularity."
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
-derive_more = "0.99.0"
+delegate = "0.6.0"
+spin = "0.9.0"
 
 [dependencies.log]
 default-features = false
