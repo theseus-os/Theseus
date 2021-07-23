@@ -606,7 +606,7 @@ help:
 ##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
 
-## Specify a basic machine/platform, which currently is the `q35`
+## Specify a basic machine/platform, which currently is the `q35` machine
 ## because it's the only one that supports a guest OS vIOMMU: <https://wiki.qemu.org/Features/VT-d>
 QEMU_FLAGS := -machine q35,kernel-irqchip=split 
 ## Boot from the cd-rom drive

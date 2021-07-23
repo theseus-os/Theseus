@@ -108,12 +108,18 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
     {
         let acpi_tables = ACPI_TABLES.lock();
         if let Some(dmar_table) = dmar::Dmar::get(&acpi_tables) {
-            debug!("TODO: do something with DMAR table: {:X?}", dmar_table);
+            debug!("TODO: do something with DMAR table:\n{:#X?}", dmar_table);
             for table in dmar_table.iter() {
-                trace!("{:X?}", table);
+                trace!("{:#X?}", table);
+                match table {
+                    dmar::DmarEntry::Drhd(drhd) => {
+
+                    }
+                    _ => { }
+                }
             }
         } else {
-            info!("This machine has no DMAR ACPI table (used for IOMMU).");
+            warn!("Note: this machine has no DMAR ACPI table (used for IOMMU).");
         }
     }
 
