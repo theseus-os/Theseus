@@ -627,6 +627,7 @@ name = "dmar"
 version = "0.1.0"
 dependencies = [
  "acpi_table",
+ "log",
  "memory",
  "sdt",
  "zerocopy",

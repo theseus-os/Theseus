@@ -17,6 +17,24 @@ use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 
+mod drhd;
+mod device_scope;
+
+// TODO: once these sub-tables are complete, uncomment them.
+// mod rmrr;
+// mod atsr;
+// mod rhsa;
+// mod andd;
+// mod satc;
+
+pub use drhd::*;
+pub use device_scope::*;
+// pub use rmrr::*;
+// pub use atsr::*;
+// pub use rhsa::*;
+// pub use andd::*;
+// pub use satc::*;
+
 
 pub const DMAR_SIGNATURE: &'static [u8; 4] = b"DMAR";
 
@@ -54,15 +72,16 @@ struct DmarReporting {
 /// A wrapper around the DMAR ACPI table ([`DmarReporting`]),
 /// which contains details about IOMMU configuration.
 /// 
-/// You most likely only care about the [`Dmar::iter()`] method.
+/// You most likely care about the [`Dmar::iter()`]
+/// and [`Dmar::host_address_width()`] methods.
 #[derive(Debug)]
 pub struct Dmar<'t> {
     /// The fixed-size part of the actual DMAR ACPI table.
     table: &'t DmarReporting,
     /// The underlying MappedPages that cover this table
     mapped_pages: &'t MappedPages,
-    /// The starting offset of the dynamic part of the DMAR table.
-    /// This is to be used as an offset into the above `mapped_pages`.
+    /// The offset into the above `mapped_pages` at which the dynamic part
+    /// of the DMAR table begins.
     dynamic_entries_starting_offset: usize,
     /// The total size in bytes of all dynamic entries.
     /// This is *not* the number of entries.
@@ -84,7 +103,7 @@ impl<'t> Dmar<'t> {
         })
     }
 
-    /// Returns an iterator over the DMAR's entries,
+    /// Returns An [`Iterator`] over the DMAR's entries,
     /// which are variable in both number and size.
     pub fn iter(&self) -> DmarIter {
         DmarIter {
@@ -114,7 +133,7 @@ impl<'t> Dmar<'t> {
 }
 
 
-/// An Iterator over the dynamic entries of the [`Dmar`].
+/// An [`Iterator`] over the dynamic entries of the [`Dmar`].
 /// Its lifetime is dependent upon the lifetime of its [`Dmar`] instance,
 /// which itself is bound to the lifetime of the underlying [`AcpiTables`]. 
 #[derive(Clone)]
@@ -165,9 +184,9 @@ pub struct DmarEntryRecord {
 /// The set of possible sub-tables that can exist in the top-level DMAR table.
 ///
 /// The types of sub-tables are described in Section 8.2 of the VT Directed I/O Spec.
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 pub enum DmarEntry<'t> {
-    Drhd(&'t DmarDrhd),
+    Drhd(DmarDrhd<'t>),
     Rmrr(&'t DmarRmrr),
     Atsr(&'t DmarAtsr),
     Rhsa(&'t DmarRhsa),
@@ -185,7 +204,7 @@ impl<'t> DmarEntry<'t> {
         entry: &DmarEntryRecord,
     ) -> Result<DmarEntry<'t>, &'static str> {
         match entry.typ {
-            0 => mp.as_type(mp_offset).map(|ent| Self::Drhd(ent)),
+            0 => Ok(Self::Drhd(DmarDrhd::from_entry(mp, mp_offset, entry)?)),
             1 => mp.as_type(mp_offset).map(|ent| Self::Rmrr(ent)),
             2 => mp.as_type(mp_offset).map(|ent| Self::Atsr(ent)),
             3 => mp.as_type(mp_offset).map(|ent| Self::Rhsa(ent)),
@@ -194,102 +213,6 @@ impl<'t> DmarEntry<'t> {
             _ => Ok(Self::UnknownOrCorrupt(*entry)),
         }
     }
-}
-
-
-/// DRHD: DMAR Hardware Unit Definition Structure.
-///
-/// This table is described in Section 8.3 of the VT Directed I/O Spec.
-#[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
-pub struct DmarDrhd {
-    header: DmarEntryRecord,
-    flags: u8,
-    _reserved: u8,
-    segment_number: u16,
-    register_base_address: u64,
-    // Following this is a variable number of variable-sized DMAR device scope table entries,
-    // so we cannot include them here in the static struct definition.
-}
-impl DmarDrhd {
-    /// Returns an iterator over the [`DmarDeviceScope`] entries in this DRHD,
-    /// which are variable in both number and size.
-    pub fn iter(&self) -> DrhdIter {
-        DrhdIter {
-            mapped_pages: self.mapped_pages,
-            offset: self.dynamic_entries_starting_offset,
-            end_of_entries: self.dynamic_entries_starting_offset + self.dynamic_entries_total_size,
-        }
-    }
-
-    /// Returns the flags in this DRHD table.
-    pub fn flags(&self) -> u8 {
-        self.flags
-    }
-
-    /// Returns the PCI segment number associated with this DRHD.
-    pub fn segment_number(&self) -> u16 {
-        self.segment_number
-    }
-
-    /// Returns the base address of this DRHD's remapping hardware register set.
-    pub fn register_base_address(&self) -> u64 {
-        self.register_base_address
-    }
-}
-
-
-
-/// An Iterator over the dynamic entries of the [`DmarDrhd`].
-/// Its lifetime is dependent upon the lifetime of its [`DmarDrhd`] instance,
-/// which itself is bound to the lifetime of the underlying [`AcpiTables`]. 
-#[derive(Clone)]
-pub struct DmarDrhdIter<'t> {
-    /// The underlying MappedPages that contain all ACPI tables.
-    mapped_pages: &'t MappedPages,
-    /// The offset of the next entry, which should point to a [`DmarEntryRecord`]
-    /// at the start of each iteration.
-    offset: usize,
-    /// The end bound of all DMAR entries. 
-    /// This is fixed and should not ever change throughout iteration.
-    end_of_entries: usize,
-}
-
-impl<'t> Iterator for DmarIter<'t> {
-    type Item = DmarEntry<'t>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if (self.offset + size_of::<DmarEntryRecord>()) < self.end_of_entries {
-            // First, we get the next entry record to get the type and size of the actual entry.
-            let entry: &DmarEntryRecord = self.mapped_pages.as_type(self.offset).ok()?;
-            // Second, use that entry record to return the specific DMAR entry struct.
-            if (self.offset + entry.length as usize) <= self.end_of_entries {
-                let table = DmarEntry::from_entry(self.mapped_pages, self.offset, entry);
-                // move the offset to the end of this entry, i.e., the beginning of the next entry record
-                self.offset += entry.length as usize;
-                return table.ok();
-            }
-        }
-        None
-    }
-}
-
-
-/// DMAR Device Scope Structure.
-///
-/// This structure is described in Section 8.3.1 of the VT Directed I/O Spec.
-#[derive(Clone, Copy, Debug, FromBytes)]
-#[repr(packed)]
-pub struct DmarDeviceScope {
-    typ: u8,
-    length: u8,
-    _reserved: u16,
-    enumeration_id: u8,
-    start_bus_number: u8,
-    // Following this is a variable-sized `Path` field,
-    // so we cannot include it here in the static struct definition.
-    // It would look something like:
-    // path: [u16],
 }
 
 
