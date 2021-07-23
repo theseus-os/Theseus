@@ -741,7 +741,9 @@ impl CommandQueueEntry {
 
     /// Returns the value written to the input opcode field of the command
     fn get_command_opcode(&self) -> Result<CommandOpcode, CommandQueueError> {
-        CommandOpcode::try_from(self.command_input_opcode.read().get() >> 16).map_err(|_e| CommandQueueError::IncorrectCommandOpcode)
+        let opcode = self.command_input_opcode.read().get() >> 16;
+        debug!("command opcode: {:#X}", opcode);
+        CommandOpcode::try_from(opcode).map_err(|_e| CommandQueueError::IncorrectCommandOpcode)
     }
 
     /// Returns the first 16 bytes of output data that are written inline in the command.
@@ -771,7 +773,9 @@ impl CommandQueueEntry {
     /// Returns the status of command delivery.
     /// This only informs us if the command was delivered to the NIC successfully, not if it was completed successfully.
     pub fn get_delivery_status(&self) -> Result<CommandDeliveryStatus, CommandQueueError> {
-        CommandDeliveryStatus::try_from(self.token_signature_status_own.read().get() & 0xFE)
+        let status = self.token_signature_status_own.read().get() & 0xFE;
+        debug!("delivery status: {:#X}", status);
+        CommandDeliveryStatus::try_from(status)
             .map_err(|_e| CommandQueueError::InvalidCommandDeliveryStatus)
     }
 
@@ -789,6 +793,7 @@ impl CommandQueueEntry {
     /// Returns the status of command execution.
     pub fn get_return_status(&self) -> Result<CommandReturnStatus, CommandQueueError> {
         let (status, _syndrome, _, _) = self.get_output_inline_data();
+        debug!("return status: {:#X}", status);
         CommandReturnStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandReturnStatus)
     }
 }
