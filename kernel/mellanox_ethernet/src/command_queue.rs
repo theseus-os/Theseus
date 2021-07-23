@@ -42,10 +42,6 @@ pub enum CommandQueueError {
     MissingInput,
     /// Opcode value in the command entry is not what was expected
     IncorrectCommandOpcode,
-    /// Delivery status value in the command entry is not what was expected
-    InvalidCommandDeliveryStatus,
-    /// Return status value in the command entry is not what was expected
-    InvalidCommandReturnStatus,
     /// Trying to access the command entry before HW is done processing it
     CommandNotCompleted,
     /// Offset in a page is too large to map a [`CommandInterfaceMailbox`] to that offset
@@ -65,8 +61,6 @@ impl From<CommandQueueError> for &'static str {
             CommandQueueError::MissingInputPages => "No pages were passed to the command",
             CommandQueueError::MissingInput => "An input was not passed to a command that required it",
             CommandQueueError::IncorrectCommandOpcode => "Incorrect command opcode",
-            CommandQueueError::InvalidCommandDeliveryStatus => "Invalid command delivery status",
-            CommandQueueError::InvalidCommandReturnStatus => "Invalid command return status",
             CommandQueueError::CommandNotCompleted => "Command not complete yet",
             CommandQueueError::InvalidMailboxOffset => "Invalid offset for mailbox in a page",
             CommandQueueError::PageAllocationFailed => "Failed to allocate MappedPages",
@@ -96,24 +90,6 @@ pub enum CommandDeliveryStatus {
     Unknown,
 }
 
-// impl From<u32> for CommandDeliveryStatus {
-//     fn from(status: u32) -> Self {
-//         match status {
-//             0 => Self::Success,
-//             1 => Self::SignatureErr,
-//             2 => Self::TokenErr,
-//             3 => Self::BadBlockNumber,
-//             4 => Self::BadOutputPointer,
-//             5 => Self::BadInputPointer,
-//             6 => Self::InternalErr,
-//             7 => Self::InputLenErr,
-//             8 => Self::OutputLenErr,
-//             9 => Self::ReservedNotZero,
-//             10 => Self::BadCommandType,
-//             _ => Self::Unknown
-//         }
-//     }
-// }
 
 /// Command opcode written by SW in opcode field of the input data in the command entry.
 /// See [`CommandQueueEntry::command_input_opcode`].
@@ -191,36 +167,6 @@ impl CommandOpcode {
     }
 }
 
-// impl From<u32> for CommandOpcode {
-//     fn from(opcode: u32) -> Self {
-//         match opcode {
-//             0x100   => Self::QueryHcaCap,
-//             0x101   => Self::QueryAdapter, 
-//             0x102   => Self::InitHca, 
-//             0x103   => Self::TeardownHca, 
-//             0x104   => Self::EnableHca, 
-//             0x105   => Self::DisableHca, 
-//             0x107   => Self::QueryPages, 
-//             0x108   => Self::ManagePages, 
-//             0x10A   => Self::QueryIssi, 
-//             0x10B   => Self::SetIssi,
-//             0x203   => Self::QuerySpecialContexts, 
-//             0x301   => Self::CreateEq, 
-//             0x400   => Self::CreateCq, 
-//             0x751   => Self::QueryVportState, 
-//             0x754   => Self::QueryNicVportContext, 
-//             0x800   => Self::AllocPd, 
-//             0x802   => Self::AllocUar, 
-//             0x816   => Self::AllocTransportDomain, 
-//             0x904   => Self::CreateSq, 
-//             0x905   => Self::ModifySq, 
-//             0x908   => Self::CreateRq, 
-//             0x909   => Self::ModifyRq, 
-//             0x912   => Self::CreateTis, 
-//             _       => Self::Unknown
-//         }
-//     }
-// }
 
 /// Command status written by HW in status field of the output data in the command entry.
 /// See [`CommandQueueEntry::command_output_status`].
@@ -246,29 +192,6 @@ pub enum CommandReturnStatus {
     Unknown
 }
 
-// impl From<u8> for CommandReturnStatus {
-//     fn from(status: u8) -> Self {
-//         match status{
-//             0x0 => Self::OK,
-//             0x1 => Self::InternalError,
-//             0x2 => Self::BadOp,
-//             0x3 => Self::BadParam,
-//             0x4 => Self::BadSysState,
-//             0x5 => Self::BadResource,
-//             0x6 => Self::ResourceBusy,
-//             0x8 => Self::ExceedLim,
-//             0x9 => Self::BadResState,
-//             0xA => Self::BadIndex,
-//             0xF => Self::NoResources,
-//             0x50 => Self::BadInputLen,
-//             0x51 => Self::BadOutputLen,
-//             0x10 => Self::BadResourceState,
-//             0x30 => Self::BadPkt,
-//             0x40 => Self::BadSize,
-//             _ => Self::Unknown
-//         }
-//     }
-// }
 
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::ManagePages`].
 pub enum ManagePagesOpMod {
@@ -290,7 +213,6 @@ enum MailboxType {
     Input,
     Output
 }
-
 
 
 /// A buffer of fixed-size entries that is used to pass commands to the HCA.
