@@ -9,14 +9,14 @@ edition = "2018"
 [dependencies]
 cfg-if = "1.0.0"
 
-[target.'cfg(target = "thumbv7em-none-eabi")'.dependencies.cortex-m]
+[target.stm32f4-discovery.dependencies.cortex-m]
 version = "0.6.7"
 
-[target.'cfg(target = "thumbv7em-none-eabi")'.dependencies.stm32f4]
+[target.stm32f4-discovery.dependencies.stm32f4]
 features = ["stm32f407"]
 version = "0.13.0"
 
-[target.'cfg(target = "thumbv7em-none-eabi")'.dependencies.lazy_static]
+[target.stm32f4-discovery.dependencies.lazy_static]
 version = "1.2.0"
 
 [lib]

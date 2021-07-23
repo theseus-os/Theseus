@@ -2,7 +2,7 @@
 #[macro_use] extern crate cfg_if;
 
 cfg_if! {
-    if #[cfg(target = "thumbv7em-none-eabi")] {
+    if #[cfg(target_vendor = "stm32f407")] {
         use cortex_m::interrupt::{self, CriticalSection};
         use stm32f4::stm32f407::usart1;
         use stm32f4_discovery::STM_PERIPHERALS;
