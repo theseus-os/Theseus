@@ -487,8 +487,8 @@
     <span class="ident">table</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MadtAcpiTable</span>,
     <span class="doccomment">/// The underlying MappedPages that cover this MADT</span>
     <span class="ident">mapped_pages</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="ident">MappedPages</span>,
-    <span class="doccomment">/// The starting offset of the dynamic part of the MADT table.</span>
-    <span class="doccomment">/// This is to be used as an offset into the above `mapped_pages`.</span>
+    <span class="doccomment">/// The offset into the above `mapped_pages` at which the dynamic part</span>
+    <span class="doccomment">/// of the MADT table begins.</span>
     <span class="ident">dynamic_entries_starting_offset</span>: <span class="ident">usize</span>,
     <span class="doccomment">/// The total size in bytes of all dynamic entries.</span>
     <span class="doccomment">/// This is *not* the number of entries.</span>
@@ -520,7 +520,7 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Returns an iterator over the MADT&#39;s entries,</span>
+    <span class="doccomment">/// Returns an [`Iterator`] over the MADT&#39;s entries,</span>
     <span class="doccomment">/// which are variable in both number and size.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iter</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MadtIter</span> {
         <span class="ident">MadtIter</span> {
@@ -547,7 +547,7 @@
 }
 
 
-<span class="doccomment">/// An Iterator over the dynamic entries of the MADT.</span>
+<span class="doccomment">/// An [`Iterator`] over the dynamic entries of the MADT.</span>
 <span class="doccomment">/// Its lifetime is dependent upon the lifetime of its `Madt` instance,</span>
 <span class="doccomment">/// which itself is bound to the lifetime of the underlying `AcpiTables`. </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>)]</span>

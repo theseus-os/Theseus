@@ -167,7 +167,7 @@
 <span class="doccomment">/// This table primarily contains an array of physical addresses</span>
 <span class="doccomment">/// where other ACPI SDTs can be found.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// Use the `addresses()` method to obtain an iterator over those physical addresses.</span>
+<span class="doccomment">/// Use the `addresses()` method to obtain an [`Iterator`] over those physical addresses.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RsdtXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>(<span class="ident">RsdtOrXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span>);
 <span class="kw">enum</span> <span class="ident">RsdtOrXsdt</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span><span class="op">&gt;</span> {
     <span class="doccomment">/// RSDT, which contains 32-bit addresses.</span>
@@ -201,7 +201,7 @@
         }
     }
 
-    <span class="doccomment">/// Returns an iterator over the `PhysicalAddress`es of the SDT entries</span>
+    <span class="doccomment">/// Returns an [`Iterator`] over the `PhysicalAddress`es of the SDT entries</span>
     <span class="doccomment">/// included in this RSDT or XSDT.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">addresses</span><span class="op">&lt;</span><span class="lifetime">&#39;r</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;r</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw">impl</span> <span class="ident">Iterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">PhysicalAddress</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;r</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rsdt_iter</span> <span class="op">=</span> <span class="prelude-val">None</span>;

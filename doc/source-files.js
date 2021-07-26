@@ -23,6 +23,7 @@ sourcesIndex["crate_swap"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["debug_info"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["device_manager"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["displayable"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["dmar"] = {"name":"","files":["device_scope.rs","drhd.rs","lib.rs"]};
 sourcesIndex["e1000"] = {"name":"","files":["lib.rs","regs.rs","test_e1000_driver.rs"]};
 sourcesIndex["entryflags_x86_64"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["environment"] = {"name":"","files":["lib.rs"]};

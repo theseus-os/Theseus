@@ -81,18 +81,8 @@
 <span id="78">78</span>
 <span id="79">79</span>
 <span id="80">80</span>
-<span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
 </pre><pre class="rust">
-<span class="doccomment">//! Definitions for the ACPI RSDT and XSDT system tables.</span>
-<span class="doccomment">//!</span>
-<span class="doccomment">//! RSDT is the Root System Descriptor Table, whereas</span>
-<span class="doccomment">//! XSDT is the Extended System Descriptor Table. </span>
-<span class="doccomment">//! They are identical except that the XSDT uses 64-bit physical addresses</span>
-<span class="doccomment">//! to point to other ACPI SDTs, while the RSDT uses 32-bit physical addresses.</span>
+<span class="doccomment">//! Definitions for FADT, the Fixed ACPI Description Table.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
