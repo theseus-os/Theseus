@@ -630,6 +630,7 @@ dependencies = [
  "log",
  "memory",
  "sdt",
+ "static_assertions",
  "zerocopy",
 ]
 
@@ -2306,6 +2307,7 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
+ "static_assertions",
  "zerocopy",
 ]
 

@@ -18,6 +18,7 @@ pub(crate) struct DeviceScope {
     // It would look something like:
     // path: [u16],
 }
+const_assert_eq!(core::mem::size_of::<DeviceScope>(), 6);
 
 
 /// DMAR Device Scope Structure.
@@ -46,7 +47,7 @@ impl<'t> DmarDeviceScope<'t> {
         Ok(DmarDeviceScope {
             table: dev_scope,
             mapped_pages: mp,
-            path_starting_offset: size_of::<DeviceScope>(), 
+            path_starting_offset: mp_offset + size_of::<DeviceScope>(), 
             path_total_size: dev_scope.length as usize - size_of::<DeviceScope>(),
         })
     }
@@ -94,8 +95,8 @@ impl<'t> DmarDeviceScope<'t> {
     /// # Warning -- incomplete!
     /// TODO: finish this function, it is not yet complete. It only returns the first path. 
     pub fn path(&self) -> Result<&'t DeviceScopePath, &'static str> {
-        log::warn!("The DmarDeviceScope::path() function is incomplete! Its value cannot be used.");
-        let mut offset = self.path_starting_offset;
+        log::warn!("The DmarDeviceScope::path() function is incomplete! Its value may be incorrect.");
+        let /* mut */ offset = self.path_starting_offset;
         let starting_path: &DeviceScopePath = self.mapped_pages.as_type(offset)?;
 
         // TODO: complete the path iteration algorithm described in Section 8.3.1
@@ -104,7 +105,9 @@ impl<'t> DmarDeviceScope<'t> {
 }
 
 #[derive(Debug, Clone, Copy, FromBytes)]
+#[repr(packed)]
 pub struct DeviceScopePath {
     pub device: u8,
     pub function: u8,
 }
+const_assert_eq!(core::mem::size_of::<DeviceScopePath>(), 2);

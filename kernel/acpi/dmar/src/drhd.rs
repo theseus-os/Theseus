@@ -16,6 +16,7 @@ pub(crate) struct Drhd {
     // Following this is a variable number of variable-sized DMAR device scope table entries,
     // so we cannot include them here in the static struct definition.
 }
+const_assert_eq!(core::mem::size_of::<Drhd>(), 16);
 
 
 /// DRHD: DMAR Hardware Unit Definition Structure.
@@ -44,7 +45,7 @@ impl<'t> DmarDrhd<'t> {
         Ok(DmarDrhd {
             table: mp.as_type(mp_offset)?,
             mapped_pages: mp,
-            dynamic_entries_starting_offset: size_of::<Drhd>(), 
+            dynamic_entries_starting_offset: mp_offset + size_of::<Drhd>(), 
             dynamic_entries_total_size: entry.length as usize - size_of::<Drhd>(),
         })
     }
@@ -52,7 +53,7 @@ impl<'t> DmarDrhd<'t> {
 
 
 impl<'t> DmarDrhd<'t> {
-    /// Returns An [`Iterator`] over the [`DmarDeviceScope`] entries in this DRHD,
+    /// Returns an [`Iterator`] over the [`DmarDeviceScope`] entries in this DRHD,
     /// which are variable in both number and size.
     pub fn iter(&self) -> DrhdIter<'t> {
         DrhdIter {
@@ -62,9 +63,23 @@ impl<'t> DmarDrhd<'t> {
         }
     }
 
-    /// Returns the flags in this DRHD table.
-    pub fn flags(&self) -> u8 {
-        self.table.flags
+    /// Returns the value of the `INCLUDE_PCI_ALL` flag,
+    /// the only bit flag in this DRHD table.
+    ///
+    /// ## Description from Intel Spec
+    /// If `false`, this remapping hardware unit has under its scope only
+    /// devices in the specified segment that are explicitly identified through
+    /// the Device Scope field. The device can be of any type as described by
+    /// the Type field in the Device Scope Structure including (but not limited to)
+    /// IOAPIC and HPET.
+    /// 
+    /// If `true`, this remapping hardware unit has under its scope all PCI
+    /// compatible devices in the specified segment, except devices reported
+    /// under the scope of other remapping hardware units for the same segment. 
+    /// As such, one can use the Device Scope structures to enumerate 
+    /// IOAPIC and HPET devices under its scope.
+    pub fn include_pci_all(&self) -> bool {
+        self.table.flags & 0x01 == 0x01
     }
 
     /// Returns the PCI segment number associated with this DRHD.

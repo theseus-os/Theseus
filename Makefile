@@ -680,8 +680,6 @@ ifdef vfio
 endif
 
 ## Enable the IOMMU, e.g., Intel VT-d. 
-## For this to actually work, you need to enable KVM acceleration.
-##
 ## See more here: <https://wiki.qemu.org/Features/VT-d>
 QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
 
