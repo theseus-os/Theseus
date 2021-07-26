@@ -1,4 +1,4 @@
-[target.stm32f4-discovery.cortex-m]
+[target.thumbv7em-stm32f407-none-eabi.cortex-m]
 rustc-link-lib = ["cortex-m"]
-rustc-link-search = ["../bin"]
+rustc-link-search = ["../libs/cortex_m/thumbv7em"]
 rustc-cfg = ['cortex_m', 'armv7m', 'armv7em']
