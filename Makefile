@@ -394,15 +394,15 @@ arm:
 		target/thumbv7em-none-eabi/release/libnano_core.a
 
 arm-hardware:
-	cargo build -p nano_core --target cfg/stm32f4-discovery.json \
+	cargo build -p nano_core --target cfg/thumbv7em-stm32f407-none-eabi.json \
 		-Z build-std=core,alloc \
 		-Z build-std-features=compiler-builtins-mem \
 		--release
 	arm-none-eabi-ld \
 		-T kernellink.ld \
 		--nmagic \
-		-o target/stm32f4-discovery/theseus.bin \
-		target/stm32f4-discovery/release/libnano_core.a
+		-o target/thumbv7em-stm32f407-none-eabi/theseus.bin \
+		target/thumbv7em-stm32f407-none-eabi/release/libnano_core.a
 
 ### Run the build for Cortex-m4 with QEMU.
 run-arm: arm

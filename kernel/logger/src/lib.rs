@@ -1,9 +1,10 @@
 #![no_std]
 
 extern crate log;
-#[macro_use] extern crate cfg_if;
+#[macro_use]
+extern crate cfg_if;
 
-cfg_if!{
+cfg_if! {
 
 if #[cfg(target_arch="x86_64")] {
 
@@ -15,12 +16,13 @@ pub use x86_64::*;
 
 } else if #[cfg(target_arch="arm")] {
 
-extern crate cortex_m_semihosting;
+
 cfg_if! {
-	if #[cfg(target_vendor = "stm32f407")] {
-		#[macro_use]
-		extern crate uart;
-	}
+    if #[cfg(target_vendor = "stm32f407")] {
+    	extern crate uart;
+    } else if #[cfg(target_vendor = "")] {
+        extern crate cortex_m_semihosting;
+    }
 }
 
 mod armv7em;

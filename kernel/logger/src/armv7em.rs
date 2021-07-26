@@ -1,16 +1,20 @@
-use log::{Record, Level, SetLoggerError, Metadata, Log};
+use log::{Level, Log, Metadata, Record, SetLoggerError};
+
+#[cfg(target_vendor = "")]
 use cortex_m_semihosting::hprintln;
+
 #[cfg(target_vendor = "stm32f407")]
-use uart::{SerialPort};
+use uart::{SerialPort, uprint, uprintln};
+use core::fmt::{Write};
 
 /// The static logger instance, an empty struct that implements the `Log` trait.
-static LOGGER: Logger = Logger { };
+static LOGGER: Logger = Logger {};
 
-/// By default, Theseus will log 
+/// By default, Theseus will log
 const DEFAULT_LOG_LEVEL: Level = Level::Trace;
 
 /// A dummy struct that exists so we can implement the Log trait's methods.
-struct Logger { }
+struct Logger {}
 
 impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
@@ -23,16 +27,16 @@ impl Log for Logger {
         }
 
         let level_str = match record.level() {
-            Level::Error => "[E] ", 
-            Level::Warn =>  "[W] ",
-            Level::Info =>  "[I] ",
+            Level::Error => "[E] ",
+            Level::Warn => "[W] ",
+            Level::Info => "[I] ",
             Level::Debug => "[D] ",
             Level::Trace => "[T] ",
         };
 
         let file_loc = record.file().unwrap_or("??");
         let line_loc = record.line().unwrap_or(0);
-        cfg_if!{
+        cfg_if! {
             if #[cfg(target_vendor = "stm32f407")] {
                 let mut serial = SerialPort::get_uart();
                 let _result = uprintln!(serial, "{}{}:{}: {}",
@@ -47,7 +51,7 @@ impl Log for Logger {
                     level_str,
                     file_loc,
                     line_loc,
-                    record.args()    
+                    record.args()
                 );
             }
         }
@@ -58,7 +62,6 @@ impl Log for Logger {
     }
 }
 
-
 /// Initialize the Theseus system logger, which writes log messages through semihosting.
 pub fn init() -> Result<(), SetLoggerError> {
     log::set_logger(&LOGGER)?;
@@ -66,12 +69,12 @@ pub fn init() -> Result<(), SetLoggerError> {
     Ok(())
 }
 
-/// Set the log level, which determines whether a given log message is actually logged. 
-/// 
+/// Set the log level, which determines whether a given log message is actually logged.
+///
 /// For example, if `Level::Trace` is set, all log levels will be logged.
-/// 
-/// If `Level::Info` is set, `debug!()` and `trace!()` will not be logged, 
-/// but `info!()`, `warn!()`, and `error!()` will be. 
+///
+/// If `Level::Info` is set, `debug!()` and `trace!()` will not be logged,
+/// but `info!()`, `warn!()`, and `error!()` will be.
 pub fn set_log_level(level: Level) {
     log::set_max_level(level.to_level_filter())
 }
