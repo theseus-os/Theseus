@@ -52,7 +52,7 @@ pub fn handle(
 /// This table primarily contains an array of physical addresses
 /// where other ACPI SDTs can be found.
 ///
-/// Use the `addresses()` method to obtain An [`Iterator`] over those physical addresses.
+/// Use the `addresses()` method to obtain an [`Iterator`] over those physical addresses.
 pub struct RsdtXsdt<'t>(RsdtOrXsdt<'t>);
 enum RsdtOrXsdt<'t> {
     /// RSDT, which contains 32-bit addresses.
@@ -86,7 +86,7 @@ impl<'t> RsdtXsdt<'t> {
         }
     }
 
-    /// Returns An [`Iterator`] over the `PhysicalAddress`es of the SDT entries
+    /// Returns an [`Iterator`] over the `PhysicalAddress`es of the SDT entries
     /// included in this RSDT or XSDT.
     pub fn addresses<'r>(&'r self) -> impl Iterator<Item = PhysicalAddress> + 'r {
         let mut rsdt_iter = None;

@@ -98,7 +98,7 @@ impl<'t> Madt<'t> {
         Ok(())
     }
 
-    /// Returns An [`Iterator`] over the MADT's entries,
+    /// Returns an [`Iterator`] over the MADT's entries,
     /// which are variable in both number and size.
     pub fn iter(&self) -> MadtIter {
         MadtIter {
