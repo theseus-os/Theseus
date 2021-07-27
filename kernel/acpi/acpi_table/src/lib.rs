@@ -86,7 +86,7 @@ impl AcpiTables {
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
         }
 
-        let sdt_offset = self.frames.offset_from_start(sdt_phys_addr)
+        let sdt_offset = self.frames.offset_of_address(sdt_phys_addr)
             .ok_or("BUG: AcpiTables::map_new_table(): SDT physical address wasn't in expected frame iter")?;
 
         // Here we check if the header of the ACPI table fits at the offset.
@@ -185,10 +185,10 @@ impl AcpiTables {
             return Err("ACPI signature already existed");
         }
 
-        let offset = self.frames.offset_from_start(phys_addr).ok_or("ACPI table's physical address is beyond the ACPI table bounds.")?;
+        let offset = self.frames.offset_of_address(phys_addr).ok_or("ACPI table's physical address is beyond the ACPI table bounds.")?;
         let slice_offset_and_length = if let Some((slice_paddr, slice_len)) = slice_phys_addr_and_length {
             Some((
-                self.frames.offset_from_start(slice_paddr).ok_or("ACPI table's slice physical address is beyond the ACPI table bounds.")?,
+                self.frames.offset_of_address(slice_paddr).ok_or("ACPI table's slice physical address is beyond the ACPI table bounds.")?,
                 slice_len,
             ))
         } else { 
