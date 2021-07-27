@@ -135,8 +135,8 @@ impl LapicIpiDestination {
 /// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.
 pub fn init(_page_table: &mut PageTable) -> Result<(), &'static str> {
     let x2 = has_x2apic();
-    debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", 
-        x2, PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?
+    debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:X?}", 
+        x2, PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)
     );
 
     if !x2 {
@@ -152,7 +152,8 @@ pub fn init(_page_table: &mut PageTable) -> Result<(), &'static str> {
 fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     if has_x2apic() { return Err("map_apic() is only for use in apic/xapic systems, not x2apic."); }
     
-    let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
+    let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)
+        .ok_or("APIC physical address was invalid")?;
     let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
     let flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
     let apic_mapped_page = if let Ok(allocated_frame) = allocate_frames_at(phys_addr, 1) {

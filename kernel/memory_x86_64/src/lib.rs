@@ -49,7 +49,7 @@ pub fn get_kernel_address(
             .map(|s| s.start_address())
             .min()
             .ok_or("Couldn't find kernel start (phys) address")? as usize,
-    )?;
+    ).ok_or("kernel start physical address was invalid")?;
     let kernel_virt_end = VirtualAddress::new(
         elf_sections_tag
             .sections()
@@ -57,8 +57,9 @@ pub fn get_kernel_address(
             .map(|s| s.end_address())
             .max()
             .ok_or("Couldn't find kernel end (virt) address")? as usize,
-    )?;
-    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)?;
+    ).ok_or("kernel virtual end address was invalid")?;
+    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)
+        .ok_or("kernel end physical address was invalid")?;
 
     Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
@@ -84,8 +85,10 @@ pub fn get_boot_info_mem_area(
     boot_info: &BootInformation,
 ) -> Result<(PhysicalAddress, PhysicalAddress), &'static str> {
     Ok((
-        PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)?,
-        PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)?,
+        PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)
+            .ok_or("boot info start physical address was invalid")?,
+        PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)
+            .ok_or("boot info end physical address was invalid")?,
     ))
 }
 
@@ -147,8 +150,8 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
             start_virt_addr += KERNEL_OFFSET;
         }
 
-        let start_phys_addr = PhysicalAddress::new(start_phys_addr)?;
-        let start_virt_addr = VirtualAddress::new(start_virt_addr)?;
+        let start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or("section had invalid starting physical address")?;
+        let start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or("section had invalid ending physical address")?;
         let end_virt_addr = start_virt_addr + (section.size() as usize);
         let end_phys_addr = start_phys_addr + (section.size() as usize);
 
@@ -298,7 +301,7 @@ pub fn get_vga_mem_addr(
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
     Ok((
-        PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?,
+        PhysicalAddress::new(VGA_DISPLAY_PHYS_START).ok_or("invalid VGA starting physical address")?,
         vga_size_in_bytes,
         vga_display_flags,
     ))
