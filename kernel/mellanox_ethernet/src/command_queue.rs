@@ -139,9 +139,7 @@ impl CommandOpcode {
             Self::AllocUar => 8,              
             Self::AllocPd => 8,               
             Self::AllocTransportDomain => 8,
-            _ => {
-                return Err(CommandQueueError::NotImplemented);
-            }            
+            _ => return Err(CommandQueueError::NotImplemented)           
         };
         Ok(len)
     }
@@ -159,9 +157,7 @@ impl CommandOpcode {
             Self::AllocUar => 12,              
             Self::AllocPd => 12,               
             Self::AllocTransportDomain => 12,
-            _ => {
-                return Err(CommandQueueError::NotImplemented);
-            }            
+            _ => return Err(CommandQueueError::NotImplemented)         
         };
         Ok(len)
     }
