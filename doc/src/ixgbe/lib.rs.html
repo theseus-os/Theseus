@@ -1338,6 +1338,7 @@
 <span id="1335">1335</span>
 <span id="1336">1336</span>
 <span id="1337">1337</span>
+<span id="1338">1338</span>
 </pre><pre class="rust">
 <span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.</span>
 <span class="doccomment">//! </span>
@@ -1877,7 +1878,8 @@
         <span class="kw">let</span> <span class="ident">bar</span> <span class="op">=</span> <span class="ident">table_offset</span> <span class="op">&amp;</span> <span class="number">0x7</span>;
         <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">table_offset</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">3</span>;
         <span class="comment">// find the memory base address and size of the area for the vector table</span>
-        <span class="kw">let</span> <span class="ident">mem_base</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>((<span class="ident">dev</span>.<span class="ident">bars</span>[<span class="ident">bar</span> <span class="kw">as</span> <span class="ident">usize</span>] <span class="op">+</span> <span class="ident">offset</span>) <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">mem_base</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>((<span class="ident">dev</span>.<span class="ident">bars</span>[<span class="ident">bar</span> <span class="kw">as</span> <span class="ident">usize</span>] <span class="op">+</span> <span class="ident">offset</span>) <span class="kw">as</span> <span class="ident">usize</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;ixgbe: the mem_base physical address specified in the BAR was invalid&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">mem_size_in_bytes</span> <span class="op">=</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">MsixVectorEntry</span><span class="op">&gt;</span>() <span class="op">*</span> <span class="ident">IXGBE_MAX_MSIX_VECTORS</span>;
 
         <span class="comment">// debug!(&quot;msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes&quot;, bar, mem_base, mem_size_in_bytes);</span>

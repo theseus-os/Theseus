@@ -334,6 +334,7 @@
 <span id="331">331</span>
 <span id="332">332</span>
 <span id="333">333</span>
+<span id="334">334</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A SCAllocator that can allocate fixed size objects.</span>
 
@@ -627,7 +628,8 @@
         <span class="comment">// );</span>
 
         <span class="comment">// let page_addr = (ptr.as_ptr() as usize) &amp; !(MappedPages8k::SIZE - 1) as usize;</span>
-        <span class="kw">let</span> <span class="ident">page_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>((<span class="ident">ptr</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">MappedPages8k::SIZE</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">page_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>((<span class="ident">ptr</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">MappedPages8k::SIZE</span> <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">usize</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;pointer to deallocate was an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// Figure out which page we are on and retrieve a reference to it</span>
         <span class="kw">let</span> <span class="ident">new_layout</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Layout::from_size_align_unchecked</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">layout</span>.<span class="ident">align</span>()) };

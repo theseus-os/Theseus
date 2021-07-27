@@ -612,56 +612,6 @@
 <span id="609">609</span>
 <span id="610">610</span>
 <span id="611">611</span>
-<span id="612">612</span>
-<span id="613">613</span>
-<span id="614">614</span>
-<span id="615">615</span>
-<span id="616">616</span>
-<span id="617">617</span>
-<span id="618">618</span>
-<span id="619">619</span>
-<span id="620">620</span>
-<span id="621">621</span>
-<span id="622">622</span>
-<span id="623">623</span>
-<span id="624">624</span>
-<span id="625">625</span>
-<span id="626">626</span>
-<span id="627">627</span>
-<span id="628">628</span>
-<span id="629">629</span>
-<span id="630">630</span>
-<span id="631">631</span>
-<span id="632">632</span>
-<span id="633">633</span>
-<span id="634">634</span>
-<span id="635">635</span>
-<span id="636">636</span>
-<span id="637">637</span>
-<span id="638">638</span>
-<span id="639">639</span>
-<span id="640">640</span>
-<span id="641">641</span>
-<span id="642">642</span>
-<span id="643">643</span>
-<span id="644">644</span>
-<span id="645">645</span>
-<span id="646">646</span>
-<span id="647">647</span>
-<span id="648">648</span>
-<span id="649">649</span>
-<span id="650">650</span>
-<span id="651">651</span>
-<span id="652">652</span>
-<span id="653">653</span>
-<span id="654">654</span>
-<span id="655">655</span>
-<span id="656">656</span>
-<span id="657">657</span>
-<span id="658">658</span>
-<span id="659">659</span>
-<span id="660">660</span>
-<span id="661">661</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate contains common types used for memory mapping. </span>
 
@@ -676,6 +626,8 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">entryflags_x86_64</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">zerocopy</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">paste</span>;
+
 
 <span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
 <span class="kw">use</span> <span class="ident">core</span>::{
@@ -688,209 +640,157 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">entryflags_x86_64::EntryFlags</span>;
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
+<span class="kw">use</span> <span class="ident">paste::paste</span>;
 
-<span class="doccomment">/// A virtual memory address, which is a `usize` under the hood.</span>
-<span class="attribute">#[<span class="ident">derive</span>(
-    <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">Hash</span>, <span class="ident">Default</span>, 
-    <span class="ident">Binary</span>, <span class="ident">Octal</span>, <span class="ident">LowerHex</span>, <span class="ident">UpperHex</span>, 
-    <span class="ident">BitAnd</span>, <span class="ident">BitOr</span>, <span class="ident">BitXor</span>, <span class="ident">BitAndAssign</span>, <span class="ident">BitOrAssign</span>, <span class="ident">BitXorAssign</span>, 
-    <span class="ident">Add</span>, <span class="ident">Sub</span>, <span class="ident">AddAssign</span>, <span class="ident">SubAssign</span>,
-    <span class="ident">FromBytes</span>,
-)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VirtualAddress</span>(<span class="ident">usize</span>);
 
-<span class="kw">impl</span> <span class="ident">VirtualAddress</span> {
-    <span class="doccomment">/// Creates a new `VirtualAddress`,</span>
-    <span class="doccomment">/// checking that the address is canonical,</span>
-    <span class="doccomment">/// i.e., bits (64:48] are sign-extended from bit 47.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">virt_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">virt_addr</span>.<span class="ident">get_bits</span>(<span class="number">47</span>..<span class="number">64</span>) {
-            <span class="number">0</span> <span class="op">|</span> <span class="number">0b1_1111_1111_1111_1111</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">VirtualAddress</span>(<span class="ident">virt_addr</span>)),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="string">&quot;VirtualAddress bits 48-63 must be a sign-extension of bit 47&quot;</span>),
+<span class="doccomment">/// A macro for defining `VirtualAddress` and `PhysicalAddress` structs</span>
+<span class="doccomment">/// and implementing their common traits, which are generally identical.</span>
+<span class="macro">macro_rules!</span> <span class="ident">implement_address</span> {
+    (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">desc</span>:<span class="ident">literal</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">prefix</span>:<span class="ident">literal</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_canonical</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">canonicalize</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">chunk</span>:<span class="ident">ident</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="macro">paste!</span> { <span class="comment">// using the paste crate&#39;s macro for easy concatenation</span>
+
+            <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="string">&quot;A &quot;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">desc</span> <span class="string">&quot; memory address, which is a `usize` under the hood.&quot;</span>]</span>
+            <span class="attribute">#[<span class="ident">derive</span>(
+                <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">Hash</span>, <span class="ident">Default</span>, 
+                <span class="ident">Binary</span>, <span class="ident">Octal</span>, <span class="ident">LowerHex</span>, <span class="ident">UpperHex</span>, 
+                <span class="ident">BitAnd</span>, <span class="ident">BitOr</span>, <span class="ident">BitXor</span>, <span class="ident">BitAndAssign</span>, <span class="ident">BitOrAssign</span>, <span class="ident">BitXorAssign</span>, 
+                <span class="ident">Add</span>, <span class="ident">Sub</span>, <span class="ident">AddAssign</span>, <span class="ident">SubAssign</span>,
+                <span class="ident">FromBytes</span>,
+            )]</span>
+            <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
+            <span class="kw">pub</span> <span class="kw">struct</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span>(<span class="ident">usize</span>);
+
+            <span class="kw">impl</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="string">&quot;Creates a new `&quot;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> <span class="string">&quot;`, returning an error if the address is not canonical.\n\n \
+                    This is useful for checking whether an address is valid before using it. 
+                    For example, on x86_64, virtual addresses are canonical
+                    if their upper bits `(64:48]` are sign-extended from bit 47,
+                    and physical addresses are canonical if their upper bits `(64:52]` are 0.&quot;</span>]</span>
+                <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span><span class="op">&gt;</span> {
+                    <span class="kw">if</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_canonical</span>(<span class="ident">addr</span>) { <span class="prelude-val">Some</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span>(<span class="ident">addr</span>)) } <span class="kw">else</span> { <span class="prelude-val">None</span> }
+                }
+
+                <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="string">&quot;Creates a new `&quot;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> <span class="string">&quot;` that is guaranteed to be canonical.&quot;</span>]</span>
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new_canonical</span>(<span class="ident">addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">canonicalize</span>(<span class="ident">addr</span>))
+                }
+
+                <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="string">&quot;Creates a new `&quot;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> <span class="string">&quot;` with a value 0.&quot;</span>]</span>
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">zero</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span>(<span class="number">0</span>)
+                }
+
+                <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="string">&quot;Returns the underlying `usize` value for this `&quot;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> <span class="string">&quot;`.&quot;</span>]</span>
+                <span class="attribute">#[<span class="ident">inline</span>]</span>
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+                    <span class="self">self</span>.<span class="number">0</span>
+                }
+
+                <span class="attribute">#[<span class="ident">doc</span> <span class="op">=</span> <span class="string">&quot;Returns the offset from the &quot;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">chunk</span> <span class="string">&quot; boundary specified by this `&quot;</span>
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> <span class="string">&quot;.\n\n \
+                    For example, if the [`PAGE_SIZE`] is 4096 (4KiB), then this will return
+                    the least significant 12 bits `(12:0]` of this `&quot;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> <span class="string">&quot;`.&quot;</span>]</span>
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> [<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">chunk</span> <span class="ident">_offset</span><span class="op">&gt;</span>](<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+                    <span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> (<span class="ident">PAGE_SIZE</span> <span class="op">-</span> <span class="number">1</span>)
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">prefix</span>, <span class="string">&quot;{:#X}&quot;</span>), <span class="self">self</span>.<span class="number">0</span>)
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>)
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">fmt::Pointer</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+                    <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>)
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">Add</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span>;
+                <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_add</span>(<span class="ident">rhs</span>))
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">AddAssign</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="kw">fn</span> <span class="ident">add_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) {
+                    <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_add</span>(<span class="ident">rhs</span>));
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">Sub</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span>;
+                <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_sub</span>(<span class="ident">rhs</span>))
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">SubAssign</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="kw">fn</span> <span class="ident">sub_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) {
+                    <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_sub</span>(<span class="ident">rhs</span>));
+                }
+            }
+            <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">TypeName</span> {
+                <span class="attribute">#[<span class="ident">inline</span>]</span>
+                <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+                    <span class="self">self</span>.<span class="number">0</span>
+                }
+            }
         }
-    }
-
-    <span class="doccomment">/// Creates a new `VirtualAddress` that is guaranteed to be canonical</span>
-    <span class="doccomment">/// by forcing the upper bits (64:48] to be sign-extended from bit 47.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new_canonical</span>(<span class="ident">virt_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VirtualAddress</span> {
-        <span class="comment">// match virt_addr.get_bit(47) {</span>
-        <span class="comment">//     false =&gt; virt_addr.set_bits(48..64, 0),</span>
-        <span class="comment">//     true =&gt; virt_addr.set_bits(48..64, 0xffff),</span>
-        <span class="comment">// };</span>
-
-        <span class="comment">// The below code is semantically equivalent to the above, but it works in const functions.</span>
-        <span class="ident">VirtualAddress</span>(((<span class="ident">virt_addr</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="kw">as</span> <span class="ident">isize</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">16</span>) <span class="kw">as</span> <span class="ident">usize</span>)
-    }
-
-    <span class="doccomment">/// Creates a VirtualAddress with the value 0.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">zero</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VirtualAddress</span> {
-        <span class="ident">VirtualAddress</span>(<span class="number">0</span>)
-    }
-
-    <span class="doccomment">/// Returns the underlying `usize` value for this `VirtualAddress`.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
-
-    <span class="doccomment">/// Returns the offset that this VirtualAddress specifies into its containing memory Page.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// For example, if the PAGE_SIZE is 4KiB, then this will return</span>
-    <span class="doccomment">/// the least significant 12 bits (12:0] of this VirtualAddress.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">page_offset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> (<span class="ident">PAGE_SIZE</span> <span class="op">-</span> <span class="number">1</span>)
-    }
+    };
 }
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">VirtualAddress</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;v{:#X}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
-    }
-}
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">VirtualAddress</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>)
-    }
-}
-<span class="kw">impl</span> <span class="ident">fmt::Pointer</span> <span class="kw">for</span> <span class="ident">VirtualAddress</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>)
+
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">fn</span> <span class="ident">is_canonical_virtual_address</span>(<span class="ident">virt_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">match</span> <span class="ident">virt_addr</span>.<span class="ident">get_bits</span>(<span class="number">47</span>..<span class="number">64</span>) {
+        <span class="number">0</span> <span class="op">|</span> <span class="number">0b1_1111_1111_1111_1111</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Add</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">VirtualAddress</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">VirtualAddress</span>;
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">const</span> <span class="kw">fn</span> <span class="ident">canonicalize_virtual_address</span>(<span class="ident">virt_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="comment">// match virt_addr.get_bit(47) {</span>
+    <span class="comment">//     false =&gt; virt_addr.set_bits(48..64, 0),</span>
+    <span class="comment">//     true =&gt;  virt_addr.set_bits(48..64, 0xffff),</span>
+    <span class="comment">// };</span>
 
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VirtualAddress</span> {
-        <span class="ident">VirtualAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_add</span>(<span class="ident">rhs</span>))
+    <span class="comment">// The below code is semantically equivalent to the above, but it works in const functions.</span>
+    ((<span class="ident">virt_addr</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="kw">as</span> <span class="ident">isize</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">16</span>) <span class="kw">as</span> <span class="ident">usize</span>
+}
+
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">fn</span> <span class="ident">is_canonical_physical_address</span>(<span class="ident">phys_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">match</span> <span class="ident">phys_addr</span>.<span class="ident">get_bits</span>(<span class="number">52</span>..<span class="number">64</span>) {
+        <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
     }
 }
 
-<span class="kw">impl</span> <span class="ident">AddAssign</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">VirtualAddress</span> {
-    <span class="kw">fn</span> <span class="ident">add_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_add</span>(<span class="ident">rhs</span>));
-    }
+<span class="attribute">#[<span class="ident">inline</span>]</span>
+<span class="kw">const</span> <span class="kw">fn</span> <span class="ident">canonicalize_physical_address</span>(<span class="ident">phys_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="ident">phys_addr</span> <span class="op">&amp;</span> <span class="number">0x000F_FFFF_FFFF_FFFF</span>
 }
 
-<span class="kw">impl</span> <span class="ident">Sub</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">VirtualAddress</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">VirtualAddress</span>;
+<span class="macro">implement_address!</span>(
+    <span class="ident">VirtualAddress</span>,
+    <span class="string">&quot;virtual&quot;</span>,
+    <span class="string">&quot;v&quot;</span>,
+    <span class="ident">is_canonical_virtual_address</span>,
+    <span class="ident">canonicalize_virtual_address</span>,
+    <span class="ident">page</span>
+);
 
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VirtualAddress</span> {
-        <span class="ident">VirtualAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_sub</span>(<span class="ident">rhs</span>))
-    }
-}
+<span class="macro">implement_address!</span>(
+    <span class="ident">PhysicalAddress</span>,
+    <span class="string">&quot;physical&quot;</span>,
+    <span class="string">&quot;p&quot;</span>,
+    <span class="ident">is_canonical_physical_address</span>,
+    <span class="ident">canonicalize_physical_address</span>,
+    <span class="ident">frame</span>
+);
 
-<span class="kw">impl</span> <span class="ident">SubAssign</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">VirtualAddress</span> {
-    <span class="kw">fn</span> <span class="ident">sub_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_sub</span>(<span class="ident">rhs</span>));
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">usize</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">virt_addr</span>: <span class="ident">VirtualAddress</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="ident">virt_addr</span>.<span class="number">0</span>
-    }
-}
-
-
-<span class="doccomment">/// A physical memory address, which is a `usize` under the hood.</span>
-<span class="attribute">#[<span class="ident">derive</span>(
-    <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">PartialOrd</span>, <span class="ident">Ord</span>, <span class="ident">Hash</span>, <span class="ident">Default</span>, 
-    <span class="ident">Binary</span>, <span class="ident">Octal</span>, <span class="ident">LowerHex</span>, <span class="ident">UpperHex</span>, 
-    <span class="ident">BitAnd</span>, <span class="ident">BitOr</span>, <span class="ident">BitXor</span>, <span class="ident">BitAndAssign</span>, <span class="ident">BitOrAssign</span>, <span class="ident">BitXorAssign</span>, 
-    <span class="ident">Add</span>, <span class="ident">Sub</span>, <span class="ident">AddAssign</span>, <span class="ident">SubAssign</span>,
-    <span class="ident">FromBytes</span>,
-)]</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PhysicalAddress</span>(<span class="ident">usize</span>);
-
-<span class="kw">impl</span> <span class="ident">PhysicalAddress</span> {
-    <span class="doccomment">/// Creates a new `PhysicalAddress`,</span>
-    <span class="doccomment">/// checking that the bits (64:52] are 0.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">phys_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="ident">phys_addr</span>.<span class="ident">get_bits</span>(<span class="number">52</span>..<span class="number">64</span>) {
-            <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">PhysicalAddress</span>(<span class="ident">phys_addr</span>)),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="string">&quot;PhysicalAddress bits 52-63 must be zero&quot;</span>),
-        }
-    }
-
-    <span class="doccomment">/// Creates a new `PhysicalAddress` that is guaranteed to be canonical</span>
-    <span class="doccomment">/// by forcing the upper bits (64:52] to be 0.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new_canonical</span>(<span class="ident">phys_addr</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PhysicalAddress</span> {
-        <span class="comment">// phys_addr.set_bits(52..64, 0);</span>
-        <span class="ident">PhysicalAddress</span>(<span class="ident">phys_addr</span> <span class="op">&amp;</span> <span class="number">0x000F_FFFF_FFFF_FFFF</span>)
-    }
-
-    <span class="doccomment">/// Returns the underlying `usize` value for this `PhysicalAddress`.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
-
-    <span class="doccomment">/// Creates a PhysicalAddress with the value 0.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">zero</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PhysicalAddress</span> {
-        <span class="ident">PhysicalAddress</span>(<span class="number">0</span>)
-    }
-
-    <span class="doccomment">/// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// For example, if the PAGE_SIZE is 4KiB, then this will return</span>
-    <span class="doccomment">/// the least significant 12 bits (12:0] of this PhysicalAddress.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">frame_offset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> (<span class="ident">PAGE_SIZE</span> <span class="op">-</span> <span class="number">1</span>)
-    }
-}
-<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">PhysicalAddress</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;p{:#X}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
-    }
-}
-<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">PhysicalAddress</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>)
-    }
-}
-<span class="kw">impl</span> <span class="ident">fmt::Pointer</span> <span class="kw">for</span> <span class="ident">PhysicalAddress</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">Add</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PhysicalAddress</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">PhysicalAddress</span>;
-
-    <span class="kw">fn</span> <span class="ident">add</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PhysicalAddress</span> {
-        <span class="ident">PhysicalAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_add</span>(<span class="ident">rhs</span>))
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">AddAssign</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PhysicalAddress</span> {
-    <span class="kw">fn</span> <span class="ident">add_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_add</span>(<span class="ident">rhs</span>));
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">Sub</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PhysicalAddress</span> {
-    <span class="kw">type</span> <span class="ident">Output</span> <span class="op">=</span> <span class="ident">PhysicalAddress</span>;
-
-    <span class="kw">fn</span> <span class="ident">sub</span>(<span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PhysicalAddress</span> {
-        <span class="ident">PhysicalAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_sub</span>(<span class="ident">rhs</span>))
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">SubAssign</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PhysicalAddress</span> {
-    <span class="kw">fn</span> <span class="ident">sub_assign</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">rhs</span>: <span class="ident">usize</span>) {
-        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new_canonical</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">saturating_sub</span>(<span class="ident">rhs</span>));
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">usize</span> {
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">virt_addr</span>: <span class="ident">PhysicalAddress</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="ident">virt_addr</span>.<span class="number">0</span>
-    }
-}
 
 
 <span class="doccomment">/// A `Frame` is a chunk of **physical** memory,</span>

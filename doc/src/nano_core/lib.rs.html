@@ -261,8 +261,6 @@
 <span id="258">258</span>
 <span id="259">259</span>
 <span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.</span>
 <span class="doccomment">//! </span>
@@ -377,7 +375,7 @@
     <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): initialized early IDT with exception handlers.&quot;</span>); 
 
     <span class="comment">// safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity</span>
-    <span class="kw">if</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">multiboot_information_virtual_address</span>).<span class="ident">is_err</span>() {
+    <span class="kw">if</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">multiboot_information_virtual_address</span>).<span class="ident">is_none</span>() {
         <span class="macro">try_exit!</span>(<span class="prelude-val">Err</span>(<span class="string">&quot;multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!&quot;</span>));
     }
     <span class="kw">let</span> <span class="ident">boot_info</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">multiboot2::load</span>(<span class="ident">multiboot_information_virtual_address</span>) };
@@ -427,15 +425,13 @@
             <span class="comment">// They will be present in the &quot;.init&quot; sections, i.e., in the `init_symbols` list. </span>
             <span class="kw">let</span> <span class="ident">ap_realmode_begin</span> <span class="op">=</span> <span class="macro">try_exit!</span>(
                 <span class="ident">init_symbols</span>.<span class="ident">get</span>(<span class="string">&quot;ap_start_realmode&quot;</span>)
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;Missing expected symbol from assembly code \&quot;ap_start_realmode\&quot;&quot;</span>)
-                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">VirtualAddress::new</span>(<span class="kw-2">*</span><span class="ident">v</span> <span class="op">+</span> <span class="ident">KERNEL_OFFSET</span>)
-                )
+                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">VirtualAddress::new</span>(<span class="kw-2">*</span><span class="ident">v</span> <span class="op">+</span> <span class="ident">KERNEL_OFFSET</span>))
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode\&quot;&quot;</span>)
             );
             <span class="kw">let</span> <span class="ident">ap_realmode_end</span>   <span class="op">=</span> <span class="macro">try_exit!</span>(
                 <span class="ident">init_symbols</span>.<span class="ident">get</span>(<span class="string">&quot;ap_start_realmode_end&quot;</span>)
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;Missing expected symbol from assembly code \&quot;ap_start_realmode_end\&quot;&quot;</span>)
-                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">VirtualAddress::new</span>(<span class="kw-2">*</span><span class="ident">v</span> <span class="op">+</span> <span class="ident">KERNEL_OFFSET</span>)
-                )
+                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">v</span><span class="op">|</span> <span class="ident">VirtualAddress::new</span>(<span class="kw-2">*</span><span class="ident">v</span> <span class="op">+</span> <span class="ident">KERNEL_OFFSET</span>))
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode_end\&quot;&quot;</span>)
             );
             <span class="comment">// debug!(&quot;ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}&quot;, ap_realmode_begin, ap_realmode_end);</span>
             (<span class="ident">nano_core_crate_ref</span>, <span class="ident">ap_realmode_begin</span>, <span class="ident">ap_realmode_end</span>)

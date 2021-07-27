@@ -198,6 +198,7 @@
 <span id="195">195</span>
 <span id="196">196</span>
 <span id="197">197</span>
+<span id="198">198</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for the x86 HPET: High Precision Event Timer.</span>
 
@@ -373,7 +374,8 @@
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns a reference to the initialized `Hpet` structure.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_hpet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PageTable</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">Hpet</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="self">self</span>.<span class="ident">gen_addr_struct</span>.<span class="ident">phys_addr</span> <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="self">self</span>.<span class="ident">gen_addr_struct</span>.<span class="ident">phys_addr</span> <span class="kw">as</span> <span class="ident">usize</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;HPET physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="ident">allocate_frames_by_bytes_at</span>(<span class="ident">phys_addr</span>, <span class="self">self</span>.<span class="ident">header</span>.<span class="ident">length</span> <span class="kw">as</span> <span class="ident">usize</span>)
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Couldn&#39;t allocate frames for HPET&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">allocate_pages</span>(<span class="ident">frames</span>.<span class="ident">size_in_frames</span>())

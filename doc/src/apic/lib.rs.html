@@ -705,6 +705,7 @@
 <span id="702">702</span>
 <span id="703">703</span>
 <span id="704">704</span>
+<span id="705">705</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -843,8 +844,8 @@
 <span class="doccomment">/// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">_page_table</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PageTable</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">x2</span> <span class="op">=</span> <span class="ident">has_x2apic</span>();
-    <span class="macro">debug!</span>(<span class="string">&quot;is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}&quot;</span>, 
-        <span class="ident">x2</span>, <span class="ident">PhysicalAddress::new</span>(<span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>
+    <span class="macro">debug!</span>(<span class="string">&quot;is x2apic? {}.  IA32_APIC_BASE (phys addr): {:X?}&quot;</span>, 
+        <span class="ident">x2</span>, <span class="ident">PhysicalAddress::new</span>(<span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="kw">as</span> <span class="ident">usize</span>)
     );
 
     <span class="kw">if</span> <span class="op">!</span><span class="ident">x2</span> {
@@ -860,7 +861,8 @@
 <span class="kw">fn</span> <span class="ident">map_apic</span>(<span class="ident">page_table</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PageTable</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">has_x2apic</span>() { <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;map_apic() is only for use in apic/xapic systems, not x2apic.&quot;</span>); }
     
-    <span class="kw">let</span> <span class="ident">phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="kw">as</span> <span class="ident">usize</span>)
+        .<span class="ident">ok_or</span>(<span class="string">&quot;APIC physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">new_page</span> <span class="op">=</span> <span class="ident">allocate_pages</span>(<span class="number">1</span>).<span class="ident">ok_or</span>(<span class="string">&quot;out of virtual address space!&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_EXECUTE</span>;
     <span class="kw">let</span> <span class="ident">apic_mapped_page</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">allocated_frame</span>) <span class="op">=</span> <span class="ident">allocate_frames_at</span>(<span class="ident">phys_addr</span>, <span class="number">1</span>) {

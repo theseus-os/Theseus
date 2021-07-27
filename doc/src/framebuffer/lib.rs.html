@@ -186,6 +186,7 @@
 <span id="183">183</span>
 <span id="184">184</span>
 <span id="185">185</span>
+<span id="186">186</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate defines a `Framebuffer` structure, which is effectively a region of memory</span>
 <span class="doccomment">//! that is interpreted as a 2-D array of pixels.</span>
@@ -223,9 +224,10 @@
         <span class="kw">let</span> <span class="ident">graphic_info</span> <span class="op">=</span> <span class="ident">multicore_bringup::GRAPHIC_INFO</span>.<span class="ident">lock</span>();
         <span class="macro">info!</span>(<span class="string">&quot;Using graphical framebuffer, {} x {}, at paddr {:#X}&quot;</span>, <span class="ident">graphic_info</span>.<span class="ident">width</span>, <span class="ident">graphic_info</span>.<span class="ident">height</span>, <span class="ident">graphic_info</span>.<span class="ident">physical_address</span>);
         <span class="kw">if</span> <span class="ident">graphic_info</span>.<span class="ident">physical_address</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Fail to get graphic mode infomation!&quot;</span>);
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get graphic mode information!&quot;</span>);
         }
-        <span class="ident">vesa_display_phys_start</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">graphic_info</span>.<span class="ident">physical_address</span> <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+        <span class="ident">vesa_display_phys_start</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">graphic_info</span>.<span class="ident">physical_address</span> <span class="kw">as</span> <span class="ident">usize</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;Graphic mode physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
         <span class="ident">buffer_width</span> <span class="op">=</span> <span class="ident">graphic_info</span>.<span class="ident">width</span> <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="ident">buffer_height</span> <span class="op">=</span> <span class="ident">graphic_info</span>.<span class="ident">height</span> <span class="kw">as</span> <span class="ident">usize</span>;
     };

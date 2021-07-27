@@ -321,6 +321,9 @@
 <span id="318">318</span>
 <span id="319">319</span>
 <span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.</span>
 <span class="doccomment">//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  </span>
@@ -373,7 +376,7 @@
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">start_address</span>())
             .<span class="ident">min</span>()
             .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find kernel start (phys) address&quot;</span>)<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>,
-    )<span class="question-mark">?</span>;
+    ).<span class="ident">ok_or</span>(<span class="string">&quot;kernel start physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">kernel_virt_end</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(
         <span class="ident">elf_sections_tag</span>
             .<span class="ident">sections</span>()
@@ -381,8 +384,9 @@
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">end_address</span>())
             .<span class="ident">max</span>()
             .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t find kernel end (virt) address&quot;</span>)<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>,
-    )<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">kernel_phys_end</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">kernel_virt_end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)<span class="question-mark">?</span>;
+    ).<span class="ident">ok_or</span>(<span class="string">&quot;kernel virtual end address was invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let</span> <span class="ident">kernel_phys_end</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">kernel_virt_end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)
+        .<span class="ident">ok_or</span>(<span class="string">&quot;kernel end physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>((<span class="ident">kernel_phys_start</span>, <span class="ident">kernel_phys_end</span>, <span class="ident">kernel_virt_end</span>))
 }
@@ -408,8 +412,10 @@
     <span class="ident">boot_info</span>: <span class="kw-2">&amp;</span><span class="ident">BootInformation</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">PhysicalAddress</span>, <span class="ident">PhysicalAddress</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="prelude-val">Ok</span>((
-        <span class="ident">PhysicalAddress::new</span>(<span class="ident">boot_info</span>.<span class="ident">start_address</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)<span class="question-mark">?</span>,
-        <span class="ident">PhysicalAddress::new</span>(<span class="ident">boot_info</span>.<span class="ident">end_address</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)<span class="question-mark">?</span>,
+        <span class="ident">PhysicalAddress::new</span>(<span class="ident">boot_info</span>.<span class="ident">start_address</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;boot info start physical address was invalid&quot;</span>)<span class="question-mark">?</span>,
+        <span class="ident">PhysicalAddress::new</span>(<span class="ident">boot_info</span>.<span class="ident">end_address</span>() <span class="op">-</span> <span class="ident">KERNEL_OFFSET</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;boot info end physical address was invalid&quot;</span>)<span class="question-mark">?</span>,
     ))
 }
 
@@ -471,8 +477,8 @@
             <span class="ident">start_virt_addr</span> <span class="op">+</span><span class="op">=</span> <span class="ident">KERNEL_OFFSET</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">start_phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">start_phys_addr</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">start_virt_addr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">start_virt_addr</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">start_phys_addr</span> <span class="op">=</span> <span class="ident">PhysicalAddress::new</span>(<span class="ident">start_phys_addr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;section had invalid starting physical address&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">start_virt_addr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">start_virt_addr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;section had invalid ending physical address&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">end_virt_addr</span> <span class="op">=</span> <span class="ident">start_virt_addr</span> <span class="op">+</span> (<span class="ident">section</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
         <span class="kw">let</span> <span class="ident">end_phys_addr</span> <span class="op">=</span> <span class="ident">start_phys_addr</span> <span class="op">+</span> (<span class="ident">section</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
 
@@ -622,7 +628,7 @@
         <span class="ident">EntryFlags::PRESENT</span> <span class="op">|</span> <span class="ident">EntryFlags::WRITABLE</span> <span class="op">|</span> <span class="ident">EntryFlags::GLOBAL</span> <span class="op">|</span> <span class="ident">EntryFlags::NO_CACHE</span>;
 
     <span class="prelude-val">Ok</span>((
-        <span class="ident">PhysicalAddress::new</span>(<span class="ident">VGA_DISPLAY_PHYS_START</span>)<span class="question-mark">?</span>,
+        <span class="ident">PhysicalAddress::new</span>(<span class="ident">VGA_DISPLAY_PHYS_START</span>).<span class="ident">ok_or</span>(<span class="string">&quot;invalid VGA starting physical address&quot;</span>)<span class="question-mark">?</span>,
         <span class="ident">vga_size_in_bytes</span>,
         <span class="ident">vga_display_flags</span>,
     ))

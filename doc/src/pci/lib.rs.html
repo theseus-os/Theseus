@@ -898,13 +898,13 @@
             <span class="kw">let</span> <span class="ident">next_bar</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">bars</span>.<span class="ident">get</span>(<span class="ident">bar_index</span> <span class="op">+</span> <span class="number">1</span>).<span class="ident">ok_or</span>(<span class="string">&quot;next highest BAR index is out of range&quot;</span>)<span class="question-mark">?</span>;
             <span class="comment">// Clear the bottom 4 bits because it&#39;s a 16-byte aligned address</span>
             <span class="ident">PhysicalAddress::new</span>(<span class="kw-2">*</span><span class="ident">bar</span>.<span class="ident">set_bits</span>(<span class="number">0</span>..<span class="number">4</span>, <span class="number">0</span>) <span class="kw">as</span> <span class="ident">usize</span> <span class="op">|</span> ((<span class="ident">next_bar</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span>))
-                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;determine_mem_base(): [64-bit] BAR physical address was invalid&quot;</span>)<span class="question-mark">?</span>
+                .<span class="ident">ok_or</span>(<span class="string">&quot;determine_mem_base(): [64-bit] BAR physical address was invalid&quot;</span>)<span class="question-mark">?</span>
         } <span class="kw">else</span> {
             <span class="comment">// Here: this BAR is the lower 32-bit part of a 64-bit address, </span>
             <span class="comment">// so we need to access the next highest BAR to get the address&#39;s upper 32 bits.</span>
             <span class="comment">// Also, clear the bottom 4 bits because it&#39;s a 16-byte aligned address.</span>
             <span class="ident">PhysicalAddress::new</span>(<span class="kw-2">*</span><span class="ident">bar</span>.<span class="ident">set_bits</span>(<span class="number">0</span>..<span class="number">4</span>, <span class="number">0</span>) <span class="kw">as</span> <span class="ident">usize</span>)
-                .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;determine_mem_base(): [32-bit] BAR physical address was invalid&quot;</span>)<span class="question-mark">?</span>
+                .<span class="ident">ok_or</span>(<span class="string">&quot;determine_mem_base(): [32-bit] BAR physical address was invalid&quot;</span>)<span class="question-mark">?</span>
         };  
         <span class="prelude-val">Ok</span>(<span class="ident">mem_base</span>)
     }

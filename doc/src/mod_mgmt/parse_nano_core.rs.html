@@ -672,6 +672,12 @@
 <span id="669">669</span>
 <span id="670">670</span>
 <span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,</span>
 <span class="doccomment">//! in other words, the code that is currently executing.</span>
@@ -860,7 +866,7 @@
         <span class="kw">let</span> <span class="ident">size_hex_str</span> <span class="op">=</span> <span class="ident">tokens</span>.<span class="ident">next</span>();
         <span class="comment">// parse both the Address and Size fields as hex strings</span>
         <span class="ident">addr_hex_str</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">usize::from_str_radix</span>(<span class="ident">a</span>, <span class="number">16</span>).<span class="ident">ok</span>())
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">addr</span><span class="op">|</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">addr</span>).<span class="ident">ok</span>())
+            .<span class="ident">and_then</span>(<span class="ident">VirtualAddress::new</span>)
             .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">vaddr</span><span class="op">|</span> {
                 <span class="ident">size_hex_str</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">usize::from_str_radix</span>(<span class="ident">s</span>, <span class="number">16</span>).<span class="ident">ok</span>())
                     .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">size</span><span class="op">|</span> <span class="prelude-val">Some</span>((<span class="ident">vaddr</span>, <span class="ident">size</span>)))
@@ -1128,7 +1134,8 @@
                 <span class="ident">bss_shndx</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">shndx</span>);
             }
             <span class="prelude-val">Ok</span>(<span class="string">&quot;.gcc_except_table&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section had an invalid physical address&quot;</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
                 <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
@@ -1147,7 +1154,8 @@
                 <span class="ident">section_counter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
             }
             <span class="prelude-val">Ok</span>(<span class="string">&quot;.eh_frame&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section had an invalid physical address&quot;</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
                 <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
@@ -1273,7 +1281,8 @@
     <span class="ident">global</span>: <span class="ident">bool</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">new_section</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">text_shndx</span> {
-        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;new text section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Text</span>,
             <span class="ident">sec_name</span>,
@@ -1286,7 +1295,8 @@
         ))
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">rodata_shndx</span> {
-        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;new rodata section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Rodata</span>,
             <span class="ident">sec_name</span>,
@@ -1299,7 +1309,8 @@
         ))
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">data_shndx</span> {
-        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;new data section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Data</span>,
             <span class="ident">sec_name</span>,
@@ -1312,7 +1323,8 @@
         ))
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">bss_shndx</span> {
-        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;new bss section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Bss</span>,
             <span class="ident">sec_name</span>,
