@@ -364,6 +364,12 @@
 <span id="361">361</span>
 <span id="362">362</span>
 <span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Functions for initializing and bringing up other CPU cores. </span>
 <span class="doccomment">//! </span>
@@ -572,11 +578,17 @@
     
     <span class="comment">// wait for all cores to finish booting and init</span>
     <span class="macro">info!</span>(<span class="string">&quot;handle_ap_cores(): BSP is waiting for APs to boot...&quot;</span>);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">count</span> <span class="op">=</span> <span class="ident">get_lapics</span>().<span class="ident">iter</span>().<span class="ident">count</span>();
-    <span class="kw">while</span> <span class="ident">count</span> <span class="op">&lt;</span> <span class="ident">ap_count</span> <span class="op">+</span> <span class="number">1</span> {
-        <span class="macro">trace!</span>(<span class="string">&quot;BSP-known count: {}&quot;</span>, <span class="ident">count</span>);
+    <span class="kw">let</span> <span class="ident">expected_cores</span> <span class="op">=</span> <span class="ident">ap_count</span> <span class="op">+</span> <span class="number">1</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num_known_cores</span> <span class="op">=</span> <span class="ident">get_lapics</span>().<span class="ident">iter</span>().<span class="ident">count</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="kw">while</span> <span class="ident">num_known_cores</span> <span class="op">&lt;</span> <span class="ident">expected_cores</span> {
         <span class="ident">spin_loop_hint</span>();
-        <span class="ident">count</span> <span class="op">=</span> <span class="ident">get_lapics</span>().<span class="ident">iter</span>().<span class="ident">count</span>();
+        <span class="ident">num_known_cores</span> <span class="op">=</span> <span class="ident">get_lapics</span>().<span class="ident">iter</span>().<span class="ident">count</span>();
+        <span class="kw">if</span> <span class="ident">iter</span> <span class="op">=</span><span class="op">=</span> <span class="number">100000</span> {
+            <span class="macro">trace!</span>(<span class="string">&quot;BSP is waiting for APs to boot ({} of {})&quot;</span>, <span class="ident">num_known_cores</span>, <span class="ident">expected_cores</span>);
+            <span class="ident">iter</span> <span class="op">=</span> <span class="number">0</span>;
+        }
+        <span class="ident">iter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
     }
     
     <span class="prelude-val">Ok</span>(<span class="ident">ap_count</span>)  
