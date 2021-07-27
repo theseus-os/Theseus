@@ -65,6 +65,9 @@ path = "madt"
 [dependencies.hpet]
 path = "hpet"
 
+[dependencies.dmar]
+path = "dmar"
+
 
 [lib]
 crate-type = ["rlib"]

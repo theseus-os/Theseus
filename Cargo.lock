@@ -10,6 +10,7 @@ dependencies = [
  "acpi_table_handler",
  "ap_start",
  "apic",
+ "dmar",
  "fadt",
  "hpet",
  "ioapic",
@@ -43,6 +44,7 @@ name = "acpi_table_handler"
 version = "0.1.0"
 dependencies = [
  "acpi_table",
+ "dmar",
  "fadt",
  "hpet",
  "log",
@@ -685,6 +687,18 @@ dependencies = [
  "framebuffer",
  "shapes",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "dmar"
+version = "0.1.0"
+dependencies = [
+ "acpi_table",
+ "log",
+ "memory",
+ "sdt",
+ "static_assertions",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1552,6 +1566,7 @@ dependencies = [
  "entryflags_x86_64",
  "kernel_config",
  "multiboot2",
+ "paste",
  "xmas-elf",
  "zerocopy",
 ]
@@ -1913,6 +1928,12 @@ dependencies = [
  "task",
  "unwind",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
 
 [[package]]
 name = "path"
@@ -2404,6 +2425,7 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
+ "static_assertions",
  "zerocopy",
 ]
 
