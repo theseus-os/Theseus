@@ -42,6 +42,12 @@ pub enum CommandQueueError {
     MissingInput,
     /// Opcode value in the command entry is not what was expected
     IncorrectCommandOpcode,
+    /// Opcode in the command entry is not a valid value
+    InvalidCommandOpcode,
+    /// Delivery status in the command entry is not a valid value
+    InvalidCommandDeliveryStatus,
+    /// Return status in the command entry is not a valid value
+    InvalidCommandReturnStatus,
     /// Trying to access the command entry before HW is done processing it
     CommandNotCompleted,
     /// Offset in a page is too large to map a [`CommandInterfaceMailbox`] to that offset
@@ -61,6 +67,10 @@ impl From<CommandQueueError> for &'static str {
             CommandQueueError::MissingInputPages => "No pages were passed to the command",
             CommandQueueError::MissingInput => "An input was not passed to a command that required it",
             CommandQueueError::IncorrectCommandOpcode => "Incorrect command opcode",
+            CommandQueueError::InvalidCommandOpcode => "Invalid command opcode. This could be because the value is invalid, 
+                                                        or because the driver currently doesn't support the opcode.",
+            CommandQueueError::InvalidCommandDeliveryStatus => "Invalid command delivery status",
+            CommandQueueError::InvalidCommandReturnStatus => "Invalid command return status",
             CommandQueueError::CommandNotCompleted => "Command not complete yet",
             CommandQueueError::InvalidMailboxOffset => "Invalid offset for mailbox in a page",
             CommandQueueError::PageAllocationFailed => "Failed to allocate MappedPages",
@@ -87,7 +97,6 @@ pub enum CommandDeliveryStatus {
     OutputLenErr        = 0x8,
     ReservedNotZero     = 0x9,
     BadCommandType      = 0x10,
-    Unknown,
 }
 
 
@@ -119,7 +128,6 @@ pub enum CommandOpcode {
     CreateRq                = 0x908,
     ModifyRq                = 0x909,
     CreateTis               = 0x912,
-    Unknown
 }
 
 impl CommandOpcode {
@@ -185,7 +193,6 @@ pub enum CommandReturnStatus {
     BadResourceState    = 0x10,
     BadPkt              = 0x30,
     BadSize             = 0x40,
-    Unknown
 }
 
 
@@ -432,10 +439,12 @@ impl CommandQueue {
     }
 
     /// Waits for ownership bit to be cleared, and then returns the command delivery status and the command return status.
-    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> (CommandDeliveryStatus, CommandReturnStatus) {
+    pub fn wait_for_command_completion(&mut self, entry_num: usize) -> Result<(CommandDeliveryStatus, CommandReturnStatus), CommandQueueError> {
         while self.entries[entry_num].owned_by_hw() {}
         self.available_entries[entry_num] = true;
-        (self.entries[entry_num].get_delivery_status(), self.entries[entry_num].get_return_status())
+        let delivery_status = self.entries[entry_num].get_delivery_status().ok_or(CommandQueueError::InvalidCommandDeliveryStatus)?;
+        let return_status = self.entries[entry_num].get_return_status().ok_or(CommandQueueError::InvalidCommandReturnStatus)?;
+        Ok((delivery_status, return_status))
     }
 
     /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
@@ -495,7 +504,7 @@ impl CommandQueue {
             error!("the command hasn't completed yet!");
             return Err(CommandQueueError::CommandNotCompleted);
         }
-        if self.entries[entry_num].get_command_opcode() != cmd_opcode {
+        if self.entries[entry_num].get_command_opcode().ok_or(CommandQueueError::InvalidCommandOpcode)? != cmd_opcode {
             error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode());
             return Err(CommandQueueError::IncorrectCommandOpcode);
         }
@@ -660,9 +669,10 @@ impl CommandQueueEntry {
     }
 
     /// Returns the value written to the input opcode field of the command
-    fn get_command_opcode(&self) -> CommandOpcode {
+    /// A `None` returned value indicates that there was no valid value in the bitfield.
+    fn get_command_opcode(&self) -> Option<CommandOpcode> {
         let opcode = self.command_input_opcode.read().get() >> 16;
-        CommandOpcode::try_from(opcode).unwrap_or(CommandOpcode::Unknown)
+        CommandOpcode::try_from(opcode).ok()
     }
 
     /// Returns the first 16 bytes of output data that are written inline in the command.
@@ -691,9 +701,10 @@ impl CommandQueueEntry {
 
     /// Returns the status of command delivery.
     /// This only informs us if the command was delivered to the NIC successfully, not if it was completed successfully.
-    pub fn get_delivery_status(&self) -> CommandDeliveryStatus {
+    /// A `None` returned value indicates that there was no valid value in the bitfield.
+    pub fn get_delivery_status(&self) -> Option<CommandDeliveryStatus> {
         let status = (self.token_signature_status_own.read().get() & 0xFE) >> 1;
-        CommandDeliveryStatus::try_from(status).unwrap_or(CommandDeliveryStatus::Unknown)
+        CommandDeliveryStatus::try_from(status).ok()
     }
 
     /// Sets the ownership bit so that HW can take control of the command entry
@@ -708,9 +719,10 @@ impl CommandQueueEntry {
     }
 
     /// Returns the status of command execution.
-    pub fn get_return_status(&self) -> CommandReturnStatus {
+    /// A `None` returned value indicates that there was no valid value in the bitfield.
+    pub fn get_return_status(&self) -> Option<CommandReturnStatus> {
         let (status, _syndrome, _, _) = self.get_output_inline_data();
-        CommandReturnStatus::try_from(status).unwrap_or(CommandReturnStatus::Unknown)
+        CommandReturnStatus::try_from(status).ok()
     }
 }
 
