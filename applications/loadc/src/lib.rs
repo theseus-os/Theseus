@@ -227,7 +227,7 @@ fn parse_and_load_elf_executable<'f>(
     // Allocate enough virtually-contiguous space for all the segments together.
     let total_size_in_bytes = end_vaddr - start_vaddr;
     let mut all_pages = memory::allocate_pages_by_bytes_at(
-        VirtualAddress::new(start_vaddr).map_err(String::from)?,
+        VirtualAddress::new(start_vaddr).ok_or_else(|| format!("Segment had invalid virtual address {:#X}", start_vaddr))?,
         total_size_in_bytes
     ).map_err(|_| format!("Failed to allocate {} bytes at {}", total_size_in_bytes, start_vaddr))?;
     let vaddr_adjustment = Offset::new(all_pages.start_address().value(), start_vaddr); 
@@ -255,7 +255,7 @@ fn parse_and_load_elf_executable<'f>(
             continue; 
         }
 
-        let mut start_vaddr = VirtualAddress::new(prog_hdr.virtual_addr() as usize).map_err(|_e| {
+        let mut start_vaddr = VirtualAddress::new(prog_hdr.virtual_addr() as usize).ok_or_else(|| {
             error!("Program header virtual address was invalid: {:?}", prog_hdr);
             "Program header had an invalid virtual address"
         })?;
@@ -321,7 +321,7 @@ fn parse_and_load_elf_executable<'f>(
 
     let entry_point = elf_file.header.pt2.entry_point() as usize;
     let mut entry_point_vaddr = VirtualAddress::new(entry_point)
-        .map_err(|_e| format!("ELF entry point was invalid virtual address: {:#X}", entry_point))?;
+        .ok_or_else(|| format!("ELF entry point was invalid virtual address: {:#X}", entry_point))?;
     Offset::adjust_assign(&mut entry_point_vaddr, vaddr_adjustment);
     debug!("ELF had entry point {:#X}, adjusted to {:#X}", entry_point, entry_point_vaddr);
 
@@ -434,7 +434,7 @@ fn overwrite_relocations(
                 // Therefore, we need to adjust that value before we invoke `write_relocation()`, 
                 // which expects a regular `offset` + an offset into the target segment's mapped pages. 
                 let offset_into_target_segment = target_segment.mp.offset_of_address(
-                    VirtualAddress::new(relocation_entry.offset).map_err(|_e| 
+                    VirtualAddress::new(relocation_entry.offset).ok_or_else(|| 
                         format!("relocation_entry.offset {:#X} was not a valid virtual address", relocation_entry.offset)
                     )?
                 ).ok_or(format!("target segment {:X?} did not contain relocation_entry.offset {:#X}", target_segment, relocation_entry.offset))?;
