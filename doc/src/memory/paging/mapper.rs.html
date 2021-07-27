@@ -859,6 +859,8 @@
 <span id="856">856</span>
 <span id="857">857</span>
 <span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
 </pre><pre class="rust">
 <span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
@@ -882,7 +884,7 @@
     <span class="ident">PageRange</span>,
     <span class="ident">table</span>::{<span class="ident">P4</span>, <span class="ident">Table</span>, <span class="ident">Level4</span>},
 };
-<span class="kw">use</span> <span class="ident">kernel_config::memory::ENTRIES_PER_PAGE_TABLE</span>;
+<span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">PAGE_SIZE</span>, <span class="ident">ENTRIES_PER_PAGE_TABLE</span>};
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">EntryFlags</span>, <span class="ident">tlb_flush_virt_addr</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 <span class="kw">use</span> <span class="ident">page_table_entry::UnmapResult</span>;
@@ -961,10 +963,10 @@
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">start_frame</span>) <span class="op">=</span> <span class="ident">p3_entry</span>.<span class="ident">pointed_frame</span>() {
                     <span class="kw">if</span> <span class="ident">p3_entry</span>.<span class="ident">flags</span>().<span class="ident">is_huge</span>() {
                         <span class="comment">// address must be 1GiB aligned</span>
-                        <span class="macro">assert!</span>(<span class="ident">start_frame</span>.<span class="ident">number</span> <span class="op">%</span> (<span class="ident">ENTRIES_PER_PAGE_TABLE</span> <span class="op">*</span> <span class="ident">ENTRIES_PER_PAGE_TABLE</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
-                        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">Frame</span> {
-                            <span class="ident">number</span>: <span class="ident">start_frame</span>.<span class="ident">number</span> <span class="op">+</span> <span class="ident">page</span>.<span class="ident">p2_index</span>() <span class="op">*</span> <span class="ident">ENTRIES_PER_PAGE_TABLE</span> <span class="op">+</span> <span class="ident">page</span>.<span class="ident">p1_index</span>(),
-                        });
+                        <span class="macro">assert!</span>(<span class="ident">start_frame</span>.<span class="ident">number</span>() <span class="op">%</span> (<span class="ident">ENTRIES_PER_PAGE_TABLE</span> <span class="op">*</span> <span class="ident">ENTRIES_PER_PAGE_TABLE</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+                        <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">Frame::containing_address</span>(<span class="ident">PhysicalAddress::new_canonical</span>(
+                            <span class="ident">PAGE_SIZE</span> <span class="op">*</span> (<span class="ident">start_frame</span>.<span class="ident">number</span>() <span class="op">+</span> <span class="ident">page</span>.<span class="ident">p2_index</span>() <span class="op">*</span> <span class="ident">ENTRIES_PER_PAGE_TABLE</span> <span class="op">+</span> <span class="ident">page</span>.<span class="ident">p1_index</span>())
+                        )));
                     }
                 }
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">p2</span>) <span class="op">=</span> <span class="ident">p3</span>.<span class="ident">next_table</span>(<span class="ident">page</span>.<span class="ident">p3_index</span>()) {
@@ -973,8 +975,10 @@
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">start_frame</span>) <span class="op">=</span> <span class="ident">p2_entry</span>.<span class="ident">pointed_frame</span>() {
                         <span class="kw">if</span> <span class="ident">p2_entry</span>.<span class="ident">flags</span>().<span class="ident">is_huge</span>() {
                             <span class="comment">// address must be 2MiB aligned</span>
-                            <span class="macro">assert!</span>(<span class="ident">start_frame</span>.<span class="ident">number</span> <span class="op">%</span> <span class="ident">ENTRIES_PER_PAGE_TABLE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
-                            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">Frame</span> { <span class="ident">number</span>: <span class="ident">start_frame</span>.<span class="ident">number</span> <span class="op">+</span> <span class="ident">page</span>.<span class="ident">p1_index</span>() });
+                            <span class="macro">assert!</span>(<span class="ident">start_frame</span>.<span class="ident">number</span>() <span class="op">%</span> <span class="ident">ENTRIES_PER_PAGE_TABLE</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>);
+                            <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">Frame::containing_address</span>(<span class="ident">PhysicalAddress::new_canonical</span>(
+                                <span class="ident">PAGE_SIZE</span> <span class="op">*</span> (<span class="ident">start_frame</span>.<span class="ident">number</span>() <span class="op">+</span> <span class="ident">page</span>.<span class="ident">p1_index</span>())
+                            )));
                         }
                     }
                 }

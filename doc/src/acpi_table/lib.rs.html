@@ -343,7 +343,7 @@
             <span class="self">self</span>.<span class="ident">adjust_mapping_offsets</span>(<span class="ident">new_frames</span>, <span class="ident">new_mapped_pages</span>);
         }
 
-        <span class="kw">let</span> <span class="ident">sdt_offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">offset_from_start</span>(<span class="ident">sdt_phys_addr</span>)
+        <span class="kw">let</span> <span class="ident">sdt_offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">offset_of_address</span>(<span class="ident">sdt_phys_addr</span>)
             .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: AcpiTables::map_new_table(): SDT physical address wasn&#39;t in expected frame iter&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// Here we check if the header of the ACPI table fits at the offset.</span>
@@ -442,10 +442,10 @@
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;ACPI signature already existed&quot;</span>);
         }
 
-        <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">offset_from_start</span>(<span class="ident">phys_addr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;ACPI table&#39;s physical address is beyond the ACPI table bounds.&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">offset_of_address</span>(<span class="ident">phys_addr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;ACPI table&#39;s physical address is beyond the ACPI table bounds.&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">slice_offset_and_length</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">slice_paddr</span>, <span class="ident">slice_len</span>)) <span class="op">=</span> <span class="ident">slice_phys_addr_and_length</span> {
             <span class="prelude-val">Some</span>((
-                <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">offset_from_start</span>(<span class="ident">slice_paddr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;ACPI table&#39;s slice physical address is beyond the ACPI table bounds.&quot;</span>)<span class="question-mark">?</span>,
+                <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">offset_of_address</span>(<span class="ident">slice_paddr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;ACPI table&#39;s slice physical address is beyond the ACPI table bounds.&quot;</span>)<span class="question-mark">?</span>,
                 <span class="ident">slice_len</span>,
             ))
         } <span class="kw">else</span> { 
