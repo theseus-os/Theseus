@@ -3,6 +3,7 @@
 #![no_std]
 
 extern crate zerocopy;
+#[macro_use] extern crate static_assertions;
 
 use zerocopy::FromBytes;
 
@@ -24,6 +25,7 @@ pub struct Sdt {
   pub creator_id: u32,
   pub creator_revision: u32
 }
+const_assert_eq!(core::mem::size_of::<Sdt>(), 36);
 
 /// A struct used to describe the position and layout of registers
 /// related to ACPI tables.
@@ -36,3 +38,4 @@ pub struct GenericAddressStructure {
     pub access_size: u8,
     pub phys_addr: u64,
 }
+const_assert_eq!(core::mem::size_of::<GenericAddressStructure>(), 12);

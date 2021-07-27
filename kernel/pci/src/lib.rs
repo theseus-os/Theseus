@@ -385,13 +385,13 @@ impl PciDevice {
             let next_bar = *self.bars.get(bar_index + 1).ok_or("next highest BAR index is out of range")?;
             // Clear the bottom 4 bits because it's a 16-byte aligned address
             PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize | ((next_bar as usize) << 32))
-                .map_err(|_e| "determine_mem_base(): [64-bit] BAR physical address was invalid")?
+                .ok_or("determine_mem_base(): [64-bit] BAR physical address was invalid")?
         } else {
             // Here: this BAR is the lower 32-bit part of a 64-bit address, 
             // so we need to access the next highest BAR to get the address's upper 32 bits.
             // Also, clear the bottom 4 bits because it's a 16-byte aligned address.
             PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize)
-                .map_err(|_e| "determine_mem_base(): [32-bit] BAR physical address was invalid")?
+                .ok_or("determine_mem_base(): [32-bit] BAR physical address was invalid")?
         };  
         Ok(mem_base)
     }

@@ -536,7 +536,8 @@ impl IxgbeNic {
         let bar = table_offset & 0x7;
         let offset = table_offset >> 3;
         // find the memory base address and size of the area for the vector table
-        let mem_base = PhysicalAddress::new((dev.bars[bar as usize] + offset) as usize)?;
+        let mem_base = PhysicalAddress::new((dev.bars[bar as usize] + offset) as usize)
+            .ok_or("ixgbe: the mem_base physical address specified in the BAR was invalid")?;
         let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * IXGBE_MAX_MSIX_VECTORS;
 
         // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);

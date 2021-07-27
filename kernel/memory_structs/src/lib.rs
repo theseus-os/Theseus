@@ -11,6 +11,8 @@ extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate entryflags_x86_64;
 extern crate zerocopy;
+extern crate paste;
+
 
 use bit_field::BitField;
 use core::{
@@ -23,209 +25,157 @@ use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
 pub use entryflags_x86_64::EntryFlags;
 use zerocopy::FromBytes;
+use paste::paste;
 
-/// A virtual memory address, which is a `usize` under the hood.
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Binary, Octal, LowerHex, UpperHex, 
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, AddAssign, SubAssign,
-    FromBytes,
-)]
-#[repr(transparent)]
-pub struct VirtualAddress(usize);
 
-impl VirtualAddress {
-    /// Creates a new `VirtualAddress`,
-    /// checking that the address is canonical,
-    /// i.e., bits (64:48] are sign-extended from bit 47.
-    pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
-            _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
+/// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
+/// and implementing their common traits, which are generally identical.
+macro_rules! implement_address {
+    ($TypeName:ident, $desc:literal, $prefix:literal, $is_canonical:ident, $canonicalize:ident, $chunk:ident) => {
+        paste! { // using the paste crate's macro for easy concatenation
+
+            #[doc = "A " $desc " memory address, which is a `usize` under the hood."]
+            #[derive(
+                Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
+                Binary, Octal, LowerHex, UpperHex, 
+                BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+                Add, Sub, AddAssign, SubAssign,
+                FromBytes,
+            )]
+            #[repr(transparent)]
+            pub struct $TypeName(usize);
+
+            impl $TypeName {
+                #[doc = "Creates a new `" $TypeName "`, returning an error if the address is not canonical.\n\n \
+                    This is useful for checking whether an address is valid before using it. 
+                    For example, on x86_64, virtual addresses are canonical
+                    if their upper bits `(64:48]` are sign-extended from bit 47,
+                    and physical addresses are canonical if their upper bits `(64:52]` are 0."]
+                pub fn new(addr: usize) -> Option<$TypeName> {
+                    if $is_canonical(addr) { Some($TypeName(addr)) } else { None }
+                }
+
+                #[doc = "Creates a new `" $TypeName "` that is guaranteed to be canonical."]
+                pub const fn new_canonical(addr: usize) -> $TypeName {
+                    $TypeName($canonicalize(addr))
+                }
+
+                #[doc = "Creates a new `" $TypeName "` with a value 0."]
+                pub const fn zero() -> $TypeName {
+                    $TypeName(0)
+                }
+
+                #[doc = "Returns the underlying `usize` value for this `" $TypeName "`."]
+                #[inline]
+                pub const fn value(&self) -> usize {
+                    self.0
+                }
+
+                #[doc = "Returns the offset from the " $chunk " boundary specified by this `"
+                    $TypeName ".\n\n \
+                    For example, if the [`PAGE_SIZE`] is 4096 (4KiB), then this will return
+                    the least significant 12 bits `(12:0]` of this `" $TypeName "`."]
+                pub const fn [<$chunk _offset>](&self) -> usize {
+                    self.0 & (PAGE_SIZE - 1)
+                }
+            }
+            impl fmt::Debug for $TypeName {
+                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    write!(f, concat!($prefix, "{:#X}"), self.0)
+                }
+            }
+            impl fmt::Display for $TypeName {
+                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    write!(f, "{:?}", self)
+                }
+            }
+            impl fmt::Pointer for $TypeName {
+                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    write!(f, "{:?}", self)
+                }
+            }
+            impl Add<usize> for $TypeName {
+                type Output = $TypeName;
+                fn add(self, rhs: usize) -> $TypeName {
+                    $TypeName::new_canonical(self.0.saturating_add(rhs))
+                }
+            }
+            impl AddAssign<usize> for $TypeName {
+                fn add_assign(&mut self, rhs: usize) {
+                    *self = $TypeName::new_canonical(self.0.saturating_add(rhs));
+                }
+            }
+            impl Sub<usize> for $TypeName {
+                type Output = $TypeName;
+                fn sub(self, rhs: usize) -> $TypeName {
+                    $TypeName::new_canonical(self.0.saturating_sub(rhs))
+                }
+            }
+            impl SubAssign<usize> for $TypeName {
+                fn sub_assign(&mut self, rhs: usize) {
+                    *self = $TypeName::new_canonical(self.0.saturating_sub(rhs));
+                }
+            }
+            impl Into<usize> for $TypeName {
+                #[inline]
+                fn into(self) -> usize {
+                    self.0
+                }
+            }
         }
-    }
-
-    /// Creates a new `VirtualAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    pub const fn new_canonical(virt_addr: usize) -> VirtualAddress {
-        // match virt_addr.get_bit(47) {
-        //     false => virt_addr.set_bits(48..64, 0),
-        //     true => virt_addr.set_bits(48..64, 0xffff),
-        // };
-
-        // The below code is semantically equivalent to the above, but it works in const functions.
-        VirtualAddress(((virt_addr << 16) as isize >> 16) as usize)
-    }
-
-    /// Creates a VirtualAddress with the value 0.
-    pub const fn zero() -> VirtualAddress {
-        VirtualAddress(0)
-    }
-
-    /// Returns the underlying `usize` value for this `VirtualAddress`.
-    #[inline]
-    pub const fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
-    ///
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return
-    /// the least significant 12 bits (12:0] of this VirtualAddress.
-    pub const fn page_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
+    };
 }
-impl fmt::Debug for VirtualAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "v{:#X}", self.0)
-    }
-}
-impl fmt::Display for VirtualAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-impl fmt::Pointer for VirtualAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+
+#[inline]
+fn is_canonical_virtual_address(virt_addr: usize) -> bool {
+    match virt_addr.get_bits(47..64) {
+        0 | 0b1_1111_1111_1111_1111 => true,
+        _ => false,
     }
 }
 
-impl Add<usize> for VirtualAddress {
-    type Output = VirtualAddress;
+#[inline]
+const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
+    // match virt_addr.get_bit(47) {
+    //     false => virt_addr.set_bits(48..64, 0),
+    //     true =>  virt_addr.set_bits(48..64, 0xffff),
+    // };
 
-    fn add(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_add(rhs))
+    // The below code is semantically equivalent to the above, but it works in const functions.
+    ((virt_addr << 16) as isize >> 16) as usize
+}
+
+#[inline]
+fn is_canonical_physical_address(phys_addr: usize) -> bool {
+    match phys_addr.get_bits(52..64) {
+        0 => true,
+        _ => false,
     }
 }
 
-impl AddAssign<usize> for VirtualAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_add(rhs));
-    }
+#[inline]
+const fn canonicalize_physical_address(phys_addr: usize) -> usize {
+    phys_addr & 0x000F_FFFF_FFFF_FFFF
 }
 
-impl Sub<usize> for VirtualAddress {
-    type Output = VirtualAddress;
+implement_address!(
+    VirtualAddress,
+    "virtual",
+    "v",
+    is_canonical_virtual_address,
+    canonicalize_virtual_address,
+    page
+);
 
-    fn sub(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
+implement_address!(
+    PhysicalAddress,
+    "physical",
+    "p",
+    is_canonical_physical_address,
+    canonicalize_physical_address,
+    frame
+);
 
-impl SubAssign<usize> for VirtualAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<VirtualAddress> for usize {
-    #[inline]
-    fn from(virt_addr: VirtualAddress) -> usize {
-        virt_addr.0
-    }
-}
-
-
-/// A physical memory address, which is a `usize` under the hood.
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Binary, Octal, LowerHex, UpperHex, 
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, AddAssign, SubAssign,
-    FromBytes,
-)]
-#[repr(transparent)]
-pub struct PhysicalAddress(usize);
-
-impl PhysicalAddress {
-    /// Creates a new `PhysicalAddress`,
-    /// checking that the bits (64:52] are 0.
-    pub fn new(phys_addr: usize) -> Result<PhysicalAddress, &'static str> {
-        match phys_addr.get_bits(52..64) {
-            0 => Ok(PhysicalAddress(phys_addr)),
-            _ => Err("PhysicalAddress bits 52-63 must be zero"),
-        }
-    }
-
-    /// Creates a new `PhysicalAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:52] to be 0.
-    pub const fn new_canonical(phys_addr: usize) -> PhysicalAddress {
-        // phys_addr.set_bits(52..64, 0);
-        PhysicalAddress(phys_addr & 0x000F_FFFF_FFFF_FFFF)
-    }
-
-    /// Returns the underlying `usize` value for this `PhysicalAddress`.
-    #[inline]
-    pub const fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Creates a PhysicalAddress with the value 0.
-    pub const fn zero() -> PhysicalAddress {
-        PhysicalAddress(0)
-    }
-
-    /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
-    ///
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return
-    /// the least significant 12 bits (12:0] of this PhysicalAddress.
-    pub const fn frame_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-}
-impl fmt::Debug for PhysicalAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "p{:#X}", self.0)
-    }
-}
-impl fmt::Display for PhysicalAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-impl fmt::Pointer for PhysicalAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl Add<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn add(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for PhysicalAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_add(rhs));
-    }
-}
-
-impl Sub<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn sub(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
-
-impl SubAssign<usize> for PhysicalAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<PhysicalAddress> for usize {
-    #[inline]
-    fn from(virt_addr: PhysicalAddress) -> usize {
-        virt_addr.0
-    }
-}
 
 
 /// A `Frame` is a chunk of **physical** memory,

@@ -26,6 +26,7 @@ extern crate rsdp;
 extern crate rsdt;
 extern crate fadt;
 extern crate madt;
+extern crate dmar;
 
 
 use alloc::vec::Vec;
@@ -101,6 +102,33 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         let acpi_tables = ACPI_TABLES.lock();
         let madt = madt::Madt::get(&acpi_tables).ok_or("The required MADT ACPI table wasn't found (signature 'APIC')")?;
         madt.bsp_init(page_table)?;
+    }
+
+    // If we have a DMAR table, use it to obtain IOMMU info. 
+    {
+        let acpi_tables = ACPI_TABLES.lock();
+        if let Some(dmar_table) = dmar::Dmar::get(&acpi_tables) {
+            debug!("This machine has a DMAR table: flags: {:#b}, host_address_width: {} bits", 
+                dmar_table.flags(), dmar_table.host_address_width(),
+            );
+            for table in dmar_table.iter() {
+                match table {
+                    dmar::DmarEntry::Drhd(drhd) => {
+                        debug!("Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}", 
+                            drhd.include_pci_all(), drhd.segment_number(), drhd.register_base_address(),
+                        );
+                        debug!("DRHD table has Device Scope entries:");
+                        for (_idx, dev_scope) in drhd.iter().enumerate() {
+                            debug!("    Device Scope [{}]: type: {}, enumeration_id: {}, start_bus_number: {}", 
+                                _idx, dev_scope.device_type(), dev_scope.enumeration_id(), dev_scope.start_bus_number(),
+                            );
+                            debug!("                  path: {:?}", dev_scope.path());
+                        }
+                    }
+                    _ => { }
+                }
+            }
+        }
     }
 
     Ok(())
