@@ -178,90 +178,121 @@ implement_address!(
 
 
 
-/// A `Frame` is a chunk of **physical** memory,
-/// similar to how a `Page` is a chunk of **virtual** memory.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Frame {
-    pub number: usize,
-}
-impl fmt::Debug for Frame {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frame(p{:#X})", self.start_address())
-    }
-}
+/// A macro for defining `Page` and `Frame` structs
+/// and implementing their common traits, which are generally identical.
+macro_rules! implement_page_frame {
+    ($TypeName:ident, $desc:literal, $prefix:literal, $address:ident) => {
+        paste! { // using the paste crate's macro for easy concatenation
 
-impl Frame {
-    /// Returns the `Frame` containing the given `PhysicalAddress`.
-    pub const fn containing_address(phys_addr: PhysicalAddress) -> Frame {
-        Frame {
-            number: phys_addr.value() / PAGE_SIZE,
+            #[doc = "A `" $TypeName "` is a chunk of **" $desc "** memory aligned to a [`PAGE_SIZE`] boundary."]
+            #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+            pub struct $TypeName {
+                number: usize,
+            }
+
+            impl $TypeName {
+                #[doc = "Returns the `" $address "` at the start of this `" $TypeName "`."]
+                pub const fn start_address(&self) -> $address {
+                    $address::new_canonical(self.number * PAGE_SIZE)
+                }
+
+                #[doc = "Returns the number of this `" $TypeName "`."]
+                #[inline(always)]
+                pub const fn number(&self) -> usize {
+                    self.number
+                }
+                
+                #[doc = "Returns the `" $TypeName "` containing the given `" $address "`."]
+                pub const fn containing_address(addr: $address) -> $TypeName {
+                    $TypeName {
+                        number: addr.value() / PAGE_SIZE,
+                    }
+                }
+            }
+            impl fmt::Debug for $TypeName {
+                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    write!(f, concat!(stringify!($TypeName), "(", $prefix, "{:#X})"), self.start_address())
+                }
+            }
+            impl Add<usize> for $TypeName {
+                type Output = $TypeName;
+                fn add(self, rhs: usize) -> $TypeName {
+                    // cannot exceed max page number (which is also max frame number)
+                    $TypeName {
+                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+                    }
+                }
+            }
+            impl AddAssign<usize> for $TypeName {
+                fn add_assign(&mut self, rhs: usize) {
+                    *self = $TypeName {
+                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+                    };
+                }
+            }
+            impl Sub<usize> for $TypeName {
+                type Output = $TypeName;
+                fn sub(self, rhs: usize) -> $TypeName {
+                    $TypeName {
+                        number: self.number.saturating_sub(rhs),
+                    }
+                }
+            }
+            impl SubAssign<usize> for $TypeName {
+                fn sub_assign(&mut self, rhs: usize) {
+                    *self = $TypeName {
+                        number: self.number.saturating_sub(rhs),
+                    };
+                }
+            }
+            #[doc = "Implementing `Step` allows `" $TypeName "` to be used in an [`Iterator`]."]
+            unsafe impl Step for $TypeName {
+                #[inline]
+                fn steps_between(start: &$TypeName, end: &$TypeName) -> Option<usize> {
+                    Step::steps_between(&start.number, &end.number)
+                }
+                #[inline]
+                fn forward_checked(start: $TypeName, count: usize) -> Option<$TypeName> {
+                    Step::forward_checked(start.number, count).map(|n| $TypeName { number: n })
+                }
+                #[inline]
+                fn backward_checked(start: $TypeName, count: usize) -> Option<$TypeName> {
+                    Step::backward_checked(start.number, count).map(|n| $TypeName { number: n })
+                }
+            }
+
         }
-    }
-
-    /// Returns the `PhysicalAddress` at the start of this `Frame`.
-    pub const fn start_address(&self) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
-    }
-
-    #[inline(always)]
-    pub const fn number(&self) -> usize {
-        self.number
-    }
+    };
 }
 
-impl Add<usize> for Frame {
-    type Output = Frame;
+implement_page_frame!(Page, "virtual", "v", VirtualAddress);
+implement_page_frame!(Frame, "physical", "p", PhysicalAddress);
 
-    fn add(self, rhs: usize) -> Frame {
-        // cannot exceed max page number (which is also max frame number)
-        Frame {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        }
+// Implement other functions for the `Page` type that aren't relevant for `Frame.
+impl Page {
+    /// Returns the 9-bit part of this `Page`'s [`VirtualAddress`] that is the index into the P4 page table entries list.
+    pub const fn p4_index(&self) -> usize {
+        (self.number >> 27) & 0x1FF
+    }
+
+    /// Returns the 9-bit part of this `Page`'s [`VirtualAddress`] that is the index into the P3 page table entries list.
+    pub const fn p3_index(&self) -> usize {
+        (self.number >> 18) & 0x1FF
+    }
+
+    /// Returns the 9-bit part of this `Page`'s [`VirtualAddress`] that is the index into the P2 page table entries list.
+    pub const fn p2_index(&self) -> usize {
+        (self.number >> 9) & 0x1FF
+    }
+
+    /// Returns the 9-bit part of this `Page`'s [`VirtualAddress`] that is the index into the P1 page table entries list.
+    ///
+    /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
+    /// from which you can extract the mapped [`Frame`]  using `PageTableEntry::pointed_frame()`.
+    pub const fn p1_index(&self) -> usize {
+        (self.number >> 0) & 0x1FF
     }
 }
-
-impl AddAssign<usize> for Frame {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = Frame {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        };
-    }
-}
-
-impl Sub<usize> for Frame {
-    type Output = Frame;
-
-    fn sub(self, rhs: usize) -> Frame {
-        Frame {
-            number: self.number.saturating_sub(rhs),
-        }
-    }
-}
-
-impl SubAssign<usize> for Frame {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = Frame {
-            number: self.number.saturating_sub(rhs),
-        };
-    }
-}
-
-// Implementing these functions allow `Frame` to be in an `Iterator`.
-unsafe impl Step for Frame {
-    #[inline]
-    fn steps_between(start: &Frame, end: &Frame) -> Option<usize> {
-        Step::steps_between(&start.number, &end.number)
-    }
-    #[inline]
-    fn forward_checked(start: Frame, count: usize) -> Option<Frame> {
-        Step::forward_checked(start.number, count).map(|n| Frame { number: n })
-    }
-    #[inline]
-    fn backward_checked(start: Frame, count: usize) -> Option<Frame> {
-        Step::backward_checked(start.number, count).map(|n| Frame { number: n })
-    }
-}
-
 
 /// A range of `Frame`s that are contiguous in physical memory.
 #[derive(Clone, PartialEq, Eq)]
@@ -369,109 +400,6 @@ impl IntoIterator for FrameRange {
         self.0
     }
 }
-
-
-/// A virtual memory page, which contains the index of the page
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Page {
-    number: usize,
-}
-impl fmt::Debug for Page {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Page(v{:#X})", self.start_address())
-    }
-}
-
-impl Page {
-    /// Returns the `Page` that contains the given `VirtualAddress`.
-    pub const fn containing_address(virt_addr: VirtualAddress) -> Page {
-        Page {
-            number: virt_addr.value() / PAGE_SIZE,
-        }
-    }
-
-    /// Returns the `VirtualAddress` as the start of this `Page`.
-    pub const fn start_address(&self) -> VirtualAddress {
-        // Cannot create VirtualAddress directly because the field is private
-        VirtualAddress::new_canonical(self.number * PAGE_SIZE)
-    }
-
-    /// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.
-    pub const fn p4_index(&self) -> usize {
-        (self.number >> 27) & 0x1FF
-    }
-
-    /// Returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list.
-    pub const fn p3_index(&self) -> usize {
-        (self.number >> 18) & 0x1FF
-    }
-
-    /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    pub const fn p2_index(&self) -> usize {
-        (self.number >> 9) & 0x1FF
-    }
-
-    /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
-    /// from which you can extract the mapped `Frame` (or its physical address) using `pointed_frame()`.
-    pub const fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0x1FF
-    }
-}
-
-impl Add<usize> for Page {
-    type Output = Page;
-
-    fn add(self, rhs: usize) -> Page {
-        // cannot exceed max page number
-        Page {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        }
-    }
-}
-
-impl AddAssign<usize> for Page {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = Page {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        };
-    }
-}
-
-impl Sub<usize> for Page {
-    type Output = Page;
-
-    fn sub(self, rhs: usize) -> Page {
-        Page {
-            number: self.number.saturating_sub(rhs),
-        }
-    }
-}
-
-impl SubAssign<usize> for Page {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = Page {
-            number: self.number.saturating_sub(rhs),
-        };
-    }
-}
-
-// Implementing these functions allow `Page` to be in an `Iterator`.
-unsafe impl Step for Page {
-    #[inline]
-    fn steps_between(start: &Page, end: &Page) -> Option<usize> {
-        Step::steps_between(&start.number, &end.number)
-    }
-    #[inline]
-    fn forward_checked(start: Page, count: usize) -> Option<Page> {
-        Step::forward_checked(start.number, count).map(|n| Page { number: n })
-    }
-    #[inline]
-    fn backward_checked(start: Page, count: usize) -> Option<Page> {
-        Step::backward_checked(start.number, count).map(|n| Page { number: n })
-    }
-}
-
 
 
 /// An inclusive range of `Page`s that are contiguous in virtual memory.
