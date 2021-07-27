@@ -260,7 +260,6 @@ macro_rules! implement_page_frame {
                     Step::backward_checked(start.number, count).map(|n| $TypeName { number: n })
                 }
             }
-
         }
     };
 }
@@ -294,219 +293,142 @@ impl Page {
     }
 }
 
-/// A range of `Frame`s that are contiguous in physical memory.
-#[derive(Clone, PartialEq, Eq)]
-pub struct FrameRange(RangeInclusive<Frame>);
 
-impl FrameRange {
-    /// Creates a new range of `Frame`s that spans from `start` to `end`,
-    /// both inclusive bounds.
-    pub const fn new(start: Frame, end: Frame) -> FrameRange {
-        FrameRange(RangeInclusive::new(start, end))
-    }
 
-    /// Creates a FrameRange that will always yield `None`.
-    pub const fn empty() -> FrameRange {
-        FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
-    }
+/// A macro for defining `PageRange` and `FrameRange` structs
+/// and implementing their common traits, which are generally identical.
+macro_rules! implement_page_frame_range {
+    ($TypeName:ident, $desc:literal, $short:ident, $chunk:ident, $address:ident) => {
+        paste! { // using the paste crate's macro for easy concatenation
+                        
+            #[doc = "A range of [`" $chunk "`]s that are contiguous in " $desc " memory."]
+            #[derive(Clone, PartialEq, Eq)]
+            pub struct $TypeName(RangeInclusive<$chunk>);
 
-    /// A convenience method for creating a new `FrameRange`
-    /// that spans all `Frame`s from the given physical address
-    /// to an end bound based on the given size.
-    pub fn from_phys_addr(starting_phys_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
-        assert!(size_in_bytes > 0);
-        let start_frame = Frame::containing_address(starting_phys_addr);
-		// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-        let end_frame = Frame::containing_address(starting_phys_addr + (size_in_bytes - 1));
-        FrameRange::new(start_frame, end_frame)
-    }
+            impl $TypeName {
+                #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
+                pub const fn new(start: $chunk, end: $chunk) -> $TypeName {
+                    $TypeName(RangeInclusive::new(start, end))
+                }
 
-    /// Returns the `PhysicalAddress` of the starting `Frame` in this `FrameRange`.
-    pub const fn start_address(&self) -> PhysicalAddress {
-        self.0.start().start_address()
-    }
+                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
+                pub const fn empty() -> $TypeName {
+                    $TypeName::new($chunk { number: 1 }, $chunk { number: 0 })
+                }
 
-    /// Returns the number of `Frame`s covered by this iterator.
-    /// Use this instead of the Iterator trait's `count()` method.
-    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
-    pub fn size_in_frames(&self) -> usize {
-        // add 1 because it's an inclusive range
-        (self.0.end().number + 1).saturating_sub(self.0.start().number)
-    }
+                #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
+                    all [`" $chunk "`]s from the given [`" $address "`] to an end bound based on the given size."]
+                pub fn [<from_ $short _addr>](starting_addr: $address, size_in_bytes: usize) -> $TypeName {
+                    assert!(size_in_bytes > 0);
+                    let start = $chunk::containing_address(starting_addr);
+                    // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
+                    let end = $chunk::containing_address(starting_addr + (size_in_bytes - 1));
+                    $TypeName::new(start, end)
+                }
 
-    /// Whether this `FrameRange` contains the given `PhysicalAddress`.
-    pub fn contains_phys_addr(&self, phys_addr: PhysicalAddress) -> bool {
-        self.0.contains(&Frame::containing_address(phys_addr))
-    }
+                #[doc = "Returns the [`" $address "`] of the starting [`" $chunk "`] in this `" $TypeName "`."]
+                pub const fn start_address(&self) -> $address {
+                    self.0.start().start_address()
+                }
 
-    /// Returns the offset of the given `PhysicalAddress` within this `FrameRange`,
-    /// i.e., the difference between `phys_addr` and `self.start()`.
-    pub fn offset_from_start(&self, phys_addr: PhysicalAddress) -> Option<usize> {
-        if self.contains_phys_addr(phys_addr) {
-            Some(phys_addr.value() - self.start_address().value())
-        } else {
-            None
+                #[doc = "Returns the number of [`" $chunk "`]s covered by this iterator.\n\n \
+                    Use this instead of [`Iterator::count()`] method. \
+                    This is instant, because it doesn't need to iterate over each entry, unlike normal iterators."]
+                pub const fn [<size_in_ $chunk:lower s>](&self) -> usize {
+                    // add 1 because it's an inclusive range
+                    (self.0.end().number + 1).saturating_sub(self.0.start().number)
+                }
+
+                /// Returns the size of this range in number of bytes.
+                pub const fn size_in_bytes(&self) -> usize {
+                    self.[<size_in_ $chunk:lower s>]() * PAGE_SIZE
+                }
+
+                #[doc = "Returns `true` if this `" $TypeName "` contains the given [`" $address "`]."]
+                pub fn contains_address(&self, addr: $address) -> bool {
+                    self.0.contains(&$chunk::containing_address(addr))
+                }
+
+                #[doc = "Returns the offset of the given [`" $address "`] within this `" $TypeName "`, \
+                    i.e., `addr - self.start_address()`.\n\n \
+                    If the given `addr` is not covered by this range of [`" $chunk "`]s, this returns `None`.\n\n \
+                    # Examples\n \
+                    If the range covers addresses `0x2000` to `0x4000`, then `offset_of_address(0x3500)` would return `Some(0x1500)`."]
+                pub fn offset_of_address(&self, addr: $address) -> Option<usize> {
+                    if self.contains_address(addr) {
+                        Some(addr.value() - self.start_address().value())
+                    } else {
+                        None
+                    }
+                }
+
+                #[doc = "Returns the [`" $address "`] at the given `offset` into this `" $TypeName "`within this `" $TypeName "`, \
+                    i.e., `addr - self.start_address()`.\n\n \
+                    If the given `offset` is not within this range of [`" $chunk "`]s, this returns `None`.\n\n \
+                    # Examples\n \
+                    If the range covers addresses `0x2000` to `0x4000`, then `address_at_offset(0x1500)` would return `Some(0x3500)`."]
+                pub fn address_at_offset(&self, offset: usize) -> Option<$address> {
+                    if offset <= self.size_in_bytes() {
+                        Some(self.start_address() + offset)
+                    }
+                    else {
+                        None
+                    }
+                }
+
+                #[doc = "Returns a new separate `" $TypeName "` that is extended to include the given [`" $chunk "`]."]
+                pub fn to_extended(&self, to_include: $chunk) -> $TypeName {
+                    // if the current range was empty, return a new range containing only the given page/frame
+                    if self.is_empty() {
+                        return $TypeName::new(to_include.clone(), to_include);
+                    }
+                    let start = core::cmp::min(self.0.start(), &to_include);
+                    let end = core::cmp::max(self.0.end(), &to_include);
+                    $TypeName::new(start.clone(), end.clone())
+                }
+
+                #[doc = "Returns an inclusive `" $TypeName "` representing the [`" $chunk "`]s that overlap \
+                    across this `" $TypeName "` and the given other `" $TypeName "`.\n\n \
+                    If there is no overlap between the two ranges, `None` is returned."]
+                pub fn overlap(&self, other: &$TypeName) -> Option<$TypeName> {
+                    let starts = max(*self.start(), *other.start());
+                    let ends   = min(*self.end(),   *other.end());
+                    if starts <= ends {
+                        Some($TypeName::new(starts, ends))
+                    } else {
+                        None
+                    }
+                }
+            }
+            impl fmt::Debug for $TypeName {
+                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    write!(f, "{:?}", self.0)
+                }
+            }
+            impl Deref for $TypeName {
+                type Target = RangeInclusive<$chunk>;
+                fn deref(&self) -> &RangeInclusive<$chunk> {
+                    &self.0
+                }
+            }
+            impl DerefMut for $TypeName {
+                fn deref_mut(&mut self) -> &mut RangeInclusive<$chunk> {
+                    &mut self.0
+                }
+            }
+            impl IntoIterator for $TypeName {
+                type Item = $chunk;
+                type IntoIter = RangeInclusive<$chunk>;
+                fn into_iter(self) -> Self::IntoIter {
+                    self.0
+                }
+            }
         }
-    }
-
-    /// Returns a new, separate `FrameRange` that is extended to include the given `Frame`.
-    pub fn to_extended(&self, frame_to_include: Frame) -> FrameRange {
-        // if the current FrameRange was empty, return a new FrameRange containing only the given frame_to_include
-        if self.is_empty() {
-            return FrameRange::new(frame_to_include.clone(), frame_to_include);
-        }
-
-        let start = core::cmp::min(self.0.start(), &frame_to_include);
-        let end = core::cmp::max(self.0.end(), &frame_to_include);
-        FrameRange::new(start.clone(), end.clone())
-    }
-
-    /// Returns an inclusive `FrameRange` representing the frames that overlap
-    /// across this `FrameRange` and the given other `FrameRange`. 
-    ///
-    /// If there is no overlap between the two ranges, `None` is returned.
-    pub fn overlap(&self, other: &FrameRange) -> Option<FrameRange> {
-        let starts = max(*self.start(), *other.start());
-        let ends   = min(*self.end(),   *other.end());
-        if starts <= ends {
-            Some(FrameRange::new(starts, ends))
-        } else {
-            None
-        }
-    }
-}
-impl fmt::Debug for FrameRange {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{:?}", self.0)
-	}
-}
-impl Deref for FrameRange {
-    type Target = RangeInclusive<Frame>;
-    fn deref(&self) -> &RangeInclusive<Frame> {
-        &self.0
-    }
-}
-impl DerefMut for FrameRange {
-    fn deref_mut(&mut self) -> &mut RangeInclusive<Frame> {
-        &mut self.0
-    }
+    };
 }
 
-impl IntoIterator for FrameRange {
-    type Item = Frame;
-    type IntoIter = RangeInclusive<Frame>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0
-    }
-}
-
-
-/// An inclusive range of `Page`s that are contiguous in virtual memory.
-#[derive(Clone, PartialEq, Eq)]
-pub struct PageRange(RangeInclusive<Page>);
-
-impl PageRange {
-    /// Creates a new range of `Page`s that spans from `start` to `end`,
-    /// both inclusive bounds.
-    pub const fn new(start: Page, end: Page) -> PageRange {
-        PageRange(RangeInclusive::new(start, end))
-    }
-
-    /// Creates a PageRange that will always yield `None`.
-    pub const fn empty() -> PageRange {
-        PageRange::new(Page { number: 1 }, Page { number: 0 })
-    }
-
-    /// A convenience method for creating a new `PageRange`
-    /// that spans all `Page`s from the given virtual address
-    /// to an end bound based on the given size.
-    pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
-        assert!(size_in_bytes > 0);
-        let start_page = Page::containing_address(starting_virt_addr);
-		// The end page is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-        let end_page = Page::containing_address(starting_virt_addr + (size_in_bytes - 1));
-        PageRange::new(start_page, end_page)
-    }
-
-    /// Returns the `VirtualAddress` of the starting `Page`.
-    pub const fn start_address(&self) -> VirtualAddress {
-        self.0.start().start_address()
-    }
-
-    /// Returns the size in number of `Page`s.
-    /// Use this instead of the Iterator trait's `count()` method.
-    /// This is instant, because it doesn't need to iterate over each `Page`, unlike normal iterators.
-    pub const fn size_in_pages(&self) -> usize {
-        // add 1 because it's an inclusive range
-        (self.0.end().number + 1).saturating_sub(self.0.start().number)
-    }
-
-    /// Returns the size in number of bytes.
-    pub const fn size_in_bytes(&self) -> usize {
-        self.size_in_pages() * PAGE_SIZE
-    }
-
-    /// Whether this `PageRange` contains the given `VirtualAddress`.
-    pub fn contains_virt_addr(&self, virt_addr: VirtualAddress) -> bool {
-        self.0.contains(&Page::containing_address(virt_addr))
-    }
-
-    /// Returns the offset of the given `VirtualAddress` within this `PageRange`,
-    /// i.e., the difference between `virt_addr` and `self.start_address()`.
-    /// If the given `VirtualAddress` is not covered by this range of `Page`s, this returns `None`.
-    ///  
-    /// # Examples
-    /// If the page range covered addresses `0x2000` to `0x4000`, then calling
-    /// `offset_of_address(0x3500)` would return `Some(0x1500)`.
-    pub fn offset_of_address(&self, virt_addr: VirtualAddress) -> Option<usize> {
-        if self.contains_virt_addr(virt_addr) {
-            Some(virt_addr.value() - self.start_address().value())
-        } else {
-            None
-        }
-    }
-
-    /// Returns the `VirtualAddress` at the given `offset` into this mapping,  
-    /// If the given `offset` is not covered by this range of `Page`s, this returns `None`.
-    ///  
-    /// # Examples
-    /// If the page range covered addresses `0xFFFFFFFF80002000` to `0xFFFFFFFF80004000`,
-    /// then calling `address_at_offset(0x1500)` would return `Some(0xFFFFFFFF80003500)`.
-    pub fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
-        if offset <= self.size_in_bytes() {
-            Some(self.start_address() + offset)
-        }
-        else {
-            None
-        }
-    }
-}
-impl fmt::Debug for PageRange {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{:?}", self.0)
-	}
-}
-impl Deref for PageRange {
-    type Target = RangeInclusive<Page>;
-    fn deref(&self) -> &RangeInclusive<Page> {
-        &self.0
-    }
-}
-impl DerefMut for PageRange {
-    fn deref_mut(&mut self) -> &mut RangeInclusive<Page> {
-        &mut self.0
-    }
-}
-
-impl IntoIterator for PageRange {
-    type Item = Page;
-    type IntoIter = RangeInclusive<Page>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0
-    }
-}
+implement_page_frame_range!(PageRange, "virtual", virt, Page, VirtualAddress);
+implement_page_frame_range!(FrameRange, "physical", phys, Frame, PhysicalAddress);
 
 
 /// The address bounds and mapping flags of a section's memory region.
