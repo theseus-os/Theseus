@@ -52,6 +52,13 @@ e.g. `echo 15b3 1019 > /sys/bus/pci/drivers/vfio-pci/new_id`
 
 Now, QEMU can be launched with direct access to the device.
 
+### Return device to the Host OS
+To reset the device, you can either reboot the system or return the device to the host OS using the following commands (replacing `$slot_info` with the value previously retrieved):  
+```sh
+echo 1 > /sys/bus/pci/devices/$slot_info/remove    
+echo 1 > /sys/bus/pci/rescan  
+```
+
 ### Note: access for unprivileged users
 To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:
 ```sh

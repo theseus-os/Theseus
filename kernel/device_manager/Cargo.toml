@@ -59,6 +59,8 @@ path = "../ixgbe"
 [dependencies.io]
 path = "../io"
 
+[dependencies.mlx5]
+path = "../mlx5"
 
 [lib]
 crate-type = ["rlib"]
