@@ -55,8 +55,8 @@ Now, QEMU can be launched with direct access to the device.
 ### Return device to the Host OS
 To reset the device, you can either reboot the system or return the device to the host OS using the following commands (replacing `$slot_info` with the value previously retrieved):  
 ```sh
-echo 1 >/sys/bus/pci/devices/$slot_info/remove    
-echo 1 >/sys/bus/pci/rescan  
+echo 1 > /sys/bus/pci/devices/$slot_info/remove    
+echo 1 > /sys/bus/pci/rescan  
 ```
 
 ### Note: access for unprivileged users
