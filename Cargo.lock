@@ -1397,24 +1397,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mellanox_ethernet"
-version = "0.1.0"
-dependencies = [
- "bit_field 0.7.0",
- "byteorder",
- "kernel_config",
- "libm",
- "log",
- "memory",
- "nic_initialization",
- "num_enum",
- "owning_ref",
- "static_assertions",
- "volatile",
- "zerocopy",
-]
-
-[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1520,12 +1502,30 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "log",
- "mellanox_ethernet",
  "memory",
+ "mlx_ethernet",
  "nic_initialization",
  "owning_ref",
  "pci",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "mlx_ethernet"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "byteorder",
+ "kernel_config",
+ "libm",
+ "log",
+ "memory",
+ "nic_initialization",
+ "num_enum",
+ "owning_ref",
+ "static_assertions",
+ "volatile",
+ "zerocopy",
 ]
 
 [[package]]

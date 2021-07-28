@@ -1,5 +1,5 @@
 [package]
-name = "mellanox_ethernet"
+name = "mlx_ethernet"
 description = "defines structs and traits for SW objects unique to Mellanox NICs"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
