@@ -3,7 +3,7 @@
 //! Currently we only support reading the device PCI space, mapping the initialization segment,
 //! and setting up a command queue to pass commands to the NIC.
 //! 
-//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) [Rev 0.54],
+//! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) Rev 0.54,
 //! unless otherwise specified. 
 
 #![no_std]
