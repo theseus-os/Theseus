@@ -205,11 +205,17 @@ pub fn handle_ap_cores(
     
     // wait for all cores to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
-    let mut count = get_lapics().iter().count();
-    while count < ap_count + 1 {
-        trace!("BSP-known count: {}", count);
+    let expected_cores = ap_count + 1;
+    let mut num_known_cores = get_lapics().iter().count();
+    let mut iter = 0;
+    while num_known_cores < expected_cores {
         spin_loop_hint();
-        count = get_lapics().iter().count();
+        num_known_cores = get_lapics().iter().count();
+        if iter == 100000 {
+            trace!("BSP is waiting for APs to boot ({} of {})", num_known_cores, expected_cores);
+            iter = 0;
+        }
+        iter += 1;
     }
     
     Ok(ap_count)  

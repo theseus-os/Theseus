@@ -1,9 +1,4 @@
-//! Definitions for the ACPI RSDT and XSDT system tables.
-//!
-//! RSDT is the Root System Descriptor Table, whereas
-//! XSDT is the Extended System Descriptor Table. 
-//! They are identical except that the XSDT uses 64-bit physical addresses
-//! to point to other ACPI SDTs, while the RSDT uses 32-bit physical addresses.
+//! Definitions for FADT, the Fixed ACPI Description Table.
 
 #![no_std]
 
