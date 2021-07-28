@@ -65,8 +65,8 @@ pub struct Madt<'t> {
     table: &'t MadtAcpiTable,
     /// The underlying MappedPages that cover this MADT
     mapped_pages: &'t MappedPages,
-    /// The starting offset of the dynamic part of the MADT table.
-    /// This is to be used as an offset into the above `mapped_pages`.
+    /// The offset into the above `mapped_pages` at which the dynamic part
+    /// of the MADT table begins.
     dynamic_entries_starting_offset: usize,
     /// The total size in bytes of all dynamic entries.
     /// This is *not* the number of entries.
@@ -98,7 +98,7 @@ impl<'t> Madt<'t> {
         Ok(())
     }
 
-    /// Returns an iterator over the MADT's entries,
+    /// Returns an [`Iterator`] over the MADT's entries,
     /// which are variable in both number and size.
     pub fn iter(&self) -> MadtIter {
         MadtIter {
@@ -125,7 +125,7 @@ impl<'t> Madt<'t> {
 }
 
 
-/// An Iterator over the dynamic entries of the MADT.
+/// An [`Iterator`] over the dynamic entries of the MADT.
 /// Its lifetime is dependent upon the lifetime of its `Madt` instance,
 /// which itself is bound to the lifetime of the underlying `AcpiTables`. 
 #[derive(Clone)]

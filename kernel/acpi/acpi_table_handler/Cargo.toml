@@ -25,3 +25,6 @@ path = "../hpet"
 
 [dependencies.madt]
 path = "../madt"
+
+[dependencies.dmar]
+path = "../dmar"

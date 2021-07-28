@@ -185,7 +185,7 @@ fn parse_nano_core_symbol_file(
         let size_hex_str = tokens.next();
         // parse both the Address and Size fields as hex strings
         addr_hex_str.and_then(|a| usize::from_str_radix(a, 16).ok())
-            .and_then(|addr| VirtualAddress::new(addr).ok())
+            .and_then(VirtualAddress::new)
             .and_then(|vaddr| {
                 size_hex_str.and_then(|s| usize::from_str_radix(s, 16).ok())
                     .and_then(|size| Some((vaddr, size)))
@@ -453,7 +453,8 @@ fn parse_nano_core_binary(
                 bss_shndx = Some(shndx);
             }
             Ok(".gcc_except_table") => {
-                let sec_vaddr = VirtualAddress::new(sec.address() as usize)?;
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .gcc_except_table section had an invalid physical address")?;
                 let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                     .ok_or("the nano_core .gcc_except_table section wasn't covered by the read-only mapped pages!")?;
                 crate_items.sections.insert(
@@ -472,7 +473,8 @@ fn parse_nano_core_binary(
                 section_counter += 1;
             }
             Ok(".eh_frame") => {
-                let sec_vaddr = VirtualAddress::new(sec.address() as usize)?;
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .eh_frame section had an invalid physical address")?;
                 let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                     .ok_or("the nano_core .eh_frame section wasn't covered by the read-only mapped pages!")?;
                 crate_items.sections.insert(
@@ -598,7 +600,8 @@ fn add_new_section(
     global: bool,
 ) -> Result<(), &'static str> {
     let new_section = if sec_ndx == shndxs.text_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new text section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Text,
             sec_name,
@@ -611,7 +614,8 @@ fn add_new_section(
         ))
     }
     else if sec_ndx == shndxs.rodata_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new rodata section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Rodata,
             sec_name,
@@ -624,7 +628,8 @@ fn add_new_section(
         ))
     }
     else if sec_ndx == shndxs.data_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new data section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Data,
             sec_name,
@@ -637,7 +642,8 @@ fn add_new_section(
         ))
     }
     else if sec_ndx == shndxs.bss_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new bss section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Bss,
             sec_name,

@@ -10,6 +10,7 @@ dependencies = [
  "acpi_table_handler",
  "ap_start",
  "apic",
+ "dmar",
  "fadt",
  "hpet",
  "ioapic",
@@ -43,6 +44,7 @@ name = "acpi_table_handler"
 version = "0.1.0"
 dependencies = [
  "acpi_table",
+ "dmar",
  "fadt",
  "hpet",
  "log",
@@ -630,6 +632,18 @@ dependencies = [
  "framebuffer",
  "shapes",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "dmar"
+version = "0.1.0"
+dependencies = [
+ "acpi_table",
+ "log",
+ "memory",
+ "sdt",
+ "static_assertions",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1397,24 +1411,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mellanox_ethernet"
-version = "0.1.0"
-dependencies = [
- "bit_field 0.7.0",
- "byteorder",
- "kernel_config",
- "libm",
- "log",
- "memory",
- "nic_initialization",
- "num_enum",
- "owning_ref",
- "static_assertions",
- "volatile",
- "zerocopy",
-]
-
-[[package]]
 name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1486,6 +1482,7 @@ dependencies = [
  "entryflags_x86_64",
  "kernel_config",
  "multiboot2",
+ "paste",
  "xmas-elf",
  "zerocopy",
 ]
@@ -1520,12 +1517,30 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "log",
- "mellanox_ethernet",
  "memory",
+ "mlx_ethernet",
  "nic_initialization",
  "owning_ref",
  "pci",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "mlx_ethernet"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "byteorder",
+ "kernel_config",
+ "libm",
+ "log",
+ "memory",
+ "nic_initialization",
+ "num_enum",
+ "owning_ref",
+ "static_assertions",
+ "volatile",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1868,6 +1883,12 @@ dependencies = [
  "task",
  "unwind",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
 
 [[package]]
 name = "path"
@@ -2359,6 +2380,7 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
+ "static_assertions",
  "zerocopy",
 ]
 

@@ -24,8 +24,8 @@ path = "../pci"
 [dependencies.nic_initialization]
 path = "../nic_initialization"
 
-[dependencies.mellanox_ethernet]
-path = "../mellanox_ethernet"
+[dependencies.mlx_ethernet]
+path = "../mlx_ethernet"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

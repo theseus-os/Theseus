@@ -16,7 +16,7 @@ extern crate memory;
 extern crate pci; 
 extern crate owning_ref;
 extern crate nic_initialization;
-extern crate mellanox_ethernet;
+extern crate mlx_ethernet;
 extern crate kernel_config;
 
 use spin::Once; 
@@ -29,7 +29,7 @@ use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use pci::PciDevice;
 use owning_ref::BoxRefMut;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
-use mellanox_ethernet::{
+use mlx_ethernet::{
     InitializationSegment, 
     command_queue::{CommandQueueEntry, CommandQueue, CommandOpcode, ManagePagesOpMod, QueryPagesOpMod}
 };
