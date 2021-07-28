@@ -1004,6 +1004,11 @@ Below is sample output for a Mellanox ethernet card we'd like to access using PC
 </code></pre>
 <p>e.g. <code>echo 15b3 1019 &gt; /sys/bus/pci/drivers/vfio-pci/new_id</code></p>
 <p>Now, QEMU can be launched with direct access to the device.</p>
+<h3 id="return-device-to-the-host-os"><a class="header" href="#return-device-to-the-host-os">Return device to the Host OS</a></h3>
+<p>To reset the device, you can either reboot the system or return the device to the host OS using the following commands (replacing <code>$slot_info</code> with the value previously retrieved):</p>
+<pre><code class="language-sh">echo 1 &gt; /sys/bus/pci/devices/$slot_info/remove    
+echo 1 &gt; /sys/bus/pci/rescan  
+</code></pre>
 <h3 id="note-access-for-unprivileged-users"><a class="header" href="#note-access-for-unprivileged-users">Note: access for unprivileged users</a></h3>
 <p>To give access to an unprivileged user to this VFIO device, find the IOMMU group the device belongs to:</p>
 <pre><code class="language-sh">readlink /sys/bus/pci/devices/$slot_info/iommu_group
