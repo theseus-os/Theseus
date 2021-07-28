@@ -8,7 +8,6 @@
 //! an older version of the manual can be found at <http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf>.
 
  #![no_std]
- #![allow(rustdoc::private_intra_doc_links)]
  #![feature(slice_pattern)]
  #![feature(core_intrinsics)]
 

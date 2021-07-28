@@ -461,7 +461,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
 doc: check_rustc
-	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@RUSTDOCFLAGS="$$RUSTDOCFLAGS -A private_intra_doc_links" cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
