@@ -1,0 +1,13 @@
+[package]
+authors = ["Zhiyao Ma <221thunder@gmail.com>"]
+name = "context_switch_armv7em"
+description = "Context switching routines and structs for ARMv7em platform"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+zerocopy = "0.3.0"
+cfg-if = "1.0.0"
+
+[lib]
+crate-type = ["rlib"]

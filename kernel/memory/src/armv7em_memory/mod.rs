@@ -17,13 +17,14 @@ use spin::Mutex;
 use zerocopy::FromBytes;
 use memory_structs::PageRange;
 pub use page_allocator::*;
+pub use memory_structs::*;
 
 /// Dummy entry flags. For ARM micro controllers, there is no page
 /// table entry nor flags. This struct is mainly used to be compatible
 /// with existing upper layer codes which expect this struct. Likewise,
 /// the variants in this enum have no special meaning, just to make
 /// existing code compile.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum EntryFlags {
     WRITABLE
 }
@@ -43,6 +44,7 @@ impl EntryFlags {
 /// Pages that are ready to read/write. Since ARM micro controllers
 /// do not have paging mechanism, `MappedPages` is merely a wrapper
 /// around `AllocatedPages`.
+#[derive(Debug)]
 pub struct MappedPages {
     pages: AllocatedPages,
     flags: EntryFlags
