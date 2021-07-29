@@ -8,7 +8,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.9.0"
 volatile = "0.2.7"
-zerocopy = "0.3.0"
+zerocopy = "0.5.0"
 
 [dependencies.log]
 version = "0.4.8"
@@ -41,7 +41,7 @@ path = "../apic"
 path = "../ap_start"
 
 [dependencies.madt]
-path = "../madt"
+path = "../acpi/madt"
 
 [dependencies.pause]
 path = "../pause"

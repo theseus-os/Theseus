@@ -20,7 +20,7 @@ version = "0.4.8"
 path = "../upd"
 
 [dependencies.hpet]
-path = "../../kernel/hpet"
+path = "../../kernel/acpi/hpet"
 
 [dependencies.hashbrown]
 version = "0.9.1"

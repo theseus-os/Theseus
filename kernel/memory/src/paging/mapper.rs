@@ -20,7 +20,7 @@ use paging::{
     PageRange,
     table::{P4, Table, Level4},
 };
-use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
+use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
@@ -99,10 +99,10 @@ impl Mapper {
                 if let Some(start_frame) = p3_entry.pointed_frame() {
                     if p3_entry.flags().is_huge() {
                         // address must be 1GiB aligned
-                        assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
-                        return Some(Frame {
-                            number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index(),
-                        });
+                        assert!(start_frame.number() % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
+                        return Some(Frame::containing_address(PhysicalAddress::new_canonical(
+                            PAGE_SIZE * (start_frame.number() + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index())
+                        )));
                     }
                 }
                 if let Some(p2) = p3.next_table(page.p3_index()) {
@@ -111,8 +111,10 @@ impl Mapper {
                     if let Some(start_frame) = p2_entry.pointed_frame() {
                         if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
-                            assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
-                            return Some(Frame { number: start_frame.number + page.p1_index() });
+                            assert!(start_frame.number() % ENTRIES_PER_PAGE_TABLE == 0);
+                            return Some(Frame::containing_address(PhysicalAddress::new_canonical(
+                                PAGE_SIZE * (start_frame.number() + page.p1_index())
+                            )));
                         }
                     }
                 }
@@ -416,7 +418,7 @@ impl MappedPages {
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
     ///
-    /// Note that attempting to change certain flags will have no effect. 
+    /// Note that attempting to change certain "reserved" flags will have no effect. 
     /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
     pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
         if self.size_in_pages() == 0 { return Ok(()); }

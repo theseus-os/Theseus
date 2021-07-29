@@ -21,10 +21,7 @@ extern crate fault_log;
 
 use memory::{VirtualAddress, Page};
 use x86_64::{
-    registers::{
-        control_regs,
-        msr::*,
-    },
+    registers::control_regs,
     structures::idt::{
         LockedIdt,
         ExceptionStackFrame,

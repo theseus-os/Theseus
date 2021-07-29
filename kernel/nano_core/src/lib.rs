@@ -111,11 +111,11 @@ pub extern "C" fn nano_core_start(
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
-    if VirtualAddress::new(multiboot_information_virtual_address).is_err() {
+    if VirtualAddress::new(multiboot_information_virtual_address).is_none() {
         try_exit!(Err("multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
-    println_raw!("nano_core_start(): booted via multiboot2."); 
+    println_raw!("nano_core_start(): booted via multiboot2 with info at {:#X}.", multiboot_information_virtual_address); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
@@ -161,15 +161,13 @@ pub extern "C" fn nano_core_start(
             // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
             let ap_realmode_begin = try_exit!(
                 init_symbols.get("ap_start_realmode")
-                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"")
-                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
-                )
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode\"")
             );
             let ap_realmode_end   = try_exit!(
                 init_symbols.get("ap_start_realmode_end")
-                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"")
-                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
-                )
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")
             );
             // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
             (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end)

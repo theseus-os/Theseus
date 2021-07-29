@@ -2,18 +2,19 @@
 //! when SSE/SIMD extensions are not active. 
 
 #![no_std]
-#![feature(llvm_asm, naked_functions)]
+#![feature(asm, naked_functions)]
 
 extern crate zerocopy;
 
 use zerocopy::FromBytes;
 
 /// The registers saved before a context switch and restored after a context switch.
+///
+/// Note: the order of the registers here MUST MATCH the order of 
+/// registers popped in the [`restore_registers_regular!`] macro. 
 #[derive(FromBytes)]
 #[repr(C, packed)]
 pub struct ContextRegular {
-    // The order of the registers here MUST MATCH the order of 
-    // registers popped in the restore_registers_regular!() macro below. 
     r15: usize, 
     r14: usize,
     r13: usize,
@@ -34,33 +35,31 @@ impl ContextRegular {
             r12: 0,
             rbp: 0,
             rbx: 0,
-            rip: rip,
+            rip,
         }
     }
 }
 
 
-/// An assembly macro for saving regular x86_64 registers.
+/// An assembly block for saving regular x86_64 registers
 /// by pushing them onto the stack.
 #[macro_export]
 macro_rules! save_registers_regular {
     () => (
-        llvm_asm!("
-            # save all general purpose registers into the previous task
+        // save all general purpose registers into the previous task
+        r#"
             push rbx
             push rbp
             push r12
             push r13
             push r14
             push r15
-            "
-            : : : "memory" : "intel", "volatile"
-        );
+        "#
     );
 }
 
 
-/// An assembly macro for switching stacks,
+/// An assembly block for switching stacks,
 /// which is the integral part of the actual context switching routine.
 /// 
 /// * The `rdi` register must contain a pointer to the previous task's stack pointer.
@@ -68,33 +67,35 @@ macro_rules! save_registers_regular {
 #[macro_export]
 macro_rules! switch_stacks {
     () => (
-        llvm_asm!("
-            # switch the stack pointers
+        // switch the stack pointers
+        r#"
             mov [rdi], rsp
             mov rsp, rsi
-            "
-            : : : "memory" : "intel", "volatile"
-        );
+        "#
     );
 }
 
 
-/// An assembly macro for saving regular x86_64 registers.
-/// by pushing them onto the stack.
+/// An assembly block for restoring regular x86_64 registers
+/// by popping them off of the stack.
+/// 
+/// This assembly statement ends with an explicit `ret` instruction at the end,
+/// which is the final component of a context switch operation. 
+/// Note that this is intentional and required in order to accommodate 
+/// the `noreturn` option is required by Rust's naked functions.
 #[macro_export]
 macro_rules! restore_registers_regular {
     () => (
-        llvm_asm!("
-            # restore the next task's general purpose registers
+        // restore the next task's general purpose registers
+        r#" 
             pop r15
             pop r14
             pop r13
             pop r12
             pop rbp
             pop rbx
-            "
-            : : : "memory" : "intel", "volatile"
-        );
+            ret
+        "#
     );
 }
 
@@ -109,11 +110,14 @@ macro_rules! restore_registers_regular {
 /// This function is unsafe because it changes the content on both task's stacks. 
 #[naked]
 #[inline(never)]
-pub unsafe fn context_switch_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+pub unsafe extern "C" fn context_switch_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     // Since this is a naked function that expects its arguments in two registers,
-    // you CANNOT place any log statements or other instructions here,
-    // or at any point before, in between, or after the following macros.
-    save_registers_regular!();
-    switch_stacks!();
-    restore_registers_regular!();
+    // you CANNOT place any log statements or other instructions here
+    // before, in between, or after anything below.
+    asm!(
+        save_registers_regular!(),
+        switch_stacks!(),
+        restore_registers_regular!(),
+        options(noreturn)
+    );
 }

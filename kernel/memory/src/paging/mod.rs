@@ -208,13 +208,14 @@ pub fn init(
     ), &'static str>
 {
     let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info)?;
-
+    debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
+    
     // bootstrap a PageTable from the currently-loaded page table
     let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
     let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
 
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).map_err(|_| "boot_info start virtual address was invalid")?;
+    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
     let boot_info_size = boot_info.total_size();
     debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
