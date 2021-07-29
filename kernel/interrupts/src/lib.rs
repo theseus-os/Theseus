@@ -11,6 +11,7 @@
 extern crate x86_64;
 extern crate spin;
 extern crate port_io;
+extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
 extern crate apic;
@@ -346,7 +347,10 @@ extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackF
 
 /// IRQ 0x24: COM1 serial port interrupt handler.
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
+    use serial_port::{SerialPortAddress::COM1, get_serial_port};
     info!("COM1 serial handler");
+    let byte_in = get_serial_port(COM1).lock().in_byte();
+    trace!("    Read byte {} ({:#X})", byte_in, byte_in);
 
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }

@@ -1083,6 +1083,7 @@ dependencies = [
  "port_io",
  "ps2",
  "scheduler",
+ "serial_port",
  "spin 0.9.0",
  "task",
  "tlb_shootdown",

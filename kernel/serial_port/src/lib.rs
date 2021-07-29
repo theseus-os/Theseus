@@ -199,6 +199,12 @@ impl SerialPort {
 		}
 	}
 
+	/// Read one byte from the serial port.
+	pub fn in_byte(&mut self) -> u8 {
+		self.wait_until_data_received();
+		self.data.read() 
+	}
+
 	/// Blocks until the serial port is ready to transmit another byte.
 	#[inline(always)]
 	fn wait_until_ready_to_transmit(&self) {
