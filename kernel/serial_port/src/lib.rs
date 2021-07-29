@@ -171,55 +171,79 @@ impl SerialPort {
 		serial
 	}
 
-	/// Write the given string to the serial port.
+	/// Write the given string to the serial port, blocking until data can be transmitted.
 	///
 	/// # Special characters
 	/// Because this function writes strings, it will transmit a carriage return `'\r'`
 	/// after transmitting a line feed (new line) `'\n'` to ensure a proper new line.
 	pub fn out_str(&mut self, s: &str) {
-		for b in s.bytes() {
-			self.out_byte(b);
-			if b == b'\n' {
+		for byte in s.bytes() {
+			self.out_byte(byte);
+			if byte == b'\n' {
 				self.out_byte(b'\r');
 			}
 		}
 	}
 
-	/// Write the given byte to the serial port.
+	/// Write the given byte to the serial port, blocking until data can be transmitted.
 	///
 	/// This writes the byte directly with no special cases, e.g., new lines.
 	pub fn out_byte(&mut self, byte: u8) {
-		self.wait_until_ready_to_transmit();
+		while !self.ready_to_transmit() { }
 
-		// SAFE because we're just writing to the serial port. 
-		// worst-case effects here are simple out-of-order characters in the serial log.
+		// SAFE: we're just writing to the serial port, which has already been initialized.
 		unsafe { 
 			self.data.write(byte); 
 			// E9.write(byte); // for Bochs debugging
 		}
 	}
 
-	/// Read one byte from the serial port.
+	/// Write the given bytes to the serial port, blocking until data can be transmitted.
+	///
+	/// This writes the bytes directly with no special cases, e.g., new lines.
+	pub fn out_bytes(&mut self, bytes: &[u8]) {
+		for byte in bytes {
+			self.out_byte(*byte);
+		}
+	}
+
+	/// Read one byte from the serial port, blocking until data is available.
 	pub fn in_byte(&mut self) -> u8 {
-		self.wait_until_data_received();
+		while !self.data_available() { }
 		self.data.read() 
 	}
 
-	/// Blocks until the serial port is ready to transmit another byte.
-	#[inline(always)]
-	fn wait_until_ready_to_transmit(&self) {
-		while self.line_status.read() & 0x20 == 0 {
-			// do nothing
+	/// Reads multiple bytes from the serial port into the given `buffer`, non-blocking.
+	///
+	/// The buffer will be filled with as many bytes as are available in the serial port.
+	/// Once data is no longer available to be read, the read operation will stop. 
+	///
+	/// If no data is immediately available on the serial port, this will read nothing and return `0`.
+	///
+	/// Returns the number of bytes read into the given `buffer`.
+	pub fn in_bytes(&mut self, buffer: &mut [u8]) -> usize {
+		let mut bytes_read = 0;
+		for byte in buffer {
+			if !self.data_available() {
+				break;
+			}
+			*byte = self.data.read();
+			bytes_read += 1;
 		}
+		bytes_read
 	}
 
-	/// Blocks until the serial port has received a byte.
+	/// Returns `true` if the serial port is ready to transmit a byte.
+	#[inline(always)]
+	pub fn ready_to_transmit(&self) -> bool {
+		self.line_status.read() & 0x20 == 0x20
+	}
+
+	/// Return `true` if the serial port has data available to read.
 	#[allow(unused)]
 	#[inline(always)]
-	fn wait_until_data_received(&self) {
-		while self.line_status.read() & 0x01 == 0 {
-			// do nothing
-		}
+	pub fn data_available(&self) -> bool {
+		self.line_status.read() & 0x01 == 0x01
 	}
 }
 
