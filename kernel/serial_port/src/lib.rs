@@ -10,7 +10,7 @@
 //! specifically `0x08` and `0x7F`, which are ASCII "backspace" and "delete", respectively.
 //! They do so by writing them as three distinct values (with proper busy waiting in between):
 //! 1. `0x08`
-//! 2. `0x20`  (an ascii space character)
+//! 2. `0x20` (an ascii space character)
 //! 3. `0x08` again. 
 //!
 //! This isn't necessarily a bad idea, as it "clears out" whatever character was there before,
@@ -23,15 +23,51 @@
 
 #![no_std]
 
+extern crate spin;
 extern crate port_io;
+extern crate irq_safety;
 
 use core::fmt;
 use port_io::Port;
+use irq_safety::MutexIrqSafe;
+use spin::Once;
 
-pub const COM1_BASE_PORT: u16 = 0x3F8;
-pub const COM2_BASE_PORT: u16 = 0x2F8;
-pub const COM3_BASE_PORT: u16 = 0x3E8;
-pub const COM4_BASE_PORT: u16 = 0x2E8;
+
+/// The base port I/O addresses for COM serial ports.
+#[derive(Copy, Clone, Debug)]
+#[repr(u16)]
+pub enum SerialPortAddress {
+	/// The base port I/O address for the COM1 serial port.
+	COM1 = 0x3F8,
+	/// The base port I/O address for the COM2 serial port.
+	COM2 = 0x2F8,
+	/// The base port I/O address for the COM3 serial port.
+	COM3 = 0x3E8,
+	/// The base port I/O address for the COM4 serial port.
+	COM4 = 0x2E8,
+}
+
+static COM1_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+static COM2_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+static COM3_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+static COM4_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+
+
+/// Obtains a reference to the [`SerialPort`] specified by the given [`SerialPortAddress`].
+///
+/// This function initializes the given serial port if it has not yet been initialized. 
+pub fn get_serial_port(
+	serial_port_address: SerialPortAddress
+) -> &'static MutexIrqSafe<SerialPort> {
+	let sp = match serial_port_address {
+		SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
+		SerialPortAddress::COM2 => &COM2_SERIAL_PORT,
+		SerialPortAddress::COM3 => &COM3_SERIAL_PORT,
+		SerialPortAddress::COM4 => &COM4_SERIAL_PORT,
+	};
+	sp.call_once(|| MutexIrqSafe::new(SerialPort::new(serial_port_address as u16)))
+}
+
 
 // The E9 port can be used with the Bochs emulator for extra debugging info.
 // const PORT_E9: u16 = 0xE9; // for use with bochs
@@ -63,9 +99,9 @@ impl SerialPort {
 	/// * Interrupts enabled for receiving bytes only (not transmitting).
 	///
 	/// # Arguments
-	/// * `base_port`: the number (port I/O "address") of the serial port. 
+	/// * `base_port`: the port number (port I/O address) of the serial port. 
 	///    This should generally be one of the known serial ports, e.g., on x86, 
-	///    `COM1_BASE_PORT`, `COM2_BASE_PORT`, `COM3_BASE_PORT`, `COM4_BASE_PORT`.
+	///    [`SerialPortAddress::COM1`] through [`SerialPortAddress::COM4`].
 	///
 	/// Note: if you are experiencing problems with serial port behavior,
 	/// try enabling the loopback test part of this function to see if that passes.
