@@ -147,6 +147,10 @@ impl CommandOpcode {
             Self::AllocUar => 8,              
             Self::AllocPd => 8,               
             Self::AllocTransportDomain => 8,
+            Self::CreateEq => {
+                let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
+                0x110 + num_pages * 8
+            }
             _ => return Err(CommandQueueError::NotImplemented)           
         };
         Ok(len)
@@ -165,6 +169,7 @@ impl CommandOpcode {
             Self::AllocUar => 12,              
             Self::AllocPd => 12,               
             Self::AllocTransportDomain => 12,
+            Self::CreateEq => 12,
             _ => return Err(CommandQueueError::NotImplemented)         
         };
         Ok(len)
@@ -282,6 +287,8 @@ impl CommandQueue {
         opcode: CommandOpcode, 
         opmod: Option<u16>, 
         allocated_pages: Option<Vec<PhysicalAddress>>,
+        uar: Option<u32>,
+        log_queue_size: Option<u8>
     ) -> Result<usize, CommandQueueError> 
     {
         let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
@@ -365,6 +372,22 @@ impl CommandQueue {
                 cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
                 cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
                 cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
+            },
+            CommandOpcode::CreateEq => {
+                let pages_pa = allocated_pages.ok_or(CommandQueueError::MissingInputPages)?;
+
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(Some(pages_pa.len()))?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
+                cmdq_entry.set_input_inline_data(opcode, opmod, None, None);
+                
+                self.create_page_request_event_queue(
+                    entry_num, 
+                    pages_pa,
+                    uar.ok_or(CommandQueueError::MissingInput)?,
+                    log_queue_size.ok_or(CommandQueueError::MissingInput)?
+                )?;
+
+                self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
             },
             _=> {
                 error!("unimplemented opcode");
@@ -570,6 +593,89 @@ impl CommandQueue {
 
         Ok(())
     }
+
+    fn create_page_request_event_queue(
+        &mut self, entry_num: usize, 
+        mut pages: Vec<PhysicalAddress>, 
+        uar: u32, 
+        log_eq_size: u8
+    ) -> Result<(), CommandQueueError> {
+        
+        let size_of_mailbox_data = (0x110 - 0x10) + SIZE_PADDR_IN_BYTES * pages.len();
+
+        let num_mailboxes = libm::ceilf(size_of_mailbox_data as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+        self.initialize_mailboxes(entry_num, num_mailboxes, MailboxType::Input)?;
+
+        let mailbox_pages = &mut self.mailbox_buffers_input[entry_num];
+        
+        for block_num in 0..num_mailboxes {
+            let (mb_page, _mb_page_starting_addr) = &mut mailbox_pages[block_num];
+            
+            if block_num == 0 {
+                // initialize the event queue context
+                let eq_context = mb_page.as_type_mut::<EventQueueContext>(0).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+                eq_context.init(uar, log_eq_size);
+
+                // initialize the bitmask. this function only activates the page request event
+                let bitmask_offset_in_mailbox  = 0x58 - 0x10;
+                let eq_bitmask = mb_page.as_type_mut::<u64>(bitmask_offset_in_mailbox).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+                const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
+                *eq_bitmask = PAGE_REQUEST_BIT;
+
+                // Now use the remainder of the mailbox for page entries
+                let eq_pa_offset = 0x110 - 0x10;
+                let data = mb_page.as_type_mut::<[u8;256]>(eq_pa_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+                let pages_in_mailbox_0 = (MAILBOX_DATA_SIZE_IN_BYTES - eq_pa_offset) / SIZE_PADDR_IN_BYTES;
+ 
+                for page in 0..pages_in_mailbox_0 {
+                    let paddr = pages.pop();
+                    match paddr {
+                        Some(paddr) => {
+                            Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, data);
+                        },
+                        None => { 
+                            trace!("breaking out of loop on mailbox: {} and page: {}", block_num, page);
+                            break; 
+                        }
+                    }
+                }
+
+                debug!("Mailbox {}", block_num);
+                debug!("{:?}", mb_page.as_type_mut::<CommandInterfaceMailbox>(0).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?);
+                    
+            } else {
+                let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(0).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+                let paddr_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
+                let mut data = [0; 512];
+
+                for page in 0..paddr_per_mailbox {
+                    let paddr = pages.pop();
+                    match paddr {
+                        Some(paddr) => {
+                            Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, &mut data);
+                        },
+                        None => { 
+                            trace!("breaking out of loop on mailbox: {} and paddr: {}", block_num, page);
+                            break; 
+                        }
+                    }
+                }
+
+                mailbox.mailbox_data.write(data);
+
+                debug!("Mailbox {}", block_num);
+                debug!("{:?}", mailbox);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn get_eq_number(&self, entry_num: usize) -> Result<u8, CommandQueueError> {
+        self.check_command_output_validity(entry_num, CommandOpcode::CreateEq)?;
+        let (_status, _syndrome, eq_number, _reserved) = self.entries[entry_num].get_output_inline_data();
+        Ok(eq_number as u8)
+    }
+
 }
 
 /// Layout of a command passed to the NIC.
@@ -769,5 +875,33 @@ impl fmt::Debug for CommandInterfaceMailbox {
             .field("block number", &self.block_number.read().get())
             .field("token ctrl signature", &self.token_ctrl_signature.read().get())
             .finish()
+    }
+}
+
+#[derive(FromBytes, Default)]
+#[repr(C)]
+struct EventQueueContext {
+    status:             Volatile<U32<BigEndian>>,
+    _padding1:          u32,
+    page_offset:        Volatile<U32<BigEndian>>,
+    uar_log_eq_size:    Volatile<U32<BigEndian>>,
+    _padding2:          u32,
+    intr:               Volatile<U32<BigEndian>>,
+    log_pg_size:        Volatile<U32<BigEndian>>,
+    _padding3:          u64,
+    consumer_counter:   Volatile<U32<BigEndian>>,
+    producer_counter:   Volatile<U32<BigEndian>>,
+    _padding4:          [u8;12],
+}
+
+const_assert_eq!(core::mem::size_of::<EventQueueContext>(), 64);
+
+impl EventQueueContext {
+    pub fn init(&mut self, uar_page: u32, log_eq_size: u8) {
+        *self = EventQueueContext::default();
+        let uar = uar_page & 0xFF_FFFF;
+        let size = ((log_eq_size & 0x1F) as u32) << 24;
+        self.uar_log_eq_size.write(U32::new(uar | size));
+        self.log_pg_size.write(U32::new(0));
     }
 }
