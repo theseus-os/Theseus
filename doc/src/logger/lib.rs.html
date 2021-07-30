@@ -194,6 +194,9 @@
 <span id="191">191</span>
 <span id="192">192</span>
 <span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A basic logger implementation for system-wide logging in Theseus. </span>
 <span class="doccomment">//!</span>
@@ -210,7 +213,7 @@
 <span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">Record</span>, <span class="ident">Level</span>, <span class="ident">SetLoggerError</span>, <span class="ident">Metadata</span>, <span class="ident">Log</span>};
 <span class="kw">use</span> <span class="ident">core::fmt</span>::{<span class="self">self</span>, <span class="ident">Write</span>};
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">serial_port::SerialPort</span>;
+<span class="kw">use</span> <span class="ident">serial_port</span>::{<span class="ident">SerialPort</span>, <span class="ident">SerialPortAddress</span>};
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
 
 
@@ -266,7 +269,7 @@
 <span class="doccomment">/// Currently, it supports emitting log messages to up to 4 serial ports.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">struct</span> <span class="ident">Logger</span> {
-    <span class="ident">serial_ports</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="number">4</span>],
+    <span class="ident">serial_ports</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="number">4</span>],
 }
 
 <span class="kw">impl</span> <span class="ident">Logger</span> {
@@ -339,17 +342,20 @@
 <span class="doccomment">///    If `None`, the `DEFAULT_LOG_LEVEL` will be used.</span>
 <span class="doccomment">/// * `serial_ports`: an iterator over the serial ports that the system logger </span>
 <span class="doccomment">///    will write log messages to.</span>
-<span class="doccomment">///    Typically this is just a single port, e.g., `&amp;[COM1_BASE_PORT]`.</span>
+<span class="doccomment">///    Typically this is just a single port, e.g., `&amp;[COM1]`.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// This function will initialize up to a maximum of 4 serial ports and use them for logging.</span>
-<span class="doccomment">/// Serial ports after the first 4 in the `serial_port` argument will be ignored.</span>
+<span class="doccomment">/// Serial ports after the first 4 in the `serial_ports` argument will be ignored.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// This function also initializes and takes ownership of all specified serial ports</span>
 <span class="doccomment">/// such that it can atomically write log messages to them.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="lifetime">&#39;p</span><span class="op">&gt;</span>(<span class="ident">log_level</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Level</span><span class="op">&gt;</span>, <span class="ident">serial_ports</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;p</span> <span class="ident">u16</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="lifetime">&#39;p</span><span class="op">&gt;</span>(
+    <span class="ident">log_level</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Level</span><span class="op">&gt;</span>,
+    <span class="ident">serial_ports</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;p</span> <span class="ident">SerialPortAddress</span><span class="op">&gt;</span>
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">Logger::default</span>();
     <span class="kw">for</span> (<span class="ident">base_port</span>, <span class="ident">logger_serial_port</span>) <span class="kw">in</span> <span class="ident">serial_ports</span>.<span class="ident">into_iter</span>().<span class="ident">take</span>(<span class="number">4</span>).<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">logger</span>.<span class="ident">serial_ports</span>) {
-        <span class="kw-2">*</span><span class="ident">logger_serial_port</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">SerialPort::new</span>(<span class="kw-2">*</span><span class="ident">base_port</span>)));
+        <span class="kw-2">*</span><span class="ident">logger_serial_port</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">serial_port::get_serial_port</span>(<span class="kw-2">*</span><span class="ident">base_port</span>));
     }
 
     <span class="kw">let</span> <span class="ident">static_logger</span> <span class="op">=</span> <span class="ident">LOGGER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">logger</span>);

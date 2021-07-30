@@ -190,6 +190,122 @@
 <span id="187">187</span>
 <span id="188">188</span>
 <span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for basic serial port access, including initialization, transmit, and receive.</span>
 <span class="doccomment">//!</span>
@@ -203,7 +319,7 @@
 <span class="doccomment">//! specifically `0x08` and `0x7F`, which are ASCII &quot;backspace&quot; and &quot;delete&quot;, respectively.</span>
 <span class="doccomment">//! They do so by writing them as three distinct values (with proper busy waiting in between):</span>
 <span class="doccomment">//! 1. `0x08`</span>
-<span class="doccomment">//! 2. `0x20`  (an ascii space character)</span>
+<span class="doccomment">//! 2. `0x20` (an ascii space character)</span>
 <span class="doccomment">//! 3. `0x08` again. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This isn&#39;t necessarily a bad idea, as it &quot;clears out&quot; whatever character was there before,</span>
@@ -216,15 +332,68 @@
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">port_io</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bare_io</span>;
 
-<span class="kw">use</span> <span class="ident">core::fmt</span>;
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">convert::TryFrom</span>, <span class="ident">fmt</span>};
 <span class="kw">use</span> <span class="ident">port_io::Port</span>;
+<span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
+<span class="kw">use</span> <span class="ident">spin::Once</span>;
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">COM1_BASE_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x3F8</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">COM2_BASE_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x2F8</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">COM3_BASE_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x3E8</span>;
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">COM4_BASE_PORT</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">0x2E8</span>;
+
+<span class="doccomment">/// The base port I/O addresses for COM serial ports.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u16</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SerialPortAddress</span> {
+	<span class="doccomment">/// The base port I/O address for the COM1 serial port.</span>
+	<span class="ident">COM1</span> <span class="op">=</span> <span class="number">0x3F8</span>,
+	<span class="doccomment">/// The base port I/O address for the COM2 serial port.</span>
+	<span class="ident">COM2</span> <span class="op">=</span> <span class="number">0x2F8</span>,
+	<span class="doccomment">/// The base port I/O address for the COM3 serial port.</span>
+	<span class="ident">COM3</span> <span class="op">=</span> <span class="number">0x3E8</span>,
+	<span class="doccomment">/// The base port I/O address for the COM4 serial port.</span>
+	<span class="ident">COM4</span> <span class="op">=</span> <span class="number">0x2E8</span>,
+}
+<span class="kw">impl</span> <span class="ident">TryFrom</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SerialPortAddress</span> {
+	<span class="kw">type</span> <span class="ident">Error</span> <span class="op">=</span> ();
+	<span class="kw">fn</span> <span class="ident">try_from</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="self">Self</span>, <span class="self">Self</span><span class="ident">::Error</span><span class="op">&gt;</span> {
+		<span class="kw">if</span> <span class="ident">s</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM1&quot;</span>) {
+			<span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::COM1</span>)
+		} <span class="kw">else</span> <span class="kw">if</span> <span class="ident">s</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM2&quot;</span>) {
+			<span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::COM2</span>)
+		} <span class="kw">else</span> <span class="kw">if</span> <span class="ident">s</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM3&quot;</span>) {
+			<span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::COM3</span>)
+		} <span class="kw">else</span> <span class="kw">if</span> <span class="ident">s</span>.<span class="ident">eq_ignore_ascii_case</span>(<span class="string">&quot;COM4&quot;</span>) {
+			<span class="prelude-val">Ok</span>(<span class="self">Self</span><span class="ident">::COM4</span>)
+		} <span class="kw">else</span> {
+			<span class="prelude-val">Err</span>(())
+		}
+	}
+}
+
+<span class="kw">static</span> <span class="ident">COM1_SERIAL_PORT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="kw">static</span> <span class="ident">COM2_SERIAL_PORT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="kw">static</span> <span class="ident">COM3_SERIAL_PORT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="kw">static</span> <span class="ident">COM4_SERIAL_PORT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+
+
+<span class="doccomment">/// Obtains a reference to the [`SerialPort`] specified by the given [`SerialPortAddress`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This function initializes the given serial port if it has not yet been initialized. </span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_serial_port</span>(
+	<span class="ident">serial_port_address</span>: <span class="ident">SerialPortAddress</span>
+) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span> {
+	<span class="kw">let</span> <span class="ident">sp</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">serial_port_address</span> {
+		<span class="ident">SerialPortAddress::COM1</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">COM1_SERIAL_PORT</span>,
+		<span class="ident">SerialPortAddress::COM2</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">COM2_SERIAL_PORT</span>,
+		<span class="ident">SerialPortAddress::COM3</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">COM3_SERIAL_PORT</span>,
+		<span class="ident">SerialPortAddress::COM4</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">COM4_SERIAL_PORT</span>,
+	};
+	<span class="ident">sp</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">SerialPort::new</span>(<span class="ident">serial_port_address</span> <span class="kw">as</span> <span class="ident">u16</span>)))
+}
+
 
 <span class="comment">// The E9 port can be used with the Bochs emulator for extra debugging info.</span>
 <span class="comment">// const PORT_E9: u16 = 0xE9; // for use with bochs</span>
@@ -256,9 +425,9 @@
 	<span class="doccomment">/// * Interrupts enabled for receiving bytes only (not transmitting).</span>
 	<span class="doccomment">///</span>
 	<span class="doccomment">/// # Arguments</span>
-	<span class="doccomment">/// * `base_port`: the number (port I/O &quot;address&quot;) of the serial port. </span>
+	<span class="doccomment">/// * `base_port`: the port number (port I/O address) of the serial port. </span>
 	<span class="doccomment">///    This should generally be one of the known serial ports, e.g., on x86, </span>
-	<span class="doccomment">///    `COM1_BASE_PORT`, `COM2_BASE_PORT`, `COM3_BASE_PORT`, `COM4_BASE_PORT`.</span>
+	<span class="doccomment">///    [`SerialPortAddress::COM1`] through [`SerialPortAddress::COM4`].</span>
 	<span class="doccomment">///</span>
 	<span class="doccomment">/// Note: if you are experiencing problems with serial port behavior,</span>
 	<span class="doccomment">/// try enabling the loopback test part of this function to see if that passes.</span>
@@ -328,49 +497,81 @@
 		<span class="ident">serial</span>
 	}
 
-	<span class="doccomment">/// Write the given string to the serial port.</span>
+	<span class="doccomment">/// Write the given string to the serial port, blocking until data can be transmitted.</span>
 	<span class="doccomment">///</span>
 	<span class="doccomment">/// # Special characters</span>
 	<span class="doccomment">/// Because this function writes strings, it will transmit a carriage return `&#39;\r&#39;`</span>
 	<span class="doccomment">/// after transmitting a line feed (new line) `&#39;\n&#39;` to ensure a proper new line.</span>
 	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">out_str</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
-		<span class="kw">for</span> <span class="ident">b</span> <span class="kw">in</span> <span class="ident">s</span>.<span class="ident">bytes</span>() {
-			<span class="self">self</span>.<span class="ident">out_byte</span>(<span class="ident">b</span>);
-			<span class="kw">if</span> <span class="ident">b</span> <span class="op">=</span><span class="op">=</span> <span class="string">b&#39;\n&#39;</span> {
+		<span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">s</span>.<span class="ident">bytes</span>() {
+			<span class="self">self</span>.<span class="ident">out_byte</span>(<span class="ident">byte</span>);
+			<span class="kw">if</span> <span class="ident">byte</span> <span class="op">=</span><span class="op">=</span> <span class="string">b&#39;\n&#39;</span> {
 				<span class="self">self</span>.<span class="ident">out_byte</span>(<span class="string">b&#39;\r&#39;</span>);
+			} <span class="kw">else</span> <span class="kw">if</span> <span class="ident">byte</span> <span class="op">=</span><span class="op">=</span> <span class="string">b&#39;\r&#39;</span> {
+				<span class="self">self</span>.<span class="ident">out_byte</span>(<span class="string">b&#39;\n&#39;</span>);
 			}
 		}
 	}
 
-	<span class="doccomment">/// Write the given byte to the serial port.</span>
+	<span class="doccomment">/// Write the given byte to the serial port, blocking until data can be transmitted.</span>
 	<span class="doccomment">///</span>
 	<span class="doccomment">/// This writes the byte directly with no special cases, e.g., new lines.</span>
 	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">out_byte</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">byte</span>: <span class="ident">u8</span>) {
-		<span class="self">self</span>.<span class="ident">wait_until_ready_to_transmit</span>();
+		<span class="kw">while</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">ready_to_transmit</span>() { }
 
-		<span class="comment">// SAFE because we&#39;re just writing to the serial port. </span>
-		<span class="comment">// worst-case effects here are simple out-of-order characters in the serial log.</span>
+		<span class="comment">// SAFE: we&#39;re just writing to the serial port, which has already been initialized.</span>
 		<span class="kw">unsafe</span> { 
 			<span class="self">self</span>.<span class="ident">data</span>.<span class="ident">write</span>(<span class="ident">byte</span>); 
 			<span class="comment">// E9.write(byte); // for Bochs debugging</span>
 		}
 	}
 
-	<span class="doccomment">/// Blocks until the serial port is ready to transmit another byte.</span>
-	<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-	<span class="kw">fn</span> <span class="ident">wait_until_ready_to_transmit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-		<span class="kw">while</span> <span class="self">self</span>.<span class="ident">line_status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-			<span class="comment">// do nothing</span>
+	<span class="doccomment">/// Write the given bytes to the serial port, blocking until data can be transmitted.</span>
+	<span class="doccomment">///</span>
+	<span class="doccomment">/// This writes the bytes directly with no special cases, e.g., new lines.</span>
+	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">out_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bytes</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) {
+		<span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">bytes</span> {
+			<span class="self">self</span>.<span class="ident">out_byte</span>(<span class="kw-2">*</span><span class="ident">byte</span>);
 		}
 	}
 
-	<span class="doccomment">/// Blocks until the serial port has received a byte.</span>
+	<span class="doccomment">/// Read one byte from the serial port, blocking until data is available.</span>
+	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_byte</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+		<span class="kw">while</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">data_available</span>() { }
+		<span class="self">self</span>.<span class="ident">data</span>.<span class="ident">read</span>() 
+	}
+
+	<span class="doccomment">/// Reads multiple bytes from the serial port into the given `buffer`, non-blocking.</span>
+	<span class="doccomment">///</span>
+	<span class="doccomment">/// The buffer will be filled with as many bytes as are available in the serial port.</span>
+	<span class="doccomment">/// Once data is no longer available to be read, the read operation will stop. </span>
+	<span class="doccomment">///</span>
+	<span class="doccomment">/// If no data is immediately available on the serial port, this will read nothing and return `0`.</span>
+	<span class="doccomment">///</span>
+	<span class="doccomment">/// Returns the number of bytes read into the given `buffer`.</span>
+	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+		<span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bytes_read</span> <span class="op">=</span> <span class="number">0</span>;
+		<span class="kw">for</span> <span class="ident">byte</span> <span class="kw">in</span> <span class="ident">buffer</span> {
+			<span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">data_available</span>() {
+				<span class="kw">break</span>;
+			}
+			<span class="kw-2">*</span><span class="ident">byte</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>.<span class="ident">read</span>();
+			<span class="ident">bytes_read</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+		}
+		<span class="ident">bytes_read</span>
+	}
+
+	<span class="doccomment">/// Returns `true` if the serial port is ready to transmit a byte.</span>
+	<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ready_to_transmit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+		<span class="self">self</span>.<span class="ident">line_status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="number">0x20</span> <span class="op">=</span><span class="op">=</span> <span class="number">0x20</span>
+	}
+
+	<span class="doccomment">/// Return `true` if the serial port has data available to read.</span>
 	<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 	<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-	<span class="kw">fn</span> <span class="ident">wait_until_data_received</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-		<span class="kw">while</span> <span class="self">self</span>.<span class="ident">line_status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-			<span class="comment">// do nothing</span>
-		}
+	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_available</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+		<span class="self">self</span>.<span class="ident">line_status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">=</span><span class="op">=</span> <span class="number">0x01</span>
 	}
 }
 
@@ -379,6 +580,37 @@
         <span class="self">self</span>.<span class="ident">out_str</span>(<span class="ident">s</span>); 
         <span class="prelude-val">Ok</span>(())
     }
+}
+
+<span class="doccomment">/// A non-blocking implementation of `Read` that will read bytes into the given `buf`</span>
+<span class="doccomment">/// so long as more bytes are available.</span>
+<span class="doccomment">/// The read operation will be completed when there are no more bytes to be read,</span>
+<span class="doccomment">/// or when the `buf` is filled, whichever comes first.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Because it&#39;s non-blocking, a [`bare_io::ErrorKind::WouldBlock`] error is returned</span>
+<span class="doccomment">/// if there are no bytes available to be read, indicating that the read would block.</span>
+<span class="kw">impl</span> <span class="ident">bare_io::Read</span> <span class="kw">for</span> <span class="ident">SerialPort</span> {
+	<span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bare_io::Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+		<span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">data_available</span>() {
+			<span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">bare_io::ErrorKind::WouldBlock</span>.<span class="ident">into</span>());
+		}
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.<span class="ident">in_bytes</span>(<span class="ident">buf</span>))
+    }
+}
+
+<span class="doccomment">/// A blocking implementation of `Write` that will write bytes from the given `buf`</span>
+<span class="doccomment">/// to the `SerialPort`, waiting until it is ready to transfer all bytes. </span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// The `flush()` function is a no-op, since the `SerialPort` does not have buffering. </span>
+<span class="kw">impl</span> <span class="ident">bare_io::Write</span> <span class="kw">for</span> <span class="ident">SerialPort</span> {
+    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bare_io::Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+		<span class="self">self</span>.<span class="ident">out_bytes</span>(<span class="ident">buf</span>);
+		<span class="prelude-val">Ok</span>(<span class="ident">buf</span>.<span class="ident">len</span>())
+    }
+
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bare_io::Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+        <span class="prelude-val">Ok</span>(())
+    }    
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="serial_port" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
