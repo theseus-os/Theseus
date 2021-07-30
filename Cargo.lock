@@ -33,7 +33,7 @@ dependencies = [
  "log",
  "memory",
  "sdt",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -48,6 +48,12 @@ dependencies = [
  "memory",
  "rsdt",
 ]
+
+[[package]]
+name = "ahash"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
 name = "aligned"
@@ -105,7 +111,7 @@ dependencies = [
  "static_assertions",
  "volatile",
  "x86_64",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -261,10 +267,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "block_cache"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.9.1",
+ "lazy_static",
+ "log",
+ "storage_device",
+]
+
+[[package]]
 name = "block_io"
 version = "0.1.0"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.1.8",
  "lazy_static",
  "log",
  "storage_device",
@@ -309,9 +325,9 @@ checksum = "980479e6fde23246dfb54d47580d66b4e99202e7579c5eaa9fe10ecb5ebd2182"
 
 [[package]]
 name = "byteorder"
-version = "1.3.4"
+version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
+checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "captain"
@@ -441,14 +457,14 @@ name = "context_switch_avx"
 version = "0.1.0"
 dependencies = [
  "context_switch_regular",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
 name = "context_switch_regular"
 version = "0.1.0"
 dependencies = [
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -456,7 +472,7 @@ name = "context_switch_sse"
 version = "0.1.0"
 dependencies = [
  "context_switch_regular",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -519,11 +535,11 @@ dependencies = [
  "cow_arc",
  "fs_node",
  "goblin",
- "hashbrown",
+ "hashbrown 0.1.8",
  "log",
  "memory",
  "spin 0.4.10",
- "xmas-elf",
+ "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
 
 [[package]]
@@ -541,7 +557,7 @@ version = "0.1.0"
 dependencies = [
  "by_address",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.1.8",
  "hpet",
  "lazy_static",
  "log",
@@ -585,19 +601,30 @@ dependencies = [
  "fs_node",
  "gimli",
  "goblin",
- "hashbrown",
+ "hashbrown 0.1.8",
  "log",
  "memory",
  "mod_mgmt",
  "owning_ref 0.4.0",
  "rustc-demangle",
  "util",
- "xmas-elf",
+ "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
 
 [[package]]
 name = "debugit"
 version = "0.1.0"
+
+[[package]]
+name = "delegate"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bc6b43b1626e75c776f282bcf592b58c6fdd9da069ecf733111a061f6a549a7"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
 
 [[package]]
 name = "deps"
@@ -612,6 +639,17 @@ dependencies = [
  "spin 0.4.10",
  "task",
  "terminal_print",
+]
+
+[[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.48",
 ]
 
 [[package]]
@@ -698,7 +736,7 @@ dependencies = [
  "static_assertions",
  "volatile",
  "x86_64",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -723,7 +761,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "multiboot2",
- "xmas-elf",
+ "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
 
 [[package]]
@@ -804,7 +842,7 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -859,6 +897,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "frame_allocator"
+version = "0.1.0"
+dependencies = [
+ "intrusive-collections",
+ "kernel_config",
+ "log",
+ "memory_structs",
+ "page_table_entry",
+ "spin 0.9.2",
+ "static_assertions",
+]
+
+[[package]]
 name = "framebuffer"
 version = "0.1.0"
 dependencies = [
@@ -867,7 +918,7 @@ dependencies = [
  "multicore_bringup",
  "owning_ref 0.4.0",
  "shapes",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -876,7 +927,7 @@ version = "0.1.0"
 dependencies = [
  "compositor",
  "framebuffer",
- "hashbrown",
+ "hashbrown 0.1.8",
  "lazy_static",
  "shapes",
  "spin 0.4.10",
@@ -989,7 +1040,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bae29b6653b3412c2e71e9d486db9f9df5d701941d86683005efb9f2d28e3da"
 dependencies = [
  "byteorder",
- "scopeguard",
+ "scopeguard 0.3.3",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
+dependencies = [
+ "ahash",
 ]
 
 [[package]]
@@ -1036,7 +1096,7 @@ dependencies = [
  "sdt",
  "spin 0.4.10",
  "volatile",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1085,7 +1145,7 @@ dependencies = [
  "log",
  "memory",
  "volatile",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1126,6 +1186,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "io"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "delegate",
+ "lazy_static",
+ "log",
+ "spin 0.9.2",
+]
+
+[[package]]
 name = "ioapic"
 version = "0.1.0"
 dependencies = [
@@ -1136,7 +1207,7 @@ dependencies = [
  "owning_ref 0.4.0",
  "spin 0.4.10",
  "volatile",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1175,7 +1246,7 @@ dependencies = [
  "acpi",
  "apic",
  "bit_field 0.7.0",
- "hashbrown",
+ "hashbrown 0.1.8",
  "hpet",
  "intel_ethernet",
  "interrupts",
@@ -1201,7 +1272,7 @@ dependencies = [
  "virtual_nic",
  "volatile",
  "x86_64",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1285,6 +1356,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libc"
+version = "0.2.98"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "320cfe77175da3a483efed4bc0adc1968ca050b098ce4f2f1c13a56626128790"
+
+[[package]]
 name = "libm"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1326,7 +1403,7 @@ dependencies = [
  "apic",
  "atomic",
  "bit_field 0.10.0",
- "hashbrown",
+ "hashbrown 0.1.8",
  "hpet",
  "libm 0.2.1",
  "log",
@@ -1343,6 +1420,32 @@ name = "linked_list_allocator"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "822add9edb1860698b79522510da17bef885171f75aa395cff099d770c609c24"
+
+[[package]]
+name = "loadc"
+version = "0.1.0"
+dependencies = [
+ "fs_node",
+ "getopts",
+ "libc",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "path",
+ "rustc-demangle",
+ "task",
+ "terminal_print",
+ "xmas-elf 0.6.2 (git+https://github.com/theseus-os/xmas-elf.git)",
+]
+
+[[package]]
+name = "lock_api"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0382880606dff6d15c9476c416d18690b72742aa7b605bb6dd6ec9030fbf07eb"
+dependencies = [
+ "scopeguard 1.1.0",
+]
 
 [[package]]
 name = "log"
@@ -1389,7 +1492,7 @@ dependencies = [
  "memory",
  "pic",
  "sdt",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1458,8 +1561,8 @@ dependencies = [
  "page_allocator",
  "spin 0.4.10",
  "x86_64",
- "xmas-elf",
- "zerocopy",
+ "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1486,7 +1589,7 @@ dependencies = [
  "derive_more",
  "entryflags_x86_64",
  "kernel_config",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1510,6 +1613,39 @@ dependencies = [
  "task",
  "terminal_print",
  "vfs_node",
+]
+
+[[package]]
+name = "mlx5"
+version = "0.1.0"
+dependencies = [
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "kernel_config",
+ "log",
+ "memory",
+ "mlx_ethernet",
+ "nic_initialization",
+ "owning_ref 0.4.1",
+ "pci",
+ "spin 0.9.2",
+]
+
+[[package]]
+name = "mlx_ethernet"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "byteorder",
+ "kernel_config",
+ "libm 0.2.1",
+ "log",
+ "memory",
+ "nic_initialization",
+ "num_enum",
+ "owning_ref 0.4.1",
+ "static_assertions",
+ "volatile",
+ "zerocopy 0.5.0",
 ]
 
 [[package]]
@@ -1541,7 +1677,7 @@ dependencies = [
  "crate_name_utils",
  "cstr_core",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.1.8",
  "kernel_config",
  "log",
  "memfs",
@@ -1554,7 +1690,7 @@ dependencies = [
  "spin 0.4.10",
  "util",
  "vfs_node",
- "xmas-elf",
+ "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
 
 [[package]]
@@ -1604,7 +1740,7 @@ dependencies = [
  "spin 0.4.10",
  "stack",
  "volatile",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1613,7 +1749,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cfg-if 0.1.10",
- "hashbrown",
+ "hashbrown 0.1.8",
  "heap",
  "intrusive-collections",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -1768,6 +1904,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_enum"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5adf0198d427ee515335639f275e806ca01acf9f07d7cf14bb36a10532a6169"
+dependencies = [
+ "derivative",
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1def5a3f69d4707d8a040b12785b98029a39e8c610ae685c7f6265669767482"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
+
+[[package]]
 name = "opaque-debug"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1833,6 +1990,16 @@ dependencies = [
  "log",
  "memory_structs",
  "spin 0.4.10",
+]
+
+[[package]]
+name = "page_table_entry"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "kernel_config",
+ "memory_structs",
+ "zerocopy 0.5.0",
 ]
 
 [[package]]
@@ -1925,7 +2092,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "getopts",
- "hashbrown",
+ "hashbrown 0.1.8",
  "hpet",
  "log",
  "network_manager",
@@ -2230,7 +2397,7 @@ version = "0.1.0"
 dependencies = [
  "memory",
  "owning_ref 0.4.0",
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -2296,9 +2463,9 @@ dependencies = [
 
 [[package]]
 name = "rustc-demangle"
-version = "0.1.14"
+version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccc78bfd5acd7bf3e89cffcf899e5cb1a52d6fafa8dec2739ad70c9577a57288"
+checksum = "dead70b0b5e03e9c814bcb6b01e03e68f7c57a80aa48c72ec92152ab3e818d49"
 
 [[package]]
 name = "rustc_version"
@@ -2363,6 +2530,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94258f53601af11e6a49f722422f6e3425c52b06245a5cf9bc09908b174f5e27"
 
 [[package]]
+name = "scopeguard"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
+
+[[package]]
 name = "scroll"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2375,7 +2548,7 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -2566,6 +2739,9 @@ name = "spin"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "511254be0c5bcf062b019a6c89c01a664aa359ded62f78aa72c6fc137c0590e5"
+dependencies = [
+ "lock_api",
+]
 
 [[package]]
 name = "stable_deref_trait"
@@ -2801,6 +2977,19 @@ dependencies = [
  "spin 0.4.10",
  "task",
  "x86_64",
+]
+
+[[package]]
+name = "test_block_io"
+version = "0.1.0"
+dependencies = [
+ "ata",
+ "bare-io",
+ "io",
+ "log",
+ "storage_manager",
+ "task",
+ "terminal_print",
 ]
 
 [[package]]
@@ -3070,7 +3259,7 @@ name = "volatile"
 version = "0.2.7"
 source = "git+https://github.com/theseus-os/volatile#c40875624976eb7a90267424d225d53413b3d0b7"
 dependencies = [
- "zerocopy",
+ "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -3169,7 +3358,15 @@ name = "xmas-elf"
 version = "0.6.2"
 source = "git+https://github.com/kevinaboos/xmas-elf.git#faf514033cb815a58f5119c3e867c42fac5cb6d6"
 dependencies = [
- "zero",
+ "zero 0.1.3 (git+https://github.com/kevinaboos/zero.git)",
+]
+
+[[package]]
+name = "xmas-elf"
+version = "0.6.2"
+source = "git+https://github.com/theseus-os/xmas-elf.git#635d55f6886ae3fe0ec8a78e0bcc1238224c903d"
+dependencies = [
+ "zero 0.1.3 (git+https://github.com/theseus-os/zero.git)",
 ]
 
 [[package]]
@@ -3178,13 +3375,28 @@ version = "0.1.3"
 source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2d6bf91deafc62"
 
 [[package]]
+name = "zero"
+version = "0.1.3"
+source = "git+https://github.com/theseus-os/zero.git#9fc7ff523138a21f40359b706d2d6bf91deafc62"
+
+[[package]]
 name = "zerocopy"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6580539ad917b7c026220c4b3f2c08d52ce54d6ce0dc491e66002e35388fab46"
 dependencies = [
  "byteorder",
- "zerocopy-derive",
+ "zerocopy-derive 0.2.0",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e59ec1d2457bd6c0dd89b50e7d9d6b0b647809bf3f0a59ac85557046950b7b2"
+dependencies = [
+ "byteorder",
+ "zerocopy-derive 0.3.0",
 ]
 
 [[package]]
@@ -3192,6 +3404,17 @@ name = "zerocopy-derive"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d498dbd1fd7beb83c86709ae1c33ca50942889473473d287d56ce4770a18edfb"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "syn 1.0.48",
+ "synstructure",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0af017aca1fa6181f5dd7a802456fe6f7666ecdcc18d0910431f0fc89d474e51"
 dependencies = [
  "proc-macro2 1.0.24",
  "syn 1.0.48",
