@@ -1083,6 +1083,7 @@ dependencies = [
  "port_io",
  "ps2",
  "scheduler",
+ "serial_port",
  "spin 0.9.0",
  "task",
  "tlb_shootdown",
@@ -2403,7 +2404,10 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
+ "bare-io",
+ "irq_safety",
  "port_io",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -2843,6 +2847,17 @@ dependencies = [
  "log",
  "spawn",
  "spin 0.9.0",
+ "terminal_print",
+]
+
+[[package]]
+name = "test_serial_echo"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "log",
+ "serial_port",
+ "task",
  "terminal_print",
 ]
 

@@ -5,8 +5,15 @@ description = "Basic driver for serial ports, e.g., COM1, COM2"
 version = "0.1.0"
 build = "../../build.rs"
 
+[dependencies]
+spin = "0.9.0"
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
+
 [dependencies.port_io]
 path = "../../libs/port_io"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
 
 [lib]
 crate-type = ["rlib"]
