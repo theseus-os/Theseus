@@ -2851,6 +2851,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_serial_echo"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "log",
+ "serial_port",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
 name = "text_display"
 version = "0.1.0"
 dependencies = [

@@ -28,7 +28,7 @@ extern crate port_io;
 extern crate irq_safety;
 extern crate bare_io;
 
-use core::fmt;
+use core::{convert::TryFrom, fmt};
 use port_io::Port;
 use irq_safety::MutexIrqSafe;
 use spin::Once;
@@ -46,6 +46,22 @@ pub enum SerialPortAddress {
 	COM3 = 0x3E8,
 	/// The base port I/O address for the COM4 serial port.
 	COM4 = 0x2E8,
+}
+impl TryFrom<&str> for SerialPortAddress {
+	type Error = ();
+	fn try_from(s: &str) -> Result<Self, Self::Error> {
+		if s.eq_ignore_ascii_case("COM1") {
+			Ok(Self::COM1)
+		} else if s.eq_ignore_ascii_case("COM2") {
+			Ok(Self::COM2)
+		} else if s.eq_ignore_ascii_case("COM3") {
+			Ok(Self::COM3)
+		} else if s.eq_ignore_ascii_case("COM4") {
+			Ok(Self::COM4)
+		} else {
+			Err(())
+		}
+	}
 }
 
 static COM1_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
@@ -182,6 +198,8 @@ impl SerialPort {
 			self.out_byte(byte);
 			if byte == b'\n' {
 				self.out_byte(b'\r');
+			} else if byte == b'\r' {
+				self.out_byte(b'\n');
 			}
 		}
 	}
