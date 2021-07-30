@@ -31,7 +31,8 @@ use owning_ref::BoxRefMut;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
 use mlx_ethernet::{
     InitializationSegment, 
-    command_queue::{CommandQueueEntry, CommandQueue, CommandOpcode, ManagePagesOpMod, QueryPagesOpMod}
+    command_queue::{CommandQueueEntry, CommandQueue, CommandOpcode, ManagePagesOpMod, QueryPagesOpMod}, 
+    event_queue::EventQueue
 };
 use kernel_config::memory::PAGE_SIZE;
 
@@ -63,6 +64,7 @@ pub struct ConnectX5Nic {
     boot_pages: Vec<MappedPages>,
     /// Init pages passed to the NIC. Once transferred, they should not be accessed by the driver.
     init_pages: Vec<MappedPages>,
+    event_queue: EventQueue
 }
 
 
@@ -214,7 +216,7 @@ impl ConnectX5Nic {
 
         // execute CREATE_EQ for page request event
         // Allocate pages for EQ
-        let num_eq_pages = 1;
+        let num_eq_pages = 2;
         let mut eq_mp = Vec::with_capacity(num_eq_pages as usize);
         let mut eq_pa = Vec::with_capacity(num_eq_pages as usize);
         for _ in 0..num_eq_pages {
@@ -222,6 +224,10 @@ impl ConnectX5Nic {
             eq_mp.push(page);
             eq_pa.push(pa);
         }
+        // set the ownership bit of the EQE to HW owned
+        let mut event_queue = EventQueue::create(eq_mp)?;
+        event_queue.init();
+
         let cmdq_entry = cmdq.create_command(CommandOpcode::CreateEq, None, Some(eq_pa), Some(uar), Some(7))?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -233,7 +239,8 @@ impl ConnectX5Nic {
             init_segment: init_segment,
             command_queue: cmdq, 
             boot_pages: boot_mp,
-            init_pages: init_mp
+            init_pages: init_mp,
+            event_queue: event_queue
         };
         
         let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));

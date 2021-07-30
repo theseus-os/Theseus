@@ -1,6 +1,9 @@
  //! Defines the Command Queue that is used to pass commands from the driver to the NIC.
 
-use alloc::vec::Vec;
+use alloc::{
+    vec::Vec,
+    boxed::Box
+};
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use volatile::Volatile;
 use bit_field::BitField;
@@ -12,6 +15,7 @@ use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
+use crate::event_queue::*;
 
 /// Size of mailboxes, including both control fields and data.
 #[allow(dead_code)]
@@ -151,6 +155,10 @@ impl CommandOpcode {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
                 0x110 + num_pages * 8
             }
+            Self::CreateCq => {
+                let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
+                0x110 + num_pages * 8
+            }
             _ => return Err(CommandQueueError::NotImplemented)           
         };
         Ok(len)
@@ -169,7 +177,8 @@ impl CommandOpcode {
             Self::AllocUar => 12,              
             Self::AllocPd => 12,               
             Self::AllocTransportDomain => 12,
-            Self::CreateEq => 12,
+            Self::CreateEq => 16,
+            Self::CreateCq => 16,
             _ => return Err(CommandQueueError::NotImplemented)         
         };
         Ok(len)
@@ -226,7 +235,6 @@ enum MailboxType {
 /// A buffer of fixed-size entries that is used to pass commands to the HCA.
 /// It resides in a physically contiguous 4 KiB memory chunk.
 /// (Section 8.24.1: HCA Command Queue)
-#[repr(C)]
 pub struct CommandQueue {
     /// Physically-contiguous command queue entries
     entries: BoxRefMut<MappedPages, [CommandQueueEntry]>,
@@ -388,6 +396,7 @@ impl CommandQueue {
                 )?;
 
                 self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
+
             },
             _=> {
                 error!("unimplemented opcode");
@@ -618,9 +627,9 @@ impl CommandQueue {
 
                 // initialize the bitmask. this function only activates the page request event
                 let bitmask_offset_in_mailbox  = 0x58 - 0x10;
-                let eq_bitmask = mb_page.as_type_mut::<u64>(bitmask_offset_in_mailbox).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+                let eq_bitmask = mb_page.as_type_mut::<U64<BigEndian>>(bitmask_offset_in_mailbox).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
                 const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
-                *eq_bitmask = PAGE_REQUEST_BIT;
+                *eq_bitmask = U64::new(PAGE_REQUEST_BIT);
 
                 // Now use the remainder of the mailbox for page entries
                 let eq_pa_offset = 0x110 - 0x10;
@@ -868,7 +877,7 @@ impl CommandInterfaceMailbox {
 
 impl fmt::Debug for CommandInterfaceMailbox {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("CommandQueueEntry")
+        f.debug_struct("CommandInterfaceMailbox")
             .field("mailbox_data", &self.mailbox_data.read())
             .field("next pointer h", &self.next_pointer_h.read().get())
             .field("next pointer l", &self.next_pointer_l.read().get())
@@ -878,30 +887,4 @@ impl fmt::Debug for CommandInterfaceMailbox {
     }
 }
 
-#[derive(FromBytes, Default)]
-#[repr(C)]
-struct EventQueueContext {
-    status:             Volatile<U32<BigEndian>>,
-    _padding1:          u32,
-    page_offset:        Volatile<U32<BigEndian>>,
-    uar_log_eq_size:    Volatile<U32<BigEndian>>,
-    _padding2:          u32,
-    intr:               Volatile<U32<BigEndian>>,
-    log_pg_size:        Volatile<U32<BigEndian>>,
-    _padding3:          u64,
-    consumer_counter:   Volatile<U32<BigEndian>>,
-    producer_counter:   Volatile<U32<BigEndian>>,
-    _padding4:          [u8;12],
-}
 
-const_assert_eq!(core::mem::size_of::<EventQueueContext>(), 64);
-
-impl EventQueueContext {
-    pub fn init(&mut self, uar_page: u32, log_eq_size: u8) {
-        *self = EventQueueContext::default();
-        let uar = uar_page & 0xFF_FFFF;
-        let size = ((log_eq_size & 0x1F) as u32) << 24;
-        self.uar_log_eq_size.write(U32::new(uar | size));
-        self.log_pg_size.write(U32::new(0));
-    }
-}
