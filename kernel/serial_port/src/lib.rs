@@ -26,6 +26,7 @@
 extern crate spin;
 extern crate port_io;
 extern crate irq_safety;
+extern crate bare_io;
 
 use core::fmt;
 use port_io::Port;
@@ -252,4 +253,35 @@ impl fmt::Write for SerialPort {
         self.out_str(s); 
         Ok(())
     }
+}
+
+/// A non-blocking implementation of `Read` that will read bytes into the given `buf`
+/// so long as more bytes are available.
+/// The read operation will be completed when there are no more bytes to be read,
+/// or when the `buf` is filled, whichever comes first.
+///
+/// Because it's non-blocking, a [`bare_io::ErrorKind::WouldBlock`] error is returned
+/// if there are no bytes available to be read, indicating that the read would block.
+impl bare_io::Read for SerialPort {
+	fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize> {
+		if !self.data_available() {
+			return Err(bare_io::ErrorKind::WouldBlock.into());
+		}
+        Ok(self.in_bytes(buf))
+    }
+}
+
+/// A blocking implementation of `Write` that will write bytes from the given `buf`
+/// to the `SerialPort`, waiting until it is ready to transfer all bytes. 
+///
+/// The `flush()` function is a no-op, since the `SerialPort` does not have buffering. 
+impl bare_io::Write for SerialPort {
+    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+		self.out_bytes(buf);
+		Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> bare_io::Result<()> {
+        Ok(())
+    }    
 }
