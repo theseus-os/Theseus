@@ -2854,6 +2854,7 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cortex-m 0.6.7",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "stm32f4",
 ]

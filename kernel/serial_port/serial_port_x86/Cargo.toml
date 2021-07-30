@@ -1,9 +1,12 @@
 [package]
-name = "serial_port_x86"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "serial_port"
+description = "Basic driver for serial ports, e.g., COM1, COM2"
 version = "0.1.0"
-authors = ["Jacob Earle <jacob.earle@yale.edu>"]
-edition = "2018"
+build = "../../build.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies.port_io]
+path = "../../libs/port_io"
 
-[dependencies]
+[lib]
+crate-type = ["rlib"]
