@@ -11,6 +11,7 @@
 extern crate x86_64;
 extern crate spin;
 extern crate port_io;
+extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
 extern crate apic;
@@ -337,10 +338,42 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     scheduler::schedule();
 }
 
+/// IRQ 0x23: COM2 serial port interrupt handler.
+///
+/// Note: this IRQ may also be used for COM4, but I haven't seen a machine with a COM4 port yet.
+extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
+    // trace!("COM2 serial handler");
 
-/// 0x24
+    use serial_port::{SerialPortAddress::COM2, get_serial_port};
+    let com2_port = get_serial_port(COM2);
+    // NOTE: we cannot hold serial port lock while issuing a log statement.
+
+    // Read multiple bytes at once. DO NOT use a blocking read operation in an interrupt handler. 
+    let mut buf: [u8; 50] = [0; 50];
+    let bytes_read = com2_port.lock().in_bytes(&mut buf);
+    if bytes_read > 0 {
+        trace!("    Read {} bytes from COM2: {:X?})", bytes_read, &buf[..bytes_read]);
+    }
+
+    eoi(Some(PIC_MASTER_OFFSET + 0x3));
+}
+
+/// IRQ 0x24: COM1 serial port interrupt handler.
+///
+/// Note: this IRQ may also be used for COM3, but I haven't seen a machine with a COM3 port yet.
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    info!("COM1 serial handler");
+    // trace!("COM1 serial handler");
+
+    use serial_port::{SerialPortAddress::COM1, get_serial_port};
+    let com1_port = get_serial_port(COM1);
+    // NOTE: we cannot hold serial port lock while issuing a log statement.
+
+    // Read multiple bytes at once. DO NOT use a blocking read operation in an interrupt handler. 
+    let mut buf: [u8; 50] = [0; 50];
+    let bytes_read = com1_port.lock().in_bytes(&mut buf);
+    if bytes_read > 0 {
+        trace!("    Read {} bytes from COM1: {:X?})", bytes_read, &buf[..bytes_read]);
+    }
 
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }

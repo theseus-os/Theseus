@@ -13,7 +13,7 @@ extern crate irq_safety;
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use core::fmt::{self, Write};
 use spin::Once;
-use serial_port::SerialPort;
+use serial_port::{SerialPort, SerialPortAddress};
 use irq_safety::MutexIrqSafe;
 
 
@@ -69,7 +69,7 @@ pub fn mirror_to_vga(func: LogOutputFunc) {
 /// Currently, it supports emitting log messages to up to 4 serial ports.
 #[derive(Default)]
 struct Logger {
-    serial_ports: [Option<MutexIrqSafe<SerialPort>>; 4],
+    serial_ports: [Option<&'static MutexIrqSafe<SerialPort>>; 4],
 }
 
 impl Logger {
@@ -142,17 +142,20 @@ impl Log for Logger {
 ///    If `None`, the `DEFAULT_LOG_LEVEL` will be used.
 /// * `serial_ports`: an iterator over the serial ports that the system logger 
 ///    will write log messages to.
-///    Typically this is just a single port, e.g., `&[COM1_BASE_PORT]`.
+///    Typically this is just a single port, e.g., `&[COM1]`.
 ///
 /// This function will initialize up to a maximum of 4 serial ports and use them for logging.
-/// Serial ports after the first 4 in the `serial_port` argument will be ignored.
+/// Serial ports after the first 4 in the `serial_ports` argument will be ignored.
 /// 
 /// This function also initializes and takes ownership of all specified serial ports
 /// such that it can atomically write log messages to them.
-pub fn init<'p>(log_level: Option<Level>, serial_ports: impl IntoIterator<Item = &'p u16>) -> Result<(), SetLoggerError> {
+pub fn init<'p>(
+    log_level: Option<Level>,
+    serial_ports: impl IntoIterator<Item = &'p SerialPortAddress>
+) -> Result<(), SetLoggerError> {
     let mut logger = Logger::default();
     for (base_port, logger_serial_port) in serial_ports.into_iter().take(4).zip(&mut logger.serial_ports) {
-        *logger_serial_port = Some(MutexIrqSafe::new(SerialPort::new(*base_port)));
+        *logger_serial_port = Some(serial_port::get_serial_port(*base_port));
     }
 
     let static_logger = LOGGER.call_once(|| logger);

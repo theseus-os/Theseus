@@ -313,9 +313,9 @@ checksum = "980479e6fde23246dfb54d47580d66b4e99202e7579c5eaa9fe10ecb5ebd2182"
 
 [[package]]
 name = "byteorder"
-version = "1.3.4"
+version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
+checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "captain"
@@ -631,6 +631,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -659,6 +670,7 @@ dependencies = [
  "keyboard",
  "log",
  "memory",
+ "mlx5",
  "mouse",
  "mpmc",
  "network_manager",
@@ -1167,6 +1179,7 @@ dependencies = [
  "port_io",
  "ps2",
  "scheduler",
+ "serial_port",
  "spin 0.9.0",
  "task",
  "tlb_shootdown",
@@ -1595,6 +1608,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "mlx5"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "kernel_config",
+ "log",
+ "memory",
+ "mlx_ethernet",
+ "nic_initialization",
+ "owning_ref",
+ "pci",
+ "spin 0.9.0",
+]
+
+[[package]]
+name = "mlx_ethernet"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0",
+ "byteorder",
+ "kernel_config",
+ "libm",
+ "log",
+ "memory",
+ "nic_initialization",
+ "num_enum",
+ "owning_ref",
+ "static_assertions",
+ "volatile",
+ "zerocopy",
+]
+
+[[package]]
 name = "mm_eval"
 version = "0.1.0"
 dependencies = [
@@ -1842,6 +1888,27 @@ dependencies = [
  "path",
  "task",
  "terminal_print",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5adf0198d427ee515335639f275e806ca01acf9f07d7cf14bb36a10532a6169"
+dependencies = [
+ "derivative",
+ "num_enum_derive",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1def5a3f69d4707d8a040b12785b98029a39e8c610ae685c7f6265669767482"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -2448,7 +2515,10 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
+ "bare-io",
+ "irq_safety",
  "port_io",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -2909,6 +2979,17 @@ dependencies = [
  "log",
  "spawn",
  "spin 0.9.0",
+ "terminal_print",
+]
+
+[[package]]
+name = "test_serial_echo"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "log",
+ "serial_port",
+ "task",
  "terminal_print",
 ]
 

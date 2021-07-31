@@ -461,7 +461,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
 doc: check_rustc
-	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@RUSTDOCFLAGS="$$RUSTDOCFLAGS -A private_intra_doc_links" cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
@@ -608,15 +608,24 @@ help:
 
 ## Specify a basic machine/platform, which currently is the `q35` machine
 ## because it's the only one that supports a guest OS vIOMMU: <https://wiki.qemu.org/Features/VT-d>
-QEMU_FLAGS := -machine q35,kernel-irqchip=split 
+QEMU_FLAGS ?=
+QEMU_FLAGS += -machine q35,kernel-irqchip=split 
 ## Boot from the cd-rom drive
 QEMU_FLAGS += -cdrom $(iso) -boot d
 ## Don't reboot or shutdown upon failure or a triple reset
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 
 QEMU_FLAGS += -s
-## Enable the serial log to be redirected to the host terminal's stdio
+## Enable the serial log to be redirected to the host terminal's stdio, or you can
+## use `mon:stdio` to have the host terminal forward escape/control sequences to Theseus's serial port.
 QEMU_FLAGS += -serial stdio 
+# QEMU_FLAGS += -serial mon:stdio
+
+## Disable the graphical display (for testing headless server functionality)
+## `-vga none`:      removes the VGA card
+## `-display none`:  disables QEMU's graphical display
+## `-nographic`:     disables QEMU's graphical display and redirects VGA text mode output to serial.
+# QEMU_FLAGS += -display none -vga none
 
 ## Set the amount of system memory (RAM) provided to the QEMU guest OS
 QEMU_MEMORY ?= 512M
