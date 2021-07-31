@@ -1072,11 +1072,9 @@ impl Shell {
                                 let val: Option<&isize> = exit_status.downcast_ref::<isize>();
                                 info!("terminal: task [{}] returned exit value: {:?}", exited_task_id, val);
                                 if let Some(val) = val {
-                                    if *val < 0 {
-                                        self.terminal.lock().print_to_terminal(
-                                            format!("task [{}] returned error value {:?}\n", exited_task_id, val)
-                                        );
-                                    }
+                                    self.terminal.lock().print_to_terminal(
+                                        format!("task [{}] exited with code {} ({:#X})\n", exited_task_id, val, val)
+                                    );
                                 }
                             },
 

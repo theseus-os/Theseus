@@ -6,52 +6,58 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
+cfg-if = "1.0.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+spin = "0.9.0"
 multiboot2 = "0.7.1"
-xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-rustc-demangle = "0.1.14"
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
+rustc-demangle = "0.1.19"
 qp-trie = "0.7.3"
-cstr_core = "0.1.2"
+cstr_core = "0.2.3"
 
 
-[dependencies.util]
+[target.'cfg(target_arch = "x86_64")'.dependencies.util]
 path = "../../libs/util"
 
-[dependencies.cow_arc]
+[target.'cfg(target_arch = "x86_64")'.dependencies.cow_arc]
 path = "../../libs/cow_arc"
 
-[dependencies.kernel_config]
+[target.'cfg(target_arch = "x86_64")'.dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.log]
+[target.'cfg(target_arch = "x86_64")'.dependencies.log]
 version = "0.4.8"
 
-[dependencies.crate_name_utils]
+[target.'cfg(target_arch = "x86_64")'.dependencies.crate_name_utils]
 path = "../crate_name_utils"
 
-[dependencies.crate_metadata]
+[target.'cfg(target_arch = "x86_64")'.dependencies.crate_metadata]
 path = "../crate_metadata"
 
-[dependencies.memory]
+[target.'cfg(target_arch = "x86_64")'.dependencies.memory]
 path = "../memory"
 
-[dependencies.root]
+[dependencies.memory_initialization]
+path = "../memory_initialization"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.root]
 path = "../root"
 
-[dependencies.fs_node]
+[target.'cfg(target_arch = "x86_64")'.dependencies.fs_node]
 path = "../fs_node"
 
-[dependencies.hashbrown]
-version = "0.1.8"
+[target.'cfg(target_arch = "x86_64")'.dependencies.hashbrown]
+version = "0.9.1"
 features = ["nightly"]
 
-[dependencies.vfs_node]
+[target.'cfg(target_arch = "x86_64")'.dependencies.vfs_node]
 path = "../vfs_node"
 
-[dependencies.path]
+[target.'cfg(target_arch = "x86_64")'.dependencies.path]
 path = "../path"
 
-[dependencies.memfs]
+[target.'cfg(target_arch = "x86_64")'.dependencies.memfs]
 path = "../memfs"
 
 [lib]

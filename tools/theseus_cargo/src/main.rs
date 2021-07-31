@@ -137,7 +137,8 @@ fn main() -> Result<(), String> {
                 }
             }
             _ => {
-                return Err(format!("Found file with unexpected extension: {}", path.display()));
+                println!("Skipping potentially-redundant file with unexpected extension: {}", path.display());
+                continue;
             }
         };
 

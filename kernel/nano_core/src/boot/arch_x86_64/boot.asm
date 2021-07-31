@@ -7,8 +7,18 @@
 ; This file may not be copied, modified, or distributed
 ; except according to those terms.
 
-; Kernel is linked to run at -2Gb
-KERNEL_OFFSET equ 0xFFFFFFFF80000000
+%include "defines.asm"
+
+; Debug builds require a larger initial boot stack,
+; because their code is larger and less optimized.
+%ifndef INITIAL_STACK_SIZE
+%ifdef DEBUG
+	INITIAL_STACK_SIZE equ 32 ; 32 pages for debug builds
+%else 
+	INITIAL_STACK_SIZE equ 16 ; 16 pages for release builds
+%endif 
+%endif
+
 
 global start
 
@@ -43,6 +53,7 @@ start:
 %endif
 
 	call set_up_page_tables
+	call unmap_guard_page
 	call enable_paging
 
 	; Load the 64-bit GDT
@@ -83,7 +94,7 @@ set_up_page_tables:
 
 .map_kernel_table:
 	mov eax, 0x200000  ; 2MiB
-	mul ecx            ; start address of ecx-th page
+	mul ecx            ; eax now holds the start address of the ecx-th page
 	or eax, 10000011b  ; present + writable + huge
 	mov [(kernel_table - KERNEL_OFFSET) + (ecx * 8)], eax ; map ecx-th entry
 
@@ -110,6 +121,18 @@ set_up_page_tables:
 	jne .map_megabyte_table ; else map the next entry
 
 	ret
+
+
+unmap_guard_page:
+	; put the address of the stack guard huge pages into ecx
+	mov ecx, (initial_bsp_stack_guard_page - 0x200000 - KERNEL_OFFSET)
+	shr ecx, 18      ; calculate p2 index
+	and ecx, 0x1FF  ; get p2 index by itself
+	; ecx now holds the index into the p2 page table of the entry we want to unmap
+	mov eax, 0x0  ; set huge page flag, clear all others
+	mov [(kernel_table - KERNEL_OFFSET) + ecx], eax ; unmap (clear) ecx-th entry
+	ret
+
 
 enable_paging:
 	; Enable:
@@ -320,9 +343,10 @@ start_high:
 	call puts
 	pop rdi
 
-	; Give rust the higher half address to the multiboot2 information structure
+	; First argument: the higher half address to the multiboot2 information structure
 	add rdi, KERNEL_OFFSET
-	
+	; Second argument: the higher half address to the multiboot2 information structure
+	mov rsi, initial_double_fault_stack_top
 	call nano_core_start
 
 	; rust main returned, print `OS returned!`
@@ -371,12 +395,20 @@ strings:
 .long_start:
 	db 'Hello long mode!',0
 
-section .bss
-; This reserves space for the first page table that we must set up
-; before enabling paging and jumping to long mode.
-align 4096
+
+; The following `resb` commands reserve space for the first page table,
+; which we must set up before enabling paging and jumping to long mode.
+; We split it into two parts:
+; (1) the initial p4 page table (the root P4 frame), and
+; (2) all the other initial page table frames. 
+; This is because Theseus needs to obtain exclusive ownership of the root p4 table
+; separately from the rest of the .data/.bss section contents.
+section .page_table nobits alloc noexec write  ; same section flags as .bss
+align 4096 
 p4_table:
 	resb 4096
+
+section .bss
 low_p3_table:
 	resb 4096
 high_p3_table:
@@ -389,18 +421,29 @@ kernel_table:
 	resb 4096
 
 
+; Note that the linker script (`linker_higher_half.lf`) inserts a 2MiB space here 
+; in order to provide stack guard pages beneath the .stack section afterwards.
+; We don't really *need* to specify the section itself here, but it helps for clarity's sake.
+section .guard_huge_page nobits noalloc noexec nowrite
+
+
 ; Although x86 only requires 16-byte alignment for its stacks, 
 ; we use page alignment (4096B) for convenience and compatibility 
 ; with Theseus's stack abstractions in Rust. 
 ; We place the stack in its own sections for loading/parsing convenience.
 ; Currently, the stack is 16 pages in size, with a guard page beneath the bottom.
-section .stack nobits alloc noexec write  ; give it the same section flags as .bss
+; ---
+; Note that the `initial_bsp_stack_guard_page` is actually mapped by the boot-time page tables,
+; but that's okay because we have real guard pages above. 
+section .stack nobits alloc noexec write  ; same section flags as .bss
 align 4096 
 global initial_bsp_stack_guard_page
 initial_bsp_stack_guard_page:
 	resb 4096
 global initial_bsp_stack_bottom
 initial_bsp_stack_bottom:
-	resb 4096 * 16
+	resb 4096 * INITIAL_STACK_SIZE
 global initial_bsp_stack_top
 initial_bsp_stack_top:
+	resb 4096
+initial_double_fault_stack_top:

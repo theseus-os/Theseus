@@ -11,7 +11,7 @@ extern crate heap;
 
 #[macro_use] extern crate alloc;
 // #[macro_use] extern crate terminal_print;
-extern crate serial_port;
+extern crate logger;
 
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -27,7 +27,7 @@ pub fn main() {
 #[inline(never)]
 pub fn libtheseus_hello(_args: Vec<String>) -> isize {
     // println!("Hello from an example dylib main function!");
-    serial_port::write_fmt(format_args!("\n\nHello from libtheseus: args: {:?}", _args)).unwrap();
+    logger::write_fmt(format_args!("\n\nHello from libtheseus: args: {:?}", _args)).unwrap();
     0
 }
 

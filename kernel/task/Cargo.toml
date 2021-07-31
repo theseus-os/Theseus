@@ -7,8 +7,8 @@ build = "../../build.rs"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-spin = "0.4.10"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+spin = "0.9.0"
+cfg-if = "1.0.0"
 
 [dependencies.log]
 version = "0.4.8"
@@ -16,12 +16,6 @@ version = "0.4.8"
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
-
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.tss]
-path = "../tss"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
@@ -32,16 +26,25 @@ path = "../memory"
 [dependencies.stack]
 path = "../stack"
 
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
 [dependencies.context_switch]
 path = "../context_switch"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
 
 [dependencies.environment]
 path = "../environment"
 
-[dependencies.root]
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.tss]
+path = "../tss"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.root]
 path = "../root"
 
 

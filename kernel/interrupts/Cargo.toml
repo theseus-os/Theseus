@@ -9,8 +9,8 @@ build = "../../build.rs"
 cfg-if = "1.0.0"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+spin = "0.9.0"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 
@@ -22,7 +22,7 @@ features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+path = "../../libs/irq_safety"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.port_io]
 path = "../../libs/port_io"
@@ -35,6 +35,9 @@ path = "../kernel_config"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.apic]
 path = "../apic"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.serial_port]
+path = "../serial_port"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.tlb_shootdown]
 path = "../tlb_shootdown"

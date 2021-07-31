@@ -3,11 +3,10 @@
 //! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
 
 #![no_std]
-#![feature(const_fn)]
 #![feature(ptr_internals)]
 
 extern crate kernel_config;
-extern crate serial_port;
+extern crate logger;
 extern crate spin;
 extern crate volatile;
 
@@ -118,7 +117,7 @@ impl fmt::Write for VgaBuffer {
         
         // mirror DIRECTLY to serial port, do not use the log statements
         // because that can introduce an infinite loop when mirror_to_serial is enabled.
-        let ret = serial_port::write_str(s); 
+        let ret = logger::write_str(s); 
         
         for byte in s.bytes() {
             self.write_byte(byte)

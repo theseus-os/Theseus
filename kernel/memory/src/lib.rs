@@ -28,6 +28,8 @@ extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate memory_x86_64;
 extern crate x86_64;
+extern crate page_table_entry;
+extern crate frame_allocator;
 
 mod x86_64_memory;
 pub use x86_64_memory::*;

@@ -1,6 +1,6 @@
 use log::{Level, Log, Metadata, Record, SetLoggerError};
 
-#[cfg(target_vendor = "")]
+#[cfg(target_vendor = "unknown")]
 use cortex_m_semihosting::hprintln;
 
 #[cfg(target_vendor = "stm32f407")]

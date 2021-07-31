@@ -17,7 +17,7 @@ features = ["inline-asm"]
 version = "0.7.2"
 
 [target.'cfg(target_arch = "arm")'.dependencies.spin]
-version = "0.4.10"
+version = "0.9.0"
 
 [target.'cfg(target_arch = "arm")'.dependencies.owning_ref]
 git = "https://github.com/kevinaboos/owning-ref-rs.git"

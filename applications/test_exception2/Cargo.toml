@@ -12,8 +12,8 @@ build = "../../build.rs"
 version = "0.4.8"
 
 
-[dependencies.serial_port]
-path = "../../kernel/serial_port"
+[dependencies.logger]
+path = "../../kernel/logger"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"

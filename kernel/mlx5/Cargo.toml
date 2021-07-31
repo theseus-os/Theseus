@@ -13,7 +13,7 @@ owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 version = "0.4.8"
 
 [dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+path = "../../libs/irq_safety"
 
 [dependencies.memory]
 path = "../memory"

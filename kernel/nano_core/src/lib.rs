@@ -35,6 +35,7 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate stack;
+extern crate serial_port;
 extern crate mod_mgmt;
 extern crate exceptions_early;
 #[macro_use] extern crate vga_buffer;
@@ -98,31 +99,41 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// then change the [`captain::init`](../captain/fn.init.html) routine.
 /// 
 #[no_mangle]
-pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
-    println_raw!("Entered nano_core_start()."); 
-	
-	// start the kernel with interrupts disabled
+pub extern "C" fn nano_core_start(
+    multiboot_information_virtual_address: usize,
+    early_double_fault_stack_top: usize,
+) {
+    // start the kernel with interrupts disabled
 	irq_safety::disable_interrupts();
+    println_raw!("Entered nano_core_start(). Interrupts disabled.");
 
-    // first, bring up the logger so we can debug
-    try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
+    // Initialize the logger up front so we can see early log messages for debugging.
+    let logger_serial_ports = [serial_port::SerialPortAddress::COM1];  // some servers use COM2 instead. 
+    try_exit!(logger::init(None, &logger_serial_ports).map_err(|_a| "couldn't init logger!"));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
-    exceptions_early::init(&EARLY_IDT);
+    exceptions_early::init(&EARLY_IDT, Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
-    if VirtualAddress::new(multiboot_information_virtual_address).is_err() {
+    if VirtualAddress::new(multiboot_information_virtual_address).is_none() {
         try_exit!(Err("multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
-    println_raw!("nano_core_start(): booted via multiboot2."); 
+    println_raw!("nano_core_start(): booted via multiboot2 with info at {:#X}.", multiboot_information_virtual_address); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, stack, identity_mapped_pages) = 
-        try_exit!(memory_initialization::init_memory_management(&boot_info));
+    let (
+        kernel_mmi_ref,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        stack,
+        bootloader_modules,
+        identity_mapped_pages
+    ) = try_exit!(memory_initialization::init_memory_management(boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped upon a returned error, causing all execution to stop. 
@@ -134,7 +145,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized state store.");     
 
     // initialize the module management subsystem, so we can create the default crate namespace
-    let default_namespace = match mod_mgmt::init(&boot_info, kernel_mmi_ref.lock().deref_mut()) {
+    let default_namespace = match mod_mgmt::init(bootloader_modules, kernel_mmi_ref.lock().deref_mut()) {
         Ok(namespace) => namespace,
         Err(err) => { 
             core::mem::forget(text_mapped_pages);
@@ -157,15 +168,13 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
             let ap_realmode_begin = try_exit!(
                 init_symbols.get("ap_start_realmode")
-                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"")
-                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
-                )
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode\"")
             );
             let ap_realmode_end   = try_exit!(
                 init_symbols.get("ap_start_realmode_end")
-                    .ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"")
-                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)
-                )
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")
             );
             // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
             (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end)

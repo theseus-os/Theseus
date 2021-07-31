@@ -15,20 +15,16 @@ use memory_structs::VirtualAddress;
 pub fn alloc_stack(size_in_pages: usize) -> Option<Stack> {
     // Allocate enough pages for an additional guard page.
     let pages = page_allocator::allocate_pages(size_in_pages + 1)?;
-    if let Some(fa) = memory::get_frame_allocator_ref() {
-        if let Some(kmmi) = memory::get_kernel_mmi_ref() {
-            let dummy_page_table = &mut kmmi.lock().page_table;
-            let mut dummy_frame_allocator = fa.lock();
-            let dummy_mapped_pages = match dummy_page_table.map_allocated_pages(
-                pages,
-                EntryFlags::WRITABLE,
-                &mut *dummy_frame_allocator
-            ) {
-                Ok(mapped_pages) => mapped_pages,
-                Err(_) => return None
-            };
-            return Stack::from_pages(dummy_mapped_pages).ok();
-        }
+    if let Some(kmmi) = memory::get_kernel_mmi_ref() {
+        let dummy_page_table = &mut kmmi.lock().page_table;
+        let dummy_mapped_pages = match dummy_page_table.map_allocated_pages(
+            pages,
+            EntryFlags::WRITABLE
+        ) {
+            Ok(mapped_pages) => mapped_pages,
+            Err(_) => return None
+        };
+        return Stack::from_pages(dummy_mapped_pages).ok();
     }
     None
 }

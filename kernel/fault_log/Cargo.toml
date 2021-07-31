@@ -11,7 +11,7 @@ features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+path = "../../libs/irq_safety"
 
 [dependencies.memory]
 path = "../memory"

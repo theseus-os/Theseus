@@ -1,63 +1,73 @@
+%include "defines.asm"
+
 ABSOLUTE 0x5000
 VBECardInfo:
-	.signature resb 4
-	.version resw 1
-	.oemstring resd 1
-	.capabilities resd 1
-	.videomodeptr resd 1
-	.totalmemory resw 1
-	.oemsoftwarerev resw 1
-	.oemvendornameptr resd 1
-	.oemproductnameptr resd 1
-	.oemproductrevptr resd 1
-	.reserved resb 222
-	.oemdata resb 256
+	.signature             resb 4
+	.version               resw 1
+	.oemstring             resd 1
+	.capabilities          resd 1
+	.videomodeptr          resd 1
+	.totalmemory           resw 1
+	.oemsoftwarerev        resw 1
+	.oemvendornameptr      resd 1
+	.oemproductnameptr     resd 1
+	.oemproductrevptr      resd 1
+	.reserved              resb 222
+	.oemdata               resb 256
 
 ABSOLUTE 0x5200
 VBEModeInfo:
-	.attributes resw 1
-	.winA resb 1
-	.winB resb 1
-	.granularity resw 1
-	.winsize resw 1
-	.segmentA resw 1
-	.segmentB resw 1
-	.winfuncptr resd 1
-	.bytesperscanline resw 1
-	.xresolution resw 1
-	.yresolution resw 1
-	.xcharsize resb 1
-	.ycharsize resb 1
-	.numberofplanes resb 1
-	.bitsperpixel resb 1
-	.numberofbanks resb 1
-	.memorymodel resb 1
-	.banksize resb 1
-	.numberofimagepages resb 1
-	.unused resb 1
-	.redmasksize resb 1
-	.redfieldposition resb 1
-	.greenmasksize resb 1
-	.greenfieldposition resb 1
-	.bluemasksize resb 1
-	.bluefieldposition resb 1
-	.rsvdmasksize resb 1
-	.rsvdfieldposition resb 1
-	.directcolormodeinfo resb 1
-	.physbaseptr resd 1
+	.attributes            resw 1
+	.winA                  resb 1
+	.winB                  resb 1
+	.granularity           resw 1
+	.winsize               resw 1
+	.segmentA              resw 1
+	.segmentB              resw 1
+	.winfuncptr            resd 1
+	.pitch                 resw 1
+	.width                 resw 1
+	.height                resw 1
+	.xcharsize             resb 1
+	.ycharsize             resb 1
+	.numberofplanes        resb 1
+	.bitsperpixel          resb 1
+	.numberofbanks         resb 1
+	.memorymodel           resb 1
+	.banksize              resb 1
+	.numberofimagepages    resb 1
+	.unused                resb 1
+	.redmasksize           resb 1
+	.redfieldposition      resb 1
+	.greenmasksize         resb 1
+	.greenfieldposition    resb 1
+	.bluemasksize          resb 1
+	.bluefieldposition     resb 1
+	.rsvdmasksize          resb 1
+	.rsvdfieldposition     resb 1
+	.directcolormodeinfo   resb 1
+	.physbaseptr           resd 1
 	.offscreenmemoryoffset resd 1
-	.offscreenmemsize resw 1
-	.reserved resb 206
+	.offscreenmemsize      resw 1
+	.reserved              resb 206
 
 ABSOLUTE 0x5400
 current:
-    .mode resd 1
+    .mode                  resw 1
+
+; Keeps track of the "best" (highest-resolution) graphics mode so far
+best_mode:
+    .mode                  resw 1
+    .width                 resw 1
+    .height                resw 1
+    .physaddr              resd 1
+
 
 section .init.realmodetext16 progbits alloc exec nowrite
 bits 16 ; we're in real mode, that's how APs boot up
 
+; This is the entry point for APs when they first boot.
 global ap_start_realmode
-
 ap_start_realmode:
     cli
 
@@ -91,100 +101,166 @@ ap_start_realmode:
     mov al, "T"
     int 0x10
 
-;The graphic mode setting code is executed once. [0000:0900] indicates if it's the first time to run the code. If not, skip the graphic mode setting block.
+; We only need to execute the graphic mode setting code once, system-wide. 
+; We use the byte at [0000:0900] to indicate if another core has already run this code.
     mov ax, 0
     mov es, ax
     mov di, 0x900
     mov ax, [es:di]
     cmp ax, 5
-    je gdt
+    ; skip graphics mode setting code if it's already been done.
+    je create_gdt
 
-;Here we get the VESA information and set a VESA mode of a choosen resolution
-;We get a list of available modes, and pick the first mode of 32bit(RGB_) and whose x-resolution >= 1280
-;We put the mode information in physical address 0xF100 which can be read in Rust
-getcardinfo:            ;get super VGA information including available modes list
-    mov ax, 0x4F00      ;BIOS int 10, ax=4F00, get superVGA information
-    mov di, VBECardInfo ;di, buffer for returned information
-    int 0x10            ;BIOS int 10
-    cmp al, 0x4F        ;al=4f, function is supported
-    jne gdt             ;if not supported, skip the VESA mode setting block
-    
-findmode:               ;initialize the mode pointer
-    mov si, [VBECardInfo.videomodeptr]
-    mov ax, [VBECardInfo.videomodeptr+2]
-    mov fs, ax          ;[fs:si] pointes to the first mode
-    sub si, 2           ;initilize the pointer [fs:si] to the index before the first mode
 
-;travers the mode list to fint the first mode of intended parameters
-.searchmodes:
-    add si, 2           ;[fs:si] points to the next mode
-    mov cx, [fs:si]     ;move current mode index to cx
-    cmp cx, 0xFFFF      
-    je gdt              ;if the mode index extends the bound, skip the VESA mode setting block;
-
-.getmodeinfo:
-    push esi
-    mov [current.mode], cx  ;set current mode
-    mov ax, 0x4F01          ;BIOS int 10, ax=4f01, get current mode information. cx:mode address
-    mov di, VBEModeInfo     ;di: returned mode information buffer
-    int 0x10                ;BIOS int 10
-    pop esi
-    cmp al, 0x4F            ;al=4f, function is supported
-    jne gdt                 ;if not supported, skip the VESA mode setting block
-
-.foundmode:
-    cmp byte [VBEModeInfo.bitsperpixel], 32
-    jne .searchmodes; if current mode is not 32-byte, continue to search
-    cmp word [VBEModeInfo.xresolution], 1280
-    jb .searchmodes; if current x-resolution is less than 1280, continue to search
-
-; store resolution and bufferr address to [0000:F100] so that Rust can read them
-store_mode_info:    
+; This is the start of the graphics mode code. 
+; First, initialize both our "best" mode info and the Rust-visible GraphicInfo to all zeros.
+    mov word [best_mode.mode],       0
+    mov word [best_mode.width],      0
+    mov word [best_mode.height],     0
+    mov word [best_mode.physaddr],   0
+    mov word [best_mode.physaddr+2], 0
+    ; WARNING: the below code must be kept in sync with the `GraphicInfo` struct 
+    ;          in the `multicore_bringup` crate. 
     push di
     mov ax, 0
     mov es, ax
     mov di, 0xF100
-
-    ;move x resolution to [0:F100]
-    mov word ax, [VBEModeInfo.xresolution]
-    mov word [es:di], ax
-    mov word [es:di+2], 0
-    mov word [es:di+4], 0
-    mov word [es:di+6], 0
-
-    ;move y resolution to [0:F108]
-    mov word ax, [VBEModeInfo.yresolution]
-    mov word [es:di+8], ax
+    ; set width to zero
+    mov word [es:di+0],  0
+    mov word [es:di+2],  0
+    mov word [es:di+4],  0
+    mov word [es:di+6],  0
+    ; set height to zero
+    mov word [es:di+8],  0
     mov word [es:di+10], 0
     mov word [es:di+12], 0
     mov word [es:di+14], 0
-
-    ;move lfb address to [0:F110]
-    ;liner frame buffer address
-    mov word ax, [VBEModeInfo.physbaseptr]
-    mov word [es:di+16], ax
-    mov word ax, [VBEModeInfo.physbaseptr+2]
-    mov word [es:di+18], ax
-    mov word [es:di+20], 0000
-    mov word [es:di+22], 0000
+    ; set physical address to zero
+    mov word [es:di+16], 0
+    mov word [es:di+18], 0
+    mov word [es:di+20], 0
+    mov word [es:di+22], 0
     pop di
 
-set_graphic_mode:
-    mov ax, 0x4f02;         ;BIOS int 10, ax=4f02, set graphic mode
-    ;0x4f41:640*400*32bit in QEMU; bx 4___ is linear frame buffer 
-    mov bx, [current.mode]  ;bx: current mode 
-    int 0x10                ;BIOS int 10
+; Next, we get the VBE card info such that we can iterate over the list of available modes. 
+; We then pick the highest-resolution mode, only considering modes with 32-bit pixels. 
+; If this runs successfully, we write the graphics mode details starting at physical address 0xF100
+; such that Rust code can read them later. 
+get_vbe_card_info:
+    mov ax, 0x4F00         ; 0x4F00 is the argument to the BIOS 0x10 interrupt used to request VGA/VESA information
+    mov di, VBECardInfo    ; Set `di` to the address where the VBE card info will be written
+    int 0x10
+    cmp al, 0x4F           ; The result is placed into `al`. A result of `0x4f` means the query was successful.
+    jne graphic_mode_done  ; A failure here means we can't set graphic modes, so just skip to the end. 
+    
+    ; initialize the mode pointer so we can iterate over the available graphics modes
+    mov si, [VBECardInfo.videomodeptr]
+    mov ax, [VBECardInfo.videomodeptr+2]
+    mov fs, ax          ; [fs:si] will point to the first mode in the list of modes
+    sub si, 2           ; initilize the pointer [fs:si] to the index before the first mode
 
-    ;Set the flag [0000:0900] indicating that the graphic mode is set
+; Traverse the next mode in the list of available modes
+.next_mode:
+    add si, 2           ; [fs:si] points to the next mode
+    mov cx, [fs:si]     ; `cx` now holds the current mode index
+    cmp cx, 0xFFFF      ; A mode index of 0xFFFF indicates we are done iterating over the modes.
+    je mode_iter_done
+
+    ; Here, we attempt to get the mode info for the mode we just iterated to
+    push esi
+    mov [current.mode], cx  ; Store the current mode in `current.mode`
+    mov ax, 0x4F01          ; 0x4F01 is the argument fo the BIOS 0x10 interrupt used to get the currrent mode information
+    mov di, VBEModeInfo     ; Set `di` to the address where the mode information will be written
+    int 0x10
+    pop esi
+    cmp al, 0x4F            ; The result is placed into `al`. A result of `0x4f` means the query was successful.
+    jne .next_mode          ; We failed to get info about this mode. Go back and try the next mode.
+
+    ; We only support modes with 32-bit pixel sizes
+    cmp byte [VBEModeInfo.bitsperpixel], 32
+    jne .next_mode
+    ; Check whether the current mode is higher resolution than our maximum resolution.
+    ; If it is, then continue iterating through the modes.
+    mov word ax, [VBEModeInfo.width]
+    cmp word ax, [es:AP_MAX_FB_WIDTH]
+    ja .next_mode
+    mov word ax, [VBEModeInfo.height]
+    cmp word ax, [es:AP_MAX_FB_HEIGHT]
+    ja .next_mode
+    ; Check whether the current mode is higher resolution than the "best" mode thus far.
+    ; If not, continue iterating through the modes. 
+    mov word ax, [best_mode.width]
+    cmp word [VBEModeInfo.width], ax
+    jb .next_mode ; if current width is greater than or equal to best width, fall through.
+    mov word ax, [best_mode.height]
+    cmp word [VBEModeInfo.height], ax
+    jb .next_mode
+
+    ; Here, the current mode was higher resolution, so we update the "best" mode to that.
+    mov word ax, [current.mode]
+    mov word [best_mode.mode], ax
+    mov word ax, [VBEModeInfo.width]
+    mov word [best_mode.width], ax
+    mov word ax, [VBEModeInfo.height]
+    mov word [best_mode.height], ax
+    mov word ax, [VBEModeInfo.physbaseptr]
+    mov word [best_mode.physaddr], ax
+    mov word ax, [VBEModeInfo.physbaseptr+2]
+    mov word [best_mode.physaddr+2], ax
+    jmp .next_mode    ; we may find better modes later, so keep iterating!
+
+; Once we have iterated over all available graphic modes, we jump here to
+; store the details of the "best" mode that we found into [0000:F100]
+; such that our Rust code can access the details of the current graphic mode.
+mode_iter_done:
+    ; WARNING: the below code must be kept in sync with the `GraphicInfo` struct 
+    ;          in the `multicore_bringup` crate. 
+    push di
+    mov ax, 0
+    mov es, ax
+    mov di, 0xF100
+    ; copy the best mode's width to [0:F100]
+    mov word ax, [best_mode.width]
+    mov word [es:di+0], ax
+    mov word [es:di+2], 0
+    mov word [es:di+4], 0
+    mov word [es:di+6], 0
+    ; copy the best mode's height to [0:F108]
+    mov word ax, [best_mode.height]
+    mov word [es:di+ 8], ax
+    mov word [es:di+10], 0
+    mov word [es:di+12], 0
+    mov word [es:di+14], 0
+    ; move the best mode's 32-bit physical address to [0:F110]
+    mov word ax, [best_mode.physaddr]
+    mov word [es:di+16], ax
+    mov word ax, [best_mode.physaddr+2]
+    mov word [es:di+18], ax
+    mov word [es:di+20], 0
+    mov word [es:di+22], 0
+    pop di
+
+; Finally, once we have saved the info of the best graphical mode,
+; we must actually set the VGA card to use that mode. 
+; For this, we use BIOS int 0x10 with arguments `0x4F02` in `ax`
+; and the chosen mode index in `bx`. 
+    mov ax, 0x4F02
+    mov bx, [best_mode.mode]
+    int 0x10
+
+graphic_mode_done:
+    ; Set the byte at [0000:0900] to indicate that we've run the graphic mode setting code.
     mov ax, 0
     mov es, ax
     mov di, 0x900
     mov byte [es:di], 5
+    ; move on (fall through) to the next step, setting up our GDT
 
-gdt:
-    ; here we're creating a GDT manually at address 0x800 by writing to addresses starting at 0x800
-    ; since this code will be forcibly loaded by GRUB multiboot above 1MB, and we're in 16-bit real mode,
-    ; we cannot create a gdt regularly. We have to 
+
+; Here, we create a GDT manually by writing its contents directly, starting at address 0x800.
+; Since this code will be forcibly loaded by the GRUB multiboot2 bootloader at an address above 1MB,
+; and because we're in 16-bit real mode, we cannot create a GDT regularly using assembler directives.
+create_gdt:
     ; Point es:di to the right memory section:
     mov   ax, 0
     mov   es, ax     ; segment of 0 since we're just accessing 0x800
@@ -242,7 +318,7 @@ load_gdt:
 clear_prefetch: 
     ; jump to protected mode. "dword" here tells nasm to generate a 32-bit instruction,
     ; even though we're still in 16-bit mode. GCC's "as" assembler can't do that! haha
-    ; 0x8 is for the newly-created kernel code segment from the above GDT
+    ; `0x8` is the newly-created kernel code segment from the above GDT
     jmp dword 0x8:prot_mode 
 
 
@@ -276,16 +352,6 @@ prot_mode:
 
 halt:
     jmp halt
-
-
-
-
-
-
-; real_mode_stack_bottom:
-;     resb 512
-; real_mode_stack_top:
-
 
 
 

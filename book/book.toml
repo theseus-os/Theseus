@@ -1,6 +1,12 @@
 [book]
 title = "The Theseus OS Book"
 authors = ["Kevin Boos", "Lin Zhong"]
-description = "The book-style documentation of the design and implementation of Theseus, a companion to its source-level documentation."
+description = "Describes the design principles and implementation details of Theseus, a companion to its source-level docs."
 multilingual = false
 src = "src"
+
+[output.html]
+
+[output.linkcheck]
+optional = true
+## See other linkcheck options here: <https://github.com/Michael-F-Bryan/mdbook-linkcheck#configuration>
