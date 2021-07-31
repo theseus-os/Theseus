@@ -1,5 +1,7 @@
 //! Traits for items that are "Lockable", e.g., `Mutex`es.
 
+#![no_std]
+
 // #![feature(generic_associated_types)]
 // #![allow(incomplete_features)]
 
