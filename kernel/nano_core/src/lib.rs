@@ -279,6 +279,9 @@ extern crate panic_halt;
 extern crate memory_initialization;
 extern crate captain;
 
+#[cfg(target_vendor = "stm32f407")]
+extern crate stm32f4_discovery;
+
 mod boot;
 
 use alloc::string::String;
@@ -303,6 +306,13 @@ extern "C" fn main() -> ! {
 
     info!("heap: {}", &heap_hello);
     info!("memfile: {}", &memfile_hello);
+
+    // Initialize board peripherals
+    cfg_if! {
+        if #[cfg(target_vendor = "stm32f407")] {
+            stm32f4_discovery::init_peripherals();
+        }
+    }
 
     captain::init()
 }

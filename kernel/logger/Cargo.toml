@@ -17,8 +17,8 @@ path = "../serial_port"
 [target.'cfg(all(target_arch = "arm", target_vendor = "unknown"))'.dependencies.cortex-m-semihosting]
 version = "0.3.7"
 
-[target.thumbv7em-stm32f407-theseus-eabi.dependencies.uart]
-path = "../peripherals/stm32f4_discovery/uart"
+[target.thumbv7em-stm32f407-theseus-eabi.dependencies.stm32f4_discovery]
+path = "../boards/stm32f4_discovery"
 
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]

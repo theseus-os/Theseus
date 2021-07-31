@@ -1,5 +1,5 @@
 [package]
-name = "peripherals"
+name = "boards"
 version = "0.1.0"
 authors = ["Jacob Earle <jacob.earle@yale.edu>"]
 edition = "2018"

@@ -76,6 +76,9 @@ path = "../task"
 [target.'cfg(target_arch = "arm")'.dependencies.scheduler]
 path = "../scheduler"
 
+[target.thumbv7em-stm32f407-theseus-eabi.dependencies.stm32f4_discovery]
+path = "../boards/stm32f4_discovery"
+
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
 # that we can jump to from the bootloader.

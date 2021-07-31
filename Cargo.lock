@@ -310,6 +310,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "boards"
+version = "0.1.0"
+
+[[package]]
 name = "by_address"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1513,7 +1517,7 @@ dependencies = [
  "log",
  "serial_port",
  "spin 0.9.0",
- "uart",
+ "stm32f4_discovery",
 ]
 
 [[package]]
@@ -1863,6 +1867,7 @@ dependencies = [
  "spin 0.9.0",
  "stack",
  "state_store",
+ "stm32f4_discovery",
  "task",
  "vga_buffer",
  "x86_64",
@@ -2127,10 +2132,6 @@ dependencies = [
 [[package]]
 name = "percent-encoding"
 version = "1.0.2"
-
-[[package]]
-name = "peripherals"
-version = "0.1.0"
 
 [[package]]
 name = "physical_nic"
@@ -3155,15 +3156,6 @@ name = "typenum"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f6906492a7cd215bfa4cf595b600146ccfac0c79bcbd1f3000162af5e8b06"
-
-[[package]]
-name = "uart"
-version = "0.1.0"
-dependencies = [
- "cfg-if 1.0.0",
- "cortex-m 0.6.7",
- "stm32f4_discovery",
-]
 
 [[package]]
 name = "unicode-width"

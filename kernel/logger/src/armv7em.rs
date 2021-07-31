@@ -4,7 +4,7 @@ use log::{Level, Log, Metadata, Record, SetLoggerError};
 use cortex_m_semihosting::hprintln;
 
 #[cfg(target_vendor = "stm32f407")]
-use uart::{SerialPort, uprint, uprintln};
+use stm32f4_discovery::{uprint, uprintln, uart::SerialPort};
 use core::fmt::{Write};
 
 /// The static logger instance, an empty struct that implements the `Log` trait.

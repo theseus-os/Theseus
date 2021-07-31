@@ -25,7 +25,7 @@ pub use x86_64::*;
 
 cfg_if! {
     if #[cfg(target_vendor = "stm32f407")] {
-    	extern crate uart;
+    	extern crate stm32f4_discovery;
     } else if #[cfg(target_vendor = "unknown")] {
         extern crate cortex_m_semihosting;
     }

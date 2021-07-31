@@ -14,5 +14,11 @@ if #[cfg(target_vendor = "stm32f407")] {
             Mutex::new(RefCell::new(p))
         };
     }
+
+    pub mod uart;
+
+    pub fn init_peripherals () {
+        uart::uart_init();
+    }
 }
 }
