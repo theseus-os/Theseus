@@ -9,9 +9,9 @@ if #[cfg(target_vendor = "stm32f407")] {
     use lazy_static::lazy_static;
 
     lazy_static!{
-        pub static ref STM_PERIPHERALS : MutexIrqSafe<stm32f407::Peripherals> = {
+        pub static ref STM_PERIPHERALS : Mutex<RefCell<stm32f407::Peripherals>> = {
             let p = stm32f407::Peripherals::take().unwrap();
-            MutexIrqSafe::new(p)
+            Mutex::new(RefCell::new(p))
         };
     }
 }
