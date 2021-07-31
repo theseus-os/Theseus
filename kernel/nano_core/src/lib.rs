@@ -291,6 +291,14 @@ use memfs::MemFile;
 extern "C" fn main() -> ! {
     let heap_start = boot::heap_start();
     memory_initialization::init_memory_management(heap_start, kernel_config::memory::KERNEL_HEAP_INITIAL_SIZE + heap_start);
+
+    // Initialize board peripherals
+    cfg_if! {
+        if #[cfg(target_vendor = "stm32f407")] {
+            stm32f4_discovery::init_peripherals();
+        }
+    }
+
     logger::init().unwrap();
 
     info!("memory and logging initialized");
@@ -307,12 +315,6 @@ extern "C" fn main() -> ! {
     info!("heap: {}", &heap_hello);
     info!("memfile: {}", &memfile_hello);
 
-    // Initialize board peripherals
-    cfg_if! {
-        if #[cfg(target_vendor = "stm32f407")] {
-            stm32f4_discovery::init_peripherals();
-        }
-    }
 
     captain::init()
 }
