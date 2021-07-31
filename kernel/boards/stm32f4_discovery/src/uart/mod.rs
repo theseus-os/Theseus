@@ -1,8 +1,9 @@
-use cortex_m::interrupt::{self};
-use core::fmt::{self};
+//! Implements UART specific functionality for the STM32F4 Discovery Board 
+use cortex_m::interrupt;
+use core::fmt;
 use crate::STM_PERIPHERALS;
 
-
+/// Initialize UART for use.
 pub fn uart_init() {
     interrupt::free(|cs| {
         let p = STM_PERIPHERALS.borrow(cs).borrow();
@@ -44,7 +45,7 @@ pub fn uart_init() {
     });
 }
 
-// implementation of uprintln! inspired by Rust Embedded Discovery Book
+/// Macro used to print a formatted string over a serial port on the UART
 #[macro_export]
 macro_rules! uprint {
     ($serial:expr, $($arg:tt)*) => {
@@ -52,6 +53,7 @@ macro_rules! uprint {
     };
 }
 
+/// Implementation of uprintln! inspired by Rust Embedded Discovery Book
 #[macro_export]
 macro_rules! uprintln {
     ($serial:expr, $fmt:expr) => {
@@ -62,6 +64,7 @@ macro_rules! uprintln {
     };
 }
 
+/// The `SerialPort` struct implements the Write trait that is necessary for use with uprint! macro.
 pub struct SerialPort; 
 
 impl fmt::Write for SerialPort {
