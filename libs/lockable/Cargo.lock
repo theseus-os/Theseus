@@ -5,7 +5,7 @@ version = 3
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/kevinaboos/irq_safety?branch=update_interface_and_rwlock#6b0ea5232174f006f79d3334216144aca62d55bd"
+source = "git+https://github.com/theseus-os/irq_safety#598d714463fbf07555f3359358662e00a7a8baee"
 dependencies = [
  "owning_ref",
  "spin",

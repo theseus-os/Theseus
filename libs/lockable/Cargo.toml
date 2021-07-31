@@ -9,10 +9,3 @@ license = "MIT"
 [dependencies]
 spin = "0.9.0"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
-
-
-[patch.'https://github.com/theseus-os/irq_safety']
-### Temporary patch for irq_safety which updates the locking API. 
-### Once the below PR lands, we can remove this and run `cargo update -p irq_safety`.
-### <https://github.com/theseus-os/irq_safety/pull/3>
-irq_safety = { git = "https://github.com/kevinaboos/irq_safety", branch = "update_interface_and_rwlock" }

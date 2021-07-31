@@ -39,11 +39,6 @@ exclude = [
 	"libtheseus",
 ]
 
-[patch.'https://github.com/theseus-os/irq_safety']
-### Temporary patch for irq_safety which updates the locking API. 
-### Once the below PR lands, we can remove this and run `cargo update -p irq_safety`.
-### <https://github.com/theseus-os/irq_safety/pull/3>
-irq_safety = { git = "https://github.com/kevinaboos/irq_safety", branch = "update_interface_and_rwlock" }
 
 [patch.'https://github.com/rafalh/rust-fatfs']
 ### Temporary patch for fatfs which allows us to set the logging level.

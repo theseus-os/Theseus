@@ -49,7 +49,7 @@ extern crate lockable;
 #[cfg(test)]
 mod test;
 
-use core::{cmp::min, ops::Range};
+use core::{cmp::min, marker::PhantomData, ops::Range};
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use spin::Mutex;
 use lockable::Lockable;
@@ -633,7 +633,17 @@ impl<IO> Seek for Writer<IO> where IO: KnownLength {
 
 /// WIP: this should replace the [`LockedIO`] type.
 #[derive(Debug, Clone)]
-pub struct LockableIo<L, IO>(L) where L: Lockable<IO>, IO: ?Sized;
+pub struct LockableIo<'io, L, IO> where L: Lockable<'io, IO>, IO: 'io + ?Sized {
+    inner: Arc<L>,
+    _phantom: PhantomData<&'io IO>,
+}
+
+pub fn test() {
+    let lockable_io = LockableIo { inner: Arc::new(Mutex::new(20usize)), _phantom: PhantomData, };
+    let mut me = lockable_io.inner.lock();
+    *me += 10;
+    
+}
 
 // impl<IO: ?Sized> From<Arc<Mutex<IO>>> for LockableIo<IO> {
 //     fn from(arc_mutex_io: Arc<Mutex<IO>>) -> Self {

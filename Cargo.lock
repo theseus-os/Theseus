@@ -1130,7 +1130,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/kevinaboos/irq_safety?branch=update_interface_and_rwlock#bf38b598607ef1bbf0e65a5212a66e8adf760870"
+source = "git+https://github.com/theseus-os/irq_safety#598d714463fbf07555f3359358662e00a7a8baee"
 dependencies = [
  "owning_ref",
  "spin 0.9.0",
