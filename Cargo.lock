@@ -447,18 +447,9 @@ name = "context_switch"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
- "context_switch_armv7em",
  "context_switch_avx",
  "context_switch_regular",
  "context_switch_sse",
-]
-
-[[package]]
-name = "context_switch_armv7em"
-version = "0.1.0"
-dependencies = [
- "cfg-if 1.0.0",
- "zerocopy 0.3.0",
 ]
 
 [[package]]
@@ -1217,18 +1208,6 @@ dependencies = [
  "spin 0.4.10",
  "volatile",
  "zerocopy 0.3.0",
-]
-
-[[package]]
-name = "irq_safety"
-version = "0.0.1"
-dependencies = [
- "cfg-if 1.0.0",
- "cortex-m 0.7.3",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "owning_ref 0.4.0",
- "spin 0.4.10",
- "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
 ]
 
 [[package]]
@@ -2790,7 +2769,6 @@ dependencies = [
 name = "stack"
 version = "0.1.0"
 dependencies = [
- "cfg-if 1.0.0",
  "kernel_config",
  "log",
  "memory",
@@ -2876,7 +2854,7 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cortex-m 0.6.7",
- "irq_safety 0.0.1",
+ "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
  "lazy_static",
  "stm32f4",
 ]
