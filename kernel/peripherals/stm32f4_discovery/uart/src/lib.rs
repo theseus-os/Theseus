@@ -4,7 +4,6 @@
 cfg_if! {
     if #[cfg(target_vendor = "stm32f407")] {
         use cortex_m::interrupt::{self, CriticalSection};
-        use stm32f4::stm32f407::usart1;
         use stm32f4_discovery::STM_PERIPHERALS;
         use core::fmt::{self, Write};
 
@@ -87,7 +86,6 @@ cfg_if! {
 
         impl SerialPort {
             pub fn get_uart() ->  SerialPort {
-                uart_init();
                 SerialPort
             }
         }

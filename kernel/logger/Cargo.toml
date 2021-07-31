@@ -18,7 +18,7 @@ path = "../serial_port"
 version = "0.3.7"
 
 [target.thumbv7em-stm32f407-theseus-eabi.dependencies.uart]
-path = "../uart"
+path = "../peripherals/stm32f4_discovery/uart"
 
 
 [lib]

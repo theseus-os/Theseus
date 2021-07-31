@@ -12,12 +12,8 @@ cfg-if = "1.0.0"
 [target.thumbv7em-stm32f407-theseus-eabi.dependencies.cortex-m]
 version = "0.6.7"
 
-[target.thumbv7em-stm32f407-theseus-eabi.dependencies.stm32f4]
-features = ["stm32f407"]
-version = "0.13.0"
-
 [target.thumbv7em-stm32f407-theseus-eabi.dependencies.stm32f4_discovery]
-path = "../stm32f4_discovery"
+path = ".."
 
 [lib]
 crate-type = ["rlib"]

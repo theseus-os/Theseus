@@ -2089,6 +2089,10 @@ name = "percent-encoding"
 version = "1.0.2"
 
 [[package]]
+name = "peripherals"
+version = "0.1.0"
+
+[[package]]
 name = "physical_nic"
 version = "0.1.0"
 dependencies = [
@@ -3136,7 +3140,6 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cortex-m 0.6.7",
- "stm32f4",
  "stm32f4_discovery",
 ]
 
