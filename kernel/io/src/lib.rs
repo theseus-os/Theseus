@@ -44,6 +44,7 @@
 #[macro_use] extern crate delegate;
 extern crate spin;
 extern crate bare_io;
+extern crate lockable;
 
 #[cfg(test)]
 mod test;
@@ -51,6 +52,7 @@ mod test;
 use core::{cmp::min, ops::Range};
 use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use spin::Mutex;
+use lockable::Lockable;
 use bare_io::{Seek, SeekFrom};
 
 
@@ -627,6 +629,17 @@ impl<IO> bare_io::Write for Writer<IO> where IO: ByteWriter {
 impl<IO> Seek for Writer<IO> where IO: KnownLength {
     delegate!{ to self.0 { fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64>; } }
 }
+
+
+/// WIP: this should replace the [`LockedIO`] type.
+#[derive(Debug, Clone)]
+pub struct LockableIo<L, IO>(L) where L: Lockable<IO>, IO: ?Sized;
+
+// impl<IO: ?Sized> From<Arc<Mutex<IO>>> for LockableIo<IO> {
+//     fn from(arc_mutex_io: Arc<Mutex<IO>>) -> Self {
+//         LockedIo(arc_mutex_io)
+//     }
+// }
 
 
 /// A newtype wrapper around `Arc<Mutex<IO>>` that implements 

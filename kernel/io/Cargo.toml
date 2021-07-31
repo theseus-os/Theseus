@@ -18,5 +18,8 @@ version = "0.4.8"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
+[dependencies.lockable]
+path = "../../libs/lockable"
+
 [lib]
 crate-type = ["rlib"]
