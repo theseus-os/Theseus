@@ -1,5 +1,5 @@
 [package]
-name = "uart"
+name = "stm32f4_discovery"
 version = "0.1.0"
 authors = ["Jacob Earle <jacob.earle@yale.edu>"]
 edition = "2018"
@@ -16,8 +16,11 @@ version = "0.6.7"
 features = ["stm32f407"]
 version = "0.13.0"
 
-[target.thumbv7em-stm32f407-theseus-eabi.dependencies.stm32f4_discovery]
-path = "../stm32f4_discovery"
+[target.thumbv7em-stm32f407-theseus-eabi.dependencies.lazy_static]
+version = "1.2.0"
+
+[target.thumbv7em-stm32f407-theseus-eabi.dependencies.irq_safety]
+path = "../../../libs/irq_safety"
 
 [lib]
 crate-type = ["rlib"]
