@@ -499,7 +499,7 @@ version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bffa6c1454368a6aa4811ae60964c38e6996d397ff8095a8b9211b1c1f749bc"
 dependencies = [
- "cortex-m 0.6.7",
+ "cortex-m 0.7.2",
 ]
 
 [[package]]
@@ -1675,6 +1675,7 @@ dependencies = [
  "panic-halt",
  "panic_entry",
  "root",
+ "scheduler",
  "spin",
  "stack",
  "state_store",
@@ -2267,7 +2268,7 @@ name = "runqueue"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety 0.1.1",
+ "irq_safety 0.0.1",
  "lazy_static",
  "log",
  "runqueue_priority",
@@ -2281,7 +2282,7 @@ name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety 0.1.1",
+ "irq_safety 0.0.1",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2293,7 +2294,7 @@ name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "irq_safety 0.1.1",
+ "irq_safety 0.0.1",
  "lazy_static",
  "log",
  "single_simd_task_optimization",
@@ -2320,7 +2321,8 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety 0.1.1",
+ "cfg-if 1.0.0",
+ "irq_safety 0.0.1",
  "log",
  "runqueue",
  "scheduler_priority",
@@ -2544,6 +2546,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "catch_unwind",
+ "cfg-if 1.0.0",
  "context_switch",
  "debugit",
  "fault_crate_swap",
