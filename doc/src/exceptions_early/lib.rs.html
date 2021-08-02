@@ -212,6 +212,8 @@
 <span id="209">209</span>
 <span id="210">210</span>
 <span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.</span>
 
@@ -360,7 +362,9 @@
 }
 
 <span class="doccomment">/// exception 0x07</span>
-<span class="doccomment">/// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// For more information about &quot;spurious interrupts&quot;, </span>
+<span class="doccomment">/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}&quot;</span>,
              <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,

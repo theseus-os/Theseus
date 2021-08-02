@@ -706,6 +706,7 @@
 <span id="703">703</span>
 <span id="704">704</span>
 <span id="705">705</span>
+<span id="706">706</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -898,8 +899,9 @@
 
 
 <span class="doccomment">/// A structure that offers access to APIC/xAPIC through its I/O registers.</span>
-<span class="doccomment">/// Definitions are based on [Intel&#39;s x86 Manual Vol 3a, Table 10-1]</span>
-<span class="doccomment">/// (https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.pdf). </span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Definitions are based on Intel&#39;s x86 Manual Vol 3a, Table 10-1. </span>
+<span class="doccomment">/// [Link to the manual](https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.pdf).</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ApicRegisters</span> {

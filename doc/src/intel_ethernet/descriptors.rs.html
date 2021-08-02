@@ -379,6 +379,13 @@
 <span id="376">376</span>
 <span id="377">377</span>
 <span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The different descriptor types used by Intel NICs.</span>
 <span class="doccomment">//! Usually the newer NICs use more advanced descriptor types but retain support for older ones.</span>
@@ -711,11 +718,15 @@
 }
 
 
-<span class="doccomment">/// Advanced Transmit Descriptor used in the Ixgbe driver.</span>
+<span class="doccomment">/// Advanced Transmit Descriptor used by the `ixgbe` NIC driver.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Two usage modes</span>
 <span class="doccomment">/// It has 2 modes: Read and Write Back, both of which use the whole 128 bits. </span>
-<span class="doccomment">/// There is one transmit descriptor per transmit buffer that can be converted between these 2 modes.</span>
+<span class="doccomment">/// There is one transmit descriptor per transmit buffer; it can be converted between these 2 modes.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Read contains the addresses that the driver writes.</span>
 <span class="doccomment">/// Write Back contains information the hardware writes on receiving a packet.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// More information can be found in the 82599 datasheet.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">FromBytes</span>)]</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
@@ -724,14 +735,17 @@
     <span class="kw">pub</span> <span class="ident">packet_buffer_address</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Length of data buffer</span>
     <span class="kw">pub</span> <span class="ident">data_len</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// dtyp (Descriptor Type) occupies bits [7:4],</span>
-    <span class="doccomment">/// mac (option to apply LinkSec and time stamp) occupies bits [3:2]</span>
+    <span class="doccomment">/// A multi-part field:</span>
+    <span class="doccomment">/// * `dtyp`: Descriptor Type, occupies bits `[7:4]`,</span>
+    <span class="doccomment">/// * `mac`: options to apply LinkSec and time stamp, occupies bits `[3:2]`.</span>
     <span class="kw">pub</span> <span class="ident">dtyp_mac_rsv</span> : <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Command bits</span>
     <span class="kw">pub</span> <span class="ident">dcmd</span>:  <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// paylen (size in bytes of the data buffer in host memory, not including the fields that the hardware adds) occupies bits [31:14],</span>
-    <span class="doccomment">/// popts (options to offload checksum calculation) occupies bits [13:8],</span>
-    <span class="doccomment">/// sta (status of the descriptor, if it&#39;s in use or not) occupies bits [3:0]</span>
+    <span class="doccomment">/// A multi-part field:</span>
+    <span class="doccomment">/// * `paylen`: the size in bytes of the data buffer in host memory.</span>
+    <span class="doccomment">///   not including the fields that the hardware adds), occupies bits `[31:14]`.</span>
+    <span class="doccomment">/// * `popts`: options to offload checksum calculation, occupies bits `[13:8]`.</span>
+    <span class="doccomment">/// * `sta`: status of the descriptor (whether it&#39;s in use or not), occupies bits `[3:0]`.</span>
     <span class="kw">pub</span> <span class="ident">paylen_popts_cc_idx_sta</span>: <span class="ident">Volatile</span><span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>,
 }
 

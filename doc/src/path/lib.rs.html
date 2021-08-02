@@ -277,6 +277,7 @@
 <span id="274">274</span>
 <span id="275">275</span>
 <span id="276">276</span>
+<span id="277">277</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="doccomment">/// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific</span>
@@ -421,8 +422,9 @@
         <span class="ident">Path::new</span>(<span class="ident">new_path</span>)
     }
     
-    <span class="doccomment">/// Expresses the current Path, self, relative to another Path, other</span>
-    <span class="doccomment">/// https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74</span>
+    <span class="doccomment">/// Returns a `Path` that expresses a relative path from this `Path` (`self`)</span>
+    <span class="doccomment">/// to the given `other` `Path`.</span>
+    <span class="comment">// An example algorithm: https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">relative</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ita_iter</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">components</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">itb_iter</span> <span class="op">=</span> <span class="ident">other</span>.<span class="ident">components</span>();

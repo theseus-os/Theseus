@@ -85,6 +85,7 @@
 <span id="82">82</span>
 <span id="83">83</span>
 <span id="84">84</span>
+<span id="85">85</span>
 </pre><pre class="rust">
 <span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
@@ -101,13 +102,14 @@
 <span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">TEMPORARY_PAGE_VIRT_ADDR</span>, <span class="ident">PAGE_SIZE</span>};
 
 
-<span class="doccomment">/// A Page that can be temporarily mapped to the recursive page table frame,</span>
-<span class="doccomment">/// used for purposes of editing a top-level (P4) PageTable itself.</span>
+<span class="doccomment">/// A page that can be temporarily mapped to the recursive page table frame,</span>
+<span class="doccomment">/// used for purposes of editing a top-level (P4) page table itself.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// See how recursive paging works: &lt;https://wiki.osdev.org/Page_Tables#Recursive_mapping&gt;</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// # Note </span>
-<span class="doccomment">/// Instead of just dropping a `TemporaryPage` object, it should be cleaned up using `unmap_into_parts()`.</span>
+<span class="doccomment">/// Instead of just dropping a `TemporaryPage` object, </span>
+<span class="doccomment">/// it should be cleaned up (reclaimed) using [`TemporaryPage::unmap_into_parts()`].</span>
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TemporaryPage</span> {
     <span class="ident">mapped_page</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span>,
@@ -126,7 +128,7 @@
     <span class="doccomment">/// Returns a reference to the now mapped table.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Arguments</span>
-    <span class="doccomment">/// * `frame`: the [`Frame`] containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].     </span>
+    <span class="doccomment">/// * `frame`: the single frame containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].</span>
     <span class="doccomment">/// * `page_table`: the currently active [`PageTable`]. </span>
     <span class="doccomment">/// </span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_table_frame</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">frame</span>: <span class="ident">AllocatedFrames</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PageTable</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Table</span><span class="op">&lt;</span><span class="ident">Level1</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
@@ -147,7 +149,7 @@
     }
 
     <span class="doccomment">/// Call this to clean up a `TemporaryPage` instead of just letting it be dropped.</span>
-    <span class="doccomment">/// A simple wrapper around `MappedPages::unmap_into_parts()`.</span>
+    <span class="doccomment">/// A simple wrapper around [`MappedPages::unmap_into_parts()`].</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// This is useful for unmapping pages but still maintaining ownership of the previously-mapped pages and frames</span>
     <span class="doccomment">/// without having them be auto-dropped as normal.</span>

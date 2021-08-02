@@ -336,6 +336,7 @@
 <span id="333">333</span>
 <span id="334">334</span>
 <span id="335">335</span>
+<span id="336">336</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -506,6 +507,9 @@
 }
 
 <span class="doccomment">/// The Global Descriptor Table, as specified by the x86_64 architecture.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// See more info about GDT [here](http://wiki.osdev.org/Global_Descriptor_Table)</span>
+<span class="doccomment">/// and [here](http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/).</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Gdt</span> {
     <span class="ident">table</span>: [<span class="ident">u64</span>; <span class="number">10</span>],  <span class="comment">// max size is 8192 entries, but we don&#39;t need that many.</span>
     <span class="ident">next_free</span>: <span class="ident">usize</span>,
@@ -567,14 +571,12 @@
     }
 }
 
-<span class="doccomment">/// We need 6 GDT segments even for 64-bit: http://tunes.org/~qz/search/?view=1&amp;c=osdev&amp;y=17&amp;m=1&amp;d=2</span>
-<span class="doccomment">/// See more info about GDT here: http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/</span>
-<span class="doccomment">///                     and here: http://wiki.osdev.org/Global_Descriptor_Table</span>
+<span class="doccomment">/// The two kinds of descriptor entries in the GDT.</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">Descriptor</span> {
     <span class="doccomment">/// UserSegment is used for both code and data segments, </span>
-    <span class="doccomment">/// in both the kernel and in user space</span>
+    <span class="doccomment">/// in both the kernel and in user space.</span>
     <span class="ident">UserSegment</span>(<span class="ident">u64</span>),
-    <span class="doccomment">/// SystemSegment is used only for TSS</span>
+    <span class="doccomment">/// SystemSegment is used only for TSS.</span>
     <span class="ident">SystemSegment</span>(<span class="ident">u64</span>, <span class="ident">u64</span>),
 }
 

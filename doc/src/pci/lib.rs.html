@@ -510,6 +510,9 @@
 <span id="507">507</span>
 <span id="508">508</span>
 <span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -843,16 +846,19 @@
 
 <span class="doccomment">/// Contains information common to every type of PCI Device,</span>
 <span class="doccomment">/// and offers functions for reading/writing to the PCI configuration space.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// For more, see [this partial table](http://wiki.osdev.org/PCI#Class_Codes)</span>
+<span class="doccomment">/// of `class`, `subclass`, and `prog_if` codes, </span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PciDevice</span> {
     <span class="doccomment">/// the bus, slot, and function number that locates this PCI device in the bus tree.</span>
     <span class="kw">pub</span> <span class="ident">location</span>: <span class="ident">PciLocation</span>,
 
-    <span class="doccomment">/// The class code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes </span>
+    <span class="doccomment">/// The class code, used to determine device type.</span>
     <span class="kw">pub</span> <span class="ident">class</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// The subclass code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes </span>
+    <span class="doccomment">/// The subclass code, used to determine device type.</span>
     <span class="kw">pub</span> <span class="ident">subclass</span>: <span class="ident">u8</span>,
-    <span class="doccomment">/// The programming interface of this PCI device</span>
+    <span class="doccomment">/// The programming interface of this PCI device, also used to determine device type.</span>
     <span class="kw">pub</span> <span class="ident">prog_if</span>: <span class="ident">u8</span>,
     <span class="doccomment">/// The six Base Address Registers (BARs)</span>
     <span class="kw">pub</span> <span class="ident">bars</span>: [<span class="ident">u32</span>; <span class="number">6</span>],
@@ -875,7 +881,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Argument</span>
     <span class="doccomment">/// * `bar_index` must be between `0` and `5` inclusively, as each PCI device </span>
-    <span class="doccomment">/// can only have 6 BARs at the most.  </span>
+    <span class="doccomment">///   can only have 6 BARs at the most.  </span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Note that if the given `BAR` actually indicates it is part of a 64-bit address,</span>
     <span class="doccomment">/// it will be used together with the BAR right above it (`bar + 1`), e.g., `BAR1:BAR0`.</span>

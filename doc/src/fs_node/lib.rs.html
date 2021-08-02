@@ -247,7 +247,7 @@
     <span class="doccomment">/// Gets either the file or directory in this `Directory`  on its name.</span>
     <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileOrDir</span><span class="op">&gt;</span>;
 
-    <span class="doccomment">/// Like [`get()`], but only looks for files matching the given `name` in this `Directory`.</span>
+    <span class="doccomment">/// Like [`Directory::get()`], but only looks for **files** matching the given `name` in this `Directory`.</span>
     <span class="kw">fn</span> <span class="ident">get_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">FileRef</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">name</span>) {
             <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::File</span>(<span class="ident">f</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>),
@@ -255,7 +255,7 @@
         }
     }
 
-    <span class="doccomment">/// Like [`get()`], but only looks for directories matching the given `name` in this `Directory`.</span>
+    <span class="doccomment">/// Like [`Directory::get()`], but only looks for **directories** matching the given `name` in this `Directory`.</span>
     <span class="kw">fn</span> <span class="ident">get_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">name</span>) {
             <span class="prelude-val">Some</span>(<span class="ident">FileOrDir::Dir</span>(<span class="ident">d</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">d</span>),

@@ -404,6 +404,8 @@
 <span id="401">401</span>
 <span id="402">402</span>
 <span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.</span>
 
@@ -729,7 +731,9 @@
 }
 
 <span class="doccomment">/// exception 0x07</span>
-<span class="doccomment">/// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// For more information about &quot;spurious interrupts&quot;, </span>
+<span class="doccomment">/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
     <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#X}\n{:#?}\n&quot;</span>,
              <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,

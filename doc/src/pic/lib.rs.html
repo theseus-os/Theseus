@@ -248,6 +248,11 @@
 <span id="245">245</span>
 <span id="246">246</span>
 <span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for the x86 PIC (8259 Programmable Interrupt Controller),</span>
 <span class="doccomment">//! which handles basic interrupts.</span>
@@ -287,13 +292,18 @@
 <span class="kw">const</span> <span class="ident">SLAVE_DATA</span>:  <span class="ident">u16</span> <span class="op">=</span> <span class="number">0xA1</span>;
 
 
+<span class="doccomment">/// The set of status registers for both PIC chips.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Each PIC chip has two interrupt status registers: </span>
-<span class="doccomment">/// the In-Service Register (ISR) and the Interrupt Request Register (IRR). </span>
-<span class="doccomment">/// The ISR tells us which interrupts are currently being serviced, meaning IRQs sent to the CPU. </span>
-<span class="doccomment">/// The IRR tells us which interrupts have been raised, but not necessarily serviced yet. </span>
+<span class="doccomment">///  * `ISR`: the In-Service Register: specifies which interrupts are currently being serviced,</span>
+<span class="doccomment">///     meaning IRQs sent to the CPU. </span>
+<span class="doccomment">///  * `IRR`: the Interrupt Request Register: specifies which interrupts have been raised</span>
+<span class="doccomment">///     but not necessarily serviced yet.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU, </span>
 <span class="doccomment">/// at which point they are marked in the ISR.</span>
-<span class="doccomment">/// see http://wiki.osdev.org/8259_PIC#ISR_and_IRR</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// For more, [see this explanation](http://wiki.osdev.org/8259_PIC#ISR_and_IRR).</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IrqStatusRegisters</span> {
     <span class="kw">pub</span> <span class="ident">master_isr</span>: <span class="ident">u8</span>,
     <span class="kw">pub</span> <span class="ident">master_irr</span>: <span class="ident">u8</span>,
