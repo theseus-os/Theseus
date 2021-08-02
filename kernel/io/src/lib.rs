@@ -49,8 +49,8 @@ extern crate lockable;
 #[cfg(test)]
 mod test;
 
-use core::{cmp::min, marker::PhantomData, ops::Range};
-use alloc::{boxed::Box, sync::Arc, vec::Vec};
+use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, Range}};
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
 use spin::Mutex;
 use lockable::Lockable;
 use bare_io::{Seek, SeekFrom};
@@ -631,27 +631,195 @@ impl<IO> Seek for Writer<IO> where IO: KnownLength {
 }
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\
+
 /// WIP: this should replace the [`LockedIO`] type.
 #[derive(Debug, Clone)]
-pub struct LockableIo<'io, L, IO> where L: Lockable<'io, IO>, IO: 'io + ?Sized {
+pub struct LockableIo2<'io, IO, L> 
+    where IO: 'io + ?Sized,
+          L: for <'a> Lockable<'a, IO> + ?Sized,
+{
     inner: Arc<L>,
-    _phantom: PhantomData<&'io IO>,
+    _phantom1: PhantomData<&'io IO>,
 }
 
-pub fn test() {
-    let lockable_io = LockableIo { inner: Arc::new(Mutex::new(20usize)), _phantom: PhantomData, };
-    let mut me = lockable_io.inner.lock();
-    *me += 10;
-    
+impl<'io, IO, L> LockableIo2<'io, IO, L> 
+    where IO: 'io + ?Sized,
+          L: for <'a> Lockable<'a, IO> + ?Sized,
+{
+    pub fn new(lockable_io: Arc<L>) -> Self {
+        LockableIo2 {
+            inner: lockable_io,
+            _phantom1: PhantomData,
+        }
+    }
 }
 
-// impl<IO: ?Sized> From<Arc<Mutex<IO>>> for LockableIo<IO> {
-//     fn from(arc_mutex_io: Arc<Mutex<IO>>) -> Self {
-//         LockedIo(arc_mutex_io)
+// Implement (by delegation) various I/O traits for the `LockableIo2` wrapper around Mutex<trait>.
+impl<'io, IO, L> BlockIo for LockableIo2<'io, IO, L> 
+    where IO: BlockIo + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized
+{
+    delegate!{ to self.inner.lock() { fn block_size(&self) -> usize; } }
+}
+
+impl<'io, IO, L> KnownLength for LockableIo2<'io, IO, L>
+    where IO: KnownLength + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized
+{
+    delegate!{ to self.inner.lock() { fn len(&self) -> usize; } }
+}
+impl<'io, IO, L> BlockReader for LockableIo2<'io, IO, L>
+    where IO: BlockReader + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized
+{
+    delegate!{ to self.inner.lock_mut() { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L> BlockWriter for LockableIo2<'io, IO, L>
+    where IO: BlockWriter + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized
+{
+    delegate!{ to self.inner.lock_mut() {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<'io, IO, L> ByteReader for LockableIo2<'io, IO, L>
+    where IO: ByteReader + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized
+{
+    delegate!{ to self.inner.lock_mut() { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L> ByteWriter for LockableIo2<'io, IO, L>
+    where IO: ByteWriter + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized
+{
+    delegate!{ to self.inner.lock_mut() {
+        fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+
+
+/*
+/// WIP: this should replace the [`LockedIO`] type.
+#[derive(Debug, Clone)]
+pub struct LockableIo<'io, IO, L, B> 
+    where IO: 'io,
+          L: Lockable<'io, IO>,
+          B: Borrow<L>,
+{
+    inner: B,
+    _phantom1: PhantomData<&'io IO>,
+    _phantom2: PhantomData<L>,
+}
+
+// impl<'io, IO, L, B> From<B> for LockableIo<'io, IO, L, B> 
+//     where IO: 'io + ?Sized,
+//           L: Lockable<'io, IO>,
+//           B: Borrow<L>,
+// {
+//     fn from(lockable_io: B) -> Self {
+//         LockableIo {
+//             inner: lockable_io,
+//             _phantom1: PhantomData,
+//             _phantom2: PhantomData,
+//         }
 //     }
 // }
 
+impl<'io, IO, L, B> LockableIo<'io, IO, L, B> 
+    where IO: 'io,
+          L: Lockable<'io, IO>,
+          B: Borrow<L>,
+{
+    pub fn new(lockable_io: B) -> Self {
+        LockableIo {
+            inner: lockable_io,
+            _phantom1: PhantomData,
+            _phantom2: PhantomData,
+        }
+    }
+}
 
+// impl<'io, IO, L, B> Deref for LockableIo<'io, IO, L, B> 
+//     where IO: 'io,
+//           L: Lockable<'io, IO>,
+//           B: Borrow<L>,
+// {
+//     type Target = L;
+//     fn deref(&self) -> &L {
+//         self.inner.borrow()
+//     }
+// }
+*/
+
+/*
+// Implement (by delegation) various I/O traits for the `LockableIo` wrapper around Mutex<trait>.
+impl<'io, IO, L, B> BlockIo for LockableIo<'io, IO, L, B> 
+    where IO: BlockIo, L: Lockable<'io, IO> + 'io, B: Borrow<L> 
+{
+    fn block_size(&self) -> usize {
+        let i = &self.inner;
+        let b = i.borrow();
+        let l = b.lock();
+        let d = l.deref();
+        let size = d.block_size();
+
+        size
+    }
+    // delegate!{ to self.inner.borrow().lock() { fn block_size(&self) -> usize; } }
+}
+impl<'io, IO, L, B> KnownLength for LockableIo<'io, IO, L, B>
+    where IO: KnownLength, L: Lockable<'io, IO>, B: Borrow<L> 
+{
+    delegate!{ to self.inner.borrow().lock() { fn len(&self) -> usize; } }
+}
+impl<'io, IO, L, B> BlockReader for LockableIo<'io, IO, L, B>
+    where IO: BlockReader, L: Lockable<'io, IO>, B: Borrow<L> 
+{
+    delegate!{ to self.inner.borrow().lock_mut() { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L, B> BlockWriter for LockableIo<'io, IO, L, B>
+    where IO: BlockWriter, L: Lockable<'io, IO>, B: Borrow<L> 
+{
+    delegate!{ to self.inner.borrow().lock_mut() {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<'io, IO, L, B> ByteReader for LockableIo<'io, IO, L, B>
+    where IO: ByteReader, L: Lockable<'io, IO>, B: Borrow<L> 
+{
+    delegate!{ to self.inner.borrow().lock_mut() { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L, B> ByteWriter for LockableIo<'io, IO, L, B>
+    where IO: ByteWriter, L: Lockable<'io, IO>, B: Borrow<L> 
+{
+    delegate!{ to self.inner.borrow().lock_mut() {
+        fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+*/
+/*
+impl<'io, IO, L, B> bare_io::Read for LockableIo<'io, IO, L, B>
+    where IO: bare_io::Read, L: Lockable<'io, IO>, B: Borrow<L>    
+{
+    delegate!{ to self.lock_mut() { fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize>; } }
+}
+impl<'io, IO, L, B> bare_io::Write for LockableIo<'io, IO, L, B>
+    where IO: bare_io::Write, L: Lockable<'io, IO>, B: Borrow<L>
+{
+    delegate!{ to self.lock_mut() {
+        fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize>;
+        fn flush(&mut self) -> bare_io::Result<()>;
+    } }
+}
+impl<'io, IO, L, B> bare_io::Seek for LockableIo<'io, IO, L, B>
+    where IO: bare_io::Seek, L: Lockable<'io, IO>, B: Borrow<L>
+{
+    delegate!{ to self.lock_mut() { fn seek(&mut self, position: bare_io::SeekFrom) -> bare_io::Result<u64>; } }
+}
+*/
+
+
+/*
 /// A newtype wrapper around `Arc<Mutex<IO>>` that implements 
 /// (delegates) various IO-related traits through the lock/mutex.
 ///
@@ -659,6 +827,13 @@ pub fn test() {
 /// to be used within another wrapper object that requires an IO object
 /// that implements some IO-specific trait, 
 /// such as those listed in the crate-level documentation. 
+///
+/// The following traits are forwarded to the `IO` instance through the `Arc<Mutex<IO>>` wrapper:
+/// * [`BlockIo`]
+/// * [`KnownLength`]
+/// * [`BlockReader`] and [`BlockWriter`]
+/// * [`ByteReader`] and [`ByteWriter`]
+/// * [`bare_io::Read`], [`bare_io::Write`], and [`bare_io::Seek`]
 ///
 /// Because this is a wrapper around `Arc<...>`, it implements `Clone`
 /// cheaply via a standard shallow copy. 
@@ -686,6 +861,28 @@ impl<IO> BlockWriter for LockedIo<IO> where IO: BlockWriter + ?Sized {
         fn flush(&mut self) -> Result<(), IoError>;
     } }
 }
+impl<IO> ByteReader for LockedIo<IO> where IO: ByteReader + ?Sized {
+    delegate!{ to self.0.lock() { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
+}
+impl<IO> ByteWriter for LockedIo<IO> where IO: ByteWriter + ?Sized {
+    delegate!{ to self.0.lock() {
+        fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<IO> bare_io::Read for LockedIo<IO> where IO: bare_io::Read + ?Sized {
+    delegate!{ to self.0.lock() { fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize>; } }
+}
+impl<IO> bare_io::Write for LockedIo<IO> where IO: bare_io::Write + ?Sized {
+    delegate!{ to self.0.lock() {
+        fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize>;
+        fn flush(&mut self) -> bare_io::Result<()>;
+    } }
+}
+impl<IO> bare_io::Seek for LockedIo<IO> where IO: bare_io::Seek + ?Sized {
+    delegate!{ to self.0.lock() { fn seek(&mut self, position: bare_io::SeekFrom) -> bare_io::Result<u64>; } }
+}
+*/
 
 
 /// Calculates block-wise bounds for an I/O transfer 

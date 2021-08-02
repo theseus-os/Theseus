@@ -2,19 +2,27 @@
 
 #![no_std]
 
+// #![feature(in_band_lifetimes)]
 // #![feature(generic_associated_types)]
 // #![allow(incomplete_features)]
 
 extern crate spin;
 extern crate irq_safety;
 
+
+use core::ops::{Deref, DerefMut};
+
 /// A trait representing types that can be locked, e.g., `Mutex`es.
 ///
 /// It also can represent types like `RwLock` (read-write lock) 
 /// that allow multiple concurrent readers but only one concurrent writer. 
+///
+/// Note: an optional design choice would be to remove the generic `T` parameter
+/// and instead assign it as an associated type, e.g., `type Inner: 't`.
+/// 
 pub trait Lockable<'t, T: 't + ?Sized> {
     /// The immutable "guard" type returned by the [`Self::lock()`] function.
-    type Guard;
+    type Guard: Deref<Target = T>;
 
     /// The mutable "guard" type returned by the [`Self::lock_mut()`] function.
     ///
@@ -22,7 +30,7 @@ pub trait Lockable<'t, T: 't + ?Sized> {
     /// this should be set to the read-write guard type.
     /// For locks like `Mutex` that only have one locking function,
     /// this should be set to the same type as [`Self::Guard`].
-    type GuardMut;
+    type GuardMut: DerefMut<Target = T>;
 
     /// Obtain the lock in a blocking fashion, 
     /// returning an immutable guard that dereferences into the inner data.
@@ -53,13 +61,18 @@ pub trait Lockable<'t, T: 't + ?Sized> {
 
     /// Returns a mutable reference to the underlying data.
     fn get_mut(&'t mut self) -> &'t mut T;
+}
 
+
+/// An extension of the [`Lockable`] trait that adds the `into_inner()` method
+/// only for types `T` that are `Sized`. 
+pub trait LockableSized<'t, T: 't + Sized>: Lockable<'t, T> {
     /// Consumes the lock, returning the underlying data.
     fn into_inner(self) -> T;
 }
 
 /// Implement `Lockable` for [`spin::Mutex`].
-impl<'t, T> Lockable<'t, T> for spin::Mutex<T> where T: 't {
+impl<'t, T> Lockable<'t, T> for spin::Mutex<T> where T: 't + ?Sized {
     type Guard = spin::MutexGuard<'t, T>;
     type GuardMut = Self::Guard;
 
@@ -69,38 +82,45 @@ impl<'t, T> Lockable<'t, T> for spin::Mutex<T> where T: 't {
     fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_lock() }
     fn is_locked(&self) -> bool { self.is_locked() }
     fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+}
+/// Implement `LockableSized` for [`spin::Mutex`].
+impl<'t, T> LockableSized<'t, T> for spin::Mutex<T> where T: 't + Sized {
     fn into_inner(self) -> T { self.into_inner() }
 }
 
-/*
 /// Implement `Lockable` for [`spin::RwLock`].
-impl<T> Lockable<T> for spin::RwLock<T> {
-    type Guard<'a> = spin::RwLockReadGuard<'a, T>;
-    type GuardMut<'a> = spin::RwLockWriteGuard<'a, T>;
+impl<'t, T> Lockable<'t, T> for spin::RwLock<T> where T: 't + ?Sized {
+    type Guard = spin::RwLockReadGuard<'t, T>;
+    type GuardMut = spin::RwLockWriteGuard<'t, T>;
 
-    fn lock<'a>(&'a self) -> Self::Guard<'a> { self.read() }
-    fn try_lock<'a>(&'a self) -> Option<Self::Guard<'a>> { self.try_read() }
-    fn lock_mut<'a>(&'a self) -> Self::GuardMut<'a> { self.write() }
-    fn try_lock_mut<'a>(&'a self) -> Option<Self::GuardMut<'a>> { self.try_write() }
-    fn is_locked<'a>(&'a self) -> bool { self.writer_count() > 0 }
-    fn get_mut<'a>(&'a mut self) -> &mut T { self.get_mut() }
+    fn lock(&'t self) -> Self::Guard { self.read() }
+    fn try_lock(&'t self) -> Option<Self::Guard> { self.try_read() }
+    fn lock_mut(&'t self) -> Self::GuardMut { self.write() }
+    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_write() }
+    fn is_locked(&self) -> bool { self.writer_count() > 0 }
+    fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+}
+/// Implement `LockableSized` for [`spin::RwLock`].
+impl<'t, T> LockableSized<'t, T> for spin::RwLock<T> where T: 't + Sized {
     fn into_inner(self) -> T { self.into_inner() }
 }
 
 /// Implement `Lockable` for [`irq_safety::MutexIrqSafe`].
-impl<T> Lockable<T> for irq_safety::MutexIrqSafe<T> {
-    type Guard<'a> = irq_safety::MutexIrqSafeGuard<'a, T>;
-    type GuardMut<'a> = Self::Guard<'a>;
+impl<'t, T> Lockable<'t, T> for irq_safety::MutexIrqSafe<T> where T: 't {
+    type Guard = irq_safety::MutexIrqSafeGuard<'t, T>;
+    type GuardMut = Self::Guard;
 
-    fn lock<'a>(&'a self) -> Self::Guard<'a> { self.lock() }
-    fn try_lock<'a>(&'a self) -> Option<Self::Guard<'a>> { self.try_lock() }
-    fn lock_mut<'a>(&'a self) -> Self::GuardMut<'a> { self.lock() }
-    fn try_lock_mut<'a>(&'a self) -> Option<Self::GuardMut<'a>> { self.try_lock() }
-    fn is_locked<'a>(&'a self) -> bool { self.is_locked() }
-    fn get_mut<'a>(&'a mut self) -> &mut T { self.get_mut() }
+    fn lock(&'t self) -> Self::Guard { self.lock() }
+    fn try_lock(&'t self) -> Option<Self::Guard> { self.try_lock() }
+    fn lock_mut(&'t self) -> Self::GuardMut { self.lock() }
+    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_lock() }
+    fn is_locked(&self) -> bool { self.is_locked() }
+    fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+}
+/// Implement `LockableSized` for [`irq_safety::MutexIrqSafe`].
+impl<'t, T> LockableSized<'t, T> for irq_safety::MutexIrqSafe<T> where T: 't + Sized {
     fn into_inner(self) -> T { self.into_inner() }
 }
-*/
 
 /// Implement `Lockable` for [`irq_safety::RwLockIrqSafe`].
 impl<'t, T> Lockable<'t, T> for irq_safety::RwLockIrqSafe<T> where T: 't {
@@ -113,5 +133,8 @@ impl<'t, T> Lockable<'t, T> for irq_safety::RwLockIrqSafe<T> where T: 't {
     fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_write() }
     fn is_locked(&self) -> bool { self.writer_count() > 0 }
     fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+}
+/// Implement `LockableSized` for [`irq_safety::RwLockIrqSafe`].
+impl<'t, T> LockableSized<'t, T> for irq_safety::RwLockIrqSafe<T> where T: 't + Sized {
     fn into_inner(self) -> T { self.into_inner() }
 }

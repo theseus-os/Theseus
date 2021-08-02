@@ -28,7 +28,7 @@ use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
-use io::{ByteReaderWriterWrapper, LockedIo, ReaderWriter};
+use io::{ByteReaderWriterWrapper, LockableIo2, ReaderWriter};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -151,12 +151,12 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
     // Discover filesystems from each storage device on the storage controllers initialized above
     // and mount each filesystem to the root directory by default.
-    if false {
+    if true {
         for storage_device in storage_manager::storage_devices() {
             let disk = FatFsAdapter(
                 ReaderWriter::new(
                     ByteReaderWriterWrapper::from(
-                        LockedIo::from(storage_device)
+                        LockableIo2::new(storage_device)
                     )
                 ),
             );
