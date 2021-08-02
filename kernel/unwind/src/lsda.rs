@@ -1,5 +1,5 @@
 //! Routines for parsing the gcc-style LSDA (Language-Specific Data Area) in an ELF object file, 
-//! which corresponds to an area within the `.gcc_except_table` section. 
+//! which corresponds to an area within a `.gcc_except_table` section. 
 
 #![allow(nonstandard_style)]
 
@@ -10,8 +10,8 @@ use FallibleIterator;
 /// `GccExceptTableArea` contains the contents of the Language-Specific Data Area (LSDA)
 /// that is used to locate cleanup (run destructors for) a given function during stack unwinding. 
 /// 
-/// Though an object file typically only includes a single `.gcc_except_table` section,
-/// this struct represents only one area of that section, the area that is for cleaning up a single function. 
+/// Though an object file typically only includes a single `.gcc_except_table` section, it may include multiple.
+/// This struct represents only *one area* of that section, the area that is for cleaning up a single function. 
 /// There may exist multiple instances of this struct created as overlays 
 /// for different, non-overlapping areas of that one `.gcc_except_table` section.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,7 +71,7 @@ impl<R: Reader> GccExceptTableArea<R> {
     }
 
     /// Returns an iterator over all of the call site entries
-    /// found in this area of the gcc_except_table section.
+    /// found in this area of this .gcc_except_table section.
     /// 
     /// Can be used with the `FallibleIterator` trait. 
     pub fn call_site_table_entries(&self) -> gimli::Result<CallSiteTableIterator<R>> {
@@ -100,8 +100,8 @@ impl<R: Reader> GccExceptTableArea<R> {
     }
 }
 
-/// The header of an LSDA section, which is at the very beginning of the area in the .gcc_except_table section
-/// that was pointed to by a stack frame's LSDA pointer. 
+/// The header of an LSDA section, which is at the very beginning of the area 
+/// in the .gcc_except_table section that was pointed to by a stack frame's LSDA pointer. 
 #[derive(Debug)]
 struct LsdaHeader {
     /// The encoding used to read the next value `landing_pad_base`.

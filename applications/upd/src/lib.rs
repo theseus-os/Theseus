@@ -55,7 +55,7 @@ use ota_update_client::DIFF_FILE_NAME;
 
 static VERBOSE: Once<bool> = Once::new();
 macro_rules! verbose {
-    () => (VERBOSE.try() == Some(&true));
+    () => (VERBOSE.get() == Some(&true));
 }
 
 

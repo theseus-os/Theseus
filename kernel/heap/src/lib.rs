@@ -2,7 +2,6 @@
 //! It starts off as a single fixed size allocator.
 //! When a more complex heap is set up, it is set as the default allocator.
 
-#![feature(const_fn)]
 #![feature(allocator_api)]
 #![no_std]
 
@@ -75,7 +74,7 @@ impl Heap {
 unsafe impl GlobalAlloc for Heap {
 
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        match DEFAULT_ALLOCATOR.try() {
+        match DEFAULT_ALLOCATOR.get() {
             Some(allocator) => {
                 allocator.alloc(layout)
             }
@@ -90,7 +89,7 @@ unsafe impl GlobalAlloc for Heap {
             self.initial_allocator.lock().deallocate(ptr, layout);
         }
         else {
-            DEFAULT_ALLOCATOR.try()
+            DEFAULT_ALLOCATOR.get()
                 .expect("Ptr passed to dealloc is not within the initial allocator's range, and another allocator has not been set up")
                 .dealloc(ptr, layout);
         }

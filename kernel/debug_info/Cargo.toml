@@ -6,10 +6,10 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 by_address = "1.0.4"
-rustc-demangle = "0.1.14"
+rustc-demangle = "0.1.19"
 
 [dependencies.log]
 version = "0.4.8"
@@ -26,7 +26,7 @@ default-features = false
 features = ["elf64"]
 
 [dependencies.hashbrown]
-version = "0.1.8"
+version = "0.9.1"
 features = ["nightly"]
 
 [dependencies.util]

@@ -21,10 +21,7 @@ extern crate fault_log;
 
 use memory::{VirtualAddress, Page};
 use x86_64::{
-    registers::{
-        control_regs,
-        msr::*,
-    },
+    registers::control_regs,
     structures::idt::{
         LockedIdt,
         ExceptionStackFrame,
@@ -239,16 +236,14 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
 }
 
 /// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts
+///
+/// # Important Note
+/// Acquiring ANY locks in this function, even irq-safe ones, could cause a deadlock
+/// because this interrupt takes priority over everything else and can interrupt
+/// another regular interrupt. 
+/// This includes printing to the log (e.g., `debug!()`) or the screen.
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     let mut expected_nmi = false;
-    
-    // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
-    if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-        if let Err(e) = pmu_x86::handle_sample(stack_frame) {
-            println_both!("nmi_handler::pmu_x86: sample couldn't be recorded: {:?}", e);
-        }
-        expected_nmi = true;
-    }
 
     // currently we're using NMIs to send TLB shootdown IPIs
     {
@@ -260,13 +255,27 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
         }
     }
 
+    // Performance monitoring hardware uses NMIs to trigger a sampling interrupt.
+    match pmu_x86::handle_sample(stack_frame) {
+        // A PMU sample did occur and was properly handled, so this NMI was expected. 
+        Ok(true) => expected_nmi = true,
+        // No PMU sample occurred, so this NMI was unexpected.
+        Ok(false) => { }
+        // A PMU sample did occur but wasn't properly handled, so this NMI was expected. 
+        Err(_e) => {
+            println_both!("nmi_handler: pmu_x86 failed to record sample: {:?}", _e);
+            expected_nmi = true;
+        }
+    }
+
     if expected_nmi {
         return;
     }
 
-    println_both!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#X}\n{:#?}\n",
-             stack_frame.instruction_pointer,
-             stack_frame);
+    println_both!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#X}\n{:#X?}\n",
+        stack_frame.instruction_pointer,
+        stack_frame,
+    );
 
     log_exception(0x2, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x2, stack_frame, true)
@@ -325,10 +334,13 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
 
 /// exception 0x08
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
     let accessed_vaddr = control_regs::cr2();
+    println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\nTried to access {:#X}
+        Note: double faults in Theseus are typically caused by stack overflow, is the stack large enough?",
+        stack_frame, accessed_vaddr,
+    );
     if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr.0)) {
-        println_both!("--> Double fault was caused by stack overflow, tried to access {:#X}.\n", accessed_vaddr);
+        println_both!("--> This double fault was definitely caused by stack overflow, tried to access {:#X}.\n", accessed_vaddr);
     }
     
     log_exception(0x8, stack_frame.instruction_pointer.0, Some(error_code), None);

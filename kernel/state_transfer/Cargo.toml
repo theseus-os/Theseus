@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
 
 
 [dependencies.log]
@@ -20,7 +20,7 @@ version = "1.2.0"
 path = "../../libs/atomic_linked_list"
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.task]
 path = "../task"
@@ -38,7 +38,7 @@ path = "../runqueue_round_robin"
 path = "../runqueue_priority"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [lib]
 crate-type = ["rlib"]

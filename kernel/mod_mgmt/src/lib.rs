@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(rustc_private)]
-#![feature(const_fn)]
 
 
 #[macro_use] extern crate cfg_if;
@@ -13,7 +12,7 @@ if #[cfg(target_arch="x86_64")] {
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
-extern crate multiboot2;
+extern crate memory_initialization;
 extern crate kernel_config;
 extern crate util;
 extern crate crate_name_utils;

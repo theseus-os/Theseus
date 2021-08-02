@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
 x86_64 = { path = "../../libs/x86_64" }
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
 
@@ -39,8 +39,8 @@ version = "1.2.0"
 [dependencies.stdio]
 path = "../../libs/stdio"
 
-[dependencies.serial_port]
-path = "../../kernel/serial_port"
+[dependencies.logger]
+path = "../../kernel/logger"
 
 [lib]
 crate-type = ["rlib"]

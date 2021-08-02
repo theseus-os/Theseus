@@ -1,6 +1,6 @@
 use core::{
     fmt,
-    ops::{DerefMut, Deref, Range},
+    ops::{Deref, Range},
 };
 use alloc::{
     vec::Vec,
@@ -14,8 +14,8 @@ use xmas_elf::{
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
 };
 use util::round_up_power_of_two;
-use memory::{MmiRef, get_frame_allocator_ref, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
-use multiboot2::BootInformation;
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+use memory_initialization::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, wrapper::BString};
@@ -42,7 +42,7 @@ static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
 /// which must exist because it contains the initially-loaded kernel crates. 
 /// Returns None if the default namespace hasn't yet been initialized.
 pub fn get_initial_kernel_namespace() -> Option<&'static Arc<CrateNamespace>> {
-    INITIAL_KERNEL_NAMESPACE.try()
+    INITIAL_KERNEL_NAMESPACE.get()
 }
 
 /// Returns the top-level directory that contains all of the namespaces. 
@@ -81,8 +81,11 @@ pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespa
 
 /// Initializes the module management system based on the bootloader-provided modules, 
 /// and creates and returns the default `CrateNamespace` for kernel crates.
-pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static Arc<CrateNamespace>, &'static str> {
-    let (_namespaces_dir, default_kernel_namespace_dir) = parse_bootloader_modules_into_files(boot_info, kernel_mmi)?;
+pub fn init(
+    bootloader_modules: Vec<BootloaderModule>,
+    kernel_mmi: &mut MemoryManagementInfo
+) -> Result<&'static Arc<CrateNamespace>, &'static str> {
+    let (_namespaces_dir, default_kernel_namespace_dir) = parse_bootloader_modules_into_files(bootloader_modules, kernel_mmi)?;
     // Create the default CrateNamespace for kernel crates.
     let name = default_kernel_namespace_dir.lock().get_name();
     let default_namespace = CrateNamespace::new(name, default_kernel_namespace_dir, None);
@@ -99,7 +102,7 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
 /// * the top-level root "namespaces" directory that contains all other namespace directories,
 /// * the directory of the default kernel crate namespace.
 fn parse_bootloader_modules_into_files(
-    boot_info: &BootInformation, 
+    bootloader_modules: Vec<BootloaderModule>,
     kernel_mmi: &mut MemoryManagementInfo
 ) -> Result<(DirRef, NamespaceDir), &'static str> {
 
@@ -109,32 +112,30 @@ fn parse_bootloader_modules_into_files(
     // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
     let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
 
-    let fa = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
-
     // Closure to create the directory for a new namespace.
     let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
         VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
     };
 
-    for m in boot_info.module_tags() {
-        let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-        let frames = FrameRange::from_phys_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
-        let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
+    for m in bootloader_modules {
+        let (crate_type, prefix, file_name) = CrateType::from_module_name(&m.name)?;
         let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
         let name = String::from(file_name);
 
-        let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
+        let frames = allocate_frames_by_bytes_at(m.start, m.size_in_bytes())
+            .map_err(|_e| "Failed to allocate frames for bootloader module")?;
+        let pages = allocate_pages_by_bytes(m.size_in_bytes())
+            .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
         let mp = kernel_mmi.page_table.map_allocated_pages_to(
             pages, 
             frames, 
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
-            fa.lock().deref_mut()
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+        // debug!("Module: {:?}, size {}, mp: {:?}", m.name, m.size_in_bytes(), mp);
 
         let create_file = |dir: &DirRef| {
-            MemFile::from_mapped_pages(mp, name, size_in_bytes, dir)
+            MemFile::from_mapped_pages(mp, name, m.size_in_bytes(), dir)
         };
 
         // Get the existing (or create a new) namespace directory corresponding to the given directory name.
@@ -621,7 +622,7 @@ impl CrateNamespace {
     /// 
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
-    fn method_get_crate_object_files_starting_with(
+    pub fn method_get_crate_object_files_starting_with(
         &self,
         file_name_prefix: &str
     ) -> Vec<(FileRef, &CrateNamespace)> { 
@@ -648,7 +649,7 @@ impl CrateNamespace {
     /// 
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
-    fn method_get_crate_object_file_starting_with(
+    pub fn method_get_crate_object_file_starting_with(
         &self,
         file_name_prefix: &str
     ) -> Option<(FileRef, &CrateNamespace)> { 
@@ -995,13 +996,13 @@ impl CrateNamespace {
         // keeping track of the offset into each of their MappedPages as we go.
         let (mut rodata_offset, mut data_offset) = (0 , 0);
                     
-        const TEXT_PREFIX:           &'static str = ".text.";
-        const RODATA_PREFIX:         &'static str = ".rodata.";
-        const DATA_PREFIX:           &'static str = ".data.";
-        const BSS_PREFIX:            &'static str = ".bss.";
-        const RELRO_PREFIX:          &'static str = "rel.ro.";
-        const GCC_EXCEPT_TABLE_NAME: &'static str = ".gcc_except_table";
-        const EH_FRAME_NAME:         &'static str = ".eh_frame";
+        const TEXT_PREFIX:             &'static str = ".text.";
+        const RODATA_PREFIX:           &'static str = ".rodata.";
+        const DATA_PREFIX:             &'static str = ".data.";
+        const BSS_PREFIX:              &'static str = ".bss.";
+        const RELRO_PREFIX:            &'static str = "rel.ro.";
+        const GCC_EXCEPT_TABLE_PREFIX: &'static str = ".gcc_except_table.";
+        const EH_FRAME_NAME:           &'static str = ".eh_frame";
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              crate_name.clone(),
@@ -1028,7 +1029,9 @@ impl CrateNamespace {
 
         // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
-        for (shndx, sec) in elf_file.section_iter().enumerate() {
+        //
+        // Also, skip the first two sections, which correspond to the `NULL` and `.text` empty sections.
+        for (shndx, sec) in elf_file.section_iter().enumerate().skip(2) {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
@@ -1044,11 +1047,6 @@ impl CrateNamespace {
                     return Err("couldn't get section name");
                 }
             };
-
-            // ignore the empty .text section at the start
-            if sec_name == ".text" {
-                continue;    
-            }
 
             // This handles the rare case of a zero-sized section. 
             // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations;
@@ -1231,7 +1229,7 @@ impl CrateNamespace {
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
                     else {
-                        return Err("no rodata_pages were allocated");
+                        return Err("no rodata_pages were allocated when handling .rodata section");
                     }
                 }
                 else {
@@ -1240,45 +1238,53 @@ impl CrateNamespace {
                 }
             }
 
-            // Fourth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` section
-            else if sec_name == GCC_EXCEPT_TABLE_NAME {
-                // The gcc_except_table section is read-only, so we put it in the .rodata pages
-                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                    // here: we're ready to copy the rodata section to the proper address
-                    let dest_vaddr = rp.address_at_offset(rodata_offset)
-                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                    let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
-                    match sec.get_data(&elf_file) {
-                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                        Ok(SectionData::Empty) => {
-                            for b in dest_slice {
-                                *b = 0;
+            // Fourth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` sections
+            else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
+                if let Some(name) = sec_name.get(GCC_EXCEPT_TABLE_PREFIX.len() ..) {
+                    let demangled = demangle(name).to_string();
+
+                    // gcc_except_table sections are read-only, so we put them in the .rodata pages
+                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                        // here: we're ready to copy the rodata section to the proper address
+                        let dest_vaddr = rp.address_at_offset(rodata_offset)
+                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            Ok(SectionData::Empty) => {
+                                for b in dest_slice {
+                                    *b = 0;
+                                }
+                            },
+                            _ => {
+                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                                return Err("couldn't get section data in .gcc_except_table section");
                             }
-                        },
-                        _ => {
-                            error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                            return Err("couldn't get section data in .gcc_except_table section");
                         }
+
+                        loaded_sections.insert(
+                            shndx, 
+                            Arc::new(LoadedSection::new(
+                                SectionType::GccExceptTable,
+                                demangled,
+                                Arc::clone(rp_ref),
+                                rodata_offset,
+                                dest_vaddr,
+                                sec_size,
+                                false, // .gcc_except_table sections are not globally visible,
+                                new_crate_weak_ref.clone(),
+                            ))
+                        );
+
+                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
-
-                    loaded_sections.insert(
-                        shndx, 
-                        Arc::new(LoadedSection::new(
-                            SectionType::GccExceptTable,
-                            sec_name.to_string(),
-                            Arc::clone(rp_ref),
-                            rodata_offset,
-                            dest_vaddr,
-                            sec_size,
-                            false, // .gcc_except_table section is not globally visible,
-                            new_crate_weak_ref.clone(),
-                        ))
-                    );
-
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    else {
+                        return Err("no rodata_pages were allocated when handling .gcc_except_table");
+                    }
                 }
                 else {
-                    return Err("no rodata_pages were allocated when handling .gcc_except_table");
+                    error!("Failed to get the .gcc_except_table section's name after \".gcc_except_table.\": {:?}", sec_name);
+                    return Err("Failed to get the .gcc_except_table section's name after \".gcc_except_table.\"!");
                 }
             }
 
@@ -1831,7 +1837,7 @@ impl CrateNamespace {
             weak_sec
         } else {
             #[cfg(not(loscd_eval))]
-            error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            debug!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
             Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
         }
     }
@@ -2104,13 +2110,13 @@ impl CrateNamespace {
 /// that can be allocated and mapped for a single `LoadedCrate`. 
 struct SectionPages {
     /// MappedPages that will hold any and all executable sections: `.text`
-    /// and their bounds express in `VirtualAddress`es.
+    /// and their bounds expressed as `VirtualAddress`es.
     executable_pages: Option<(MappedPages, Range<VirtualAddress>)>,
     /// MappedPages that will hold any and all read-only sections: `.rodata`, `.eh_frame`, `.gcc_except_table`
-    /// and their bounds express in `VirtualAddress`es.
+    /// and their bounds expressed as `VirtualAddress`es.
     read_only_pages: Option<(MappedPages, Range<VirtualAddress>)>,
     /// MappedPages that will hold any and all read-write sections: `.data` and `.bss`
-    /// and their bounds express in `VirtualAddress`es.
+    /// and their bounds expressed as `VirtualAddress`es.
     read_write_pages: Option<(MappedPages, Range<VirtualAddress>)>,
 }
 
@@ -2196,9 +2202,8 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
 /// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
 /// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
 fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: &MmiRef) -> Result<MappedPages, &'static str> {
-    let frame_allocator = get_frame_allocator_ref().ok_or("couldn't get frame allocator")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.lock().deref_mut())
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE)
 }
 
 

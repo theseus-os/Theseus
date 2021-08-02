@@ -3,7 +3,7 @@
 
 // extern crate alloc;
 // #[macro_use] extern crate log;
-extern crate serial_port;
+extern crate logger;
 // #[macro_use] extern crate terminal_print;
 // extern crate task;
 
@@ -16,7 +16,7 @@ struct MyStruct(pub usize);
 impl Drop for MyStruct {
     #[inline(never)]
     fn drop(&mut self) {
-        serial_port::write_str("*** DROPPING MYSTRUCT ***").unwrap();
+        logger::write_str("*** DROPPING MYSTRUCT ***").unwrap();
     }
 }
 

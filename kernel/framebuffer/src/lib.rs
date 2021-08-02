@@ -3,6 +3,7 @@
 
 #![no_std]
 
+#[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;
 extern crate multicore_bringup;
@@ -15,7 +16,7 @@ pub mod pixel;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
 
-use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, get_frame_allocator_ref};
+use memory::{EntryFlags, MappedPages, PhysicalAddress};
 use owning_ref::BoxRefMut;
 use shapes::Coord;
 pub use pixel::*;
@@ -31,10 +32,12 @@ pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
     let buffer_height: usize;
     {
         let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
+        info!("Using graphical framebuffer, {} x {}, at paddr {:#X}", graphic_info.width, graphic_info.height, graphic_info.physical_address);
         if graphic_info.physical_address == 0 {
-            return Err("Fail to get graphic mode infomation!");
+            return Err("Failed to get graphic mode information!");
         }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)?;
+        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)
+            .ok_or("Graphic mode physical address was invalid")?;
         buffer_width = graphic_info.width as usize;
         buffer_height = graphic_info.height as usize;
     };
@@ -67,27 +70,25 @@ impl<P: Pixel> Framebuffer<P> {
     ) -> Result<Framebuffer<P>, &'static str> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        let allocator = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
 
         let vesa_display_flags: EntryFlags =
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
         let size = width * height * core::mem::size_of::<P>();
-        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
+        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages for a new framebuffer")?;
 
         let mapped_framebuffer = if let Some(address) = physical_address {
-            let frame = FrameRange::from_phys_addr(address, size);
+            let frames = memory::allocate_frames_by_bytes_at(address, size)
+                .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
             kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
-                frame,
+                frames,
                 vesa_display_flags,
-                allocator.lock().deref_mut()
             )?
         } else {
             kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
                 vesa_display_flags,
-                allocator.lock().deref_mut()
             )?
         };
 
