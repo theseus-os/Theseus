@@ -1,0 +1,34 @@
+[package]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "mlx5"
+description = "Driver for the Mellanox ConnectX-5 NIC"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.9.0"
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.irq_safety]
+path = "../../libs/irq_safety"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.pci]
+path = "../pci"
+
+[dependencies.nic_initialization]
+path = "../nic_initialization"
+
+[dependencies.mlx_ethernet]
+path = "../mlx_ethernet"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[lib]
+crate-type = ["rlib"]

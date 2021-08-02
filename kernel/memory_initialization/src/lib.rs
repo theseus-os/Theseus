@@ -20,21 +20,33 @@ use memory::{MmiRef, MappedPages};
 use multiboot2::BootInformation;
 use alloc::vec::Vec;
 use stack::Stack;
+pub use x86_64::BootloaderModule;
 
 /// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
 /// which represents the initial (kernel) address space. 
-/// Consumes the given BootInformation, because after the memory system is initialized,
+///
+/// This consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * The kernel's new MemoryManagementInfo
-///  * the MappedPages of the kernel's text section,
-///  * the MappedPages of the kernel's rodata section,
-///  * the MappedPages of the kernel's data section,
-///  * the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
-///  * the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
-pub fn init_memory_management(boot_info: &BootInformation)  
-    -> Result<(MmiRef, MappedPages, MappedPages, MappedPages, Stack, Vec<MappedPages>), &'static str>
+///  1. The kernel's new MemoryManagementInfo
+///  2. the MappedPages of the kernel's text section,
+///  3. the MappedPages of the kernel's rodata section,
+///  4. the MappedPages of the kernel's data section,
+///  5. the initial stack for this CPU (e.g., the BSP stack) that is currently in use,
+///  6. the list of bootloader modules obtained from the given `boot_info`,
+///  7. the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
+pub fn init_memory_management(
+    boot_info: BootInformation
+) -> Result<(
+        MmiRef,
+        MappedPages,
+        MappedPages,
+        MappedPages,
+        Stack,
+        Vec<BootloaderModule>,
+        Vec<MappedPages>
+    ), &'static str>
 {
     x86_64::init_memory_management(boot_info)
 }

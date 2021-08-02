@@ -6,7 +6,7 @@ description = "contains the MappedPages-backed implementation of the fs_node tra
 
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.9.0"
 
 [dependencies.fs_node]
 path = "../fs_node"

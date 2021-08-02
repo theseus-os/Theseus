@@ -1,0 +1,88 @@
+name: Documentation
+
+on: [push, pull_request]
+
+jobs:
+  documentation:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository and submodules
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: Cache build artifacts
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+          ${{ runner.os }}-
+
+    # Remove documentation directory cache before publishing.
+    - name: Clean source documentation directory before publishing
+      if: github.event_name == 'push' && github.ref == 'refs/heads/theseus_main'
+      run: cargo clean --doc
+
+    - name: Install mdbook
+      uses: peaceiris/actions-mdbook@v1
+      with:
+        mdbook-version: '0.4.10'
+
+    - name: Install mdbook-linkcheck
+      run: |
+        version="v0.7.4"
+        file="mdbook-linkcheck"
+        zip_file="mdbook-linkcheck.${version}.x86_64-unknown-linux-gnu.zip"
+        curl -sSL https://github.com/Michael-F-Bryan/mdbook-linkcheck/releases/download/${version}/${zip_file} --output ${zip_file}
+        unzip -d bin ${zip_file} ${file}
+        chmod +x bin/${file}
+        rm ${zip_file}
+        echo "$(pwd)/bin" >> ${GITHUB_PATH}
+
+    - name: Report versions
+      run: |
+        rustc --version --verbose
+        mdbook --version
+        mdbook-linkcheck --version
+
+    - name: Build book
+      run: make book
+
+    - name: Build source documentation
+      run: make doc
+
+    - name: Run spell check
+      uses: streetsidesoftware/cspell-action@v1.2.4
+      with:
+        config: 'book/cspell.json'
+        files: 'book/**'
+        incremental_files_only: false
+        # Enforce strict spell check except on push to main branch.
+        strict: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/theseus_main') }}
+
+    # Move build artifacts to publish directory on push to main branch.
+    - name: Move build artifacts
+      if: github.event_name == 'push' && github.ref == 'refs/heads/theseus_main'
+      run: |
+        rm -rf ./github_pages/book
+        rm -rf ./github_pages/doc
+        mv ./build/book/html/ ./github_pages/book/
+        mv ./build/doc/ ./github_pages/doc/
+
+    # Deploy on push to main branch.
+    - name: Deploy
+      if: github.event_name == 'push' && github.ref == 'refs/heads/theseus_main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        commit_message: ${{ github.event.head_commit.message }}
+        publish_branch: github_pages
+        publish_dir: ./github_pages

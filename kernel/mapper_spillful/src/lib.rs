@@ -18,7 +18,7 @@ extern crate rbtree;
 
 use core::ptr::Unique;
 use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
-use memory::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
+use memory::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
 use memory::paging::table::{Table, Level4, P4};
 use irq_safety::MutexIrqSafe;
 use memory_structs::{PageRange};
@@ -99,28 +99,25 @@ impl MapperSpillful {
     }
 
 
-    pub fn map<A>(&mut self, vaddr: VirtualAddress, size: usize, flags: EntryFlags, allocator_ref: &MutexIrqSafe<A>) -> Result<(), &'static str>
-        where A: FrameAllocator
-    {
+    pub fn map(&mut self, vaddr: VirtualAddress, size: usize, flags: EntryFlags) -> Result<(), &'static str> {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
         let mut top_level_flags = flags.clone();
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
         {
-            let mut allocator = allocator_ref.lock();
-
             for page in PageRange::from_virt_addr(vaddr, size).clone() {
-                let frame = allocator.allocate_frame().ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
-                let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, &mut *allocator);
-                let p2 = p3.next_table_create(page.p3_index(), top_level_flags, &mut *allocator);
-                let p1 = p2.next_table_create(page.p2_index(), top_level_flags, &mut *allocator);
+                let af = memory::allocate_frames(1).ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
+                let frame = *af.start();
+                let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags);
+                let p2 = p3.next_table_create(page.p3_index(), top_level_flags);
+                let p1 = p2.next_table_create(page.p2_index(), top_level_flags);
 
                 if !p1[page.p1_index()].is_unused() {
                     error!("MapperSpillful::map() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                     return Err("page was already mapped");
                 }
-                p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+                p1[page.p1_index()].set_entry(frame, flags | EntryFlags::PRESENT | EntryFlags::EXCLUSIVE);
             }
         }
 
@@ -154,12 +151,12 @@ impl MapperSpillful {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set_entry(frame, new_flags | EntryFlags::PRESENT);
 
             tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
             func(pages);
         }
 
@@ -168,9 +165,7 @@ impl MapperSpillful {
     }
 
     /// Remove the virtual memory mapping for the given virtual address.
-    pub fn unmap<A>(&mut self, vaddr: VirtualAddress, _allocator_ref: &MutexIrqSafe<A>) -> Result<(), &'static str>
-        where A: FrameAllocator
-    {
+    pub fn unmap(&mut self, vaddr: VirtualAddress) -> Result<(), &'static str> {
         let mut vmas = VMAS.lock();
         let vma  = vmas.find_node_between(&vaddr).ok_or("couldn't find corresponding VMA")?;
         let start_addr = vma.start_address();
@@ -189,12 +184,12 @@ impl MapperSpillful {
                 .ok_or("mapping code does not support huge pages")?;
             
             let _frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
-            p1[page.p1_index()].set_unused();
+            let _ = p1[page.p1_index()].set_unmapped();
 
             tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
             func(pages);
         }
 

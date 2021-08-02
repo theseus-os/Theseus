@@ -12,6 +12,7 @@ if #[cfg(target_arch="x86_64")] {
 extern crate x86_64;
 extern crate spin;
 extern crate port_io;
+extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
 extern crate apic;

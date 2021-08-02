@@ -6,7 +6,7 @@ description = "provides a Displayable trait, which abstracts objects that can di
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
+spin = "0.9.0"
 
 [dependencies.framebuffer]
 path = "../framebuffer"

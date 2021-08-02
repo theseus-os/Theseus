@@ -22,7 +22,6 @@ extern crate rustc_demangle;
 
 use core::ops::{
     Deref,
-    DerefMut,
     Range,
 };
 use alloc::{
@@ -31,7 +30,7 @@ use alloc::{
 };
 use fs_node::WeakFileRef;
 use owning_ref::ArcRef;
-use memory::{MappedPages, VirtualAddress, MmiRef, get_frame_allocator_ref, allocate_pages_by_bytes, EntryFlags};
+use memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, EntryFlags};
 use xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
@@ -873,9 +872,8 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
         return Err("no .debug sections found");
     }
 
-    let frame_allocator = get_frame_allocator_ref().ok_or("couldn't get frame allocator")?;
     let allocated_pages = allocate_pages_by_bytes(ro_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.lock().deref_mut())?;
+    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE)?;
     let start_address = mp.start_address();
     let range = start_address .. (start_address + ro_bytes);
     Ok((mp, range))

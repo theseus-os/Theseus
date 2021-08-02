@@ -20,7 +20,7 @@ pub use entryflags_x86_64::EntryFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
-    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
+    PhysicalAddress, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
 };
 use x86_64::{registers::control_regs, instructions::tlb};
 
@@ -49,7 +49,7 @@ pub fn get_kernel_address(
             .map(|s| s.start_address())
             .min()
             .ok_or("Couldn't find kernel start (phys) address")? as usize,
-    )?;
+    ).ok_or("kernel start physical address was invalid")?;
     let kernel_virt_end = VirtualAddress::new(
         elf_sections_tag
             .sections()
@@ -57,65 +57,13 @@ pub fn get_kernel_address(
             .map(|s| s.end_address())
             .max()
             .ok_or("Couldn't find kernel end (virt) address")? as usize,
-    )?;
-    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)?;
+    ).ok_or("kernel virtual end address was invalid")?;
+    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)
+        .ok_or("kernel end physical address was invalid")?;
 
     Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
 
-/// Gets the available physical memory areas from the bootloader-provided list.
-///
-/// Returns the following tuple, if successful:
-///  * An array of available physical memory areas,
-///  * The number of valid entries in that array.
-pub fn get_available_memory(
-    boot_info: &BootInformation,
-    kernel_phys_end: PhysicalAddress,
-) -> Result<([PhysicalMemoryArea; 32], usize), &'static str> {
-    // parse the list of physical memory areas from multiboot
-    let mut available: [PhysicalMemoryArea; 32] = Default::default();
-    let mut avail_index = 0;
-    let memory_map_tag = boot_info
-        .memory_map_tag()
-        .ok_or("Memory map tag not found")?;
-    for area in memory_map_tag.memory_areas() {
-        let area_start = PhysicalAddress::new(area.start_address() as usize)?;
-        let area_end = PhysicalAddress::new(area.end_address() as usize)?;
-        let area_size = area.size() as usize;
-        debug!(
-            "memory area base_addr={:#x} length={:#x} ({:?})",
-            area_start, area_size, area
-        );
-
-        // optimization: we reserve memory from areas below the end of the kernel's physical address,
-        // which includes addresses beneath 1 MB
-        if area_end < kernel_phys_end {
-            debug!("--> skipping region before kernel_phys_end");
-            continue;
-        }
-        let start_paddr: PhysicalAddress = if area_start >= kernel_phys_end {
-            area_start
-        } else {
-            kernel_phys_end
-        };
-        let start_paddr = (Frame::containing_address(start_paddr) + 1).start_address(); // align up to next page
-
-        let new_entry = available.get_mut(avail_index).ok_or("Found more than 32 physical memory areas, only 32 are supported.")?;
-        *new_entry = PhysicalMemoryArea {
-            base_addr: start_paddr,
-            size_in_bytes: area_size,
-            typ: 1,
-            acpi: 0,
-        };
-
-        info!("--> memory region established: start={:#x}, size_in_bytes={:#x}",
-            new_entry.base_addr, new_entry.size_in_bytes
-        );
-        avail_index += 1;
-    }
-
-    Ok((available, avail_index))
-}
 
 /// Gets the address bounds of physical memory occupied by all bootloader-loaded modules.
 /// 
@@ -135,12 +83,12 @@ pub fn get_modules_address(boot_info: &BootInformation) -> (PhysicalAddress, Phy
 /// Gets the physical memory area occupied by the bootloader information.
 pub fn get_boot_info_mem_area(
     boot_info: &BootInformation,
-) -> Result<PhysicalMemoryArea, &'static str> {
-    Ok(PhysicalMemoryArea::new(
-        PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)?,
-        boot_info.end_address() - boot_info.start_address(),
-        1,
-        0,
+) -> Result<(PhysicalAddress, PhysicalAddress), &'static str> {
+    Ok((
+        PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)
+            .ok_or("boot info start physical address was invalid")?,
+        PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)
+            .ok_or("boot info end physical address was invalid")?,
     ))
 }
 
@@ -156,18 +104,20 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
     let mut index = 0;
-    let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut text_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut rodata_start: Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut rodata_end:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut rodata_start:      Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut rodata_end:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut stack_start:       Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut stack_end:         Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut page_table_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut page_table_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
-    let mut text_flags: Option<EntryFlags> = None;
+    let mut text_flags:   Option<EntryFlags> = None;
     let mut rodata_flags: Option<EntryFlags> = None;
-    let mut data_flags: Option<EntryFlags> = None;
+    let mut data_flags:   Option<EntryFlags> = None;
 
     let mut sections_memory_bounds: [Option<SectionMemoryBounds>; 32] = Default::default();
 
@@ -200,8 +150,8 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
             start_virt_addr += KERNEL_OFFSET;
         }
 
-        let start_phys_addr = PhysicalAddress::new(start_phys_addr)?;
-        let start_virt_addr = VirtualAddress::new(start_virt_addr)?;
+        let start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or("section had invalid starting physical address")?;
+        let start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or("section had invalid ending physical address")?;
         let end_virt_addr = start_virt_addr + (section.size() as usize);
         let end_phys_addr = start_phys_addr + (section.size() as usize);
 
@@ -213,14 +163,21 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         }
 
         // The linker script (linker_higher_half.ld) defines the following order of sections:
-        // (1) .init (start of executable pages)
-        // (2) .text (end of executable pages)
-        // (3) .rodata (start of read-only pages)
-        // (4) .eh_frame
-        // (5) .gcc_except_table (end of read-only pages)
-        // (6) .data (start of read-write pages)
-        // (7) .bss (end of read-write pages)
-        // (8) .stack
+        // |-----|-------------------|------------------------------|
+        // | Sec |    Sec Name       |    Description / purpose     |
+        // | Num |                   |                              |
+        // |-----|--------------------------------------------------|
+        // | (1) | .init             | start of executable pages    |
+        // | (2) | .text             | end of executable pages      |
+        // | (3) | .rodata           | start of read-only pages     |
+        // | (4) | .eh_frame         | part of read-only pages      |
+        // | (5) | .gcc_except_table | end of read-only pages       |
+        // | (6) | .data             | start of read-write pages    | 
+        // | (7) | .bss              | end of read-write pages      |
+        // | (8) | .page_table       | separate .data-like section  |
+        // | (9) | .stack            | separate .data-like section  |
+        // |-----|-------------------|------------------------------|
+        //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
             ".init" => {
@@ -253,18 +210,23 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 data_end = Some((end_virt_addr, end_phys_addr));
                 "nano_core .bss"
             }
+            ".page_table" => {
+                page_table_start = Some((start_virt_addr, start_phys_addr));
+                page_table_end   = Some((end_virt_addr, end_phys_addr));
+                "initial page_table"
+            }
             ".stack" => {
                 stack_start = Some((start_virt_addr, start_phys_addr));
                 stack_end   = Some((end_virt_addr, end_phys_addr));
                 "initial stack"
             }
             _ =>  {
-                error!("Section {} at {:#X}, size {:#X} was not an expected section (.init, .text, .data, .bss, .rodata)", 
+                error!("Section {} at {:#X}, size {:#X} was not an expected section", 
                         section.name(), section.start_address(), section.size());
-                return Err("Kernel ELF Section had an unexpected name (expected .init, .text, .data, .bss, .rodata)");
+                return Err("Kernel ELF Section had an unexpected name");
             }
         };
-        debug!("     mapping kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
+        debug!("     will map kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
 
         sections_memory_bounds[index] = Some(SectionMemoryBounds {
             start: (start_virt_addr, start_phys_addr),
@@ -275,15 +237,17 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         index += 1;
     }
 
-    let text_start    = text_start  .ok_or("Couldn't find start of .text section")?;
-    let text_end      = text_end    .ok_or("Couldn't find end of .text section")?;
-    let rodata_start  = rodata_start.ok_or("Couldn't find start of .rodata section")?;
-    let rodata_end    = rodata_end  .ok_or("Couldn't find end of .rodata section")?;
-    let data_start    = data_start  .ok_or("Couldn't find start of .data section")?;
-    let data_end      = data_end    .ok_or("Couldn't find start of .data section")?;
-    let stack_start   = stack_start .ok_or("Couldn't find start of .stack section")?;
-    let stack_end     = stack_end   .ok_or("Couldn't find start of .stack section")?;
-
+    let text_start         = text_start       .ok_or("Couldn't find start of .text section")?;
+    let text_end           = text_end         .ok_or("Couldn't find end of .text section")?;
+    let rodata_start       = rodata_start     .ok_or("Couldn't find start of .rodata section")?;
+    let rodata_end         = rodata_end       .ok_or("Couldn't find end of .rodata section")?;
+    let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
+    let data_end           = data_end         .ok_or("Couldn't find start of .data section")?;
+    let page_table_start   = page_table_start .ok_or("Couldn't find start of .page_table section")?;
+    let page_table_end     = page_table_end   .ok_or("Couldn't find start of .page_table section")?;
+    let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
+    let stack_end          = stack_end        .ok_or("Couldn't find start of .stack section")?;
+     
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
     let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
@@ -303,6 +267,11 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         end: data_end,
         flags: data_flags,
     };
+    let page_table = SectionMemoryBounds {
+        start: page_table_start,
+        end: page_table_end,
+        flags: data_flags, // same flags as data sections
+    };
     let stack = SectionMemoryBounds {
         start: stack_start,
         end: stack_end,
@@ -313,6 +282,7 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         text,
         rodata,
         data,
+        page_table,
         stack,
     };
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))
@@ -331,7 +301,7 @@ pub fn get_vga_mem_addr(
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
     Ok((
-        PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?,
+        PhysicalAddress::new(VGA_DISPLAY_PHYS_START).ok_or("invalid VGA starting physical address")?,
         vga_size_in_bytes,
         vga_display_flags,
     ))

@@ -290,7 +290,8 @@ impl SCAllocator {
         // );
 
         // let page_addr = (ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize;
-        let page_vaddr = VirtualAddress::new((ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize)?;
+        let page_vaddr = VirtualAddress::new((ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize)
+            .ok_or("pointer to deallocate was an invalid virtual address")?;
 
         // Figure out which page we are on and retrieve a reference to it
         let new_layout = unsafe { Layout::from_size_align_unchecked(self.size, layout.align()) };

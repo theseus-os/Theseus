@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 
 
 [dependencies.log]
@@ -28,7 +28,7 @@ features = [
 ]
 
 [dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+path = "../../libs/irq_safety"
 
 [dependencies.memory]
 path = "../memory"

@@ -268,7 +268,7 @@ impl PageTable {
     /// `AllocatedPages`.
     pub fn map_allocated_pages(
         &mut self, pages: AllocatedPages,
-        _flags: EntryFlags, _allocator: &mut AreaFrameAllocator
+        _flags: EntryFlags
     ) -> Result<MappedPages, &'static str> {
         Ok(MappedPages{
             pages,

@@ -60,12 +60,11 @@ pub fn init(
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
-        let frame_allocator_ref = memory::get_frame_allocator_ref().ok_or("frame allocator not initialized")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
-            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table, frame_allocator_ref)
+            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table)
                 .ok_or("could not allocate double fault stack")?,
-            stack::alloc_stack(1, &mut kernel_mmi.page_table, frame_allocator_ref)
+            stack::alloc_stack(1, &mut kernel_mmi.page_table)
                 .ok_or("could not allocate privilege stack")?,
         )
     };
@@ -85,7 +84,12 @@ pub fn init(
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
-    let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
+    let ap_count = multicore_bringup::handle_ap_cores(
+        kernel_mmi_ref.clone(),
+        ap_start_realmode_begin,
+        ap_start_realmode_end,
+        Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
+    )?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
     // //initialize the per core heaps
@@ -100,18 +104,19 @@ pub fn init(
     task_fs::init()?;
 
 
-    // We can drop and unmap the identity mappings (e.g., for the multiboot2 boot_info) 
-    // after the initial bootstrap is complete, 
+    // We can drop and unmap the identity mappings after the initial bootstrap is complete.
     // We could probably do this earlier, but we definitely can't do it until after the APs boot.
     drop(identity_mapped_pages);
     
     // create a SIMD personality
-    #[cfg(simd_personality)]
-    {
+    #[cfg(simd_personality)] {
+        #[cfg(simd_personality_sse)]
         let simd_ext = task::SimdExt::SSE;
+        #[cfg(simd_personality_avx)]
+        let simd_ext = task::SimdExt::AVX;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
-        spawn::spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
-            .name(alloc::string::String::from("setup_simd_personality"))
+        spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
+            .name(alloc::format!("setup_simd_personality_{:?}", simd_ext))
             .spawn()?;
     }
 

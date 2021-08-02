@@ -11,7 +11,7 @@ cfg-if = "1.0.0"
 path = "../kernel_config"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-multiboot2 = "0.7.1"
+multiboot2 = "0.10.1"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.memory]
 path = "../memory"
@@ -23,7 +23,7 @@ path = "../stack"
 version = "0.4.8"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+path = "../../libs/irq_safety"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.heap]
 path = "../heap"

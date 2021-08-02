@@ -7,5 +7,5 @@ categories = ["no-std", "memory-management"]
 license = "MIT"
 
 [dependencies]
-spin = "0.4.5"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+spin = "0.9.0"
+owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }

@@ -61,7 +61,7 @@ use alloc::{
     vec::Vec,
 };
 use memory::{MappedPages, VirtualAddress, EntryFlags};
-#[cfg(internal_deps)] use memory::{PageTable, FrameAllocator};
+#[cfg(internal_deps)] use memory::PageTable;
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
@@ -110,6 +110,7 @@ pub enum CrateType {
     Kernel,
     Application,
     Userspace,
+    Executable,
 }
 impl CrateType {
     fn first_char(&self) -> &'static str {
@@ -117,6 +118,7 @@ impl CrateType {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
             CrateType::Userspace    => "u",
+            CrateType::Executable   => "e",
         }
     }
     
@@ -127,6 +129,7 @@ impl CrateType {
             CrateType::Kernel       => "_kernel",
             CrateType::Application  => "_applications",
             CrateType::Userspace    => "_userspace",
+            CrateType::Executable   => "_executables",
         }
     }
     
@@ -161,25 +164,13 @@ impl CrateType {
         else if prefix.starts_with(CrateType::Userspace.first_char()) {
             Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
+        else if prefix.starts_with(CrateType::Executable.first_char()) {
+            Ok((CrateType::Executable, namespace_prefix, crate_name))
+        }
         else {
             error!("module_name {:?} didn't start with a known CrateType prefix", module_name);
             Err("module_name didn't start with a known CrateType prefix")
         }
-    }
-
-    /// Returns `true` if the given `module_name` indicates an application crate.
-    pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a kernel crate.
-    pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a userspace crate.
-    pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.first_char())
     }
 }
 
@@ -266,7 +257,6 @@ impl fmt::Debug for LoadedCrate {
 
 impl Drop for LoadedCrate {
     fn drop(&mut self) {
-        
         #[cfg(not(downtime_eval))]
         trace!("### Dropped LoadedCrate: {}", self.crate_name);
     }
@@ -375,10 +365,9 @@ impl LoadedCrate {
     /// 
     /// This is only available when the `internal_deps` cfg option is set.
     #[cfg(internal_deps)]
-    pub fn deep_copy<A: FrameAllocator>(
+    pub fn deep_copy(
         &self, 
         page_table: &mut PageTable, 
-        allocator: &mut A
     ) -> Result<StrongCrateRef, &'static str> {
 
         // This closure deep copies the given mapped_pages (mapping them as WRITABLE)
@@ -390,7 +379,7 @@ impl LoadedCrate {
             let old_start_address = old_mp_range.1.start.value();
             let size = old_mp_range.1.end.value() - old_start_address;
             let offset = old_start_address - old_mp_locked.start_address().value();
-            let new_mp = old_mp_range.0.lock().deep_copy(Some(flags | EntryFlags::WRITABLE), page_table, allocator)?;
+            let new_mp = old_mp_range.0.lock().deep_copy(Some(flags | EntryFlags::WRITABLE), page_table)?;
             let new_start_address = new_mp.start_address() + offset;
             Ok((Arc::new(Mutex::new(new_mp)), new_start_address .. (new_start_address + size)))
         };
@@ -572,11 +561,15 @@ impl LoadedCrate {
 /// The possible types of sections that can be loaded from a crate object file.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SectionType {
+    /// A `text` section contains executable code, i.e., functions. 
     Text,
+    /// An `rodata` section contains read-only data, i.e., constants.
     Rodata,
+    /// A `data` section contains data that is both readable and writable, i.e., static variables. 
     Data,
+    /// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.
     Bss,
-    /// The ".gcc_except_table" contains landing pads for exception handling,
+    /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process
     /// (e.g., "catching" an exception). 
@@ -588,7 +581,7 @@ pub enum SectionType {
     /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
     /// 
     GccExceptTable,
-    /// The ".eh_frame" contains information about stack unwinding and destructor functions
+    /// The `.eh_frame` section contains information about stack unwinding and destructor functions
     /// that should be called when traversing up the stack for cleanup. 
     /// 
     /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>
