@@ -606,10 +606,14 @@ help:
 ##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
 
-## Specify a basic machine/platform, which currently is the `q35` machine
-## because it's the only one that supports a guest OS vIOMMU: <https://wiki.qemu.org/Features/VT-d>
 QEMU_FLAGS ?=
-QEMU_FLAGS += -machine q35,kernel-irqchip=split 
+
+ifdef IOMMU
+## Currently only the `q35` machine model supports a virtual IOMMU: <https://wiki.qemu.org/Features/VT-d>
+	QEMU_FLAGS += -machine q35,kernel-irqchip=split
+	QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
+endif
+
 ## Boot from the cd-rom drive
 QEMU_FLAGS += -cdrom $(iso) -boot d
 ## Don't reboot or shutdown upon failure or a triple reset
@@ -688,9 +692,6 @@ ifdef vfio
 	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
 endif
 
-## Enable the IOMMU, e.g., Intel VT-d. 
-## See more here: <https://wiki.qemu.org/Features/VT-d>
-QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
 
 
 
