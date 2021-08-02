@@ -608,6 +608,7 @@ dependencies = [
  "mpmc",
  "network_manager",
  "pci",
+ "spin 0.9.0",
  "storage_manager",
 ]
 

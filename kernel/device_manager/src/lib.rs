@@ -2,6 +2,7 @@
 #![feature(trait_alias)]
 
 #[macro_use] extern crate log;
+extern crate spin;
 extern crate event_types;
 extern crate e1000;
 extern crate memory;
@@ -28,7 +29,8 @@ use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
-use io::{ByteReaderWriterWrapper, LockableIo2, ReaderWriter};
+use io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
+use storage_manager::StorageDevice;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -151,12 +153,12 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 
     // Discover filesystems from each storage device on the storage controllers initialized above
     // and mount each filesystem to the root directory by default.
-    if true {
+    if false {
         for storage_device in storage_manager::storage_devices() {
             let disk = FatFsAdapter(
                 ReaderWriter::new(
                     ByteReaderWriterWrapper::from(
-                        LockableIo2::new(storage_device)
+                        LockableIo::<dyn StorageDevice + Send, spin::Mutex<_>, _>::from(storage_device)
                     )
                 ),
             );
