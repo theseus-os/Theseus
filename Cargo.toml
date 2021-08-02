@@ -39,7 +39,6 @@ exclude = [
 	"libtheseus",
 ]
 
-
 [patch.'https://github.com/rafalh/rust-fatfs']
 ### Temporary patch for fatfs which allows us to set the logging level.
 ### Once the below PR lands, we can remove this.
