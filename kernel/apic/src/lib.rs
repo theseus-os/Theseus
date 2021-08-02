@@ -189,8 +189,9 @@ const APIC_NMI: u32 = 4 << 8;
 
 
 /// A structure that offers access to APIC/xAPIC through its I/O registers.
-/// Definitions are based on [Intel's x86 Manual Vol 3a, Table 10-1]
-/// (https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.pdf). 
+///
+/// Definitions are based on Intel's x86 Manual Vol 3a, Table 10-1. 
+/// [Link to the manual](https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.pdf).
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct ApicRegisters {

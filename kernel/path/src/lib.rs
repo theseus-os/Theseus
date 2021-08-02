@@ -141,8 +141,9 @@ impl Path {
         Path::new(new_path)
     }
     
-    /// Expresses the current Path, self, relative to another Path, other
-    /// https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
+    /// Returns a `Path` that expresses a relative path from this `Path` (`self`)
+    /// to the given `other` `Path`.
+    // An example algorithm: https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
     pub fn relative(&self, other: &Path) -> Option<Path> {
         let mut ita_iter = self.components();
         let mut itb_iter = other.components();

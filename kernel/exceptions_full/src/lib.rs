@@ -322,7 +322,9 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
 }
 
 /// exception 0x07
-/// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
+///
+/// For more information about "spurious interrupts", 
+/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).
 pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#X}\n{:#?}\n",
              stack_frame.instruction_pointer,
