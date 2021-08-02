@@ -2,13 +2,8 @@
 
 #![no_std]
 
-// #![feature(in_band_lifetimes)]
-// #![feature(generic_associated_types)]
-// #![allow(incomplete_features)]
-
 extern crate spin;
 extern crate irq_safety;
-
 
 use core::ops::{Deref, DerefMut};
 
