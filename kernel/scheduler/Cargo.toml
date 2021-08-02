@@ -13,9 +13,6 @@ cfg-if = "1.0.0"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.apic]
-path= "../apic"
-
 [dependencies.task]
 path = "../task"
 

@@ -23,13 +23,13 @@ extern crate kernel_config;
 extern crate memory_structs;
 extern crate alloc;
 extern crate spin;
-#[macro_use] extern crate static_assertions;
 extern crate intrusive_collections;
 
 cfg_if!{
 if #[cfg(target_arch="x86_64")] {
 
 #[macro_use] extern crate log;
+#[macro_use] extern crate static_assertions;
 
 mod x86_64;
 pub use x86_64::*;

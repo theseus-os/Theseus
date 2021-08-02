@@ -17,5 +17,8 @@ path = "../serial_port"
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
 path = "../../libs/irq_safety"
 
+[target.'cfg(target_arch = "arm")'.dependencies.cortex-m-semihosting]
+version = "0.3.7"
+
 [lib]
 crate-type = ["rlib"]

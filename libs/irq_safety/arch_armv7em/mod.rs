@@ -4,8 +4,7 @@ use core::ops::{Deref, DerefMut};
 use spin::{Mutex, MutexGuard};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use cortex_m::{interrupt, register};
-use owning_ref::{OwningRef, OwningRefMut};
-use stable_deref_trait::StableDeref;
+use owning_ref::{OwningRef, OwningRefMut, StableAddress};
 
 /// This type provides interrupt-safe MUTual EXclusion based on [spin::Mutex].
 ///
@@ -135,8 +134,8 @@ impl<'a, T: ?Sized> Drop for MutexIrqSafeGuard<'a, T> {
     }
 }
 
-// Implement the StableDeref trait for MutexIrqSafe guards, just like it's implemented for Mutex guards
-unsafe impl<'a, T: ?Sized> StableDeref for MutexIrqSafeGuard<'a, T> {}
+// Implement the StableAddress trait for MutexIrqSafe guards, just like it's implemented for Mutex guards
+unsafe impl<'a, T: ?Sized> StableAddress for MutexIrqSafeGuard<'a, T> {}
 
 /// Typedef of a owning reference that uses a `MutexIrqSafeGuard` as the owner.
 pub type MutexIrqSafeGuardRef<'a, T, U = T> = OwningRef<MutexIrqSafeGuard<'a, T>, U>;
@@ -443,9 +442,9 @@ impl<'rwlock, T: ?Sized> Drop for RwLockIrqSafeWriteGuard<'rwlock, T> {
     }
 }
 
-// Implement the StableDeref trait for RwLockIrqSafe guards, just like it's implemented for RwLock guards
-unsafe impl<'a, T: ?Sized> StableDeref for RwLockIrqSafeReadGuard<'a, T> {}
-unsafe impl<'a, T: ?Sized> StableDeref for RwLockIrqSafeWriteGuard<'a, T> {}
+// Implement the StableAddress trait for RwLockIrqSafe guards, just like it's implemented for RwLock guards
+unsafe impl<'a, T: ?Sized> StableAddress for RwLockIrqSafeReadGuard<'a, T> {}
+unsafe impl<'a, T: ?Sized> StableAddress for RwLockIrqSafeWriteGuard<'a, T> {}
 
 /// Typedef of a owning reference that uses a `RwLockIrqSafeReadGuard` as the owner.
 pub type RwLockIrqSafeReadGuardRef<'a, T, U = T> = OwningRef<RwLockIrqSafeReadGuard<'a, T>, U>;

@@ -14,7 +14,7 @@ dependencies = [
  "fadt",
  "hpet",
  "ioapic",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -84,7 +84,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "interrupts",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -103,7 +103,7 @@ dependencies = [
  "atomic",
  "atomic_linked_list",
  "bit_field 0.7.0",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -519,6 +519,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cortex-m-semihosting"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bffa6c1454368a6aa4811ae60964c38e6996d397ff8095a8b9211b1c1f749bc"
+dependencies = [
+ "cortex-m 0.7.2",
+]
+
+[[package]]
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
@@ -746,7 +755,7 @@ dependencies = [
  "apic",
  "intel_ethernet",
  "interrupts",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -804,7 +813,7 @@ dependencies = [
 name = "ethernet_smoltcp_device"
 version = "0.1.0"
 dependencies = [
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "lazy_static",
  "log",
  "memory",
@@ -910,7 +919,7 @@ name = "fault_log"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "lazy_static",
  "log",
  "memory",
@@ -999,7 +1008,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -1089,7 +1097,7 @@ name = "heap"
 version = "0.1.0"
 dependencies = [
  "block_allocator",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "log",
  "memory",
@@ -1101,7 +1109,7 @@ name = "heapfile"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "log",
  "memory",
  "spin 0.9.0",
@@ -1188,7 +1196,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "exceptions_early",
  "gdt",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "keyboard",
  "lazy_static",
@@ -1295,7 +1303,7 @@ dependencies = [
  "hpet",
  "intel_ethernet",
  "interrupts",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1500,6 +1508,7 @@ name = "logger"
 version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
+ "cortex-m-semihosting",
  "irq_safety 0.0.1",
  "log",
  "serial_port",
@@ -1525,7 +1534,7 @@ dependencies = [
  "acpi_table",
  "apic",
  "ioapic",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "log",
  "memory",
  "pic",
@@ -1544,7 +1553,7 @@ name = "mapper_spillful"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1565,11 +1574,8 @@ name = "memfs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
- "log",
  "memory",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -1590,7 +1596,7 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "frame_allocator",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1612,7 +1618,7 @@ dependencies = [
  "alloc-cortex-m",
  "cfg-if 1.0.0",
  "heap",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "log",
  "memory",
@@ -1662,7 +1668,7 @@ dependencies = [
 name = "mlx5"
 version = "0.1.0"
 dependencies = [
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "log",
  "memory",
@@ -1806,7 +1812,7 @@ dependencies = [
  "hashbrown",
  "heap",
  "intrusive-collections",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "log",
  "memory",
@@ -1839,7 +1845,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "cortex-m 0.7.2",
  "exceptions_early",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "log",
  "logger",
@@ -1994,7 +2000,7 @@ dependencies = [
  "hpet",
  "http_client",
  "httparse",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "itertools",
  "log",
  "network_manager",
@@ -2199,7 +2205,7 @@ dependencies = [
  "apic",
  "atomic",
  "bit_field 0.10.0",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "lazy_static",
  "log",
  "memory",
@@ -2381,7 +2387,7 @@ version = "0.1.0"
 dependencies = [
  "debugit",
  "hpet",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "log",
  "scheduler",
  "spin 0.9.0",
@@ -2410,7 +2416,6 @@ dependencies = [
  "lazy_static",
  "log",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -2450,7 +2455,7 @@ dependencies = [
 name = "rtc"
 version = "0.1.0"
 dependencies = [
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "kernel_config",
  "lazy_static",
  "log",
@@ -2848,7 +2853,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "hpet",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "lazy_static",
  "log",
  "memory",
@@ -3089,7 +3094,7 @@ name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
  "apic",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "log",
  "memory",
  "pause",
@@ -3242,7 +3247,7 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "network_interface_card",
  "nic_buffers",
  "nic_queues",
@@ -3284,7 +3289,7 @@ dependencies = [
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
- "irq_safety 0.1.1 (git+https://github.com/theseus-os/irq_safety)",
+ "irq_safety 0.0.1",
  "log",
  "scheduler",
  "task",

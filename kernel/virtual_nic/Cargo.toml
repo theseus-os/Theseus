@@ -23,7 +23,7 @@ path = "../physical_nic"
 path = "../intel_ethernet"
 
 [dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+path = "../../libs/irq_safety"
 
 [lib]
 crate-type = ["rlib"]

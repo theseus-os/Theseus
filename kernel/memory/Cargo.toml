@@ -10,6 +10,12 @@ cfg-if = "1.0.0"
 spin = "0.9.0"
 zerocopy = "0.5.0"
 
+[dependencies.memory_structs]
+path = "../memory_structs"
+
+[dependencies.page_allocator]
+path = "../page_allocator"
+
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 bitflags = "1.1.0"
 multiboot2 = "0.10.1"
@@ -25,7 +31,7 @@ features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+path = "../../libs/irq_safety"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
@@ -36,16 +42,10 @@ path = "../kernel_config"
 [target.'cfg(target_arch = "x86_64")'.dependencies.memory_x86_64]
 path = "../memory_x86_64"
 
-[dependencies.memory_structs]
-path = "../memory_structs"
-
-[dependencies.page_table_entry]
+[target.'cfg(target_arch = "x86_64")'.dependencies.page_table_entry]
 path = "../page_table_entry"
 
-[dependencies.page_allocator]
-path = "../page_allocator"
-
-[dependencies.frame_allocator]
+[target.'cfg(target_arch = "x86_64")'.dependencies.frame_allocator]
 path = "../frame_allocator"
 
 [lib]

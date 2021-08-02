@@ -19,7 +19,7 @@ path = "../memory"
 version = "0.4.8"
 
 [dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+path = "../../libs/irq_safety"
 
 [lib]
 crate-type = ["rlib"]
