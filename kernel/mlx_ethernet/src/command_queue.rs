@@ -167,6 +167,7 @@ impl CommandOpcode {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
                 0x20 + 0x30 + 0xC0 + num_pages * 8
             }
+            Self::ModifySq => 0x20 + 0x30 + 0xC0,
             _ => return Err(CommandQueueError::NotImplemented)           
         };
         Ok(len)
@@ -189,6 +190,7 @@ impl CommandOpcode {
             Self::CreateCq => 16,
             Self::CreateTis => 16,
             Self::CreateSq => 16,
+            Self::ModifySq => 8,
             _ => return Err(CommandQueueError::NotImplemented)         
         };
         Ok(len)
@@ -312,7 +314,8 @@ impl CommandQueue {
         transport_domain: Option<u32>,
         completion_queue_num: Option<u32>,
         transport_interface_send_num: Option<u32>,
-        protection_domain: Option<u32>
+        protection_domain: Option<u32>,
+        sqn: Option<u32>
     ) -> Result<usize, CommandQueueError> 
     {
         let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
@@ -460,6 +463,20 @@ impl CommandQueue {
                     uar.ok_or(CommandQueueError::MissingInput)?, 
                     doorbell_page.ok_or(CommandQueueError::MissingInput)?, 
                     log_queue_size.ok_or(CommandQueueError::MissingInput)?
+                )?;
+
+                self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
+            },
+            CommandOpcode::ModifySq => {
+                cmdq_entry.set_input_length_in_bytes(opcode.input_bytes(None)?);
+                cmdq_entry.set_output_length_in_bytes(opcode.output_bytes()?);
+                let sq_state = 0 << 28;
+                cmdq_entry.set_input_inline_data(opcode, opmod, Some(sq_state | sqn.ok_or(CommandQueueError::MissingInput)?), None);
+
+                self.modify_sq_state(
+                    entry_num, 
+                    completion_queue_num.ok_or(CommandQueueError::MissingInput)?, 
+                    transport_interface_send_num.ok_or(CommandQueueError::MissingInput)?, 
                 )?;
 
                 self.set_mailbox_pointer_in_cmd_entry(&mut cmdq_entry, entry_num, MailboxType::Input);
@@ -934,6 +951,23 @@ impl CommandQueue {
         self.check_command_output_validity(entry_num, CommandOpcode::CreateSq)?;
         let (_status, _syndrome, sqn, _reserved) = self.entries[entry_num].get_output_inline_data();
         Ok(sqn & 0xFF_FFFF)
+    }
+
+    fn modify_sq_state(&mut self, entry_num: usize, cqn: u32, tisn: u32) -> Result<(), CommandQueueError> {
+        let num_mailboxes = 1;
+        self.initialize_mailboxes(entry_num, num_mailboxes, MailboxType::Input)?;
+
+        let mailbox_pages = &mut self.mailbox_buffers_input[entry_num];
+        
+        let (mb_page, _mb_page_starting_addr) = &mut mailbox_pages[0];
+            
+        // initialize the TIS context
+        let sq_context_offset = 0x10;
+        let sq_context = mb_page.as_type_mut::<SendQueueContext>(sq_context_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        sq_context.init(cqn, tisn);
+        sq_context.set_state(SendQueueState::Ready);
+
+        Ok(())
     }
 }
 

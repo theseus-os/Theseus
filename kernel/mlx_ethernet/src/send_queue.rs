@@ -37,7 +37,7 @@ impl TransportInterfaceSendContext {
 #[derive(FromBytes, Default)]
 #[repr(C, packed)]
 pub(crate) struct SendQueueContext {
-    rlky:                               Volatile<U32<BigEndian>>,
+    rlky_state:                         Volatile<U32<BigEndian>>,
     user_index:                         Volatile<U32<BigEndian>>,
     cqn:                                Volatile<U32<BigEndian>>,
     hairpin_peer_rq:                    Volatile<U32<BigEndian>>,
@@ -51,13 +51,24 @@ pub(crate) struct SendQueueContext {
 
 const_assert_eq!(core::mem::size_of::<SendQueueContext>(), 48);
 
+pub enum SendQueueState {
+    Reset = 0x0,
+    Ready = 0x1,
+    Error = 0x3
+}
+
 impl SendQueueContext {
     pub fn init(&mut self, cqn: u32, tisn: u32) {
         *self = SendQueueContext::default();
-        self.rlky.write(U32::new((1 << 31) | (1 << 29) | (1 << 28) | (1 << 24))); // enable reserved lkey | fast register enable |  flush in error WQEs | min_wqe_inline_mode
+        self.rlky_state.write(U32::new((1 << 31) | (1 << 29) | (1 << 28) | (1 << 24))); // enable reserved lkey | fast register enable |  flush in error WQEs | min_wqe_inline_mode
         self.cqn.write(U32::new(cqn & 0xFF_FFFF));
         self.tis_lst_sz.write(U32::new(1 << 16));
         self.tis_num_0.write(U32::new(tisn & 0xFF_FFFF));
+    }
+
+    pub fn set_state(&mut self, next_state: SendQueueState) {
+        let state = self.rlky_state.read().get() & !0xF0_0000;
+        self.rlky_state.write(U32::new(state | ((next_state as u32) << 20))); 
     }
 }
 

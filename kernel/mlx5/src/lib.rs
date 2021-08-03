@@ -129,7 +129,9 @@ impl ConnectX5Nic {
         // Execute ENABLE_HCA command
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::EnableHca, 
-            None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, 
+            None, None, None, 
+            None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -138,7 +140,7 @@ impl ConnectX5Nic {
         // execute QUERY_ISSI
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::QueryIssi, 
-            None, None, None, None,None, None, None, None, None, None
+            None, None, None, None,None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -148,7 +150,7 @@ impl ConnectX5Nic {
         // execute SET_ISSI
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::SetIssi, 
-            None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -158,7 +160,7 @@ impl ConnectX5Nic {
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::QueryPages, 
             Some(QueryPagesOpMod::BootPages as u16), 
-            None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -183,7 +185,7 @@ impl ConnectX5Nic {
             None,
             None,
             None,
-            None, None, None, None
+            None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -193,7 +195,7 @@ impl ConnectX5Nic {
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::QueryPages, 
             Some(QueryPagesOpMod::InitPages as u16), 
-            None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -219,7 +221,7 @@ impl ConnectX5Nic {
                 None,
                 None,
                 None,
-                None, None, None, None
+                None, None, None, None, None
             )?;
             init_segment.post_command(cmdq_entry);
             let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -229,7 +231,7 @@ impl ConnectX5Nic {
         // execute INIT_HCA
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::InitHca, 
-            None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -238,7 +240,7 @@ impl ConnectX5Nic {
         // execute ALLOC_UAR
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::AllocUar, 
-            None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -269,7 +271,7 @@ impl ConnectX5Nic {
             Some(7),
             None,
             None,
-            None, None, None, None
+            None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -279,7 +281,7 @@ impl ConnectX5Nic {
         // execute ALLOC_PD
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::AllocPd, 
-            None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -289,7 +291,7 @@ impl ConnectX5Nic {
         // execute ALLOC_TRANSPORT_DOMAIN
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::AllocTransportDomain, 
-            None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -299,7 +301,7 @@ impl ConnectX5Nic {
         // execute QUERY_SPECIAL_CONTEXTS
         let cmdq_entry = cmdq.create_command(
             CommandOpcode::QuerySpecialContexts, 
-            None, None, None, None, None, None, None, None, None, None
+            None, None, None, None, None, None, None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -331,7 +333,7 @@ impl ConnectX5Nic {
             Some(0),
             Some(eq_number),
             Some(db_pa),
-            None, None, None, None
+            None, None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -343,7 +345,7 @@ impl ConnectX5Nic {
             CommandOpcode::CreateTis, 
             None, None, None, None, None, None, 
             Some(td),
-            None, None, None
+            None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -378,11 +380,26 @@ impl ConnectX5Nic {
             Some(cq_number), 
             Some(tisn), 
             Some(pd)
+            , None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         let sq_number = cmdq.get_send_queue_number(cmdq_entry)?;
         trace!("Create SQ status: {:?}, number: {}", status, sq_number);
+
+        // MODIFY_SQ
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::ModifySq, 
+            None, 
+            None, None, None, None, None, None,
+            Some(cq_number), 
+            Some(tisn), 
+            None, 
+            Some(sq_number)
+        )?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        trace!("Modify SQ status: {:?}", status);
 
         let mlx5_nic = ConnectX5Nic {
             mem_base: mem_base,
