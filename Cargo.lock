@@ -2865,6 +2865,8 @@ name = "test_serial_echo"
 version = "0.1.0"
 dependencies = [
  "bare-io",
+ "io",
+ "irq_safety",
  "log",
  "serial_port",
  "task",

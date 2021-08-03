@@ -664,7 +664,7 @@ impl<IO> Seek for Writer<IO> where IO: KnownLength {
 /// You can also optionally specify the final parameter `B: Borrow<L>`,
 /// but Rustc can also infer that based on your argument to `LockableIo::from()`.
 /// You can ask Rustc to infer both of those using the `_` character, as shown above.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LockableIo<'io, IO, L, B> 
     where IO: 'io + ?Sized,
           L: for <'a> Lockable<'a, IO> + ?Sized,
@@ -683,6 +683,20 @@ impl<'io, IO, L, B> From<B> for LockableIo<'io, IO, L, B>
     fn from(lockable_io: B) -> Self {
         LockableIo {
             inner: lockable_io,
+            _phantom1: PhantomData,
+            _phantom2: PhantomData,
+        }
+    }
+}
+
+impl<'io, IO, L, B> Clone for LockableIo<'io, IO, L, B> 
+    where IO: 'io + ?Sized,
+          L: for <'a> Lockable<'a, IO> + ?Sized,
+          B: Borrow<L> + Clone,
+{
+    fn clone(&self) -> Self {
+        LockableIo {
+            inner: self.inner.clone(),
             _phantom1: PhantomData,
             _phantom2: PhantomData,
         }
