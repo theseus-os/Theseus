@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="DFQ is a decoupled, fault-tolerant, multi-producer single-consumer queue. DFQ is compatible with `no_std` and is interrupt-safe by being entirely lock-free and mostly wait-free."><meta name="keywords" content="rust, rustlang, rust-lang, dfqueue"><title>dfqueue - Rust</title><link rel="stylesheet" type="text/css" href="../normalize.css"><link rel="stylesheet" type="text/css" href="../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../ayu.css" disabled ><script id="default-settings"></script><script src="../storage.js"></script><script src="../crates.js"></script><noscript><link rel="stylesheet" href="../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../dfqueue/index.html'><div class='logo-container rust-logo'><img src='../rust-logo.png' alt='logo'></div></a><p class="location">Crate dfqueue</p><div class="block version"><p>Version 0.1.0</p></div><div class="sidebar-elems"><a id="all-types" href="all.html"><p>See all dfqueue's items</p></a><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#structs">Structs</a></li><li><a href="#enums">Enums</a></li></ul></div><p class="location"></p><div id="sidebar-vars" data-name="dfqueue" data-ty="mod" data-relpath="../"></div><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
+                <a id="settings-menu" href="../settings.html"><img src="../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Crate <a class="mod" href="">dfqueue</a><button id="copy-path" onclick="copy_path(this)"><img src="../clipboard.svg" width="19" height="18" alt="Copy item import"></button></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../src/dfqueue/lib.rs.html#1-673" title="goto source code">[src]</a></span></h1><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>DFQ is a decoupled, fault-tolerant, multi-producer single-consumer queue.
+DFQ is compatible with <code>no_std</code> and is interrupt-safe by being entirely lock-free and mostly wait-free.</p>
+<p>DFQ accepts immutable data items only and does not allow the consumer
+to immediately remove (pop) or modify the items in the queue.
+In a transactional fashion, the consumer must call [<code>mark_completed</code>]: #method.mark_completed 
+on a queued item to indicate that that item can be safely removed from the queue. 
+Because the original producer that enqueued that item retains a reference to that item,
+it is then safe for any entity (any producer or the consumer) to remove it from the queue. 
+Currently, the consumer simply removes completed items from the queue on the next occasion 
+of a conumser method like <code>peek()</code>.</p>
+<p>Each producer retains ownership of the data items it queues, and only those items. 
+Thus, a producer is able to query the status of that item’s handling by the consumer, 
+to see if it is still on the queue or if something has gone wrong and it has failed. 
+If a failure has occurred, that producer can enqueue that item again, 
+but of course its original position in the queue will be lost. </p>
+</div></details><h2 id="modules" class="section-header"><a href="#modules">Modules</a></h2>
+<table><tr class="module-item"><td><a class="mod" href="mpsc_queue/index.html" title="dfqueue::mpsc_queue mod">mpsc_queue</a></td><td class="docblock-short"><p>Ported from Rust’s std::sync::mpsc::Queue.</p>
+</td></tr></table><h2 id="structs" class="section-header"><a href="#structs">Structs</a></h2>
+<table><tr class="module-item"><td><a class="struct" href="struct.DFQueue.html" title="dfqueue::DFQueue struct">DFQueue</a></td><td class="docblock-short"><p>The actual queue, an opaque type that cannot be used directly. 
+The user must use <code>DFQueueConsumer</code> and <code>DFQueueProducer</code>. </p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.DFQueueConsumer.html" title="dfqueue::DFQueueConsumer struct">DFQueueConsumer</a></td><td class="docblock-short"><p>A consumer that can process (peek into) elements in a DFQueue, but not actually remove them.
+Do not wrap this in an Arc or Mutex, the queue it is already protected by those on the interior. </p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.DFQueueProducer.html" title="dfqueue::DFQueueProducer struct">DFQueueProducer</a></td><td class="docblock-short"><p>A producer that can enqueue elements into a DFQueue.
+Do not wrap this in an Arc or Mutex, the queue it is already protected by those on the interior. </p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.PeekedData.html" title="dfqueue::PeekedData struct">PeekedData</a></td><td class="docblock-short"><p>A wrapper around data in the queue that allows a DFQueueConsumer 
+to access the data and mark the queued item as completed. 
+Automatically Derefs to the inner type <code>&amp;T</code>, just like Arc does. </p>
+</td></tr><tr class="module-item"><td><a class="struct" href="struct.QueuedData.html" title="dfqueue::QueuedData struct">QueuedData</a></td><td class="docblock-short"><p>A special reference type that wraps a data item that has been queued. 
+This is returned to a producer thread (the user of a DFQueueProducer)
+when enqueuing an item onto the queue so that the producer 
+can retain a reference to it in the case of failure.</p>
+</td></tr></table><h2 id="enums" class="section-header"><a href="#enums">Enums</a></h2>
+<table><tr class="module-item"><td><a class="enum" href="enum.PeekResult.html" title="dfqueue::PeekResult enum">PeekResult</a></td><td class="docblock-short"><p>A result of the <code>peek</code> function.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../" data-current-crate="dfqueue" data-search-index-js="../search-index.js" data-search-js="../search.js"></div>
+    <script src="../main.js"></script></body></html>

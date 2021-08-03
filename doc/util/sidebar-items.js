@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["log2","the log base 2 of an integer value"],["round_up_power_of_two","rounds the given `value` to the nearest base, which must be a power of two"]]});
