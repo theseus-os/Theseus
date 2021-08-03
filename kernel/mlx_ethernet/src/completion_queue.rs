@@ -131,4 +131,13 @@ impl CompletionQueue {
         self.doorbell.update_ci.write(U32::new(0));
         self.doorbell.arm_ci.write(U32::new(0));
     }
+
+    pub fn hw_owned(&self) -> bool {
+        self.entries[0][0].owner.read().get() & 0x1 == 0x1
+    }
+
+    pub fn check_packet_transmission(&mut self) {
+        debug!("CQ owner: {:#X}", self.entries[0][0].owner.read().get());
+        debug!("CQ flow_tag: {:#X}", self.entries[0][0].flow_tag.read().get());
+    }
 }
