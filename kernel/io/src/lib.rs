@@ -630,14 +630,14 @@ impl<IO> Seek for Writer<IO> where IO: KnownLength {
 }
 
 
-/// A struct that holds a lock-wrapped IO type, which forwards/implements 
-/// various IO-related traits through the lock/mutex wrapper via delegation.
+/// A struct that holds an IO object wrapped in a [`Lockable`] type `L`, 
+/// for the purpose of forwarding various IO-related traits through the lock to the `IO` type.
 ///
 /// This allows an IO object inside of a lock type (e.g., `Mutex<IO>`, `Arc<Mutex<IO>>`) 
 /// to be used as a type that implements some IO-specific trait, 
 /// such as those listed in the crate-level documentation. 
 ///
-/// The following traits are forwarded to the `IO` instance through the `Arc<Mutex<IO>>` wrapper:
+/// The following traits are forwarded to the `IO` instance through the `Lockable` wrapper:
 /// * [`BlockIo`]
 /// * [`KnownLength`]
 /// * [`BlockReader`] and [`BlockWriter`]
@@ -647,13 +647,13 @@ impl<IO> Seek for Writer<IO> where IO: KnownLength {
 /// # Usage and Examples
 /// The Rust compiler has difficulty inferring all of the types needed in this struct; 
 /// therefore, you must typically specify at least two types: 
-///  1. the type of the `IO`, which is what's inside of the lock. 
-///  2. the type of the lock `L`, which implements `Lockable`.
+///  1. `L`: the type of the lock itself, which implements `Lockable`.
+///  2. `IO`, the inner type inside of the `Lockable` lock type `L`.
 ///
 /// Here's an example of the minimal types that must be specified:
 /// ```no_run
-/// let storage_dev = storage_manager::storage_devices().next().unwrap();
 /// // `storage_dev` has the type `Arc<spin::Mutex<dyn Storage Device + Send>>`
+/// let storage_dev = storage_manager::storage_devices().next().unwrap();
 /// let fail = LockableIo::from(storage_dev); // <-- Error: rustc will complain!
 /// let success = LockableIo::<dyn StorageDevice + Send, spin::Mutex<_>, _>::from(storage_dev);
 /// let rw = ReaderWriter::new(ByteReaderWriterWrapper::from(success));

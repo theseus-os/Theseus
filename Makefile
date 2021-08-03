@@ -460,8 +460,23 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
+doc: export override RUSTDOCFLAGS += -A private_intra_doc_links
 doc: check_rustc
-	@RUSTDOCFLAGS="$$RUSTDOCFLAGS -A private_intra_doc_links" cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+## Build the docs for select library crates, namely those not hosted online.
+## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/cow_arc/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/debugit/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dfqueue/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/keycodes_ascii/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
+## Now, build the docs for all of Theseus's main kernel crates.
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
