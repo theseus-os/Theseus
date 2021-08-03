@@ -32,7 +32,9 @@ use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
 use mlx_ethernet::{
     InitializationSegment, 
     command_queue::{CommandQueueEntry, CommandQueue, CommandOpcode, ManagePagesOpMod, QueryPagesOpMod}, 
-    event_queue::EventQueue
+    event_queue::EventQueue,
+    completion_queue::CompletionQueue,
+    send_queue::SendQueue
 };
 use kernel_config::memory::PAGE_SIZE;
 
@@ -64,7 +66,9 @@ pub struct ConnectX5Nic {
     boot_pages: Vec<MappedPages>,
     /// Init pages passed to the NIC. Once transferred, they should not be accessed by the driver.
     init_pages: Vec<MappedPages>,
-    event_queue: EventQueue
+    event_queue: EventQueue,
+    completion_queue: CompletionQueue,
+    send_queue: SendQueue
 }
 
 
@@ -123,26 +127,39 @@ impl ConnectX5Nic {
         trace!("initializing field is cleared.");
 
         // Execute ENABLE_HCA command
-        let cmdq_entry = cmdq.create_command(CommandOpcode::EnableHca, None, None, None, None)?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::EnableHca, 
+            None, None, None, None, None, None, None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         trace!("EnableHCA: {:?}", status);
 
         // execute QUERY_ISSI
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryIssi, None, None, None, None)?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::QueryIssi, 
+            None, None, None, None,None, None, None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         let (current_issi, available_issi) = cmdq.get_query_issi_command_output(cmdq_entry)?;
         trace!("QueryISSI: {:?}, issi version :{}, available: {:#X}", status, current_issi, available_issi);
 
         // execute SET_ISSI
-        let cmdq_entry = cmdq.create_command(CommandOpcode::SetIssi, None, None, None, None)?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::SetIssi, 
+            None, None, None, None, None, None, None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         trace!("SetISSI: {:?}", status);
 
         // Query pages for boot
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpMod::BootPages as u16), None, None, None)?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::QueryPages, 
+            Some(QueryPagesOpMod::BootPages as u16), 
+            None, None, None, None, None, None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         let num_boot_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
@@ -163,14 +180,21 @@ impl ConnectX5Nic {
             Some(ManagePagesOpMod::AllocationSuccess as u16), 
             Some(boot_pa), 
             None, 
-            None
+            None,
+            None,
+            None,
+            None, None, None, None
         )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         trace!("Manage pages boot status: {:?}", status);
 
         // Query pages for init
-        let cmdq_entry = cmdq.create_command(CommandOpcode::QueryPages, Some(QueryPagesOpMod::InitPages as u16), None, None, None)?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::QueryPages, 
+            Some(QueryPagesOpMod::InitPages as u16), 
+            None, None, None, None, None, None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         let num_init_pages = cmdq.get_query_pages_command_output(cmdq_entry)?;
@@ -192,7 +216,10 @@ impl ConnectX5Nic {
                 Some(ManagePagesOpMod::AllocationSuccess as u16), 
                 Some(init_pa), 
                 None, 
-                None
+                None,
+                None,
+                None,
+                None, None, None, None
             )?;
             init_segment.post_command(cmdq_entry);
             let status = cmdq.wait_for_command_completion(cmdq_entry)?;
@@ -200,13 +227,19 @@ impl ConnectX5Nic {
         }
 
         // execute INIT_HCA
-        let cmdq_entry = cmdq.create_command(CommandOpcode::InitHca, None, None, None, None)?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::InitHca, 
+            None, None, None, None, None, None, None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         trace!("Init HCA status: {:?}", status);
 
         // execute ALLOC_UAR
-        let cmdq_entry = cmdq.create_command(CommandOpcode::AllocUar, None, None, None, None)?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::AllocUar, 
+            None, None, None, None, None, None, None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         trace!("UAR status: {:?}", status);        
@@ -228,11 +261,128 @@ impl ConnectX5Nic {
         let mut event_queue = EventQueue::create(eq_mp)?;
         event_queue.init();
 
-        let cmdq_entry = cmdq.create_command(CommandOpcode::CreateEq, None, Some(eq_pa), Some(uar), Some(7))?;
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::CreateEq, 
+            None, 
+            Some(eq_pa), 
+            Some(uar), 
+            Some(7),
+            None,
+            None,
+            None, None, None, None
+        )?;
         init_segment.post_command(cmdq_entry);
         let status = cmdq.wait_for_command_completion(cmdq_entry)?;
         let eq_number = cmdq.get_eq_number(cmdq_entry)?;
         trace!("Create EQ status: {:?}, number: {}", status, eq_number);
+
+        // execute ALLOC_PD
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::AllocPd, 
+            None, None, None, None, None, None, None, None, None, None
+        )?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let pd = cmdq.get_protection_domain(cmdq_entry)?;
+        trace!("Alloc PD status: {:?}, protection domain num: {}", status, pd);
+
+        // execute ALLOC_TRANSPORT_DOMAIN
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::AllocTransportDomain, 
+            None, None, None, None, None, None, None, None, None, None
+        )?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let td = cmdq.get_transport_domain(cmdq_entry)?;
+        trace!("Alloc TD status: {:?}, transport domain num: {}", status, td);
+
+        // execute QUERY_SPECIAL_CONTEXTS
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::QuerySpecialContexts, 
+            None, None, None, None, None, None, None, None, None, None
+        )?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let rlkey = cmdq.get_reserved_lkey(cmdq_entry)?;
+        trace!("Query Special Contexts status: {:?}, rlkey: {}", status, rlkey);
+        
+        // execute CREATE_CQ for page request event
+        // Allocate pages for CQ
+        let num_cq_pages = 1;
+        let mut cq_mp = Vec::with_capacity(num_cq_pages as usize);
+        let mut cq_pa = Vec::with_capacity(num_cq_pages as usize);
+        for _ in 0..num_cq_pages {
+            let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+            cq_mp.push(page);
+            cq_pa.push(pa);
+        }
+        // Allocate page for doorbell
+        let (db_page, db_pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+        
+        // Initialize the CQ
+        let mut completion_queue = CompletionQueue::create(cq_mp, db_page)?;
+        completion_queue.init();
+
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::CreateCq, 
+            None, 
+            Some(cq_pa), 
+            Some(uar), 
+            Some(0),
+            Some(eq_number),
+            Some(db_pa),
+            None, None, None, None
+        )?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let cq_number = cmdq.get_cq_number(cmdq_entry)?;
+        trace!("Create CQ status: {:?}, number: {}", status, cq_number);
+
+        // execute CREATE_TIS
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::CreateTis, 
+            None, None, None, None, None, None, 
+            Some(td),
+            None, None, None
+        )?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let tisn = cmdq.get_tis_context_number(cmdq_entry)?;
+        trace!("Create TIS status: {:?}, tisn: {}", status, tisn);
+
+        // execute CREATE_SQ for page request event
+        // Allocate pages for SQ
+        let num_sq_pages = 2;
+        let mut sq_mp = Vec::with_capacity(num_sq_pages as usize);
+        let mut sq_pa = Vec::with_capacity(num_sq_pages as usize);
+        for _ in 0..num_sq_pages {
+            let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+            sq_mp.push(page);
+            sq_pa.push(pa);
+        }
+        // Allocate page for doorbell
+        let (db_page, db_pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+        
+        // Create the SQ
+        let send_queue = SendQueue::create(sq_mp, db_page)?;
+
+        let cmdq_entry = cmdq.create_command(
+            CommandOpcode::CreateSq, 
+            None, 
+            Some(sq_pa), 
+            Some(uar), 
+            Some(7),
+            None,
+            Some(db_pa),
+            None,
+            Some(cq_number), 
+            Some(tisn), 
+            Some(pd)
+        )?;
+        init_segment.post_command(cmdq_entry);
+        let status = cmdq.wait_for_command_completion(cmdq_entry)?;
+        let sq_number = cmdq.get_send_queue_number(cmdq_entry)?;
+        trace!("Create SQ status: {:?}, number: {}", status, sq_number);
 
         let mlx5_nic = ConnectX5Nic {
             mem_base: mem_base,
@@ -240,7 +390,9 @@ impl ConnectX5Nic {
             command_queue: cmdq, 
             boot_pages: boot_mp,
             init_pages: init_mp,
-            event_queue: event_queue
+            event_queue: event_queue,
+            completion_queue: completion_queue,
+            send_queue: send_queue
         };
         
         let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
