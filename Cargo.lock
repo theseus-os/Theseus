@@ -608,6 +608,7 @@ dependencies = [
  "mpmc",
  "network_manager",
  "pci",
+ "spin 0.9.0",
  "storage_manager",
 ]
 
@@ -1108,6 +1109,7 @@ dependencies = [
  "bare-io",
  "delegate",
  "lazy_static",
+ "lockable",
  "log",
  "spin 0.9.0",
 ]
@@ -1129,7 +1131,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#253d482f1c1192181f6db1e12296edab00661095"
+source = "git+https://github.com/theseus-os/irq_safety#598d714463fbf07555f3359358662e00a7a8baee"
 dependencies = [
  "owning_ref",
  "spin 0.9.0",
@@ -1342,6 +1344,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd96ffd135b2fd7b973ac026d28085defbe8983df057ced3eb4f2130b0831312"
 dependencies = [
  "scopeguard",
+]
+
+[[package]]
+name = "lockable"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "spin 0.9.0",
 ]
 
 [[package]]

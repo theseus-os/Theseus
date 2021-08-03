@@ -460,8 +460,23 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
+doc: export override RUSTDOCFLAGS += -A private_intra_doc_links
 doc: check_rustc
-	@RUSTDOCFLAGS="$$RUSTDOCFLAGS -A private_intra_doc_links" cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+## Build the docs for select library crates, namely those not hosted online.
+## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/cow_arc/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/debugit/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dfqueue/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/keycodes_ascii/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
+## Now, build the docs for all of Theseus's main kernel crates.
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
@@ -606,10 +621,14 @@ help:
 ##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
 
-## Specify a basic machine/platform, which currently is the `q35` machine
-## because it's the only one that supports a guest OS vIOMMU: <https://wiki.qemu.org/Features/VT-d>
 QEMU_FLAGS ?=
-QEMU_FLAGS += -machine q35,kernel-irqchip=split 
+
+ifdef IOMMU
+## Currently only the `q35` machine model supports a virtual IOMMU: <https://wiki.qemu.org/Features/VT-d>
+	QEMU_FLAGS += -machine q35,kernel-irqchip=split
+	QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
+endif
+
 ## Boot from the cd-rom drive
 QEMU_FLAGS += -cdrom $(iso) -boot d
 ## Don't reboot or shutdown upon failure or a triple reset
@@ -688,9 +707,6 @@ ifdef vfio
 	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
 endif
 
-## Enable the IOMMU, e.g., Intel VT-d. 
-## See more here: <https://wiki.qemu.org/Features/VT-d>
-QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
 
 
 
