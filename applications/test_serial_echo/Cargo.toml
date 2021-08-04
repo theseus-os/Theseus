@@ -7,9 +7,10 @@ build = "../../build.rs"
 
 [dependencies]
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
+log = "0.4.8"
 
-[dependencies.log]
-version = "0.4.8"
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
@@ -20,3 +21,5 @@ path = "../../kernel/task"
 [dependencies.serial_port]
 path = "../../kernel/serial_port"
 
+[dependencies.io]
+path = "../../kernel/io"

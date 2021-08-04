@@ -13,13 +13,14 @@ use super::{AllocatedPages, AllocatedFrames, VirtualAddress};
 use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
 
 
-/// A Page that can be temporarily mapped to the recursive page table frame,
-/// used for purposes of editing a top-level (P4) PageTable itself.
+/// A page that can be temporarily mapped to the recursive page table frame,
+/// used for purposes of editing a top-level (P4) page table itself.
 /// 
 /// See how recursive paging works: <https://wiki.osdev.org/Page_Tables#Recursive_mapping>
 ///
 /// # Note 
-/// Instead of just dropping a `TemporaryPage` object, it should be cleaned up using `unmap_into_parts()`.
+/// Instead of just dropping a `TemporaryPage` object, 
+/// it should be cleaned up (reclaimed) using [`TemporaryPage::unmap_into_parts()`].
 
 pub struct TemporaryPage {
     mapped_page: Option<MappedPages>,
@@ -38,7 +39,7 @@ impl TemporaryPage {
     /// Returns a reference to the now mapped table.
     /// 
     /// # Arguments
-    /// * `frame`: the [`Frame`] containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].     
+    /// * `frame`: the single frame containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].
     /// * `page_table`: the currently active [`PageTable`]. 
     /// 
     pub fn map_table_frame(&mut self, frame: AllocatedFrames, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str> {
@@ -59,7 +60,7 @@ impl TemporaryPage {
     }
 
     /// Call this to clean up a `TemporaryPage` instead of just letting it be dropped.
-    /// A simple wrapper around `MappedPages::unmap_into_parts()`.
+    /// A simple wrapper around [`MappedPages::unmap_into_parts()`].
     ///
     /// This is useful for unmapping pages but still maintaining ownership of the previously-mapped pages and frames
     /// without having them be auto-dropped as normal.

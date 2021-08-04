@@ -36,13 +36,18 @@ const SLAVE_CMD:   u16 = 0xA0;
 const SLAVE_DATA:  u16 = 0xA1;
 
 
+/// The set of status registers for both PIC chips.
+///
 /// Each PIC chip has two interrupt status registers: 
-/// the In-Service Register (ISR) and the Interrupt Request Register (IRR). 
-/// The ISR tells us which interrupts are currently being serviced, meaning IRQs sent to the CPU. 
-/// The IRR tells us which interrupts have been raised, but not necessarily serviced yet. 
+///  * `ISR`: the In-Service Register: specifies which interrupts are currently being serviced,
+///     meaning IRQs sent to the CPU. 
+///  * `IRR`: the Interrupt Request Register: specifies which interrupts have been raised
+///     but not necessarily serviced yet.
+///
 /// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU, 
 /// at which point they are marked in the ISR.
-/// see http://wiki.osdev.org/8259_PIC#ISR_and_IRR
+///
+/// For more, [see this explanation](http://wiki.osdev.org/8259_PIC#ISR_and_IRR).
 pub struct IrqStatusRegisters {
     pub master_isr: u8,
     pub master_irr: u8,

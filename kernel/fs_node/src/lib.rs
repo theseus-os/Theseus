@@ -83,7 +83,7 @@ pub trait Directory : FsNode {
     /// Gets either the file or directory in this `Directory`  on its name.
     fn get(&self, name: &str) -> Option<FileOrDir>;
 
-    /// Like [`get()`], but only looks for files matching the given `name` in this `Directory`.
+    /// Like [`Directory::get()`], but only looks for **files** matching the given `name` in this `Directory`.
     fn get_file(&self, name: &str) -> Option<FileRef> {
         match self.get(name) {
             Some(FileOrDir::File(f)) => Some(f),
@@ -91,7 +91,7 @@ pub trait Directory : FsNode {
         }
     }
 
-    /// Like [`get()`], but only looks for directories matching the given `name` in this `Directory`.
+    /// Like [`Directory::get()`], but only looks for **directories** matching the given `name` in this `Directory`.
     fn get_dir(&self, name: &str) -> Option<DirRef> {
         match self.get(name) {
             Some(FileOrDir::Dir(d)) => Some(d),
