@@ -330,16 +330,19 @@ impl fmt::Debug for PciLocation {
 
 /// Contains information common to every type of PCI Device,
 /// and offers functions for reading/writing to the PCI configuration space.
+///
+/// For more, see [this partial table](http://wiki.osdev.org/PCI#Class_Codes)
+/// of `class`, `subclass`, and `prog_if` codes, 
 #[derive(Debug)]
 pub struct PciDevice {
     /// the bus, slot, and function number that locates this PCI device in the bus tree.
     pub location: PciLocation,
 
-    /// The class code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    /// The class code, used to determine device type.
     pub class: u8,
-    /// The subclass code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    /// The subclass code, used to determine device type.
     pub subclass: u8,
-    /// The programming interface of this PCI device
+    /// The programming interface of this PCI device, also used to determine device type.
     pub prog_if: u8,
     /// The six Base Address Registers (BARs)
     pub bars: [u32; 6],
@@ -362,7 +365,7 @@ impl PciDevice {
     ///
     /// # Argument
     /// * `bar_index` must be between `0` and `5` inclusively, as each PCI device 
-    /// can only have 6 BARs at the most.  
+    ///   can only have 6 BARs at the most.  
     ///
     /// Note that if the given `BAR` actually indicates it is part of a 64-bit address,
     /// it will be used together with the BAR right above it (`bar + 1`), e.g., `BAR1:BAR0`.

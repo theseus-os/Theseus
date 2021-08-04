@@ -329,11 +329,15 @@ impl fmt::Debug for AdvancedRxDescriptor {
 }
 
 
-/// Advanced Transmit Descriptor used in the Ixgbe driver.
+/// Advanced Transmit Descriptor used by the `ixgbe` NIC driver.
+///
+/// # Two usage modes
 /// It has 2 modes: Read and Write Back, both of which use the whole 128 bits. 
-/// There is one transmit descriptor per transmit buffer that can be converted between these 2 modes.
+/// There is one transmit descriptor per transmit buffer; it can be converted between these 2 modes.
+///
 /// Read contains the addresses that the driver writes.
 /// Write Back contains information the hardware writes on receiving a packet.
+///
 /// More information can be found in the 82599 datasheet.
 #[derive(FromBytes)]
 #[repr(C)]
@@ -342,14 +346,17 @@ pub struct AdvancedTxDescriptor {
     pub packet_buffer_address:  Volatile<u64>,
     /// Length of data buffer
     pub data_len: Volatile<u16>,
-    /// dtyp (Descriptor Type) occupies bits [7:4],
-    /// mac (option to apply LinkSec and time stamp) occupies bits [3:2]
+    /// A multi-part field:
+    /// * `dtyp`: Descriptor Type, occupies bits `[7:4]`,
+    /// * `mac`: options to apply LinkSec and time stamp, occupies bits `[3:2]`.
     pub dtyp_mac_rsv : Volatile<u8>,
     /// Command bits
     pub dcmd:  Volatile<u8>,
-    /// paylen (size in bytes of the data buffer in host memory, not including the fields that the hardware adds) occupies bits [31:14],
-    /// popts (options to offload checksum calculation) occupies bits [13:8],
-    /// sta (status of the descriptor, if it's in use or not) occupies bits [3:0]
+    /// A multi-part field:
+    /// * `paylen`: the size in bytes of the data buffer in host memory.
+    ///   not including the fields that the hardware adds), occupies bits `[31:14]`.
+    /// * `popts`: options to offload checksum calculation, occupies bits `[13:8]`.
+    /// * `sta`: status of the descriptor (whether it's in use or not), occupies bits `[3:0]`.
     pub paylen_popts_cc_idx_sta: Volatile<u32>,
 }
 
