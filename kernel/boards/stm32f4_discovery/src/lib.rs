@@ -4,6 +4,8 @@
 
 cfg_if!{
 if #[cfg(target_vendor = "stm32f407")] {
+    extern crate stm32f4;
+
     use stm32f4::stm32f407;
     use lazy_static::lazy_static;
     use irq_safety::MutexIrqSafe;
@@ -18,10 +20,11 @@ if #[cfg(target_vendor = "stm32f407")] {
     }
 
     pub mod uart;
+    pub mod uart_pointers;
 
     /// Initializes device peripherals for use.
     pub fn init_peripherals () {
-        uart::uart_init();
+        uart_pointers::uart_init(uart_pointers::USART2_BASE);
     }
 }
 }

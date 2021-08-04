@@ -1,16 +1,19 @@
 //! Implements UART specific functionality for the STM32F4 Discovery Board 
 use core::fmt;
-use crate::STM_PERIPHERALS;
+use stm32f4::stm32f407::{usart1, USART1, USART2, USART3, USART6, RCC, GPIOA};
+
+pub const USART1_BASE : *const usart1::RegisterBlock = USART1::ptr();
+pub const USART2_BASE : *const usart1::RegisterBlock = USART2::ptr();
+pub const USART3_BASE : *const usart1::RegisterBlock = USART3::ptr();
+pub const USART6_BASE : *const usart1::RegisterBlock = USART6::ptr();
 
 /// Initialize UART for use.
-pub fn uart_init() {
-    {
-        let p = STM_PERIPHERALS.lock();
-        let uart = &p.USART2;
-
+pub fn uart_init(uart_address: *const usart1::RegisterBlock) {
+    unsafe {
         // initializing gpio
-        let gpioa = &p.GPIOA;
-        let rcc = &p.RCC;
+        let uart = &*uart_address;
+        let gpioa = &*GPIOA::ptr();
+        let rcc = &*RCC::ptr();
 
         // initializing clock
         rcc.ahb1enr.write(|w| w.gpioaen().bit(true));
@@ -44,20 +47,20 @@ pub fn uart_init() {
     }
 }
 
-
-
 /// The `SerialPort` struct implements the Write trait that is necessary for use with uprint! macro.
-pub struct SerialPort; 
+pub struct SerialPort {
+    uart_address: *const usart1::RegisterBlock,
+} 
 
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        {
-            let p = STM_PERIPHERALS.lock();
-            let usart = &p.USART2;
+        
+        unsafe {
+            let uart = &*(self.uart_address);
             for byte in s.as_bytes().iter() {
-                while usart.sr.read().txe().bit_is_clear() {} 
+                while uart.sr.read().txe().bit_is_clear() {} 
 
-                usart.dr.write(|w| w.dr().bits(u16::from(*byte)));
+                uart.dr.write(|w| w.dr().bits(u16::from(*byte)));
             }
         }
         Ok(())
@@ -65,7 +68,28 @@ impl fmt::Write for SerialPort {
 }
 
 impl SerialPort {
-    pub fn get_uart() ->  SerialPort {
-        SerialPort
+    pub fn get_uart(uart_address: *const usart1::RegisterBlock) ->  SerialPort {
+        SerialPort {
+            uart_address,
+        }
     }
+}
+
+/// Macro used to print a formatted string over a serial port on the UART
+#[macro_export]
+macro_rules! uprint {
+    ($serial:expr, $($arg:tt)*) => {
+        $serial.write_fmt(format_args!($($arg)*)).ok()
+    };
+}
+
+/// Implementation of uprintln! inspired by Rust Embedded Discovery Book
+#[macro_export]
+macro_rules! uprintln {
+    ($serial:expr, $fmt:expr) => {
+        uprint!($serial, concat!($fmt, "\n"))
+    };
+    ($serial:expr, $fmt:expr, $($arg:tt)*) => {
+        uprint!($serial, concat!($fmt, "\n"), $($arg)*)
+    };
 }
