@@ -797,11 +797,6 @@
 <span id="794">794</span>
 <span id="795">795</span>
 <span id="796">796</span>
-<span id="797">797</span>
-<span id="798">798</span>
-<span id="799">799</span>
-<span id="800">800</span>
-<span id="801">801</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate offers routines for spawning new tasks</span>
 <span class="doccomment">//! and convenient builder patterns for customizing new tasks. </span>
@@ -968,12 +963,7 @@
     };
     <span class="kw">let</span> <span class="ident">main_func_sec</span> <span class="op">=</span> <span class="ident">main_func_sec_opt</span>.<span class="ident">ok_or</span>(<span class="string">&quot;spawn::new_application_task_builder(): couldn&#39;t find \&quot;main\&quot; function, expected function name like \&quot;&lt;crate_name&gt;::main::&lt;hash&gt;\&quot;\
         --&gt; Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)&quot;</span>)<span class="question-mark">?</span>;
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">space</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>; <span class="comment">// must live as long as main_func, see MappedPages::as_func()</span>
-    <span class="kw">let</span> <span class="ident">main_func</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">mapped_pages</span> <span class="op">=</span> <span class="ident">main_func_sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
-        <span class="ident">mapped_pages</span>.<span class="ident">as_func</span>::<span class="op">&lt;</span><span class="ident">MainFunc</span><span class="op">&gt;</span>(<span class="ident">main_func_sec</span>.<span class="ident">mapped_pages_offset</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">space</span>)<span class="question-mark">?</span>
-    };
+    <span class="kw">let</span> <span class="ident">main_func</span> <span class="op">=</span> <span class="ident">main_func_sec</span>.<span class="ident">as_func</span>::<span class="op">&lt;</span><span class="ident">MainFunc</span><span class="op">&gt;</span>()<span class="question-mark">?</span>;
 
     <span class="comment">// Create the underlying task builder. </span>
     <span class="comment">// Give it a default name based on the app crate&#39;s name, but that can be changed later. </span>
