@@ -163,12 +163,7 @@ pub fn new_application_task_builder(
     };
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
         --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)")?;
-
-    let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
-    let main_func = {
-        let mapped_pages = main_func_sec.mapped_pages.lock();
-        mapped_pages.as_func::<MainFunc>(main_func_sec.mapped_pages_offset, &mut space)?
-    };
+    let main_func = main_func_sec.as_func::<MainFunc>()?;
 
     // Create the underlying task builder. 
     // Give it a default name based on the app crate's name, but that can be changed later. 

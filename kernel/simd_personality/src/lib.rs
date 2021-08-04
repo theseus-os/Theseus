@@ -159,10 +159,8 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let section_ref1 = simd_app_namespace.get_symbol_starting_with("simd_test::test1::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test1\"")?;
-	let mut space1 = 0;	
-	let (mapped_pages1, mapped_pages_offset1) = (section_ref1.mapped_pages.clone(), section_ref1.mapped_pages_offset);
-	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
-	let _task1 = spawn::new_task_builder(func1, ())
+	let func1: &SimdTestFunc = section_ref1.as_func()?;
+	let _task1 = spawn::new_task_builder(*func1, ())
 		.name(format!("simd_test_1-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
@@ -173,10 +171,8 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let section_ref2 = simd_app_namespace.get_symbol_starting_with("simd_test::test2::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test2\"")?;
-	let mut space2 = 0;	
-	let (mapped_pages2, mapped_pages_offset2) = (section_ref2.mapped_pages.clone(), section_ref2.mapped_pages_offset);
-	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
-	let _task2 = spawn::new_task_builder(func, ())
+	let func2: &SimdTestFunc = section_ref2.as_func()?;
+	let _task2 = spawn::new_task_builder(*func2, ())
 		.name(format!("simd_test_2-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
@@ -187,10 +183,8 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let section_ref3 = simd_app_namespace.get_symbol_starting_with("simd_test::test_short::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test_short\"")?;
-	let mut space3 = 0;	
-	let (mapped_pages3, mapped_pages_offset3) = (section_ref3.mapped_pages.clone(), section_ref3.mapped_pages_offset);
-	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
-	let _task3 = spawn::new_task_builder(func, ())
+	let func3: &SimdTestFunc = section_ref3.as_func()?;
+	let _task3 = spawn::new_task_builder(*func3, ())
 		.name(format!("simd_test_short-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
