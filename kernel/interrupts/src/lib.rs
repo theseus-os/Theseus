@@ -345,15 +345,7 @@ extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackF
     // trace!("COM2 serial handler");
 
     use serial_port::{SerialPortAddress::COM2, get_serial_port};
-    let com2_port = get_serial_port(COM2);
-    // NOTE: we cannot hold serial port lock while issuing a log statement.
-
-    // Read multiple bytes at once. DO NOT use a blocking read operation in an interrupt handler. 
-    let mut buf: [u8; 50] = [0; 50];
-    let bytes_read = com2_port.lock().in_bytes(&mut buf);
-    if bytes_read > 0 {
-        trace!("    Read {} bytes from COM2: {:X?})", bytes_read, &buf[..bytes_read]);
-    }
+    serial_port::handle_receive_interrupt(get_serial_port(COM2));
 
     eoi(Some(PIC_MASTER_OFFSET + 0x3));
 }
@@ -365,15 +357,7 @@ extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackF
     // trace!("COM1 serial handler");
 
     use serial_port::{SerialPortAddress::COM1, get_serial_port};
-    let com1_port = get_serial_port(COM1);
-    // NOTE: we cannot hold serial port lock while issuing a log statement.
-
-    // Read multiple bytes at once. DO NOT use a blocking read operation in an interrupt handler. 
-    let mut buf: [u8; 50] = [0; 50];
-    let bytes_read = com1_port.lock().in_bytes(&mut buf);
-    if bytes_read > 0 {
-        trace!("    Read {} bytes from COM1: {:X?})", bytes_read, &buf[..bytes_read]);
-    }
+    serial_port::handle_receive_interrupt(get_serial_port(COM1));
 
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }

@@ -637,8 +637,8 @@ QEMU_FLAGS += -no-reboot -no-shutdown
 QEMU_FLAGS += -s
 ## Enable the serial log to be redirected to the host terminal's stdio, or you can
 ## use `mon:stdio` to have the host terminal forward escape/control sequences to Theseus's serial port.
-QEMU_FLAGS += -serial stdio 
-# QEMU_FLAGS += -serial mon:stdio
+# QEMU_FLAGS += -serial stdio 
+QEMU_FLAGS += -serial mon:stdio
 
 ## Disable the graphical display (for testing headless server functionality)
 ## `-vga none`:      removes the VGA card

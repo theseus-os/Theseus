@@ -6,6 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+log = "0.4.8"
 spin = "0.9.0"
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
 
@@ -14,6 +15,9 @@ path = "../../libs/port_io"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.mpmc]
+path = "../../libs/mpmc"
 
 [lib]
 crate-type = ["rlib"]

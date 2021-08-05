@@ -2416,6 +2416,8 @@ version = "0.1.0"
 dependencies = [
  "bare-io",
  "irq_safety",
+ "log",
+ "mpmc",
  "port_io",
  "spin 0.9.0",
 ]
@@ -2884,6 +2886,15 @@ dependencies = [
  "framebuffer_printer",
  "shapes",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "text_terminal"
+version = "0.1.0"
+dependencies = [
+ "color",
+ "event_types",
+ "log",
 ]
 
 [[package]]

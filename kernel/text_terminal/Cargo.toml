@@ -1,0 +1,20 @@
+[package]
+name = "text_terminal"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "A text-based terminal emulator that supports ANSI, VT100, xterm, and other standards."
+build = "../../build.rs"
+
+[dependencies]
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.color]
+path = "../color"
+
+[dependencies.event_types]
+path = "../event_types"
+
+[lib]
+crate-type = ["rlib"]

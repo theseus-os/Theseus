@@ -4,6 +4,7 @@
 //! * <https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming>
 //! * <https://tldp.org/HOWTO/Modem-HOWTO-4.html>
 //! * <https://wiki.osdev.org/Serial_Ports>
+//! * <https://www.sci.muni.cz/docs/pc/serport.txt>
 //!
 //! # Notes
 //! Some serial port drivers use special cases for transmitting some byte values,
@@ -23,10 +24,12 @@
 
 #![no_std]
 
+#[macro_use] extern crate log;
 extern crate spin;
 extern crate port_io;
 extern crate irq_safety;
 extern crate bare_io;
+extern crate mpmc;
 
 use core::{convert::TryFrom, fmt};
 use port_io::Port;
@@ -50,16 +53,24 @@ pub enum SerialPortAddress {
 impl TryFrom<&str> for SerialPortAddress {
 	type Error = ();
 	fn try_from(s: &str) -> Result<Self, Self::Error> {
-		if s.eq_ignore_ascii_case("COM1") {
-			Ok(Self::COM1)
-		} else if s.eq_ignore_ascii_case("COM2") {
-			Ok(Self::COM2)
-		} else if s.eq_ignore_ascii_case("COM3") {
-			Ok(Self::COM3)
-		} else if s.eq_ignore_ascii_case("COM4") {
-			Ok(Self::COM4)
-		} else {
-			Err(())
+		match s {
+			v if v.eq_ignore_ascii_case("COM1") => Ok(Self::COM1),
+			v if v.eq_ignore_ascii_case("COM2") => Ok(Self::COM2),
+			v if v.eq_ignore_ascii_case("COM3") => Ok(Self::COM3),
+			v if v.eq_ignore_ascii_case("COM4") => Ok(Self::COM4),
+			_ => Err(()),
+		}
+	}
+}
+impl TryFrom<u16> for SerialPortAddress {
+	type Error = ();
+	fn try_from(port: u16) -> Result<Self, Self::Error> {
+		match port {
+			p if p == Self::COM1 as u16 => Ok(Self::COM1),
+			p if p == Self::COM2 as u16 => Ok(Self::COM2),
+			p if p == Self::COM3 as u16 => Ok(Self::COM3),
+			p if p == Self::COM4 as u16 => Ok(Self::COM4),
+			_ => Err(()),
 		}
 	}
 }
@@ -103,6 +114,7 @@ pub struct SerialPort {
     line_status:                Port<u8>,
     _modem_status:              Port<u8>,
     _scratch:                   Port<u8>,
+	data_producer:				Option<mpmc::Queue<u8>>,
 }
 
 impl SerialPort {
@@ -132,6 +144,7 @@ impl SerialPort {
 			line_status:                Port::new(base_port + 5),
 			_modem_status:              Port::new(base_port + 6),
 			_scratch:                   Port::new(base_port + 7),
+			data_producer:              None,
 		};
 
 		// SAFE: we are just accessing this serial port's registers.
@@ -259,10 +272,15 @@ impl SerialPort {
 	}
 
 	/// Return `true` if the serial port has data available to read.
-	#[allow(unused)]
 	#[inline(always)]
 	pub fn data_available(&self) -> bool {
 		self.line_status.read() & 0x01 == 0x01
+	}
+
+	/// Tells this `SerialPort` to push received data bytes
+	/// onto the given queue `producer`. 
+	pub fn set_queue_producer(&mut self, producer: mpmc::Queue<u8>) {
+		self.data_producer = Some(producer);
 	}
 }
 
@@ -302,4 +320,54 @@ impl bare_io::Write for SerialPort {
     fn flush(&mut self) -> bare_io::Result<()> {
         Ok(())
     }    
+}
+
+
+/// This is called from the serial port interrupt handlers 
+/// when data has been received and is ready to read.
+pub fn handle_receive_interrupt(serial_port: &MutexIrqSafe<SerialPort>) {
+	// Read multiple bytes at once. DO NOT use a blocking read operation in an interrupt handler. 
+    // NOTE: we cannot hold serial port lock while issuing a log statement.
+	
+    let mut buf: [u8; 64] = [0; 64];
+	let bytes_read;
+
+	let mut input_was_ignored = false;
+	let mut error_occurred = false;
+	let mut _port_address;
+
+	// scope the lock on `serial_port`
+	{ 
+		let mut sp = serial_port.lock();
+		_port_address = sp.data.port_address();
+		bytes_read = sp.in_bytes(&mut buf);
+		if bytes_read > 0 {
+			if let Some(ref producer) = sp.data_producer {
+				for b in &buf[..bytes_read] {
+					let result = producer.push(*b);
+					error_occurred |= result.is_err();
+				}
+			} 
+			else {
+				input_was_ignored = true; 
+			}
+		}
+	}
+
+	if error_occurred {
+		error!("Failed to enqueue data onto queue for serial port {:#X}", _port_address);
+	}
+
+	if input_was_ignored {
+		trace!("    Read {} bytes from serial port {:#X}: {:X?})", bytes_read, _port_address, &buf[..bytes_read]);
+		notify(serial_port);
+	}
+}
+
+/// Inform the system that bytes have been received on a serial port,
+/// and that the system should spawn a new task, e.g., a terminal,
+/// to handle the incoming data on the serial port.
+fn notify(_serial_port: &MutexIrqSafe<SerialPort>) {
+	// TODO: essentially do what `getty` does on Linux:
+	//       spawn a new terminal with this `serial_port` as the I/O stream.
 }
