@@ -6,7 +6,6 @@
 cfg_if!{
 
 if #[cfg(target_arch="x86_64")] {
-
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate debugit;
@@ -24,6 +23,7 @@ extern crate fs_node;
 extern crate catch_unwind;
 extern crate fault_crate_swap;
 extern crate pause;
+
 
 mod arch_x86_64;
 pub use arch_x86_64::*;
