@@ -790,6 +790,64 @@ impl LoadedSection {
             Err("this source section has a different length than the destination section")
         }
     }
+
+    /// Reinterprets this section's underlying `MappedPages` memory region as an executable function.
+    ///
+    /// The generic `F` parameter is the function type signature itself, e.g., `fn(String) -> u8`.
+    /// 
+    /// Returns a reference to the function that is formed from the underlying memory region,
+    /// with a lifetime dependent upon the lifetime of this section.
+    ///
+    /// # Locking
+    /// Obtains the lock on this section's `MappedPages` object.
+    ///
+    /// # Note
+    /// Ideally, we would use debug information to know the size of the entire function
+    /// and test whether that fits within the bounds of the memory region, rather than just checking
+    /// the size of `F`, the function pointer/signature.
+    /// Without debug information, checking the size is restricted to in-bounds memory safety 
+    /// rather than actual functional correctness. 
+    ///
+    /// # Examples
+    /// Here's how you might call this function:
+    /// ```
+    /// type MyPrintFuncSignature = fn(&str) -> Result<(), &'static str>;
+    /// let section = mod_mgmt::get_symbol_starting_with("my_crate::print::").upgrade().unwrap();
+    /// let print_func: &MyPrintFuncSignature = section.as_func().unwrap();
+    /// print_func("hello there");
+    /// ```
+    /// 
+    pub fn as_func<F>(&self) -> Result<&F, &'static str> {
+        if false {
+            debug!("Requested LoadedSection {:#X?} as function {:?}", self, core::any::type_name::<F>());
+        }
+
+        let mp = self.mapped_pages.lock();
+        // Check flags to make sure these pages are executable (otherwise a page fault would occur when this func is called)
+        if self.typ != SectionType::Text || !mp.flags().is_executable() {
+            error!("Requested LoadedSection as function {:?}, but was not an executable text section! (flags: {:?})",
+                core::any::type_name::<F>(), mp.flags()
+            );
+            return Err("as_func(): section was not an executable text section");
+        }
+
+        // Check that the bounds of this entire section fit within its MappedPages
+        let end = self.mapped_pages_offset + self.size();
+        if end > mp.size_in_bytes() {
+            error!("Requested LoadedSection as function {:?}, but section's end offset ({:X?}) was beyond its MappedPages ({:X?})",
+                core::any::type_name::<F>(), end, mp.size_in_bytes()
+            );
+            return Err("requested type and offset would not fit within the MappedPages bounds");
+        }
+
+        // SAFE: above, we check the section type, executability, and size bounds of its underlying MappedPages
+        //       and tie the lifetime of the returned function reference to this section's lifetime.
+        Ok(unsafe { 
+            core::mem::transmute(
+                &(mp.start_address().value() + self.mapped_pages_offset)
+            )
+        })
+    }
 }
 
 impl fmt::Debug for LoadedSection {
