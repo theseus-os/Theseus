@@ -4,7 +4,7 @@ use log::{Level, Log, Metadata, Record, SetLoggerError};
 use cortex_m_semihosting::hprintln;
 
 #[cfg(target_vendor = "stm32f407")]
-use stm32f4_discovery::{uprint, uprintln, uart::SerialPort};
+use stm32f4_discovery::{uprint, uprintln, uart::{USART2_BASE, SerialPort}};
 use core::fmt::{Write};
 
 /// The static logger instance, an empty struct that implements the `Log` trait.
@@ -38,7 +38,7 @@ impl Log for Logger {
         let line_loc = record.line().unwrap_or(0);
         cfg_if! {
             if #[cfg(target_vendor = "stm32f407")] {
-                let mut serial = SerialPort::get_uart();
+                let mut serial = SerialPort::get_uart(USART2_BASE);
                 let _result = uprintln!(serial, "{}{}:{}: {}",
                     level_str,
                     file_loc,
