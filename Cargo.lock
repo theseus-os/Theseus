@@ -2892,9 +2892,11 @@ dependencies = [
 name = "text_terminal"
 version = "0.1.0"
 dependencies = [
+ "bare-io",
  "bitflags",
  "event_types",
  "log",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2939,9 +2941,9 @@ checksum = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 
 [[package]]
 name = "unicode-width"
-version = "0.1.5"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
+checksum = "9337591893a19b88d8d87f2cec1e73fad5cdfd10e5a6f349f498ad6ea2ffb1e3"
 
 [[package]]
 name = "unicode-xid"
