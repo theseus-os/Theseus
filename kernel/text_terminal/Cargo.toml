@@ -6,12 +6,10 @@ description = "A text-based terminal emulator that supports ANSI, VT100, xterm, 
 build = "../../build.rs"
 
 [dependencies]
+bitflags = "1.1.0"
 
 [dependencies.log]
 version = "0.4.8"
-
-[dependencies.color]
-path = "../color"
 
 [dependencies.event_types]
 path = "../event_types"

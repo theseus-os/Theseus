@@ -2892,7 +2892,7 @@ dependencies = [
 name = "text_terminal"
 version = "0.1.0"
 dependencies = [
- "color",
+ "bitflags",
  "event_types",
  "log",
 ]
