@@ -38,7 +38,7 @@ path = "../state_store"
 [target.'cfg(target_arch = "x86_64")'.dependencies.memory]
 path = "../memory"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies.serial_port]
+[dependencies.serial_port]
 path = "../serial_port"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.stack]

@@ -293,7 +293,8 @@ extern "C" fn main() -> ! {
         }
     }
 
-    logger::init().unwrap();
+    let logger_serial_ports = [serial_port::SerialPortAddress::USART2];  // some servers use COM2 instead. 
+    logger::init(None, &logger_serial_ports).unwrap();
 
     info!("memory and logging initialized");
 

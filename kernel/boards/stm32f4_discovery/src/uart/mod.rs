@@ -1,16 +1,51 @@
 //! Implements UART specific functionality for the STM32F4 Discovery Board 
-use core::fmt;
-use crate::STM_PERIPHERALS;
+use core::{convert::TryFrom, fmt};
+use irq_safety::MutexIrqSafe;
+use spin::Once;
+use stm32f4::stm32f407::{usart1, USART1, USART2, USART3, USART6, RCC, GPIOA};
+
+const USART1_BASE : *const usart1::RegisterBlock = USART1::ptr();
+const USART2_BASE : *const usart1::RegisterBlock = USART2::ptr();
+const USART3_BASE : *const usart1::RegisterBlock = USART3::ptr();
+const USART6_BASE : *const usart1::RegisterBlock = USART6::ptr();
+
+#[derive(Copy, Clone, Debug)]
+pub enum SerialPortAddress {
+    USART1,
+    USART2,
+    USART3,
+    USART6,
+}
+impl TryFrom<&str> for SerialPortAddress {
+	type Error = ();
+	fn try_from(s: &str) -> Result<Self, Self::Error> {
+		if s.eq_ignore_ascii_case("USART1") {
+			Ok(Self::USART1)
+		} else if s.eq_ignore_ascii_case("USART2") {
+			Ok(Self::USART2)
+		} else if s.eq_ignore_ascii_case("USART3") {
+			Ok(Self::USART3)
+		} else if s.eq_ignore_ascii_case("USART6") {
+			Ok(Self::USART6)
+		} else {
+			Err(())
+		}
+	}
+}
+
+static USART1_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+static USART2_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+static USART3_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+static USART6_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+
 
 /// Initialize UART for use.
-pub fn uart_init() {
-    {
-        let p = STM_PERIPHERALS.lock();
-        let uart = &p.USART2;
-
+pub fn uart_init(uart_address: *const usart1::RegisterBlock) {
+    unsafe {
         // initializing gpio
-        let gpioa = &p.GPIOA;
-        let rcc = &p.RCC;
+        let uart = &*uart_address;
+        let gpioa = &*GPIOA::ptr();
+        let rcc = &*RCC::ptr();
 
         // initializing clock
         rcc.ahb1enr.write(|w| w.gpioaen().bit(true));
@@ -44,20 +79,37 @@ pub fn uart_init() {
     }
 }
 
-
+pub fn get_serial_port(
+    serial_port_address: SerialPortAddress
+) -> &'static MutexIrqSafe<SerialPort> {
+    let (sp, address_pointer) = match serial_port_address {
+        SerialPortAddress::USART1 => (&USART1_SERIAL_PORT, USART1_BASE),
+        SerialPortAddress::USART2 => (&USART2_SERIAL_PORT, USART2_BASE),
+        SerialPortAddress::USART3 => (&USART3_SERIAL_PORT, USART3_BASE),
+        SerialPortAddress::USART6 => (&USART6_SERIAL_PORT, USART6_BASE),
+    };
+    sp.call_once(|| {
+        uart_init(address_pointer);
+        MutexIrqSafe::new(SerialPort::new(address_pointer))
+    })
+}
 
 /// The `SerialPort` struct implements the Write trait that is necessary for use with uprint! macro.
-pub struct SerialPort; 
+pub struct SerialPort {
+    uart_address: *const usart1::RegisterBlock,
+} 
+
+unsafe impl Send for SerialPort {}
 
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        {
-            let p = STM_PERIPHERALS.lock();
-            let usart = &p.USART2;
+        
+        unsafe {
+            let uart = &*(self.uart_address);
             for byte in s.as_bytes().iter() {
-                while usart.sr.read().txe().bit_is_clear() {} 
+                while uart.sr.read().txe().bit_is_clear() {} 
 
-                usart.dr.write(|w| w.dr().bits(u16::from(*byte)));
+                uart.dr.write(|w| w.dr().bits(u16::from(*byte)));
             }
         }
         Ok(())
@@ -65,7 +117,28 @@ impl fmt::Write for SerialPort {
 }
 
 impl SerialPort {
-    pub fn get_uart() ->  SerialPort {
-        SerialPort
+    pub fn new(uart_address: *const usart1::RegisterBlock) ->  SerialPort {
+        SerialPort {
+            uart_address,
+        }
     }
+}
+
+/// Macro used to print a formatted string over a serial port on the UART
+#[macro_export]
+macro_rules! uprint {
+    ($serial:expr, $($arg:tt)*) => {
+        $serial.write_fmt(format_args!($($arg)*)).ok()
+    };
+}
+
+/// Implementation of uprintln! inspired by Rust Embedded Discovery Book
+#[macro_export]
+macro_rules! uprintln {
+    ($serial:expr, $fmt:expr) => {
+        uprint!($serial, concat!($fmt, "\n"))
+    };
+    ($serial:expr, $fmt:expr, $($arg:tt)*) => {
+        uprint!($serial, concat!($fmt, "\n"), $($arg)*)
+    };
 }
