@@ -198,8 +198,7 @@ pub extern "C" fn nano_core_start(
     }
     
     // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
-    #[cfg(loadable)] 
-    {
+    #[cfg(loadable)] {
         use mod_mgmt::CrateNamespace;
         println_raw!("nano_core_start(): loading the \"captain\" crate...");     
         let (captain_file, _ns) = try_exit!(CrateNamespace::get_crate_object_file_starting_with(default_namespace, "captain-").ok_or("couldn't find the singular \"captain\" crate object file"));
@@ -213,14 +212,12 @@ pub extern "C" fn nano_core_start(
     // at this point, we load and jump directly to the Captain, which will take it from here. 
     // That's it, the nano_core is done! That's really all it does! 
     println_raw!("nano_core_start(): invoking the captain...");     
-    #[cfg(not(loadable))]
-    {
+    #[cfg(not(loadable))] {
         try_exit!(
             captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
         );
     }
-    #[cfg(loadable)]
-    {
+    #[cfg(loadable)] {
         use alloc::vec::Vec;
         use memory::{MmiRef, MappedPages};
 
@@ -232,10 +229,7 @@ pub extern "C" fn nano_core_start(
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
         type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, stack::Stack, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
-        let mut space = 0;
-        let func: &CaptainInitFunc = {
-            try_exit!(section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space))
-        };
+        let func: &CaptainInitFunc = try_exit!(section.as_func());
 
         try_exit!(
             func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)
