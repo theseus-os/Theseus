@@ -124,21 +124,21 @@ impl SerialPort {
     }
 }
 
-/// Macro used to print a formatted string over a serial port on the UART
-#[macro_export]
-macro_rules! uprint {
-    ($serial:expr, $($arg:tt)*) => {
-        $serial.write_fmt(format_args!($($arg)*)).ok()
-    };
-}
+// /// Macro used to print a formatted string over a serial port on the UART
+// #[macro_export]
+// macro_rules! uprint {
+//     ($serial:expr, $($arg:tt)*) => {
+//         $serial.write_fmt(format_args!($($arg)*)).ok()
+//     };
+// }
 
-/// Implementation of uprintln! inspired by Rust Embedded Discovery Book
-#[macro_export]
-macro_rules! uprintln {
-    ($serial:expr, $fmt:expr) => {
-        uprint!($serial, concat!($fmt, "\n"))
-    };
-    ($serial:expr, $fmt:expr, $($arg:tt)*) => {
-        uprint!($serial, concat!($fmt, "\n"), $($arg)*)
-    };
-}
+// /// Implementation of uprintln! inspired by Rust Embedded Discovery Book
+// #[macro_export]
+// macro_rules! uprintln {
+//     ($serial:expr, $fmt:expr) => {
+//         uprint!($serial, concat!($fmt, "\n"))
+//     };
+//     ($serial:expr, $fmt:expr, $($arg:tt)*) => {
+//         uprint!($serial, concat!($fmt, "\n"), $($arg)*)
+//     };
+// }
