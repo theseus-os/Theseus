@@ -523,6 +523,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cortex-m-semihosting"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bffa6c1454368a6aa4811ae60964c38e6996d397ff8095a8b9211b1c1f749bc"
+dependencies = [
+ "cortex-m 0.7.3",
+]
+
+[[package]]
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
@@ -2611,7 +2620,11 @@ dependencies = [
 name = "serial_port_arm"
 version = "0.1.0"
 dependencies = [
+ "bare-io",
  "cfg-if 1.0.0",
+ "cortex-m-semihosting",
+ "irq_safety 0.0.1",
+ "spin 0.9.0",
  "stm32f4_discovery",
 ]
 
