@@ -30,6 +30,7 @@ extern crate bare_io;
 
 
 use core::cmp::max;
+use core::mem::size_of;
 use core::ops::{Deref, DerefMut};
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
@@ -255,6 +256,17 @@ pub struct Style {
     color_foreground: Color,
     color_background: Color,
 }
+impl Style {
+    fn diff(&self, other: &Style) -> StyleDiff {
+        unimplemented!()
+
+    }
+}
+
+struct StyleDiff<'old, 'new> {
+    old: &'old Style,
+    new: &'new Style,
+}
 
 
 #[test]
@@ -289,7 +301,7 @@ pub enum AnsiStyleCodes {
     Italic,
     /// Underlined text. 
     Underlined,
-    /// The text will blink slowly, under 150 blinks per minute.
+    /// The text will blink at slower rate, under 150 blinks per minute.
     Blink,
     /// The text will blink rapidly at a fast rate, over 150 blinks per minute.
     BlinkRapid,
@@ -432,11 +444,15 @@ impl AnsiStyleCodes {
 
 
 bitflags! {
+    /// The flags that describe the formatting of a given text character.
+    ///
+    /// This set of flags is completely self-contained within each `Unit`
+    /// and does not need to reference any previous `Unit`'s flag as an anchor.
     ///
     /// Note: the order of the flags is the same as the standard ANSI escape codes,
     ///       but the values are not the same because this is a bitfield. 
     #[derive(Default)]
-    pub struct FormatFlags: u16 {
+    pub struct FormatFlags: u8 {
         /// If set, this character is displayed in a bright color, which is sometimes called "bold".
         const BRIGHT                    = 1 << 0;
         /// If set, this character is displayed using a dim or faint color, the opposite of `BRIGHT`.
@@ -475,29 +491,99 @@ bitflags! {
     }
 }
 
-/*
-impl FormatFlags {
-    pub fn to_escape_sequence(self) -> String {
-        let capacity = self.bits().count_ones() * 2;
-        let mut seq = String::with_capacity(capacity as usize);
-        if self.contains(Self::BRIGHT) { seq.push(AnsiFormatCodes::Bright) };
-        seq
-        /*
-        let mut empty = true;
+#[test]
+fn test_bit_diff1() {
+    let old = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::HIDDEN;
+    let new = FormatFlags::STRIKETHROUGH;
+    println!("old: {:?}", old);
+    println!("new: {:?}", new);
+    println!("old - new: {:?}", old-new);
+    println!("new - old: {:?}", new-old);
+}
 
-        if self.contains(Self::BRIGHT) { 
-            args = format_args!("{}", args);
-        } else {
-            panic!("")
+impl FormatFlags {
+    /// The max bit index of the `FormatFlags` type.
+    const MAX_BIT: u32 = 8;
+    
+    /// Returns an [`Iterator`] that yields all of the escape sequence parameters
+    /// needed to transform the terminal's text format (excluding colors)
+    /// from this `FormatFlags` (`self`) to the given `new` `FormatFlags`. 
+    pub fn diff(self, new: FormatFlags) -> FormatFlagsDiff {
+        FormatFlagsDiff::new(self, new)
+    }
+
+    fn bits_that_differ(self, other: FormatFlags) -> FormatFlags {
+        self ^ other
+    }
+
+
+
+
+}
+
+pub struct FormatFlagsDiff {
+    old: FormatFlags,
+    new: FormatFlags,
+    next_bit: u32,
+    num_different_bits: u32,
+    reset_issued: bool,
+}
+impl FormatFlagsDiff {
+    fn new(old: FormatFlags, new: FormatFlags) -> Self {
+        FormatFlagsDiff {
+            old,
+            new,
+            next_bit: 0,
+            num_different_bits: old.bits_that_differ(new).bits().count_ones(),
+            reset_issued: false,
         }
-        args
-        // format_args!("{}{}{}{}{}{}{}{}{}",
-        //     self.contains(other)
-        // )
-        */
     }
 }
-*/
+impl Iterator for FormatFlagsDiff {
+    type Item = Cow<'static, str>;
+    fn next(&mut self) -> Option<Self::Item> {
+        // Optimization: the set of new flags is empty, so we only need to issue one `Reset`. 
+        if self.new.is_empty() && !self.old.is_empty() {
+            self.next_bit = FormatFlags::MAX_BIT;
+            self.reset_issued = true;
+            return Some(AnsiStyleCodes::Reset.to_escape_code());
+        }
+
+        // If there are more bits that differ than bits that are the same,
+        // then it's faster to emit a full `Reset` followed by the parameter for each bit set in `new`.
+        if !self.reset_issued && self.num_different_bits >= FormatFlags::MAX_BIT / 2 {
+            self.reset_issued = true;
+            return Some(AnsiStyleCodes::Reset.to_escape_code());
+        }
+
+
+        TODO FIXME: use the bits_that_differ() function (which is just XOR)
+        to determine which bits need to change.
+        Then, for those bits, just emit the parameter code that corresponds
+        to its value in the `new` bitset
+
+        // If a `Reset` has already been issued (as in the above conditional),
+        // then all we have to do is go through each bit that is set in `new`
+        // and emit that bit's parameter.
+        if self.reset_issued {
+            while self.next_bit < FormatFlags::MAX_BIT {
+                if self.new.bits() & (1 << self.next_bit) != 0 {
+
+
+                }
+            }
+
+        }
+        // If a `Reset` hasn't been issued, we need to go through each bit
+        // that differs between `old` to `new` and issue the proper 
+        else {
+
+        }
+        
+        None
+
+    }
+}
 
 /// The set of colors that can be displayed by a terminal emulator. 
 /// 
