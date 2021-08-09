@@ -33,6 +33,7 @@ use core::cmp::max;
 use core::mem::size_of;
 use core::ops::{Deref, DerefMut};
 use alloc::borrow::Cow;
+use alloc::fmt::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use bare_io::Write;
@@ -242,6 +243,7 @@ impl Character {
 pub struct Unit {
     /// The displayable character(s) held in this `Unit`.
     character: Character,
+    /// The style/formatting with which this `Unit`s character(s) should be displayed.
     style: Style,
 }
 impl Deref for Unit {
@@ -251,23 +253,221 @@ impl Deref for Unit {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Style {
     format_flags: FormatFlags,
-    color_foreground: Color,
-    color_background: Color,
+    /// The color of the text itself. If `None`, the default is used.
+    color_foreground: Option<ForegroundColor>,
+    /// The color behind the text. If `None`, the default is used.
+    color_background: Option<BackgroundColor>,
 }
 impl Style {
-    fn diff(&self, other: &Style) -> StyleDiff {
-        unimplemented!()
-
+    pub fn diff<'old, 'new>(&'old self, other: &'new Style) -> StyleDiff<'old, 'new> {
+        StyleDiff::new(self, other)
     }
 }
 
-struct StyleDiff<'old, 'new> {
+
+/// A representation of the difference between two [`Style`]s.
+/// 
+/// This implements an [`Iterator`] that successively returns the set of 
+/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying 
+/// the `old` style to the `new` style. 
+///
+/// It first iterates over the complex differences in the two [`FormatFlags`],
+/// and then iterates over the remaining differences in color.
+pub struct StyleDiff<'old, 'new> {
+    stage: u8,
+    format_flags_diff: FormatFlagsDiff,
     old: &'old Style,
     new: &'new Style,
 }
+impl<'old, 'new> StyleDiff<'old, 'new> {
+    fn new(old: &'old Style, new: &'new Style) -> Self {
+        let mut format_flags_diff = old.format_flags.diff(new.format_flags);
+        let fg_color_changed = old.color_foreground != new.color_foreground;
+        let bg_color_changed = old.color_background != new.color_background;
+        // Adjust the `FormatFlagsDiff` to account for the 2 possible color diffs.
+        format_flags_diff.max_differences += 2;
+        format_flags_diff.num_differences += fg_color_changed as u32 + bg_color_changed as u32;
+        
+        StyleDiff {
+            stage: 0,
+            format_flags_diff,
+            old,
+            new,
+        }
+    }
+}
+impl<'old, 'new> Iterator for StyleDiff<'old, 'new> {
+    type Item = AnsiStyleCodes;
+    fn next(&mut self) -> Option<Self::Item> {
+        // Stage 0: return all the diffs for the format flags.
+        if self.stage == 0 {
+            if let Some(diff) = self.format_flags_diff.next() {
+                return Some(diff);
+            } else {
+                self.stage = 1;
+            }
+        }
 
+        // Stage 1: return foreground color diff.
+        if self.stage == 1 {
+            self.stage = 2;
+            if self.format_flags_diff.reset_issued {
+                if let Some(fg_new) = self.new.color_foreground {
+                    return Some(AnsiStyleCodes::ForegroundColor(fg_new));
+                }
+            } else {
+                // No reset issued, so manually set the new foreground color.
+                if self.old.color_foreground != self.new.color_foreground {
+                    return self.new.color_foreground
+                        .map(|fg_new| AnsiStyleCodes::ForegroundColor(fg_new))
+                        .or(Some(AnsiStyleCodes::DefaultForegroundColor));
+                }
+            }
+        }
+
+        // Stage 2: return background color diff.
+        if self.stage == 2 {
+            self.stage = 3;
+            if self.format_flags_diff.reset_issued {
+                if let Some(bg_new) = self.new.color_background {
+                    return Some(AnsiStyleCodes::BackgroundColor(bg_new));
+                }
+            } else {
+                // No reset issued, so manually set the new background color.
+                if self.old.color_background != self.new.color_background {
+                    return self.new.color_background
+                        .map(|bg_new| AnsiStyleCodes::BackgroundColor(bg_new))
+                        .or(Some(AnsiStyleCodes::DefaultBackgroundColor));
+                }
+            }
+        }
+
+        // Add new stages here, for handling future additions to `Style`
+
+        None
+    }
+}
+
+pub struct FormatFlagsDiff {
+    old: FormatFlags,
+    new: FormatFlags,
+    /// The bit that should be compared in the next iteration.
+    next_bit: u32,
+    /// A bitmask of the bits that differ between `old` and `new`.
+    bits_that_differ: FormatFlags,
+    /// The number of differences between `old` and `new`.
+    num_differences: u32,
+    /// The maximum number of differences that can possibly exist
+    /// between `old` and `new`.
+    max_differences: u32,
+    /// Whether a `Reset` command has already been issued.
+    reset_issued: bool,
+}
+impl FormatFlagsDiff {
+    fn new(old: FormatFlags, new: FormatFlags) -> Self {
+        let bits_that_differ = old.bits_that_differ(new);
+        let num_different_bits = bits_that_differ.bits().count_ones();
+        FormatFlagsDiff {
+            old,
+            new,
+            next_bit: 0,
+            bits_that_differ,
+            num_differences: num_different_bits,
+            max_differences: FormatFlags::MAX_BIT,
+            reset_issued: false,
+        }
+    }
+}
+
+impl Iterator for FormatFlagsDiff {
+    type Item = AnsiStyleCodes;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next_bit >= FormatFlags::MAX_BIT { return None; }
+
+        // Optimization: the set of new flags is empty, so we only need to issue one `Reset`. 
+        if !self.reset_issued && self.new.is_empty() && !self.old.is_empty() {
+            self.next_bit = FormatFlags::MAX_BIT;
+            self.reset_issued = true;
+            return Some(AnsiStyleCodes::Reset);
+        }
+
+        // If there are more bits that differ than bits that are the same,
+        // then it's faster to emit a full `Reset` followed by the parameter for each bit set in `new`.
+        if !self.reset_issued && self.num_differences >= self.max_differences / 2 {
+            self.reset_issued = true;
+            return Some(AnsiStyleCodes::Reset);
+        }
+
+        // The regular case: iterate to the `next_bit` and return the style code for that bit. 
+        // There are two main cases here:
+        //  1. `Reset` has been issued, so we go through all of the bits that are set in `new`
+        //      and emit an "enabled" style code for each one. 
+        //  2. `Reset` has NOT been issued, so we go through all of the `bits_that_differ`
+        //      and emit a style code for each one. 
+        //      The style code should be "enabled" if the bit is set in `new`, or "disabled" if not.
+        while self.next_bit < FormatFlags::MAX_BIT {
+            let bit_mask = FormatFlags::from_bits_truncate(1 << self.next_bit);
+            if self.reset_issued && self.new.intersects(bit_mask) {
+                // Case 1: `Reset` was issued.
+                self.next_bit += 1;
+                return bit_mask.to_style_code(true);
+            }
+            if !self.reset_issued && self.bits_that_differ.intersects(bit_mask) {
+                // Case 2: `Reset` was NOT issued.
+                self.next_bit += 1;
+                let bit_is_set_in_new = self.new.intersects(bit_mask);
+                return bit_mask.to_style_code(bit_is_set_in_new);
+            }
+
+            self.next_bit += 1;
+        }
+
+        None
+    }
+}
+
+#[test]
+fn test_bit_diff1() {
+    let old = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::INVERSE | FormatFlags::HIDDEN;
+    let new = FormatFlags::STRIKETHROUGH | FormatFlags::INVERSE; // | FormatFlags::BRIGHT;
+    println!("old: {:?}", old);
+    println!("new: {:?}", new);
+    println!("old - new: {:?}", old-new);
+    println!("new - old: {:?}", new-old);
+    println!("old XOR new: {:?}", old.bits_that_differ(new));
+    for code in old.diff(new) {
+        println!("\t{:?}", code);
+    }
+}
+
+#[test]
+fn test_style_diff1() {
+    let old_ff = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::INVERSE | FormatFlags::HIDDEN;
+    let old = Style { 
+        format_flags: old_ff,
+        color_foreground: Some(ForegroundColor(Color::BrightCyan)),
+        color_background: Some(BackgroundColor(Color::Cyan)),
+    };
+
+    // let new_ff = FormatFlags::empty();
+    let new_ff = FormatFlags::BRIGHT | FormatFlags::STRIKETHROUGH | FormatFlags::INVERSE;
+    let new = Style { 
+        format_flags: new_ff,
+        // color_foreground: None,
+        color_foreground: Some(ForegroundColor(Color::BrightCyan)),
+        color_background: Some(BackgroundColor(Color::Cyan)),
+    };
+
+    println!("old: {:?}", old);
+    println!("new: {:?}", new);
+    println!("");
+    for code in old.diff(&new) {
+        println!("\t{:?}", code);
+    }
+}
 
 #[test]
 fn test_size() {
@@ -281,15 +481,16 @@ fn test_size() {
 
 
 
-
 /// The set of all possible ANSI escape codes for setting text style.
 ///
 /// This is also referred to as Select Graphic Rendition (SGR) parameters or Display Attributes.
 ///
-/// Note that terminal emulators may not support all of these codes.
+/// Note that terminal emulators may not support all of these codes;
+/// in general, only the first 9 codes are supported (and their `Not*` variants that disable them).
 ///
 /// See a list of all such parameters here:
 /// <https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters>
+#[derive(Debug)]
 pub enum AnsiStyleCodes {
     /// Resets or clears all styles.
     Reset,
@@ -327,10 +528,10 @@ pub enum AnsiStyleCodes {
     /// The text will be underlined twice.
     /// Note: on some terminals, this disables bold text.
     DoubleUnderlined,
-    /// Disables Bright or Dim.
-    NormalIntensity, 
-    /// Disables Italic or Fraktur.
-    NormalFont,
+    /// Normal font intensity: Disables Bright or Dim.
+    NotBrightNorDim, 
+    /// Normal font sytle: Disables Italic or Fraktur.
+    NotItalicNorFraktur,
     /// Disables Underline or DoubleUnderline.
     NotUnderlined,
     /// Disables Blink or BlinkRapid.
@@ -346,11 +547,11 @@ pub enum AnsiStyleCodes {
     NotStrikethrough,
     /// Set the foreground color: the color the text will be displayed in.
     ForegroundColor(ForegroundColor),
-    /// Sets the foreground color to the default.
+    /// Sets the foreground color back to the default.
     DefaultForegroundColor,
     /// Set the background color: the color displayed behind the text.
-    BackgroundColor(ForegroundColor),
-    /// Sets the background color to the default.
+    BackgroundColor(BackgroundColor),
+    /// Sets the background color back to the default.
     DefaultBackgroundColor,
     /// Disables ProportionalSpacing.
     _NotProportionalSpacing,
@@ -364,80 +565,85 @@ pub enum AnsiStyleCodes {
     NotFramedOrCircled,
     /// Disabled Overlined.
     NotOverlined,
+    /// Any text that is underlined will be 
     UnderlinedColor(UnderlinedColor),
+    /// Sets the underline color back to the default.
     DefaultUnderlinedColor,
-    IdeogramUnderlined,
-    IdeogramDoubleUnderlined,
-    IdeogramOverlined,
-    IdeogramDoubleOverlined,
-    IdeogramStressMarking,
+    _IdeogramUnderlined,
+    _IdeogramDoubleUnderlined,
+    _IdeogramOverlined,
+    _IdeogramDoubleOverlined,
+    _IdeogramStressMarking,
     /// Disables all Ideogram styles.
-    NoIdeogram,
+    NotIdeogram,
     Superscript,
     Subscript,
     /// Disables Superscript or Subscript.
-    NoSuperOrSubscript,
+    NotSuperOrSubscript,
 }
 
 impl AnsiStyleCodes {
     pub fn to_escape_code(self) -> Cow<'static, str> {
         match self {
-            Self::Reset                    => "0".into(),
-            Self::Bright                   => "1".into(),
-            Self::Dim                      => "2".into(),
-            Self::Italic                   => "3".into(),
-            Self::Underlined               => "4".into(),
-            Self::Blink                    => "5".into(),
-            Self::BlinkRapid               => "6".into(),
-            Self::Inverse                  => "7".into(),
-            Self::Hidden                   => "8".into(),
-            Self::Strikethrough            => "9".into(),
-            Self::PrimaryFont              => "10".into(),
-            Self::AlternateFont(0)         => "10".into(),
-            Self::AlternateFont(1)         => "11".into(),
-            Self::AlternateFont(2)         => "12".into(),
-            Self::AlternateFont(3)         => "13".into(),
-            Self::AlternateFont(4)         => "14".into(),
-            Self::AlternateFont(5)         => "15".into(),
-            Self::AlternateFont(6)         => "16".into(),
-            Self::AlternateFont(7)         => "17".into(),
-            Self::AlternateFont(8)         => "18".into(),
-            Self::AlternateFont(_over_9)   => "19".into(),
-            Self::Fraktur                  => "20".into(),
-            Self::DoubleUnderlined         => "21".into(),
-            Self::NormalIntensity          => "22".into(),
-            Self::NormalFont               => "23".into(),
-            Self::NotUnderlined            => "24".into(),
-            Self::NotBlink                 => "25".into(),
-            Self::_ProportionalSpacing     => "26".into(),
-            Self::NotInverse               => "27".into(),
-            Self::NotHidden                => "28".into(),
-            Self::NotStrikethrough         => "29".into(),
-            Self::ForegroundColor(fgc)     => fgc.to_escape_code(), // Covers "30"-"38" and "90"-"97"
-            Self::DefaultForegroundColor   => "39".into(),           
-            Self::BackgroundColor(bgc)     => bgc.to_escape_code(), // Covers "40"-"48" and "100"-"107"
-            Self::DefaultBackgroundColor   => "49".into(),
-            Self::_NotProportionalSpacing  => "50".into(),
-            Self::Framed                   => "51".into(),
-            Self::Circled                  => "52".into(),
-            Self::Overlined                => "53".into(),
-            Self::NotFramedOrCircled       => "54".into(),
-            Self::NotOverlined             => "55".into(),
-            // 56 and 57 are unknown
-            Self::UnderlinedColor(ulc)     => ulc.to_escape_code(), // Covers "58"
-            Self::DefaultUnderlinedColor   => "59".into(),
-            Self::IdeogramUnderlined       => "60".into(),
-            Self::IdeogramDoubleUnderlined => "61".into(),
-            Self::IdeogramOverlined        => "62".into(),
-            Self::IdeogramDoubleOverlined  => "63".into(),
-            Self::IdeogramStressMarking    => "64".into(),
-            Self::NoIdeogram               => "65".into(),
+            Self::Reset                     => "0".into(),
+            Self::Bright                    => "1".into(),
+            Self::Dim                       => "2".into(),
+            Self::Italic                    => "3".into(),
+            Self::Underlined                => "4".into(),
+            Self::Blink                     => "5".into(),
+            Self::BlinkRapid                => "6".into(),
+            Self::Inverse                   => "7".into(),
+            Self::Hidden                    => "8".into(),
+            Self::Strikethrough             => "9".into(),
+            Self::PrimaryFont               => "10".into(),
+            Self::AlternateFont(0)          => "10".into(),
+            Self::AlternateFont(1)          => "11".into(),
+            Self::AlternateFont(2)          => "12".into(),
+            Self::AlternateFont(3)          => "13".into(),
+            Self::AlternateFont(4)          => "14".into(),
+            Self::AlternateFont(5)          => "15".into(),
+            Self::AlternateFont(6)          => "16".into(),
+            Self::AlternateFont(7)          => "17".into(),
+            Self::AlternateFont(8)          => "18".into(),
+            Self::AlternateFont(_9_and_up)  => "19".into(),
+            Self::Fraktur                   => "20".into(),
+            Self::DoubleUnderlined          => "21".into(),
+            Self::NotBrightNorDim           => "22".into(),
+            Self::NotItalicNorFraktur       => "23".into(),
+            Self::NotUnderlined             => "24".into(),
+            Self::NotBlink                  => "25".into(),
+            Self::_ProportionalSpacing      => "26".into(),
+            Self::NotInverse                => "27".into(),
+            Self::NotHidden                 => "28".into(),
+            Self::NotStrikethrough          => "29".into(),
+            Self::ForegroundColor(fgc)      => fgc.to_escape_code(), // Covers "30"-"38" and "90"-"97"
+            Self::DefaultForegroundColor    => "39".into(),           
+            Self::BackgroundColor(bgc)      => bgc.to_escape_code(), // Covers "40"-"48" and "100"-"107"
+            Self::DefaultBackgroundColor    => "49".into(),
+            Self::_NotProportionalSpacing   => "50".into(),
+            Self::Framed                    => "51".into(),
+            Self::Circled                   => "52".into(),
+            Self::Overlined                 => "53".into(),
+            Self::NotFramedOrCircled        => "54".into(),
+            Self::NotOverlined              => "55".into(),
+            // 56 - 57 are unknown
+            Self::UnderlinedColor(ulc)      => ulc.to_escape_code(), // Covers "58"
+            Self::DefaultUnderlinedColor    => "59".into(),
+            Self::_IdeogramUnderlined       => "60".into(),
+            Self::_IdeogramDoubleUnderlined => "61".into(),
+            Self::_IdeogramOverlined        => "62".into(),
+            Self::_IdeogramDoubleOverlined  => "63".into(),
+            Self::_IdeogramStressMarking    => "64".into(),
+            Self::NotIdeogram               => "65".into(),
             // 66 - 72 are unknown
-            Self::Superscript              => "73".into(),
-            Self::Subscript                => "74".into(),
-            Self::NoSuperOrSubscript       => "75".into(),
+            Self::Superscript               => "73".into(),
+            Self::Subscript                 => "74".into(),
+            Self::NotSuperOrSubscript       => "75".into(),
             // 76 - 89 are unknown
-            // 90 - 97 
+            // 90 - 97 are covered by `Self::ForegroundColor`
+            // 98 - 99 are unknown
+            // 100 - 107 are covered by `Self::BackgroundColor`
+            // 108 and up are unknown
         }
     }
 }
@@ -448,9 +654,6 @@ bitflags! {
     ///
     /// This set of flags is completely self-contained within each `Unit`
     /// and does not need to reference any previous `Unit`'s flag as an anchor.
-    ///
-    /// Note: the order of the flags is the same as the standard ANSI escape codes,
-    ///       but the values are not the same because this is a bitfield. 
     #[derive(Default)]
     pub struct FormatFlags: u8 {
         /// If set, this character is displayed in a bright color, which is sometimes called "bold".
@@ -466,124 +669,61 @@ bitflags! {
         /// If set, this character is displayed with inversed/reversed colors:
         /// the foreground character text is displayed using the background color,
         /// while the background is displayed using the foreground color.
-        const INVERSED                  = 1 << 5;
+        const INVERSE                   = 1 << 5;
         /// If set, this character is not displayed at all,
         /// only a blank box (in the specified background color) will be displayed.
         const HIDDEN                    = 1 << 6;
         /// If set, this character is displayed with a strike-through, i.e.,
         /// with a line crossing it out.
         const STRIKETHROUGH             = 1 << 7;
-
-        // const INVERSE                   = 0b0000_0000_0000_0001;
-        // const BOLD                      = 0b0000_0000_0000_0010;
-        // const ITALIC                    = 0b0000_0000_0000_0100;
-        // const BOLD_ITALIC               = 0b0000_0000_0000_0110;
-        // const UNDERLINE                 = 0b0000_0000_0000_1000;
-        // const WRAPLINE                  = 0b0000_0000_0001_0000;
-        // const WIDE_CHAR                 = 0b0000_0000_0010_0000;
-        // const WIDE_CHAR_SPACER          = 0b0000_0000_0100_0000;
-        // const DIM                       = 0b0000_0000_1000_0000;
-        // const DIM_BOLD                  = 0b0000_0000_1000_0010;
-        // const HIDDEN                    = 0b0000_0001_0000_0000;
-        // const STRIKETHROUGH             = 0b0000_0010_0000_0000;
-        // const LEADING_WIDE_CHAR_SPACER  = 0b0000_0100_0000_0000;
-        // const DOUBLE_UNDERLINE          = 0b0000_1000_0000_0000;
     }
-}
-
-#[test]
-fn test_bit_diff1() {
-    let old = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::HIDDEN;
-    let new = FormatFlags::STRIKETHROUGH;
-    println!("old: {:?}", old);
-    println!("new: {:?}", new);
-    println!("old - new: {:?}", old-new);
-    println!("new - old: {:?}", new-old);
 }
 
 impl FormatFlags {
     /// The max bit index of the `FormatFlags` type.
     const MAX_BIT: u32 = 8;
     
-    /// Returns an [`Iterator`] that yields all of the escape sequence parameters
-    /// needed to transform the terminal's text format (excluding colors)
-    /// from this `FormatFlags` (`self`) to the given `new` `FormatFlags`. 
-    pub fn diff(self, new: FormatFlags) -> FormatFlagsDiff {
-        FormatFlagsDiff::new(self, new)
-    }
-
-    fn bits_that_differ(self, other: FormatFlags) -> FormatFlags {
+    /// Returns a bit mask of the bits that differ between `self` and `other`,
+    /// in which the bit is set if that bit was different across `self` vs `other`.
+    ///
+    /// This is merely a bit-wise logical XOR of `self` and `other`. 
+    pub fn bits_that_differ(self, other: FormatFlags) -> FormatFlags {
         self ^ other
     }
 
+    fn diff(self, other: FormatFlags) -> FormatFlagsDiff {
+        FormatFlagsDiff::new(self, other)
+    }
 
-
-
-}
-
-pub struct FormatFlagsDiff {
-    old: FormatFlags,
-    new: FormatFlags,
-    next_bit: u32,
-    num_different_bits: u32,
-    reset_issued: bool,
-}
-impl FormatFlagsDiff {
-    fn new(old: FormatFlags, new: FormatFlags) -> Self {
-        FormatFlagsDiff {
-            old,
-            new,
-            next_bit: 0,
-            num_different_bits: old.bits_that_differ(new).bits().count_ones(),
-            reset_issued: false,
-        }
+    /// Returns the style code required to enable or disable the style
+    /// given by the single bit that is set in this `Format`Flags` (`self`). 
+    /// 
+    /// Returns `None` if more than one bit is set in this `FormatFlags` (`self`).
+    fn to_style_code(self, enable: bool) -> Option<AnsiStyleCodes> {
+        let code = match (self, enable) {
+            (FormatFlags::BRIGHT, true)            => AnsiStyleCodes::Bright,
+            (FormatFlags::BRIGHT, false)           => AnsiStyleCodes::NotBrightNorDim,
+            (FormatFlags::DIM, true)               => AnsiStyleCodes::Dim,
+            (FormatFlags::DIM, false)              => AnsiStyleCodes::NotBrightNorDim,
+            (FormatFlags::ITALIC, true)            => AnsiStyleCodes::Italic,
+            (FormatFlags::ITALIC, false)           => AnsiStyleCodes::NotItalicNorFraktur,
+            (FormatFlags::UNDERLINE, true)         => AnsiStyleCodes::Underlined,
+            (FormatFlags::UNDERLINE, false)        => AnsiStyleCodes::NotUnderlined,
+            (FormatFlags::BLINK, true)             => AnsiStyleCodes::Blink,
+            (FormatFlags::BLINK, false)            => AnsiStyleCodes::NotBlink,
+            (FormatFlags::INVERSE, true)           => AnsiStyleCodes::Inverse,
+            (FormatFlags::INVERSE, false)          => AnsiStyleCodes::NotInverse,
+            (FormatFlags::HIDDEN, true)            => AnsiStyleCodes::Hidden,
+            (FormatFlags::HIDDEN, false)           => AnsiStyleCodes::NotHidden,
+            (FormatFlags::STRIKETHROUGH, true)     => AnsiStyleCodes::Strikethrough,
+            (FormatFlags::STRIKETHROUGH, false)    => AnsiStyleCodes::NotStrikethrough,
+            // When more bit flags exist, add those cases here.
+            _ => return None,
+        };
+        Some(code)
     }
 }
-impl Iterator for FormatFlagsDiff {
-    type Item = Cow<'static, str>;
-    fn next(&mut self) -> Option<Self::Item> {
-        // Optimization: the set of new flags is empty, so we only need to issue one `Reset`. 
-        if self.new.is_empty() && !self.old.is_empty() {
-            self.next_bit = FormatFlags::MAX_BIT;
-            self.reset_issued = true;
-            return Some(AnsiStyleCodes::Reset.to_escape_code());
-        }
 
-        // If there are more bits that differ than bits that are the same,
-        // then it's faster to emit a full `Reset` followed by the parameter for each bit set in `new`.
-        if !self.reset_issued && self.num_different_bits >= FormatFlags::MAX_BIT / 2 {
-            self.reset_issued = true;
-            return Some(AnsiStyleCodes::Reset.to_escape_code());
-        }
-
-
-        TODO FIXME: use the bits_that_differ() function (which is just XOR)
-        to determine which bits need to change.
-        Then, for those bits, just emit the parameter code that corresponds
-        to its value in the `new` bitset
-
-        // If a `Reset` has already been issued (as in the above conditional),
-        // then all we have to do is go through each bit that is set in `new`
-        // and emit that bit's parameter.
-        if self.reset_issued {
-            while self.next_bit < FormatFlags::MAX_BIT {
-                if self.new.bits() & (1 << self.next_bit) != 0 {
-
-
-                }
-            }
-
-        }
-        // If a `Reset` hasn't been issued, we need to go through each bit
-        // that differs between `old` to `new` and issue the proper 
-        else {
-
-        }
-        
-        None
-
-    }
-}
 
 /// The set of colors that can be displayed by a terminal emulator. 
 /// 
@@ -594,6 +734,8 @@ impl Iterator for FormatFlagsDiff {
 /// Finally, the 24-bit color variant accepts standard RGB values. 
 ///
 /// See here for the set of colors: <https://en.wikipedia.org/wiki/ANSI_escape_code#Colors>
+#[derive(Copy, Clone, Debug, PartialEq, Eq
+)]
 pub enum Color {
     /////////////////////// 2-bit Colors //////////////////////
     Black,
@@ -615,7 +757,7 @@ pub enum Color {
     BrightBlue,
     BrightMagenta,
     BrightCyan,
-    /// True white. 
+    /// True pure white. 
     BrightWhite,
 
     /////////////////////// 8-bit Colors //////////////////////
@@ -658,6 +800,9 @@ impl From<u8> for Color {
 }
 
 
+/// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
+/// to set the foreground color (for displayed text).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ForegroundColor(pub Color);
 impl ForegroundColor {
     const ANSI_ESCAPE_FOREGROUND_COLOR: &'static str = "38";
@@ -694,6 +839,10 @@ impl ForegroundColor {
     }
 }
 
+/// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
+/// to set the background color (behind displayed text).
+#[derive(Copy, Clone, Debug, PartialEq, Eq
+)]
 pub struct BackgroundColor(pub Color);
 impl BackgroundColor {
     const ANSI_ESCAPE_BACKGROUND_COLOR: &'static str = "48";
@@ -730,6 +879,10 @@ impl BackgroundColor {
     }
 }
 
+/// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
+/// to set the color of the underline for underlined text.
+#[derive(Copy, Clone, Debug, PartialEq, Eq
+)]
 pub struct UnderlinedColor(pub Color);
 impl UnderlinedColor {
     const ANSI_ESCAPE_UDERLINED_COLOR: &'static str = "58";
@@ -773,6 +926,7 @@ const ANSI_ESCAPE_24_BIT_COLOR: &'static str = "2";
 
 /// The set of ASCII values that are non-printable characters 
 /// and require special handling by a terminal emulator. 
+#[derive(Debug)]
 pub enum AsciiControlCodes {
     /// (BEL) Plays a terminal bell or beep.
     /// `Ctrl + G`, or `'\a'`.
