@@ -253,6 +253,9 @@ impl Deref for Unit {
     }
 }
 
+
+/// The style of text, including formatting and color choice, 
+/// for the character(s) displayed in a `Unit`.
 #[derive(Copy, Clone, Debug)]
 pub struct Style {
     format_flags: FormatFlags,
@@ -351,7 +354,12 @@ impl<'old, 'new> Iterator for StyleDiff<'old, 'new> {
     }
 }
 
-pub struct FormatFlagsDiff {
+/// A representation of the difference between two [`FormatFlags`].
+/// 
+/// This implements an [`Iterator`] that successively returns the set of 
+/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying 
+/// the `old` format to the `new` format. 
+struct FormatFlagsDiff {
     old: FormatFlags,
     new: FormatFlags,
     /// The bit that should be compared in the next iteration.
