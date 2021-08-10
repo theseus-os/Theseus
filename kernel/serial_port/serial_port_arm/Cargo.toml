@@ -1,0 +1,24 @@
+[package]
+name = "serial_port_arm"
+version = "0.1.0"
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cfg-if = "1.0.0"
+
+[target.thumbv7em-stm32f407-theseus-eabi.dependencies.stm32f4_discovery]
+path = "../../boards/stm32f4_discovery"
+
+[target.'cfg(all(target_arch = "arm", target_vendor = "unknown"))'.dependencies]
+spin = "0.9.0"
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
+irq_safety = {path = "../../../libs/irq_safety"}
+
+[target.'cfg(all(target_arch = "arm", target_vendor = "unknown"))'.dependencies.cortex-m-semihosting]
+version = "0.3.7"
+
+[lib]
+crate-type = ["rlib"]

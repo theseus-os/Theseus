@@ -446,6 +446,33 @@ preserve_old_modules:
 	@mv $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
 	cargo clean
 
+### Build for Cortex-m4 targets. Currently it only builds the nanocore.
+arm:
+	cargo build -p nano_core --target thumbv7em-none-eabi --release
+	arm-none-eabi-ld \
+		-T kernellink.ld \
+		--nmagic \
+		-o target/thumbv7em-none-eabi/theseus.bin \
+		target/thumbv7em-none-eabi/release/libnano_core.a
+
+arm-hardware:
+	cargo build -p nano_core --target cfg/thumbv7em-stm32f407-theseus-eabi.json \
+		-Z build-std=core,alloc \
+		-Z build-std-features=compiler-builtins-mem \
+		--release
+	arm-none-eabi-ld \
+		-T kernellink.ld \
+		--nmagic \
+		-o target/thumbv7em-stm32f407-theseus-eabi/theseus.bin \
+		target/thumbv7em-stm32f407-theseus-eabi/release/libnano_core.a
+
+### Run the build for Cortex-m4 with QEMU.
+run-arm: arm
+	@qemu-system-gnuarmeclipse \
+		--board STM32F4-Discovery \
+		-nographic \
+		-semihosting-config enable=on,target=native \
+		-kernel target/thumbv7em-none-eabi/theseus.bin
 
 
 

@@ -1,9 +1,14 @@
 //! Implements platform specific functionalities for the STM32F4_Discovery board, exposing its peripherals and providing ways of interacting with them.
 #![no_std]
+#![feature(const_raw_ptr_to_usize_cast)]
 #[macro_use] extern crate cfg_if;
 
 cfg_if!{
 if #[cfg(target_vendor = "stm32f407")] {
+    extern crate stm32f4;
+    extern crate spin;
+    extern crate irq_safety;
+
     use stm32f4::stm32f407;
     use lazy_static::lazy_static;
     use irq_safety::MutexIrqSafe;
@@ -21,7 +26,6 @@ if #[cfg(target_vendor = "stm32f407")] {
 
     /// Initializes device peripherals for use.
     pub fn init_peripherals () {
-        uart::uart_init();
     }
 }
 }
