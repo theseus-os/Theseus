@@ -36,7 +36,7 @@ use alloc::borrow::Cow;
 use alloc::fmt::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use bare_io::Write;
+use bare_io::{Read, Write};
 use event_types::Event;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -99,11 +99,15 @@ impl Line {
         let mut bytes_written = 0;
 
         for unit in &self.units {
-            /*
-            TODO: implement the `diff` function for `Style`
-            let diff = unit.style.diff(previous_style);
-            bytes_written += diff.write_diff_to(writer)?;
-            */
+            // First, write out the escape sequences first
+            if unit.style != previous_style {
+                for code in unit.style.diff(&previous_style) {
+                    bytes_written += writer.write(code.to_escape_code().as_bytes())?;
+                }
+            }
+            previous_style = unit.style;
+
+            // Then, write out the actual character(s)
             bytes_written += writer.write(match unit.character {
                 Character::Single(ref ch) => ch.encode_utf8(&mut char_encode_buf[..]).as_bytes(),
                 Character::Multi(ref s) => s.as_bytes(),
@@ -112,6 +116,20 @@ impl Line {
         bytes_written += writer.write(b"\n")?;
         
         Ok(bytes_written)
+    }
+}
+
+
+struct TerminalDefaultSettings {
+    pub default_foreground_color: ForegroundColor,
+    pub default_background_color: BackgroundColor,
+}
+impl Default for TerminalDefaultSettings {
+    fn default() -> Self {
+        TerminalDefaultSettings {
+            default_foreground_color: Color::White.into(),
+            default_background_color: Color::Black.into(),
+        }
     }
 }
 
@@ -142,6 +160,8 @@ pub struct TextTerminal<Output: bare_io::Write> {
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_position: ScrollPosition,
 
+    defaults: TerminalDefaultSettings,
+
     // /// The cursor of the terminal.
     // cursor: Cursor,
 
@@ -160,13 +180,39 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     ///
     /// For example, a standard VGA text mode terminal is 80x25 (columns x rows).
     pub fn new(width: u16, height: u16, backend: Output) -> TextTerminal<Output> {
-        TextTerminal {
+        let mut terminal = TextTerminal {
             scrollback_buffer: Vec::new(),
             columns: width,
             rows: height,
             scroll_position: ScrollPosition::default(),
+            defaults: Default::default(),
             backend,
+        };
+
+        // TODO: test printing some formatted text to the terminal
+
+        terminal
+    }
+
+
+    /// Pulls bytes from the given [`Read`]er and handles that stream of bytes
+    /// as input into this terminal.
+    ///
+    /// Returns the number of bytes read from the given reader.
+    pub fn handle_input<R: Read>(&mut self, reader: &mut R) -> bare_io::Result<usize> {
+        const MAX_READ: usize = 64;
+        let mut total_bytes_read = 0;
+        let mut buf = [0; MAX_READ];
+
+        let mut n = MAX_READ;
+        while n == MAX_READ {
+            n = reader.read(&mut buf)?;
+            total_bytes_read += n;
+
+            TODO: do something with the bytes in `buf`
         }
+
+        Ok(total_bytes_read)
     }
 
     /// Resizes this terminal's screen to be `width` columns and `height` rows (lines),
@@ -182,7 +228,7 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
 
     /// Returns the size `(columns, rows)` of this terminal's screen, 
     /// in units of displayable characters.
-    pub fn size(&self) -> (u16, u16) {
+    pub fn screen_size(&self) -> (u16, u16) {
         (self.columns, self.rows)
     }
 
@@ -192,8 +238,6 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     ///
     /// No caching or performance optimizations are used. 
     pub fn flush(&mut self) -> bare_io::Result<usize> {
-
-        // self.backend.write(buf)
         unimplemented!()
     }
 }
@@ -256,7 +300,7 @@ impl Deref for Unit {
 
 /// The style of text, including formatting and color choice, 
 /// for the character(s) displayed in a `Unit`.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Style {
     format_flags: FormatFlags,
     /// The color of the text itself. If `None`, the default is used.
@@ -846,11 +890,15 @@ impl ForegroundColor {
         }
     }
 }
+impl From<Color> for ForegroundColor {
+    fn from(c: Color) -> Self {
+        ForegroundColor(c)
+    }
+}
 
 /// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
 /// to set the background color (behind displayed text).
-#[derive(Copy, Clone, Debug, PartialEq, Eq
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BackgroundColor(pub Color);
 impl BackgroundColor {
     const ANSI_ESCAPE_BACKGROUND_COLOR: &'static str = "48";
@@ -886,11 +934,16 @@ impl BackgroundColor {
         }
     }
 }
+impl From<Color> for BackgroundColor {
+    fn from(c: Color) -> Self {
+        BackgroundColor(c)
+    }
+}
+
 
 /// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
 /// to set the color of the underline for underlined text.
-#[derive(Copy, Clone, Debug, PartialEq, Eq
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct UnderlinedColor(pub Color);
 impl UnderlinedColor {
     const ANSI_ESCAPE_UDERLINED_COLOR: &'static str = "58";
@@ -927,6 +980,12 @@ impl UnderlinedColor {
         }
     }
 }
+impl From<Color> for UnderlinedColor {
+    fn from(c: Color) -> Self {
+        UnderlinedColor(c)
+    }
+}
+
 
 const ANSI_ESCAPE_8_BIT_COLOR: &'static str = "5";
 const ANSI_ESCAPE_24_BIT_COLOR: &'static str = "2";
