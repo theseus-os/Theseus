@@ -1,4 +1,5 @@
-//! Implements platform specific functionalities for the STM32F4_Discovery board, exposing its peripherals and providing ways of interacting with them.
+//! Implements platform specific functionalities for the STM32F4_Discovery board,
+//! exposing its peripherals and providing ways of interacting with them.
 #![no_std]
 #![feature(const_raw_ptr_to_usize_cast)]
 #[macro_use] extern crate cfg_if;
@@ -25,7 +26,11 @@ if #[cfg(target_vendor = "stm32f407")] {
     pub mod uart;
 
     /// Initializes device peripherals for use.
+    /// TODO: As we add support for more peripherals,
+    /// we can figure out how to initialize them together.
+    /// For now however, we initialize te devices individually as needed.
     pub fn init_peripherals () {
+        todo!("For now, peripherals are initialized individually as needed.");
     }
 }
 }

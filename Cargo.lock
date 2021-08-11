@@ -300,6 +300,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "boards"
+version = "0.1.0"
+
+[[package]]
 name = "by_address"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -496,6 +500,15 @@ dependencies = [
  "bitfield",
  "embedded-hal",
  "volatile-register",
+]
+
+[[package]]
+name = "cortex-m-semihosting"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bffa6c1454368a6aa4811ae60964c38e6996d397ff8095a8b9211b1c1f749bc"
+dependencies = [
+ "cortex-m 0.7.3",
 ]
 
 [[package]]
@@ -2525,6 +2538,27 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
+ "cfg-if 1.0.0",
+ "serial_port_arm",
+ "serial_port_x86",
+]
+
+[[package]]
+name = "serial_port_arm"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "cfg-if 1.0.0",
+ "cortex-m-semihosting",
+ "irq_safety",
+ "spin 0.9.0",
+ "stm32f4_discovery",
+]
+
+[[package]]
+name = "serial_port_x86"
+version = "0.1.0"
+dependencies = [
  "bare-io",
  "irq_safety",
  "port_io",
@@ -2801,9 +2835,12 @@ dependencies = [
 name = "stm32f4_discovery"
 version = "0.1.0"
 dependencies = [
+ "bare-io",
  "cfg-if 1.0.0",
  "cortex-m 0.6.7",
+ "irq_safety",
  "lazy_static",
+ "spin 0.9.0",
  "stm32f4",
 ]
 
@@ -3057,16 +3094,6 @@ name = "typenum"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879f6906492a7cd215bfa4cf595b600146ccfac0c79bcbd1f3000162af5e8b06"
-
-[[package]]
-name = "uart"
-version = "0.1.0"
-dependencies = [
- "cfg-if 1.0.0",
- "cortex-m 0.6.7",
- "stm32f4",
- "stm32f4_discovery",
-]
 
 [[package]]
 name = "unicode-width"

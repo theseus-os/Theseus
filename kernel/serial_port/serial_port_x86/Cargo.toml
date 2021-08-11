@@ -13,7 +13,7 @@ bare-io = { version = "0.2.1", features = [ "alloc" ] }
 path = "../../../libs/port_io"
 
 [dependencies.irq_safety]
-path = "../../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [lib]
 crate-type = ["rlib"]
