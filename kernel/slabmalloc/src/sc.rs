@@ -88,11 +88,6 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         new_sc_allocator!(size)
     }
 
-    /// Returns the maximum supported object size of this allocator.
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
     /// Add page to partial list.
     fn insert_partial_slab(&mut self, new_head: &'a mut P) {
         self.slabs.insert_front(new_head);

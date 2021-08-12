@@ -87,11 +87,6 @@ impl SCAllocator {
         new_sc_allocator!(size)
     }
 
-    /// Returns the maximum supported object size of this allocator.
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
     /// Add a page to the partial list
     fn insert_partial(&mut self, new_page: MappedPages8k) {
         self.slabs.push(new_page);
