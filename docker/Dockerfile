@@ -2,7 +2,7 @@
 ### that is sufficient to build Theseus and run it using QEMU.
 
 
-FROM ubuntu:18.04
+FROM ubuntu:21.04
 LABEL author=kevinaboos@gmail.com
 
 
