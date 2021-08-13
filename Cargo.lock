@@ -128,6 +128,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrayvec"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
+
+[[package]]
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
@@ -287,6 +293,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "console",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -295,7 +302,6 @@ dependencies = [
  "interrupts",
  "irq_safety",
  "kernel_config",
- "keycodes_ascii",
  "log",
  "logger",
  "memory",
@@ -385,6 +391,23 @@ version = "0.1.0"
 dependencies = [
  "framebuffer",
  "shapes",
+]
+
+[[package]]
+name = "console"
+version = "0.1.0"
+dependencies = [
+ "async_channel",
+ "bare-io",
+ "io",
+ "irq_safety",
+ "log",
+ "mpmc",
+ "serial_port",
+ "spawn",
+ "spin 0.9.0",
+ "task",
+ "text_terminal",
 ]
 
 [[package]]
@@ -944,7 +967,7 @@ version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "162d18ae5f2e3b90a993d202f1ba17a5633c2484426f8bcae201f86194bacd00"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.4.11",
  "byteorder",
  "fallible-iterator",
  "stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2414,6 +2437,7 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
+ "async_channel",
  "bare-io",
  "irq_safety",
  "port_io",
@@ -2887,6 +2911,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "text_terminal"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "bitflags",
+ "event_types",
+ "log",
+ "unicode-width",
+ "vte",
+]
+
+[[package]]
 name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
@@ -2928,9 +2964,9 @@ checksum = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 
 [[package]]
 name = "unicode-width"
-version = "0.1.5"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
+checksum = "9337591893a19b88d8d87f2cec1e73fad5cdfd10e5a6f349f498ad6ea2ffb1e3"
 
 [[package]]
 name = "unicode-xid"
@@ -3003,6 +3039,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "utf8parse"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
+
+[[package]]
 name = "util"
 version = "0.1.0"
 
@@ -3051,6 +3093,27 @@ version = "0.2.7"
 source = "git+https://github.com/theseus-os/volatile#73a307a2906c9f67fa4b951ce858d642c2fa669b"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "vte"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cbce692ab4ca2f1f3047fcf732430249c0e971bfdd2b234cf2c47ad93af5983"
+dependencies = [
+ "arrayvec 0.5.2",
+ "utf8parse",
+ "vte_generate_state_changes",
+]
+
+[[package]]
+name = "vte_generate_state_changes"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d257817081c7dffcdbab24b9e62d2def62e2ff7d00b1c20062551e6cccc145ff"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
