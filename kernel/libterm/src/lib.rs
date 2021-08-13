@@ -60,8 +60,6 @@ pub struct Terminal {
     /// The terminal's own window.
     pub window: Window,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
-    ///
-    /// TODO: we should really replace this with a Rope data structure.
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
     is_scroll_end: bool,

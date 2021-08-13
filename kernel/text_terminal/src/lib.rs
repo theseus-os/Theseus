@@ -17,7 +17,9 @@
 //! * Handling events delivered from the window manager.
 
 #![no_std]
-#![allow(dead_code)] // TODO: FIXME: remove this once the implementation is complete.
+
+// TODO: FIXME: remove this once the implementation is complete.
+#![allow(dead_code, unused_variables, unused_imports)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -147,7 +149,7 @@ impl Line {
 /// This representation helps avoid huge contiguous dynamic memory allocations. 
 ///
 pub struct TextTerminal<Output> where Output: bare_io::Write {
-    state: TerminalState<Output>,
+    inner: TerminalInner<Output>,
 
     /// The VTE parser for parsing VT100/ANSI/xterm control and escape sequences.
     ///
@@ -157,7 +159,7 @@ pub struct TextTerminal<Output> where Output: bare_io::Write {
     parser: Parser,
 }
 
-struct TerminalState<Output> where Output: bare_io::Write {
+struct TerminalInner<Output> where Output: bare_io::Write {
     /// The buffer of all content that is currently displayed or has been previously displayed
     /// on this terminal's screen, including in-band control and escape sequences.
     /// This is what should be written out directly to the terminal backend.
@@ -203,7 +205,7 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     /// For example, a standard VGA text mode terminal is 80x25 (columns x rows).
     pub fn new(width: u16, height: u16, backend: Output) -> TextTerminal<Output> {
         let mut terminal = TextTerminal {
-            state: TerminalState {
+            inner: TerminalInner {
                 scrollback_buffer: Vec::new(),
                 columns: width,
                 rows: height,
@@ -217,7 +219,7 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
         };
 
         // TODO: test printing some formatted text to the terminal
-        let _ = terminal.state.backend.write(b"Hello from the TextTerminal! This is not yet functional.\n");
+        let _ = terminal.inner.backend.write(b"Hello from the TextTerminal! This is not yet functional.\n");
 
         // TODO: issue a term info command to the terminal backend
         //       to obtain its size, and then resize this new `terminal` accordingly
@@ -234,7 +236,7 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
         let mut total_bytes_read = 0;
         let mut buf = [0; READ_BATCH_SIZE];
 
-        let mut handler = TerminalParserHandler { terminal: &mut self.state };
+        let mut handler = TerminalParserHandler { terminal: &mut self.inner };
 
         // Keep reading for as long as there are more bytes available.
         let mut n = READ_BATCH_SIZE;
@@ -257,14 +259,14 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     ///
     /// Note: values will be adjusted to the minimum width and height of `2`. 
     pub fn resize(&mut self, width: u16, height: u16) {
-        self.state.columns = max(2, width);
-        self.state.rows = max(2, height);
+        self.inner.columns = max(2, width);
+        self.inner.rows = max(2, height);
     }
 
     /// Returns the size `(columns, rows)` of this terminal's screen, 
     /// in units of displayable characters.
     pub fn screen_size(&self) -> (u16, u16) {
-        (self.state.columns, self.state.rows)
+        (self.inner.columns, self.inner.rows)
     }
 
 
@@ -278,7 +280,7 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
 }
 
 struct TerminalParserHandler<'term, Output: bare_io::Write> {
-    terminal: &'term mut TerminalState<Output>,
+    terminal: &'term mut TerminalInner<Output>,
 }
 
 impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Output> {

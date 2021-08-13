@@ -16,12 +16,6 @@ path = "../../libs/port_io"
 git = "https://github.com/theseus-os/irq_safety"
 
 # Dependencies below here are temporary, for console creation testing.
-[dependencies.mpmc]
-path = "../../libs/mpmc"
-
-[dependencies.io]
-path = "../io"
-
 [dependencies.async_channel]
 path = "../async_channel"
 

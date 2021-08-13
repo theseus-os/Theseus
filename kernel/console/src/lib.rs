@@ -83,7 +83,7 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 		serial_port.lock().set_data_sender(sender);
 
 		let _taskref = spawn::new_task_builder(console_entry, (new_console, receiver))
-			.name(alloc::format!("console_{:?}_loop", serial_port_address))
+			.name(alloc::format!("console_loop_{:?}", serial_port_address))
 			.spawn()?;
 	}
 
