@@ -270,8 +270,9 @@ fn parse_nano_core_symbol_file(
     let bss_shndx    = bss_shndx   .ok_or("parse_nano_core_symbol_file(): couldn't find .bss section index")?;
     let shndxs = MainShndx { text_shndx, rodata_shndx, data_shndx, bss_shndx };
 
-    // second, skip ahead to the start of the symbol table 
-    let mut file_iterator = file_iterator.skip_while(|(_line_num, line)|  !line.starts_with("Symbol table"));
+    // second, skip ahead to the start of the symbol table: a line which contains ".symtab" but does NOT contain "SYMTAB"
+    let is_start_of_symbol_table = |line: &str| { line.contains(".symtab") && !line.contains("SYMTAB") };
+    let mut file_iterator = file_iterator.skip_while(|(_line_num, line)|  !is_start_of_symbol_table(line));
     // skip the symbol table start line, e.g., "Symbol table '.symtab' contains N entries:"
     if let Some((_num, _line)) = file_iterator.next() {
         // trace!("SKIPPING LINE {}: {}", _num + 1, _line);
