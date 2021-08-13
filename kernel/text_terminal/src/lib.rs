@@ -17,6 +17,7 @@
 //! * Handling events delivered from the window manager.
 
 #![no_std]
+#![allow(dead_code)] // TODO: FIXME: remove this once the implementation is complete.
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -36,15 +37,12 @@ pub use ansi_style::*;
 
 use core::cmp::max;
 use core::fmt;
-use core::mem::size_of;
-use core::ops::{Deref, DerefMut};
-use alloc::string::{String, ToString};
+use core::ops::{Deref};
+use alloc::string::String;
 use alloc::vec::Vec;
 use bare_io::{Read, Write};
-use event_types::Event;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use vte::{Parser, Perform};
-
 
 
 /// The position ("viewport") that the terminal is currently scrolled to. 
@@ -185,9 +183,9 @@ struct TerminalState<Output> where Output: bare_io::Write {
     /// such as inserting or overwriting a character, deleting text, selecting, etc. 
     cursor: Cursor,
 
-    /// The mode determines what specific action will be taken on receiving an input,
-    /// such as whether we should insert or overwrite new character input. 
-    mode: TerminalMode,
+    // /// The mode determines what specific action will be taken on receiving an input,
+    // /// such as whether we should insert or overwrite new character input. 
+    // mode: TerminalMode,
 
     /// The sink (I/O stream) to which sequences of data are written,
     /// inclusive of all control and escape sequences. 
@@ -212,14 +210,14 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
                 scroll_position: ScrollPosition::default(),
                 tab_size: 4,
                 cursor: Cursor::default(),
-                mode: TerminalMode::default(),
+                // mode: TerminalMode::default(),
                 backend,
             },
             parser: Parser::new(),
         };
 
         // TODO: test printing some formatted text to the terminal
-        let _ = terminal.state.backend.write(b"Hello from the TextTerminal!\n");
+        let _ = terminal.state.backend.write(b"Hello from the TextTerminal! This is not yet functional.\n");
 
         // TODO: issue a term info command to the terminal backend
         //       to obtain its size, and then resize this new `terminal` accordingly
@@ -285,46 +283,45 @@ struct TerminalParserHandler<'term, Output: bare_io::Write> {
 
 impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Output> {
     fn print(&mut self, c: char) {
-        debug!("[PRINT]: char: {:?}", c);
+        // debug!("[PRINT]: char: {:?}", c);
     }
 
     fn execute(&mut self, byte: u8) {
-        debug!("[EXECUTE]: byte: {:#X}", byte);
+        // debug!("[EXECUTE]: byte: {:#X}", byte);
     }
 
     fn hook(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
-        debug!("[HOOK]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
-            _params, _intermediates, _ignore, _action,
-        );
+        // debug!("[HOOK]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
+        //     _params, _intermediates, _ignore, _action,
+        // );
     }
 
     fn put(&mut self, byte: u8) {
-        debug!("[PUT]: byte: {:#X?}", byte);
+        // debug!("[PUT]: byte: {:#X?}", byte);
     }
 
     fn unhook(&mut self) {
-        debug!("[UNHOOK]");
+        // debug!("[UNHOOK]");
     }
 
     fn osc_dispatch(&mut self, _params: &[&[u8]], _bell_terminated: bool) {
-        debug!("[OSC_DISPATCH]: bell_terminated?: {:?},\n\t params: {:X?}",
-            _bell_terminated, _params,
-        );
+        // debug!("[OSC_DISPATCH]: bell_terminated?: {:?},\n\t params: {:X?}",
+        //     _bell_terminated, _params,
+        // );
     }
 
     fn csi_dispatch(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
-        debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
-            _params, _intermediates, _ignore, _action,
-        );
+        // debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
+        //     _params, _intermediates, _ignore, _action,
+        // );
     }
 
     fn esc_dispatch(&mut self, _intermediates: &[u8], _ignore: bool, _byte: u8) {
-        debug!("[ESC_DISPATCH]: intermediates: {:X?}\n\t ignore?: {}, byte: {:#X}",
-            _intermediates, _ignore, _byte,
-        );
+        // debug!("[ESC_DISPATCH]: intermediates: {:X?}\n\t ignore?: {}, byte: {:#X}",
+        //     _intermediates, _ignore, _byte,
+        // );
     }
 }
-
 
 
 
@@ -425,37 +422,5 @@ pub enum CursorStyle {
 impl Default for CursorStyle {
     fn default() -> Self {
         CursorStyle::FilledBox
-    }
-}
-
-
-
-
-
-// TODO: adjust this bitflags, taken from alacritty.
-bitflags! {
-    pub struct TerminalMode: u16 {
-        const SHOW_CURSOR         = 0b00_0000_0000_0001;
-        const APP_CURSOR          = 0b00_0000_0000_0010;
-        const APP_KEYPAD          = 0b00_0000_0000_0100;
-        const MOUSE_REPORT_CLICK  = 0b00_0000_0000_1000;
-        const BRACKETED_PASTE     = 0b00_0000_0001_0000;
-        const SGR_MOUSE           = 0b00_0000_0010_0000;
-        const MOUSE_MOTION        = 0b00_0000_0100_0000;
-        const LINE_WRAP           = 0b00_0000_1000_0000;
-        const LINE_FEED_NEW_LINE  = 0b00_0001_0000_0000;
-        const ORIGIN              = 0b00_0010_0000_0000;
-        const INSERT              = 0b00_0100_0000_0000;
-        const FOCUS_IN_OUT        = 0b00_1000_0000_0000;
-        const ALT_SCREEN          = 0b01_0000_0000_0000;
-        const MOUSE_DRAG          = 0b10_0000_0000_0000;
-        const ANY                 = 0b11_1111_1111_1111;
-        const NONE                = 0;
-    }
-}
-
-impl Default for TerminalMode {
-    fn default() -> TerminalMode {
-        TerminalMode::SHOW_CURSOR | TerminalMode::LINE_WRAP
     }
 }

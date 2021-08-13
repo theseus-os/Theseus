@@ -40,7 +40,7 @@ pub fn start_connection_detection() -> Result<TaskRef, &'static str> {
 
 pub struct Console<I, O> where I: bare_io::Read, O: bare_io::Write {
 	name: String,
-	input: I,
+	_input: I,
 	terminal: TextTerminal<O>,
 }
 
@@ -56,7 +56,7 @@ impl<I, O> Console<I, O> where I: bare_io::Read, O: bare_io::Write {
 	) -> Console<I, O> {
 		Console {
 			name: name.into(),
-			input: input_stream,
+			_input: input_stream,
 			terminal: TextTerminal::new(80, 25, output_stream),
 		}
 	}
@@ -104,11 +104,13 @@ fn console_entry<I, O>(
 			Ok((num_bytes, data)) => {
 				let _res = console.terminal.handle_input(&mut &data[.. (num_bytes as usize)]);
 			}
-			Err(e) => {
-				error!("[LIKELY BUG] Error receiving input data on {:?}. Retrying...", console.name);
+			Err(_e) => {
+				error!("[LIKELY BUG] Error receiving input data on {:?}: {:?}. Retrying...",
+					_e, console.name
+				);
 			}
 		}
 	}	
 
-	Err("console_entry task returned unexpectedly")
+	// Err("console_entry task returned unexpectedly")
 }
