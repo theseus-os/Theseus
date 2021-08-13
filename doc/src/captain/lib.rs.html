@@ -176,6 +176,9 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The main initialization routine and setup logic of the OS. </span>
 <span class="doccomment">//! </span>
@@ -223,6 +226,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">network_manager</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">window_manager</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">multiple_heaps</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">console</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">simd_personality</span>)]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">simd_personality</span>;
 
 
@@ -331,7 +335,9 @@
             .<span class="ident">spawn</span>()<span class="question-mark">?</span>;
     }
 
-    <span class="comment">// Now that initialization is complete, we can spawn the first application(s)</span>
+    <span class="comment">// Now that initialization is complete, we can spawn various system tasks/daemons</span>
+    <span class="comment">// and then the first application(s).</span>
+    <span class="ident">console::start_connection_detection</span>()<span class="question-mark">?</span>;
     <span class="ident">first_application::start</span>()<span class="question-mark">?</span>;
 
     <span class="macro">info!</span>(<span class="string">&quot;captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...&quot;</span>, <span class="ident">bsp_apic_id</span>);

@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["start_connection_detection","Starts a new task that detects new console connections by waiting for new data to be received on serial ports."]],"struct":[["Console",""]]});

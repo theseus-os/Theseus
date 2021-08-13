@@ -134,6 +134,21 @@
 <span id="131">131</span>
 <span id="132">132</span>
 <span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
 </pre><pre class="rust">
 <span class="doccomment">//! CPU-level input/output instructions, including `inb`, `outb`, etc., and</span>
 <span class="doccomment">//! a high level Rust wrapper.</span>
@@ -214,6 +229,11 @@
         <span class="ident">Port</span> { <span class="ident">port</span>: <span class="ident">port</span>, <span class="ident">_phantom</span>: <span class="ident">PhantomData</span> }
     }
 
+    <span class="doccomment">/// Returns the address of this port.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">port_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u16</span> { 
+        <span class="self">self</span>.<span class="ident">port</span>
+    }
+
     <span class="doccomment">/// Read data of size `T` from the port.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
         <span class="kw">unsafe</span> { <span class="ident">T::port_in</span>(<span class="self">self</span>.<span class="ident">port</span>) }
@@ -241,6 +261,11 @@
         <span class="ident">PortReadOnly</span> { <span class="ident">port</span>: <span class="ident">port</span>, <span class="ident">_phantom</span>: <span class="ident">PhantomData</span> }
     }
 
+    <span class="doccomment">/// Returns the address of this port.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">port_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u16</span> { 
+        <span class="self">self</span>.<span class="ident">port</span>
+    }
+
     <span class="doccomment">/// Read data of size `T` from the port.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span> {
         <span class="kw">unsafe</span> { <span class="ident">T::port_in</span>(<span class="self">self</span>.<span class="ident">port</span>) }
@@ -260,6 +285,11 @@
     <span class="doccomment">/// Create a new read-only I/O port.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">port</span>: <span class="ident">u16</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PortWriteOnly</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">PortWriteOnly</span> { <span class="ident">port</span>: <span class="ident">port</span>, <span class="ident">_phantom</span>: <span class="ident">PhantomData</span> }
+    }
+
+    <span class="doccomment">/// Returns the address of this port.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">port_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u16</span> { 
+        <span class="self">self</span>.<span class="ident">port</span>
     }
 
     <span class="doccomment">/// Write data of size `T` to the port.</span>
