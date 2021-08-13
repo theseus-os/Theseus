@@ -24,17 +24,34 @@
 
 #![no_std]
 
-#[macro_use] extern crate log;
 extern crate spin;
 extern crate port_io;
 extern crate irq_safety;
 extern crate bare_io;
-extern crate mpmc;
 
-use core::{convert::TryFrom, fmt};
+use core::{convert::TryFrom, fmt::{self, Write}, str::FromStr};
 use port_io::Port;
 use irq_safety::MutexIrqSafe;
 use spin::Once;
+
+
+// Dependencies below here are temporary and will be removed
+// after we have support for separate interrupt handling tasks.
+extern crate mpmc;
+extern crate async_channel;
+use async_channel::Sender;
+
+/// A temporary hack to allow the serial port interrupt handler
+/// to inform a listener on the other end of this channel
+/// that a new connection has been detected on one of the serial ports,
+/// i.e., that it received some data on a serial port that 
+/// didn't expect it or wasn't yet set up to handle incoming data.
+pub fn set_connection_listener(
+	sender: Sender<SerialPortAddress>
+) -> &'static Sender<SerialPortAddress> {
+	NEW_CONNECTION_NOTIFIER.call_once(|| sender)
+}
+static NEW_CONNECTION_NOTIFIER: Once<Sender<SerialPortAddress>> = Once::new();
 
 
 /// The base port I/O addresses for COM serial ports.
@@ -60,6 +77,12 @@ impl TryFrom<&str> for SerialPortAddress {
 			v if v.eq_ignore_ascii_case("COM4") => Ok(Self::COM4),
 			_ => Err(()),
 		}
+	}
+}
+impl FromStr for SerialPortAddress {
+	type Err = ();
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Self::try_from(s)
 	}
 }
 impl TryFrom<u16> for SerialPortAddress {
@@ -106,6 +129,7 @@ pub fn get_serial_port(
 ///
 /// TODO: use PortReadOnly and PortWriteOnly to set permissions for each register.
 pub struct SerialPort {
+	/// The data port, for receiving and transmitting data.
     data:                       Port<u8>,
     interrupt_enable:           Port<u8>,
     interrupt_id_fifo_control:  Port<u8>,
@@ -114,6 +138,8 @@ pub struct SerialPort {
     line_status:                Port<u8>,
     _modem_status:              Port<u8>,
     _scratch:                   Port<u8>,
+	/// The queue endpoint to which received data will be pushed.
+	/// If `None`, received data will be ignored and a warning printed.
 	data_producer:				Option<mpmc::Queue<u8>>,
 }
 
@@ -271,7 +297,7 @@ impl SerialPort {
 		self.line_status.read() & 0x20 == 0x20
 	}
 
-	/// Return `true` if the serial port has data available to read.
+	/// Returns `true` if the serial port has data available to read.
 	#[inline(always)]
 	pub fn data_available(&self) -> bool {
 		self.line_status.read() & 0x01 == 0x01
@@ -279,8 +305,14 @@ impl SerialPort {
 
 	/// Tells this `SerialPort` to push received data bytes
 	/// onto the given queue `producer`. 
-	pub fn set_queue_producer(&mut self, producer: mpmc::Queue<u8>) {
-		self.data_producer = Some(producer);
+	///
+	/// If a queue producer already existed, it is replaced
+	/// by the given `producer` and returned.
+	pub fn set_queue_producer(
+		&mut self,
+		producer: mpmc::Queue<u8>
+	) -> Option<mpmc::Queue<u8>> {
+		self.data_producer.replace(producer)
 	}
 }
 
@@ -325,49 +357,63 @@ impl bare_io::Write for SerialPort {
 
 /// This is called from the serial port interrupt handlers 
 /// when data has been received and is ready to read.
-pub fn handle_receive_interrupt(serial_port: &MutexIrqSafe<SerialPort>) {
+pub fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
 	// Read multiple bytes at once. DO NOT use a blocking read operation in an interrupt handler. 
-    // NOTE: we cannot hold serial port lock while issuing a log statement.
-	
-    let mut buf: [u8; 64] = [0; 64];
+    let mut buf: [u8; 128] = [0; 128];
 	let bytes_read;
 
+	
 	let mut input_was_ignored = false;
 	let mut error_occurred = false;
-	let mut _port_address;
+	let serial_port = get_serial_port(serial_port_address);
 
-	// scope the lock on `serial_port`
+    // NOTE: we cannot hold the serial port lock while issuing a log statement.
 	{ 
 		let mut sp = serial_port.lock();
-		_port_address = sp.data.port_address();
 		bytes_read = sp.in_bytes(&mut buf);
 		if bytes_read > 0 {
 			if let Some(ref producer) = sp.data_producer {
 				for b in &buf[..bytes_read] {
 					let result = producer.push(*b);
-					error_occurred |= result.is_err();
+					if result.is_err() {
+						error_occurred = true;
+						break;
+					}
 				}
-			} 
-			else {
-				input_was_ignored = true; 
+			} else {
+				input_was_ignored = true;
 			}
 		}
 	}
 
 	if error_occurred {
-		error!("Failed to enqueue data onto queue for serial port {:#X}", _port_address);
+		let _result = write!(
+			&mut serial_port.lock(),
+			"Error: failed to enqueue data onto queue for serial port {:?}.\n",
+			serial_port_address
+		);
 	}
 
 	if input_was_ignored {
-		trace!("    Read {} bytes from serial port {:#X}: {:X?})", bytes_read, _port_address, &buf[..bytes_read]);
-		notify(serial_port);
+		if let Some(sender) = NEW_CONNECTION_NOTIFIER.get() {
+			let _result = write!(
+				&mut serial_port.lock(),
+				"Requesting new console to be spawned for this serial port ({:?})\n",
+				serial_port_address
+			);
+			if let Err(err) = sender.try_send(serial_port_address) {
+				let _result = write!(
+					&mut serial_port.lock(),
+					"Error sending request for new console to be spawned for this serial port ({:?}): {:?}\n",
+					serial_port_address, err
+				);
+			}
+		} else {
+			let _result = write!(
+				&mut serial_port.lock(),
+				"Warning: no connection detector; ignoring {}-byte input read from serial port {:?}: {:X?}\n",
+				bytes_read, serial_port_address, &buf[..bytes_read]
+			);
+		}
 	}
-}
-
-/// Inform the system that bytes have been received on a serial port,
-/// and that the system should spawn a new task, e.g., a terminal,
-/// to handle the incoming data on the serial port.
-fn notify(_serial_port: &MutexIrqSafe<SerialPort>) {
-	// TODO: essentially do what `getty` does on Linux:
-	//       spawn a new terminal with this `serial_port` as the I/O stream.
 }

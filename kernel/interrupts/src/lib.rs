@@ -343,10 +343,7 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 /// Note: this IRQ may also be used for COM4, but I haven't seen a machine with a COM4 port yet.
 extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
     // trace!("COM2 serial handler");
-
-    use serial_port::{SerialPortAddress::COM2, get_serial_port};
-    serial_port::handle_receive_interrupt(get_serial_port(COM2));
-
+    serial_port::handle_receive_interrupt(serial_port::SerialPortAddress::COM2);
     eoi(Some(PIC_MASTER_OFFSET + 0x3));
 }
 
@@ -355,10 +352,7 @@ extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackF
 /// Note: this IRQ may also be used for COM3, but I haven't seen a machine with a COM3 port yet.
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
     // trace!("COM1 serial handler");
-
-    use serial_port::{SerialPortAddress::COM1, get_serial_port};
-    serial_port::handle_receive_interrupt(get_serial_port(COM1));
-
+    serial_port::handle_receive_interrupt(serial_port::SerialPortAddress::COM1);
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 

@@ -24,21 +24,26 @@
 extern crate event_types;
 extern crate unicode_width;
 extern crate bare_io;
+extern crate vte;
 
 #[cfg(test)]
 #[macro_use] extern crate std;
 
+mod ansi_colors;
+mod ansi_style;
+pub use ansi_colors::*;
+pub use ansi_style::*;
 
 use core::cmp::max;
+use core::fmt;
 use core::mem::size_of;
 use core::ops::{Deref, DerefMut};
-use alloc::borrow::Cow;
-use alloc::fmt::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use bare_io::{Read, Write};
 use event_types::Event;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use vte::{Parser, Perform};
 
 
 
@@ -94,45 +99,45 @@ impl Line {
     /// Writes this entire `Line` to the given `writer` output stream.
     ///
     /// Returns the total number of bytes written.
-    fn write_line_to<W: Write>(&self, writer: &mut W, mut previous_style: Style) -> bare_io::Result<usize> {
+    fn write_line_to<W: Write>(
+        &self,
+        writer: &mut W,
+        previous_style: Option<Style>
+    ) -> bare_io::Result<usize> {
         let mut char_encode_buf = [0u8; 4];
         let mut bytes_written = 0;
 
+        let mut previous_style = previous_style.unwrap_or_default();
+
         for unit in &self.units {
-            // First, write out the escape sequences first
+            // First, write out the escape sequences for the difference in style.
             if unit.style != previous_style {
-                for code in unit.style.diff(&previous_style) {
-                    bytes_written += writer.write(code.to_escape_code().as_bytes())?;
+                let mut diff_iter = unit.style.diff(&previous_style);
+                // Only write out the escape sequences if there is at least one style difference.
+                if let Some(first_code) = diff_iter.next() {
+                    bytes_written += writer.write(AnsiStyleCodes::ESCAPE_PREFIX)?;
+                    bytes_written += writer.write(first_code.to_escape_code().as_bytes())?;
+                    for code in diff_iter {
+                        bytes_written += writer.write(AnsiStyleCodes::ESCAPE_DELIM)?;
+                        bytes_written += writer.write(code.to_escape_code().as_bytes())?;
+                    }
+                    bytes_written += writer.write(AnsiStyleCodes::ESCAPE_SUFFIX)?;
                 }
             }
             previous_style = unit.style;
 
-            // Then, write out the actual character(s)
+            // Second, write out the actual character(s).
             bytes_written += writer.write(match unit.character {
                 Character::Single(ref ch) => ch.encode_utf8(&mut char_encode_buf[..]).as_bytes(),
                 Character::Multi(ref s) => s.as_bytes(),
             })?;
         }
+        // At the end of the `Line`, write out a newline character.
         bytes_written += writer.write(b"\n")?;
         
         Ok(bytes_written)
     }
 }
-
-
-struct TerminalDefaultSettings {
-    pub default_foreground_color: ForegroundColor,
-    pub default_background_color: BackgroundColor,
-}
-impl Default for TerminalDefaultSettings {
-    fn default() -> Self {
-        TerminalDefaultSettings {
-            default_foreground_color: Color::White.into(),
-            default_background_color: Color::Black.into(),
-        }
-    }
-}
-
 
 
 /// A text-based terminal that supports the ANSI, xterm, VT100, and other standards. 
@@ -143,7 +148,18 @@ impl Default for TerminalDefaultSettings {
 /// such that a `Line` is a `Vec<Unit>`, and the buffer itself is a `Vec<Line>`. 
 /// This representation helps avoid huge contiguous dynamic memory allocations. 
 ///
-pub struct TextTerminal<Output: bare_io::Write> {
+pub struct TextTerminal<Output> where Output: bare_io::Write {
+    state: TerminalState<Output>,
+
+    /// The VTE parser for parsing VT100/ANSI/xterm control and escape sequences.
+    ///
+    /// The event handler for the [`Parser`] is a transient zero-cost object 
+    /// of type [`TerminalParserHandler`] that is created on demand in 
+    /// [`TextTerminal::handle_input()`] every time an input byte needs to be handled.
+    parser: Parser,
+}
+
+struct TerminalState<Output> where Output: bare_io::Write {
     /// The buffer of all content that is currently displayed or has been previously displayed
     /// on this terminal's screen, including in-band control and escape sequences.
     /// This is what should be written out directly to the terminal backend.
@@ -160,10 +176,18 @@ pub struct TextTerminal<Output: bare_io::Write> {
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_position: ScrollPosition,
 
-    defaults: TerminalDefaultSettings,
+    /// The number of spaces a tab character `'\t'` occupies when displayed.
+    tab_size: u16,
 
-    // /// The cursor of the terminal.
-    // cursor: Cursor,
+    /// The cursor of the terminal.
+    ///
+    /// The cursor determines *where* the next input action will be applied to the terminal, 
+    /// such as inserting or overwriting a character, deleting text, selecting, etc. 
+    cursor: Cursor,
+
+    /// The mode determines what specific action will be taken on receiving an input,
+    /// such as whether we should insert or overwrite new character input. 
+    mode: TerminalMode,
 
     /// The sink (I/O stream) to which sequences of data are written,
     /// inclusive of all control and escape sequences. 
@@ -181,35 +205,48 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     /// For example, a standard VGA text mode terminal is 80x25 (columns x rows).
     pub fn new(width: u16, height: u16, backend: Output) -> TextTerminal<Output> {
         let mut terminal = TextTerminal {
-            scrollback_buffer: Vec::new(),
-            columns: width,
-            rows: height,
-            scroll_position: ScrollPosition::default(),
-            defaults: Default::default(),
-            backend,
+            state: TerminalState {
+                scrollback_buffer: Vec::new(),
+                columns: width,
+                rows: height,
+                scroll_position: ScrollPosition::default(),
+                tab_size: 4,
+                cursor: Cursor::default(),
+                mode: TerminalMode::default(),
+                backend,
+            },
+            parser: Parser::new(),
         };
 
         // TODO: test printing some formatted text to the terminal
+        let _ = terminal.state.backend.write(b"Hello from the TextTerminal!\n");
+
+        // TODO: issue a term info command to the terminal backend
+        //       to obtain its size, and then resize this new `terminal` accordingly
 
         terminal
     }
 
-
-    /// Pulls bytes from the given [`Read`]er and handles that stream of bytes
-    /// as input into this terminal.
+    /// Pulls as many bytes as possible from the given [`Read`]er
+    /// and handles that stream of bytes as input into this terminal.
     ///
     /// Returns the number of bytes read from the given reader.
     pub fn handle_input<R: Read>(&mut self, reader: &mut R) -> bare_io::Result<usize> {
-        const MAX_READ: usize = 64;
+        const READ_BATCH_SIZE: usize = 128;
         let mut total_bytes_read = 0;
-        let mut buf = [0; MAX_READ];
+        let mut buf = [0; READ_BATCH_SIZE];
 
-        let mut n = MAX_READ;
-        while n == MAX_READ {
+        let mut handler = TerminalParserHandler { terminal: &mut self.state };
+
+        // Keep reading for as long as there are more bytes available.
+        let mut n = READ_BATCH_SIZE;
+        while n == READ_BATCH_SIZE {
             n = reader.read(&mut buf)?;
             total_bytes_read += n;
 
-            TODO: do something with the bytes in `buf`
+            for byte in &buf[..n] {
+                self.parser.advance(&mut handler, *byte);
+            }
         }
 
         Ok(total_bytes_read)
@@ -222,14 +259,14 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     ///
     /// Note: values will be adjusted to the minimum width and height of `2`. 
     pub fn resize(&mut self, width: u16, height: u16) {
-        self.columns = max(2, width);
-        self.rows = max(2, height);
+        self.state.columns = max(2, width);
+        self.state.rows = max(2, height);
     }
 
     /// Returns the size `(columns, rows)` of this terminal's screen, 
     /// in units of displayable characters.
     pub fn screen_size(&self) -> (u16, u16) {
-        (self.columns, self.rows)
+        (self.state.columns, self.state.rows)
     }
 
 
@@ -242,6 +279,54 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     }
 }
 
+struct TerminalParserHandler<'term, Output: bare_io::Write> {
+    terminal: &'term mut TerminalState<Output>,
+}
+
+impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Output> {
+    fn print(&mut self, c: char) {
+        debug!("[PRINT]: char: {:?}", c);
+    }
+
+    fn execute(&mut self, byte: u8) {
+        debug!("[EXECUTE]: byte: {:#X}", byte);
+    }
+
+    fn hook(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
+        debug!("[HOOK]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
+            _params, _intermediates, _ignore, _action,
+        );
+    }
+
+    fn put(&mut self, byte: u8) {
+        debug!("[PUT]: byte: {:#X?}", byte);
+    }
+
+    fn unhook(&mut self) {
+        debug!("[UNHOOK]");
+    }
+
+    fn osc_dispatch(&mut self, _params: &[&[u8]], _bell_terminated: bool) {
+        debug!("[OSC_DISPATCH]: bell_terminated?: {:?},\n\t params: {:X?}",
+            _bell_terminated, _params,
+        );
+    }
+
+    fn csi_dispatch(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
+        debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
+            _params, _intermediates, _ignore, _action,
+        );
+    }
+
+    fn esc_dispatch(&mut self, _intermediates: &[u8], _ignore: bool, _byte: u8) {
+        debug!("[ESC_DISPATCH]: intermediates: {:X?}\n\t ignore?: {}, byte: {:#X}",
+            _intermediates, _ignore, _byte,
+        );
+    }
+}
+
+
+
 
 /// The character stored in each [`Unit`] of the terminal screen. 
 ///
@@ -251,6 +336,7 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
 /// In the rare case of a character that consist of multiple UTF-8 sequences, e.g., complex emoji,
 /// we store the entire character here as a dynamically-allocated `String`. 
 /// This saves space in the typical case of a character being 4 bytes or less (`char`-sized).
+#[derive(Debug)]
 pub enum Character {
     Single(char),
     Multi(String),
@@ -269,6 +355,19 @@ impl Character {
         }
     }
 }
+impl fmt::Display for Character {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            Character::Single(c) => write!(f, "{}", c),
+            Character::Multi(s)  => write!(f, "{}", s),
+        }
+    }
+}
+impl Default for Character {
+    fn default() -> Self {
+        Character::Single(' ')
+    }
+}
 
 
 /// A `Unit` is a single character block displayed in the terminal.
@@ -284,6 +383,7 @@ impl Character {
 /// Non-displayable control/escape sequences, i.e., bells, backspace, delete, etc,
 /// are **NOT** saved as `Unit`s in the terminal's scrollback buffer,
 /// as they cannot be displayed and are simply transient actions.
+#[derive(Debug, Default)]
 pub struct Unit {
     /// The displayable character(s) held in this `Unit`.
     character: Character,
@@ -298,728 +398,64 @@ impl Deref for Unit {
 }
 
 
-/// The style of text, including formatting and color choice, 
-/// for the character(s) displayed in a `Unit`.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Style {
-    format_flags: FormatFlags,
-    /// The color of the text itself. If `None`, the default is used.
-    color_foreground: Option<ForegroundColor>,
-    /// The color behind the text. If `None`, the default is used.
-    color_background: Option<BackgroundColor>,
-}
-impl Style {
-    pub fn diff<'old, 'new>(&'old self, other: &'new Style) -> StyleDiff<'old, 'new> {
-        StyleDiff::new(self, other)
-    }
+#[derive(Debug, Default)]
+struct Cursor {
+    /// The position of the cursor on the terminal screen,
+    /// given as `(x, y)` where `x` is the line/row index
+    /// and `y` is the column index.
+    position: (u16, u16),
+    /// The character that is beneath the cursor,
+    /// which is possibly occluded by the cursor (depending on its style).
+    underneath: Unit,
+    /// The style of the cursor when it is displayed.
+    style: CursorStyle,
 }
 
-
-/// A representation of the difference between two [`Style`]s.
-/// 
-/// This implements an [`Iterator`] that successively returns the set of 
-/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying 
-/// the `old` style to the `new` style. 
-///
-/// It first iterates over the complex differences in the two [`FormatFlags`],
-/// and then iterates over the remaining differences in color.
-pub struct StyleDiff<'old, 'new> {
-    stage: u8,
-    format_flags_diff: FormatFlagsDiff,
-    old: &'old Style,
-    new: &'new Style,
-}
-impl<'old, 'new> StyleDiff<'old, 'new> {
-    fn new(old: &'old Style, new: &'new Style) -> Self {
-        let mut format_flags_diff = old.format_flags.diff(new.format_flags);
-        let fg_color_changed = old.color_foreground != new.color_foreground;
-        let bg_color_changed = old.color_background != new.color_background;
-        // Adjust the `FormatFlagsDiff` to account for the 2 possible color diffs.
-        format_flags_diff.max_differences += 2;
-        format_flags_diff.num_differences += fg_color_changed as u32 + bg_color_changed as u32;
-        
-        StyleDiff {
-            stage: 0,
-            format_flags_diff,
-            old,
-            new,
-        }
-    }
-}
-impl<'old, 'new> Iterator for StyleDiff<'old, 'new> {
-    type Item = AnsiStyleCodes;
-    fn next(&mut self) -> Option<Self::Item> {
-        // Stage 0: return all the diffs for the format flags.
-        if self.stage == 0 {
-            if let Some(diff) = self.format_flags_diff.next() {
-                return Some(diff);
-            } else {
-                self.stage = 1;
-            }
-        }
-
-        // Stage 1: return foreground color diff.
-        if self.stage == 1 {
-            self.stage = 2;
-            if self.format_flags_diff.reset_issued {
-                if let Some(fg_new) = self.new.color_foreground {
-                    return Some(AnsiStyleCodes::ForegroundColor(fg_new));
-                }
-            } else {
-                // No reset issued, so manually set the new foreground color.
-                if self.old.color_foreground != self.new.color_foreground {
-                    return self.new.color_foreground
-                        .map(|fg_new| AnsiStyleCodes::ForegroundColor(fg_new))
-                        .or(Some(AnsiStyleCodes::DefaultForegroundColor));
-                }
-            }
-        }
-
-        // Stage 2: return background color diff.
-        if self.stage == 2 {
-            self.stage = 3;
-            if self.format_flags_diff.reset_issued {
-                if let Some(bg_new) = self.new.color_background {
-                    return Some(AnsiStyleCodes::BackgroundColor(bg_new));
-                }
-            } else {
-                // No reset issued, so manually set the new background color.
-                if self.old.color_background != self.new.color_background {
-                    return self.new.color_background
-                        .map(|bg_new| AnsiStyleCodes::BackgroundColor(bg_new))
-                        .or(Some(AnsiStyleCodes::DefaultBackgroundColor));
-                }
-            }
-        }
-
-        // Add new stages here, for handling future additions to `Style`
-
-        None
-    }
-}
-
-/// A representation of the difference between two [`FormatFlags`].
-/// 
-/// This implements an [`Iterator`] that successively returns the set of 
-/// [`AnsiStyleCodes`] needed to change a terminal emulator from displaying 
-/// the `old` format to the `new` format. 
-struct FormatFlagsDiff {
-    old: FormatFlags,
-    new: FormatFlags,
-    /// The bit that should be compared in the next iteration.
-    next_bit: u32,
-    /// A bitmask of the bits that differ between `old` and `new`.
-    bits_that_differ: FormatFlags,
-    /// The number of differences between `old` and `new`.
-    num_differences: u32,
-    /// The maximum number of differences that can possibly exist
-    /// between `old` and `new`.
-    max_differences: u32,
-    /// Whether a `Reset` command has already been issued.
-    reset_issued: bool,
-}
-impl FormatFlagsDiff {
-    fn new(old: FormatFlags, new: FormatFlags) -> Self {
-        let bits_that_differ = old.bits_that_differ(new);
-        let num_different_bits = bits_that_differ.bits().count_ones();
-        FormatFlagsDiff {
-            old,
-            new,
-            next_bit: 0,
-            bits_that_differ,
-            num_differences: num_different_bits,
-            max_differences: FormatFlags::MAX_BIT,
-            reset_issued: false,
-        }
-    }
-}
-
-impl Iterator for FormatFlagsDiff {
-    type Item = AnsiStyleCodes;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.next_bit >= FormatFlags::MAX_BIT { return None; }
-
-        // Optimization: the set of new flags is empty, so we only need to issue one `Reset`. 
-        if !self.reset_issued && self.new.is_empty() && !self.old.is_empty() {
-            self.next_bit = FormatFlags::MAX_BIT;
-            self.reset_issued = true;
-            return Some(AnsiStyleCodes::Reset);
-        }
-
-        // If there are more bits that differ than bits that are the same,
-        // then it's faster to emit a full `Reset` followed by the parameter for each bit set in `new`.
-        if !self.reset_issued && self.num_differences >= self.max_differences / 2 {
-            self.reset_issued = true;
-            return Some(AnsiStyleCodes::Reset);
-        }
-
-        // The regular case: iterate to the `next_bit` and return the style code for that bit. 
-        // There are two main cases here:
-        //  1. `Reset` has been issued, so we go through all of the bits that are set in `new`
-        //      and emit an "enabled" style code for each one. 
-        //  2. `Reset` has NOT been issued, so we go through all of the `bits_that_differ`
-        //      and emit a style code for each one. 
-        //      The style code should be "enabled" if the bit is set in `new`, or "disabled" if not.
-        while self.next_bit < FormatFlags::MAX_BIT {
-            let bit_mask = FormatFlags::from_bits_truncate(1 << self.next_bit);
-            if self.reset_issued && self.new.intersects(bit_mask) {
-                // Case 1: `Reset` was issued.
-                self.next_bit += 1;
-                return bit_mask.to_style_code(true);
-            }
-            if !self.reset_issued && self.bits_that_differ.intersects(bit_mask) {
-                // Case 2: `Reset` was NOT issued.
-                self.next_bit += 1;
-                let bit_is_set_in_new = self.new.intersects(bit_mask);
-                return bit_mask.to_style_code(bit_is_set_in_new);
-            }
-
-            self.next_bit += 1;
-        }
-
-        None
-    }
-}
-
-#[test]
-fn test_bit_diff1() {
-    let old = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::INVERSE | FormatFlags::HIDDEN;
-    let new = FormatFlags::STRIKETHROUGH | FormatFlags::INVERSE; // | FormatFlags::BRIGHT;
-    println!("old: {:?}", old);
-    println!("new: {:?}", new);
-    println!("old - new: {:?}", old-new);
-    println!("new - old: {:?}", new-old);
-    println!("old XOR new: {:?}", old.bits_that_differ(new));
-    for code in old.diff(new) {
-        println!("\t{:?}", code);
-    }
-}
-
-#[test]
-fn test_style_diff1() {
-    let old_ff = FormatFlags::BRIGHT | FormatFlags::UNDERLINE | FormatFlags::INVERSE | FormatFlags::HIDDEN;
-    let old = Style { 
-        format_flags: old_ff,
-        color_foreground: Some(ForegroundColor(Color::BrightCyan)),
-        color_background: Some(BackgroundColor(Color::Cyan)),
-    };
-
-    // let new_ff = FormatFlags::empty();
-    let new_ff = FormatFlags::BRIGHT | FormatFlags::STRIKETHROUGH | FormatFlags::INVERSE;
-    let new = Style { 
-        format_flags: new_ff,
-        // color_foreground: None,
-        color_foreground: Some(ForegroundColor(Color::BrightCyan)),
-        color_background: Some(BackgroundColor(Color::Cyan)),
-    };
-
-    println!("old: {:?}", old);
-    println!("new: {:?}", new);
-    println!("");
-    for code in old.diff(&new) {
-        println!("\t{:?}", code);
-    }
-}
-
-#[test]
-fn test_size() {
-    println!("Unit: {}", std::mem::size_of::<Unit>());
-    println!("      Character: {}", std::mem::size_of::<Character>());
-    println!("      Style: {}", std::mem::size_of::<Style>());
-    println!("      FormatFlags: {}", std::mem::size_of::<FormatFlags>());
-    println!("      Color: {}", std::mem::size_of::<Color>());
-}
-
-
-
-
-/// The set of all possible ANSI escape codes for setting text style.
-///
-/// This is also referred to as Select Graphic Rendition (SGR) parameters or Display Attributes.
-///
-/// Note that terminal emulators may not support all of these codes;
-/// in general, only the first 9 codes are supported (and their `Not*` variants that disable them).
-///
-/// See a list of all such parameters here:
-/// <https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_(Select_Graphic_Rendition)_parameters>
 #[derive(Debug)]
-pub enum AnsiStyleCodes {
-    /// Resets or clears all styles.
-    Reset,
-    /// Bright or bold text.
-    Bright,
-    /// Dim or faint text.
-    Dim,
-    /// Italicized text.
-    Italic,
-    /// Underlined text. 
-    Underlined,
-    /// The text will blink at slower rate, under 150 blinks per minute.
-    Blink,
-    /// The text will blink rapidly at a fast rate, over 150 blinks per minute.
-    BlinkRapid,
-    /// The foreground and background colors will be swapped. 
-    /// The text will be displayed using the background color,
-    /// while the background will be displayed using the foreground color. 
-    Inverse,
-    /// The text will be concealed/invisible and not displayed at all.
-    /// Only the solid background color will be displayed. 
-    Hidden,
-    /// The text will be striked through, i.e., crossed out with a line through it.
-    Strikethrough,
-    /// Sets the font to the primary default font.
-    PrimaryFont,
-    /// Sets the font to an alternate font. 
-    /// There are 10 available choices, from `0` to `9`,
-    /// in which `0` is the same as [`Self::PrimaryFont`].
-    AlternateFont(u8),
-    /// Sets the font to be a blackletter font, which is a calligraphic/angular font 
-    /// in a gothic German style rather than the typical Roman/Latin style. 
-    /// Example: <https://git.enlightenment.org/apps/terminology.git/commit/?id=02856cbdec511e08cf579b08e906499d9583f018>
-    Fraktur,
-    /// The text will be underlined twice.
-    /// Note: on some terminals, this disables bold text.
-    DoubleUnderlined,
-    /// Normal font intensity: Disables Bright or Dim.
-    NotBrightNorDim, 
-    /// Normal font sytle: Disables Italic or Fraktur.
-    NotItalicNorFraktur,
-    /// Disables Underline or DoubleUnderline.
-    NotUnderlined,
-    /// Disables Blink or BlinkRapid.
-    NotBlink, 
-    /// Proportional spacing, which sets the Teletex character set: <https://en.wikipedia.org/wiki/ITU_T.61>.
-    /// This is a different text encoding that is not used and has no effect on terminals. 
-    _ProportionalSpacing,
-    /// Disables Inverse: foreground colors and background colors are used as normal.
-    NotInverse,
-    /// Disables Hidden: text is displayed as normal. Sometimes called reveal.
-    NotHidden, 
-    /// Disables Strikethrough: text is not crossed out.
-    NotStrikethrough,
-    /// Set the foreground color: the color the text will be displayed in.
-    ForegroundColor(ForegroundColor),
-    /// Sets the foreground color back to the default.
-    DefaultForegroundColor,
-    /// Set the background color: the color displayed behind the text.
-    BackgroundColor(BackgroundColor),
-    /// Sets the background color back to the default.
-    DefaultBackgroundColor,
-    /// Disables ProportionalSpacing.
-    _NotProportionalSpacing,
-    /// The text will be displayed with a rectangular box surrounding it.
-    Framed,
-    /// The text will be displayed with a circle or oval surrounding it.
-    Circled,
-    /// The text will be overlined: displayed with a line on top (like underlined).
-    Overlined,
-    /// Disables Framed or Circled.
-    NotFramedOrCircled,
-    /// Disabled Overlined.
-    NotOverlined,
-    /// Any text that is underlined will be 
-    UnderlinedColor(UnderlinedColor),
-    /// Sets the underline color back to the default.
-    DefaultUnderlinedColor,
-    _IdeogramUnderlined,
-    _IdeogramDoubleUnderlined,
-    _IdeogramOverlined,
-    _IdeogramDoubleOverlined,
-    _IdeogramStressMarking,
-    /// Disables all Ideogram styles.
-    NotIdeogram,
-    Superscript,
-    Subscript,
-    /// Disables Superscript or Subscript.
-    NotSuperOrSubscript,
+pub enum CursorStyle {
+    /// A rectangle that covers the entire character box. This is the default.
+    FilledBox,
+    /// A line beneath the character box.
+    Underscore,
+    /// A line before (to the left of) the character box.
+    Bar,
+    /// An empty box that surrounds the character but does not occlude it.
+    EmptyBox,
 }
-
-impl AnsiStyleCodes {
-    pub fn to_escape_code(self) -> Cow<'static, str> {
-        match self {
-            Self::Reset                     => "0".into(),
-            Self::Bright                    => "1".into(),
-            Self::Dim                       => "2".into(),
-            Self::Italic                    => "3".into(),
-            Self::Underlined                => "4".into(),
-            Self::Blink                     => "5".into(),
-            Self::BlinkRapid                => "6".into(),
-            Self::Inverse                   => "7".into(),
-            Self::Hidden                    => "8".into(),
-            Self::Strikethrough             => "9".into(),
-            Self::PrimaryFont               => "10".into(),
-            Self::AlternateFont(0)          => "10".into(),
-            Self::AlternateFont(1)          => "11".into(),
-            Self::AlternateFont(2)          => "12".into(),
-            Self::AlternateFont(3)          => "13".into(),
-            Self::AlternateFont(4)          => "14".into(),
-            Self::AlternateFont(5)          => "15".into(),
-            Self::AlternateFont(6)          => "16".into(),
-            Self::AlternateFont(7)          => "17".into(),
-            Self::AlternateFont(8)          => "18".into(),
-            Self::AlternateFont(_9_and_up)  => "19".into(),
-            Self::Fraktur                   => "20".into(),
-            Self::DoubleUnderlined          => "21".into(),
-            Self::NotBrightNorDim           => "22".into(),
-            Self::NotItalicNorFraktur       => "23".into(),
-            Self::NotUnderlined             => "24".into(),
-            Self::NotBlink                  => "25".into(),
-            Self::_ProportionalSpacing      => "26".into(),
-            Self::NotInverse                => "27".into(),
-            Self::NotHidden                 => "28".into(),
-            Self::NotStrikethrough          => "29".into(),
-            Self::ForegroundColor(fgc)      => fgc.to_escape_code(), // Covers "30"-"38" and "90"-"97"
-            Self::DefaultForegroundColor    => "39".into(),           
-            Self::BackgroundColor(bgc)      => bgc.to_escape_code(), // Covers "40"-"48" and "100"-"107"
-            Self::DefaultBackgroundColor    => "49".into(),
-            Self::_NotProportionalSpacing   => "50".into(),
-            Self::Framed                    => "51".into(),
-            Self::Circled                   => "52".into(),
-            Self::Overlined                 => "53".into(),
-            Self::NotFramedOrCircled        => "54".into(),
-            Self::NotOverlined              => "55".into(),
-            // 56 - 57 are unknown
-            Self::UnderlinedColor(ulc)      => ulc.to_escape_code(), // Covers "58"
-            Self::DefaultUnderlinedColor    => "59".into(),
-            Self::_IdeogramUnderlined       => "60".into(),
-            Self::_IdeogramDoubleUnderlined => "61".into(),
-            Self::_IdeogramOverlined        => "62".into(),
-            Self::_IdeogramDoubleOverlined  => "63".into(),
-            Self::_IdeogramStressMarking    => "64".into(),
-            Self::NotIdeogram               => "65".into(),
-            // 66 - 72 are unknown
-            Self::Superscript               => "73".into(),
-            Self::Subscript                 => "74".into(),
-            Self::NotSuperOrSubscript       => "75".into(),
-            // 76 - 89 are unknown
-            // 90 - 97 are covered by `Self::ForegroundColor`
-            // 98 - 99 are unknown
-            // 100 - 107 are covered by `Self::BackgroundColor`
-            // 108 and up are unknown
-        }
+impl Default for CursorStyle {
+    fn default() -> Self {
+        CursorStyle::FilledBox
     }
 }
 
 
+
+
+
+// TODO: adjust this bitflags, taken from alacritty.
 bitflags! {
-    /// The flags that describe the formatting of a given text character.
-    ///
-    /// This set of flags is completely self-contained within each `Unit`
-    /// and does not need to reference any previous `Unit`'s flag as an anchor.
-    #[derive(Default)]
-    pub struct FormatFlags: u8 {
-        /// If set, this character is displayed in a bright color, which is sometimes called "bold".
-        const BRIGHT                    = 1 << 0;
-        /// If set, this character is displayed using a dim or faint color, the opposite of `BRIGHT`.
-        const DIM                       = 1 << 1;
-        /// If set, this character is displayed in italics.
-        const ITALIC                    = 1 << 2;
-        /// If set, this character is displayed with a single underline.
-        const UNDERLINE                 = 1 << 3;
-        /// If set, the unit box where this character is displayed will blink.
-        const BLINK                     = 1 << 4;
-        /// If set, this character is displayed with inversed/reversed colors:
-        /// the foreground character text is displayed using the background color,
-        /// while the background is displayed using the foreground color.
-        const INVERSE                   = 1 << 5;
-        /// If set, this character is not displayed at all,
-        /// only a blank box (in the specified background color) will be displayed.
-        const HIDDEN                    = 1 << 6;
-        /// If set, this character is displayed with a strike-through, i.e.,
-        /// with a line crossing it out.
-        const STRIKETHROUGH             = 1 << 7;
+    pub struct TerminalMode: u16 {
+        const SHOW_CURSOR         = 0b00_0000_0000_0001;
+        const APP_CURSOR          = 0b00_0000_0000_0010;
+        const APP_KEYPAD          = 0b00_0000_0000_0100;
+        const MOUSE_REPORT_CLICK  = 0b00_0000_0000_1000;
+        const BRACKETED_PASTE     = 0b00_0000_0001_0000;
+        const SGR_MOUSE           = 0b00_0000_0010_0000;
+        const MOUSE_MOTION        = 0b00_0000_0100_0000;
+        const LINE_WRAP           = 0b00_0000_1000_0000;
+        const LINE_FEED_NEW_LINE  = 0b00_0001_0000_0000;
+        const ORIGIN              = 0b00_0010_0000_0000;
+        const INSERT              = 0b00_0100_0000_0000;
+        const FOCUS_IN_OUT        = 0b00_1000_0000_0000;
+        const ALT_SCREEN          = 0b01_0000_0000_0000;
+        const MOUSE_DRAG          = 0b10_0000_0000_0000;
+        const ANY                 = 0b11_1111_1111_1111;
+        const NONE                = 0;
     }
 }
 
-impl FormatFlags {
-    /// The max bit index of the `FormatFlags` type.
-    const MAX_BIT: u32 = 8;
-    
-    /// Returns a bit mask of the bits that differ between `self` and `other`,
-    /// in which the bit is set if that bit was different across `self` vs `other`.
-    ///
-    /// This is merely a bit-wise logical XOR of `self` and `other`. 
-    pub fn bits_that_differ(self, other: FormatFlags) -> FormatFlags {
-        self ^ other
+impl Default for TerminalMode {
+    fn default() -> TerminalMode {
+        TerminalMode::SHOW_CURSOR | TerminalMode::LINE_WRAP
     }
-
-    fn diff(self, other: FormatFlags) -> FormatFlagsDiff {
-        FormatFlagsDiff::new(self, other)
-    }
-
-    /// Returns the style code required to enable or disable the style
-    /// given by the single bit that is set in this `Format`Flags` (`self`). 
-    /// 
-    /// Returns `None` if more than one bit is set in this `FormatFlags` (`self`).
-    fn to_style_code(self, enable: bool) -> Option<AnsiStyleCodes> {
-        let code = match (self, enable) {
-            (FormatFlags::BRIGHT, true)            => AnsiStyleCodes::Bright,
-            (FormatFlags::BRIGHT, false)           => AnsiStyleCodes::NotBrightNorDim,
-            (FormatFlags::DIM, true)               => AnsiStyleCodes::Dim,
-            (FormatFlags::DIM, false)              => AnsiStyleCodes::NotBrightNorDim,
-            (FormatFlags::ITALIC, true)            => AnsiStyleCodes::Italic,
-            (FormatFlags::ITALIC, false)           => AnsiStyleCodes::NotItalicNorFraktur,
-            (FormatFlags::UNDERLINE, true)         => AnsiStyleCodes::Underlined,
-            (FormatFlags::UNDERLINE, false)        => AnsiStyleCodes::NotUnderlined,
-            (FormatFlags::BLINK, true)             => AnsiStyleCodes::Blink,
-            (FormatFlags::BLINK, false)            => AnsiStyleCodes::NotBlink,
-            (FormatFlags::INVERSE, true)           => AnsiStyleCodes::Inverse,
-            (FormatFlags::INVERSE, false)          => AnsiStyleCodes::NotInverse,
-            (FormatFlags::HIDDEN, true)            => AnsiStyleCodes::Hidden,
-            (FormatFlags::HIDDEN, false)           => AnsiStyleCodes::NotHidden,
-            (FormatFlags::STRIKETHROUGH, true)     => AnsiStyleCodes::Strikethrough,
-            (FormatFlags::STRIKETHROUGH, false)    => AnsiStyleCodes::NotStrikethrough,
-            // When more bit flags exist, add those cases here.
-            _ => return None,
-        };
-        Some(code)
-    }
-}
-
-
-/// The set of colors that can be displayed by a terminal emulator. 
-/// 
-/// The first 8 variants are 3-bit colors, supported on every terminal emulator. 
-/// The next 8 variants are 4-bit colors, which are brightened (or bold) versions of the first 8.
-/// After that, the 8-bit color variant accepts any value from 0 to 256, 
-/// in which values of 0-15 are the same as the first 16 variants of this enum
-/// Finally, the 24-bit color variant accepts standard RGB values. 
-///
-/// See here for the set of colors: <https://en.wikipedia.org/wiki/ANSI_escape_code#Colors>
-#[derive(Copy, Clone, Debug, PartialEq, Eq
-)]
-pub enum Color {
-    /////////////////////// 2-bit Colors //////////////////////
-    Black,
-    Red,
-    Green,
-    Yellow,
-    Blue,
-    Magenta,
-    Cyan,
-    /// More of a light gray/grey. Use `BrightWhite` for true white.
-    White,
-
-    /////////////////////// 4-bit Colors //////////////////////
-    /// Gray/grey.
-    BrightBlack,
-    BrightRed,
-    BrightGreen,
-    BrightYellow,
-    BrightBlue,
-    BrightMagenta,
-    BrightCyan,
-    /// True pure white. 
-    BrightWhite,
-
-    /////////////////////// 8-bit Colors //////////////////////
-    /// 8-bit color, as introduced in xterm.
-    /// 
-    /// * Values of `0` through `15` are identical to the above 16 color variants. 
-    /// * The next 216 colors `16` through `231` are arranged into a 6 x 6 x 6 color cube,
-    ///   as shown here: <https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit>.
-    /// * The last 24 colors `232` through `255` are grayscale steps from dark gray to light. 
-    ///
-    /// This is sometimes referred to as a Palette color lookup table.
-    Color8Bit(u8),
-
-    /////////////////////// 24-bit Colors //////////////////////
-    /// True 24-bit RGB color, with 8 bits for each of the red, green, and blue channels.
-    RGB { red: u8, green: u8, blue: u8 },
-}
-impl From<u8> for Color {
-    fn from(value: u8) -> Self {
-        match value {
-            0  => Self::Black,
-            1  => Self::Red,
-            2  => Self::Green,
-            3  => Self::Yellow,
-            4  => Self::Blue,
-            5  => Self::Magenta,
-            6  => Self::Cyan,
-            7  => Self::White,
-            8  => Self::BrightBlack,
-            9  => Self::BrightRed,
-            10 => Self::BrightGreen,
-            11 => Self::BrightYellow,
-            12 => Self::BrightBlue,
-            13 => Self::BrightMagenta,
-            14 => Self::BrightCyan,
-            15 => Self::BrightWhite,
-            x  => Self::Color8Bit(x),
-        }
-    }
-}
-
-
-/// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
-/// to set the foreground color (for displayed text).
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct ForegroundColor(pub Color);
-impl ForegroundColor {
-    const ANSI_ESCAPE_FOREGROUND_COLOR: &'static str = "38";
-
-    pub fn to_escape_code(self) -> Cow<'static, str> {
-        match self.0 {
-            Color::Black                            => "30".into(),
-            Color::Red                              => "31".into(),
-            Color::Green                            => "32".into(),
-            Color::Yellow                           => "33".into(),
-            Color::Blue                             => "34".into(),
-            Color::Magenta                          => "35".into(),
-            Color::Cyan                             => "36".into(),
-            Color::White                            => "37".into(),
-            Color::BrightBlack                      => "90".into(),
-            Color::BrightRed                        => "91".into(),
-            Color::BrightGreen                      => "92".into(),
-            Color::BrightYellow                     => "93".into(),
-            Color::BrightBlue                       => "94".into(),
-            Color::BrightMagenta                    => "95".into(),
-            Color::BrightCyan                       => "96".into(),
-            Color::BrightWhite                      => "97".into(),
-            // For better compatibility, reduce 8-bit color codes to their 4-bit representation if possible.
-            Color::Color8Bit(c_4bit) if c_4bit < 16 => Self(Color::from(c_4bit)).to_escape_code(),
-            Color::Color8Bit(c_8bit)                => format!(
-                "{};{};{}",
-                Self::ANSI_ESCAPE_FOREGROUND_COLOR, ANSI_ESCAPE_8_BIT_COLOR, c_8bit
-            ).into(),
-            Color::RGB { red, green, blue }         => format!(
-                "{};{};{};{};{}",
-                Self::ANSI_ESCAPE_FOREGROUND_COLOR, ANSI_ESCAPE_24_BIT_COLOR, red, green, blue
-            ).into(),
-        }
-    }
-}
-impl From<Color> for ForegroundColor {
-    fn from(c: Color) -> Self {
-        ForegroundColor(c)
-    }
-}
-
-/// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
-/// to set the background color (behind displayed text).
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct BackgroundColor(pub Color);
-impl BackgroundColor {
-    const ANSI_ESCAPE_BACKGROUND_COLOR: &'static str = "48";
-    
-    pub fn to_escape_code(self) -> Cow<'static, str> {
-        match self.0 {
-            Color::Black                            => "40".into(),
-            Color::Red                              => "41".into(),
-            Color::Green                            => "42".into(),
-            Color::Yellow                           => "43".into(),
-            Color::Blue                             => "44".into(),
-            Color::Magenta                          => "45".into(),
-            Color::Cyan                             => "46".into(),
-            Color::White                            => "47".into(),
-            Color::BrightBlack                      => "100".into(),
-            Color::BrightRed                        => "101".into(),
-            Color::BrightGreen                      => "102".into(),
-            Color::BrightYellow                     => "103".into(),
-            Color::BrightBlue                       => "104".into(),
-            Color::BrightMagenta                    => "105".into(),
-            Color::BrightCyan                       => "106".into(),
-            Color::BrightWhite                      => "107".into(),
-            // For better compatibility, reduce 8-bit color codes to their 4-bit representation if possible.
-            Color::Color8Bit(c_4bit) if c_4bit < 16 => Self(Color::from(c_4bit)).to_escape_code(),
-            Color::Color8Bit(c_8bit)                => format!(
-                "{};{};{}",
-                Self::ANSI_ESCAPE_BACKGROUND_COLOR, ANSI_ESCAPE_8_BIT_COLOR, c_8bit
-            ).into(),
-            Color::RGB { red, green, blue }         => format!(
-                "{};{};{};{};{}",
-                Self::ANSI_ESCAPE_BACKGROUND_COLOR, ANSI_ESCAPE_24_BIT_COLOR, red, green, blue
-            ).into(),
-        }
-    }
-}
-impl From<Color> for BackgroundColor {
-    fn from(c: Color) -> Self {
-        BackgroundColor(c)
-    }
-}
-
-
-/// A wrapper type around [`Color`] that is used in [`AnsiStyleCodes`]
-/// to set the color of the underline for underlined text.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct UnderlinedColor(pub Color);
-impl UnderlinedColor {
-    const ANSI_ESCAPE_UDERLINED_COLOR: &'static str = "58";
-    
-    pub fn to_escape_code(self) -> Cow<'static, str> {
-        match self.0 {
-            Color::Color8Bit(c_8bit) => format!(
-                "{};{};{}",
-                Self::ANSI_ESCAPE_UDERLINED_COLOR, ANSI_ESCAPE_8_BIT_COLOR, c_8bit
-            ).into(),
-            Color::RGB { red, green, blue } => format!(
-                "{};{};{};{};{}",
-                Self::ANSI_ESCAPE_UDERLINED_COLOR, ANSI_ESCAPE_24_BIT_COLOR, red, green, blue
-            ).into(),
-            
-            // This mode only supports parameters of 8-bit and 24-bit (RBG) colors,
-            // so we must convert 4-bit colors into 8-bit colors first.
-            Color::Black         => Self(Color::Color8Bit(0)).to_escape_code(),
-            Color::Red           => Self(Color::Color8Bit(1)).to_escape_code(),
-            Color::Green         => Self(Color::Color8Bit(2)).to_escape_code(),
-            Color::Yellow        => Self(Color::Color8Bit(3)).to_escape_code(),
-            Color::Blue          => Self(Color::Color8Bit(4)).to_escape_code(),
-            Color::Magenta       => Self(Color::Color8Bit(5)).to_escape_code(),
-            Color::Cyan          => Self(Color::Color8Bit(6)).to_escape_code(),
-            Color::White         => Self(Color::Color8Bit(7)).to_escape_code(),
-            Color::BrightBlack   => Self(Color::Color8Bit(8)).to_escape_code(),
-            Color::BrightRed     => Self(Color::Color8Bit(9)).to_escape_code(),
-            Color::BrightGreen   => Self(Color::Color8Bit(10)).to_escape_code(),
-            Color::BrightYellow  => Self(Color::Color8Bit(11)).to_escape_code(),
-            Color::BrightBlue    => Self(Color::Color8Bit(12)).to_escape_code(),
-            Color::BrightMagenta => Self(Color::Color8Bit(13)).to_escape_code(),
-            Color::BrightCyan    => Self(Color::Color8Bit(14)).to_escape_code(),
-            Color::BrightWhite   => Self(Color::Color8Bit(15)).to_escape_code(),
-        }
-    }
-}
-impl From<Color> for UnderlinedColor {
-    fn from(c: Color) -> Self {
-        UnderlinedColor(c)
-    }
-}
-
-
-const ANSI_ESCAPE_8_BIT_COLOR: &'static str = "5";
-const ANSI_ESCAPE_24_BIT_COLOR: &'static str = "2";
-
-
-/// The set of ASCII values that are non-printable characters 
-/// and require special handling by a terminal emulator. 
-#[derive(Debug)]
-pub enum AsciiControlCodes {
-    /// (BEL) Plays a terminal bell or beep.
-    /// `Ctrl + G`, or `'\a'`.
-    Bell         = 0x07,
-    /// (BS) Backspaces over the previous character before (to the left of) the cursor.
-    /// `Ctrl + H`, or `'\b'`.
-    Backspace    = 0x08,
-    /// (HT) Inserts a horizontal tab.
-    /// `Ctrl + I`, or `'\t'`.
-    Tab          = 0x09,
-    /// (LF) Moves the cursor to the next line, i.e., Line feed.
-    /// `Ctrl + J`, or `'\n'`.
-    NewLine      = 0x0A,
-    /// (VT) Inserts a vertical tab.
-    /// `Ctrl + K`, or `'\v'`.
-    VerticalTab  = 0x0B,
-    /// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).
-    /// `Ctrl + K`, or `'\v'`.
-    NewPage  = 0x0C,
-    /// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.
-    /// `Ctrl + M`, or `'\r'`.
-    CarriageReturn  = 0x0D,
-    /// (ESC) The escape character.
-    /// `ESC`, or `'\e'`.
-    Escape = 0x1B,
-    /// (DEL) Deletes the next character after (to the right of) the cursor.
-    /// `DEL`.
-    Delete = 0x7F,
 }
