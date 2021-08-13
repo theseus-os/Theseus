@@ -19,7 +19,7 @@ extern crate text_terminal;
 use alloc::string::String;
 use task::TaskRef;
 use async_channel::Receiver;
-use serial_port::{SerialPort, SerialPortAddress, get_serial_port};
+use serial_port::{SerialPort, SerialPortAddress, get_serial_port, DataChunk};
 use io::LockableIo;
 use text_terminal::TextTerminal;
 use irq_safety::MutexIrqSafe;
@@ -62,6 +62,7 @@ impl<I, O> Console<I, O> where I: bare_io::Read, O: bare_io::Write {
 	}
 }
 
+
 /// The entry point for the console connection detector task.
 fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>) -> Result<(), &'static str> {
 
@@ -78,10 +79,10 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port),
 		);
 		
-		let queue = mpmc::Queue::with_capacity(128);
-		serial_port.lock().set_queue_producer(queue.clone());
+		let (sender, receiver) = async_channel::new_channel(16);
+		serial_port.lock().set_data_sender(sender);
 
-		let _taskref = spawn::new_task_builder(console_entry, (new_console, queue))
+		let _taskref = spawn::new_task_builder(console_entry, (new_console, receiver))
 			.name(alloc::format!("console_{:?}_loop", serial_port_address))
 			.spawn()?;
 	}
@@ -90,16 +91,22 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 }
 
 
-/// The entry point for the each new `Console` task.
+/// The entry point for the each new [`Console`] task.
 fn console_entry<I, O>(
-	(mut console, input_queue): (Console<I, O>, mpmc::Queue<u8>),
+	(mut console, input_receiver): (Console<I, O>, Receiver<DataChunk>),
 ) -> Result<(), &'static str> 
 	where I: bare_io::Read,
 	      O: bare_io::Write 
 {
 	loop {
-		while let Some(byte) = input_queue.pop() {
-			let _res = console.terminal.handle_input(&mut &[byte][..]);
+		// Block until we receive the next data chunk from the sender.
+		match input_receiver.receive() {
+			Ok((num_bytes, data)) => {
+				let _res = console.terminal.handle_input(&mut &data[.. (num_bytes as usize)]);
+			}
+			Err(e) => {
+				error!("[LIKELY BUG] Error receiving input data on {:?}. Retrying...", console.name);
+			}
 		}
 	}	
 

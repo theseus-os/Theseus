@@ -138,9 +138,14 @@ pub struct SerialPort {
     line_status:                Port<u8>,
     _modem_status:              Port<u8>,
     _scratch:                   Port<u8>,
-	/// The queue endpoint to which received data will be pushed.
+	/// The channel endpoint to which data received on this serial port will be pushed.
 	/// If `None`, received data will be ignored and a warning printed.
-	data_producer:				Option<mpmc::Queue<u8>>,
+	/// 
+	/// The format of data sent via this channel is effectively a slice of bytes,
+	/// but is represented without using references as a tuple:
+	///  * the number of bytes actually being transmitted, to be used as an index into the array,
+	///  * an array of bytes holding the actual data, up to 
+	data_sender:                Option<Sender<DataChunk>>,
 }
 
 impl SerialPort {
@@ -170,7 +175,7 @@ impl SerialPort {
 			line_status:                Port::new(base_port + 5),
 			_modem_status:              Port::new(base_port + 6),
 			_scratch:                   Port::new(base_port + 7),
-			data_producer:              None,
+			data_sender:                None,
 		};
 
 		// SAFE: we are just accessing this serial port's registers.
@@ -304,15 +309,15 @@ impl SerialPort {
 	}
 
 	/// Tells this `SerialPort` to push received data bytes
-	/// onto the given queue `producer`. 
+	/// onto the given `sender` channel.
 	///
-	/// If a queue producer already existed, it is replaced
-	/// by the given `producer` and returned.
-	pub fn set_queue_producer(
+	/// If a sender already existed, it is replaced
+	/// by the given `sender` and returned.
+	pub fn set_data_sender(
 		&mut self,
-		producer: mpmc::Queue<u8>
-	) -> Option<mpmc::Queue<u8>> {
-		self.data_producer.replace(producer)
+		sender: Sender<DataChunk>
+	) -> Option<Sender<DataChunk>> {
+		self.data_sender.replace(sender)
 	}
 }
 
@@ -358,39 +363,37 @@ impl bare_io::Write for SerialPort {
 /// This is called from the serial port interrupt handlers 
 /// when data has been received and is ready to read.
 pub fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
-	// Read multiple bytes at once. DO NOT use a blocking read operation in an interrupt handler. 
-    let mut buf: [u8; 128] = [0; 128];
+	// Important notes:
+	//  * We read a chunk of multiple bytes at once.
+	//  * We MUST NOT use a blocking read operation in an interrupt handler. 
+    //  * We cannot hold the serial port lock while issuing a log statement.
+    let mut buf = [0; u8::MAX as usize];
 	let bytes_read;
-
 	
 	let mut input_was_ignored = false;
-	let mut error_occurred = false;
+	let mut send_result = Ok(());
 	let serial_port = get_serial_port(serial_port_address);
 
-    // NOTE: we cannot hold the serial port lock while issuing a log statement.
 	{ 
 		let mut sp = serial_port.lock();
 		bytes_read = sp.in_bytes(&mut buf);
 		if bytes_read > 0 {
-			if let Some(ref producer) = sp.data_producer {
-				for b in &buf[..bytes_read] {
-					let result = producer.push(*b);
-					if result.is_err() {
-						error_occurred = true;
-						break;
-					}
-				}
+			if let Some(ref sender) = sp.data_sender {
+				send_result = sender.try_send((bytes_read as u8, buf));
 			} else {
 				input_was_ignored = true;
 			}
+		} else {
+			// This was a "false" interrupt, no data was actually received.
+			return;
 		}
 	}
 
-	if error_occurred {
+	if let Err(e) = send_result {
 		let _result = write!(
 			&mut serial_port.lock(),
-			"Error: failed to enqueue data onto queue for serial port {:?}.\n",
-			serial_port_address
+			"Error: failed to send data received for serial port {:?}: {:?}.\n",
+			serial_port_address, e.1
 		);
 	}
 
@@ -417,3 +420,7 @@ pub fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
 		}
 	}
 }
+
+/// A chunk of data read from a serial port
+/// that will be transmitted to a receiver.
+pub type DataChunk = (u8, [u8; u8::MAX as usize]);
