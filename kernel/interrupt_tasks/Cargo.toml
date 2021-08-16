@@ -1,0 +1,35 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "interrupt_tasks"
+description = "Abstractions for deferred interrupt handler tasks"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.9.0"
+log = "0.4.8"
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[dependencies.async_channel]
+path = "../async_channel"
+
+[dependencies.text_terminal]
+path = "../text_terminal"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.interrupts]
+path = "../interrupts"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
+[lib]
+crate-type = ["rlib"]

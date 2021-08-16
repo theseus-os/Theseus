@@ -1089,6 +1089,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "interrupt_tasks"
+version = "0.1.0"
+dependencies = [
+ "async_channel",
+ "interrupts",
+ "irq_safety",
+ "log",
+ "mpmc",
+ "spawn",
+ "spin 0.9.0",
+ "task",
+ "text_terminal",
+ "x86_64",
+]
+
+[[package]]
 name = "interrupts"
 version = "0.1.0"
 dependencies = [
