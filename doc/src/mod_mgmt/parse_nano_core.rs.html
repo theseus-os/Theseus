@@ -678,6 +678,7 @@
 <span id="675">675</span>
 <span id="676">676</span>
 <span id="677">677</span>
+<span id="678">678</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,</span>
 <span class="doccomment">//! in other words, the code that is currently executing.</span>
@@ -951,8 +952,9 @@
     <span class="kw">let</span> <span class="ident">bss_shndx</span>    <span class="op">=</span> <span class="ident">bss_shndx</span>   .<span class="ident">ok_or</span>(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .bss section index&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">shndxs</span> <span class="op">=</span> <span class="ident">MainShndx</span> { <span class="ident">text_shndx</span>, <span class="ident">rodata_shndx</span>, <span class="ident">data_shndx</span>, <span class="ident">bss_shndx</span> };
 
-    <span class="comment">// second, skip ahead to the start of the symbol table </span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_iterator</span> <span class="op">=</span> <span class="ident">file_iterator</span>.<span class="ident">skip_while</span>(<span class="op">|</span>(<span class="ident">_line_num</span>, <span class="ident">line</span>)<span class="op">|</span>  <span class="op">!</span><span class="ident">line</span>.<span class="ident">starts_with</span>(<span class="string">&quot;Symbol table&quot;</span>));
+    <span class="comment">// second, skip ahead to the start of the symbol table: a line which contains &quot;.symtab&quot; but does NOT contain &quot;SYMTAB&quot;</span>
+    <span class="kw">let</span> <span class="ident">is_start_of_symbol_table</span> <span class="op">=</span> <span class="op">|</span><span class="ident">line</span>: <span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">|</span> { <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.symtab&quot;</span>) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;SYMTAB&quot;</span>) };
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">file_iterator</span> <span class="op">=</span> <span class="ident">file_iterator</span>.<span class="ident">skip_while</span>(<span class="op">|</span>(<span class="ident">_line_num</span>, <span class="ident">line</span>)<span class="op">|</span>  <span class="op">!</span><span class="ident">is_start_of_symbol_table</span>(<span class="ident">line</span>));
     <span class="comment">// skip the symbol table start line, e.g., &quot;Symbol table &#39;.symtab&#39; contains N entries:&quot;</span>
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">_num</span>, <span class="ident">_line</span>)) <span class="op">=</span> <span class="ident">file_iterator</span>.<span class="ident">next</span>() {
         <span class="comment">// trace!(&quot;SKIPPING LINE {}: {}&quot;, _num + 1, _line);</span>
