@@ -2767,6 +2767,7 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "atomic",
  "context_switch",
  "environment",
  "irq_safety",

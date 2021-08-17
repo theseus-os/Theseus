@@ -42,6 +42,7 @@ extern crate root;
 extern crate x86_64;
 extern crate spin;
 extern crate kernel_config;
+extern crate atomic;
 
 
 use core::fmt;
@@ -55,6 +56,7 @@ use alloc::{
     string::String,
     sync::Arc,
 };
+use atomic::Atomic;
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::MmiRef;
 use stack::Stack;
@@ -173,7 +175,7 @@ pub enum RunState {
     /// The `Task` has exited and can no longer be run,
     /// either by running to completion or being killed. 
     Exited,
-    /// This `Task` had already exited and now its ExitValue has been taken;
+    /// This `Task` had already exited and its `ExitValue` has been taken;
     /// its exit value can only be taken once, and consumed by another `Task`.
     /// This `Task` is now useless, and can be deleted and removed from the Task list.
     Reaped,
@@ -211,65 +213,76 @@ pub struct RestartInfo {
 pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
 
 
-/// A structure that contains contextual information for a thread of execution. 
-pub struct Task {
-    /// the unique id of this Task.
-    pub id: usize,
-    /// the simple name of this Task
-    pub name: String,
-    /// Which cpu core the Task is currently running on.
-    /// `None` if not currently running.
-    pub running_on_cpu: Option<u8>,
-    
+/// The parts of a `Task` that may be modified after its creation.
+///
+/// This includes only the parts that cannot be modified atomically.
+/// As such, they are protected by a lock in the containing `Task` struct.
+struct TaskInner {   
     #[cfg(runqueue_spillful)]
     /// The runqueue that this Task is on.
     pub on_runqueue: Option<u8>,
-    
-    /// the runnability status of this task, basically whether it's allowed to be scheduled in.
-    pub runstate: RunState,
+
     /// The status or value this Task exited with, if it has already exited.
     pub exit_value: Option<ExitValue>,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
-    /// A reference to this task's`TaskLocalData` struct, which is used to quickly retrieve the "current" Task
+    /// A reference to this task's `TaskLocalData` struct, which is used to quickly retrieve the "current" Task
     /// on a given CPU core. 
     /// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later
     /// after the task has been fully created, which currently occurs in `TaskRef::new()`.
     task_local_data: Option<Box<TaskLocalData>>,
-    /// Data that should be dropped after a task switch; for example, the previous Task's TaskLocalData.
+    /// Data that should be dropped after a task switch; for example, the previous Task's [`TaskLocalData`].
     drop_after_task_switch: Option<Box<dyn Any + Send>>,
-    /// Memory management details: page tables, mappings, allocators, etc.
-    /// This is shared among all other tasks in the same address space.
-    pub mmi: MmiRef, 
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
     /// Whether or not this task is pinned to a certain core.
     /// The idle tasks (like idle_task) are always pinned to their respective cores.
     pub pinned_core: Option<u8>,
-    /// Whether this Task is an idle task, the task that runs by default when no other task is running.
-    /// There exists one idle task per core, so this is `false` for most tasks.
-    pub is_an_idle_task: bool,
-    /// For application `Task`s, this is a reference to the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
-    /// that contains the entry function for this `Task`.
-    pub app_crate: Option<Arc<AppCrateRef>>,
-    /// This `Task` is linked into and runs within the context of 
-    /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
-    pub namespace: Arc<CrateNamespace>,
     /// The function that will be called when this `Task` panics or fails due to a machine exception.
     /// It will be invoked before the task is cleaned up via stack unwinding.
     /// This is similar to Rust's built-in panic hook, but is also called upon a machine exception, not just a panic.
     pub kill_handler: Option<KillHandler>,
-    /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
+    /// The environment variables for this task, shared among child and parent tasks.
     pub env: Arc<Mutex<Environment>>,
+    /// Stores the restartable information of the task. 
+    /// `Some(RestartInfo)` indicates that the task is restartable.
+    pub restart_info: Option<RestartInfo>,
+}
+
+
+/// A structure that contains contextual information for a thread of execution. 
+pub struct Task {
+    /// The mutable parts of a `Task` struct that can be modified after task creation.
+    /// We use this inner structure to reduce contention when accessing task struct fields,
+    /// because they are primarily read, not written. 
+    inner: MutexIrqSafe<TaskInner>,
+
+    /// The unique identifier of this Task.
+    pub id: usize,
+    /// The simple name of this Task.
+    pub name: String,
+    /// Which cpu core this Task is currently running on.
+    /// `None` if not currently running.
+    pub running_on_cpu: Option<u8>, // Atomic<Option<u8>>,
+    /// The runnability of this task, i.e., whether it's eligible to be scheduled in.
+    pub runstate: RunState, // Atomic<RunState>,
+    /// Memory management details: page tables, mappings, allocators, etc.
+    /// This is shared among all other tasks in the same address space.
+    pub mmi: MmiRef, 
+    /// Whether this Task is an idle task, the task that runs by default when no other task is running.
+    /// There exists one idle task per core, so this is `false` for most tasks.
+    pub is_an_idle_task: bool,
+    /// For application `Task`s, this is effectively a reference to the [`mod_mgmt::LoadedCrate`]
+    /// that contains the entry function for this `Task`.
+    pub app_crate: Option<Arc<AppCrateRef>>,
+    /// This `Task` is linked into and runs within the context of this [`CrateNamespace`].
+    pub namespace: Arc<CrateNamespace>,
     /// The function that should be run as a last-ditch attempt to recover from this task's failure,
     /// e.g., this can be called when unwinding itself fails. 
     /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
     /// which has generic type parameters that describe its function signature, argument type, and return type.
     pub failure_cleanup_function: FailureCleanupFunction,
-    /// Stores the restartable information of the task. 
-    /// `Some(RestartInfo)` indicates that the task is restartable.
-    pub restart_info: Option<RestartInfo>,
-    
+        
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
@@ -331,28 +344,28 @@ impl Task {
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
 
         Task {
+            inner: MutexIrqSafe::new(TaskInner {
+                #[cfg(runqueue_spillful)]
+                on_runqueue: None,
+                exit_value: None,
+                saved_sp: 0,
+                task_local_data: None,
+                drop_after_task_switch: None,
+                kstack,
+                pinned_core: None,
+                kill_handler: None,
+                env,
+                restart_info: None,
+            }),
             id: task_id,
-            runstate: RunState::Initing,
-            exit_value: None,
-            running_on_cpu: None,
-            
-            #[cfg(runqueue_spillful)]
-            on_runqueue: None,
-            
-            saved_sp: 0,
-            task_local_data: None,
-            drop_after_task_switch: None,
             name: format!("task_{}", task_id),
-            kstack,
+            runstate: RunState::Initing, // Atomic::new(RunState::Initing),
+            running_on_cpu: None, // Atomic::new(None),
             mmi,
-            pinned_core: None,
             is_an_idle_task: false,
             app_crate,
             namespace,
-            kill_handler: None,
-            env,
             failure_cleanup_function,
-            restart_info: None,
             
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -360,15 +373,17 @@ impl Task {
     }
 
     fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
-        self.env = new_env;
+        self.inner.lock().env = new_env;
     }
 
     /// returns true if this Task is currently running on any cpu.
     pub fn is_running(&self) -> bool {
         self.running_on_cpu.is_some()
+        // self.running_on_cpu.load(Ordering::Acquire).is_some()
     }
 
     /// Returns true if this `Task` is Runnable, i.e., able to be scheduled in.
+    ///
     /// # Note
     /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
     pub fn is_runnable(&self) -> bool {
@@ -388,7 +403,7 @@ impl Task {
         self.app_crate.is_some()
     }
 
-    /// Returns true if this is a userspace`Task`.
+    /// Returns true if this is a userspace `Task`.
     /// Currently userspace support is disabled, so this always returns `false`.
     pub fn is_userspace(&self) -> bool {
         // self.ustack.is_some()
@@ -399,14 +414,14 @@ impl Task {
     /// or otherwise fails (e.g., due to a machine exception occurring).
     /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
     pub fn set_kill_handler(&mut self, callback: KillHandler) {
-        self.kill_handler = Some(callback);
+        self.inner.lock().kill_handler = Some(callback);
     }
 
     /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
     /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
     /// After invoking this, the `Task`'s `kill_handler` will be `None`.
     pub fn take_kill_handler(&mut self) -> Option<KillHandler> {
-        self.kill_handler.take()
+        self.inner.lock().kill_handler.take()
     }
 
 
@@ -414,7 +429,7 @@ impl Task {
     /// if its runstate is `RunState::Exited`. 
     /// Unlike [`take_exit_value`](#method.take_exit_value), this does not consume the exit value.
     pub fn get_exit_value(&self) -> Option<&ExitValue> {
-        self.exit_value.as_ref()
+        self.inner.lock().exit_value.as_ref()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -426,7 +441,7 @@ impl Task {
         if self.runstate == RunState::Exited {
             self.runstate = RunState::Reaped;
             TASKLIST.lock().remove(&self.id);
-            self.exit_value.take()
+            self.inner.lock().exit_value.take()
         } else {
             None
         }
@@ -437,7 +452,7 @@ impl Task {
     /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
     /// into the FS segment register base MSR.
     fn set_as_current_task(&self) {
-        if let Some(ref tld) = self.task_local_data {
+        if let Some(ref tld) = self.inner.lock().task_local_data {
             unsafe {
                 wrmsr(IA32_FS_BASE, tld.deref() as *const _ as u64);
             }
@@ -640,12 +655,13 @@ impl fmt::Display for Task {
 /// `TaskRef` implements the `PartialEq` trait; 
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
 #[derive(Debug, Clone)]
-pub struct TaskRef(
-    Arc<(
+pub struct TaskRef(Arc<Task>);
+/*
         MutexIrqSafe<Task>,  // the actual task
         AtomicBool,          // true if it has exited, this is used for faster `join()` calls that avoid disabling interrupts
     )>
 ); 
+*/
 
 // impl Drop for TaskRef {
 //     fn drop(&mut self) {
@@ -660,17 +676,18 @@ impl TaskRef {
     /// which will be used to determine the current `Task` on each CPU core.
     pub fn new(task: Task) -> TaskRef {
         let task_id = task.id;
-        let taskref = TaskRef(Arc::new((MutexIrqSafe::new(task), AtomicBool::new(false))));
+        let taskref = TaskRef(Arc::new(task));
         let tld = TaskLocalData {
             current_taskref: taskref.clone(),
             current_task_id: task_id,
         };
-        taskref.0.deref().0.lock().task_local_data = Some(Box::new(tld));
+        taskref.0.inner.lock().task_local_data = Some(Box::new(tld));
         taskref
     }
 
-    /// Waits until the given `task` has finished executing, 
-    /// i.e., blocks until its runstate is `RunState::Exited`.
+    /// Waits until this task has finished executing, 
+    /// i.e., blocks until its has exited or has been killed.
+    ///
     /// Returns `Ok()` when the given `task` is actually exited,
     /// and `Err()` if there is a problem or interruption while waiting for it to exit. 
     /// 
@@ -691,15 +708,14 @@ impl TaskRef {
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
         loop {
-            // if self.0.lock().has_exited() {
-            if self.0.deref().1.load(Ordering::SeqCst) == true {
+            if self.0.has_exited() {
                 break;
             }
         }
 
         // Then, wait for it to actually stop running on any CPU core.
         loop {
-            if !self.0.deref().0.lock().is_running() {
+            if !self.0.is_running() {
                 return Ok(());
             }
         }
@@ -710,19 +726,17 @@ impl TaskRef {
     /// It also performs select cleanup routines, e.g., removing the task from the task list.
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
         {
-            let mut task = self.0.deref().0.lock();
-            if task.runstate == RunState::Exited {
+            if self.0.runstate == RunState::Exited {
                 return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
             }
-            task.runstate = RunState::Exited;
-            task.exit_value = Some(val);
-            self.0.deref().1.store(true, Ordering::SeqCst);
+            self.0.runstate = RunState::Exited;
+            self.0.inner.lock().exit_value = Some(val);
 
             // Corner case: if the task isn't running (as with killed tasks), 
             // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
-            if !task.is_running() {
+            if !self.0.is_running() {
                 // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
-                let _tld = task.task_local_data.take();
+                let _tld = self.0.inner.lock().task_local_data.take();
             }
         }
 
