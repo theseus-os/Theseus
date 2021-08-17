@@ -212,7 +212,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame, print_
 fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
     let page = Page::containing_address(vaddr);
     task::get_my_current_task()
-        .map(|curr_task| curr_task.lock().kstack.guard_page().contains(&page))
+        .map(|curr_task| curr_task.with_kstack(|kstack| kstack.guard_page().contains(&page)))
         .unwrap_or(false)
 }
 

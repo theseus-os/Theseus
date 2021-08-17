@@ -16,9 +16,9 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::VecDeque;
-use irq_safety::{RwLockIrqSafe, MutexIrqSafeGuardRef};
+use irq_safety::RwLockIrqSafe;
 use atomic_linked_list::atomic_map::AtomicMap;
-use task::{TaskRef, Task};
+use task::TaskRef;
 use core::ops::{Deref, DerefMut};
 
 pub const MAX_PRIORITY: u8 = 40;

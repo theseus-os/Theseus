@@ -54,11 +54,7 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
         }
     };
 
-    let working_dir = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let working_dir = Arc::clone(&taskref.get_env().lock().working_dir);
 
     if matches.free.is_empty() {
         return Err("rm: missing argument".into());

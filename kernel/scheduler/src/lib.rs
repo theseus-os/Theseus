@@ -13,7 +13,7 @@ extern crate runqueue;
 use core::ops::Deref;
 use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
-use task::{Task, get_my_current_task, TaskRef};
+use task::{get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
 #[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
 
@@ -39,15 +39,15 @@ pub fn schedule() -> bool {
     };
 
     // No need to task switch if the chosen task is the same as the current task.
-    if current_task == next_task {
+    if curr_task == &next_task {
         return false;
     }
 
-    trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {}, next: {}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
+    trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {:?}, next: {:?}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
 
     curr_task.task_switch(next_task.deref(), apic_id); 
 
-    trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
+    trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
  
     true
 }

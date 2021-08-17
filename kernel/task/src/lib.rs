@@ -216,13 +216,22 @@ pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
 ///
 /// This includes only the parts that cannot be modified atomically.
 /// As such, they are protected by a lock in the containing `Task` struct.
-struct TaskInner {   
+///
+/// In general, other crates cannot obtain a mutable reference to a Task (`&mut Task`),
+/// which means they cannot access this struct's contents directly at all 
+/// (except through the specific get/set methods exposed by `Task`).
+///
+/// Therefore, it is safe to expose all members of this struct as public, 
+/// though not strictly necessary. 
+/// Currently, we only publicize the fields here that need to be modified externally,
+/// primarily by the `spawn` crate for creating and running new tasks. 
+pub struct TaskInner {
     #[cfg(runqueue_spillful)]
     /// The runqueue that this Task is on.
     pub on_runqueue: Option<u8>,
 
     /// The status or value this Task exited with, if it has already exited.
-    pub exit_value: Option<ExitValue>,
+    exit_value: Option<ExitValue>,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
     /// A reference to this task's `TaskLocalData` struct, which is used to quickly retrieve the "current" Task
@@ -240,9 +249,9 @@ struct TaskInner {
     /// The function that will be called when this `Task` panics or fails due to a machine exception.
     /// It will be invoked before the task is cleaned up via stack unwinding.
     /// This is similar to Rust's built-in panic hook, but is also called upon a machine exception, not just a panic.
-    pub kill_handler: Option<KillHandler>,
+    kill_handler: Option<KillHandler>,
     /// The environment variables for this task, which are shared among child and parent tasks by default.
-    pub env: Arc<Mutex<Environment>>,
+    env: Arc<Mutex<Environment>>,
     /// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
@@ -251,9 +260,11 @@ struct TaskInner {
 
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
-    /// The mutable parts of a `Task` struct that can be modified after task creation.
+    /// The mutable parts of a `Task` struct that can be modified after task creation,
+    /// excluding private items that can be modified atomically.
+    ///
     /// We use this inner structure to reduce contention when accessing task struct fields,
-    /// because they are primarily read, not written. 
+    /// because the other fields aside from this one are primarily read, not written.
     inner: MutexIrqSafe<TaskInner>,
 
     /// The unique identifier of this Task.
@@ -380,7 +391,7 @@ impl Task {
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to mutate it.
-    pub fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
+    pub fn set_env(&self, new_env:Arc<Mutex<Environment>>) {
         self.inner.lock().env = new_env;
     }
 
@@ -402,6 +413,12 @@ impl Task {
         self.running_on_cpu.load(Ordering::Acquire)
     }
 
+    /// Returns the APIC ID of the CPU this `Task` is pinned on,
+    /// or `None` if it is not pinned.
+    pub fn pinned_core(&self) -> Option<u8> {
+        self.inner.lock().pinned_core.clone()
+    }
+
     /// Returns the current [`RunState`] of this `Task`.
     pub fn runstate(&self) -> RunState {
         self.runstate.load(Ordering::Acquire)
@@ -413,6 +430,57 @@ impl Task {
     /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
     pub fn is_runnable(&self) -> bool {
         self.runstate() == RunState::Runnable
+    }
+
+    /// Returns the namespace in which this `Task` is loaded/linked into and runs within.
+    pub fn get_namespace(&self) -> &Arc<CrateNamespace> {
+        &self.namespace
+    }
+
+    /// Exposes read-only access to this `Task`'s [`Stack`] by invoking
+    /// the given `func` with a reference to its kernel stack.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state for the duration of `func`
+    /// in order to access its stack.
+    /// The given `func` **must not** attempt to obtain that same inner lock.
+    pub fn with_kstack<R, F>(&self, func: F) -> R 
+        where F: Fn(&Stack) -> R
+    {
+        func(&self.inner.lock().kstack)
+    }
+
+    /// Exposes mutable access to this `Task`'s [`TaskInner`] by invoking
+    /// the given `func` with a reference to its inner state.
+    ///
+    /// # Note about mutability
+    /// This function requires the caller to have a mutable reference to this `Task`
+    /// in order to protect the inner state from foreign crates accessing it
+    /// through a `TaskRef` auto-dereferencing into a `Task`.
+    /// This is because you can only obtain a mutable reference to a `Task`
+    /// before you enclose it in a `TaskRef` wrapper type.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state for the duration of `func`
+    /// in order to access its stack.
+    /// The given `func` **must not** attempt to obtain that same inner lock.
+    pub fn with_inner_mut<R, F>(&self, func: F) -> R 
+        where F: Fn(&mut TaskInner) -> R
+    {
+        func(&mut self.inner.lock())
+    }
+
+    /// Exposes read-only access to this `Task`'s [`RestartInfo`] by invoking
+    /// the given `func` with a reference to its `RestartInfo`.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state for the duration of `func`
+    /// in order to access its stack.
+    /// The given `func` **must not** attempt to obtain that same inner lock.
+    pub fn with_restart_info<R, F>(&self, func: F) -> R 
+        where F: Fn(Option<&RestartInfo>) -> R
+    {
+        func(self.inner.lock().restart_info.as_ref())
     }
 
     /// Returns `true` if this `Task` has been exited, i.e.,
@@ -563,13 +631,10 @@ impl Task {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
             return;
         }
-        {
-            let pinned = next.inner.lock().pinned_core.clone();
-            if let Some(pc) = pinned {
-                if pc != apic_id {
-                    error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", pinned, apic_id, self, next);
-                    return;
-                }
+        if let Some(pc) = next.pinned_core() {
+            if pc != apic_id {
+                error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, apic_id, self, next);
+                return;
             }
         }
 

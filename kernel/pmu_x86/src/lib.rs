@@ -849,7 +849,7 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<bool, &'st
     if let Some(taskref) = task::get_my_current_task() {
         let requested_task_id = samples.task_id;
         
-        let task_id = taskref.lock().id;
+        let task_id = taskref.id;
         if (requested_task_id == 0) | (requested_task_id == task_id) {
             samples.ip_list.push(stack_frame.instruction_pointer);
             samples.task_id_list.push(task_id);

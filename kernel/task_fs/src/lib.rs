@@ -79,7 +79,7 @@ impl TaskFs {
         let id = node.parse::<usize>().map_err(|_e| "could not parse Task id as usize")?;
         let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = self.get_self_pointer().ok_or("BUG: tasks directory wasn't in root")?;
-        let dir_name = task_ref.lock().id.to_string(); 
+        let dir_name = task_ref.id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
         let task_dir = TaskDir::new(dir_name, &parent_dir, task_ref.clone())?;        
         let boxed_task_dir = Arc::new(Mutex::new(task_dir)) as DirRef;
@@ -154,7 +154,7 @@ pub struct TaskDir {
 impl TaskDir {
     /// Creates a new directory and passes a pointer to the new directory created as output
     pub fn new(name: String, parent: &DirRef, taskref: TaskRef)  -> Result<TaskDir, &'static str> {
-        let task_id = taskref.lock().id.clone();
+        let task_id = taskref.id;
         let directory = TaskDir {
             name: name,
             path: Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, task_id)),
@@ -227,7 +227,7 @@ pub struct TaskFile {
 
 impl TaskFile {
     pub fn new(taskref: TaskRef) -> TaskFile {
-        let task_id = taskref.lock().id.clone();
+        let task_id = taskref.id;
         TaskFile {
             taskref,
             task_id,
@@ -238,22 +238,20 @@ impl TaskFile {
     /// Generates the task info string.
     fn generate(&self) -> String {
         // Print all tasks
-        let name = &self.taskref.lock().name.clone();
-        let runstate = format!("{:?}", self.taskref.lock().runstate);
-        let cpu = self.taskref.lock().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &self.taskref.lock().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
-        let task_type = if self.taskref.lock().is_an_idle_task {
+        let cpu = self.taskref.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
+        let pinned = &self.taskref.pinned_core().map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
+        let task_type = if self.taskref.is_an_idle_task {
             "I"
-        } else if self.taskref.lock().is_application() {
+        } else if self.taskref.is_application() {
             "A"
         } else {
             " "
         };  
 
-        format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
-            "name", name,
-            "task id", self.taskref.lock().id,
-            "runstate", runstate,
+        format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5:?}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
+            "name", self.taskref.name,
+            "task id", self.taskref.id,
+            "runstate", self.taskref.runstate(),
             "cpu", cpu,
             "pinned", pinned,
             "task type", task_type
@@ -267,7 +265,7 @@ impl FsNode for TaskFile {
     }
 
     fn get_name(&self) -> String {
-        self.taskref.lock().name.clone()
+        self.taskref.name.clone()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
@@ -323,7 +321,7 @@ pub struct MmiDir {
 impl MmiDir {
     /// Creates a new directory and passes a pointer to the new directory created as output
     pub fn new(taskref: TaskRef) -> MmiDir {
-        let task_id = taskref.lock().id.clone();
+        let task_id = taskref.id;
         MmiDir {
             taskref,
             task_id,
@@ -393,7 +391,7 @@ pub struct MmiFile {
 
 impl MmiFile {
     pub fn new(taskref: TaskRef) -> MmiFile {
-        let task_id = taskref.lock().id;
+        let task_id = taskref.id;
         MmiFile {
             taskref,
             task_id,
@@ -403,9 +401,7 @@ impl MmiFile {
 
     /// Generates the mmi info string.
     fn generate(&self) -> String {
-        let task = self.taskref.lock();
-        let mmi = task.mmi.lock();
-        format!("Page table: {:?}\n", mmi.page_table)
+        format!("Page table: {:?}\n", self.taskref.mmi.lock().page_table)
     }
 }
 

@@ -20,11 +20,7 @@ pub fn main(args: Vec<String>) -> isize {
             // add child dir to current directory
             if let Some(taskref) = task::get_my_current_task() {
                 // grabs a pointer to the current working directory; this is scoped so that we drop the lock on the "mkdir" task as soon as we're finished
-                let curr_dir = {
-                    let locked_task = &taskref.lock();
-                    let curr_env = locked_task.env.lock();
-                    Arc::clone(&curr_env.working_dir)
-                };
+                let curr_dir = Arc::clone(&taskref.get_env().lock().working_dir);
                 let _new_dir = match VFSDirectory::new(dir_name.to_string(), &curr_dir) {
                     Ok(dir) => dir,
                     Err(err) => {println!("{}", err);
