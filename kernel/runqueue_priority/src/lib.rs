@@ -75,11 +75,6 @@ impl PriorityTaskRef {
         priority_taskref
     }
 
-    /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
-    pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
-       self.taskref.lock()
-    }
-
     /// Increment the number of times the task is picked
     pub fn increment_context_switches(&mut self) -> (){
         self.context_switches = self.context_switches.saturating_add(1);

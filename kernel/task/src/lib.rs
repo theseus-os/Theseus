@@ -46,7 +46,7 @@ extern crate atomic;
 
 
 use core::fmt;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
+use core::sync::atomic::{Ordering, AtomicUsize};
 use core::any::Any;
 use core::panic::PanicInfo;
 use core::ops::Deref;
@@ -57,11 +57,10 @@ use alloc::{
     sync::Arc,
 };
 use atomic::Atomic;
-use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, interrupts_enabled};
 use memory::MmiRef;
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-// use tss::tss_set_rsp0;
 use mod_mgmt::{
     CrateNamespace,
     AppCrateRef,
@@ -242,7 +241,7 @@ struct TaskInner {
     /// It will be invoked before the task is cleaned up via stack unwinding.
     /// This is similar to Rust's built-in panic hook, but is also called upon a machine exception, not just a panic.
     pub kill_handler: Option<KillHandler>,
-    /// The environment variables for this task, shared among child and parent tasks.
+    /// The environment variables for this task, which are shared among child and parent tasks by default.
     pub env: Arc<Mutex<Environment>>,
     /// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
@@ -263,9 +262,9 @@ pub struct Task {
     pub name: String,
     /// Which cpu core this Task is currently running on.
     /// `None` if not currently running.
-    pub running_on_cpu: Option<u8>, // Atomic<Option<u8>>,
+    running_on_cpu: Atomic<Option<u8>>,
     /// The runnability of this task, i.e., whether it's eligible to be scheduled in.
-    pub runstate: RunState, // Atomic<RunState>,
+    runstate: Atomic<RunState>,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
     pub mmi: MmiRef, 
@@ -290,8 +289,11 @@ pub struct Task {
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{Task \"{}\" ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}}}", 
-               self.name, self.id, self.running_on_cpu, self.runstate, self.pinned_core)
+        f.debug_struct("Task")
+            .field("running_on", &self.running_on_cpu)
+            .field("runstate", &self.runstate)
+            .field("pinned", &self.inner.try_lock().map(|l| l.pinned_core).unwrap_or(None))
+            .finish()
     }
 }
 
@@ -314,10 +316,12 @@ impl Task {
         failure_cleanup_function: FailureCleanupFunction
     ) -> Result<Task, &'static str> {
         let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
-        let (mmi, namespace, env, app_crate) = {
-            let t = curr_task.lock();
-            (Arc::clone(&t.mmi), Arc::clone(&t.namespace), Arc::clone(&t.env), t.app_crate.clone())
-        };
+        let (mmi, namespace, env, app_crate) = (
+            Arc::clone(&curr_task.mmi),
+            Arc::clone(&curr_task.namespace),
+            Arc::clone(&curr_task.inner.lock().env),
+            curr_task.app_crate.clone(),
+        );
 
         let kstack = kstack
             .or_else(|| stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table))
@@ -359,8 +363,8 @@ impl Task {
             }),
             id: task_id,
             name: format!("task_{}", task_id),
-            runstate: RunState::Initing, // Atomic::new(RunState::Initing),
-            running_on_cpu: None, // Atomic::new(None),
+            runstate: Atomic::new(RunState::Initing),
+            running_on_cpu: Atomic::new(None),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -372,28 +376,52 @@ impl Task {
         }
     }
 
-    fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
+    /// Sets the `Environment` of this Task.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to mutate it.
+    pub fn set_env(&mut self, new_env:Arc<Mutex<Environment>>) {
         self.inner.lock().env = new_env;
     }
 
-    /// returns true if this Task is currently running on any cpu.
-    pub fn is_running(&self) -> bool {
-        self.running_on_cpu.is_some()
-        // self.running_on_cpu.load(Ordering::Acquire).is_some()
+    /// Gets a reference to this task's `Environment`.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to access it.
+    pub fn get_env(&self) -> Arc<Mutex<Environment>> {
+        Arc::clone(&self.inner.lock().env)
     }
 
-    /// Returns true if this `Task` is Runnable, i.e., able to be scheduled in.
+    /// Returns `true` if this `Task` is currently running.
+    pub fn is_running(&self) -> bool {
+        self.running_on_cpu().is_some()
+    }
+
+    /// Returns the APIC ID of the CPU this `Task` is currently running on.
+    pub fn running_on_cpu(&self) -> Option<u8> {
+        self.running_on_cpu.load(Ordering::Acquire)
+    }
+
+    /// Returns the current [`RunState`] of this `Task`.
+    pub fn runstate(&self) -> RunState {
+        self.runstate.load(Ordering::Acquire)
+    }
+
+    /// Returns `true` if this `Task` is Runnable, i.e., able to be scheduled in.
     ///
     /// # Note
     /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
     pub fn is_runnable(&self) -> bool {
-        self.runstate == RunState::Runnable
+        self.runstate() == RunState::Runnable
     }
 
-    /// Returns true if this `Task` has been exited, i.e.,
+    /// Returns `true` if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
-        self.runstate == RunState::Exited || self.runstate == RunState::Reaped
+        match self.runstate() {
+            RunState::Exited | RunState::Reaped => true,
+            _ => false,
+        }
     }
 
     /// Returns `true` if this is an application `Task`. 
@@ -403,43 +431,53 @@ impl Task {
         self.app_crate.is_some()
     }
 
-    /// Returns true if this is a userspace `Task`.
+    /// Returns `true` if this is a userspace `Task`.
     /// Currently userspace support is disabled, so this always returns `false`.
     pub fn is_userspace(&self) -> bool {
         // self.ustack.is_some()
         false
     }
 
+    /// Returns `true` if this `Task` was spawned as a restartable task.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to access it.
+    pub fn is_restartable(&self) -> bool {
+        self.inner.lock().restart_info.is_some()
+    }
+
     /// Registers a function or closure that will be called if this `Task` panics
-    /// or otherwise fails (e.g., due to a machine exception occurring).
+    /// or otherwise fails (e.g., due to a machine exception).
+    ///
     /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
-    pub fn set_kill_handler(&mut self, callback: KillHandler) {
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to mutate it.
+    pub fn set_kill_handler(&self, callback: KillHandler) {
         self.inner.lock().kill_handler = Some(callback);
     }
 
     /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
-    /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
+    /// and returns it so it can be invoked without holding this `Task`'s inner lock.
     /// After invoking this, the `Task`'s `kill_handler` will be `None`.
-    pub fn take_kill_handler(&mut self) -> Option<KillHandler> {
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to mutate it.
+    pub fn take_kill_handler(&self) -> Option<KillHandler> {
         self.inner.lock().kill_handler.take()
-    }
-
-
-    /// Returns a reference to the exit value of this `Task`, 
-    /// if its runstate is `RunState::Exited`. 
-    /// Unlike [`take_exit_value`](#method.take_exit_value), this does not consume the exit value.
-    pub fn get_exit_value(&self) -> Option<&ExitValue> {
-        self.inner.lock().exit_value.as_ref()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
     /// if and only if this `Task` was in the `Exited` runstate.
-    /// # Note
+    ///
     /// After invoking this, the `Task`'s runstate will be `Reaped`,
     /// and this `Task` will be removed from the system task list.
-    pub fn take_exit_value(&mut self) -> Option<ExitValue> {
-        if self.runstate == RunState::Exited {
-            self.runstate = RunState::Reaped;
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to mutate it.    
+    pub fn take_exit_value(&self) -> Option<ExitValue> {
+        if self.runstate() == RunState::Exited {
+            self.runstate.store(RunState::Reaped, Ordering::Release);
             TASKLIST.lock().remove(&self.id);
             self.inner.lock().exit_value.take()
         } else {
@@ -447,10 +485,56 @@ impl Task {
         }
     }
 
+    /// The internal routine that actually exits or kills a Task.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to mutate it. 
+    fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
+        {
+            if self.runstate() == RunState::Exited {
+                return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
+            }
+            self.runstate.store(RunState::Exited, Ordering::Release);
+            let mut inner = self.inner.lock();
+            inner.exit_value = Some(val);
+
+            // Corner case: if the task isn't currently running (as with killed tasks), 
+            // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
+            if !self.is_running() {
+                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
+                let _tld = inner.task_local_data.take();
+            }
+        }
+
+        #[cfg(runqueue_spillful)] {   
+            let task_on_rq = { self.inner.lock().on_runqueue.clone() };
+            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
+                if let Some(rq) = task_on_rq {
+                    remove_from_runqueue(self, rq)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Blocks this `Task` by setting its `RunState` to blocked.
+    pub fn block(&self) {
+        self.runstate.store(RunState::Blocked, Ordering::Release);
+    }
+
+    /// Unblocks this `Task` by setting its `RunState` to runnable.
+    pub fn unblock(&self) {
+        self.runstate.store(RunState::Runnable, Ordering::Release);
+    }
+
     /// Sets this `Task` as this core's current task.
     /// 
     /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
     /// into the FS segment register base MSR.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to access it. 
     fn set_as_current_task(&self) {
         if let Some(ref tld) = self.inner.lock().task_local_data {
             unsafe {
@@ -461,47 +545,56 @@ impl Task {
         }
     }
 
-    /// Switches from the current (`self`)  to the given `next` Task.
+    /// Switches from the current task (`self`) to the given `next` task.
     /// 
-    /// No locks need to be held to call this, but interrupts (later, preemption) should be disabled.
-    pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
+    /// # Locking / Deadlock
+    /// Obtains the locks on both this `Task`'s inner state and the given `next` `Task`'s inner state
+    /// in order to mutate them. 
+    pub fn task_switch(&self, next: &Task, apic_id: u8) {
+        let _held_interrupts = irq_safety::hold_interrupts();
         // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);         
 
         // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
-        // if !next.is_runnable() {
-        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-        //     return;
-        // }
-        // if next.is_running() {
-        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-        //     return;
-        // }
-        // if let Some(pc) = next.pinned_core {
-        //     if pc != apic_id {
-        //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
-        //         return;
-        //     }
-        // }
+        if !next.is_runnable() {
+            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
+            return;
+        }
+        if next.is_running() {
+            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
+            return;
+        }
+        {
+            let pinned = next.inner.lock().pinned_core.clone();
+            if let Some(pc) = pinned {
+                if pc != apic_id {
+                    error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", pinned, apic_id, self, next);
+                    return;
+                }
+            }
+        }
 
         // Note that because userspace support is currently disabled, this will never happen.
-        // // Change the privilege stack (RSP0) in the TSS.
-        // // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
-        // // i.e., when `next` is not a userspace task.
-        // //
-        // if next.is_userspace() {
-        //     let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
-        //     if tss_set_rsp0(new_tss_rsp0).is_ok() { 
-        //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
-        //     }
-        //     else {
-        //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-        //         return;
-        //     }
-        // }
+        // Change the privilege stack (RSP0) in the TSS.
+        // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
+        // i.e., when `next` is not a userspace task.
+        //
+        if next.is_userspace() {
+            let (stack_bottom, stack_size) = {
+                let kstack = &next.inner.lock().kstack;
+                (kstack.bottom(), kstack.size_in_bytes())
+            };
+            let new_tss_rsp0 = stack_bottom + (stack_size / 2); // the middle half of the stack
+            if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { 
+                // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+            } else {
+                error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+                return;
+            }
+        }
 
         // update runstates
-        self.running_on_cpu = None; // no longer running
-        next.running_on_cpu = Some(apic_id); // now running on this core
+        self.running_on_cpu.store(None, Ordering::Release); // no longer running
+        next.running_on_cpu.store(Some(apic_id), Ordering::Release); // now running on this core
 
         // Switch page tables. 
         // Since there is only a single address space (as userspace support is currently disabled),
@@ -510,12 +603,10 @@ impl Task {
             let prev_mmi = &self.mmi;
             let next_mmi = &next.mmi;
             
-
             if Arc::ptr_eq(prev_mmi, next_mmi) {
                 // do nothing because we're not changing address spaces
                 // debug!("task_switch [3]: prev_mmi is the same as next_mmi!");
-            }
-            else {
+            } else {
                 // time to change to a different address space and switch the page tables!
                 let mut prev_mmi_locked = prev_mmi.lock();
                 let next_mmi_locked = next_mmi.lock();
@@ -533,15 +624,17 @@ impl Task {
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
             // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
-            next.drop_after_task_switch = self.task_local_data.take().map(|tld_box| tld_box as Box<dyn Any + Send>);
+            next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
-        // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
+        let prev_task_saved_sp: *mut usize = { (&mut self.inner.lock().saved_sp) as *mut usize };
+        let next_task_saved_sp: usize = { next.inner.lock().saved_sp.clone() };
+        // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", prev_task_saved_sp, next_task_saved_sp);
 
         /// A private macro that actually calls the given context switch routine.
         macro_rules! call_context_switch {
             ($func:expr) => ( unsafe {
-                $func(&mut self.saved_sp as *mut usize, next.saved_sp);
+                $func(prev_task_saved_sp, next_task_saved_sp);
             });
         }
 
@@ -610,7 +703,7 @@ impl Task {
 
         // Now, as a final action, we drop any data that the original previous task 
         // prepared for droppage before the context switch occurred.
-        let _prev_task_data_to_drop = self.drop_after_task_switch.take();
+        let _prev_task_data_to_drop = self.inner.lock().drop_after_task_switch.take();
 
     }
 }
@@ -628,8 +721,7 @@ impl Drop for Task {
             if let Some(_kill_handler) = self.take_kill_handler() {
                 warn!("While dropping task {:?}, its kill handler callback was still present. Removing it now.", self);
             }
-            // Scoping rules ensure the kill handler is dropped now, before this Task's app_crate could possibly be dropped.
-        }
+        } // Scoping rules ensure the kill handler is dropped now, before this Task's app_crate could possibly be dropped.
     }
 }
 
@@ -652,22 +744,12 @@ impl fmt::Display for Task {
 /// Currently, `Lock` is a `MutexIrqSafe`, so it **does not** allow
 /// multiple readers simultaneously; that will cause deadlock.
 /// 
-/// `TaskRef` implements the `PartialEq` trait; 
+/// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits; 
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
+/// 
+/// `TaskRef` also auto-derefs into an immutable `Task` reference.
 #[derive(Debug, Clone)]
 pub struct TaskRef(Arc<Task>);
-/*
-        MutexIrqSafe<Task>,  // the actual task
-        AtomicBool,          // true if it has exited, this is used for faster `join()` calls that avoid disabling interrupts
-    )>
-); 
-*/
-
-// impl Drop for TaskRef {
-//     fn drop(&mut self) {
-//         trace!("Dropping TaskRef: strong_refs: {}, {:?}", Arc::strong_count(&self.0), self);
-//     }
-// }
 
 impl TaskRef {
     /// Creates a new `TaskRef` that wraps the given `Task`.
@@ -685,10 +767,9 @@ impl TaskRef {
         taskref
     }
 
-    /// Waits until this task has finished executing, 
-    /// i.e., blocks until its has exited or has been killed.
+    /// Blocks until this task has exited or has been killed.
     ///
-    /// Returns `Ok()` when the given `task` is actually exited,
+    /// Returns `Ok()` once this task has exited,
     /// and `Err()` if there is a problem or interruption while waiting for it to exit. 
     /// 
     /// # Note
@@ -707,48 +788,10 @@ impl TaskRef {
         }
         
         // First, wait for this Task to be marked as Exited (no longer runnable).
-        loop {
-            if self.0.has_exited() {
-                break;
-            }
-        }
+        while !self.0.has_exited() { }
 
         // Then, wait for it to actually stop running on any CPU core.
-        loop {
-            if !self.0.is_running() {
-                return Ok(());
-            }
-        }
-    }
-
-
-    /// The internal routine that actually exits or kills a Task.
-    /// It also performs select cleanup routines, e.g., removing the task from the task list.
-    fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
-        {
-            if self.0.runstate == RunState::Exited {
-                return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
-            }
-            self.0.runstate = RunState::Exited;
-            self.0.inner.lock().exit_value = Some(val);
-
-            // Corner case: if the task isn't running (as with killed tasks), 
-            // we must clean it up now rather than in task_switch(), because it will never be scheduled in again. 
-            if !self.0.is_running() {
-                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
-                let _tld = self.0.inner.lock().task_local_data.take();
-            }
-        }
-
-        #[cfg(runqueue_spillful)] 
-        {   
-            let task_on_rq = { self.0.deref().0.lock().on_runqueue.clone() };
-            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = task_on_rq {
-                    remove_from_runqueue(self, rq)?;
-                }
-            }
-        }
+        while self.0.is_running() { }
 
         Ok(())
     }
@@ -796,7 +839,7 @@ impl TaskRef {
     /// it will finish running its current timeslice, and then never be run again.
     #[doc(hidden)]
     pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
-        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
+        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check the current task")?;
         if curr_task == self {
             self.internal_exit(ExitValue::Killed(reason))
         } else {
@@ -828,77 +871,6 @@ impl TaskRef {
         // instead of immediately causing it to exit
         self.internal_exit(ExitValue::Killed(reason))
     }
-
-
-    /// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.
-    /// This is okay because we want to allow any other part of the OS to read 
-    /// the details of the `Task` struct.
-    pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
-        MutexIrqSafeGuardRef::new(self.0.deref().0.lock())
-    }
-
-    /// Blocks this `Task` by setting its `RunState` to blocked.
-    pub fn block(&self) {
-        self.0.deref().0.lock().runstate = RunState::Blocked;
-    }
-
-    /// Unblocks this `Task` by setting its `RunState` to runnable.
-    pub fn unblock(&self) {
-        self.0.deref().0.lock().runstate = RunState::Runnable;
-    }
-
-    /// Registers a function or closure that will be called if this `Task` panics
-    /// or otherwise fails (e.g., due to a machine exception). 
-    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
-    /// # Locking / Deadlock
-    /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn set_kill_handler(&self, callback: KillHandler) {
-        self.0.deref().0.lock().set_kill_handler(callback)
-    }
-
-    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
-    /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
-    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
-    /// # Locking / Deadlock
-    /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn take_kill_handler(&self) -> Option<KillHandler> {
-        self.0.deref().0.lock().take_kill_handler()
-    }
-
-    /// Takes ownership of this `Task`'s exit value and returns it,
-    /// if and only if this `Task` was in the `Exited` runstate.
-    /// After invoking this, the `Task`'s runstate will be `Reaped`.
-    /// # Locking / Deadlock
-    /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn take_exit_value(&self) -> Option<ExitValue> {
-        self.0.deref().0.lock().take_exit_value()
-    }
-
-    /// Sets the `Environment` of this Task.
-    pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
-        self.0.deref().0.lock().set_env(new_env);
-    }
-
-    /// Gets a reference to this task's `Environment`.
-    pub fn get_env(&self) -> Arc<Mutex<Environment>> {
-        Arc::clone(&self.0.deref().0.lock().env)
-    }
-
-    /// Gets a reference to this task's `CrateNamespace`.
-    pub fn get_namespace(&self) -> Arc<CrateNamespace> {
-        Arc::clone(&self.0.deref().0.lock().namespace)
-    }
-    
-    /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
-    #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
-    #[doc(hidden)]
-    pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
-        MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
-    }
-
-    pub fn is_restartable(&self) -> bool {
-        self.0.deref().0.lock().restart_info.is_some()
-    }
 }
 
 impl PartialEq for TaskRef {
@@ -906,9 +878,20 @@ impl PartialEq for TaskRef {
         Arc::ptr_eq(&self.0, &other.0)
     }
 }
-
 impl Eq for TaskRef { }
 
+impl Deref for TaskRef {
+    type Target = Task;
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+// impl Drop for TaskRef {
+//     fn drop(&mut self) {
+//         trace!("Dropping TaskRef: strong_refs: {}, {:?}", Arc::strong_count(&self.0), self);
+//     }
+// }
 
 
 /// Bootstrap a new task from the current thread of execution.
@@ -926,16 +909,23 @@ pub fn bootstrap_task(
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut bootstrap_task = Task::new_internal(stack, kernel_mmi_ref, default_namespace, default_env, None, bootstrap_task_cleanup_failure);
+    let mut bootstrap_task = Task::new_internal(
+        stack,
+        kernel_mmi_ref,
+        default_namespace,
+        default_env,
+        None,
+        bootstrap_task_cleanup_failure,
+    );
     bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
-    bootstrap_task.runstate = RunState::Runnable;
-    bootstrap_task.running_on_cpu = Some(apic_id); 
-    bootstrap_task.pinned_core = Some(apic_id); // can only run on this CPU core
+    bootstrap_task.runstate.store(RunState::Runnable, Ordering::Release);
+    bootstrap_task.running_on_cpu.store(Some(apic_id), Ordering::Release); 
+    bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);
 
     // set this as this core's current task, since it's obviously running
-    task_ref.0.deref().0.lock().set_as_current_task();
+    task_ref.set_as_current_task();
     if get_my_current_task().is_none() {
         error!("BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}", apic_id);
         return Err("BUG: bootstrap_task(): failed to properly set the new idle task as the current task");
@@ -962,7 +952,7 @@ pub fn bootstrap_task(
 /// 
 /// Therefore there's not much we can actually do.
 fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
-    error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task, kill_reason);
     loop { }
 }
 

@@ -1,7 +1,7 @@
 #![no_std]
 
 extern crate alloc;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate apic;
 extern crate task;
@@ -23,47 +23,31 @@ use task::{Task, get_my_current_task, TaskRef};
 /// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
     let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
-
-    let current_task: *mut Task;
-    let next_task: *mut Task; 
     let apic_id = get_my_apic_id();
 
-    {
-        if let Some(selected_next_task) = select_next_task(apic_id) {
-            next_task = selected_next_task.lock().deref() as *const Task as *mut Task;
-        }
-        else {
-            // keep running the same current task
-            return false;
-        }
-    }
+    let curr_task = if let Some(curr) = get_my_current_task() {
+        curr
+    } else {
+        error!("BUG: schedule(): could not get current task.");
+        return false; // keep running the same current task
+    };
 
-    if next_task as usize == 0 {
-        // keep the same current task
-        return false;
-    }
-    
-    // same scoping reasons as above: to release the lock around current_task
-    {
-        current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-            .lock().deref() as *const Task as *mut Task; 
-    }
+    let next_task = if let Some(next) = select_next_task(apic_id) {
+        next
+    } else {
+        return false; // keep running the same current task
+    };
 
+    // No need to task switch if the chosen task is the same as the current task.
     if current_task == next_task {
-        // no need to switch if the chosen task is the same as the current task
         return false;
     }
 
-    // we want mutable task references without the locks, and we use unsafe code to obtain those references
-    // because the scope-based lock guard won't drop properly after the actual task_switch occurs.
-    let (curr, next) = unsafe { (&mut *current_task, &mut *next_task) };
+    trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {}, next: {}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
 
-    // trace!("BEFORE TASK_SWITCH CALL (AP {}), current={}, next={}, interrupts are {}", apic_id, curr, next, irq_safety::interrupts_enabled());
+    curr_task.task_switch(next_task.deref(), apic_id); 
 
-    curr.task_switch(next, apic_id); 
-
-    // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
-    // trace!("AFTER TASK_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
+    trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
  
     true
 }
