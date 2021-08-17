@@ -9,7 +9,7 @@ extern crate scheduler;
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
-use task::{TASKLIST, RunState};
+use task::TASKLIST;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -55,13 +55,7 @@ pub fn main(args: Vec<String>) -> isize {
         {
             let task = taskref.lock();
             name = task.name.clone();
-            runstate = match &task.runstate {
-                RunState::Initing    => "Initing",
-                RunState::Runnable   => "Runnable",
-                RunState::Blocked    => "Blocked",
-                RunState::Exited(_)  => "Exited",
-                RunState::Reaped     => "Reaped",
-            };
+            runstate = format!("{:?}", task.runstate);
             cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
             pinned = task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
             task_type = if task.is_an_idle_task {"I"}
@@ -95,16 +89,15 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn print_usage(opts: Options) -> isize {
-    let mut brief = format!("Usage: ps [options] \n \n");
-
-    brief.push_str("TYPE is 'I' if it is an idle task and 'A' if it is an application task. \n");
-    brief.push_str("CPU is the cpu core the task is currently running on. \n");
-    brief.push_str("PIN is the core the task is pinned on, if any. \n");
-    brief.push_str("RUNSATE is runnability status of this task, i.e. whether it's allowed to be scheduled in. \n");
-    brief.push_str("ID is the unique id of task. \n");
-    brief.push_str("NAME is the simple name of the task");
-
-    println!("{} \n", opts.usage(&brief));
-
+    println!("{}", opts.usage(BRIEF));
     0
 }
+
+const BRIEF: &'static str = "Usage: ps [options]\n
+    TYPE:      'I' if an idle task, 'A' if an application task, '-' otherwise.
+    CPU:       the cpu core the task is currently running on.
+    PIN:       the core the task is pinned on, if any.
+    RUNSTATE:  runnability status of this task, e.g., whether it can be scheduled in.
+    ID:        the unique identifier for this task.
+    NAME:      the name of the task.";
+    

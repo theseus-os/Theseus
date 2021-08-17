@@ -161,7 +161,7 @@ pub enum ExitValue {
 
 /// The set of possible runstates that a task can be in, e.g.,
 /// runnable, blocked, exited, etc. 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RunState {
     /// in the midst of setting up the task
     Initing,
@@ -172,7 +172,7 @@ pub enum RunState {
     Blocked,
     /// The `Task` has exited and can no longer be run,
     /// either by running to completion or being killed. 
-    Exited(ExitValue),
+    Exited,
     /// This `Task` had already exited and now its ExitValue has been taken;
     /// its exit value can only be taken once, and consumed by another `Task`.
     /// This `Task` is now useless, and can be deleted and removed from the Task list.
@@ -227,6 +227,8 @@ pub struct Task {
     
     /// the runnability status of this task, basically whether it's allowed to be scheduled in.
     pub runstate: RunState,
+    /// The status or value this Task exited with, if it has already exited.
+    pub exit_value: Option<ExitValue>,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
     /// A reference to this task's`TaskLocalData` struct, which is used to quickly retrieve the "current" Task
@@ -331,6 +333,7 @@ impl Task {
         Task {
             id: task_id,
             runstate: RunState::Initing,
+            exit_value: None,
             running_on_cpu: None,
             
             #[cfg(runqueue_spillful)]
@@ -369,19 +372,13 @@ impl Task {
     /// # Note
     /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
     pub fn is_runnable(&self) -> bool {
-        match self.runstate {
-            RunState::Runnable => true,
-            _ => false,
-        }
+        self.runstate == RunState::Runnable
     }
 
     /// Returns true if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
-        match self.runstate {
-            RunState::Exited(_) | RunState::Reaped => true,
-            _ => false,
-        }
+        self.runstate == RunState::Exited || self.runstate == RunState::Reaped
     }
 
     /// Returns `true` if this is an application `Task`. 
@@ -417,11 +414,7 @@ impl Task {
     /// if its runstate is `RunState::Exited`. 
     /// Unlike [`take_exit_value`](#method.take_exit_value), this does not consume the exit value.
     pub fn get_exit_value(&self) -> Option<&ExitValue> {
-        if let RunState::Exited(ref val) = self.runstate {
-            Some(val)
-        } else {
-            None
-        }
+        self.exit_value.as_ref()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -430,18 +423,11 @@ impl Task {
     /// After invoking this, the `Task`'s runstate will be `Reaped`,
     /// and this `Task` will be removed from the system task list.
     pub fn take_exit_value(&mut self) -> Option<ExitValue> {
-        match self.runstate {
-            RunState::Exited(_) => { }
-            _ => return None, 
-        }
-
-        let exited = core::mem::replace(&mut self.runstate, RunState::Reaped);
-        TASKLIST.lock().remove(&self.id);
-        if let RunState::Exited(exit_value) = exited {
-            Some(exit_value)
-        } 
-        else {
-            error!("BUG: Task::take_exit_value(): task {} runstate was Exited but couldn't get exit value.", self);
+        if self.runstate == RunState::Exited {
+            self.runstate = RunState::Reaped;
+            TASKLIST.lock().remove(&self.id);
+            self.exit_value.take()
+        } else {
             None
         }
     }
@@ -725,10 +711,11 @@ impl TaskRef {
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
         {
             let mut task = self.0.deref().0.lock();
-            if let RunState::Exited(_) = task.runstate {
-                return Err("task was already exited! (did not overwrite its existing exit value)");
+            if task.runstate == RunState::Exited {
+                return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
             }
-            task.runstate = RunState::Exited(val);
+            task.runstate = RunState::Exited;
+            task.exit_value = Some(val);
             self.0.deref().1.store(true, Ordering::SeqCst);
 
             // Corner case: if the task isn't running (as with killed tasks), 

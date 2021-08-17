@@ -41,7 +41,7 @@ use spin::Mutex;
 use alloc::sync::Arc;
 use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 use memory::MappedPages;
-use task::{TaskRef, TASKLIST, RunState};
+use task::{TaskRef, TASKLIST};
 use path::Path;
 
 
@@ -239,13 +239,7 @@ impl TaskFile {
     fn generate(&self) -> String {
         // Print all tasks
         let name = &self.taskref.lock().name.clone();
-        let runstate = match &self.taskref.lock().runstate {
-            RunState::Initing    => "Initing",
-            RunState::Runnable   => "Runnable",
-            RunState::Blocked    => "Blocked",
-            RunState::Exited(_)  => "Exited",
-            RunState::Reaped     => "Reaped",
-        };
+        let runstate = format!("{:?}", self.taskref.lock().runstate);
         let cpu = self.taskref.lock().running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
         let pinned = &self.taskref.lock().pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
         let task_type = if self.taskref.lock().is_an_idle_task {
