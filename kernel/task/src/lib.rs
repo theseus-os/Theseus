@@ -337,11 +337,17 @@ const_assert!(AtomicCell::<RunState>::is_lock_free());
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Task")
+        let mut ds = f.debug_struct("Task");
+        ds.field("name", &self.name)
+            .field("id", &self.id)
             .field("running_on", &self.running_on_cpu)
-            .field("runstate", &self.runstate)
-            .field("pinned", &self.inner.try_lock().map(|l| l.pinned_core).unwrap_or(None))
-            .finish()
+            .field("runstate", &self.runstate);
+        if let Some(inner) = self.inner.try_lock() {
+            ds.field("pinned", &inner.pinned_core);
+        } else {
+            ds.field("pinned", &"<Locked>");
+        }
+        ds.finish()
     }
 }
 
