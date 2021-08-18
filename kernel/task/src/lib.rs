@@ -28,8 +28,6 @@
 #![no_std]
 #![feature(panic_info_message)]
 
-#[cfg(test)] #[macro_use] extern crate std;
-
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
