@@ -124,7 +124,6 @@ pub fn set_my_kill_handler(handler: KillHandler) -> Result<(), &'static str> {
 }
 
 
-
 /// The list of possible reasons that a given `Task` was killed prematurely.
 #[derive(Debug)]
 pub enum KillReason {
@@ -200,8 +199,7 @@ pub enum SimdExt {
     None,
 }
 
-/// A data structure to hold data related to restart the function. 
-/// Presence of `RestartInfo` itself indicates the task will be restartable.
+/// A struct holding data items needed to restart a `Task`.
 pub struct RestartInfo {
     /// Stores the argument of the task for restartable tasks
     pub argument: Box<dyn Any + Send>,
@@ -578,8 +576,12 @@ impl Task {
     /// Takes ownership of this `Task`'s exit value and returns it,
     /// if and only if this `Task` was in the `Exited` runstate.
     ///
-    /// After invoking this, the `Task`'s runstate will be `Reaped`,
+    /// If this `Task` was in the `Exited` runstate, after invoking this,
+    /// this `Task`'s runstate will be set to `Reaped`
     /// and this `Task` will be removed from the system task list.
+    ///
+    /// If this `Task` was **not** in the `Exited` runstate, 
+    /// nothing is done and `None` is returned.
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to mutate it.    
@@ -598,10 +600,10 @@ impl Task {
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to mutate it. 
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
+        if self.has_exited() {
+            return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
+        }
         {
-            if self.runstate() == RunState::Exited {
-                return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
-            }
             self.runstate.store(RunState::Exited);
             let mut inner = self.inner.lock();
             inner.exit_value = Some(val);
@@ -626,12 +628,12 @@ impl Task {
         Ok(())
     }
 
-    /// Blocks this `Task` by setting its `RunState` to blocked.
+    /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
     pub fn block(&self) {
         self.runstate.store(RunState::Blocked);
     }
 
-    /// Unblocks this `Task` by setting its `RunState` to runnable.
+    /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
     pub fn unblock(&self) {
         self.runstate.store(RunState::Runnable);
     }
@@ -662,42 +664,38 @@ impl Task {
         // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}, interrupts?: {}", apic_id, self, next, irq_safety::interrupts_enabled());
 
         // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
-        /*
-        if !next.is_runnable() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-            return;
-        }
-        if next.is_running() {
-            error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-            return;
-        }
-        if let Some(pc) = next.pinned_core() {
-            if pc != apic_id {
-                error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, apic_id, self, next);
-                return;
-            }
-        }
-        */
+        // if !next.is_runnable() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
+        //     return;
+        // }
+        // if next.is_running() {
+        //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
+        //     return;
+        // }
+        // if let Some(pc) = next.pinned_core() {
+        //     if pc != apic_id {
+        //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, apic_id, self, next);
+        //         return;
+        //     }
+        // }
 
         // Note that because userspace support is currently disabled, this will never happen.
-        // Change the privilege stack (RSP0) in the TSS.
-        // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
-        // i.e., when `next` is not a userspace task.
-        /*
-        if next.is_userspace() {
-            let (stack_bottom, stack_size) = {
-                let kstack = &next.inner.lock().kstack;
-                (kstack.bottom(), kstack.size_in_bytes())
-            };
-            let new_tss_rsp0 = stack_bottom + (stack_size / 2); // the middle half of the stack
-            if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { 
-                // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
-            } else {
-                error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-                return;
-            }
-        }
-        */
+        // // Change the privilege stack (RSP0) in the TSS.
+        // // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
+        // // i.e., when `next` is not a userspace task.
+        // if next.is_userspace() {
+        //     let (stack_bottom, stack_size) = {
+        //         let kstack = &next.inner.lock().kstack;
+        //         (kstack.bottom(), kstack.size_in_bytes())
+        //     };
+        //     let new_tss_rsp0 = stack_bottom + (stack_size / 2); // the middle half of the stack
+        //     if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { 
+        //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+        //     } else {
+        //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+        //         return;
+        //     }
+        // }
 
         // update runstates
         self.running_on_cpu.store(None.into()); // no longer running
@@ -706,7 +704,6 @@ impl Task {
         // Switch page tables. 
         // Since there is only a single address space (as userspace support is currently disabled),
         // we do not need to do this at all.
-        /*
         if false {
             let prev_mmi = &self.mmi;
             let next_mmi = &next.mmi;
@@ -724,7 +721,6 @@ impl Task {
                 prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
             }
         }
-        */
        
         // update the current task to `next`
         next.set_as_current_task();
@@ -745,8 +741,6 @@ impl Task {
             inner.saved_sp
         };
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", prev_task_saved_sp as usize, next_task_saved_sp);
-        // if self.inner.is_locked() { error!("BUG: previous task inner was locked!"); }
-        // if next.inner.is_locked() { error!("BUG: next task inner was locked!"); }
 
         /// A private macro that actually calls the given context switch routine.
         macro_rules! call_context_switch {
