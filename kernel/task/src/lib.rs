@@ -214,7 +214,8 @@ pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
 
 
 /// A wrapper around `Option<u8>` with a forced type alignment of 2 bytes,
-/// to ensure lock freedom when using it inside of [`AtomicCell`].
+/// which guarantees that it compiles down to lock-free native atomic instructions
+/// when using it inside of an atomic type like [`AtomicCell`].
 #[derive(Copy, Clone)]
 #[repr(align(2))]
 struct OptionU8(Option<u8>);
