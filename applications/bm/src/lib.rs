@@ -1555,8 +1555,7 @@ fn get_prog_name() -> String {
         }
     };
 
-    let locked_task = taskref.lock();
-    locked_task.name.clone()
+    taskref.name.clone()
 }
 
 /// Helper function to get the PID of current task
@@ -1569,8 +1568,7 @@ fn getpid() -> usize {
         }
     };
 
-    let locked_task = taskref.lock();
-    locked_task.id
+    taskref.id
 }
 
 
@@ -1589,13 +1587,9 @@ fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
 
 /// Helper function to get current working directory
 fn get_cwd() -> Option<DirRef> {
-	if let Some(taskref) = task::get_my_current_task() {
-        let locked_task = &taskref.lock();
-        let curr_env = locked_task.env.lock();
-        return Some(Arc::clone(&curr_env.working_dir));
-    }
-
-    None
+	task::get_my_current_task().map(|t| 
+		Arc::clone(&t.get_env().lock().working_dir)
+	)
 }
 
 /// Helper function to make a temporary file to be used to measure read open latencies

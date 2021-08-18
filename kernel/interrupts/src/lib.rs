@@ -233,7 +233,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
 /// irq arg is only used for PIC
 pub fn eoi(irq: Option<u8>) {
-    match INTERRUPT_CHIP.load(Ordering::Acquire) {
+    match INTERRUPT_CHIP.load() {
         InterruptChip::APIC |
         InterruptChip::X2APIC => {
             apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").write().eoi();
@@ -364,7 +364,7 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut Exc
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
-	match apic::INTERRUPT_CHIP.load(Ordering::Acquire) {
+	match apic::INTERRUPT_CHIP.load() {
         apic::InterruptChip::PIC => {
             let irq_regs = PIC.get().map(|pic| pic.read_isr_irr());  
             println_raw!("PIC IRQ Registers: {:?}", irq_regs);

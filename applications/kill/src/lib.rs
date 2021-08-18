@@ -60,7 +60,7 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
             .and_then(|_| runqueue::remove_task_from_all(&task_ref))
             .is_ok() 
         {
-            println!("Killed task {}", &*task_ref.lock());
+            println!("Killed task {}", &*task_ref);
             if reap {
                 match task_ref.take_exit_value() {
                     Some(exit_val) => { 

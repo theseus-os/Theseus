@@ -38,18 +38,8 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    // grabs the current environment pointer; this is scoped so that we drop the lock on the "cd" task
-    let curr_env = {
-        let locked_task = taskref.lock();
-        Arc::clone(&locked_task.env)
-    };
-
-    // grabs the current working directory pointer; this is scoped so that we drop the lock on the "cd" task
-    let curr_wr = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let curr_env = taskref.get_env();
+    let curr_wr = Arc::clone(&curr_env.lock().working_dir);
 
     // go to root directory 
     if matches.free.is_empty() {
