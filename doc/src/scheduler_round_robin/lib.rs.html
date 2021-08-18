@@ -55,8 +55,6 @@
 <span id="52">52</span>
 <span id="53">53</span>
 <span id="54">54</span>
-<span id="55">55</span>
-<span id="56">56</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate picks the next task in round robin fashion.</span>
 <span class="doccomment">//! Each time the task at the front of the queue is picked.</span>
@@ -89,9 +87,7 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idle_task_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chosen_task_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
 
-    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">taskref</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">lock</span>();
-
+    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">t</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
         <span class="comment">// we skip the idle task, and only choose it if no other tasks are runnable</span>
         <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">is_an_idle_task</span> {
             <span class="ident">idle_task_index</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>);
@@ -105,7 +101,7 @@
             
         <span class="comment">// found a runnable task!</span>
         <span class="ident">chosen_task_index</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>);
-        <span class="comment">// debug!(&quot;select_next_task(): AP {} chose Task {:?}&quot;, apic_id, *t);</span>
+        <span class="comment">// debug!(&quot;select_next_task(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);</span>
         <span class="kw">break</span>;
     }
 

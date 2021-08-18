@@ -707,6 +707,9 @@
 <span id="704">704</span>
 <span id="705">705</span>
 <span id="706">706</span>
+<span id="707">707</span>
+<span id="708">708</span>
+<span id="709">709</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -727,10 +730,9 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">raw_cpuid</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pit_clock</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crossbeam_utils</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
 
-<span class="kw">use</span> <span class="ident">core::sync::atomic::Ordering</span>;
 <span class="kw">use</span> <span class="ident">volatile</span>::{<span class="ident">Volatile</span>, <span class="ident">ReadOnly</span>, <span class="ident">WriteOnly</span>};
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
 <span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
@@ -742,7 +744,7 @@
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">PageTable</span>, <span class="ident">PhysicalAddress</span>, <span class="ident">EntryFlags</span>, <span class="ident">MappedPages</span>, <span class="ident">allocate_pages</span>, <span class="ident">allocate_frames_at</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS</span>;
 <span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
-<span class="kw">use</span> <span class="ident">atomic::Atomic</span>;
+<span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
 <span class="kw">use</span> <span class="ident">pit_clock::pit_wait</span>;
 <span class="kw">use</span> <span class="ident">bit_field::BitField</span>;
 
@@ -750,14 +752,18 @@
 <span class="doccomment">/// The interrupt chip that is currently configured on this machine. </span>
 <span class="doccomment">/// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,</span>
 <span class="doccomment">/// which will be set once those chips have been initialized.</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">INTERRUPT_CHIP</span>: <span class="ident">Atomic</span><span class="op">&lt;</span><span class="ident">InterruptChip</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Atomic::new</span>(<span class="ident">InterruptChip::PIC</span>);
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">INTERRUPT_CHIP</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="ident">InterruptChip</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">AtomicCell::new</span>(<span class="ident">InterruptChip::PIC</span>);
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">InterruptChip</span> {
     <span class="ident">APIC</span>,
     <span class="ident">X2APIC</span>,
     <span class="ident">PIC</span>,
 }
+
+<span class="comment">// Ensure that `AtomicCell&lt;InterruptChip&gt;` is actually a lock-free atomic.</span>
+<span class="macro">const_assert!</span>(<span class="ident">AtomicCell</span>::<span class="op">&lt;</span><span class="ident">InterruptChip</span><span class="op">&gt;</span><span class="ident">::is_lock_free</span>());
 
 
 <span class="macro">lazy_static!</span> {
@@ -1051,7 +1057,7 @@
         <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span>); }
         <span class="macro">info!</span>(<span class="string">&quot;LAPIC ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, <span class="self">self</span>.<span class="ident">id</span>(), <span class="self">self</span>.<span class="ident">version</span>(), <span class="ident">is_bsp</span>);
         <span class="kw">if</span> <span class="ident">is_bsp</span> {
-            <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::APIC</span>, <span class="ident">Ordering::Release</span>);
+            <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::APIC</span>);
         }
 
         <span class="comment">// init APIC to a clean state</span>
@@ -1084,7 +1090,7 @@
         <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_APIC_BASE</span>, <span class="ident">rdmsr</span>(<span class="ident">IA32_APIC_BASE</span>) <span class="op">|</span> <span class="ident">IA32_APIC_XAPIC_ENABLE</span> <span class="op">|</span> <span class="ident">IA32_APIC_X2APIC_ENABLE</span>); }
         <span class="macro">info!</span>(<span class="string">&quot;LAPIC x2 ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, <span class="self">self</span>.<span class="ident">id</span>(), <span class="self">self</span>.<span class="ident">version</span>(), <span class="ident">is_bsp</span>);
         <span class="kw">if</span> <span class="ident">is_bsp</span> {
-            <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::X2APIC</span>, <span class="ident">Ordering::Release</span>);
+            <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">store</span>(<span class="ident">InterruptChip::X2APIC</span>);
         }
 
 

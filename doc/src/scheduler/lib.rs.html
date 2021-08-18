@@ -79,28 +79,11 @@
 <span id="76">76</span>
 <span id="77">77</span>
 <span id="78">78</span>
-<span id="79">79</span>
-<span id="80">80</span>
-<span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-<span id="84">84</span>
-<span id="85">85</span>
-<span id="86">86</span>
-<span id="87">87</span>
-<span id="88">88</span>
-<span id="89">89</span>
-<span id="90">90</span>
-<span id="91">91</span>
-<span id="92">92</span>
-<span id="93">93</span>
-<span id="94">94</span>
-<span id="95">95</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="comment">// #[macro_use] extern crate log;</span>
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
@@ -112,7 +95,7 @@
 <span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::hold_interrupts</span>;
 <span class="kw">use</span> <span class="ident">apic::get_my_apic_id</span>;
-<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">Task</span>, <span class="ident">get_my_current_task</span>, <span class="ident">TaskRef</span>};
+<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">get_my_current_task</span>, <span class="ident">TaskRef</span>};
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> <span class="kw">use</span> <span class="ident">scheduler_priority::select_next_task</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> <span class="kw">use</span> <span class="ident">scheduler_round_robin::select_next_task</span>;
 
@@ -122,47 +105,31 @@
 <span class="doccomment">/// Interrupts will be disabled while this function runs.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">schedule</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
     <span class="kw">let</span> <span class="ident">_held_interrupts</span> <span class="op">=</span> <span class="ident">hold_interrupts</span>(); <span class="comment">// auto-reenables interrupts on early return</span>
-
-    <span class="kw">let</span> <span class="ident">current_task</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Task</span>;
-    <span class="kw">let</span> <span class="ident">next_task</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Task</span>; 
     <span class="kw">let</span> <span class="ident">apic_id</span> <span class="op">=</span> <span class="ident">get_my_apic_id</span>();
 
-    {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">selected_next_task</span>) <span class="op">=</span> <span class="ident">select_next_task</span>(<span class="ident">apic_id</span>) {
-            <span class="ident">next_task</span> <span class="op">=</span> <span class="ident">selected_next_task</span>.<span class="ident">lock</span>().<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">Task</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Task</span>;
-        }
-        <span class="kw">else</span> {
-            <span class="comment">// keep running the same current task</span>
-            <span class="kw">return</span> <span class="bool-val">false</span>;
-        }
-    }
+    <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">curr</span>) <span class="op">=</span> <span class="ident">get_my_current_task</span>() {
+        <span class="ident">curr</span>
+    } <span class="kw">else</span> {
+        <span class="macro">error!</span>(<span class="string">&quot;BUG: schedule(): could not get current task.&quot;</span>);
+        <span class="kw">return</span> <span class="bool-val">false</span>; <span class="comment">// keep running the same current task</span>
+    };
 
-    <span class="kw">if</span> <span class="ident">next_task</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-        <span class="comment">// keep the same current task</span>
-        <span class="kw">return</span> <span class="bool-val">false</span>;
-    }
-    
-    <span class="comment">// same scoping reasons as above: to release the lock around current_task</span>
-    {
-        <span class="ident">current_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">expect</span>(<span class="string">&quot;schedule(): get_my_current_task() failed&quot;</span>)
-            .<span class="ident">lock</span>().<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">Task</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Task</span>; 
-    }
+    <span class="kw">let</span> <span class="ident">next_task</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next</span>) <span class="op">=</span> <span class="ident">select_next_task</span>(<span class="ident">apic_id</span>) {
+        <span class="ident">next</span>
+    } <span class="kw">else</span> {
+        <span class="kw">return</span> <span class="bool-val">false</span>; <span class="comment">// keep running the same current task</span>
+    };
 
-    <span class="kw">if</span> <span class="ident">current_task</span> <span class="op">=</span><span class="op">=</span> <span class="ident">next_task</span> {
-        <span class="comment">// no need to switch if the chosen task is the same as the current task</span>
+    <span class="comment">// No need to task switch if the chosen task is the same as the current task.</span>
+    <span class="kw">if</span> <span class="ident">curr_task</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">next_task</span> {
         <span class="kw">return</span> <span class="bool-val">false</span>;
     }
 
-    <span class="comment">// we want mutable task references without the locks, and we use unsafe code to obtain those references</span>
-    <span class="comment">// because the scope-based lock guard won&#39;t drop properly after the actual task_switch occurs.</span>
-    <span class="kw">let</span> (<span class="ident">curr</span>, <span class="ident">next</span>) <span class="op">=</span> <span class="kw">unsafe</span> { (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">current_task</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">next_task</span>) };
+    <span class="comment">// trace!(&quot;BEFORE TASK_SWITCH CALL (AP {}), current: {:?}, next: {:?}, interrupts are {}&quot;, apic_id, curr_task, next_task, irq_safety::interrupts_enabled());</span>
 
-    <span class="comment">// trace!(&quot;BEFORE TASK_SWITCH CALL (AP {}), current={}, next={}, interrupts are {}&quot;, apic_id, curr, next, irq_safety::interrupts_enabled());</span>
+    <span class="ident">curr_task</span>.<span class="ident">task_switch</span>(<span class="ident">next_task</span>.<span class="ident">deref</span>(), <span class="ident">apic_id</span>); 
 
-    <span class="ident">curr</span>.<span class="ident">task_switch</span>(<span class="ident">next</span>, <span class="ident">apic_id</span>); 
-
-    <span class="comment">// let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);</span>
-    <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (current={}), interrupts are {}&quot;, new_current, ::interrupts::interrupts_enabled());</span>
+    <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}&quot;, apic_id, get_my_current_task(), irq_safety::interrupts_enabled());</span>
  
     <span class="bool-val">true</span>
 }
@@ -186,7 +153,6 @@
         <span class="ident">scheduler_priority::get_priority</span>(<span class="ident">_task</span>)
     }
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> {
-        <span class="comment">//Err(&quot;no scheduler that uses task priority is currently loaded&quot;)</span>
         <span class="prelude-val">None</span>
     }
 }

@@ -454,16 +454,6 @@
 <span id="451">451</span>
 <span id="452">452</span>
 <span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -508,7 +498,7 @@
 <span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">DirRef</span>, <span class="ident">WeakDirRef</span>, <span class="ident">Directory</span>, <span class="ident">FileOrDir</span>, <span class="ident">File</span>, <span class="ident">FileRef</span>, <span class="ident">FsNode</span>};
 <span class="kw">use</span> <span class="ident">memory::MappedPages</span>;
-<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>, <span class="ident">TASKLIST</span>, <span class="ident">RunState</span>};
+<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>, <span class="ident">TASKLIST</span>};
 <span class="kw">use</span> <span class="ident">path::Path</span>;
 
 
@@ -546,7 +536,7 @@
         <span class="kw">let</span> <span class="ident">id</span> <span class="op">=</span> <span class="ident">node</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;could not parse Task id as usize&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">task_ref</span> <span class="op">=</span> <span class="ident">task::get_task</span>(<span class="ident">id</span>).<span class="ident">ok_or</span>(<span class="string">&quot;could not get taskref from TASKLIST&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">parent_dir</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_self_pointer</span>().<span class="ident">ok_or</span>(<span class="string">&quot;BUG: tasks directory wasn&#39;t in root&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">dir_name</span> <span class="op">=</span> <span class="ident">task_ref</span>.<span class="ident">lock</span>().<span class="ident">id</span>.<span class="ident">to_string</span>(); 
+        <span class="kw">let</span> <span class="ident">dir_name</span> <span class="op">=</span> <span class="ident">task_ref</span>.<span class="ident">id</span>.<span class="ident">to_string</span>(); 
         <span class="comment">// lazily compute a new TaskDir everytime the caller wants to get a TaskDir</span>
         <span class="kw">let</span> <span class="ident">task_dir</span> <span class="op">=</span> <span class="ident">TaskDir::new</span>(<span class="ident">dir_name</span>, <span class="kw-2">&amp;</span><span class="ident">parent_dir</span>, <span class="ident">task_ref</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;        
         <span class="kw">let</span> <span class="ident">boxed_task_dir</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">task_dir</span>)) <span class="kw">as</span> <span class="ident">DirRef</span>;
@@ -621,7 +611,7 @@
 <span class="kw">impl</span> <span class="ident">TaskDir</span> {
     <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">name</span>: <span class="ident">String</span>, <span class="ident">parent</span>: <span class="kw-2">&amp;</span><span class="ident">DirRef</span>, <span class="ident">taskref</span>: <span class="ident">TaskRef</span>)  <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TaskDir</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">id</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
         <span class="kw">let</span> <span class="ident">directory</span> <span class="op">=</span> <span class="ident">TaskDir</span> {
             <span class="ident">name</span>: <span class="ident">name</span>,
             <span class="ident">path</span>: <span class="ident">Path::new</span>(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, <span class="ident">TASKS_DIRECTORY_PATH</span>, <span class="ident">task_id</span>)),
@@ -694,7 +684,7 @@
 
 <span class="kw">impl</span> <span class="ident">TaskFile</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">taskref</span>: <span class="ident">TaskRef</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TaskFile</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">id</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
         <span class="ident">TaskFile</span> {
             <span class="ident">taskref</span>,
             <span class="ident">task_id</span>,
@@ -705,28 +695,20 @@
     <span class="doccomment">/// Generates the task info string.</span>
     <span class="kw">fn</span> <span class="ident">generate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
         <span class="comment">// Print all tasks</span>
-        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">name</span>.<span class="ident">clone</span>();
-        <span class="kw">let</span> <span class="ident">runstate</span> <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">runstate</span> {
-            <span class="ident">RunState::Initing</span>    <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Initing&quot;</span>,
-            <span class="ident">RunState::Runnable</span>   <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Runnable&quot;</span>,
-            <span class="ident">RunState::Blocked</span>    <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Blocked&quot;</span>,
-            <span class="ident">RunState::Exited</span>(<span class="kw">_</span>)  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Exited&quot;</span>,
-            <span class="ident">RunState::Reaped</span>     <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;Reaped&quot;</span>,
-        };
-        <span class="kw">let</span> <span class="ident">cpu</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">running_on_cpu</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">cpu</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">cpu</span>)).<span class="ident">unwrap_or</span>(<span class="ident">String::from</span>(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let</span> <span class="ident">pinned</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">pinned_core</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">pin</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">pin</span>)).<span class="ident">unwrap_or</span>(<span class="ident">String::from</span>(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let</span> <span class="ident">task_type</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">is_an_idle_task</span> {
+        <span class="kw">let</span> <span class="ident">cpu</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">running_on_cpu</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">cpu</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">cpu</span>)).<span class="ident">unwrap_or</span>(<span class="ident">String::from</span>(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let</span> <span class="ident">pinned</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">pinned_core</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">pin</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">pin</span>)).<span class="ident">unwrap_or</span>(<span class="ident">String::from</span>(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let</span> <span class="ident">task_type</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">is_an_idle_task</span> {
             <span class="string">&quot;I&quot;</span>
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">is_application</span>() {
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">is_application</span>() {
             <span class="string">&quot;A&quot;</span>
         } <span class="kw">else</span> {
             <span class="string">&quot; &quot;</span>
         };  
 
-        <span class="macro">format!</span>(<span class="string">&quot;{0:&lt;10} {1}\n{2:&lt;10} {3}\n{4:&lt;10} {5}\n{6:&lt;10} {7}\n{8:&lt;10} {9}\n{10:&lt;10} {11:&lt;10}&quot;</span>, 
-            <span class="string">&quot;name&quot;</span>, <span class="ident">name</span>,
-            <span class="string">&quot;task id&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">id</span>,
-            <span class="string">&quot;runstate&quot;</span>, <span class="ident">runstate</span>,
+        <span class="macro">format!</span>(<span class="string">&quot;{0:&lt;10} {1}\n{2:&lt;10} {3}\n{4:&lt;10} {5:?}\n{6:&lt;10} {7}\n{8:&lt;10} {9}\n{10:&lt;10} {11:&lt;10}&quot;</span>, 
+            <span class="string">&quot;name&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">name</span>,
+            <span class="string">&quot;task id&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">id</span>,
+            <span class="string">&quot;runstate&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">runstate</span>(),
             <span class="string">&quot;cpu&quot;</span>, <span class="ident">cpu</span>,
             <span class="string">&quot;pinned&quot;</span>, <span class="ident">pinned</span>,
             <span class="string">&quot;task type&quot;</span>, <span class="ident">task_type</span>
@@ -740,7 +722,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
-        <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">name</span>.<span class="ident">clone</span>()
+        <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">name</span>.<span class="ident">clone</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span> {
@@ -796,7 +778,7 @@
 <span class="kw">impl</span> <span class="ident">MmiDir</span> {
     <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">taskref</span>: <span class="ident">TaskRef</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MmiDir</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">id</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
         <span class="ident">MmiDir</span> {
             <span class="ident">taskref</span>,
             <span class="ident">task_id</span>,
@@ -866,7 +848,7 @@
 
 <span class="kw">impl</span> <span class="ident">MmiFile</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">taskref</span>: <span class="ident">TaskRef</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MmiFile</span> {
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">id</span>;
+        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
         <span class="ident">MmiFile</span> {
             <span class="ident">taskref</span>,
             <span class="ident">task_id</span>,
@@ -876,9 +858,7 @@
 
     <span class="doccomment">/// Generates the mmi info string.</span>
     <span class="kw">fn</span> <span class="ident">generate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
-        <span class="kw">let</span> <span class="ident">task</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">mmi</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">mmi</span>.<span class="ident">lock</span>();
-        <span class="macro">format!</span>(<span class="string">&quot;Page table: {:?}\n&quot;</span>, <span class="ident">mmi</span>.<span class="ident">page_table</span>)
+        <span class="macro">format!</span>(<span class="string">&quot;Page table: {:?}\n&quot;</span>, <span class="self">self</span>.<span class="ident">taskref</span>.<span class="ident">mmi</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>)
     }
 }
 

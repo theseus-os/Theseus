@@ -694,7 +694,7 @@
 <span class="doccomment">/// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)</span>
 <span class="doccomment">/// irq arg is only used for PIC</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">eoi</span>(<span class="ident">irq</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) {
-    <span class="kw">match</span> <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>) {
+    <span class="kw">match</span> <span class="ident">INTERRUPT_CHIP</span>.<span class="ident">load</span>() {
         <span class="ident">InterruptChip::APIC</span> <span class="op">|</span>
         <span class="ident">InterruptChip::X2APIC</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="ident">apic::get_my_apic</span>().<span class="ident">expect</span>(<span class="string">&quot;eoi(): couldn&#39;t get my apic to send EOI!&quot;</span>).<span class="ident">write</span>().<span class="ident">eoi</span>();
@@ -825,7 +825,7 @@
 
 <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">unimplemented_interrupt_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nUnimplemented interrupt handler: {:#?}&quot;</span>, <span class="ident">_stack_frame</span>);
-	<span class="kw">match</span> <span class="ident">apic::INTERRUPT_CHIP</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>) {
+	<span class="kw">match</span> <span class="ident">apic::INTERRUPT_CHIP</span>.<span class="ident">load</span>() {
         <span class="ident">apic::InterruptChip::PIC</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="kw">let</span> <span class="ident">irq_regs</span> <span class="op">=</span> <span class="ident">PIC</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">pic</span><span class="op">|</span> <span class="ident">pic</span>.<span class="ident">read_isr_irr</span>());  
             <span class="macro">println_raw!</span>(<span class="string">&quot;PIC IRQ Registers: {:?}&quot;</span>, <span class="ident">irq_regs</span>);

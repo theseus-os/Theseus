@@ -152,9 +152,9 @@
     <span class="ident">unwind::invoke_with_current_registers</span>(<span class="op">|</span><span class="ident">registers</span><span class="op">|</span> {
         <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">get_namespace</span>())
-            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>().<span class="ident">cloned</span>())
+            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>())
             .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get current task&#39;s or default namespace&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stack_frame_iter</span> <span class="op">=</span> <span class="ident">StackFrameIter::new</span>(<span class="ident">namespace</span>, <span class="ident">registers</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">stack_frame_iter</span> <span class="op">=</span> <span class="ident">StackFrameIter::new</span>(<span class="ident">namespace</span>.<span class="ident">clone</span>(), <span class="ident">registers</span>);
 
         <span class="comment">// iterate over each frame in the call stack</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0</span>;

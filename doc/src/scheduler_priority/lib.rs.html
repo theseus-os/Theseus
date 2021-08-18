@@ -226,18 +226,6 @@
 <span id="223">223</span>
 <span id="224">224</span>
 <span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate picks the next task on token based scheduling policy.</span>
 <span class="doccomment">//! At the begining of each scheduling epoch a set of tokens is distributed among tasks</span>
@@ -323,9 +311,7 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chosen_task_index</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idle_task</span> <span class="op">=</span> <span class="bool-val">true</span>;
 
-    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">priority_taskref</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">priority_taskref</span>.<span class="ident">lock</span>();
-
+    <span class="kw">for</span> (<span class="ident">i</span>, <span class="ident">t</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
         <span class="comment">// we skip the idle task, and only choose it if no other tasks are runnable</span>
         <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">is_an_idle_task</span> {
             <span class="ident">idle_task_index</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>);
@@ -338,23 +324,23 @@
         }
 
         <span class="comment">// if this task is pinned, it must not be pinned to a different core</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pinned</span>) <span class="op">=</span> <span class="ident">t</span>.<span class="ident">pinned_core</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pinned</span>) <span class="op">=</span> <span class="ident">t</span>.<span class="ident">pinned_core</span>() {
             <span class="kw">if</span> <span class="ident">pinned</span> <span class="op">!</span><span class="op">=</span> <span class="ident">apic_id</span> {
                 <span class="comment">// with per-core runqueues, this should never happen!</span>
-                <span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, <span class="ident">apic_id</span>, <span class="kw-2">*</span><span class="ident">t</span>);
+                <span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, <span class="ident">apic_id</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">t</span>);
                 <span class="kw">return</span> <span class="prelude-val">None</span>;
             }
         }
 
         <span class="comment">// if the task has no remaining tokens we ignore the task</span>
-        <span class="kw">if</span> <span class="ident">priority_taskref</span>.<span class="ident">tokens_remaining</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>{
+        <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">tokens_remaining</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
             <span class="kw">continue</span>;
         }
             
         <span class="comment">// found a runnable task!</span>
         <span class="ident">chosen_task_index</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">i</span>);
         <span class="ident">idle_task</span> <span class="op">=</span> <span class="bool-val">false</span>;
-        <span class="comment">// debug!(&quot;select_next_task(): AP {} chose Task {:?}&quot;, apic_id, *t);</span>
+        <span class="comment">// debug!(&quot;select_next_task(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);</span>
         <span class="kw">break</span>; 
     }
 
@@ -396,9 +382,7 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_priorities</span> :<span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 
     <span class="comment">// This loop calculates the total priorities of the runqueue</span>
-    <span class="kw">for</span> (<span class="ident">_i</span>, <span class="ident">priority_taskref</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
-        <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">priority_taskref</span>.<span class="ident">lock</span>();
-
+    <span class="kw">for</span> (<span class="ident">_i</span>, <span class="ident">t</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter</span>().<span class="ident">enumerate</span>() {
         <span class="comment">// we skip the idle task, it contains zero tokens as it is picked last</span>
         <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">is_an_idle_task</span> {
             <span class="kw">continue</span>;
@@ -410,22 +394,22 @@
         }
 
         <span class="comment">// if this task is pinned, it must not be pinned to a different core</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pinned</span>) <span class="op">=</span> <span class="ident">t</span>.<span class="ident">pinned_core</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pinned</span>) <span class="op">=</span> <span class="ident">t</span>.<span class="ident">pinned_core</span>() {
             <span class="kw">if</span> <span class="ident">pinned</span> <span class="op">!</span><span class="op">=</span> <span class="ident">apic_id</span> {
                 <span class="comment">// with per-core runqueues, this should never happen!</span>
-                <span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, <span class="ident">apic_id</span>, <span class="kw-2">*</span><span class="ident">t</span>);
+                <span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, <span class="ident">apic_id</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">t</span>);
                 <span class="kw">return</span> <span class="bool-val">false</span>;
             }
         }
             
         <span class="comment">// found a runnable task!</span>
         <span class="comment">// We add its priority</span>
-        <span class="comment">// debug!(&quot;assign_tokens(): AP {} Task {:?} priority {}&quot;, apic_id, *t, priority_taskref.priority);</span>
-        <span class="ident">total_priorities</span> <span class="op">=</span> <span class="ident">total_priorities</span>.<span class="ident">saturating_add</span>(<span class="number">1</span>).<span class="ident">saturating_add</span>(<span class="ident">priority_taskref</span>.<span class="ident">priority</span> <span class="kw">as</span> <span class="ident">usize</span>);
+        <span class="comment">// debug!(&quot;assign_tokens(): AP {} Task {:?} priority {}&quot;, apic_id, &amp;*t, t.priority);</span>
+        <span class="ident">total_priorities</span> <span class="op">=</span> <span class="ident">total_priorities</span>.<span class="ident">saturating_add</span>(<span class="number">1</span>).<span class="ident">saturating_add</span>(<span class="ident">t</span>.<span class="ident">priority</span> <span class="kw">as</span> <span class="ident">usize</span>);
         
         
         
-        <span class="comment">// debug!(&quot;assign_tokens(): AP {} chose Task {:?}&quot;, apic_id, *t);</span>
+        <span class="comment">// debug!(&quot;assign_tokens(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);</span>
         <span class="comment">// break; </span>
     }
 
@@ -437,40 +421,32 @@
 
     <span class="comment">// We iterate through each task in runqueue</span>
     <span class="comment">// We dont use iterator as items are modified in the process</span>
-    <span class="kw">for</span> (<span class="ident">_i</span>, <span class="ident">priority_taskref</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter_mut</span>().<span class="ident">enumerate</span>() { 
+    <span class="kw">for</span> (<span class="ident">_i</span>, <span class="ident">t</span>) <span class="kw">in</span> <span class="ident">runqueue_locked</span>.<span class="ident">iter_mut</span>().<span class="ident">enumerate</span>() { 
         <span class="kw">let</span> <span class="ident">task_tokens</span>;
-        {
 
-            <span class="comment">//let priority_taskref = match runqueue_locked.get_priority_task_ref(_i){ Some(x) =&gt; x, None =&gt; { continue;},};</span>
-
-            <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">priority_taskref</span>.<span class="ident">lock</span>();
-
-            <span class="comment">// we give zero tokens to the idle tasks</span>
-            <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">is_an_idle_task</span> {
-                <span class="kw">continue</span>;
-            }
-
-            <span class="comment">// we give zero tokens to none runnable tasks</span>
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">t</span>.<span class="ident">is_runnable</span>() {
-                <span class="kw">continue</span>;
-            }
-
-            <span class="comment">// if this task is pinned, it must not be pinned to a different core</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pinned</span>) <span class="op">=</span> <span class="ident">t</span>.<span class="ident">pinned_core</span> {
-                <span class="kw">if</span> <span class="ident">pinned</span> <span class="op">!</span><span class="op">=</span> <span class="ident">apic_id</span> {
-                    <span class="comment">// with per-core runqueues, this should never happen!</span>
-                    <span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, <span class="ident">apic_id</span>, <span class="kw-2">*</span><span class="ident">t</span>);
-                    <span class="kw">return</span> <span class="bool-val">false</span>;
-                }
-            }
-            <span class="comment">// task_tokens = epoch * (taskref + 1) / total_priorities;</span>
-            <span class="ident">task_tokens</span> <span class="op">=</span> <span class="ident">epoch</span>.<span class="ident">saturating_mul</span>((<span class="ident">priority_taskref</span>.<span class="ident">priority</span> <span class="kw">as</span> <span class="ident">usize</span>).<span class="ident">saturating_add</span>(<span class="number">1</span>)).<span class="ident">wrapping_div</span>(<span class="ident">total_priorities</span>);
+        <span class="comment">// we give zero tokens to the idle tasks</span>
+        <span class="kw">if</span> <span class="ident">t</span>.<span class="ident">is_an_idle_task</span> {
+            <span class="kw">continue</span>;
         }
-        
-        {
-            <span class="ident">priority_taskref</span>.<span class="ident">tokens_remaining</span> <span class="op">=</span> <span class="ident">task_tokens</span>;
+
+        <span class="comment">// we give zero tokens to none runnable tasks</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">t</span>.<span class="ident">is_runnable</span>() {
+            <span class="kw">continue</span>;
         }
-        <span class="comment">// debug!(&quot;assign_tokens(): AP {} chose Task {:?}&quot;, apic_id, *t);</span>
+
+        <span class="comment">// if this task is pinned, it must not be pinned to a different core</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">pinned</span>) <span class="op">=</span> <span class="ident">t</span>.<span class="ident">pinned_core</span>() {
+            <span class="kw">if</span> <span class="ident">pinned</span> <span class="op">!</span><span class="op">=</span> <span class="ident">apic_id</span> {
+                <span class="comment">// with per-core runqueues, this should never happen!</span>
+                <span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, <span class="ident">apic_id</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">t</span>);
+                <span class="kw">return</span> <span class="bool-val">false</span>;
+            }
+        }
+        <span class="comment">// task_tokens = epoch * (taskref + 1) / total_priorities;</span>
+        <span class="ident">task_tokens</span> <span class="op">=</span> <span class="ident">epoch</span>.<span class="ident">saturating_mul</span>((<span class="ident">t</span>.<span class="ident">priority</span> <span class="kw">as</span> <span class="ident">usize</span>).<span class="ident">saturating_add</span>(<span class="number">1</span>)).<span class="ident">wrapping_div</span>(<span class="ident">total_priorities</span>);
+
+        <span class="ident">t</span>.<span class="ident">tokens_remaining</span> <span class="op">=</span> <span class="ident">task_tokens</span>;
+        <span class="comment">// debug!(&quot;assign_tokens(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);</span>
         <span class="comment">// break; </span>
     }
 

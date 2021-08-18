@@ -784,19 +784,6 @@
 <span id="781">781</span>
 <span id="782">782</span>
 <span id="783">783</span>
-<span id="784">784</span>
-<span id="785">785</span>
-<span id="786">786</span>
-<span id="787">787</span>
-<span id="788">788</span>
-<span id="789">789</span>
-<span id="790">790</span>
-<span id="791">791</span>
-<span id="792">792</span>
-<span id="793">793</span>
-<span id="794">794</span>
-<span id="795">795</span>
-<span id="796">796</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate offers routines for spawning new tasks</span>
 <span class="doccomment">//! and convenient builder patterns for customizing new tasks. </span>
@@ -845,7 +832,7 @@
 <span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">MutexIrqSafe</span>, <span class="ident">hold_interrupts</span>, <span class="ident">enable_interrupts</span>};
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">get_kernel_mmi_ref</span>, <span class="ident">MemoryManagementInfo</span>};
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
-<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">Task</span>, <span class="ident">TaskRef</span>, <span class="ident">get_my_current_task</span>, <span class="ident">RunState</span>, <span class="ident">RestartInfo</span>, <span class="ident">TASKLIST</span>};
+<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">Task</span>, <span class="ident">TaskRef</span>, <span class="ident">get_my_current_task</span>, <span class="ident">RestartInfo</span>, <span class="ident">TASKLIST</span>};
 <span class="kw">use</span> <span class="ident">mod_mgmt</span>::{<span class="ident">CrateNamespace</span>, <span class="ident">SectionType</span>, <span class="ident">SECTION_HASH_DELIMITER</span>};
 <span class="kw">use</span> <span class="ident">path::Path</span>;
 <span class="kw">use</span> <span class="ident">apic::get_my_apic_id</span>;
@@ -936,8 +923,7 @@
     <span class="ident">new_namespace</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TaskBuilder</span><span class="op">&lt;</span><span class="ident">MainFunc</span>, <span class="ident">MainFuncArg</span>, <span class="ident">MainFuncRet</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     
-    <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">new_namespace</span>.<span class="ident">clone</span>()
-        .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">taskref</span><span class="op">|</span> <span class="ident">taskref</span>.<span class="ident">get_namespace</span>()))
+    <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">new_namespace</span>.<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">get_namespace</span>().<span class="ident">clone</span>()))
         .<span class="ident">ok_or</span>(<span class="string">&quot;spawn::new_application_task_builder(): couldn&#39;t get current task to use its CrateNamespace&quot;</span>)<span class="question-mark">?</span>;
     
     <span class="kw">let</span> <span class="ident">crate_object_file</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">crate_object_file</span>.<span class="ident">get</span>(<span class="ident">namespace</span>.<span class="ident">dir</span>())
@@ -1088,21 +1074,19 @@
         <span class="comment">// Currently we&#39;re using the very bottom of the kstack for kthread arguments. </span>
         <span class="comment">// This is probably stupid (it&#39;d be best to put them directly where they need to go towards the top of the stack),</span>
         <span class="comment">// but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.</span>
-        {
-            <span class="kw">let</span> <span class="ident">bottom_of_stack</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">usize</span> <span class="op">=</span> <span class="ident">new_task</span>.<span class="ident">kstack</span>.<span class="ident">as_type_mut</span>(<span class="number">0</span>)<span class="question-mark">?</span>;
-            <span class="kw">let</span> <span class="ident">box_ptr</span> <span class="op">=</span> <span class="ident">Box::into_raw</span>(<span class="ident">Box::new</span>(<span class="ident">TaskFuncArg</span>::<span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span> {
-                <span class="ident">arg</span>:  <span class="self">self</span>.<span class="ident">argument</span>,
-                <span class="ident">func</span>: <span class="self">self</span>.<span class="ident">func</span>,
-                <span class="ident">_rettype</span>: <span class="ident">PhantomData</span>,
-            }));
-            <span class="kw-2">*</span><span class="ident">bottom_of_stack</span> <span class="op">=</span> <span class="ident">box_ptr</span> <span class="kw">as</span> <span class="ident">usize</span>;
-        }
+        <span class="kw">let</span> <span class="ident">bottom_of_stack</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">usize</span> <span class="op">=</span> <span class="ident">new_task</span>.<span class="ident">inner_mut</span>().<span class="ident">kstack</span>.<span class="ident">as_type_mut</span>(<span class="number">0</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">box_ptr</span> <span class="op">=</span> <span class="ident">Box::into_raw</span>(<span class="ident">Box::new</span>(<span class="ident">TaskFuncArg</span>::<span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span> {
+            <span class="ident">arg</span>:  <span class="self">self</span>.<span class="ident">argument</span>,
+            <span class="ident">func</span>: <span class="self">self</span>.<span class="ident">func</span>,
+            <span class="ident">_rettype</span>: <span class="ident">PhantomData</span>,
+        }));
+        <span class="kw-2">*</span><span class="ident">bottom_of_stack</span> <span class="op">=</span> <span class="ident">box_ptr</span> <span class="kw">as</span> <span class="ident">usize</span>;
 
         <span class="comment">// The new task is ready to be scheduled in, now that its stack trampoline has been set up.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">blocked</span> {
-            <span class="ident">new_task</span>.<span class="ident">runstate</span> <span class="op">=</span> <span class="ident">RunState::Blocked</span>;
+            <span class="ident">new_task</span>.<span class="ident">block</span>();
         } <span class="kw">else</span> {
-            <span class="ident">new_task</span>.<span class="ident">runstate</span> <span class="op">=</span> <span class="ident">RunState::Runnable</span>;
+            <span class="ident">new_task</span>.<span class="ident">unblock</span>();
         }
 
         <span class="comment">// The new task is marked as idle</span>
@@ -1174,7 +1158,7 @@
         <span class="comment">// and tell it to use the restartable version of the final task cleanup function.</span>
         <span class="self">self</span>.<span class="ident">post_build_function</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Box::new</span>(
             <span class="kw">move</span> <span class="op">|</span><span class="ident">new_task</span><span class="op">|</span> {
-                <span class="ident">new_task</span>.<span class="ident">restart_info</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">restart_info</span>);
+                <span class="ident">new_task</span>.<span class="ident">inner_mut</span>().<span class="ident">restart_info</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">restart_info</span>);
                 <span class="ident">new_task</span>.<span class="ident">failure_cleanup_function</span> <span class="op">=</span> <span class="ident">task_restartable_cleanup_failure</span>::<span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>;
                 <span class="ident">setup_context_trampoline</span>(<span class="ident">new_task</span>, <span class="ident">task_wrapper_restartable</span>::<span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>)<span class="question-mark">?</span>;
                 <span class="prelude-val">Ok</span>(())
@@ -1228,10 +1212,10 @@
         (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ContextType</span>:<span class="ident">ty</span>) <span class="op">=</span><span class="op">&gt;</span> (
             <span class="comment">// We write the new Context struct at the top of the stack, which is at the end of the stack&#39;s MappedPages. </span>
             <span class="comment">// We subtract &quot;size of usize&quot; (8) bytes to ensure the new Context struct doesn&#39;t spill over past the top of the stack.</span>
-            <span class="kw">let</span> <span class="ident">mp_offset</span> <span class="op">=</span> <span class="ident">new_task</span>.<span class="ident">kstack</span>.<span class="ident">size_in_bytes</span>() <span class="op">-</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>() <span class="op">-</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ContextType</span><span class="op">&gt;</span>();
-            <span class="kw">let</span> <span class="ident">new_context_destination</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ContextType</span> <span class="op">=</span> <span class="ident">new_task</span>.<span class="ident">kstack</span>.<span class="ident">as_type_mut</span>(<span class="ident">mp_offset</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">mp_offset</span> <span class="op">=</span> <span class="ident">new_task</span>.<span class="ident">inner_mut</span>().<span class="ident">kstack</span>.<span class="ident">size_in_bytes</span>() <span class="op">-</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>() <span class="op">-</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ContextType</span><span class="op">&gt;</span>();
+            <span class="kw">let</span> <span class="ident">new_context_destination</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ContextType</span> <span class="op">=</span> <span class="ident">new_task</span>.<span class="ident">inner_mut</span>().<span class="ident">kstack</span>.<span class="ident">as_type_mut</span>(<span class="ident">mp_offset</span>)<span class="question-mark">?</span>;
             <span class="kw-2">*</span><span class="ident">new_context_destination</span> <span class="op">=</span> <span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">ContextType</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">entry_point_function</span> <span class="kw">as</span> <span class="ident">usize</span>);
-            <span class="ident">new_task</span>.<span class="ident">saved_sp</span> <span class="op">=</span> <span class="ident">new_context_destination</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>; 
+            <span class="ident">new_task</span>.<span class="ident">inner_mut</span>().<span class="ident">saved_sp</span> <span class="op">=</span> <span class="ident">new_context_destination</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>;
         );
     }
 
@@ -1274,22 +1258,21 @@
     <span class="comment">// when invoking the task&#39;s entry function, in order to simplify cleanup when unwinding.</span>
     <span class="comment">// That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.</span>
     <span class="kw">let</span> (<span class="ident">func</span>, <span class="ident">arg</span>) <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">curr_task_ref</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t get current task (before task func).&quot;</span>);
+        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t get current task (before task func).&quot;</span>);
 
         <span class="comment">// This task&#39;s function and argument were placed at the bottom of the stack when this task was spawned.</span>
-        <span class="kw">let</span> <span class="ident">task_func_arg</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">curr_task_ref</span>.<span class="ident">lock</span>();
-            <span class="kw">let</span> <span class="ident">tfa_box_raw_ptr</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span> <span class="op">=</span> <span class="ident">t</span>.<span class="ident">kstack</span>.<span class="ident">as_type</span>(<span class="number">0</span>)
-                .<span class="ident">expect</span>(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t access task&#39;s function/argument at bottom of stack&quot;</span>);
-            <span class="comment">// SAFE: we placed this Box in this task&#39;s stack in the `spawn()` function when creating the TaskFuncArg struct.</span>
-            <span class="kw">let</span> <span class="ident">tfa_boxed</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Box::from_raw</span>((<span class="kw-2">*</span><span class="ident">tfa_box_raw_ptr</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">TaskFuncArg</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>) };
-            <span class="kw-2">*</span><span class="ident">tfa_boxed</span> <span class="comment">// un-box it</span>
-        };
+        <span class="kw">let</span> <span class="ident">task_func_arg</span> <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">with_kstack</span>(<span class="op">|</span><span class="ident">kstack</span><span class="op">|</span> {
+            <span class="ident">kstack</span>.<span class="ident">as_type</span>(<span class="number">0</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">tfa_box_raw_ptr</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> {
+                <span class="comment">// SAFE: we placed this Box in this task&#39;s stack in the `spawn()` function when creating the TaskFuncArg struct.</span>
+                <span class="kw">let</span> <span class="ident">tfa_boxed</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Box::from_raw</span>((<span class="kw-2">*</span><span class="ident">tfa_box_raw_ptr</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">TaskFuncArg</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">A</span>, <span class="ident">R</span><span class="op">&gt;</span>) };
+                <span class="kw-2">*</span><span class="ident">tfa_boxed</span> <span class="comment">// un-box it</span>
+            })
+        }).<span class="ident">expect</span>(<span class="string">&quot;BUG: task_wrapper: couldn&#39;t access task&#39;s function/argument at bottom of stack&quot;</span>);
         <span class="kw">let</span> (<span class="ident">func</span>, <span class="ident">arg</span>) <span class="op">=</span> (<span class="ident">task_func_arg</span>.<span class="ident">func</span>, <span class="ident">task_func_arg</span>.<span class="ident">arg</span>);
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">any</span>(<span class="ident">rq_eval</span>, <span class="ident">downtime_eval</span>)))]</span>
         <span class="macro">debug!</span>(<span class="string">&quot;task_wrapper [1]: \&quot;{}\&quot; about to call task entry func {:?} {{{}}} with arg {:?}&quot;</span>,
-            <span class="ident">curr_task_ref</span>.<span class="ident">lock</span>().<span class="ident">name</span>.<span class="ident">clone</span>(), <span class="macro">debugit!</span>(<span class="ident">func</span>), <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(), <span class="macro">debugit!</span>(<span class="ident">arg</span>)
+            <span class="ident">curr_task</span>.<span class="ident">name</span>.<span class="ident">clone</span>(), <span class="macro">debugit!</span>(<span class="ident">func</span>), <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(), <span class="macro">debugit!</span>(<span class="ident">arg</span>)
         );
 
         (<span class="ident">func</span>, <span class="ident">arg</span>)
@@ -1358,9 +1341,9 @@
     <span class="kw">let</span> <span class="ident">held_interrupts</span> <span class="op">=</span> <span class="ident">hold_interrupts</span>();
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">rq_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;task_cleanup_success: {:?} successfully exited with return value {:?}&quot;</span>, <span class="ident">current_task</span>.<span class="ident">lock</span>().<span class="ident">name</span>, <span class="macro">debugit!</span>(<span class="ident">exit_value</span>));
+    <span class="macro">debug!</span>(<span class="string">&quot;task_cleanup_success: {:?} successfully exited with return value {:?}&quot;</span>, <span class="ident">current_task</span>.<span class="ident">name</span>, <span class="macro">debugit!</span>(<span class="ident">exit_value</span>));
     <span class="kw">if</span> <span class="ident">current_task</span>.<span class="ident">mark_as_exited</span>(<span class="ident">Box::new</span>(<span class="ident">exit_value</span>)).<span class="ident">is_err</span>() {
-        <span class="macro">error!</span>(<span class="string">&quot;task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?&quot;</span>, <span class="ident">current_task</span>.<span class="ident">lock</span>().<span class="ident">name</span>);
+        <span class="macro">error!</span>(<span class="string">&quot;task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?&quot;</span>, <span class="ident">current_task</span>.<span class="ident">name</span>);
     }
 
     (<span class="ident">held_interrupts</span>, <span class="ident">current_task</span>)
@@ -1395,10 +1378,10 @@
     <span class="kw">let</span> <span class="ident">held_interrupts</span> <span class="op">=</span> <span class="ident">hold_interrupts</span>();
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-    <span class="macro">debug!</span>(<span class="string">&quot;task_cleanup_failure: {:?} panicked with {:?}&quot;</span>, <span class="ident">current_task</span>.<span class="ident">lock</span>().<span class="ident">name</span>, <span class="ident">kill_reason</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;task_cleanup_failure: {:?} panicked with {:?}&quot;</span>, <span class="ident">current_task</span>.<span class="ident">name</span>, <span class="ident">kill_reason</span>);
 
     <span class="kw">if</span> <span class="ident">current_task</span>.<span class="ident">mark_as_killed</span>(<span class="ident">kill_reason</span>).<span class="ident">is_err</span>() {
-        <span class="macro">error!</span>(<span class="string">&quot;task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?&quot;</span>, <span class="ident">current_task</span>.<span class="ident">lock</span>().<span class="ident">name</span>);
+        <span class="macro">error!</span>(<span class="string">&quot;task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?&quot;</span>, <span class="ident">current_task</span>.<span class="ident">name</span>);
     }
 
     (<span class="ident">held_interrupts</span>, <span class="ident">current_task</span>)
@@ -1484,17 +1467,15 @@
 
         <span class="comment">// Re-spawn a new instance of the task if it was spawned as a restartable task. </span>
         <span class="comment">// We must not hold the current task&#39;s lock when calling spawn().</span>
-        <span class="kw">let</span> <span class="ident">restartable_info</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">current_task</span>.<span class="ident">lock</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">restart_info</span>) <span class="op">=</span> <span class="ident">t</span>.<span class="ident">restart_info</span>.<span class="ident">as_ref</span>() {
+        <span class="kw">let</span> <span class="ident">restartable_info</span> <span class="op">=</span> <span class="ident">current_task</span>.<span class="ident">with_restart_info</span>(<span class="op">|</span><span class="ident">restart_info_opt</span><span class="op">|</span> {
+            <span class="ident">restart_info_opt</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">restart_info</span><span class="op">|</span> {
                 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">use_crate_replacement</span>)]</span> {
                     <span class="kw">let</span> <span class="ident">func_ptr</span> <span class="op">=</span> <span class="kw-2">&amp;</span>(<span class="ident">restart_info</span>.<span class="ident">func</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="kw">let</span> <span class="ident">arg_ptr</span> <span class="op">=</span> <span class="kw-2">&amp;</span>(<span class="ident">restart_info</span>.<span class="ident">argument</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>;
 
-                    <span class="kw">let</span> <span class="ident">arg_size</span> <span class="op">=</span> <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>();
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span> {
                         <span class="macro">debug!</span>(<span class="string">&quot;func_ptr {:#X}&quot;</span>, <span class="ident">func_ptr</span>);
-                        <span class="macro">debug!</span>(<span class="string">&quot;arg_ptr {:#X} , {}&quot;</span>, <span class="ident">arg_ptr</span>, <span class="ident">arg_size</span>);
+                        <span class="macro">debug!</span>(<span class="string">&quot;arg_ptr {:#X} , {}&quot;</span>, <span class="ident">arg_ptr</span>, <span class="ident">mem::size_of</span>::<span class="op">&lt;</span><span class="ident">A</span><span class="op">&gt;</span>());
                     }
 
                     <span class="comment">// func_ptr is of size 16. Argument is of the argument_size + 8.</span>
@@ -1505,30 +1486,23 @@
                         <span class="macro">debug!</span>(<span class="string">&quot;Function and argument addresses corrected&quot;</span>);
                     }
                 }
-                
 
                 <span class="kw">let</span> <span class="ident">func</span>: <span class="kw-2">&amp;</span><span class="ident">F</span> <span class="op">=</span> <span class="ident">restart_info</span>.<span class="ident">func</span>.<span class="ident">downcast_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: failed to downcast restartable task&#39;s function&quot;</span>);
                 <span class="kw">let</span> <span class="ident">arg</span> : <span class="kw-2">&amp;</span><span class="ident">A</span> <span class="op">=</span> <span class="ident">restart_info</span>.<span class="ident">argument</span>.<span class="ident">downcast_ref</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: failed to downcast restartable task&#39;s argument&quot;</span>);
-                <span class="prelude-val">Some</span>((<span class="ident">t</span>.<span class="ident">name</span>.<span class="ident">clone</span>(), <span class="ident">func</span>.<span class="ident">clone</span>(), <span class="ident">arg</span>.<span class="ident">clone</span>(), <span class="ident">t</span>.<span class="ident">pinned_core</span>.<span class="ident">clone</span>()))
-            } <span class="kw">else</span> {
-                <span class="prelude-val">None</span>
-            }
-        };
+                (<span class="ident">func</span>.<span class="ident">clone</span>(), <span class="ident">arg</span>.<span class="ident">clone</span>())
+            })
+        });
 
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">name</span>, <span class="ident">func</span>, <span class="ident">arg</span>, <span class="ident">pinned_core</span>)) <span class="op">=</span> <span class="ident">restartable_info</span> {
-            <span class="kw">let</span> <span class="ident">new_task</span> <span class="op">=</span> <span class="ident">new_task_builder</span>(<span class="ident">func</span>, <span class="ident">arg</span>)
-                    .<span class="ident">name</span>(<span class="ident">name</span>);
-
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">core</span>) <span class="op">=</span> <span class="ident">pinned_core</span> {
-                <span class="ident">new_task</span>.<span class="ident">pin_on_core</span>(<span class="ident">core</span>)
-                .<span class="ident">spawn_restartable</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Could not restart the task&quot;</span>);
-            } <span class="kw">else</span> {
-                <span class="ident">new_task</span>.<span class="ident">spawn_restartable</span>()
-                .<span class="ident">expect</span>(<span class="string">&quot;Could not restart the task&quot;</span>);
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">func</span>, <span class="ident">arg</span>)) <span class="op">=</span> <span class="ident">restartable_info</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_task</span> <span class="op">=</span> <span class="ident">new_task_builder</span>(<span class="ident">func</span>, <span class="ident">arg</span>)
+                .<span class="ident">name</span>(<span class="ident">current_task</span>.<span class="ident">name</span>.<span class="ident">clone</span>());
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">core</span>) <span class="op">=</span> <span class="ident">current_task</span>.<span class="ident">pinned_core</span>() {
+                <span class="ident">new_task</span> <span class="op">=</span> <span class="ident">new_task</span>.<span class="ident">pin_on_core</span>(<span class="ident">core</span>);
             }
+            <span class="ident">new_task</span>.<span class="ident">spawn_restartable</span>()
+                .<span class="ident">expect</span>(<span class="string">&quot;Failed to respawn the restartable task&quot;</span>);
         } <span class="kw">else</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG : Restartable task has no restart information available&quot;</span>);
+            <span class="macro">error!</span>(<span class="string">&quot;BUG: Restartable task has no restart information available&quot;</span>);
         }
     }
 

@@ -369,6 +369,9 @@
 <span id="366">366</span>
 <span id="367">367</span>
 <span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
 </pre><pre class="rust">
 <span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.</span>
 <span class="doccomment">//! </span>
@@ -384,22 +387,22 @@
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span> <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">trace_channel</span>)]</span> <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">debugit</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">wait_queue</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crossbeam_utils</span>;
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hpet</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
 
-<span class="kw">use</span> <span class="ident">core::sync::atomic::Ordering</span>;
 <span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">mpmc::Queue</span> <span class="kw">as</span> <span class="ident">MpmcQueue</span>;
 <span class="kw">use</span> <span class="ident">wait_queue::WaitQueue</span>;
-<span class="kw">use</span> <span class="ident">atomic::Atomic</span>;
+<span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
 
 
 <span class="doccomment">/// Create a new channel that allows senders and receivers to </span>
@@ -421,7 +424,7 @@
         <span class="ident">queue</span>: <span class="ident">MpmcQueue::with_capacity</span>(<span class="ident">minimum_capacity</span>),
         <span class="ident">waiting_senders</span>: <span class="ident">WaitQueue::new</span>(),
         <span class="ident">waiting_receivers</span>: <span class="ident">WaitQueue::new</span>(),
-        <span class="ident">channel_status</span>: <span class="ident">Atomic::new</span>(<span class="ident">ChannelStatus::Connected</span>)
+        <span class="ident">channel_status</span>: <span class="ident">AtomicCell::new</span>(<span class="ident">ChannelStatus::Connected</span>)
     });
     (
         <span class="ident">Sender</span>   { <span class="ident">channel</span>: <span class="ident">channel</span>.<span class="ident">clone</span>() },
@@ -465,8 +468,11 @@
     <span class="ident">queue</span>: <span class="ident">MpmcQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
     <span class="ident">waiting_senders</span>: <span class="ident">WaitQueue</span>,
     <span class="ident">waiting_receivers</span>: <span class="ident">WaitQueue</span>,
-    <span class="ident">channel_status</span>: <span class="ident">Atomic</span><span class="op">&lt;</span><span class="ident">ChannelStatus</span><span class="op">&gt;</span>
+    <span class="ident">channel_status</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="ident">ChannelStatus</span><span class="op">&gt;</span>
 }
+
+<span class="comment">// Ensure that `AtomicCell&lt;ChannelStatus&gt;` is actually a lock-free atomic.</span>
+<span class="macro">const_assert!</span>(<span class="ident">AtomicCell</span>::<span class="op">&lt;</span><span class="ident">ChannelStatus</span><span class="op">&gt;</span><span class="ident">::is_lock_free</span>());
 
 <span class="kw">impl</span> <span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Channel</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Returns true if the channel is disconnected.</span>
@@ -478,7 +484,7 @@
     <span class="doccomment">/// Returns the channel Status</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">get_channel_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ChannelStatus</span> {
-        <span class="self">self</span>.<span class="ident">channel_status</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+        <span class="self">self</span>.<span class="ident">channel_status</span>.<span class="ident">load</span>()
     }
 }
 
@@ -574,7 +580,7 @@
         <span class="comment">// first we&#39;ll check whether the channel is active</span>
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">get_channel_status</span>() {
             <span class="ident">ChannelStatus::SenderDisconnected</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::Connected</span>, <span class="ident">Ordering::SeqCst</span>);
+                <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::Connected</span>);
             },
             <span class="ident">ChannelStatus::ReceiverDisconnected</span>  <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">return</span> <span class="prelude-val">Err</span>((<span class="ident">msg</span>, <span class="ident">ChannelError::ChannelDisconnected</span>));
@@ -701,7 +707,7 @@
             <span class="comment">// We check whther the channel is disconnected</span>
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">get_channel_status</span>() {
                 <span class="ident">ChannelStatus::ReceiverDisconnected</span> <span class="op">=</span><span class="op">&gt;</span> {
-                    <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::Connected</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::Connected</span>);
                     <span class="prelude-val">Err</span>(<span class="ident">ChannelError::ChannelEmpty</span>)
                 },
                 <span class="ident">ChannelStatus::SenderDisconnected</span>  <span class="op">=</span><span class="op">&gt;</span> {
@@ -725,7 +731,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="comment">// trace!(&quot;Dropping the receiver&quot;);</span>
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::ReceiverDisconnected</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::ReceiverDisconnected</span>);
         <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_senders</span>.<span class="ident">notify_one</span>();
     }
 }
@@ -734,7 +740,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
         <span class="comment">// trace!(&quot;Dropping the sender&quot;);</span>
-        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::SenderDisconnected</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">channel_status</span>.<span class="ident">store</span>(<span class="ident">ChannelStatus::SenderDisconnected</span>);
         <span class="self">self</span>.<span class="ident">channel</span>.<span class="ident">waiting_receivers</span>.<span class="ident">notify_one</span>();
     }
 }</pre></div>

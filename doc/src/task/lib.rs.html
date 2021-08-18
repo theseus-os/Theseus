@@ -1006,6 +1006,122 @@
 <span id="1003">1003</span>
 <span id="1004">1004</span>
 <span id="1005">1005</span>
+<span id="1006">1006</span>
+<span id="1007">1007</span>
+<span id="1008">1008</span>
+<span id="1009">1009</span>
+<span id="1010">1010</span>
+<span id="1011">1011</span>
+<span id="1012">1012</span>
+<span id="1013">1013</span>
+<span id="1014">1014</span>
+<span id="1015">1015</span>
+<span id="1016">1016</span>
+<span id="1017">1017</span>
+<span id="1018">1018</span>
+<span id="1019">1019</span>
+<span id="1020">1020</span>
+<span id="1021">1021</span>
+<span id="1022">1022</span>
+<span id="1023">1023</span>
+<span id="1024">1024</span>
+<span id="1025">1025</span>
+<span id="1026">1026</span>
+<span id="1027">1027</span>
+<span id="1028">1028</span>
+<span id="1029">1029</span>
+<span id="1030">1030</span>
+<span id="1031">1031</span>
+<span id="1032">1032</span>
+<span id="1033">1033</span>
+<span id="1034">1034</span>
+<span id="1035">1035</span>
+<span id="1036">1036</span>
+<span id="1037">1037</span>
+<span id="1038">1038</span>
+<span id="1039">1039</span>
+<span id="1040">1040</span>
+<span id="1041">1041</span>
+<span id="1042">1042</span>
+<span id="1043">1043</span>
+<span id="1044">1044</span>
+<span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
+<span id="1052">1052</span>
+<span id="1053">1053</span>
+<span id="1054">1054</span>
+<span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
+<span id="1094">1094</span>
+<span id="1095">1095</span>
+<span id="1096">1096</span>
+<span id="1097">1097</span>
+<span id="1098">1098</span>
+<span id="1099">1099</span>
+<span id="1100">1100</span>
+<span id="1101">1101</span>
+<span id="1102">1102</span>
+<span id="1103">1103</span>
+<span id="1104">1104</span>
+<span id="1105">1105</span>
+<span id="1106">1106</span>
+<span id="1107">1107</span>
+<span id="1108">1108</span>
+<span id="1109">1109</span>
+<span id="1110">1110</span>
+<span id="1111">1111</span>
+<span id="1112">1112</span>
+<span id="1113">1113</span>
+<span id="1114">1114</span>
+<span id="1115">1115</span>
+<span id="1116">1116</span>
+<span id="1117">1117</span>
+<span id="1118">1118</span>
+<span id="1119">1119</span>
+<span id="1120">1120</span>
+<span id="1121">1121</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
@@ -1040,6 +1156,7 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
@@ -1051,10 +1168,11 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">kernel_config</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">crossbeam_utils</span>;
 
 
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
-<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">Ordering</span>, <span class="ident">AtomicUsize</span>, <span class="ident">AtomicBool</span>};
+<span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">Ordering</span>, <span class="ident">AtomicUsize</span>};
 <span class="kw">use</span> <span class="ident">core::any::Any</span>;
 <span class="kw">use</span> <span class="ident">core::panic::PanicInfo</span>;
 <span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
@@ -1064,11 +1182,11 @@
     <span class="ident">string::String</span>,
     <span class="ident">sync::Arc</span>,
 };
-<span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">MutexIrqSafe</span>, <span class="ident">MutexIrqSafeGuardRef</span>, <span class="ident">MutexIrqSafeGuardRefMut</span>, <span class="ident">interrupts_enabled</span>};
+<span class="kw">use</span> <span class="ident">crossbeam_utils::atomic::AtomicCell</span>;
+<span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">MutexIrqSafe</span>, <span class="ident">interrupts_enabled</span>};
 <span class="kw">use</span> <span class="ident">memory::MmiRef</span>;
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
 <span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES</span>;
-<span class="comment">// use tss::tss_set_rsp0;</span>
 <span class="kw">use</span> <span class="ident">mod_mgmt</span>::{
     <span class="ident">CrateNamespace</span>,
     <span class="ident">AppCrateRef</span>,
@@ -1131,7 +1249,6 @@
 }
 
 
-
 <span class="doccomment">/// The list of possible reasons that a given `Task` was killed prematurely.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">KillReason</span> {
@@ -1170,7 +1287,7 @@
 
 <span class="doccomment">/// The set of possible runstates that a task can be in, e.g.,</span>
 <span class="doccomment">/// runnable, blocked, exited, etc. </span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">RunState</span> {
     <span class="doccomment">/// in the midst of setting up the task</span>
     <span class="ident">Initing</span>,
@@ -1181,8 +1298,8 @@
     <span class="ident">Blocked</span>,
     <span class="doccomment">/// The `Task` has exited and can no longer be run,</span>
     <span class="doccomment">/// either by running to completion or being killed. </span>
-    <span class="ident">Exited</span>(<span class="ident">ExitValue</span>),
-    <span class="doccomment">/// This `Task` had already exited and now its ExitValue has been taken;</span>
+    <span class="ident">Exited</span>,
+    <span class="doccomment">/// This `Task` had already exited and its `ExitValue` has been taken;</span>
     <span class="doccomment">/// its exit value can only be taken once, and consumed by another `Task`.</span>
     <span class="doccomment">/// This `Task` is now useless, and can be deleted and removed from the Task list.</span>
     <span class="ident">Reaped</span>,
@@ -1207,8 +1324,7 @@
     <span class="prelude-val">None</span>,
 }
 
-<span class="doccomment">/// A data structure to hold data related to restart the function. </span>
-<span class="doccomment">/// Presence of `RestartInfo` itself indicates the task will be restartable.</span>
+<span class="doccomment">/// A struct holding data items needed to restart a `Task`.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">RestartInfo</span> {
     <span class="doccomment">/// Stores the argument of the task for restartable tasks</span>
     <span class="kw">pub</span> <span class="ident">argument</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>,
@@ -1220,72 +1336,142 @@
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">FailureCleanupFunction</span> <span class="op">=</span> <span class="kw">fn</span>(<span class="ident">TaskRef</span>, <span class="ident">KillReason</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span>;
 
 
-<span class="doccomment">/// A structure that contains contextual information for a thread of execution. </span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Task</span> {
-    <span class="doccomment">/// the unique id of this Task.</span>
-    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// the simple name of this Task</span>
-    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
-    <span class="doccomment">/// Which cpu core the Task is currently running on.</span>
-    <span class="doccomment">/// `None` if not currently running.</span>
-    <span class="kw">pub</span> <span class="ident">running_on_cpu</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
-    <span class="doccomment">/// The runqueue that this Task is on.</span>
-    <span class="kw">pub</span> <span class="ident">on_runqueue</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    
-    <span class="doccomment">/// the runnability status of this task, basically whether it&#39;s allowed to be scheduled in.</span>
-    <span class="kw">pub</span> <span class="ident">runstate</span>: <span class="ident">RunState</span>,
+<span class="doccomment">/// A wrapper around `Option&lt;u8&gt;` with a forced type alignment of 2 bytes,</span>
+<span class="doccomment">/// which guarantees that it compiles down to lock-free native atomic instructions</span>
+<span class="doccomment">/// when using it inside of an atomic type like [`AtomicCell`].</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">align</span>(<span class="number">2</span>))]</span>
+<span class="kw">struct</span> <span class="ident">OptionU8</span>(<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>);
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">OptionU8</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">opt</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="ident">OptionU8</span>(<span class="ident">opt</span>)
+    }
+}
+<span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">OptionU8</span> {
+    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="number">0</span>
+    }
+}
+<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">OptionU8</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
+    }
+}
+
+
+<span class="doccomment">/// The parts of a `Task` that may be modified after its creation.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This includes only the parts that cannot be modified atomically.</span>
+<span class="doccomment">/// As such, they are protected by a lock in the containing `Task` struct.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// In general, other crates cannot obtain a mutable reference to a Task (`&amp;mut Task`),</span>
+<span class="doccomment">/// which means they cannot access this struct&#39;s contents directly at all </span>
+<span class="doccomment">/// (except through the specific get/set methods exposed by `Task`).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Therefore, it is safe to expose all members of this struct as public, </span>
+<span class="doccomment">/// though not strictly necessary. </span>
+<span class="doccomment">/// Currently, we only publicize the fields here that need to be modified externally,</span>
+<span class="doccomment">/// primarily by the `spawn` crate for creating and running new tasks. </span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskInner</span> {
+    <span class="doccomment">/// The status or value this Task exited with, if it has already exited.</span>
+    <span class="ident">exit_value</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExitValue</span><span class="op">&gt;</span>,
     <span class="doccomment">/// the saved stack pointer value, used for task switching.</span>
     <span class="kw">pub</span> <span class="ident">saved_sp</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// A reference to this task&#39;s`TaskLocalData` struct, which is used to quickly retrieve the &quot;current&quot; Task</span>
+    <span class="doccomment">/// A reference to this task&#39;s `TaskLocalData` struct, which is used to quickly retrieve the &quot;current&quot; Task</span>
     <span class="doccomment">/// on a given CPU core. </span>
     <span class="doccomment">/// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later</span>
     <span class="doccomment">/// after the task has been fully created, which currently occurs in `TaskRef::new()`.</span>
     <span class="ident">task_local_data</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">TaskLocalData</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Data that should be dropped after a task switch; for example, the previous Task&#39;s TaskLocalData.</span>
+    <span class="doccomment">/// Data that should be dropped after a task switch; for example, the previous Task&#39;s [`TaskLocalData`].</span>
     <span class="ident">drop_after_task_switch</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Memory management details: page tables, mappings, allocators, etc.</span>
-    <span class="doccomment">/// This is shared among all other tasks in the same address space.</span>
-    <span class="kw">pub</span> <span class="ident">mmi</span>: <span class="ident">MmiRef</span>, 
     <span class="doccomment">/// The kernel stack, which all `Task`s must have in order to execute.</span>
     <span class="kw">pub</span> <span class="ident">kstack</span>: <span class="ident">Stack</span>,
     <span class="doccomment">/// Whether or not this task is pinned to a certain core.</span>
     <span class="doccomment">/// The idle tasks (like idle_task) are always pinned to their respective cores.</span>
     <span class="kw">pub</span> <span class="ident">pinned_core</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// Whether this Task is an idle task, the task that runs by default when no other task is running.</span>
-    <span class="doccomment">/// There exists one idle task per core, so this is `false` for most tasks.</span>
-    <span class="kw">pub</span> <span class="ident">is_an_idle_task</span>: <span class="ident">bool</span>,
-    <span class="doccomment">/// For application `Task`s, this is a reference to the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)</span>
-    <span class="doccomment">/// that contains the entry function for this `Task`.</span>
-    <span class="kw">pub</span> <span class="ident">app_crate</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AppCrateRef</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// This `Task` is linked into and runs within the context of </span>
-    <span class="doccomment">/// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).</span>
-    <span class="kw">pub</span> <span class="ident">namespace</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The function that will be called when this `Task` panics or fails due to a machine exception.</span>
     <span class="doccomment">/// It will be invoked before the task is cleaned up via stack unwinding.</span>
     <span class="doccomment">/// This is similar to Rust&#39;s built-in panic hook, but is also called upon a machine exception, not just a panic.</span>
-    <span class="kw">pub</span> <span class="ident">kill_handler</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KillHandler</span><span class="op">&gt;</span>,
-    <span class="doccomment">/// The environment of the task, Wrapped in an Arc &amp; Mutex because it is shared among child and parent tasks</span>
-    <span class="kw">pub</span> <span class="ident">env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">kill_handler</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KillHandler</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The environment variables for this task, which are shared among child and parent tasks by default.</span>
+    <span class="ident">env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Stores the restartable information of the task. </span>
+    <span class="doccomment">/// `Some(RestartInfo)` indicates that the task is restartable.</span>
+    <span class="kw">pub</span> <span class="ident">restart_info</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RestartInfo</span><span class="op">&gt;</span>,
+}
+
+
+<span class="doccomment">/// A structure that contains contextual information for a thread of execution. </span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Only fields that do not permit interior mutability are public and can be accessed directly.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Task</span> {
+    <span class="doccomment">/// The mutable parts of a `Task` struct that can be modified after task creation,</span>
+    <span class="doccomment">/// excluding private items that can be modified atomically.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// We use this inner structure to reduce contention when accessing task struct fields,</span>
+    <span class="doccomment">/// because the other fields aside from this one are primarily read, not written.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is not public because it permits interior mutability.</span>
+    <span class="ident">inner</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TaskInner</span><span class="op">&gt;</span>,
+
+    <span class="doccomment">/// The unique identifier of this Task.</span>
+    <span class="kw">pub</span> <span class="ident">id</span>: <span class="ident">usize</span>,
+    <span class="doccomment">/// The simple name of this Task.</span>
+    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
+    <span class="doccomment">/// Which cpu core this Task is currently running on;</span>
+    <span class="doccomment">/// `None` if not currently running.</span>
+    <span class="doccomment">/// We use `OptionU8` instead of `Option&lt;u8&gt;` to ensure that </span>
+    <span class="doccomment">/// this field is accessed using lock-free native atomic instructions.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is not public because it permits interior mutability.</span>
+    <span class="ident">running_on_cpu</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="ident">OptionU8</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The runnability of this task, i.e., whether it&#39;s eligible to be scheduled in.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is not public because it permits interior mutability.</span>
+    <span class="ident">runstate</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="ident">RunState</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Memory management details: page tables, mappings, allocators, etc.</span>
+    <span class="doccomment">/// This is shared among all other tasks in the same address space.</span>
+    <span class="kw">pub</span> <span class="ident">mmi</span>: <span class="ident">MmiRef</span>, 
+    <span class="doccomment">/// Whether this Task is an idle task, the task that runs by default when no other task is running.</span>
+    <span class="doccomment">/// There exists one idle task per core, so this is `false` for most tasks.</span>
+    <span class="kw">pub</span> <span class="ident">is_an_idle_task</span>: <span class="ident">bool</span>,
+    <span class="doccomment">/// For application `Task`s, this is effectively a reference to the [`mod_mgmt::LoadedCrate`]</span>
+    <span class="doccomment">/// that contains the entry function for this `Task`.</span>
+    <span class="kw">pub</span> <span class="ident">app_crate</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AppCrateRef</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// This `Task` is linked into and runs within the context of this [`CrateNamespace`].</span>
+    <span class="kw">pub</span> <span class="ident">namespace</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The function that should be run as a last-ditch attempt to recover from this task&#39;s failure,</span>
     <span class="doccomment">/// e.g., this can be called when unwinding itself fails. </span>
     <span class="doccomment">/// Typically, it will point to this Task&#39;s specific instance of `spawn::task_cleanup_failure()`,</span>
     <span class="doccomment">/// which has generic type parameters that describe its function signature, argument type, and return type.</span>
     <span class="kw">pub</span> <span class="ident">failure_cleanup_function</span>: <span class="ident">FailureCleanupFunction</span>,
-    <span class="doccomment">/// Stores the restartable information of the task. </span>
-    <span class="doccomment">/// `Some(RestartInfo)` indicates that the task is restartable.</span>
-    <span class="kw">pub</span> <span class="ident">restart_info</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">RestartInfo</span><span class="op">&gt;</span>,
     
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
+    <span class="doccomment">/// The runqueue that this Task is on.</span>
+    <span class="ident">on_runqueue</span>: <span class="ident">AtomicCell</span><span class="op">&lt;</span><span class="ident">OptionU8</span><span class="op">&gt;</span>,
+
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">simd_personality</span>)]</span>
     <span class="doccomment">/// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.</span>
     <span class="kw">pub</span> <span class="ident">simd</span>: <span class="ident">SimdExt</span>,
 }
 
+<span class="comment">// Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.</span>
+<span class="macro">const_assert!</span>(<span class="ident">AtomicCell</span>::<span class="op">&lt;</span><span class="ident">OptionU8</span><span class="op">&gt;</span><span class="ident">::is_lock_free</span>());
+<span class="macro">const_assert!</span>(<span class="ident">AtomicCell</span>::<span class="op">&lt;</span><span class="ident">RunState</span><span class="op">&gt;</span><span class="ident">::is_lock_free</span>());
+
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Task</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{{Task \&quot;{}\&quot; ({}), running_on_cpu: {:?}, runstate: {:?}, pinned: {:?}}}&quot;</span>, 
-               <span class="self">self</span>.<span class="ident">name</span>, <span class="self">self</span>.<span class="ident">id</span>, <span class="self">self</span>.<span class="ident">running_on_cpu</span>, <span class="self">self</span>.<span class="ident">runstate</span>, <span class="self">self</span>.<span class="ident">pinned_core</span>)
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ds</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;Task&quot;</span>);
+        <span class="ident">ds</span>.<span class="ident">field</span>(<span class="string">&quot;name&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">name</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">id</span>)
+            .<span class="ident">field</span>(<span class="string">&quot;running_on&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">running_on_cpu</span>())
+            .<span class="ident">field</span>(<span class="string">&quot;runstate&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">runstate</span>());
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">inner</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">try_lock</span>() {
+            <span class="ident">ds</span>.<span class="ident">field</span>(<span class="string">&quot;pinned&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">inner</span>.<span class="ident">pinned_core</span>);
+        } <span class="kw">else</span> {
+            <span class="ident">ds</span>.<span class="ident">field</span>(<span class="string">&quot;pinned&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;&lt;Locked&gt;&quot;</span>);
+        }
+        <span class="ident">ds</span>.<span class="ident">finish</span>()
     }
 }
 
@@ -1308,10 +1494,12 @@
         <span class="ident">failure_cleanup_function</span>: <span class="ident">FailureCleanupFunction</span>
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Task</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="string">&quot;Task::new(): couldn&#39;t get current task (not yet initialized)&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">mmi</span>, <span class="ident">namespace</span>, <span class="ident">env</span>, <span class="ident">app_crate</span>) <span class="op">=</span> {
-            <span class="kw">let</span> <span class="ident">t</span> <span class="op">=</span> <span class="ident">curr_task</span>.<span class="ident">lock</span>();
-            (<span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">t</span>.<span class="ident">mmi</span>), <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">t</span>.<span class="ident">namespace</span>), <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">t</span>.<span class="ident">env</span>), <span class="ident">t</span>.<span class="ident">app_crate</span>.<span class="ident">clone</span>())
-        };
+        <span class="kw">let</span> (<span class="ident">mmi</span>, <span class="ident">namespace</span>, <span class="ident">env</span>, <span class="ident">app_crate</span>) <span class="op">=</span> (
+            <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">curr_task</span>.<span class="ident">mmi</span>),
+            <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">curr_task</span>.<span class="ident">namespace</span>),
+            <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">curr_task</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">env</span>),
+            <span class="ident">curr_task</span>.<span class="ident">app_crate</span>.<span class="ident">clone</span>(),
+        );
 
         <span class="kw">let</span> <span class="ident">kstack</span> <span class="op">=</span> <span class="ident">kstack</span>
             .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">stack::alloc_stack</span>(<span class="ident">KERNEL_STACK_SIZE_IN_PAGES</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mmi</span>.<span class="ident">lock</span>().<span class="ident">page_table</span>))
@@ -1338,57 +1526,132 @@
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">TASKID_COUNTER</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Acquire</span>);
 
         <span class="ident">Task</span> {
+            <span class="ident">inner</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TaskInner</span> {
+                <span class="ident">exit_value</span>: <span class="prelude-val">None</span>,
+                <span class="ident">saved_sp</span>: <span class="number">0</span>,
+                <span class="ident">task_local_data</span>: <span class="prelude-val">None</span>,
+                <span class="ident">drop_after_task_switch</span>: <span class="prelude-val">None</span>,
+                <span class="ident">kstack</span>,
+                <span class="ident">pinned_core</span>: <span class="prelude-val">None</span>,
+                <span class="ident">kill_handler</span>: <span class="prelude-val">None</span>,
+                <span class="ident">env</span>,
+                <span class="ident">restart_info</span>: <span class="prelude-val">None</span>,
+            }),
             <span class="ident">id</span>: <span class="ident">task_id</span>,
-            <span class="ident">runstate</span>: <span class="ident">RunState::Initing</span>,
-            <span class="ident">running_on_cpu</span>: <span class="prelude-val">None</span>,
-            
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
-            <span class="ident">on_runqueue</span>: <span class="prelude-val">None</span>,
-            
-            <span class="ident">saved_sp</span>: <span class="number">0</span>,
-            <span class="ident">task_local_data</span>: <span class="prelude-val">None</span>,
-            <span class="ident">drop_after_task_switch</span>: <span class="prelude-val">None</span>,
             <span class="ident">name</span>: <span class="macro">format!</span>(<span class="string">&quot;task_{}&quot;</span>, <span class="ident">task_id</span>),
-            <span class="ident">kstack</span>,
+            <span class="ident">runstate</span>: <span class="ident">AtomicCell::new</span>(<span class="ident">RunState::Initing</span>),
+            <span class="ident">running_on_cpu</span>: <span class="ident">AtomicCell::new</span>(<span class="prelude-val">None</span>.<span class="ident">into</span>()),
             <span class="ident">mmi</span>,
-            <span class="ident">pinned_core</span>: <span class="prelude-val">None</span>,
             <span class="ident">is_an_idle_task</span>: <span class="bool-val">false</span>,
             <span class="ident">app_crate</span>,
             <span class="ident">namespace</span>,
-            <span class="ident">kill_handler</span>: <span class="prelude-val">None</span>,
-            <span class="ident">env</span>,
             <span class="ident">failure_cleanup_function</span>,
-            <span class="ident">restart_info</span>: <span class="prelude-val">None</span>,
+
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
+            <span class="ident">on_runqueue</span>: <span class="ident">AtomicCell::new</span>(<span class="prelude-val">None</span>.<span class="ident">into</span>()),
             
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">simd_personality</span>)]</span>
             <span class="ident">simd</span>: <span class="ident">SimdExt::None</span>,
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">set_env</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">new_env</span>:<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">env</span> <span class="op">=</span> <span class="ident">new_env</span>;
+    <span class="doccomment">/// Sets the `Environment` of this Task.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_env</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">new_env</span>:<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">env</span> <span class="op">=</span> <span class="ident">new_env</span>;
     }
 
-    <span class="doccomment">/// returns true if this Task is currently running on any cpu.</span>
+    <span class="doccomment">/// Gets a reference to this task&#39;s `Environment`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to access it.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_env</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">env</span>)
+    }
+
+    <span class="doccomment">/// Returns `true` if this `Task` is currently running.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_running</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">running_on_cpu</span>.<span class="ident">is_some</span>()
+        <span class="self">self</span>.<span class="ident">running_on_cpu</span>().<span class="ident">is_some</span>()
     }
 
-    <span class="doccomment">/// Returns true if this `Task` is Runnable, i.e., able to be scheduled in.</span>
+    <span class="doccomment">/// Returns the APIC ID of the CPU this `Task` is currently running on.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">running_on_cpu</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">running_on_cpu</span>.<span class="ident">load</span>().<span class="ident">into</span>()
+    }
+
+    <span class="doccomment">/// Returns the APIC ID of the CPU this `Task` is pinned on,</span>
+    <span class="doccomment">/// or `None` if it is not pinned.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pinned_core</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">pinned_core</span>.<span class="ident">clone</span>()
+    }
+
+    <span class="doccomment">/// Returns the current [`RunState`] of this `Task`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">runstate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">RunState</span> {
+        <span class="self">self</span>.<span class="ident">runstate</span>.<span class="ident">load</span>()
+    }
+
+    <span class="doccomment">/// Returns `true` if this `Task` is Runnable, i.e., able to be scheduled in.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// # Note</span>
     <span class="doccomment">/// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_runnable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">runstate</span> {
-            <span class="ident">RunState::Runnable</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
-        }
+        <span class="self">self</span>.<span class="ident">runstate</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">RunState::Runnable</span>
     }
 
-    <span class="doccomment">/// Returns true if this `Task` has been exited, i.e.,</span>
+    <span class="doccomment">/// Returns the namespace in which this `Task` is loaded/linked into and runs within.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_namespace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">namespace</span>
+    }
+
+    <span class="doccomment">/// Exposes read-only access to this `Task`&#39;s [`Stack`] by invoking</span>
+    <span class="doccomment">/// the given `func` with a reference to its kernel stack.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state for the duration of `func`</span>
+    <span class="doccomment">/// in order to access its stack.</span>
+    <span class="doccomment">/// The given `func` **must not** attempt to obtain that same inner lock.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_kstack</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">func</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span> 
+        <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">Stack</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>
+    {
+        <span class="ident">func</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kstack</span>)
+    }
+
+    <span class="doccomment">/// Returns a mutable reference to this `Task`&#39;s inner state. </span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Note about mutability</span>
+    <span class="doccomment">/// This function requires the caller to have a mutable reference to this `Task`</span>
+    <span class="doccomment">/// in order to protect the inner state from foreign crates accessing it</span>
+    <span class="doccomment">/// through a `TaskRef` auto-dereferencing into a `Task`.</span>
+    <span class="doccomment">/// This is because you can only obtain a mutable reference to a `Task`</span>
+    <span class="doccomment">/// before you enclose it in a `TaskRef` wrapper type.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Because this function requires a mutable reference to this `Task`,</span>
+    <span class="doccomment">/// no locks must be obtained. </span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inner_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">TaskInner</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get_mut</span>()
+    }
+
+    <span class="doccomment">/// Exposes read-only access to this `Task`&#39;s [`RestartInfo`] by invoking</span>
+    <span class="doccomment">/// the given `func` with a reference to its `RestartInfo`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state for the duration of `func`</span>
+    <span class="doccomment">/// in order to access its stack.</span>
+    <span class="doccomment">/// The given `func` **must not** attempt to obtain that same inner lock.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_restart_info</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">func</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span> 
+        <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">RestartInfo</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>
+    {
+        <span class="ident">func</span>(<span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">restart_info</span>.<span class="ident">as_ref</span>())
+    }
+
+    <span class="doccomment">/// Returns `true` if this `Task` has been exited, i.e.,</span>
     <span class="doccomment">/// if its RunState is either `Exited` or `Reaped`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_exited</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">runstate</span> {
-            <span class="ident">RunState::Exited</span>(<span class="kw">_</span>) <span class="op">|</span> <span class="ident">RunState::Reaped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">runstate</span>() {
+            <span class="ident">RunState::Exited</span> <span class="op">|</span> <span class="ident">RunState::Reaped</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
         }
     }
@@ -1400,67 +1663,95 @@
         <span class="self">self</span>.<span class="ident">app_crate</span>.<span class="ident">is_some</span>()
     }
 
-    <span class="doccomment">/// Returns true if this is a userspace`Task`.</span>
+    <span class="doccomment">/// Returns `true` if this is a userspace `Task`.</span>
     <span class="doccomment">/// Currently userspace support is disabled, so this always returns `false`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_userspace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="comment">// self.ustack.is_some()</span>
         <span class="bool-val">false</span>
     }
 
+    <span class="doccomment">/// Returns `true` if this `Task` was spawned as a restartable task.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to access it.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_restartable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">restart_info</span>.<span class="ident">is_some</span>()
+    }
+
     <span class="doccomment">/// Registers a function or closure that will be called if this `Task` panics</span>
-    <span class="doccomment">/// or otherwise fails (e.g., due to a machine exception occurring).</span>
+    <span class="doccomment">/// or otherwise fails (e.g., due to a machine exception).</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// The given `callback` will be invoked before the task is cleaned up via stack unwinding.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_kill_handler</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">callback</span>: <span class="ident">KillHandler</span>) {
-        <span class="self">self</span>.<span class="ident">kill_handler</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">callback</span>);
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_kill_handler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">callback</span>: <span class="ident">KillHandler</span>) {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kill_handler</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">callback</span>);
     }
 
     <span class="doccomment">/// Takes ownership of this `Task`&#39;s `KillHandler` closure/function if one exists,</span>
-    <span class="doccomment">/// and returns it so it can be invoked without holding this `Task`&#39;s `Mutex`.</span>
+    <span class="doccomment">/// and returns it so it can be invoked without holding this `Task`&#39;s inner lock.</span>
     <span class="doccomment">/// After invoking this, the `Task`&#39;s `kill_handler` will be `None`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_kill_handler</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KillHandler</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">kill_handler</span>.<span class="ident">take</span>()
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_kill_handler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KillHandler</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kill_handler</span>.<span class="ident">take</span>()
     }
 
-
-    <span class="doccomment">/// Returns a reference to the exit value of this `Task`, </span>
-    <span class="doccomment">/// if its runstate is `RunState::Exited`. </span>
-    <span class="doccomment">/// Unlike [`take_exit_value`](#method.take_exit_value), this does not consume the exit value.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_exit_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">ExitValue</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">RunState::Exited</span>(<span class="kw-2">ref</span> <span class="ident">val</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">runstate</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">val</span>)
+    <span class="doccomment">/// Takes ownership of this `Task`&#39;s exit value and returns it,</span>
+    <span class="doccomment">/// if and only if this `Task` was in the `Exited` runstate.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If this `Task` was in the `Exited` runstate, after invoking this,</span>
+    <span class="doccomment">/// this `Task`&#39;s runstate will be set to `Reaped`</span>
+    <span class="doccomment">/// and this `Task` will be removed from the system task list.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If this `Task` was **not** in the `Exited` runstate, </span>
+    <span class="doccomment">/// nothing is done and `None` is returned.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.    </span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_exit_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExitValue</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">runstate</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">RunState::Exited</span> {
+            <span class="self">self</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Reaped</span>);
+            <span class="ident">TASKLIST</span>.<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">id</span>);
+            <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">exit_value</span>.<span class="ident">take</span>()
         } <span class="kw">else</span> {
             <span class="prelude-val">None</span>
         }
     }
 
-    <span class="doccomment">/// Takes ownership of this `Task`&#39;s exit value and returns it,</span>
-    <span class="doccomment">/// if and only if this `Task` was in the `Exited` runstate.</span>
-    <span class="doccomment">/// # Note</span>
-    <span class="doccomment">/// After invoking this, the `Task`&#39;s runstate will be `Reaped`,</span>
-    <span class="doccomment">/// and this `Task` will be removed from the system task list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_exit_value</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExitValue</span><span class="op">&gt;</span> {
-        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">runstate</span> {
-            <span class="ident">RunState::Exited</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> { }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">None</span>, 
-        }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
+    <span class="doccomment">/// Returns the runqueue on which this `Task` is currently enqueued.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_runqueue</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">on_runqueue</span>.<span class="ident">load</span>().<span class="ident">into</span>()
+    }
 
-        <span class="kw">let</span> <span class="ident">exited</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">runstate</span>, <span class="ident">RunState::Reaped</span>);
-        <span class="ident">TASKLIST</span>.<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">id</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">RunState::Exited</span>(<span class="ident">exit_value</span>) <span class="op">=</span> <span class="ident">exited</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">exit_value</span>)
-        } 
-        <span class="kw">else</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: Task::take_exit_value(): task {} runstate was Exited but couldn&#39;t get exit value.&quot;</span>, <span class="self">self</span>);
-            <span class="prelude-val">None</span>
-        }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
+    <span class="doccomment">/// Marks this `Task` as enqueued on the given runqueue.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_on_runqueue</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">runqueue</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">on_runqueue</span>.<span class="ident">store</span>(<span class="ident">runqueue</span>.<span class="ident">into</span>());
+    }
+
+    <span class="doccomment">/// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Blocked</span>);
+    }
+
+    <span class="doccomment">/// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unblock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Runnable</span>);
     }
 
     <span class="doccomment">/// Sets this `Task` as this core&#39;s current task.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Currently this is achieved by writing a pointer to the `TaskLocalData` </span>
     <span class="doccomment">/// into the FS segment register base MSR.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to access it. </span>
     <span class="kw">fn</span> <span class="ident">set_as_current_task</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">tld</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_local_data</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">tld</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span> {
             <span class="kw">unsafe</span> {
                 <span class="ident">wrmsr</span>(<span class="ident">IA32_FS_BASE</span>, <span class="ident">tld</span>.<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">u64</span>);
             }
@@ -1469,11 +1760,13 @@
         }
     }
 
-    <span class="doccomment">/// Switches from the current (`self`)  to the given `next` Task.</span>
+    <span class="doccomment">/// Switches from the current task (`self`) to the given `next` task.</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// No locks need to be held to call this, but interrupts (later, preemption) should be disabled.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">task_switch</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">next</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Task</span>, <span class="ident">apic_id</span>: <span class="ident">u8</span>) {
-        <span class="comment">// debug!(&quot;task_switch [0]: (AP {}) prev {:?}, next {:?}&quot;, apic_id, self, next);         </span>
+    <span class="doccomment">/// # Locking / Deadlock</span>
+    <span class="doccomment">/// Obtains the locks on both this `Task`&#39;s inner state and the given `next` `Task`&#39;s inner state</span>
+    <span class="doccomment">/// in order to mutate them. </span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">task_switch</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">next</span>: <span class="kw-2">&amp;</span><span class="ident">Task</span>, <span class="ident">apic_id</span>: <span class="ident">u8</span>) {
+        <span class="comment">// debug!(&quot;task_switch [0]: (AP {}) prev {:?}, next {:?}, interrupts?: {}&quot;, apic_id, self, next, irq_safety::interrupts_enabled());</span>
 
         <span class="comment">// These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.</span>
         <span class="comment">// if !next.is_runnable() {</span>
@@ -1484,9 +1777,9 @@
         <span class="comment">//     error!(&quot;BUG: Skipping task_switch due to scheduler bug: chosen &#39;next&#39; Task was already running on AP {}!\nCurrent: {:?} Next: {:?}&quot;, apic_id, self, next);</span>
         <span class="comment">//     return;</span>
         <span class="comment">// }</span>
-        <span class="comment">// if let Some(pc) = next.pinned_core {</span>
+        <span class="comment">// if let Some(pc) = next.pinned_core() {</span>
         <span class="comment">//     if pc != apic_id {</span>
-        <span class="comment">//         error!(&quot;BUG: Skipping task_switch due to scheduler bug: chosen &#39;next&#39; Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}&quot;, next.pinned_core, apic_id, self, next);</span>
+        <span class="comment">//         error!(&quot;BUG: Skipping task_switch due to scheduler bug: chosen &#39;next&#39; Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}&quot;, pc, apic_id, self, next);</span>
         <span class="comment">//         return;</span>
         <span class="comment">//     }</span>
         <span class="comment">// }</span>
@@ -1495,21 +1788,23 @@
         <span class="comment">// // Change the privilege stack (RSP0) in the TSS.</span>
         <span class="comment">// // We can safely skip setting the TSS RSP0 when switching to a kernel task, </span>
         <span class="comment">// // i.e., when `next` is not a userspace task.</span>
-        <span class="comment">// //</span>
         <span class="comment">// if next.is_userspace() {</span>
-        <span class="comment">//     let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack</span>
-        <span class="comment">//     if tss_set_rsp0(new_tss_rsp0).is_ok() { </span>
+        <span class="comment">//     let (stack_bottom, stack_size) = {</span>
+        <span class="comment">//         let kstack = &amp;next.inner.lock().kstack;</span>
+        <span class="comment">//         (kstack.bottom(), kstack.size_in_bytes())</span>
+        <span class="comment">//     };</span>
+        <span class="comment">//     let new_tss_rsp0 = stack_bottom + (stack_size / 2); // the middle half of the stack</span>
+        <span class="comment">//     if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { </span>
         <span class="comment">//         // debug!(&quot;task_switch [2]: new_tss_rsp = {:#X}&quot;, new_tss_rsp0);</span>
-        <span class="comment">//     }</span>
-        <span class="comment">//     else {</span>
+        <span class="comment">//     } else {</span>
         <span class="comment">//         error!(&quot;task_switch(): failed to set AP {} TSS RSP0, aborting task switch!&quot;, apic_id);</span>
         <span class="comment">//         return;</span>
         <span class="comment">//     }</span>
         <span class="comment">// }</span>
 
         <span class="comment">// update runstates</span>
-        <span class="self">self</span>.<span class="ident">running_on_cpu</span> <span class="op">=</span> <span class="prelude-val">None</span>; <span class="comment">// no longer running</span>
-        <span class="ident">next</span>.<span class="ident">running_on_cpu</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">apic_id</span>); <span class="comment">// now running on this core</span>
+        <span class="self">self</span>.<span class="ident">running_on_cpu</span>.<span class="ident">store</span>(<span class="prelude-val">None</span>.<span class="ident">into</span>()); <span class="comment">// no longer running</span>
+        <span class="ident">next</span>.<span class="ident">running_on_cpu</span>.<span class="ident">store</span>(<span class="prelude-val">Some</span>(<span class="ident">apic_id</span>).<span class="ident">into</span>()); <span class="comment">// now running on this core</span>
 
         <span class="comment">// Switch page tables. </span>
         <span class="comment">// Since there is only a single address space (as userspace support is currently disabled),</span>
@@ -1518,12 +1813,10 @@
             <span class="kw">let</span> <span class="ident">prev_mmi</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mmi</span>;
             <span class="kw">let</span> <span class="ident">next_mmi</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">next</span>.<span class="ident">mmi</span>;
             
-
             <span class="kw">if</span> <span class="ident">Arc::ptr_eq</span>(<span class="ident">prev_mmi</span>, <span class="ident">next_mmi</span>) {
                 <span class="comment">// do nothing because we&#39;re not changing address spaces</span>
                 <span class="comment">// debug!(&quot;task_switch [3]: prev_mmi is the same as next_mmi!&quot;);</span>
-            }
-            <span class="kw">else</span> {
+            } <span class="kw">else</span> {
                 <span class="comment">// time to change to a different address space and switch the page tables!</span>
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">prev_mmi_locked</span> <span class="op">=</span> <span class="ident">prev_mmi</span>.<span class="ident">lock</span>();
                 <span class="kw">let</span> <span class="ident">next_mmi_locked</span> <span class="op">=</span> <span class="ident">next_mmi</span>.<span class="ident">lock</span>();
@@ -1541,15 +1834,23 @@
         <span class="comment">// We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">has_exited</span>() {
             <span class="comment">// trace!(&quot;task_switch(): preparing to drop TaskLocalData for running task {}&quot;, self);</span>
-            <span class="ident">next</span>.<span class="ident">drop_after_task_switch</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">task_local_data</span>.<span class="ident">take</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">tld_box</span><span class="op">|</span> <span class="ident">tld_box</span> <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>);
+            <span class="ident">next</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">drop_after_task_switch</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span>.<span class="ident">take</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">tld_box</span><span class="op">|</span> <span class="ident">tld_box</span> <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Any</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span>);
         }
 
-        <span class="comment">// debug!(&quot;task_switch [4]: prev sp: {:#X}, next sp: {:#X}&quot;, self.saved_sp, next.saved_sp);</span>
+        <span class="kw">let</span> <span class="ident">prev_task_saved_sp</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>(); <span class="comment">// ensure the lock is released</span>
+            (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>.<span class="ident">saved_sp</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>
+        };
+        <span class="kw">let</span> <span class="ident">next_task_saved_sp</span>: <span class="ident">usize</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">next</span>.<span class="ident">inner</span>.<span class="ident">lock</span>(); <span class="comment">// ensure the lock is released</span>
+            <span class="ident">inner</span>.<span class="ident">saved_sp</span>
+        };
+        <span class="comment">// debug!(&quot;task_switch [4]: prev sp: {:#X}, next sp: {:#X}&quot;, prev_task_saved_sp as usize, next_task_saved_sp);</span>
 
         <span class="doccomment">/// A private macro that actually calls the given context switch routine.</span>
         <span class="macro">macro_rules!</span> <span class="ident">call_context_switch</span> {
             (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">func</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> ( <span class="kw">unsafe</span> {
-                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">func</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">saved_sp</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>, <span class="ident">next</span>.<span class="ident">saved_sp</span>);
+                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">func</span>(<span class="ident">prev_task_saved_sp</span>, <span class="ident">next_task_saved_sp</span>);
             });
         }
 
@@ -1618,8 +1919,10 @@
 
         <span class="comment">// Now, as a final action, we drop any data that the original previous task </span>
         <span class="comment">// prepared for droppage before the context switch occurred.</span>
-        <span class="kw">let</span> <span class="ident">_prev_task_data_to_drop</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">drop_after_task_switch</span>.<span class="ident">take</span>();
-
+        <span class="kw">let</span> <span class="ident">_prev_task_data_to_drop</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>(); <span class="comment">// ensure the lock is released</span>
+            <span class="ident">inner</span>.<span class="ident">drop_after_task_switch</span>.<span class="ident">take</span>()
+        };
     }
 }
 
@@ -1636,8 +1939,7 @@
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_kill_handler</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">take_kill_handler</span>() {
                 <span class="macro">warn!</span>(<span class="string">&quot;While dropping task {:?}, its kill handler callback was still present. Removing it now.&quot;</span>, <span class="self">self</span>);
             }
-            <span class="comment">// Scoping rules ensure the kill handler is dropped now, before this Task&#39;s app_crate could possibly be dropped.</span>
-        }
+        } <span class="comment">// Scoping rules ensure the kill handler is dropped now, before this Task&#39;s app_crate could possibly be dropped.</span>
     }
 }
 
@@ -1660,21 +1962,12 @@
 <span class="doccomment">/// Currently, `Lock` is a `MutexIrqSafe`, so it **does not** allow</span>
 <span class="doccomment">/// multiple readers simultaneously; that will cause deadlock.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// `TaskRef` implements the `PartialEq` trait; </span>
+<span class="doccomment">/// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits; </span>
 <span class="doccomment">/// two `TaskRef`s are considered equal if they point to the same underlying `Task`.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// `TaskRef` also auto-derefs into an immutable `Task` reference.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskRef</span>(
-    <span class="ident">Arc</span><span class="op">&lt;</span>(
-        <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>,  <span class="comment">// the actual task</span>
-        <span class="ident">AtomicBool</span>,          <span class="comment">// true if it has exited, this is used for faster `join()` calls that avoid disabling interrupts</span>
-    )<span class="op">&gt;</span>
-); 
-
-<span class="comment">// impl Drop for TaskRef {</span>
-<span class="comment">//     fn drop(&amp;mut self) {</span>
-<span class="comment">//         trace!(&quot;Dropping TaskRef: strong_refs: {}, {:?}&quot;, Arc::strong_count(&amp;self.0), self);</span>
-<span class="comment">//     }</span>
-<span class="comment">// }</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskRef</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">TaskRef</span> {
     <span class="doccomment">/// Creates a new `TaskRef` that wraps the given `Task`.</span>
@@ -1683,18 +1976,18 @@
     <span class="doccomment">/// which will be used to determine the current `Task` on each CPU core.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">task</span>: <span class="ident">Task</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TaskRef</span> {
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">id</span>;
-        <span class="kw">let</span> <span class="ident">taskref</span> <span class="op">=</span> <span class="ident">TaskRef</span>(<span class="ident">Arc::new</span>((<span class="ident">MutexIrqSafe::new</span>(<span class="ident">task</span>), <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>))));
+        <span class="kw">let</span> <span class="ident">taskref</span> <span class="op">=</span> <span class="ident">TaskRef</span>(<span class="ident">Arc::new</span>(<span class="ident">task</span>));
         <span class="kw">let</span> <span class="ident">tld</span> <span class="op">=</span> <span class="ident">TaskLocalData</span> {
             <span class="ident">current_taskref</span>: <span class="ident">taskref</span>.<span class="ident">clone</span>(),
             <span class="ident">current_task_id</span>: <span class="ident">task_id</span>,
         };
-        <span class="ident">taskref</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Box::new</span>(<span class="ident">tld</span>));
+        <span class="ident">taskref</span>.<span class="number">0</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Box::new</span>(<span class="ident">tld</span>));
         <span class="ident">taskref</span>
     }
 
-    <span class="doccomment">/// Waits until the given `task` has finished executing, </span>
-    <span class="doccomment">/// i.e., blocks until its runstate is `RunState::Exited`.</span>
-    <span class="doccomment">/// Returns `Ok()` when the given `task` is actually exited,</span>
+    <span class="doccomment">/// Blocks until this task has exited or has been killed.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns `Ok()` once this task has exited,</span>
     <span class="doccomment">/// and `Err()` if there is a problem or interruption while waiting for it to exit. </span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Note</span>
@@ -1713,50 +2006,10 @@
         }
         
         <span class="comment">// First, wait for this Task to be marked as Exited (no longer runnable).</span>
-        <span class="kw">loop</span> {
-            <span class="comment">// if self.0.lock().has_exited() {</span>
-            <span class="kw">if</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">1</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">=</span><span class="op">=</span> <span class="bool-val">true</span> {
-                <span class="kw">break</span>;
-            }
-        }
+        <span class="kw">while</span> <span class="op">!</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">has_exited</span>() { }
 
         <span class="comment">// Then, wait for it to actually stop running on any CPU core.</span>
-        <span class="kw">loop</span> {
-            <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">is_running</span>() {
-                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-            }
-        }
-    }
-
-
-    <span class="doccomment">/// The internal routine that actually exits or kills a Task.</span>
-    <span class="doccomment">/// It also performs select cleanup routines, e.g., removing the task from the task list.</span>
-    <span class="kw">fn</span> <span class="ident">internal_exit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">val</span>: <span class="ident">ExitValue</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">task</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>();
-            <span class="kw">if</span> <span class="kw">let</span> <span class="ident">RunState::Exited</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="ident">task</span>.<span class="ident">runstate</span> {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;task was already exited! (did not overwrite its existing exit value)&quot;</span>);
-            }
-            <span class="ident">task</span>.<span class="ident">runstate</span> <span class="op">=</span> <span class="ident">RunState::Exited</span>(<span class="ident">val</span>);
-            <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">1</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
-
-            <span class="comment">// Corner case: if the task isn&#39;t running (as with killed tasks), </span>
-            <span class="comment">// we must clean it up now rather than in task_switch(), because it will never be scheduled in again. </span>
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">task</span>.<span class="ident">is_running</span>() {
-                <span class="comment">// trace!(&quot;internal_exit(): dropping TaskLocalData for non-running task {}&quot;, &amp;*task);</span>
-                <span class="kw">let</span> <span class="ident">_tld</span> <span class="op">=</span> <span class="ident">task</span>.<span class="ident">task_local_data</span>.<span class="ident">take</span>();
-            }
-        }
-
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span> 
-        {   
-            <span class="kw">let</span> <span class="ident">task_on_rq</span> <span class="op">=</span> { <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">on_runqueue</span>.<span class="ident">clone</span>() };
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">remove_from_runqueue</span>) <span class="op">=</span> <span class="ident">RUNQUEUE_REMOVAL_FUNCTION</span>.<span class="ident">get</span>() {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">rq</span>) <span class="op">=</span> <span class="ident">task_on_rq</span> {
-                    <span class="ident">remove_from_runqueue</span>(<span class="self">self</span>, <span class="ident">rq</span>)<span class="question-mark">?</span>;
-                }
-            }
-        }
+        <span class="kw">while</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_running</span>() { }
 
         <span class="prelude-val">Ok</span>(())
     }
@@ -1804,7 +2057,7 @@
     <span class="doccomment">/// it will finish running its current timeslice, and then never be run again.</span>
     <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mark_as_killed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">reason</span>: <span class="ident">KillReason</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="string">&quot;mark_as_exited(): failed to check what the current task is&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="string">&quot;mark_as_exited(): failed to check the current task&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">if</span> <span class="ident">curr_task</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span> {
             <span class="self">self</span>.<span class="ident">internal_exit</span>(<span class="ident">ExitValue::Killed</span>(<span class="ident">reason</span>))
         } <span class="kw">else</span> {
@@ -1837,75 +2090,36 @@
         <span class="self">self</span>.<span class="ident">internal_exit</span>(<span class="ident">ExitValue::Killed</span>(<span class="ident">reason</span>))
     }
 
-
-    <span class="doccomment">/// Obtains the lock on the underlying `Task` in a read-only, blocking fashion.</span>
-    <span class="doccomment">/// This is okay because we want to allow any other part of the OS to read </span>
-    <span class="doccomment">/// the details of the `Task` struct.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutexIrqSafeGuardRef</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span> {
-        <span class="ident">MutexIrqSafeGuardRef::new</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>())
-    }
-
-    <span class="doccomment">/// Blocks this `Task` by setting its `RunState` to blocked.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">runstate</span> <span class="op">=</span> <span class="ident">RunState::Blocked</span>;
-    }
-
-    <span class="doccomment">/// Unblocks this `Task` by setting its `RunState` to runnable.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unblock</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">runstate</span> <span class="op">=</span> <span class="ident">RunState::Runnable</span>;
-    }
-
-    <span class="doccomment">/// Registers a function or closure that will be called if this `Task` panics</span>
-    <span class="doccomment">/// or otherwise fails (e.g., due to a machine exception). </span>
-    <span class="doccomment">/// The given `callback` will be invoked before the task is cleaned up via stack unwinding.</span>
+    <span class="doccomment">/// The internal routine that actually exits or kills a Task.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// Obtains a write lock on the enclosed `Task` in order to mutate its state.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_kill_handler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">callback</span>: <span class="ident">KillHandler</span>) {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">set_kill_handler</span>(<span class="ident">callback</span>)
-    }
+    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it. </span>
+    <span class="kw">fn</span> <span class="ident">internal_exit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">val</span>: <span class="ident">ExitValue</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">has_exited</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: task was already exited! (did not overwrite its existing exit value)&quot;</span>);
+        }
+        {
+            <span class="self">self</span>.<span class="number">0</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Exited</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
+            <span class="ident">inner</span>.<span class="ident">exit_value</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">val</span>);
 
-    <span class="doccomment">/// Takes ownership of this `Task`&#39;s `KillHandler` closure/function if one exists,</span>
-    <span class="doccomment">/// and returns it so it can be invoked without holding this `Task`&#39;s `Mutex`.</span>
-    <span class="doccomment">/// After invoking this, the `Task`&#39;s `kill_handler` will be `None`.</span>
-    <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// Obtains a write lock on the enclosed `Task` in order to mutate its state.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_kill_handler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KillHandler</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">take_kill_handler</span>()
-    }
+            <span class="comment">// Corner case: if the task isn&#39;t currently running (as with killed tasks), </span>
+            <span class="comment">// we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.</span>
+            <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_running</span>() {
+                <span class="macro">trace!</span>(<span class="string">&quot;internal_exit(): dropping TaskLocalData for non-running task {}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="number">0</span>);
+                <span class="kw">let</span> <span class="ident">_tld</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">task_local_data</span>.<span class="ident">take</span>();
+            }
+        }
 
-    <span class="doccomment">/// Takes ownership of this `Task`&#39;s exit value and returns it,</span>
-    <span class="doccomment">/// if and only if this `Task` was in the `Exited` runstate.</span>
-    <span class="doccomment">/// After invoking this, the `Task`&#39;s runstate will be `Reaped`.</span>
-    <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// Obtains a write lock on the enclosed `Task` in order to mutate its state.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_exit_value</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ExitValue</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">take_exit_value</span>()
-    }
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span> {   
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">remove_from_runqueue</span>) <span class="op">=</span> <span class="ident">RUNQUEUE_REMOVAL_FUNCTION</span>.<span class="ident">get</span>() {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">rq</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">on_runqueue</span>() {
+                    <span class="ident">remove_from_runqueue</span>(<span class="self">self</span>, <span class="ident">rq</span>)<span class="question-mark">?</span>;
+                }
+            }
+        }
 
-    <span class="doccomment">/// Sets the `Environment` of this Task.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_env</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">new_env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">set_env</span>(<span class="ident">new_env</span>);
-    }
-
-    <span class="doccomment">/// Gets a reference to this task&#39;s `Environment`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_env</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">env</span>)
-    }
-
-    <span class="doccomment">/// Gets a reference to this task&#39;s `CrateNamespace`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_namespace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span> {
-        <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">namespace</span>)
-    }
-    
-    <span class="doccomment">/// Obtains the lock on the underlying `Task` in a writable, blocking fashion.</span>
-    <span class="attribute">#[<span class="ident">deprecated</span>(<span class="ident">note</span> <span class="op">=</span> <span class="string">&quot;This method exposes inner Task details for debugging purposes. Do not use it.&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutexIrqSafeGuardRefMut</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span> {
-        <span class="ident">MutexIrqSafeGuardRefMut::new</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>())
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_restartable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">restart_info</span>.<span class="ident">is_some</span>()
+        <span class="prelude-val">Ok</span>(())
     }
 }
 
@@ -1914,9 +2128,20 @@
         <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="number">0</span>)
     }
 }
-
 <span class="kw">impl</span> <span class="ident">Eq</span> <span class="kw">for</span> <span class="ident">TaskRef</span> { }
 
+<span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">TaskRef</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">Task</span>;
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="self">Self</span><span class="ident">::Target</span> {
+        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">deref</span>()
+    }
+}
+
+<span class="comment">// impl Drop for TaskRef {</span>
+<span class="comment">//     fn drop(&amp;mut self) {</span>
+<span class="comment">//         trace!(&quot;Dropping TaskRef: strong_refs: {}, {:?}&quot;, Arc::strong_count(&amp;self.0), self);</span>
+<span class="comment">//     }</span>
+<span class="comment">// }</span>
 
 
 <span class="doccomment">/// Bootstrap a new task from the current thread of execution.</span>
@@ -1934,16 +2159,23 @@
         .<span class="ident">ok_or</span>(<span class="string">&quot;The initial kernel CrateNamespace must be initialized before the tasking subsystem.&quot;</span>)<span class="question-mark">?</span>
         .<span class="ident">clone</span>();
     <span class="kw">let</span> <span class="ident">default_env</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">Mutex::new</span>(<span class="ident">Environment::default</span>()));
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bootstrap_task</span> <span class="op">=</span> <span class="ident">Task::new_internal</span>(<span class="ident">stack</span>, <span class="ident">kernel_mmi_ref</span>, <span class="ident">default_namespace</span>, <span class="ident">default_env</span>, <span class="prelude-val">None</span>, <span class="ident">bootstrap_task_cleanup_failure</span>);
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bootstrap_task</span> <span class="op">=</span> <span class="ident">Task::new_internal</span>(
+        <span class="ident">stack</span>,
+        <span class="ident">kernel_mmi_ref</span>,
+        <span class="ident">default_namespace</span>,
+        <span class="ident">default_env</span>,
+        <span class="prelude-val">None</span>,
+        <span class="ident">bootstrap_task_cleanup_failure</span>,
+    );
     <span class="ident">bootstrap_task</span>.<span class="ident">name</span> <span class="op">=</span> <span class="macro">format!</span>(<span class="string">&quot;bootstrap_task_core_{}&quot;</span>, <span class="ident">apic_id</span>);
-    <span class="ident">bootstrap_task</span>.<span class="ident">runstate</span> <span class="op">=</span> <span class="ident">RunState::Runnable</span>;
-    <span class="ident">bootstrap_task</span>.<span class="ident">running_on_cpu</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">apic_id</span>); 
-    <span class="ident">bootstrap_task</span>.<span class="ident">pinned_core</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">apic_id</span>); <span class="comment">// can only run on this CPU core</span>
+    <span class="ident">bootstrap_task</span>.<span class="ident">runstate</span>.<span class="ident">store</span>(<span class="ident">RunState::Runnable</span>);
+    <span class="ident">bootstrap_task</span>.<span class="ident">running_on_cpu</span>.<span class="ident">store</span>(<span class="prelude-val">Some</span>(<span class="ident">apic_id</span>).<span class="ident">into</span>()); 
+    <span class="ident">bootstrap_task</span>.<span class="ident">inner</span>.<span class="ident">get_mut</span>().<span class="ident">pinned_core</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">apic_id</span>); <span class="comment">// can only run on this CPU core</span>
     <span class="kw">let</span> <span class="ident">bootstrap_task_id</span> <span class="op">=</span> <span class="ident">bootstrap_task</span>.<span class="ident">id</span>;
     <span class="kw">let</span> <span class="ident">task_ref</span> <span class="op">=</span> <span class="ident">TaskRef::new</span>(<span class="ident">bootstrap_task</span>);
 
     <span class="comment">// set this as this core&#39;s current task, since it&#39;s obviously running</span>
-    <span class="ident">task_ref</span>.<span class="number">0</span>.<span class="ident">deref</span>().<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">set_as_current_task</span>();
+    <span class="ident">task_ref</span>.<span class="ident">set_as_current_task</span>();
     <span class="kw">if</span> <span class="ident">get_my_current_task</span>().<span class="ident">is_none</span>() {
         <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}&quot;</span>, <span class="ident">apic_id</span>);
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to properly set the new idle task as the current task&quot;</span>);
@@ -1970,7 +2202,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// Therefore there&#39;s not much we can actually do.</span>
 <span class="kw">fn</span> <span class="ident">bootstrap_task_cleanup_failure</span>(<span class="ident">current_task</span>: <span class="ident">TaskRef</span>, <span class="ident">kill_reason</span>: <span class="ident">KillReason</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> {
-    <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There&#39;s nothing we can do here; looping indefinitely!&quot;</span>, <span class="ident">current_task</span>.<span class="ident">lock</span>().<span class="ident">name</span>, <span class="ident">kill_reason</span>);
+    <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There&#39;s nothing we can do here; looping indefinitely!&quot;</span>, <span class="ident">current_task</span>, <span class="ident">kill_reason</span>);
     <span class="kw">loop</span> { }
 }
 

@@ -879,7 +879,6 @@
 <span id="876">876</span>
 <span id="877">877</span>
 <span id="878">878</span>
-<span id="879">879</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for the Performance Monitoring Unit </span>
 <span class="doccomment">//! </span>
@@ -955,7 +954,6 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic</span>;
 
 <span class="kw">use</span> <span class="ident">x86_64::registers::msr</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">x86_64::VirtualAddress</span>;
@@ -1732,7 +1730,7 @@
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">taskref</span>) <span class="op">=</span> <span class="ident">task::get_my_current_task</span>() {
         <span class="kw">let</span> <span class="ident">requested_task_id</span> <span class="op">=</span> <span class="ident">samples</span>.<span class="ident">task_id</span>;
         
-        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">lock</span>().<span class="ident">id</span>;
+        <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
         <span class="kw">if</span> (<span class="ident">requested_task_id</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>) <span class="op">|</span> (<span class="ident">requested_task_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">task_id</span>) {
             <span class="ident">samples</span>.<span class="ident">ip_list</span>.<span class="ident">push</span>(<span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>);
             <span class="ident">samples</span>.<span class="ident">task_id_list</span>.<span class="ident">push</span>(<span class="ident">task_id</span>);
