@@ -29,9 +29,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;
 
-    for (i, taskref) in runqueue_locked.iter().enumerate() {
-        let t = taskref.lock();
-
+    for (i, t) in runqueue_locked.iter().enumerate() {
         // we skip the idle task, and only choose it if no other tasks are runnable
         if t.is_an_idle_task {
             idle_task_index = Some(i);
@@ -45,7 +43,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
             
         // found a runnable task!
         chosen_task_index = Some(i);
-        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, *t);
+        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, &*t);
         break;
     }
 
