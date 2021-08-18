@@ -17,10 +17,9 @@ extern crate kernel_config;
 extern crate raw_cpuid;
 extern crate x86_64;
 extern crate pit_clock;
-extern crate atomic;
+extern crate crossbeam_utils;
 extern crate bit_field;
 
-use core::sync::atomic::Ordering;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 use alloc::boxed::Box;
@@ -32,7 +31,7 @@ use irq_safety::RwLockIrqSafe;
 use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
-use atomic::Atomic;
+use crossbeam_utils::atomic::AtomicCell;
 use pit_clock::pit_wait;
 use bit_field::BitField;
 
@@ -40,7 +39,7 @@ use bit_field::BitField;
 /// The interrupt chip that is currently configured on this machine. 
 /// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
 /// which will be set once those chips have been initialized.
-pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::PIC);
+pub static INTERRUPT_CHIP: AtomicCell<InterruptChip> = AtomicCell::new(InterruptChip::PIC);
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u8)]
@@ -50,11 +49,8 @@ pub enum InterruptChip {
     PIC,
 }
 
-pub fn is_lock_free() -> bool {
-    Atomic::<InterruptChip>::is_lock_free()
-}
-// Ensure that `Atomic<InterruptChip>` is actually a lock-free atomic.
-const_assert!(Atomic::<InterruptChip>::is_lock_free());
+// Ensure that `AtomicCell<InterruptChip>` is actually a lock-free atomic.
+const_assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
 
 lazy_static! {
@@ -348,7 +344,7 @@ impl LocalApic {
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
         info!("LAPIC ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
-            INTERRUPT_CHIP.store(InterruptChip::APIC, Ordering::Release);
+            INTERRUPT_CHIP.store(InterruptChip::APIC);
         }
 
         // init APIC to a clean state
@@ -381,7 +377,7 @@ impl LocalApic {
         unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
         info!("LAPIC x2 ID {:#x}, version: {:#x}, is_bsp: {}", self.id(), self.version(), is_bsp);
         if is_bsp {
-            INTERRUPT_CHIP.store(InterruptChip::X2APIC, Ordering::Release);
+            INTERRUPT_CHIP.store(InterruptChip::X2APIC);
         }
 
 

@@ -17,18 +17,17 @@ extern crate alloc;
 #[cfg(trace_channel)] #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
-extern crate atomic;
+extern crate crossbeam_utils;
 
 #[cfg(downtime_eval)]
 extern crate hpet;
 #[cfg(downtime_eval)]
 extern crate task;
 
-use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
 use wait_queue::WaitQueue;
-use atomic::Atomic;
+use crossbeam_utils::atomic::AtomicCell;
 
 
 /// Create a new channel that allows senders and receivers to 
@@ -50,7 +49,7 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
-        channel_status: Atomic::new(ChannelStatus::Connected)
+        channel_status: AtomicCell::new(ChannelStatus::Connected)
     });
     (
         Sender   { channel: channel.clone() },
@@ -94,14 +93,11 @@ struct Channel<T: Send> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
-    channel_status: Atomic<ChannelStatus>
+    channel_status: AtomicCell<ChannelStatus>
 }
 
-pub fn is_lock_free() -> bool {
-    Atomic::<ChannelStatus>::is_lock_free()
-}
-// Ensure that `Atomic<ChannelStatus>` is actually a lock-free atomic.
-const_assert!(Atomic::<ChannelStatus>::is_lock_free());
+// Ensure that `AtomicCell<ChannelStatus>` is actually a lock-free atomic.
+const_assert!(AtomicCell::<ChannelStatus>::is_lock_free());
 
 impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
@@ -113,7 +109,7 @@ impl <T: Send> Channel<T> {
     /// Returns the channel Status
     #[inline(always)]
     fn get_channel_status(&self) -> ChannelStatus {
-        self.channel_status.load(Ordering::SeqCst)
+        self.channel_status.load()
     }
 }
 
@@ -209,7 +205,7 @@ impl <T: Send> Sender<T> {
         // first we'll check whether the channel is active
         match self.channel.get_channel_status() {
             ChannelStatus::SenderDisconnected => {
-                self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
+                self.channel.channel_status.store(ChannelStatus::Connected);
             },
             ChannelStatus::ReceiverDisconnected  => {
                 return Err((msg, ChannelError::ChannelDisconnected));
@@ -336,7 +332,7 @@ impl <T: Send> Receiver<T> {
             // We check whther the channel is disconnected
             match self.channel.get_channel_status() {
                 ChannelStatus::ReceiverDisconnected => {
-                    self.channel.channel_status.store(ChannelStatus::Connected, Ordering::SeqCst);
+                    self.channel.channel_status.store(ChannelStatus::Connected);
                     Err(ChannelError::ChannelEmpty)
                 },
                 ChannelStatus::SenderDisconnected  => {
@@ -360,7 +356,7 @@ impl <T: Send> Receiver<T> {
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping the receiver");
-        self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected, Ordering::SeqCst);
+        self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
         self.channel.waiting_senders.notify_one();
     }
 }
@@ -369,7 +365,7 @@ impl<T: Send> Drop for Receiver<T> {
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping the sender");
-        self.channel.channel_status.store(ChannelStatus::SenderDisconnected, Ordering::SeqCst);
+        self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
         self.channel.waiting_receivers.notify_one();
     }
 }

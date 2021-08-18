@@ -45,7 +45,7 @@ extern crate root;
 extern crate x86_64;
 extern crate spin;
 extern crate kernel_config;
-extern crate atomic;
+extern crate crossbeam_utils;
 
 
 use core::fmt;
@@ -59,7 +59,7 @@ use alloc::{
     string::String,
     sync::Arc,
 };
-use atomic::Atomic;
+use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{MutexIrqSafe, interrupts_enabled};
 use memory::MmiRef;
 use stack::Stack;
@@ -231,8 +231,17 @@ impl Into<Option<u8>> for OptionU8 {
     }
 }
 
+pub fn is_lock_free() {
+    warn!("AtomicCell<u8> is lock free? {:?}", AtomicCell::<u8>::is_lock_free());
+    warn!("AtomicCell<u16> is lock free? {:?}", AtomicCell::<u16>::is_lock_free());
+    warn!("AtomicCell<u32> is lock free? {:?}", AtomicCell::<u32>::is_lock_free());
+    warn!("AtomicCell<u64> is lock free? {:?}", AtomicCell::<u64>::is_lock_free());
+    warn!("AtomicCell<usize> is lock free? {:?}", AtomicCell::<usize>::is_lock_free());
+    warn!("AtomicCell<Option<u8>> is lock free? {:?}", AtomicCell::<Option<u8>>::is_lock_free());
+    warn!("AtomicCell<OptionU8> is lock free? {:?}", AtomicCell::<OptionU8>::is_lock_free());
+}
 // Ensure that `Atomic<OptionU8>` is actually a lock-free atomic.
-const_assert!(Atomic::<OptionU8>::is_lock_free());
+const_assert!(AtomicCell::<OptionU8>::is_lock_free());
 
 
 
@@ -297,9 +306,9 @@ pub struct Task {
     pub name: String,
     /// Which cpu core this Task is currently running on.
     /// `None` if not currently running.
-    running_on_cpu: Atomic<OptionU8>,
+    running_on_cpu: AtomicCell<Option<u8>>,
     /// The runnability of this task, i.e., whether it's eligible to be scheduled in.
-    runstate: Atomic<RunState>,
+    runstate: AtomicCell<RunState>,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
     pub mmi: MmiRef, 
@@ -321,6 +330,10 @@ pub struct Task {
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
 }
+
+const_assert!(AtomicCell::<OptionU8>::is_lock_free());
+const_assert!(AtomicCell::<RunState>::is_lock_free());
+
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -398,8 +411,8 @@ impl Task {
             }),
             id: task_id,
             name: format!("task_{}", task_id),
-            runstate: Atomic::new(RunState::Initing),
-            running_on_cpu: Atomic::new(None.into()),
+            runstate: AtomicCell::new(RunState::Initing),
+            running_on_cpu: AtomicCell::new(None),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -434,7 +447,7 @@ impl Task {
 
     /// Returns the APIC ID of the CPU this `Task` is currently running on.
     pub fn running_on_cpu(&self) -> Option<u8> {
-        self.running_on_cpu.load(Ordering::Acquire).into()
+        self.running_on_cpu.load()
     }
 
     /// Returns the APIC ID of the CPU this `Task` is pinned on,
@@ -445,7 +458,7 @@ impl Task {
 
     /// Returns the current [`RunState`] of this `Task`.
     pub fn runstate(&self) -> RunState {
-        self.runstate.load(Ordering::Acquire)
+        self.runstate.load()
     }
 
     /// Returns `true` if this `Task` is Runnable, i.e., able to be scheduled in.
@@ -565,7 +578,7 @@ impl Task {
     /// Obtains the lock on this `Task`'s inner state in order to mutate it.    
     pub fn take_exit_value(&self) -> Option<ExitValue> {
         if self.runstate() == RunState::Exited {
-            self.runstate.store(RunState::Reaped, Ordering::Release);
+            self.runstate.store(RunState::Reaped);
             TASKLIST.lock().remove(&self.id);
             self.inner.lock().exit_value.take()
         } else {
@@ -582,7 +595,7 @@ impl Task {
             if self.runstate() == RunState::Exited {
                 return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
             }
-            self.runstate.store(RunState::Exited, Ordering::Release);
+            self.runstate.store(RunState::Exited);
             let mut inner = self.inner.lock();
             inner.exit_value = Some(val);
 
@@ -608,12 +621,12 @@ impl Task {
 
     /// Blocks this `Task` by setting its `RunState` to blocked.
     pub fn block(&self) {
-        self.runstate.store(RunState::Blocked, Ordering::Release);
+        self.runstate.store(RunState::Blocked);
     }
 
     /// Unblocks this `Task` by setting its `RunState` to runnable.
     pub fn unblock(&self) {
-        self.runstate.store(RunState::Runnable, Ordering::Release);
+        self.runstate.store(RunState::Runnable);
     }
 
     /// Sets this `Task` as this core's current task.
@@ -678,8 +691,8 @@ impl Task {
         }
 
         // update runstates
-        self.running_on_cpu.store(None.into(), Ordering::Release); // no longer running
-        next.running_on_cpu.store(Some(apic_id).into(), Ordering::Release); // now running on this core
+        self.running_on_cpu.store(None); // no longer running
+        next.running_on_cpu.store(Some(apic_id)); // now running on this core
 
         // Switch page tables. 
         // Since there is only a single address space (as userspace support is currently disabled),
@@ -1003,8 +1016,8 @@ pub fn bootstrap_task(
         bootstrap_task_cleanup_failure,
     );
     bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
-    bootstrap_task.runstate.store(RunState::Runnable, Ordering::Release);
-    bootstrap_task.running_on_cpu.store(Some(apic_id).into(), Ordering::Release); 
+    bootstrap_task.runstate.store(RunState::Runnable);
+    bootstrap_task.running_on_cpu.store(Some(apic_id)); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);

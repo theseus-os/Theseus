@@ -81,9 +81,9 @@ dependencies = [
 name = "apic"
 version = "0.1.0"
 dependencies = [
- "atomic",
  "atomic_linked_list",
  "bit_field 0.7.0",
+ "crossbeam-utils",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -137,7 +137,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
- "atomic",
+ "crossbeam-utils",
  "debugit",
  "hpet",
  "log",
@@ -159,15 +159,6 @@ dependencies = [
  "port_io",
  "spin 0.9.0",
  "storage_device",
-]
-
-[[package]]
-name = "atomic"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3410529e8288c463bedb5930f82833bc0c90e5d2fe639a56582a4d09220b281"
-dependencies = [
- "autocfg",
 ]
 
 [[package]]
@@ -370,6 +361,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "channel_app"
 version = "0.1.0"
 dependencies = [
@@ -415,7 +412,7 @@ dependencies = [
 name = "context_switch"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "context_switch_avx",
  "context_switch_regular",
  "context_switch_sse",
@@ -512,6 +509,15 @@ dependencies = [
  "path",
  "qp-trie",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d82cfc11ce7f2c3faef78d8a684447b40d503d9681acebed6cb728d45940c4db"
+dependencies = [
+ "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -1383,7 +1389,7 @@ version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
 ]
 
 [[package]]
@@ -1433,7 +1439,7 @@ checksum = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
 name = "mapper_spillful"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -1582,7 +1588,7 @@ name = "mm_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cfg-if",
+ "cfg-if 0.1.10",
  "getopts",
  "hpet",
  "kernel_config",
@@ -1677,7 +1683,7 @@ name = "multiple_heaps"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cfg-if",
+ "cfg-if 0.1.10",
  "hashbrown",
  "heap",
  "intrusive-collections",
@@ -2493,7 +2499,7 @@ name = "simd_personality"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cfg-if",
+ "cfg-if 0.1.10",
  "fs_node",
  "log",
  "memory",
@@ -2507,7 +2513,7 @@ dependencies = [
 name = "simd_test"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "core_simd",
  "log",
  "pit_clock",
@@ -2525,7 +2531,7 @@ dependencies = [
 name = "single_simd_task_optimization"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "log",
  "task",
 ]
@@ -2653,7 +2659,7 @@ dependencies = [
 name = "stack_trace_frame_pointers"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "memory",
 ]
 
@@ -2766,8 +2772,8 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
- "atomic",
  "context_switch",
+ "crossbeam-utils",
  "environment",
  "irq_safety",
  "kernel_config",
@@ -2980,7 +2986,7 @@ name = "unified_channel"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "cfg-if",
+ "cfg-if 0.1.10",
  "rendezvous",
 ]
 
