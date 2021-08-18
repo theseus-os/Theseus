@@ -153,8 +153,6 @@ pub fn init(
             .spawn()?;
     }
 
-    task::is_lock_free();
-
     // Now that initialization is complete, we can spawn various system tasks/daemons
     // and then the first application(s).
     console::start_connection_detection()?;

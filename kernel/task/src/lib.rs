@@ -216,8 +216,8 @@ pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
 
 
 /// A wrapper around `Option<u8>` with a forced type alignment of 2 bytes,
-/// to ensure lock freedom when using it inside of [`Atomic`].
-#[derive(Debug, Copy, Clone)]
+/// to ensure lock freedom when using it inside of [`AtomicCell`].
+#[derive(Copy, Clone)]
 #[repr(align(2))]
 struct OptionU8(Option<u8>);
 impl From<Option<u8>> for OptionU8 {
@@ -230,19 +230,11 @@ impl Into<Option<u8>> for OptionU8 {
         self.0
     }
 }
-
-pub fn is_lock_free() {
-    warn!("AtomicCell<u8> is lock free? {:?}", AtomicCell::<u8>::is_lock_free());
-    warn!("AtomicCell<u16> is lock free? {:?}", AtomicCell::<u16>::is_lock_free());
-    warn!("AtomicCell<u32> is lock free? {:?}", AtomicCell::<u32>::is_lock_free());
-    warn!("AtomicCell<u64> is lock free? {:?}", AtomicCell::<u64>::is_lock_free());
-    warn!("AtomicCell<usize> is lock free? {:?}", AtomicCell::<usize>::is_lock_free());
-    warn!("AtomicCell<Option<u8>> is lock free? {:?}", AtomicCell::<Option<u8>>::is_lock_free());
-    warn!("AtomicCell<OptionU8> is lock free? {:?}", AtomicCell::<OptionU8>::is_lock_free());
+impl fmt::Debug for OptionU8 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
 }
-// Ensure that `Atomic<OptionU8>` is actually a lock-free atomic.
-const_assert!(AtomicCell::<OptionU8>::is_lock_free());
-
 
 
 /// The parts of a `Task` that may be modified after its creation.
@@ -292,22 +284,32 @@ pub struct TaskInner {
 
 
 /// A structure that contains contextual information for a thread of execution. 
+///
+/// Only fields that do not permit interior mutability are public and can be accessed directly.
 pub struct Task {
     /// The mutable parts of a `Task` struct that can be modified after task creation,
     /// excluding private items that can be modified atomically.
     ///
     /// We use this inner structure to reduce contention when accessing task struct fields,
     /// because the other fields aside from this one are primarily read, not written.
+    ///
+    /// This is not public because it permits interior mutability.
     inner: MutexIrqSafe<TaskInner>,
 
     /// The unique identifier of this Task.
     pub id: usize,
     /// The simple name of this Task.
     pub name: String,
-    /// Which cpu core this Task is currently running on.
+    /// Which cpu core this Task is currently running on;
     /// `None` if not currently running.
-    running_on_cpu: AtomicCell<Option<u8>>,
+    /// We use `OptionU8` instead of `Option<u8>` to ensure that 
+    /// this field is accessed using lock-free native atomic instructions.
+    ///
+    /// This is not public because it permits interior mutability.
+    running_on_cpu: AtomicCell<OptionU8>,
     /// The runnability of this task, i.e., whether it's eligible to be scheduled in.
+    ///
+    /// This is not public because it permits interior mutability.
     runstate: AtomicCell<RunState>,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
@@ -331,17 +333,17 @@ pub struct Task {
     pub simd: SimdExt,
 }
 
+// Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
 const_assert!(AtomicCell::<OptionU8>::is_lock_free());
 const_assert!(AtomicCell::<RunState>::is_lock_free());
-
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut ds = f.debug_struct("Task");
         ds.field("name", &self.name)
             .field("id", &self.id)
-            .field("running_on", &self.running_on_cpu)
-            .field("runstate", &self.runstate);
+            .field("running_on", &self.running_on_cpu())
+            .field("runstate", &self.runstate());
         if let Some(inner) = self.inner.try_lock() {
             ds.field("pinned", &inner.pinned_core);
         } else {
@@ -418,7 +420,7 @@ impl Task {
             id: task_id,
             name: format!("task_{}", task_id),
             runstate: AtomicCell::new(RunState::Initing),
-            running_on_cpu: AtomicCell::new(None),
+            running_on_cpu: AtomicCell::new(None.into()),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -453,7 +455,7 @@ impl Task {
 
     /// Returns the APIC ID of the CPU this `Task` is currently running on.
     pub fn running_on_cpu(&self) -> Option<u8> {
-        self.running_on_cpu.load()
+        self.running_on_cpu.load().into()
     }
 
     /// Returns the APIC ID of the CPU this `Task` is pinned on,
@@ -658,10 +660,10 @@ impl Task {
     /// Obtains the locks on both this `Task`'s inner state and the given `next` `Task`'s inner state
     /// in order to mutate them. 
     pub fn task_switch(&self, next: &Task, apic_id: u8) {
-        let _held_interrupts = irq_safety::hold_interrupts();
-        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);         
+        // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}, interrupts?: {}", apic_id, self, next, irq_safety::interrupts_enabled());
 
         // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
+        /*
         if !next.is_runnable() {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
             return;
@@ -676,12 +678,13 @@ impl Task {
                 return;
             }
         }
+        */
 
         // Note that because userspace support is currently disabled, this will never happen.
         // Change the privilege stack (RSP0) in the TSS.
         // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
         // i.e., when `next` is not a userspace task.
-        //
+        /*
         if next.is_userspace() {
             let (stack_bottom, stack_size) = {
                 let kstack = &next.inner.lock().kstack;
@@ -695,14 +698,16 @@ impl Task {
                 return;
             }
         }
+        */
 
         // update runstates
-        self.running_on_cpu.store(None); // no longer running
-        next.running_on_cpu.store(Some(apic_id)); // now running on this core
+        self.running_on_cpu.store(None.into()); // no longer running
+        next.running_on_cpu.store(Some(apic_id).into()); // now running on this core
 
         // Switch page tables. 
         // Since there is only a single address space (as userspace support is currently disabled),
         // we do not need to do this at all.
+        /*
         if false {
             let prev_mmi = &self.mmi;
             let next_mmi = &next.mmi;
@@ -720,6 +725,7 @@ impl Task {
                 prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
             }
         }
+        */
        
         // update the current task to `next`
         next.set_as_current_task();
@@ -731,9 +737,17 @@ impl Task {
             next.inner.lock().drop_after_task_switch = self.inner.lock().task_local_data.take().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
-        let prev_task_saved_sp: *mut usize = { (&mut self.inner.lock().saved_sp) as *mut usize };
-        let next_task_saved_sp: usize = { next.inner.lock().saved_sp.clone() };
-        // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", prev_task_saved_sp, next_task_saved_sp);
+        let prev_task_saved_sp: *mut usize = {
+            let mut inner = self.inner.lock(); // ensure the lock is released
+            (&mut inner.saved_sp) as *mut usize
+        };
+        let next_task_saved_sp: usize = {
+            let inner = next.inner.lock(); // ensure the lock is released
+            inner.saved_sp
+        };
+        // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", prev_task_saved_sp as usize, next_task_saved_sp);
+        // if self.inner.is_locked() { error!("BUG: previous task inner was locked!"); }
+        // if next.inner.is_locked() { error!("BUG: next task inner was locked!"); }
 
         /// A private macro that actually calls the given context switch routine.
         macro_rules! call_context_switch {
@@ -807,8 +821,10 @@ impl Task {
 
         // Now, as a final action, we drop any data that the original previous task 
         // prepared for droppage before the context switch occurred.
-        let _prev_task_data_to_drop = self.inner.lock().drop_after_task_switch.take();
-
+        let _prev_task_data_to_drop = {
+            let mut inner = self.inner.lock(); // ensure the lock is released
+            inner.drop_after_task_switch.take()
+        };
     }
 }
 
@@ -1023,7 +1039,7 @@ pub fn bootstrap_task(
     );
     bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
     bootstrap_task.runstate.store(RunState::Runnable);
-    bootstrap_task.running_on_cpu.store(Some(apic_id)); 
+    bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);

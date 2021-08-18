@@ -43,11 +43,11 @@ pub fn schedule() -> bool {
         return false;
     }
 
-    trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {:?}, next: {:?}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
+    // trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {:?}, next: {:?}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
 
     curr_task.task_switch(next_task.deref(), apic_id); 
 
-    trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
+    // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
  
     true
 }
@@ -71,7 +71,6 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
         scheduler_priority::get_priority(_task)
     }
     #[cfg(not(priority_scheduler))] {
-        //Err("no scheduler that uses task priority is currently loaded")
         None
     }
 }

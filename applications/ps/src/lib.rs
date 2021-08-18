@@ -46,34 +46,28 @@ pub fn main(args: Vec<String>) -> isize {
     let mut task_string = String::new();
     for (id, task) in TASKLIST.lock().iter() {
         num_tasks += 1;
-        let runstate;
-        let cpu;
-        let pinned; 
-        let task_type;
-        // only hold the task's lock for a short time
-        {
-            runstate = task.runstate();
-            cpu = task.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
-            pinned = task.pinned_core().map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
-            task_type = if task.is_an_idle_task {"I"}
-                else if task.is_application() {"A"}
-                else {" "} ;
-        }    
         if matches.opt_present("b") {
             task_string.push_str(&format!("{0:<5}  {1}\n", id, task.name));
         }
         else {
+            // All printed fields below must be strings to ensure the width formatting specifier below works properly.
+            let runstate = format!("{:?}", task.runstate());
+            let cpu = task.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
+            let pinned = task.pinned_core().map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
+            let task_type = if task.is_an_idle_task {"I"}
+                else if task.is_application() {"A"}
+                else {" "} ;
 
             #[cfg(priority_scheduler)] {
                 let priority = scheduler::get_priority(&task).map(|priority| format!("{}", priority)).unwrap_or_else(|| String::from("-"));
                 task_string.push_str(
-                    &format!("{0:<5}  {1:<10?}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}\n", 
+                    &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}\n", 
                     id, runstate, cpu, pinned, task_type, priority, task.name)
                 );
             }
             #[cfg(not(priority_scheduler))] {
                 task_string.push_str(
-                    &format!("{0:<5}  {1:<10?}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
+                    &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}\n", 
                     id, runstate, cpu, pinned, task_type, task.name)
                 );
             }
