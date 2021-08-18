@@ -248,10 +248,6 @@ impl fmt::Debug for OptionU8 {
 /// Currently, we only publicize the fields here that need to be modified externally,
 /// primarily by the `spawn` crate for creating and running new tasks. 
 pub struct TaskInner {
-    #[cfg(runqueue_spillful)]
-    /// The runqueue that this Task is on.
-    pub on_runqueue: Option<u8>,
-
     /// The status or value this Task exited with, if it has already exited.
     exit_value: Option<ExitValue>,
     /// the saved stack pointer value, used for task switching.
@@ -324,7 +320,11 @@ pub struct Task {
     /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
     /// which has generic type parameters that describe its function signature, argument type, and return type.
     pub failure_cleanup_function: FailureCleanupFunction,
-        
+    
+    #[cfg(runqueue_spillful)]
+    /// The runqueue that this Task is on.
+    on_runqueue: AtomicCell<OptionU8>,
+
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
@@ -402,8 +402,6 @@ impl Task {
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
-                #[cfg(runqueue_spillful)]
-                on_runqueue: None,
                 exit_value: None,
                 saved_sp: 0,
                 task_local_data: None,
@@ -423,6 +421,9 @@ impl Task {
             app_crate,
             namespace,
             failure_cleanup_function,
+
+            #[cfg(runqueue_spillful)]
+            on_runqueue: AtomicCell::new(None.into()),
             
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -595,37 +596,16 @@ impl Task {
         }
     }
 
-    /// The internal routine that actually exits or kills a Task.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`'s inner state in order to mutate it. 
-    fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
-        if self.has_exited() {
-            return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
-        }
-        {
-            self.runstate.store(RunState::Exited);
-            let mut inner = self.inner.lock();
-            inner.exit_value = Some(val);
+    #[cfg(runqueue_spillful)]
+    /// Returns the runqueue on which this `Task` is currently enqueued.
+    pub fn on_runqueue(&self) -> Option<u8> {
+        self.on_runqueue.load().into()
+    }
 
-            // Corner case: if the task isn't currently running (as with killed tasks), 
-            // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
-            if !self.is_running() {
-                // trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*task);
-                let _tld = inner.task_local_data.take();
-            }
-        }
-
-        #[cfg(runqueue_spillful)] {   
-            let task_on_rq = { self.inner.lock().on_runqueue.clone() };
-            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = task_on_rq {
-                    remove_from_runqueue(self, rq)?;
-                }
-            }
-        }
-
-        Ok(())
+    #[cfg(runqueue_spillful)]
+    /// Marks this `Task` as enqueued on the given runqueue.
+    pub fn set_on_runqueue(&self, runqueue: Option<u8>) {
+        self.on_runqueue.store(runqueue.into());
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
@@ -983,6 +963,38 @@ impl TaskRef {
         // TODO FIXME: cause a panic in this Task such that it will start the unwinding process
         // instead of immediately causing it to exit
         self.internal_exit(ExitValue::Killed(reason))
+    }
+
+    /// The internal routine that actually exits or kills a Task.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on this `Task`'s inner state in order to mutate it. 
+    fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
+        if self.0.has_exited() {
+            return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
+        }
+        {
+            self.0.runstate.store(RunState::Exited);
+            let mut inner = self.0.inner.lock();
+            inner.exit_value = Some(val);
+
+            // Corner case: if the task isn't currently running (as with killed tasks), 
+            // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
+            if !self.0.is_running() {
+                trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*self.0);
+                let _tld = inner.task_local_data.take();
+            }
+        }
+
+        #[cfg(runqueue_spillful)] {   
+            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
+                if let Some(rq) = self.on_runqueue() {
+                    remove_from_runqueue(self, rq)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
