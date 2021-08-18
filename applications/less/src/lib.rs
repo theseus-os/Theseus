@@ -49,11 +49,7 @@ fn get_content_string(file_path: String) -> Result<String, String> {
     };
 
     // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
-    let curr_wr = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let curr_wr = Arc::clone(&taskref.get_env().lock().working_dir);
     let path = Path::new(file_path);
     
     // navigate to the filepath specified by first argument

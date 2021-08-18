@@ -104,10 +104,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame, print_
     // and test out using debug info for recovery
     if false {
         let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
-        let app_crate = {
-            let t = curr_task.lock();
-            t.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow()
-        };
+        let app_crate = curr_task.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow();
         let debug_symbols_file = {
             let krate = app_crate.lock_as_ref();
             trace!("============== Crate {} =================", krate.crate_name);

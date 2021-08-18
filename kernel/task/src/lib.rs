@@ -28,9 +28,12 @@
 #![no_std]
 #![feature(panic_info_message)]
 
+#[cfg(test)] #[macro_use] extern crate std;
+
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
+#[macro_use] extern crate static_assertions;
 extern crate irq_safety;
 extern crate memory;
 extern crate stack;
@@ -212,6 +215,27 @@ pub struct RestartInfo {
 pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
 
 
+/// A wrapper around `Option<u8>` with a forced type alignment of 2 bytes,
+/// to ensure lock freedom when using it inside of [`Atomic`].
+#[derive(Debug, Copy, Clone)]
+#[repr(align(2))]
+struct OptionU8(Option<u8>);
+impl From<Option<u8>> for OptionU8 {
+    fn from(opt: Option<u8>) -> Self {
+        OptionU8(opt)
+    }
+}
+impl Into<Option<u8>> for OptionU8 {
+    fn into(self) -> Option<u8> {
+        self.0
+    }
+}
+
+// Ensure that `Atomic<OptionU8>` is actually a lock-free atomic.
+const_assert!(Atomic::<OptionU8>::is_lock_free());
+
+
+
 /// The parts of a `Task` that may be modified after its creation.
 ///
 /// This includes only the parts that cannot be modified atomically.
@@ -273,7 +297,7 @@ pub struct Task {
     pub name: String,
     /// Which cpu core this Task is currently running on.
     /// `None` if not currently running.
-    running_on_cpu: Atomic<Option<u8>>,
+    running_on_cpu: Atomic<OptionU8>,
     /// The runnability of this task, i.e., whether it's eligible to be scheduled in.
     runstate: Atomic<RunState>,
     /// Memory management details: page tables, mappings, allocators, etc.
@@ -375,7 +399,7 @@ impl Task {
             id: task_id,
             name: format!("task_{}", task_id),
             runstate: Atomic::new(RunState::Initing),
-            running_on_cpu: Atomic::new(None),
+            running_on_cpu: Atomic::new(None.into()),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -410,7 +434,7 @@ impl Task {
 
     /// Returns the APIC ID of the CPU this `Task` is currently running on.
     pub fn running_on_cpu(&self) -> Option<u8> {
-        self.running_on_cpu.load(Ordering::Acquire)
+        self.running_on_cpu.load(Ordering::Acquire).into()
     }
 
     /// Returns the APIC ID of the CPU this `Task` is pinned on,
@@ -445,13 +469,12 @@ impl Task {
     /// in order to access its stack.
     /// The given `func` **must not** attempt to obtain that same inner lock.
     pub fn with_kstack<R, F>(&self, func: F) -> R 
-        where F: Fn(&Stack) -> R
+        where F: FnOnce(&Stack) -> R
     {
         func(&self.inner.lock().kstack)
     }
 
-    /// Exposes mutable access to this `Task`'s [`TaskInner`] by invoking
-    /// the given `func` with a reference to its inner state.
+    /// Returns a mutable reference to this `Task`'s inner state. 
     ///
     /// # Note about mutability
     /// This function requires the caller to have a mutable reference to this `Task`
@@ -461,13 +484,10 @@ impl Task {
     /// before you enclose it in a `TaskRef` wrapper type.
     ///
     /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`'s inner state for the duration of `func`
-    /// in order to access its stack.
-    /// The given `func` **must not** attempt to obtain that same inner lock.
-    pub fn with_inner_mut<R, F>(&self, func: F) -> R 
-        where F: Fn(&mut TaskInner) -> R
-    {
-        func(&mut self.inner.lock())
+    /// Because this function requires a mutable reference to this `Task`,
+    /// no locks must be obtained. 
+    pub fn inner_mut(&mut self) -> &mut TaskInner {
+        self.inner.get_mut()
     }
 
     /// Exposes read-only access to this `Task`'s [`RestartInfo`] by invoking
@@ -478,7 +498,7 @@ impl Task {
     /// in order to access its stack.
     /// The given `func` **must not** attempt to obtain that same inner lock.
     pub fn with_restart_info<R, F>(&self, func: F) -> R 
-        where F: Fn(Option<&RestartInfo>) -> R
+        where F: FnOnce(Option<&RestartInfo>) -> R
     {
         func(self.inner.lock().restart_info.as_ref())
     }
@@ -658,8 +678,8 @@ impl Task {
         }
 
         // update runstates
-        self.running_on_cpu.store(None, Ordering::Release); // no longer running
-        next.running_on_cpu.store(Some(apic_id), Ordering::Release); // now running on this core
+        self.running_on_cpu.store(None.into(), Ordering::Release); // no longer running
+        next.running_on_cpu.store(Some(apic_id).into(), Ordering::Release); // now running on this core
 
         // Switch page tables. 
         // Since there is only a single address space (as userspace support is currently disabled),
@@ -984,7 +1004,7 @@ pub fn bootstrap_task(
     );
     bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
     bootstrap_task.runstate.store(RunState::Runnable, Ordering::Release);
-    bootstrap_task.running_on_cpu.store(Some(apic_id), Ordering::Release); 
+    bootstrap_task.running_on_cpu.store(Some(apic_id).into(), Ordering::Release); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
     let task_ref = TaskRef::new(bootstrap_task);

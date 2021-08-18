@@ -43,11 +43,18 @@ use bit_field::BitField;
 pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::PIC);
 
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[repr(u8)]
 pub enum InterruptChip {
     APIC,
     X2APIC,
     PIC,
 }
+
+pub fn is_lock_free() -> bool {
+    Atomic::<InterruptChip>::is_lock_free()
+}
+// Ensure that `Atomic<InterruptChip>` is actually a lock-free atomic.
+const_assert!(Atomic::<InterruptChip>::is_lock_free());
 
 
 lazy_static! {

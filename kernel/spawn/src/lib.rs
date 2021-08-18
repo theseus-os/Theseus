@@ -45,7 +45,7 @@ use alloc::{
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -287,16 +287,13 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Currently we're using the very bottom of the kstack for kthread arguments. 
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
         // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
-        new_task.with_inner_mut(|inner_mut| -> Result<(), &'static str> {
-            let bottom_of_stack: &mut usize = inner_mut.kstack.as_type_mut(0)?;
-            let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
-                arg:  self.argument,
-                func: self.func,
-                _rettype: PhantomData,
-            }));
-            *bottom_of_stack = box_ptr as usize;
-            Ok(())
-        })?;
+        let bottom_of_stack: &mut usize = new_task.inner_mut().kstack.as_type_mut(0)?;
+        let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
+            arg:  self.argument,
+            func: self.func,
+            _rettype: PhantomData,
+        }));
+        *bottom_of_stack = box_ptr as usize;
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
         if self.blocked {
@@ -374,7 +371,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // and tell it to use the restartable version of the final task cleanup function.
         self.post_build_function = Some(Box::new(
             move |new_task| {
-                new_task.with_inner_mut(|inner_mut| inner_mut.restart_info = Some(restart_info));
+                new_task.inner_mut().restart_info = Some(restart_info);
                 new_task.failure_cleanup_function = task_restartable_cleanup_failure::<F, A, R>;
                 setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
                 Ok(())
@@ -428,13 +425,10 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
         ($ContextType:ty) => (
             // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages. 
             // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
-            new_task.with_inner_mut(|inner_mut| -> Result<(), &'static str> {
-                let mp_offset = inner_mut.kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
-                let new_context_destination: &mut $ContextType = inner_mut.kstack.as_type_mut(mp_offset)?;
-                *new_context_destination = <$ContextType>::new(entry_point_function as usize);
-                inner_mut.saved_sp = new_context_destination as *const _ as usize;
-                Ok(())
-            })?;
+            let mp_offset = new_task.inner_mut().kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
+            let new_context_destination: &mut $ContextType = new_task.inner_mut().kstack.as_type_mut(mp_offset)?;
+            *new_context_destination = <$ContextType>::new(entry_point_function as usize);
+            new_task.inner_mut().saved_sp = new_context_destination as *const _ as usize;
         );
     }
 

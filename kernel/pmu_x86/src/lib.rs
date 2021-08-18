@@ -72,7 +72,6 @@ extern crate apic;
 #[macro_use] extern crate log;
 extern crate mod_mgmt;
 extern crate bit_field;
-extern crate atomic;
 
 use x86_64::registers::msr::*;
 use x86_64::VirtualAddress;

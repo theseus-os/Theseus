@@ -143,6 +143,7 @@ dependencies = [
  "log",
  "mpmc",
  "spin 0.9.0",
+ "static_assertions",
  "task",
  "wait_queue",
 ]
@@ -1323,7 +1324,6 @@ name = "libtest"
 version = "0.1.0"
 dependencies = [
  "apic",
- "atomic",
  "bit_field 0.10.0",
  "hashbrown",
  "hpet",
@@ -2032,7 +2032,6 @@ name = "pmu_x86"
 version = "0.1.0"
 dependencies = [
  "apic",
- "atomic",
  "bit_field 0.10.0",
  "irq_safety",
  "lazy_static",
@@ -2779,6 +2778,7 @@ dependencies = [
  "root",
  "spin 0.9.0",
  "stack",
+ "static_assertions",
  "tss",
  "x86_64",
 ]

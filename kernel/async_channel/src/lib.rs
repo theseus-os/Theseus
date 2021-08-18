@@ -12,6 +12,7 @@
 #![no_std]
 
 extern crate alloc;
+#[macro_use] extern crate static_assertions;
 #[cfg(trace_channel)] #[macro_use] extern crate log;
 #[cfg(trace_channel)] #[macro_use] extern crate debugit;
 extern crate wait_queue;
@@ -95,6 +96,12 @@ struct Channel<T: Send> {
     waiting_receivers: WaitQueue,
     channel_status: Atomic<ChannelStatus>
 }
+
+pub fn is_lock_free() -> bool {
+    Atomic::<ChannelStatus>::is_lock_free()
+}
+// Ensure that `Atomic<ChannelStatus>` is actually a lock-free atomic.
+const_assert!(Atomic::<ChannelStatus>::is_lock_free());
 
 impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
