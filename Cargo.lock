@@ -1283,8 +1283,9 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#598d714463fbf07555f3359358662e00a7a8baee"
+source = "git+https://github.com/theseus-os/irq_safety#4ab38e655d68baa6a317ed4d6c589ecc30f4c843"
 dependencies = [
+ "cortex-m 0.7.3",
  "owning_ref",
  "spin 0.9.0",
  "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
@@ -2613,7 +2614,6 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "cfg-if 1.0.0",
  "serial_port_arm",
  "serial_port_x86",
@@ -3334,9 +3334,9 @@ dependencies = [
 
 [[package]]
 name = "volatile-register"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d67cb4616d99b940db1d6bd28844ff97108b498a6ca850e5b6191a532063286"
+checksum = "9ee8f19f9d74293faf70901bc20ad067dc1ad390d2cbf1e3f75f721ffee908b6"
 dependencies = [
  "vcell",
 ]
