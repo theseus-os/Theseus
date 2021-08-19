@@ -23,16 +23,25 @@
 //! 
 
 #![no_std]
+#![feature(abi_x86_interrupt)]
 
 extern crate spin;
 extern crate port_io;
 extern crate irq_safety;
+extern crate interrupts;
 extern crate bare_io;
 
 use core::{convert::TryFrom, fmt::{self, Write}, str::FromStr};
 use port_io::Port;
 use irq_safety::MutexIrqSafe;
 use spin::Once;
+
+
+// Dependencies beneath here are for testing the new deferred interrupt handler tasks
+#[macro_use] extern crate log;
+extern crate x86_64;
+use x86_64::structures::idt::ExceptionStackFrame;
+
 
 
 // Dependencies below here are temporary and will be removed
@@ -423,3 +432,29 @@ pub fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
 /// A chunk of data read from a serial port
 /// that will be transmitted to a receiver.
 pub type DataChunk = (u8, [u8; u8::MAX as usize]);
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+/// IRQ 0x23: COM2 serial port interrupt handler.
+///
+/// Note: this IRQ may also be used for COM4, but I haven't seen a machine with a COM4 port yet.
+extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
+    // trace!("COM2 serial handler");
+    handle_receive_interrupt(SerialPortAddress::COM2);
+    interrupts::eoi(Some(PIC_MASTER_OFFSET + 0x3));
+}
+
+
+/// IRQ 0x24: COM1 serial port interrupt handler.
+///
+/// Note: this IRQ may also be used for COM3, but I haven't seen a machine with a COM3 port yet.
+extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
+    // trace!("COM1 serial handler");
+    serial_port::handle_receive_interrupt(serial_port::SerialPortAddress::COM1);
+    interrupts::eoi(Some(PIC_MASTER_OFFSET + 0x4));
+}

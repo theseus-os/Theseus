@@ -11,7 +11,6 @@
 extern crate x86_64;
 extern crate spin;
 extern crate port_io;
-extern crate serial_port;
 extern crate kernel_config;
 extern crate memory;
 extern crate apic;
@@ -131,10 +130,6 @@ fn set_handlers(idt: &mut Idt) {
     idt[0x20].set_handler_fn(pit_timer_handler);
     idt[0x21].set_handler_fn(ps2_keyboard_handler);
     idt[0x22].set_handler_fn(lapic_timer_handler);
-    idt[0x23].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x24].set_handler_fn(com1_serial_handler);
-    idt[0x25].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x26].set_handler_fn(unimplemented_interrupt_handler);
     idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
 
     // idt[0x28].set_handler_fn(rtc_handler);
@@ -336,24 +331,6 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
     
     scheduler::schedule();
-}
-
-/// IRQ 0x23: COM2 serial port interrupt handler.
-///
-/// Note: this IRQ may also be used for COM4, but I haven't seen a machine with a COM4 port yet.
-extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // trace!("COM2 serial handler");
-    serial_port::handle_receive_interrupt(serial_port::SerialPortAddress::COM2);
-    eoi(Some(PIC_MASTER_OFFSET + 0x3));
-}
-
-/// IRQ 0x24: COM1 serial port interrupt handler.
-///
-/// Note: this IRQ may also be used for COM3, but I haven't seen a machine with a COM3 port yet.
-extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // trace!("COM1 serial handler");
-    serial_port::handle_receive_interrupt(serial_port::SerialPortAddress::COM1);
-    eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {

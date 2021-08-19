@@ -112,3 +112,9 @@ mod test {
     }
 }
 */
+
+
+extern "x86-interrupt" fn test_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+
+    trace!("top of serial_port_interrupt_handler");
+}
