@@ -15,5 +15,9 @@ path = "../../../libs/port_io"
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 
+# Dependencies below here are temporary, for console creation testing.
+[dependencies.async_channel]
+path = "../../async_channel"
+
 [lib]
 crate-type = ["rlib"]

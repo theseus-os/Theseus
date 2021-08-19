@@ -64,7 +64,7 @@ sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qe
 
   * Or on Arch Linux:
     ```bash
-    sudo pacman -S nasm pkg-config grub mtools xorriso qemu
+    sudo pacman -S make gcc nasm pkg-config grub mtools xorriso qemu
     ```
 
 If you're on WSL, also do the following steps:
@@ -103,20 +103,25 @@ If you're on WSL, also do the following steps:
     ```
 
 ### Building using Docker
-Note: building and running Theseus within a Docker container may be slower than on a native host OS (e.g., QEMU+KVM). 
-1. *(Skip if docker is already installed.)*  Install [Docker Engine](https://docs.docker.com/engine/install/). We provide a convenience script for this on Ubuntu:
+Note: building and running Theseus within a Docker container may be slower than on a native host OS.
+ 1. Ensure docker scripts are executable:
+    ```
+    chmod +x docker/*.sh
+    ```   
+ 2. *(Skip if docker is already installed.)*  Install [Docker Engine](https://docs.docker.com/engine/install/). We provide a convenience script for this on Ubuntu:
     ```
     ./docker/install_docker_ubuntu.sh
     ``` 
     * After docker installs, enable your user account to run docker without root privileges:   
       `sudo groupadd docker; sudo usermod -aG docker $USER`    
       Then, **log out and log back in** (or restart your computer) for the user/group changes to take effet.
-2. Build the docker image:     
+ 
+ 3. Build the docker image:     
     ```
     ./docker/build_docker.sh
     ```    
     This does not build Theseus, but rather only creates a docker image that contains all the necessary dependencies to build and run Theseus. 
-3. Run the new docker image locally as a container:    
+ 4. Run the new docker image locally as a container:    
     ```
     ./docker/run_docker.sh
     ```   
@@ -124,7 +129,7 @@ Note: building and running Theseus within a Docker container may be slower than 
 
 Notes on Docker usage:    
   * The docker-based workflow should only require you to re-run the `run_docker.sh` script multiple times when re-building or running Theseus after modifying its code. You shouldn't need to re-run `build_docker.sh` multiple times, though it won't hurt.
-  * KVM doesn't currently work in docker. To run Theseus in QEMU using KVM, you can build Theseus within docker, exit the container, and then run `make orun host=yes` on your host machine.
+  * KVM doesn't currently work in docker. To run Theseus in QEMU using KVM, you can build Theseus within docker, exit the container (via `Ctrl+D`), and then run `make orun host=yes` on your host machine.
 
 
 ## Building and Running

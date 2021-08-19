@@ -39,8 +39,7 @@ pub fn main(args: Vec<String>) -> isize {
         
         if let Some(runqueue) = runqueue::get_runqueue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
-            for task_ref in runqueue.iter() {
-                let task = task_ref.lock();
+            for task in runqueue.iter() {
                 runqueue_contents.push_str(&format!("{} ({}) {}\n", 
                     task.name, 
                     task.id,

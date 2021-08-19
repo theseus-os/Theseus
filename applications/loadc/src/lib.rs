@@ -64,9 +64,9 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn rmain(matches: Matches) -> Result<c_int, String> {
     let curr_task = task::get_my_current_task().unwrap();
-    let curr_wd   = Arc::clone(&curr_task.lock().env.lock().working_dir);
+    let curr_wd   = Arc::clone(&curr_task.get_env().lock().working_dir);
     let namespace = curr_task.get_namespace();
-    let mmi       = Arc::clone(&curr_task.lock().mmi);
+    let mmi       = &curr_task.mmi;
 
     let path = matches.free.get(0).ok_or_else(|| format!("Missing path to ELF executable"))?;
     let path = Path::new(path.clone());
@@ -84,7 +84,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
     // most important of which are static data sections, 
     // as it is logically incorrect to have duplicates of data that are supposed to be global system-wide singletons.
     // We should throw a warning here if there are no relocations in the file, as it was probably built/linked with the wrong arguments.
-    overwrite_relocations(&namespace, &mut segments, &elf_file, &mmi, false)?;
+    overwrite_relocations(&namespace, &mut segments, &elf_file, mmi, false)?;
 
     // Remap each segment's mapped pages using the correct flags; they were previously mapped as always writable.
     {
@@ -272,7 +272,7 @@ fn parse_and_load_elf_executable<'f>(
         // debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, memory_size_in_bytes, this_ap.start_address());
 
         let initial_flags = EntryFlags::from_elf_program_flags(prog_hdr.flags());
-        let mmi = task::get_my_current_task().unwrap().lock().mmi.clone();
+        let mmi = &task::get_my_current_task().unwrap().mmi;
         // Must initially map the memory as writable so we can copy the segment data to it later. 
         let mut mp = mmi.lock().page_table
             .map_allocated_pages(this_ap, initial_flags | EntryFlags::WRITABLE)

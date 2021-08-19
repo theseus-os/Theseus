@@ -10,7 +10,14 @@ extern crate cfg_if;
 cfg_if ! {
 	if #[cfg(target_arch = "x86_64")] {
 		extern crate serial_port_x86;
-		pub use serial_port_x86::{get_serial_port, SerialPort, SerialPortAddress};
+		pub use serial_port_x86::{
+            get_serial_port, 
+            SerialPort, 
+            SerialPortAddress,
+            handle_receive_interrupt,
+            set_connection_listener,
+            DataChunk,
+        };
 	}
 
 	else if #[cfg(target_arch = "arm")] {
