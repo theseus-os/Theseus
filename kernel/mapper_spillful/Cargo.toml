@@ -16,7 +16,7 @@ features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety.git"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

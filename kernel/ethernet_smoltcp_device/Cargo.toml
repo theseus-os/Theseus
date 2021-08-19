@@ -28,7 +28,7 @@ features = [
 ]
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety.git"
 
 [dependencies.memory]
 path = "../memory"

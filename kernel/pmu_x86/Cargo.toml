@@ -15,7 +15,7 @@ atomic = "0.5.0"
 path = "../apic"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety.git"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

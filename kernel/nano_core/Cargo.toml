@@ -30,7 +30,7 @@ multiboot2 = "0.10.1"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety.git"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.state_store]
 path = "../state_store"

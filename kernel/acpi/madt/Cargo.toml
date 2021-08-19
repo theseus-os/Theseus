@@ -12,7 +12,7 @@ zerocopy = "0.5.0"
 version = "0.4.8"
 
 [dependencies.irq_safety]
-path = "../../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety.git"
 
 [dependencies.memory]
 path = "../../memory"
