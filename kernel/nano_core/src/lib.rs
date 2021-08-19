@@ -101,8 +101,8 @@ pub extern "C" fn nano_core_start(
     println_raw!("Entered nano_core_start(). Interrupts disabled.");
 
     // Initialize the logger up front so we can see early log messages for debugging.
-    let logger_serial_ports = [serial_port::SerialPortAddress::COM1];  // some servers use COM2 instead. 
-    try_exit!(logger::init(None, &logger_serial_ports).map_err(|_a| "couldn't init logger!"));
+    let logger_writers = [serial_port::get_serial_port(serial_port::SerialPortAddress::COM1)]; // some servers use COM2 instead. 
+    try_exit!(logger::init(None, &logger_writers).map_err(|_a| "couldn't init logger!"));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
