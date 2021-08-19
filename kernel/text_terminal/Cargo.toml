@@ -1,0 +1,21 @@
+[package]
+name = "text_terminal"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "A text-based terminal emulator that supports ANSI, VT100, xterm, and other standards."
+build = "../../build.rs"
+
+[dependencies]
+bitflags = "1.1.0"
+bare-io = { version = "0.2.1", features = [ "alloc", "nightly" ] }
+unicode-width = "0.1.8"
+vte = "0.10.1"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.event_types]
+path = "../event_types"
+
+[lib]
+crate-type = ["rlib"]
