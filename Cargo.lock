@@ -1414,7 +1414,6 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
- "serial_port",
  "spin 0.9.0",
 ]
 
