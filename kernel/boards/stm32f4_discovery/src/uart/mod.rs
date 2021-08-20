@@ -1,15 +1,19 @@
 //! Implements UART specific functionality for the STM32F4 Discovery Board 
-use crate::{BOARD_GPIOA, BOARD_RCC, BOARD_USART2};
-use core::{convert::TryFrom, fmt};
+use crate::{BOARD_GPIOA, BOARD_RCC};
+use core::{
+    convert::TryFrom, 
+    fmt,
+    cell::RefCell
+};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 
+/// Exposes the board's USART2
+static BOARD_USART2: MutexIrqSafe<RefCell<Option<stm32f407::USART2>>> = MutexIrqSafe::new(RefCell::new(None));
+
 #[derive(Copy, Clone, Debug)]
 pub enum SerialPortAddress {
-//    USART1,
     USART2,
-//    USART3,
-//    USART6,
 }
 impl TryFrom<&str> for SerialPortAddress {
 	type Error = ();
@@ -22,10 +26,7 @@ impl TryFrom<&str> for SerialPortAddress {
 	}
 }
 
-// static USART1_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
 static USART2_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-// static USART3_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-// static USART6_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
 
 
 /// Initialize UART for use.
@@ -72,10 +73,7 @@ pub fn get_serial_port(
     serial_port_address: SerialPortAddress
 ) -> &'static MutexIrqSafe<SerialPort> {
     let sp = match serial_port_address {
-        // SerialPortAddress::USART1 => (&USART1_SERIAL_PORT, USART1_BASE),
         SerialPortAddress::USART2 => &USART2_SERIAL_PORT,
-        // SerialPortAddress::USART3 => (&USART3_SERIAL_PORT, USART3_BASE),
-        // SerialPortAddress::USART6 => (&USART6_SERIAL_PORT, USART6_BASE),
     };
     sp.call_once(|| {
         uart_init();

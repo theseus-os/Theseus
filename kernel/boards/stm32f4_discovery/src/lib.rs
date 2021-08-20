@@ -15,11 +15,9 @@ if #[cfg(target_vendor = "stm32f407")] {
     use irq_safety::MutexIrqSafe;
     use core::cell::RefCell;
 
-    // Exposed individual peripherals for use within the crate's submodules
-    static BOARD_GPIOA: MutexIrqSafe<RefCell<Option<stm32f407::GPIOA>>> = MutexIrqSafe::new(RefCell::new(None));
-    static BOARD_RCC: MutexIrqSafe<RefCell<Option<stm32f407::RCC>>> = MutexIrqSafe::new(RefCell::new(None));
-    static BOARD_USART2: MutexIrqSafe<RefCell<Option<stm32f407::USART2>>> = MutexIrqSafe::new(RefCell::new(None));
-
+    pub mod gpio;
+    pub mod rcc;
+    pub mod uart;
 
     /// Initializes device peripherals for use.
     /// TODO: As we add support for more peripherals,
@@ -27,11 +25,10 @@ if #[cfg(target_vendor = "stm32f407")] {
     /// For now however, we initialize te devices individually as needed.
     pub fn init_peripherals () {
         let p = stm32f407::Peripherals::take().unwrap();
-        BOARD_GPIOA.lock().replace(Some(p.GPIOA));
-        BOARD_RCC.lock().replace(Some(p.RCC));
-        BOARD_USART2.lock().replace(Some(p.USART2));
+        gpio::BOARD_GPIOA.lock().replace(Some(p.GPIOA));
+        rcc::BOARD_RCC.lock().replace(Some(p.RCC));
+        uart::BOARD_USART2.lock().replace(Some(p.USART2));
     }
 
-    pub mod uart;
 }
 }
