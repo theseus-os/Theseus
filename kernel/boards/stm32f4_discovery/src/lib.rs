@@ -8,30 +8,30 @@ cfg_if!{
 if #[cfg(target_vendor = "stm32f407")] {
     extern crate stm32f4;
     extern crate spin;
-    #[macro_use] extern crate irq_safety;
-    extern crate lazy_static;
+    extern crate irq_safety;
+    extern crate cortex_m;
 
     use stm32f4::stm32f407;
-    use lazy_static::lazy_static;
     use irq_safety::MutexIrqSafe;
+    use core::cell::RefCell;
 
-    lazy_static!{
-        /// This struct exposes device-specific peripherals conforming to the `rust2svd` API.
-        /// In order to allow safe sharing, we utilize `irq_safety::MutexIrqSafe`
-        pub static ref STM_PERIPHERALS : MutexIrqSafe<stm32f407::Peripherals> = {
-            let p = stm32f407::Peripherals::take().unwrap();
-            MutexIrqSafe::new(p)
-        };
-    }
+    // Exposed individual peripherals for use within the crate's submodules
+    static BOARD_GPIOA: MutexIrqSafe<RefCell<Option<stm32f407::GPIOA>>> = MutexIrqSafe::new(RefCell::new(None));
+    static BOARD_RCC: MutexIrqSafe<RefCell<Option<stm32f407::RCC>>> = MutexIrqSafe::new(RefCell::new(None));
+    static BOARD_USART2: MutexIrqSafe<RefCell<Option<stm32f407::USART2>>> = MutexIrqSafe::new(RefCell::new(None));
 
-    pub mod uart;
 
     /// Initializes device peripherals for use.
     /// TODO: As we add support for more peripherals,
     /// we can figure out how to initialize them together.
     /// For now however, we initialize te devices individually as needed.
     pub fn init_peripherals () {
-        todo!("For now, peripherals are initialized individually as needed.");
+        let p = stm32f407::Peripherals::take().unwrap();
+        BOARD_GPIOA.lock().replace(Some(p.GPIOA));
+        BOARD_RCC.lock().replace(Some(p.RCC));
+        BOARD_USART2.lock().replace(Some(p.USART2));
     }
+
+    pub mod uart;
 }
 }
