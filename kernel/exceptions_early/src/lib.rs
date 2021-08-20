@@ -18,7 +18,7 @@ use x86_64::structures::{
 };
 use gdt::{Gdt, create_gdt};
 
-/// An initial interrupt descriptor table for catching very simple exceptions only.
+/// An initial Interrupt Descriptor Table (IDT) for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
 pub static EARLY_IDT: LockedIdt = LockedIdt::new();
 

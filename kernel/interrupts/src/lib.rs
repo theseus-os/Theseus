@@ -67,7 +67,7 @@ pub fn is_exception_handler_with_error_code(address: u64) -> bool {
 }
 
 
-/// Initializes the interrupt subsystem and sets up an initial interrupt descriptor table (IDT).
+/// Initializes the interrupt subsystem and sets up an initial Interrupt Descriptor Table (IDT).
 ///
 /// The new IDT will be initialized with the same contents as the early IDT 
 /// created in [`exceptions_early::init()`].

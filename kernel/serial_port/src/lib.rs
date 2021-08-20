@@ -30,19 +30,14 @@ extern crate port_io;
 extern crate irq_safety;
 extern crate interrupts;
 extern crate bare_io;
+extern crate x86_64;
 
 use core::{convert::TryFrom, fmt::{self, Write}, str::FromStr};
 use port_io::Port;
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 use interrupts::{IRQ_BASE_OFFSET, register_interrupt};
-
-
-// Dependencies beneath here are for testing the new deferred interrupt handler tasks
-extern crate x86_64;
 use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
-
-
 
 // Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
@@ -468,11 +463,6 @@ fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
 /// A chunk of data read from a serial port
 /// that will be transmitted to a receiver.
 pub type DataChunk = (u8, [u8; u8::MAX as usize]);
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
