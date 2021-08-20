@@ -114,7 +114,8 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs book view-book clean-doc
+		gdb doc docs view-doc view-docs \
+		arm run-arm book view-book clean-doc
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -446,20 +447,20 @@ preserve_old_modules:
 	@mv $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
 	cargo clean
 
+
 ### Build for Cortex-m4 targets. Currently it only builds the nanocore.
-arm:
-	cargo build -p nano_core --target thumbv7em-none-eabi --release
+arm : export override TARGET := thumbv7em-none-eabi
+arm :
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) -p nano_core --target $(TARGET)
 	arm-none-eabi-ld \
 		-T kernellink.ld \
 		--nmagic \
 		-o target/thumbv7em-none-eabi/theseus.bin \
 		target/thumbv7em-none-eabi/release/libnano_core.a
 
-arm-hardware:
-	cargo build -p nano_core --target cfg/thumbv7em-stm32f407-theseus-eabi.json \
-		-Z build-std=core,alloc \
-		-Z build-std-features=compiler-builtins-mem \
-		--release
+arm-hardware : export override TARGET := thumbv7em-stm32f407-theseus-eabi 
+arm-hardware :
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) -p nano_core --target $(TARGET)
 	arm-none-eabi-ld \
 		-T kernellink.ld \
 		--nmagic \
