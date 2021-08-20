@@ -36,9 +36,6 @@ path = "../kernel_config"
 [target.'cfg(target_arch = "x86_64")'.dependencies.apic]
 path = "../apic"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies.serial_port]
-path = "../serial_port"
-
 [target.'cfg(target_arch = "x86_64")'.dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 

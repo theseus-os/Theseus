@@ -8,11 +8,8 @@ build = "../../build.rs"
 spin = "0.9.0"
 log = "0.4.8"
 
-[dependencies.serial_port]
-path = "../serial_port"
-
 [dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety.git"
+git = "https://github.com/theseus-os/irq_safety"
 
 [lib]
 crate-type = ["rlib"]

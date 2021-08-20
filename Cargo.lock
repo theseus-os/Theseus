@@ -1236,7 +1236,6 @@ dependencies = [
  "port_io",
  "ps2",
  "scheduler",
- "serial_port",
  "spin 0.9.0",
  "task",
  "tlb_shootdown",
@@ -1525,7 +1524,6 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
- "serial_port",
  "spin 0.9.0",
 ]
 
@@ -2637,9 +2635,11 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "bare-io",
+ "interrupts",
  "irq_safety",
  "port_io",
  "spin 0.9.0",
+ "x86_64",
 ]
 
 [[package]]

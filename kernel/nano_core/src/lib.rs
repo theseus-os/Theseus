@@ -299,7 +299,7 @@ extern "C" fn main() -> ! {
     #[cfg(target_vendor = "unknown")]
     let default_logger_port = serial_port::SerialPortAddress::Semihost;
 
-    let logger_serial_ports = [default_logger_port];  // some servers use COM2 instead. 
+    let logger_serial_ports = [serial_port::get_serial_port(default_logger_port)];  // some servers use COM2 instead. 
     logger::init(None, &logger_serial_ports).unwrap();
 
     info!("memory and logging initialized");
