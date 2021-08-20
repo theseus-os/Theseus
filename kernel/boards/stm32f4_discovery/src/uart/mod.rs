@@ -1,5 +1,8 @@
 //! Implements UART specific functionality for the STM32F4 Discovery Board 
-use crate::{BOARD_GPIOA, BOARD_RCC};
+use crate::{
+    gpio::BOARD_GPIOA, 
+    rcc::BOARD_RCC,
+};
 use core::{
     convert::TryFrom, 
     fmt,
@@ -7,9 +10,10 @@ use core::{
 };
 use irq_safety::MutexIrqSafe;
 use spin::Once;
+use stm32f4::stm32f407;
 
 /// Exposes the board's USART2
-static BOARD_USART2: MutexIrqSafe<RefCell<Option<stm32f407::USART2>>> = MutexIrqSafe::new(RefCell::new(None));
+pub static BOARD_USART2: MutexIrqSafe<RefCell<Option<stm32f407::USART2>>> = MutexIrqSafe::new(RefCell::new(None));
 
 #[derive(Copy, Clone, Debug)]
 pub enum SerialPortAddress {

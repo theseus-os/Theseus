@@ -12,8 +12,6 @@ if #[cfg(target_vendor = "stm32f407")] {
     extern crate cortex_m;
 
     use stm32f4::stm32f407;
-    use irq_safety::MutexIrqSafe;
-    use core::cell::RefCell;
 
     pub mod gpio;
     pub mod rcc;
