@@ -214,6 +214,7 @@
 <span id="211">211</span>
 <span id="212">212</span>
 <span id="213">213</span>
+<span id="214">214</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.</span>
 
@@ -235,6 +236,10 @@
 };
 <span class="kw">use</span> <span class="ident">gdt</span>::{<span class="ident">Gdt</span>, <span class="ident">create_gdt</span>};
 
+<span class="doccomment">/// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.</span>
+<span class="doccomment">/// This is no longer used after interrupts are set up properly, it&#39;s just a failsafe.</span>
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">EARLY_IDT</span>: <span class="ident">LockedIdt</span> <span class="op">=</span> <span class="ident">LockedIdt::new</span>();
+
 <span class="doccomment">/// The initial GDT structure for the BSP (the first CPU to boot),</span>
 <span class="doccomment">/// which is only really used for the purpose of setting up a special</span>
 <span class="doccomment">/// interrupt stack to support gracefully handling early double faults. </span>
@@ -245,16 +250,13 @@
 <span class="doccomment">/// interrupt stack to support gracefully handling early double faults. </span>
 <span class="kw">static</span> <span class="ident">EARLY_TSS</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Mutex::new</span>(<span class="ident">TaskStateSegment::new</span>());
 
-<span class="doccomment">/// Initializes the given `IDT` with a basic set of early exception handlers</span>
+<span class="doccomment">/// Initializes an early IDT with a basic set of early exception handlers</span>
 <span class="doccomment">/// that print out basic information when an exception occurs, mostly for debugging.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// If a double fault stack address is specified, a new TSS and GDT</span>
 <span class="doccomment">/// will be created and set up such that the processor will jump to </span>
 <span class="doccomment">/// that stack upon a double fault.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
-    <span class="ident">idt_ref</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">LockedIdt</span>, 
-    <span class="ident">double_fault_stack_top_unusable</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">memory::VirtualAddress</span><span class="op">&gt;</span>,
-) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">double_fault_stack_top_unusable</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">memory::VirtualAddress</span><span class="op">&gt;</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;exceptions_early(): double_fault_stack_top_unusable: {:X?}&quot;</span>, <span class="ident">double_fault_stack_top_unusable</span>);
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">df_stack_top</span>) <span class="op">=</span> <span class="ident">double_fault_stack_top_unusable</span> {
         <span class="comment">// Create and load an initial TSS and GDT so we can handle early exceptions such as double faults. </span>
@@ -282,7 +284,7 @@
     }
 
     { 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">idt_ref</span>.<span class="ident">lock</span>(); <span class="comment">// withholds interrupts</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">EARLY_IDT</span>.<span class="ident">lock</span>(); <span class="comment">// withholds interrupts</span>
 
         <span class="comment">// SET UP FIXED EXCEPTION HANDLERS</span>
         <span class="ident">idt</span>.<span class="ident">divide_by_zero</span>.<span class="ident">set_handler_fn</span>(<span class="ident">divide_by_zero_handler</span>);
@@ -318,7 +320,7 @@
         <span class="comment">// reserved: 0x1f</span>
     }
 
-    <span class="ident">idt_ref</span>.<span class="ident">load</span>();
+    <span class="ident">EARLY_IDT</span>.<span class="ident">load</span>();
 }
 
 

@@ -253,6 +253,11 @@
 <span id="250">250</span>
 <span id="251">251</span>
 <span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for the x86 PIC (8259 Programmable Interrupt Controller),</span>
 <span class="doccomment">//! which handles basic interrupts.</span>
@@ -268,7 +273,12 @@
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PIC_MASTER_OFFSET</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x20</span>;
+<span class="doccomment">/// The offset added to the first IRQ: `0x20`.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// This is needed to shift the start of all IRQ vectors </span>
+<span class="doccomment">/// to after the end of the CPU exception vectors,</span>
+<span class="doccomment">/// which occupy the first 32 IRQ vectors.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IRQ_BASE_OFFSET</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x20</span>;
 
 
 <span class="doccomment">/// Command sent to read the Interrupt Request Register.</span>
@@ -352,7 +362,7 @@
     }
 }
 
-<span class="doccomment">/// A pair of chained PIC controllers.  This is the standard setup on x86.</span>
+<span class="doccomment">/// A pair of chained PIC chips, which represents the standard x86 configuration.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ChainedPics</span> {
     <span class="ident">pics</span>: [<span class="ident">Pic</span>; <span class="number">2</span>],
 }
@@ -368,12 +378,12 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cpic</span> <span class="op">=</span> <span class="ident">ChainedPics</span> {
             <span class="ident">pics</span>: [
                 <span class="ident">Pic</span> {
-                    <span class="ident">offset</span>: <span class="ident">PIC_MASTER_OFFSET</span>,
+                    <span class="ident">offset</span>: <span class="ident">IRQ_BASE_OFFSET</span>,
                     <span class="ident">command</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">MASTER_CMD</span>),
                     <span class="ident">data</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">MASTER_DATA</span>),
                 },
                 <span class="ident">Pic</span> {
-                    <span class="ident">offset</span>: <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">8</span>, <span class="comment">// 8 IRQ lines per PIC</span>
+                    <span class="ident">offset</span>: <span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">8</span>, <span class="comment">// 8 IRQ lines per PIC</span>
                     <span class="ident">command</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">SLAVE_CMD</span>),
                     <span class="ident">data</span>: <span class="ident">port_io::Port::new</span>(<span class="ident">SLAVE_DATA</span>),
                 },
@@ -505,6 +515,7 @@
     <span class="comment">// allegedly takes long enough to make everything work on most hardware.</span>
     <span class="kw">use</span> <span class="ident">x86_64::instructions::port::outb</span>;
     <span class="kw">unsafe</span> { <span class="ident">outb</span>(<span class="number">0x80</span>, <span class="number">0</span>); }
-}</pre></div>
+}
+</pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pic" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
     <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

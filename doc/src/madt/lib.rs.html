@@ -407,18 +407,6 @@
 <span id="404">404</span>
 <span id="405">405</span>
 <span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for the MADT ACPI table, </span>
 <span class="doccomment">//! which includes interrupt and multicore info.</span>
@@ -724,7 +712,7 @@
 <span class="doccomment">/// This should be the first function invoked to initialize the BSP information, </span>
 <span class="doccomment">/// and should come before any other entries in the MADT are handled.</span>
 <span class="kw">fn</span> <span class="ident">handle_bsp_lapic_entry</span>(<span class="ident">madt_iter</span>: <span class="ident">MadtIter</span>, <span class="ident">page_table</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">PageTable</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">use</span> <span class="ident">pic::PIC_MASTER_OFFSET</span>;
+    <span class="kw">use</span> <span class="ident">pic::IRQ_BASE_OFFSET</span>;
 
     <span class="kw">let</span> <span class="ident">all_lapics</span> <span class="op">=</span> <span class="ident">get_lapics</span>();
     <span class="kw">let</span> <span class="ident">me</span> <span class="op">=</span> <span class="ident">get_my_apic_id</span>();
@@ -742,25 +730,13 @@
                 <span class="kw">for</span> <span class="ident">ioapic</span> <span class="kw">in</span> <span class="ident">ioapic::get_ioapics</span>().<span class="ident">iter</span>() {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ioapic_ref</span> <span class="op">=</span> <span class="ident">ioapic</span>.<span class="number">1</span>.<span class="ident">lock</span>();
 
-                    <span class="comment">// set the BSP to receive regular PIC interrupts routed through the IoApic</span>
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x0</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x0</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x1</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x1</span>); <span class="comment">// keyboard interrupt 0x1 -&gt; 0x21 in IDT</span>
-                    <span class="comment">// skip irq 2, since in the PIC that&#39;s the chained one (cascade line from PIC2 to PIC1) that isn&#39;t used</span>
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x3</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x3</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x4</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x4</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x5</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x5</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x6</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x6</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x7</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x7</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x8</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x8</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0x9</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0x9</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0xa</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0xa</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0xb</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0xb</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0xc</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0xc</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0xd</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0xd</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0xe</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0xe</span>);
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="number">0xf</span>, <span class="ident">bsp_id</span>, <span class="ident">PIC_MASTER_OFFSET</span> <span class="op">+</span> <span class="number">0xf</span>);
+                    <span class="comment">// Set the BSP to receive regular PIC interrupts routed through the IoApic.</span>
+                    <span class="comment">// Skip irq 2, since in the PIC that&#39;s the chained one (cascade line from PIC2 to PIC1) that isn&#39;t used.</span>
+                    <span class="kw">for</span> <span class="ident">irq</span> <span class="kw">in</span> (<span class="number">0x0</span> ..<span class="op">=</span> <span class="number">0x1</span>).<span class="ident">chain</span>(<span class="number">0x3</span> ..<span class="op">=</span> <span class="number">0xF</span>) {
+                        <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="ident">irq</span>, <span class="ident">bsp_id</span>, <span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="ident">irq</span>);
+                    }
 
-                    <span class="comment">// ioapic_ref.set_irq(0x1, 0xFF, PIC_MASTER_OFFSET + 0x1); </span>
+                    <span class="comment">// ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); </span>
                     <span class="comment">// FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. </span>
                 }
                 
@@ -788,7 +764,7 @@
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ioapic_ref</span> <span class="op">=</span> <span class="ident">ioapic</span>.<span class="ident">lock</span>();
                 <span class="kw">if</span> <span class="ident">ioapic_ref</span>.<span class="ident">handles_irq</span>(<span class="ident">int_src</span>.<span class="ident">gsi</span>) {
                     <span class="comment">// using BSP for now, but later we could redirect the IRQ to more (or all) cores</span>
-                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="ident">int_src</span>.<span class="ident">irq_source</span>, <span class="ident">bsp_id</span>, <span class="ident">int_src</span>.<span class="ident">gsi</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">+</span> <span class="ident">PIC_MASTER_OFFSET</span>); 
+                    <span class="ident">ioapic_ref</span>.<span class="ident">set_irq</span>(<span class="ident">int_src</span>.<span class="ident">irq_source</span>, <span class="ident">bsp_id</span>, <span class="ident">int_src</span>.<span class="ident">gsi</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">+</span> <span class="ident">IRQ_BASE_OFFSET</span>); 
                     <span class="macro">trace!</span>(<span class="string">&quot;MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}.&quot;</span>,
                     <span class="ident">int_src</span>.<span class="ident">bus_source</span>, <span class="ident">int_src</span>.<span class="ident">irq_source</span>, <span class="ident">int_src</span>.<span class="ident">gsi</span>, <span class="ident">int_src</span>.<span class="ident">flags</span>, <span class="ident">ioapic_ref</span>.<span class="ident">id</span>);
                     <span class="ident">handled</span> <span class="op">=</span> <span class="bool-val">true</span>;

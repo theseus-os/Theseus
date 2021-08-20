@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["PIC_MASTER_OFFSET",""]],"struct":[["ChainedPics","A pair of chained PIC controllers.  This is the standard setup on x86."],["IrqStatusRegisters","The set of status registers for both PIC chips."]]});
+initSidebarItems({"constant":[["IRQ_BASE_OFFSET","The offset added to the first IRQ: `0x20`."]],"struct":[["ChainedPics","A pair of chained PIC chips, which represents the standard x86 configuration."],["IrqStatusRegisters","The set of status registers for both PIC chips."]]});

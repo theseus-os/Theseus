@@ -403,6 +403,10 @@
 <span id="400">400</span>
 <span id="401">401</span>
 <span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.</span>
 
@@ -422,6 +426,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">gimli</span>;
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tss</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack_trace</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fault_log</span>;
 
@@ -449,7 +454,10 @@
         <span class="ident">idt</span>.<span class="ident">bound_range_exceeded</span>.<span class="ident">set_handler_fn</span>(<span class="ident">bound_range_exceeded_handler</span>);
         <span class="ident">idt</span>.<span class="ident">invalid_opcode</span>.<span class="ident">set_handler_fn</span>(<span class="ident">invalid_opcode_handler</span>);
         <span class="ident">idt</span>.<span class="ident">device_not_available</span>.<span class="ident">set_handler_fn</span>(<span class="ident">device_not_available_handler</span>);
-        <span class="ident">idt</span>.<span class="ident">double_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">double_fault_handler</span>);
+        <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">idt</span>.<span class="ident">double_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">double_fault_handler</span>);
+        <span class="kw">unsafe</span> { 
+            <span class="ident">options</span>.<span class="ident">set_stack_index</span>(<span class="ident">tss::DOUBLE_FAULT_IST_INDEX</span> <span class="kw">as</span> <span class="ident">u16</span>);
+        }
         <span class="comment">// reserved: 0x09 coprocessor segment overrun exception</span>
         <span class="ident">idt</span>.<span class="ident">invalid_tss</span>.<span class="ident">set_handler_fn</span>(<span class="ident">invalid_tss_handler</span>);
         <span class="ident">idt</span>.<span class="ident">segment_not_present</span>.<span class="ident">set_handler_fn</span>(<span class="ident">segment_not_present_handler</span>);
