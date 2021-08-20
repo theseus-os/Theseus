@@ -218,6 +218,11 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         }
     }
 
+    // Once devices have been initalized, intialize the IOMMU if it is present
+    if iommu::iommu_present() {
+        iommu::init()?;
+    }
+
     Ok(())
 }
 

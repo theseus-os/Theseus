@@ -69,5 +69,8 @@ path = "../io"
 [dependencies.mlx5]
 path = "../mlx5"
 
+[dependencies.iommu]
+path = "../iommu"
+
 [lib]
 crate-type = ["rlib"]

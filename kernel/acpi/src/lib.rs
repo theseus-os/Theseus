@@ -27,6 +27,7 @@ extern crate rsdt;
 extern crate fadt;
 extern crate madt;
 extern crate dmar;
+extern crate iommu;
 
 
 use alloc::vec::Vec;
@@ -109,14 +110,25 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         let acpi_tables = ACPI_TABLES.lock();
         if let Some(dmar_table) = dmar::Dmar::get(&acpi_tables) {
             debug!("This machine has a DMAR table: flags: {:#b}, host_address_width: {} bits", 
-                dmar_table.flags(), dmar_table.host_address_width(),
+                dmar_table.flags(), dmar_table.host_address_width()
             );
+
             for table in dmar_table.iter() {
                 match table {
                     dmar::DmarEntry::Drhd(drhd) => {
                         debug!("Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}", 
                             drhd.include_pci_all(), drhd.segment_number(), drhd.register_base_address(),
                         );
+                        if !drhd.include_pci_all() {
+                            info!("No IOMMU support when INCLUDE_PCI_ALL not set in DRHD");
+                        }
+                        else {
+                            let register_base_address = PhysicalAddress::new(drhd.register_base_address() as usize)
+                                                            .ok_or("IOMMU register_base_address was invalid")?;
+                            iommu::early_init(
+                                dmar_table.host_address_width(), drhd.segment_number(), 
+                                register_base_address, page_table)?;
+                        }
                         debug!("DRHD table has Device Scope entries:");
                         for (_idx, dev_scope) in drhd.iter().enumerate() {
                             debug!("    Device Scope [{}]: type: {}, enumeration_id: {}, start_bus_number: {}", 
