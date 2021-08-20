@@ -14,9 +14,5 @@ path = "./serial_port_x86"
 [target.'cfg(target_arch = "arm")'.dependencies.serial_port_arm]
 path = "./serial_port_arm"
 
-# Dependencies below here are temporary, for console creation testing.
-[dependencies.async_channel]
-path = "../async_channel"
-
 [lib]
 crate-type = ["rlib"]

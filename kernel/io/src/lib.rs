@@ -643,6 +643,7 @@ impl<IO> Seek for Writer<IO> where IO: KnownLength {
 /// * [`BlockReader`] and [`BlockWriter`]
 /// * [`ByteReader`] and [`ByteWriter`]
 /// * [`bare_io::Read`], [`bare_io::Write`], and [`bare_io::Seek`]
+/// * [`core::fmt::Write`]
 ///
 /// # Usage and Examples
 /// The Rust compiler has difficulty inferring all of the types needed in this struct; 
@@ -769,6 +770,13 @@ impl<'io, IO, L, B> bare_io::Seek for LockableIo<'io, IO, L, B>
     where IO: bare_io::Seek + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
 {
     delegate!{ to self.lock_mut() { fn seek(&mut self, position: bare_io::SeekFrom) -> bare_io::Result<u64>; } }
+}
+impl<'io, IO, L, B> core::fmt::Write for LockableIo<'io, IO, L, B>
+    where IO: core::fmt::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write_str(&mut self, s: &str) -> core::fmt::Result;
+    } }
 }
 
 

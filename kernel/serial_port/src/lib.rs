@@ -14,7 +14,6 @@ cfg_if ! {
             get_serial_port, 
             SerialPort, 
             SerialPortAddress,
-            handle_receive_interrupt,
             set_connection_listener,
             DataChunk,
         };

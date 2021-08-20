@@ -302,7 +302,7 @@ pub struct MadtLocalApicAddressOverride {
 /// This should be the first function invoked to initialize the BSP information, 
 /// and should come before any other entries in the MADT are handled.
 fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
-    use pic::PIC_MASTER_OFFSET;
+    use pic::IRQ_BASE_OFFSET;
 
     let all_lapics = get_lapics();
     let me = get_my_apic_id();
@@ -320,25 +320,13 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 for ioapic in ioapic::get_ioapics().iter() {
                     let mut ioapic_ref = ioapic.1.lock();
 
-                    // set the BSP to receive regular PIC interrupts routed through the IoApic
-                    ioapic_ref.set_irq(0x0, bsp_id, PIC_MASTER_OFFSET + 0x0);
-                    ioapic_ref.set_irq(0x1, bsp_id, PIC_MASTER_OFFSET + 0x1); // keyboard interrupt 0x1 -> 0x21 in IDT
-                    // skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used
-                    ioapic_ref.set_irq(0x3, bsp_id, PIC_MASTER_OFFSET + 0x3);
-                    ioapic_ref.set_irq(0x4, bsp_id, PIC_MASTER_OFFSET + 0x4);
-                    ioapic_ref.set_irq(0x5, bsp_id, PIC_MASTER_OFFSET + 0x5);
-                    ioapic_ref.set_irq(0x6, bsp_id, PIC_MASTER_OFFSET + 0x6);
-                    ioapic_ref.set_irq(0x7, bsp_id, PIC_MASTER_OFFSET + 0x7);
-                    ioapic_ref.set_irq(0x8, bsp_id, PIC_MASTER_OFFSET + 0x8);
-                    ioapic_ref.set_irq(0x9, bsp_id, PIC_MASTER_OFFSET + 0x9);
-                    ioapic_ref.set_irq(0xa, bsp_id, PIC_MASTER_OFFSET + 0xa);
-                    ioapic_ref.set_irq(0xb, bsp_id, PIC_MASTER_OFFSET + 0xb);
-                    ioapic_ref.set_irq(0xc, bsp_id, PIC_MASTER_OFFSET + 0xc);
-                    ioapic_ref.set_irq(0xd, bsp_id, PIC_MASTER_OFFSET + 0xd);
-                    ioapic_ref.set_irq(0xe, bsp_id, PIC_MASTER_OFFSET + 0xe);
-                    ioapic_ref.set_irq(0xf, bsp_id, PIC_MASTER_OFFSET + 0xf);
+                    // Set the BSP to receive regular PIC interrupts routed through the IoApic.
+                    // Skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used.
+                    for irq in (0x0 ..= 0x1).chain(0x3 ..= 0xF) {
+                        ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq);
+                    }
 
-                    // ioapic_ref.set_irq(0x1, 0xFF, PIC_MASTER_OFFSET + 0x1); 
+                    // ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
                     // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
                 }
                 
@@ -366,7 +354,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 let mut ioapic_ref = ioapic.lock();
                 if ioapic_ref.handles_irq(int_src.gsi) {
                     // using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                    ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + PIC_MASTER_OFFSET); 
+                    ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + IRQ_BASE_OFFSET); 
                     trace!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}.",
                     int_src.bus_source, int_src.irq_source, int_src.gsi, int_src.flags, ioapic_ref.id);
                     handled = true;

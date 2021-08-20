@@ -16,6 +16,7 @@ extern crate debug_info;
 extern crate gimli;
 
 extern crate memory;
+extern crate tss;
 extern crate stack_trace;
 extern crate fault_log;
 
@@ -43,7 +44,10 @@ pub fn init(idt_ref: &'static LockedIdt) {
         idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded_handler);
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
-        idt.double_fault.set_handler_fn(double_fault_handler);
+        let options = idt.double_fault.set_handler_fn(double_fault_handler);
+        unsafe { 
+            options.set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16);
+        }
         // reserved: 0x09 coprocessor segment overrun exception
         idt.invalid_tss.set_handler_fn(invalid_tss_handler);
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);

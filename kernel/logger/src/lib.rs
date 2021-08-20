@@ -1,11 +1,13 @@
 //! A basic logger implementation for system-wide logging in Theseus. 
 //!
-//! This enables Theseus crates to use the `log` crate's macros anywhere.
-//! Currently, log statements are written to one or more serial ports.
+//! This enables Theseus crates to use the `log` crate's macros anywhere,
+//! such as `error!()`, `warn!()`, `info!()`, `debug!()`, and `trace!()`.
+//!
+//! Currently, log statements are written to one or more **writers`, 
+//! which are objects that implement the [`core::fmt::Write`] trait.
 
 #![no_std]
 
-extern crate serial_port;
 extern crate log;
 extern crate spin;
 extern crate irq_safety;
@@ -13,23 +15,28 @@ extern crate irq_safety;
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use core::fmt::{self, Write};
 use spin::Once;
-use serial_port::{SerialPort, SerialPortAddress};
 use irq_safety::MutexIrqSafe;
 
-
-/// The static logger instance. 
-/// This is "static" only because it's required by the `log` crate's design.
-static LOGGER: Once<Logger> = Once::new();
+/// The singleton system-wide logger instance. 
+///
+/// This is "static" only because it's required by the `log` crate.
+static LOGGER: Once<Logger<LOG_MAX_WRITERS>> = Once::new();
 
 /// By default, Theseus will print all log levels, including `Trace` and above.
-const DEFAULT_LOG_LEVEL: Level = Level::Trace;
+pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
 
+/// The maximum number of writers: backends to which log streams can be outputted.
+pub const LOG_MAX_WRITERS: usize = 2;
+
+/// The signature of a callback function that will optionally be invoked
+/// on every log statement to be printed, which enables log mirroring.
+/// See [`mirror_to_vga()`].
 pub type LogOutputFunc = fn(fmt::Arguments);
 static MIRROR_VGA_FUNC: Once<LogOutputFunc> = Once::new();
 
-/// See ANSI terminal formatting schemes
+/// ANSI style codes for basic colors.
 #[allow(dead_code)]
-pub enum LogColor {
+enum LogColor {
     Black,
     Red,
     Green,
@@ -42,7 +49,7 @@ pub enum LogColor {
 }
 
 impl LogColor {
-    pub fn as_terminal_string(&self) -> &'static str {
+    fn as_terminal_string(&self) -> &'static str {
         match *self {
             // \x1b is the ESC character (0x1B)
 			LogColor::Black	  =>  "\x1b[30m",
@@ -66,25 +73,31 @@ pub fn mirror_to_vga(func: LogOutputFunc) {
 /// A struct that holds information about logging destinations in Theseus.
 /// 
 /// This is the "backend" for the `log` crate that allows Theseus to use its `log!()` macros.
-/// Currently, it supports emitting log messages to up to 4 serial ports.
-#[derive(Default)]
-struct Logger {
-    serial_ports: [Option<&'static MutexIrqSafe<SerialPort>>; 4],
+///
+/// We force the use of static references here to enable this crate to be used
+/// before dynamic heap allocation has been set up.
+struct Logger<const N: usize> {
+    writers: [Option<&'static MutexIrqSafe<dyn Write + Send>>; N],
+}
+impl<const N: usize> Default for Logger<{N}> {
+    fn default() -> Self {
+        Logger { writers: [None; N] }
+    }
 }
 
-impl Logger {
+impl<const N: usize> Logger<{N}> {
     /// Re-implementation of the function from `fmt::Write`, but it doesn't require `&mut self`.
     fn write_fmt(&self, arguments: fmt::Arguments) -> fmt::Result {
-        for serial_port in self.serial_ports.iter().flatten() {
-            let _result = serial_port.lock().write_fmt(arguments);
+        for writer in self.writers.iter().flatten() {
+            let _result = writer.lock().write_fmt(arguments);
             // If there was an error above, there's literally nothing we can do but ignore it,
-            // because there is no other lower-level way to log errors than the serial port.
+            // because there is no other lower-level way to log errors than this logger.
         }
         Ok(())
     }
 }
 
-impl Log for Logger {
+impl<const N: usize> Log for Logger<{N}> {
     #[inline(always)]
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= log::max_level()
@@ -130,7 +143,7 @@ impl Log for Logger {
     }
 
     fn flush(&self) {
-        // flushing the log is a no-op, since there is no write buffering yet
+        // flushing the log is a no-op, since there is no write buffering.
     }
 }
 
@@ -139,24 +152,24 @@ impl Log for Logger {
 ///
 /// # Arguments
 /// * `log_level`: the log level that should be used.
-///    If `None`, the `DEFAULT_LOG_LEVEL` will be used.
-/// * `serial_ports`: an iterator over the serial ports that the system logger 
+///    If `None`, the [`DEFAULT_LOG_LEVEL`] will be used.
+/// * `writers`: an iterator over the backends that the system logger 
 ///    will write log messages to.
-///    Typically this is just a single port, e.g., `&[COM1]`.
+///    Typically this is just a single writer, such as the COM1 serial port.
 ///
-/// This function will initialize up to a maximum of 4 serial ports and use them for logging.
-/// Serial ports after the first 4 in the `serial_ports` argument will be ignored.
-/// 
-/// This function also initializes and takes ownership of all specified serial ports
-/// such that it can atomically write log messages to them.
-pub fn init<'p>(
+/// This function will initialize the logger with a maximum of [`LOG_MAX_WRITERS`] writers;
+/// any additional writers in the given `writers` iterator will be ignored. 
+///
+/// This function accepts only static references to log writers in order to
+/// enable loggers to be used before dynamic heap allocation has been set up.
+pub fn init<'i, W: Write + Send + 'static>(
     log_level: Option<Level>,
-    serial_ports: impl IntoIterator<Item = &'p SerialPortAddress>
+    writers: impl IntoIterator<Item = &'i &'static MutexIrqSafe<W>>,
 ) -> Result<(), SetLoggerError> {
     let mut logger = Logger::default();
-    for (base_port, logger_serial_port) in serial_ports.into_iter().take(4).zip(&mut logger.serial_ports) {
-        *logger_serial_port = Some(serial_port::get_serial_port(*base_port));
-    }
+    for (writer, logger_writer) in writers.into_iter().take(LOG_MAX_WRITERS).zip(&mut logger.writers) {
+        *logger_writer = Some(*writer);
+    } 
 
     let static_logger = LOGGER.call_once(|| logger);
     log::set_logger(static_logger)?;

@@ -12,7 +12,12 @@ extern crate x86_64;
 use core::fmt;
 
 
-pub const PIC_MASTER_OFFSET: u8 = 0x20;
+/// The offset added to the first IRQ: `0x20`.
+/// 
+/// This is needed to shift the start of all IRQ vectors 
+/// to after the end of the CPU exception vectors,
+/// which occupy the first 32 IRQ vectors.
+pub const IRQ_BASE_OFFSET: u8 = 0x20;
 
 
 /// Command sent to read the Interrupt Request Register.
@@ -96,7 +101,7 @@ impl Pic {
     }
 }
 
-/// A pair of chained PIC controllers.  This is the standard setup on x86.
+/// A pair of chained PIC chips, which represents the standard x86 configuration.
 pub struct ChainedPics {
     pics: [Pic; 2],
 }
@@ -112,12 +117,12 @@ impl ChainedPics {
         let mut cpic = ChainedPics {
             pics: [
                 Pic {
-                    offset: PIC_MASTER_OFFSET,
+                    offset: IRQ_BASE_OFFSET,
                     command: port_io::Port::new(MASTER_CMD),
                     data: port_io::Port::new(MASTER_DATA),
                 },
                 Pic {
-                    offset: PIC_MASTER_OFFSET + 8, // 8 IRQ lines per PIC
+                    offset: IRQ_BASE_OFFSET + 8, // 8 IRQ lines per PIC
                     command: port_io::Port::new(SLAVE_CMD),
                     data: port_io::Port::new(SLAVE_DATA),
                 },

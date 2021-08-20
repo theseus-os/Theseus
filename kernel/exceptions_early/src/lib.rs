@@ -18,6 +18,10 @@ use x86_64::structures::{
 };
 use gdt::{Gdt, create_gdt};
 
+/// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.
+/// This is no longer used after interrupts are set up properly, it's just a failsafe.
+pub static EARLY_IDT: LockedIdt = LockedIdt::new();
+
 /// The initial GDT structure for the BSP (the first CPU to boot),
 /// which is only really used for the purpose of setting up a special
 /// interrupt stack to support gracefully handling early double faults. 
@@ -28,16 +32,13 @@ static EARLY_GDT: Mutex<Gdt> = Mutex::new(Gdt::new());
 /// interrupt stack to support gracefully handling early double faults. 
 static EARLY_TSS: Mutex<TaskStateSegment> = Mutex::new(TaskStateSegment::new());
 
-/// Initializes the given `IDT` with a basic set of early exception handlers
+/// Initializes an early IDT with a basic set of early exception handlers
 /// that print out basic information when an exception occurs, mostly for debugging.
 ///
 /// If a double fault stack address is specified, a new TSS and GDT
 /// will be created and set up such that the processor will jump to 
 /// that stack upon a double fault.
-pub fn init(
-    idt_ref: &'static LockedIdt, 
-    double_fault_stack_top_unusable: Option<memory::VirtualAddress>,
-) {
+pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
     println_raw!("exceptions_early(): double_fault_stack_top_unusable: {:X?}", double_fault_stack_top_unusable);
     if let Some(df_stack_top) = double_fault_stack_top_unusable {
         // Create and load an initial TSS and GDT so we can handle early exceptions such as double faults. 
@@ -65,7 +66,7 @@ pub fn init(
     }
 
     { 
-        let mut idt = idt_ref.lock(); // withholds interrupts
+        let mut idt = EARLY_IDT.lock(); // withholds interrupts
 
         // SET UP FIXED EXCEPTION HANDLERS
         idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
@@ -101,7 +102,7 @@ pub fn init(
         // reserved: 0x1f
     }
 
-    idt_ref.load();
+    EARLY_IDT.load();
 }
 
 

@@ -8,12 +8,16 @@ build = "../../../build.rs"
 [dependencies]
 spin = "0.9.0"
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
+x86_64 = { path = "../../../libs/x86_64" }
 
 [dependencies.port_io]
 path = "../../../libs/port_io"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.interrupts]
+path = "../../interrupts"
 
 # Dependencies below here are temporary, for console creation testing.
 [dependencies.async_channel]

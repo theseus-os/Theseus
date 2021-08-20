@@ -761,7 +761,6 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 name = "e1000"
 version = "0.1.0"
 dependencies = [
- "apic",
  "intel_ethernet",
  "interrupts",
  "irq_safety",
@@ -776,7 +775,6 @@ dependencies = [
  "nic_queues",
  "owning_ref",
  "pci",
- "pic",
  "spin 0.9.0",
  "static_assertions",
  "volatile",
@@ -879,6 +877,7 @@ dependencies = [
  "stack_trace",
  "task",
  "tlb_shootdown",
+ "tss",
  "unwind",
  "vga_buffer",
  "x86_64",
@@ -1217,7 +1216,6 @@ dependencies = [
  "port_io",
  "ps2",
  "scheduler",
- "serial_port",
  "spin 0.9.0",
  "task",
  "tlb_shootdown",
@@ -1501,7 +1499,6 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
- "serial_port",
  "spin 0.9.0",
 ]
 
@@ -1834,7 +1831,6 @@ dependencies = [
  "stack",
  "state_store",
  "vga_buffer",
- "x86_64",
 ]
 
 [[package]]
@@ -2560,7 +2556,6 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "cfg-if 1.0.0",
  "serial_port_arm",
  "serial_port_x86",
@@ -2584,9 +2579,11 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "bare-io",
+ "interrupts",
  "irq_safety",
  "port_io",
  "spin 0.9.0",
+ "x86_64",
 ]
 
 [[package]]
