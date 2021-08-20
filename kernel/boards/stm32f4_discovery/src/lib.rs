@@ -1,7 +1,6 @@
 //! Implements platform specific functionalities for the STM32F4_Discovery board,
 //! exposing its peripherals and providing ways of interacting with them.
 #![no_std]
-#![feature(const_raw_ptr_to_usize_cast)]
 #[macro_use] extern crate cfg_if;
 
 cfg_if!{
@@ -12,6 +11,7 @@ if #[cfg(target_vendor = "stm32f407")] {
     extern crate cortex_m;
 
     use stm32f4::stm32f407;
+    use irq_safety::MutexIrqSafe;
 
     pub mod gpio;
     pub mod rcc;
@@ -23,9 +23,19 @@ if #[cfg(target_vendor = "stm32f407")] {
     /// For now however, we initialize te devices individually as needed.
     pub fn init_peripherals () {
         let p = stm32f407::Peripherals::take().unwrap();
-        gpio::BOARD_GPIOA.lock().replace(Some(p.GPIOA));
-        rcc::BOARD_RCC.lock().replace(Some(p.RCC));
-        uart::BOARD_USART2.lock().replace(Some(p.USART2));
+
+        // Destructing p to get peripherals we need to initialize
+        let stm32f407::Peripherals {
+            GPIOA: gpioa,
+            RCC: rcc,
+            USART2: usart2,
+            ..
+        } = p;
+
+        // Initializing the static variables associated with each peripheral
+        gpio::BOARD_GPIOA.call_once(|| MutexIrqSafe::new(gpioa));
+        rcc::BOARD_RCC.call_once(|| MutexIrqSafe::new(rcc));
+        uart::BOARD_USART2.call_once(|| MutexIrqSafe::new(usart2));
     }
 
 }
