@@ -203,8 +203,12 @@ pub fn init_handlers_pic() {
 /// The function fails if the interrupt number is already in use. 
 /// 
 /// # Arguments 
-/// * `interrupt_num` - the interrupt that is being requested
-/// * `func` - the handler to be registered for 'interrupt_num'
+/// * `interrupt_num` - the interrupt (IRQ vector) that is being requested.
+/// * `func` - the handler to be registered, which will be invoked when the interrupt occurs.
+/// 
+/// # Return
+/// * `Ok(())` if successfully registered, or
+/// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
 pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u64> {
     let mut idt = IDT.lock();
 
