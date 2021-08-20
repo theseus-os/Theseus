@@ -6,14 +6,13 @@ use crate::{
 use core::{
     convert::TryFrom, 
     fmt,
-    cell::RefCell
 };
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 use stm32f4::stm32f407;
 
 /// Exposes the board's USART2
-pub static BOARD_USART2: MutexIrqSafe<RefCell<Option<stm32f407::USART2>>> = MutexIrqSafe::new(RefCell::new(None));
+pub static BOARD_USART2: Once<MutexIrqSafe<stm32f407::USART2>> = Once::new();
 
 #[derive(Copy, Clone, Debug)]
 pub enum SerialPortAddress {
@@ -35,42 +34,39 @@ static USART2_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
 
 /// Initialize UART for use.
 fn uart_init() {
-    let uart_locked = BOARD_USART2.lock();
-    let gpioa_locked = BOARD_GPIOA.lock();
-    let rcc_locked = BOARD_RCC.lock();
-    let uart = uart_locked.borrow();
-    let gpioa = gpioa_locked.borrow();
-    let rcc = rcc_locked.borrow();
+    let uart = BOARD_USART2.get().unwrap().lock();
+    let gpioa = BOARD_GPIOA.get().unwrap().lock();
+    let rcc = BOARD_RCC.get().unwrap().lock();
 
     // initializing clock
-    rcc.as_ref().unwrap().ahb1enr.write(|w| w.gpioaen().bit(true));
+    rcc.ahb1enr.write(|w| w.gpioaen().bit(true));
     // initialize uart clock
-    rcc.as_ref().unwrap().apb1enr.write(|w| w.usart2en().bit(true));
+    rcc.apb1enr.write(|w| w.usart2en().bit(true));
 
     // set up PA2 and PA3 pins for alternate function
-    gpioa.as_ref().unwrap().afrl.modify(|_,w| w.afrl2().bits(0b0111).afrl3().bits(0b0111));
-    gpioa.as_ref().unwrap().moder.modify(|_,w| w.moder2().bits(0b10).moder3().bits(0b10));
+    gpioa.afrl.modify(|_,w| w.afrl2().bits(0b0111).afrl3().bits(0b0111));
+    gpioa.moder.modify(|_,w| w.moder2().bits(0b10).moder3().bits(0b10));
 
     // configure pin output speeds to high
-    gpioa.as_ref().unwrap().ospeedr.modify(|_,w| w.ospeedr2().bits(0b10).ospeedr3().bits(0b10));
+    gpioa.ospeedr.modify(|_,w| w.ospeedr2().bits(0b10).ospeedr3().bits(0b10));
 
     // Enable the USART
-    uart.as_ref().unwrap().cr1.modify(|_,w| w.ue().bit(true));
+    uart.cr1.modify(|_,w| w.ue().bit(true));
 
     // Set the word length
-    uart.as_ref().unwrap().cr1.modify(|_,w| w.m().bit(false));
+    uart.cr1.modify(|_,w| w.m().bit(false));
 
     // Program the number of stop bits
-    uart.as_ref().unwrap().cr2.modify(|_,w| w.stop().bits(0));
+    uart.cr2.modify(|_,w| w.stop().bits(0));
 
     // Disable DMA transfer
-    uart.as_ref().unwrap().cr3.modify(|_,w| w.dmat().bit(false));
+    uart.cr3.modify(|_,w| w.dmat().bit(false));
 
     // Select the desired baudrate, in this case 16 MHz / 104.1875 = 9600 bits/second
-    uart.as_ref().unwrap().brr.modify(|_,w| w.div_mantissa().bits(104).div_fraction().bits(3));
+    uart.brr.modify(|_,w| w.div_mantissa().bits(104).div_fraction().bits(3));
 
     // Initialize uart for reading and writing
-    uart.as_ref().unwrap().cr1.modify(|_,w| w.te().bit(true).re().bit(true));
+    uart.cr1.modify(|_,w| w.te().bit(true).re().bit(true));
 }
 
 pub fn get_serial_port(
@@ -90,12 +86,11 @@ pub struct SerialPort;
 
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let uart_locked = BOARD_USART2.lock();
-        let uart = uart_locked.borrow();
+        let uart = BOARD_USART2.get().unwrap().lock();
         for byte in s.as_bytes().iter() {
-            while uart.as_ref().unwrap().sr.read().txe().bit_is_clear() {} 
+            while uart.sr.read().txe().bit_is_clear() {} 
 
-            uart.as_ref().unwrap().dr.write(|w| w.dr().bits(u16::from(*byte)));
+            uart.dr.write(|w| w.dr().bits(u16::from(*byte)));
         }
         Ok(())
     }
