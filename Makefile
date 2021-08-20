@@ -449,19 +449,18 @@ preserve_old_modules:
 
 
 ### Build for Cortex-m4 targets. Currently it only builds the nanocore.
-arm:
-	cargo build -p nano_core --target thumbv7em-none-eabi --release
+arm : export override TARGET := thumbv7em-none-eabi
+arm :
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) -p nano_core --target $(TARGET)
 	arm-none-eabi-ld \
 		-T kernellink.ld \
 		--nmagic \
 		-o target/thumbv7em-none-eabi/theseus.bin \
 		target/thumbv7em-none-eabi/release/libnano_core.a
 
-arm-hardware:
-	cargo build -p nano_core --target cfg/thumbv7em-stm32f407-theseus-eabi.json \
-		-Z build-std=core,alloc \
-		-Z build-std-features=compiler-builtins-mem \
-		--release
+arm-hardware : export override TARGET := thumbv7em-stm32f407-theseus-eabi 
+arm-hardware :
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) -p nano_core --target $(TARGET)
 	arm-none-eabi-ld \
 		-T kernellink.ld \
 		--nmagic \

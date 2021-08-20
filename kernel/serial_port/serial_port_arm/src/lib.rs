@@ -29,6 +29,9 @@ cfg_if ! {
     // Dummy implementation for when no physical device is present, in which case semihosting will be used
     else if #[cfg(all(target_arch = "arm", target_vendor = "unknown"))] {
         extern crate cortex_m_semihosting;
+        extern crate irq_safety;
+        extern crate spin;
+
         use cortex_m_semihosting::hio::hstdout;
         use core::fmt::{self, Write};
         use irq_safety::MutexIrqSafe;
