@@ -49,6 +49,9 @@ path = "../memory"
 [dependencies.stack_trace]
 path = "../stack_trace"
 
+[dependencies.tss]
+path = "../tss"
+
 [dependencies.debug_info]
 path = "../debug_info"
 

@@ -21,7 +21,6 @@
 extern crate alloc;
 extern crate spin;
 extern crate multiboot2;
-extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate logger;
@@ -38,13 +37,8 @@ extern crate memory_initialization;
 
 
 use core::ops::DerefMut;
-use x86_64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
-
-/// An initial interrupt descriptor table for catching very simple exceptions only.
-/// This is no longer used after interrupts are set up properly, it's just a failsafe.
-static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
@@ -107,7 +101,7 @@ pub extern "C" fn nano_core_start(
     println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers
-    exceptions_early::init(&EARLY_IDT, Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
+    exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
