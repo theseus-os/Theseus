@@ -18,11 +18,9 @@ extern crate memory;
 extern crate pci; 
 extern crate owning_ref;
 extern crate interrupts;
-extern crate pic;
 extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
-extern crate apic;
 extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
@@ -177,12 +175,12 @@ impl NetworkInterfaceCard for E1000Nic {
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
     pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
-        use pic::PIC_MASTER_OFFSET;
+        use interrupts::IRQ_BASE_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
+        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + IRQ_BASE_OFFSET;
         // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];
@@ -212,7 +210,10 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
-        register_interrupt(interrupt_num, e1000_handler)?;
+        register_interrupt(interrupt_num, e1000_handler).map_err(|_e| {
+            error!("e1000 interrupt number {} was already taken! Sharing IRQs is currently unsupported.", interrupt_num);
+            "e1000 interrupt number was already taken! Sharing IRQs is currently unsupported."
+        })?;
 
         // initialize the buffer pool
         init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;

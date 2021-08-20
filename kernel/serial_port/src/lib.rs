@@ -35,12 +35,12 @@ use core::{convert::TryFrom, fmt::{self, Write}, str::FromStr};
 use port_io::Port;
 use irq_safety::MutexIrqSafe;
 use spin::Once;
+use interrupts::{IRQ_BASE_OFFSET, register_interrupt};
 
 
 // Dependencies beneath here are for testing the new deferred interrupt handler tasks
-#[macro_use] extern crate log;
 extern crate x86_64;
-use x86_64::structures::idt::ExceptionStackFrame;
+use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
 
 
 
@@ -63,7 +63,7 @@ static NEW_CONNECTION_NOTIFIER: Once<Sender<SerialPortAddress>> = Once::new();
 
 
 /// The base port I/O addresses for COM serial ports.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum SerialPortAddress {
     /// The base port I/O address for the COM1 serial port.
@@ -74,6 +74,16 @@ pub enum SerialPortAddress {
     COM3 = 0x3E8,
     /// The base port I/O address for the COM4 serial port.
     COM4 = 0x2E8,
+}
+impl SerialPortAddress {
+    /// Returns the interrupt number (IRQ vector)
+    /// and the interrupt handler function for this serial port.
+    fn interrupt_number_handler(&self) -> (u8, HandlerFunc) {
+        match self {
+            Self::COM1 | Self::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_serial_handler),
+            Self::COM2 | Self::COM4 => (IRQ_BASE_OFFSET + 0x03, com2_serial_handler),
+        }
+    }
 }
 impl TryFrom<&str> for SerialPortAddress {
     type Error = ();
@@ -124,7 +134,10 @@ pub fn get_serial_port(
         SerialPortAddress::COM3 => &COM3_SERIAL_PORT,
         SerialPortAddress::COM4 => &COM4_SERIAL_PORT,
     };
-    sp.call_once(|| MutexIrqSafe::new(SerialPort::new(serial_port_address as u16)))
+    sp.call_once(|| {
+        let (n, h) = serial_port_address.interrupt_number_handler();
+        MutexIrqSafe::new(SerialPort::new(serial_port_address as u16, n, h))
+    })
 }
 
 
@@ -173,8 +186,12 @@ impl SerialPort {
     ///
     /// Note: if you are experiencing problems with serial port behavior,
     /// try enabling the loopback test part of this function to see if that passes.
-    pub fn new(base_port: u16) -> SerialPort {
-        let serial = SerialPort {
+    pub fn new(
+        base_port: u16,
+        interrupt_number: u8,
+        interrupt_handler: HandlerFunc,
+    ) -> SerialPort {
+        let mut serial = SerialPort {
             data:                       Port::new(base_port + 0),
             interrupt_enable:           Port::new(base_port + 1),
             interrupt_id_fifo_control:  Port::new(base_port + 2),
@@ -235,6 +252,25 @@ impl SerialPort {
             
             // Finally, enable interrupts for this serial port, for received data only.
             serial.interrupt_enable.write(0x01);
+        }
+
+        // Register the interrupt handler for this serial port. 
+        let res = register_interrupt(interrupt_number, interrupt_handler);
+        if let Err(registered_handler_addr) = res {
+            if registered_handler_addr != interrupt_handler as u64 {
+                let _result = write!(
+                    &mut serial,
+                    "\x1b[31mBUG: failed to register interrupt handler at IRQ {:#X} for serial port {:#X}.
+                        Existing interrupt handler was at address {:#X}. \x1b[0m\n",
+                    interrupt_number, base_port, registered_handler_addr,
+                );
+            }
+        } else {
+            let _result = write!(
+                &mut serial,
+                "\x1b[36mRegistered interrupt handler at IRQ {:#X} for serial port {:#X}.\x1b[0m\n",
+                interrupt_number, base_port,
+            );
         }
 
         serial
@@ -370,7 +406,7 @@ impl bare_io::Write for SerialPort {
 
 /// This is called from the serial port interrupt handlers 
 /// when data has been received and is ready to read.
-pub fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
+fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
     // Important notes:
     //  * We read a chunk of multiple bytes at once.
     //  * We MUST NOT use a blocking read operation in an interrupt handler. 
@@ -400,7 +436,7 @@ pub fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
     if let Err(e) = send_result {
         let _result = write!(
             &mut serial_port.lock(),
-            "Error: failed to send data received for serial port {:?}: {:?}.\n",
+            "\x1b[31mError: failed to send data received for serial port {:?}: {:?}.\x1b[0m\n",
             serial_port_address, e.1
         );
     }
@@ -409,20 +445,20 @@ pub fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
         if let Some(sender) = NEW_CONNECTION_NOTIFIER.get() {
             let _result = write!(
                 &mut serial_port.lock(),
-                "Requesting new console to be spawned for this serial port ({:?})\n",
+                "\x1b[36mRequesting new console to be spawned for this serial port ({:?})\x1b[0m\n",
                 serial_port_address
             );
             if let Err(err) = sender.try_send(serial_port_address) {
                 let _result = write!(
                     &mut serial_port.lock(),
-                    "Error sending request for new console to be spawned for this serial port ({:?}): {:?}\n",
+                    "\x1b[31mError sending request for new console to be spawned for this serial port ({:?}): {:?}\x1b[0m\n",
                     serial_port_address, err
                 );
             }
         } else {
             let _result = write!(
                 &mut serial_port.lock(),
-                "Warning: no connection detector; ignoring {}-byte input read from serial port {:?}: {:X?}\n",
+                "\x1b[33mWarning: no connection detector; ignoring {}-byte input read from serial port {:?}: {:X?}\x1b[0m\n",
                 bytes_read, serial_port_address, &buf[..bytes_read]
             );
         }
@@ -446,7 +482,7 @@ pub type DataChunk = (u8, [u8; u8::MAX as usize]);
 extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
     // trace!("COM2 serial handler");
     handle_receive_interrupt(SerialPortAddress::COM2);
-    interrupts::eoi(Some(PIC_MASTER_OFFSET + 0x3));
+    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x3));
 }
 
 
@@ -455,6 +491,6 @@ extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackF
 /// Note: this IRQ may also be used for COM3, but I haven't seen a machine with a COM3 port yet.
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
     // trace!("COM1 serial handler");
-    serial_port::handle_receive_interrupt(serial_port::SerialPortAddress::COM1);
-    interrupts::eoi(Some(PIC_MASTER_OFFSET + 0x4));
+    handle_receive_interrupt(SerialPortAddress::COM1);
+    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x4));
 }

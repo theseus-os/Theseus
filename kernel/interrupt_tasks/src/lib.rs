@@ -78,7 +78,9 @@ pub fn register_interrupt_handler<DF, S>(
           S: Into<String>,
 {
     // First, attempt to register the interrupt handler.
-    interrupts::register_interrupt(interrupt_number, interrupt_handler_function)?;
+    interrupts::register_interrupt(interrupt_number, interrupt_handler_function).map_err(|_e| 
+        "register_interrupt_handler(): interrupt number was already taken! Sharing IRQs is currently unsupported."
+    )?;
 
     // Spawn the deferred task, which should be initially blocked from running.
     // It will be unblocked by the interrupt handler whenever it needs to run.
@@ -90,6 +92,10 @@ pub fn register_interrupt_handler<DF, S>(
     tb.spawn()
 }
 
+
+fn test_registration() {
+    
+}
 
 
 /*
