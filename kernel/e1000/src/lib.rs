@@ -210,9 +210,9 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
-        register_interrupt(interrupt_num, e1000_handler).map_err(|_e| {
-            error!("e1000 interrupt number {} was already taken! Sharing IRQs is currently unsupported.", interrupt_num);
-            "e1000 interrupt number was already taken! Sharing IRQs is currently unsupported."
+        register_interrupt(interrupt_num, e1000_handler).map_err(|_handler_addr| {
+            error!("e1000 IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.", interrupt_num, _handler_addr);
+            "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
         })?;
 
         // initialize the buffer pool
