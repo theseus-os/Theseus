@@ -40,7 +40,6 @@ static EARLY_LOGGER: MutexIrqSafe<EarlyLogger<LOG_MAX_WRITERS>> = MutexIrqSafe::
 /// If `None`, it is uninitialized, and the [`EARLY_LOGGER`] will be used as a fallback.
 static LOGGER: MutexIrqSafe<Option<Logger>> = MutexIrqSafe::new(None);
 
-
 /// An early logger that can only write to a fixed number of [`SerialPort`]s,
 /// intended for basic use before dynamic heap allocation is available.
 struct EarlyLogger<const N: usize>([Option<SerialPort>; N]);
@@ -51,48 +50,6 @@ struct EarlyLogger<const N: usize>([Option<SerialPort>; N]);
 struct Logger {
     writers: Vec<Arc<MutexIrqSafe<dyn Write + Send>>>,
 }
-
-// impl<const N: usize> Logger<{N}> {
-//     /// A re-implementation of [`core::fmt::Write::write_fmt()`]
-//     /// that doesn't require `&mut self`.
-//     ///
-//     /// Iterates over all of the `writers` in this `Logger`, 
-//     /// locks each one, and writes the given formatted `arguments` to it.
-//     fn write_fmt(&self, arguments: fmt::Arguments) -> fmt::Result {
-//         let num_writers = self.num_writers.load(Ordering::Acquire);
-//         for writer in self.writers.iter().flatten().take(num_writers) {
-//             let _result = writer.lock().write_fmt(arguments);
-//             // If there was an error above, there's literally nothing we can do but ignore it,
-//             // because there is no other lower-level way to log errors than this logger.
-//         }
-//         Ok(())
-//     }
-
-// //     pub fn take_writers<WR: Write>(&self) -> [Option<W>; N] {
-// //         let n = self.num_writers.load(Ordering::Acquire);
-// //         self.num_writers.store(0, Ordering::Release);
-// //         for writer in self.writers.iter().take(n).flatten() {
-// //             let mut w = writer.lock();
-// //             let removed = core::mem::replace(&mut *w, DummyWriter as (dyn Write + Send));
-// //         }
-        
-// //         [None; N]
-// //     }
-// }
-
-
-// pub fn set_log_writers<'i, W: Write + Send + 'static>(
-//     writers: impl IntoIterator<Item = &'i &'static MutexIrqSafe<W>>,
-// ) {
-//     let mut logger = LOGGER.lock();
-//     let mut n = 0;
-//     for (writer, logger_writer) in writers.into_iter().take(LOG_MAX_WRITERS).zip(&mut logger.writers) {
-//         *logger_writer = Some(*writer);
-//         n += 1;
-//     }
-//     logger.num_active_writers = n;
-// }
-
 
 /// Removes all of the writers (output streams) from the early logger and returns them.
 ///
@@ -105,7 +62,6 @@ pub fn take_early_log_writers() -> [Option<SerialPort>; LOG_MAX_WRITERS] {
     }
     list
 }
-
 
 /// The static instance of the dummy logger, as required by the `log` crate.
 static DUMMY_LOGGER: DummyLogger = DummyLogger;
@@ -129,16 +85,14 @@ impl DummyLogger {
         if let Some(logger) = &*LOGGER.lock() {
             for writer in logger.writers.iter() {
                 let _result = writer.deref().borrow().lock().write_fmt(arguments);
-                // If there was an error above, there's literally nothing we can do but ignore it,
-                // because there is no other lower-level way to log errors than this logger.
             }
         } else {
             for serial_port in EARLY_LOGGER.lock().0.iter_mut().flatten() {
                 let _result = serial_port.write_fmt(arguments);
-                // If there was an error above, there's literally nothing we can do but ignore it,
-                // because there is no other lower-level way to log errors than this logger.
             }
         }
+        // If there was an error above, there's literally nothing we can do but ignore it,
+        // because there is no other lower-level way to log errors than this logger.
         Ok(())
     }
 }
