@@ -72,7 +72,7 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 			"error receiving console connection request"
 		})?;
 		let serial_port = match get_serial_port(serial_port_address) {
-			Some(sp) => sp,
+			Some(sp) => sp.clone(),
 			_ => {
 				warn!("Serial port {:?} was not initialized, skipping console connection request", serial_port_address);
 				continue;
@@ -81,8 +81,8 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 		
 		let new_console = Console::new_serial_console(
 			alloc::format!("console_{:?}", serial_port_address),
-			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port),
-			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port),
+			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
+			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
 		);
 		
 		let (sender, receiver) = async_channel::new_channel(16);

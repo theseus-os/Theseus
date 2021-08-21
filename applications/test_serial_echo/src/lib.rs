@@ -30,7 +30,7 @@ pub fn main(args: Vec<String>) -> isize {
         .unwrap_or(SerialPortAddress::COM1);
 
     let serial_port = match get_serial_port(serial_port_address) {
-        Some(sp) => sp,
+        Some(sp) => sp.clone(),
         _ => {
             println!("Error: serial port {:?} was not initialized.", serial_port_address);
             return -1;

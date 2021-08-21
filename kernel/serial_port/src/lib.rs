@@ -16,6 +16,7 @@
 #![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
+extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
 extern crate interrupts;
@@ -23,11 +24,12 @@ extern crate bare_io;
 extern crate x86_64;
 extern crate serial_port_basic;
 
+use alloc::sync::Arc;
 pub use serial_port_basic::SerialPortAddress;
 use serial_port_basic::SerialPort as SerialPortBasic;
 
 
-use core::{fmt::Write, ops::{Deref, DerefMut}};
+use core::{fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 use interrupts::{IRQ_BASE_OFFSET, register_interrupt};
@@ -51,17 +53,17 @@ pub fn set_connection_listener(
 static NEW_CONNECTION_NOTIFIER: Once<Sender<SerialPortAddress>> = Once::new();
 
 
-static COM1_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-static COM2_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-static COM3_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-static COM4_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+static COM1_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
+static COM2_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
+static COM3_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
+static COM4_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
 
 
 /// Obtains a reference to the [`SerialPort`] specified by the given [`SerialPortAddress`],
 /// if it has been initialized (see [`init_serial_port()`]).
 pub fn get_serial_port(
     serial_port_address: SerialPortAddress
-) -> Option<&'static MutexIrqSafe<SerialPort>> {
+) -> Option<&'static Arc<MutexIrqSafe<SerialPort>>> {
     static_port_of(&serial_port_address).get()
 }
 
@@ -71,19 +73,19 @@ pub fn get_serial_port(
 pub fn init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
-) -> &'static MutexIrqSafe<SerialPort> {
+) -> &'static Arc<MutexIrqSafe<SerialPort>> {
     static_port_of(&serial_port_address).call_once(|| {
         let mut sp = SerialPort::new(serial_port);
         let (int_num, int_handler) = interrupt_number_handler(&serial_port_address);
         sp.register_interrupt_handler(int_num, int_handler).unwrap();
-        MutexIrqSafe::new(sp)
+        Arc::new(MutexIrqSafe::new(sp))
     })
 }
 
 /// Returns a reference to the static instance of this serial port.
 fn static_port_of(
     serial_port_address: &SerialPortAddress
-) -> &'static Once<MutexIrqSafe<SerialPort>> {
+) -> &'static Once<Arc<MutexIrqSafe<SerialPort>>> {
     match serial_port_address {
         SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
         SerialPortAddress::COM2 => &COM2_SERIAL_PORT,
@@ -183,7 +185,7 @@ impl SerialPort {
 
 
 
-/// A non-blocking implementation of `Read` that will read bytes into the given `buf`
+/// A non-blocking implementation of [`bare_io::Read`] that will read bytes into the given `buf`
 /// so long as more bytes are available.
 /// The read operation will be completed when there are no more bytes to be read,
 /// or when the `buf` is filled, whichever comes first.
@@ -199,7 +201,7 @@ impl bare_io::Read for SerialPort {
     }
 }
 
-/// A blocking implementation of `Write` that will write bytes from the given `buf`
+/// A blocking implementation of [`bare_io::Write`] that will write bytes from the given `buf`
 /// to the `SerialPort`, waiting until it is ready to transfer all bytes. 
 ///
 /// The `flush()` function is a no-op, since the `SerialPort` does not have buffering. 
@@ -213,6 +215,14 @@ impl bare_io::Write for SerialPort {
         Ok(())
     }    
 }
+
+/// Forward the implementation of [`core::fmt::Write`] to the inner [`SerialPortBasic`].
+impl fmt::Write for SerialPort {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.inner.write_str(s) 
+    }
+}
+
 
 
 /// This is called from the serial port interrupt handlers 
@@ -247,6 +257,7 @@ fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
         }
     }
 
+    use fmt::Write;
     if let Err(e) = send_result {
         let _result = write!(
             &mut serial_port.lock(),

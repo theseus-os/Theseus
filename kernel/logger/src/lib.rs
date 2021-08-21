@@ -16,7 +16,7 @@ extern crate irq_safety;
 extern crate serial_port_basic;
 
 use log::{Record, Level, SetLoggerError, Metadata, Log};
-use core::{fmt::{self, Write}};
+use core::{borrow::Borrow, fmt::{self, Write}, ops::Deref};
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use serial_port_basic::SerialPort;
@@ -128,7 +128,7 @@ impl DummyLogger {
     fn write_fmt(&self, arguments: fmt::Arguments) -> fmt::Result {
         if let Some(logger) = &*LOGGER.lock() {
             for writer in logger.writers.iter() {
-                let _result = writer.lock().write_fmt(arguments);
+                let _result = writer.deref().borrow().lock().write_fmt(arguments);
                 // If there was an error above, there's literally nothing we can do but ignore it,
                 // because there is no other lower-level way to log errors than this logger.
             }

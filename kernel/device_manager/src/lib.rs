@@ -8,6 +8,8 @@ extern crate e1000;
 extern crate memory;
 extern crate apic;
 extern crate acpi;
+extern crate serial_port;
+extern crate logger;
 extern crate keyboard;
 extern crate pci;
 extern crate mouse;
@@ -23,6 +25,7 @@ extern crate bare_io;
 #[macro_use] extern crate derive_more;
 extern crate mlx5;
 
+use core::{array::IntoIter, convert::TryFrom};
 use mpmc::Queue;
 use event_types::Event;
 use memory::MemoryManagementInfo;
@@ -30,6 +33,7 @@ use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
 use io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
+use serial_port::SerialPortAddress;
 use storage_manager::StorageDevice;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
@@ -52,9 +56,25 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 }
 
 
-/// Initializes all other devices, such as the keyboard and mouse
-/// as well as all devices discovered on the PCI bus.
+/// Initializes all other devices not initialized during [`early_init()`]. 
+///
+/// Devices include:
+/// * Serial ports with interrupt support, currently only `COM1` and `COM2`,
+/// * The fully-featured system [`logger`],
+/// * PS2 keyboard and mouse,
+/// * All other devices discovered on the PCI bus.
 pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
+
+    let serial_ports = logger::take_early_log_writers();
+    let logger_writers = IntoIter::new(serial_ports)
+        .flatten()
+        .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
+            .ok()
+            .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
+        ).map(|arc_ref| arc_ref.clone());
+
+    logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
+
     keyboard::init(key_producer);
     mouse::init(mouse_producer);
 

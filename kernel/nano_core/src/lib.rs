@@ -98,7 +98,7 @@ pub extern "C" fn nano_core_start(
 
     // Initialize the logger up front so we can see early log messages for debugging.
     let logger_ports = [take_serial_port(SerialPortAddress::COM1)]; // some servers use COM2 instead. 
-    try_exit!(logger::early_init(None, IntoIter::new(logger_ports).flatten()).map_err(|_a| "couldn't init logger!"));
+    try_exit!(logger::early_init(None, IntoIter::new(logger_ports).flatten()).map_err(|_a| "logger::early_init() failed."));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
