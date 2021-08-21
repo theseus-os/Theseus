@@ -24,11 +24,13 @@ extern crate bare_io;
 extern crate x86_64;
 extern crate serial_port_basic;
 
+pub use serial_port_basic::{
+    SerialPortAddress,
+    SerialPort as SerialPortBasic,
+    take_serial_port as take_serial_port_basic,
+};
+
 use alloc::sync::Arc;
-pub use serial_port_basic::SerialPortAddress;
-use serial_port_basic::SerialPort as SerialPortBasic;
-
-
 use core::{fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
