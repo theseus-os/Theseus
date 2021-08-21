@@ -5,7 +5,7 @@
 
 extern crate alloc;
 // #[macro_use] extern crate log;
-// #[macro_use] extern crate terminal_print;
+#[macro_use] extern crate terminal_print;
 extern crate task;
 extern crate bare_io;
 extern crate io;
@@ -29,7 +29,13 @@ pub fn main(args: Vec<String>) -> isize {
         .and_then(|s| SerialPortAddress::try_from(&**s).ok())
         .unwrap_or(SerialPortAddress::COM1);
 
-    let serial_port = get_serial_port(serial_port_address);
+    let serial_port = match get_serial_port(serial_port_address) {
+        Some(sp) => sp,
+        _ => {
+            println!("Error: serial port {:?} was not initialized.", serial_port_address);
+            return -1;
+        }
+    };
     
     if true {
         let mut serial_port_io = LockableIo::<SerialPort, MutexIrqSafe<_>, _>::from(serial_port);

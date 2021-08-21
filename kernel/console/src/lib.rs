@@ -71,7 +71,13 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 			error!("Error receiving console connection request: {:?}", e);
 			"error receiving console connection request"
 		})?;
-		let serial_port = get_serial_port(serial_port_address);
+		let serial_port = match get_serial_port(serial_port_address) {
+			Some(sp) => sp,
+			_ => {
+				warn!("Serial port {:?} was not initialized, skipping console connection request", serial_port_address);
+				continue;
+			}
+		};
 		
 		let new_console = Console::new_serial_console(
 			alloc::format!("console_{:?}", serial_port_address),

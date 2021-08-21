@@ -34,8 +34,8 @@ path = "../state_store"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.serial_port]
-path = "../serial_port"
+[dependencies.serial_port_basic]
+path = "../serial_port_basic"
 
 [dependencies.stack]
 path = "../stack"
