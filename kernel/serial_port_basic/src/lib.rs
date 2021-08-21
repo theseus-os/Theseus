@@ -1,8 +1,8 @@
 //! Support for basic serial port access, including initialization, transmit, and receive.
 //!
-//! This is a standalone crate with very minimal dependencies and a bais feature set
+//! This is a near-standalone crate with very minimal dependencies and a basic feature set
 //! intended for use during early Theseus boot up and initialization.
-//! For a more featureful serial port driver, see the `serial_port` crate.
+//! For a more featureful serial port driver, use the `serial_port` crate.
 //!
 //! # Notes
 //! Some serial port drivers use special cases for transmitting some byte values,

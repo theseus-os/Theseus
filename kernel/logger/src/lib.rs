@@ -36,7 +36,8 @@ static EARLY_LOGGER: MutexIrqSafe<EarlyLogger<LOG_MAX_WRITERS>> = MutexIrqSafe::
 
 /// The real logger instance where log states are kept.
 ///
-/// This is accessed in the [`DummyLogger`]'s log/write methods, it is not called directly.
+/// This is accessed in the [`DummyLogger`]'s log/write methods,
+/// it is not called directly by the `log` crate.
 /// If `None`, it is uninitialized, and the [`EARLY_LOGGER`] will be used as a fallback.
 static LOGGER: MutexIrqSafe<Option<Logger>> = MutexIrqSafe::new(None);
 

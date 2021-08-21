@@ -1,10 +1,10 @@
 //! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.
 //!
-//! This crate is a wrapper around [`serial_port_basic`], which provides the lower-level types
+//! This crate builds on  [`serial_port_basic`], which provides the lower-level types
 //! and functions that enable simple interactions with serial ports. 
 //! This crate extends that functionality to provide interrupt handlers for receiving data
 //! and handling data access in a deferred, asynchronous manner.
-//! It also implements higher-level I/O traits for serial ports,
+//! It also implements additional higher-level I/O traits for serial ports,
 //! namely [`bare_io::Read`] and [`bare_io::Write`].
 //!
 //! # Notes
@@ -71,7 +71,8 @@ pub fn get_serial_port(
 
 /// Initializes the [`SerialPort`] specified by the given [`SerialPortAddress`].
 ///
-/// If the given serial port has already been initialized, this does nothing.
+/// If the given serial port has already been initialized, this does nothing
+/// and simply returns a reference to the already-initialized serial port.
 pub fn init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
