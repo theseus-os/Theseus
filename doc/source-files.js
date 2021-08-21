@@ -114,6 +114,7 @@ sourcesIndex["scheduler_priority"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["scheduler_round_robin"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["sdt"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["serial_port"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["serial_port_basic"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["shapes"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["simd_personality"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["simd_test"] = {"name":"","files":["lib.rs"]};

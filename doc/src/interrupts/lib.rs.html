@@ -489,6 +489,7 @@
 <span id="486">486</span>
 <span id="487">487</span>
 <span id="488">488</span>
+<span id="489">489</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
@@ -909,7 +910,8 @@
         }
     };
 
-    <span class="kw">loop</span> { }
+    <span class="comment">// TODO: use const generics here to know which IRQ to send an EOI for (only needed for PIC).</span>
+    <span class="ident">eoi</span>(<span class="prelude-val">None</span>); 
 }
 
 

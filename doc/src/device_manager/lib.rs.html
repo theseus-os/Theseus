@@ -257,6 +257,35 @@
 <span id="254">254</span>
 <span id="255">255</span>
 <span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
@@ -268,6 +297,8 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">serial_port</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">logger</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keyboard</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mouse</span>;
@@ -283,6 +314,7 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">derive_more</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mlx5</span>;
 
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">array::IntoIter</span>, <span class="ident">convert::TryFrom</span>};
 <span class="kw">use</span> <span class="ident">mpmc::Queue</span>;
 <span class="kw">use</span> <span class="ident">event_types::Event</span>;
 <span class="kw">use</span> <span class="ident">memory::MemoryManagementInfo</span>;
@@ -290,6 +322,7 @@
 <span class="kw">use</span> <span class="ident">network_manager::add_to_network_interfaces</span>;
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
 <span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReaderWriterWrapper</span>, <span class="ident">LockableIo</span>, <span class="ident">ReaderWriter</span>};
+<span class="kw">use</span> <span class="ident">serial_port</span>::{<span class="ident">SerialPortAddress</span>, <span class="ident">take_serial_port_basic</span>};
 <span class="kw">use</span> <span class="ident">storage_manager::StorageDevice</span>;
 
 <span class="doccomment">/// A randomly chosen IP address that must be outside of the DHCP range.</span>
@@ -300,7 +333,11 @@
 <span class="doccomment">/// TODO: use DHCP to acquire gateway IP</span>
 <span class="kw">const</span> <span class="ident">DEFAULT_GATEWAY_IP</span>: [<span class="ident">u8</span>; <span class="number">4</span>] <span class="op">=</span> [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the default QEMU user-slirp networking gateway IP</span>
 
-<span class="doccomment">/// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.</span>
+<span class="doccomment">/// Performs early-stage initialization for simple devices needed during early boot.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This includes:</span>
+<span class="doccomment">/// * local APICs ([`apic`]),</span>
+<span class="doccomment">/// * [`acpi`] tables for system configuration info, including the IOAPIC.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">early_init</span>(<span class="ident">kernel_mmi</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">MemoryManagementInfo</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// First, initialize the local apic info.</span>
     <span class="ident">apic::init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">kernel_mmi</span>.<span class="ident">page_table</span>)<span class="question-mark">?</span>;
@@ -312,9 +349,30 @@
 }
 
 
-<span class="doccomment">/// Initializes all other devices, such as the keyboard and mouse</span>
-<span class="doccomment">/// as well as all devices discovered on the PCI bus.</span>
+<span class="doccomment">/// Initializes all other devices not initialized during [`early_init()`]. </span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Devices include:</span>
+<span class="doccomment">/// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,</span>
+<span class="doccomment">/// * The fully-featured system [`logger`],</span>
+<span class="doccomment">/// * PS2 [`keyboard`] and [`mouse`],</span>
+<span class="doccomment">/// * All other devices discovered on the [`pci`] bus.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">key_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">mouse_producer</span>: <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>  {
+
+    <span class="kw">let</span> <span class="ident">serial_ports</span> <span class="op">=</span> <span class="ident">logger::take_early_log_writers</span>();
+    <span class="kw">let</span> <span class="ident">logger_writers</span> <span class="op">=</span> <span class="ident">IntoIter::new</span>(<span class="ident">serial_ports</span>)
+        .<span class="ident">flatten</span>()
+        .<span class="ident">flat_map</span>(<span class="op">|</span><span class="ident">sp</span><span class="op">|</span> <span class="ident">SerialPortAddress::try_from</span>(<span class="ident">sp</span>.<span class="ident">base_port_address</span>())
+            .<span class="ident">ok</span>()
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">sp_addr</span><span class="op">|</span> <span class="ident">serial_port::init_serial_port</span>(<span class="ident">sp_addr</span>, <span class="ident">sp</span>))
+        ).<span class="ident">map</span>(<span class="op">|</span><span class="ident">arc_ref</span><span class="op">|</span> <span class="ident">arc_ref</span>.<span class="ident">clone</span>());
+
+    <span class="ident">logger::init</span>(<span class="prelude-val">None</span>, <span class="ident">logger_writers</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;BUG: logger::init() failed&quot;</span>)<span class="question-mark">?</span>;
+
+    <span class="comment">// Ensure that COM1 is initialized, even if it wasn&#39;t used in [`logger::early_init()`].</span>
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">com1</span>) <span class="op">=</span> <span class="ident">take_serial_port_basic</span>(<span class="ident">SerialPortAddress::COM1</span>) {
+        <span class="ident">serial_port::init_serial_port</span>(<span class="ident">SerialPortAddress::COM1</span>, <span class="ident">com1</span>);
+    }
+
     <span class="ident">keyboard::init</span>(<span class="ident">key_producer</span>);
     <span class="ident">mouse::init</span>(<span class="ident">mouse_producer</span>);
 

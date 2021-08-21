@@ -210,107 +210,181 @@
 <span id="207">207</span>
 <span id="208">208</span>
 <span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A basic logger implementation for system-wide logging in Theseus. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This enables Theseus crates to use the `log` crate&#39;s macros anywhere,</span>
 <span class="doccomment">//! such as `error!()`, `warn!()`, `info!()`, `debug!()`, and `trace!()`.</span>
 <span class="doccomment">//!</span>
-<span class="doccomment">//! Currently, log statements are written to one or more **writers`, </span>
+<span class="doccomment">//! Currently, log statements are written to one or more **writers**, </span>
 <span class="doccomment">//! which are objects that implement the [`core::fmt::Write`] trait.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">serial_port_basic</span>;
 
 <span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">Record</span>, <span class="ident">Level</span>, <span class="ident">SetLoggerError</span>, <span class="ident">Metadata</span>, <span class="ident">Log</span>};
-<span class="kw">use</span> <span class="ident">core::fmt</span>::{<span class="self">self</span>, <span class="ident">Write</span>};
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">borrow::Borrow</span>, <span class="ident">fmt</span>::{<span class="self">self</span>, <span class="ident">Write</span>}, <span class="ident">ops::Deref</span>};
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
+<span class="kw">use</span> <span class="ident">serial_port_basic::SerialPort</span>;
+<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">sync::Arc</span>, <span class="ident">vec::Vec</span>};
 
-<span class="doccomment">/// The singleton system-wide logger instance. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This is &quot;static&quot; only because it&#39;s required by the `log` crate.</span>
-<span class="kw">static</span> <span class="ident">LOGGER</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Logger</span><span class="op">&lt;</span><span class="ident">LOG_MAX_WRITERS</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 
 <span class="doccomment">/// By default, Theseus will print all log levels, including `Trace` and above.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_LOG_LEVEL</span>: <span class="ident">Level</span> <span class="op">=</span> <span class="ident">Level::Trace</span>;
 
-<span class="doccomment">/// The maximum number of writers: backends to which log streams can be outputted.</span>
+<span class="doccomment">/// The maximum number of output streams that a logger can write to.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MAX_WRITERS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
 
-<span class="doccomment">/// The signature of a callback function that will optionally be invoked</span>
-<span class="doccomment">/// on every log statement to be printed, which enables log mirroring.</span>
-<span class="doccomment">/// See [`mirror_to_vga()`].</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">LogOutputFunc</span> <span class="op">=</span> <span class="kw">fn</span>(<span class="ident">fmt::Arguments</span>);
-<span class="kw">static</span> <span class="ident">MIRROR_VGA_FUNC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">LogOutputFunc</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// The early logger used before dynamic heap allocation is available.</span>
+<span class="kw">static</span> <span class="ident">EARLY_LOGGER</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">EarlyLogger</span><span class="op">&lt;</span><span class="ident">LOG_MAX_WRITERS</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(
+    <span class="ident">EarlyLogger</span>([<span class="prelude-val">None</span>, <span class="prelude-val">None</span>])
+);
 
-<span class="doccomment">/// ANSI style codes for basic colors.</span>
-<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
-<span class="kw">enum</span> <span class="ident">LogColor</span> {
-    <span class="ident">Black</span>,
-    <span class="ident">Red</span>,
-    <span class="ident">Green</span>,
-    <span class="ident">Yellow</span>,
-    <span class="ident">Blue</span>,
-    <span class="ident">Purple</span>,
-    <span class="ident">Cyan</span>,
-    <span class="ident">White</span>,
-    <span class="ident">Reset</span>,
-}
+<span class="doccomment">/// The real logger instance where log states are kept.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is accessed in the [`DummyLogger`]&#39;s log/write methods,</span>
+<span class="doccomment">/// it is not called directly by the `log` crate.</span>
+<span class="doccomment">/// If `None`, it is uninitialized, and the [`EARLY_LOGGER`] will be used as a fallback.</span>
+<span class="kw">static</span> <span class="ident">LOGGER</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Logger</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="prelude-val">None</span>);
 
-<span class="kw">impl</span> <span class="ident">LogColor</span> {
-    <span class="kw">fn</span> <span class="ident">as_terminal_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
-            <span class="comment">// \x1b is the ESC character (0x1B)</span>
-			<span class="ident">LogColor::Black</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[30m&quot;</span>,
-			<span class="ident">LogColor::Red</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[31m&quot;</span>,
-			<span class="ident">LogColor::Green</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[32m&quot;</span>,
-			<span class="ident">LogColor::Yellow</span>  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[33m&quot;</span>,
-			<span class="ident">LogColor::Blue</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[34m&quot;</span>,
-			<span class="ident">LogColor::Purple</span>  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[35m&quot;</span>,
-            <span class="ident">LogColor::Cyan</span>    <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[36m&quot;</span>,
-            <span class="ident">LogColor::White</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[37m&quot;</span>,
-            <span class="ident">LogColor::Reset</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[0m\n&quot;</span>, 
-        }
-    }
-}
+<span class="doccomment">/// An early logger that can only write to a fixed number of [`SerialPort`]s,</span>
+<span class="doccomment">/// intended for basic use before dynamic heap allocation is available.</span>
+<span class="kw">struct</span> <span class="ident">EarlyLogger</span><span class="op">&lt;</span><span class="kw">const</span> <span class="ident">N</span>: <span class="ident">usize</span><span class="op">&gt;</span>([<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span>; <span class="ident">N</span>]);
 
-<span class="doccomment">/// Call this to enable mirroring logging macros to the screen</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mirror_to_vga</span>(<span class="ident">func</span>: <span class="ident">LogOutputFunc</span>) {
-    <span class="ident">MIRROR_VGA_FUNC</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">func</span>);
-}
-
-<span class="doccomment">/// A struct that holds information about logging destinations in Theseus.</span>
+<span class="doccomment">/// The fully-featured logger that can be dynamically initialized with arbitrary output streams.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// This is the &quot;backend&quot; for the `log` crate that allows Theseus to use its `log!()` macros.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// We force the use of static references here to enable this crate to be used</span>
-<span class="doccomment">/// before dynamic heap allocation has been set up.</span>
-<span class="kw">struct</span> <span class="ident">Logger</span><span class="op">&lt;</span><span class="kw">const</span> <span class="ident">N</span>: <span class="ident">usize</span><span class="op">&gt;</span> {
-    <span class="ident">writers</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>; <span class="ident">N</span>],
-}
-<span class="kw">impl</span><span class="op">&lt;</span><span class="kw">const</span> <span class="ident">N</span>: <span class="ident">usize</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Logger</span><span class="op">&lt;</span>{<span class="ident">N</span>}<span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="ident">Logger</span> { <span class="ident">writers</span>: [<span class="prelude-val">None</span>; <span class="ident">N</span>] }
-    }
+<span class="kw">struct</span> <span class="ident">Logger</span> {
+    <span class="ident">writers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="kw">const</span> <span class="ident">N</span>: <span class="ident">usize</span><span class="op">&gt;</span> <span class="ident">Logger</span><span class="op">&lt;</span>{<span class="ident">N</span>}<span class="op">&gt;</span> {
-    <span class="doccomment">/// Re-implementation of the function from `fmt::Write`, but it doesn&#39;t require `&amp;mut self`.</span>
+<span class="doccomment">/// Removes all of the writers (output streams) from the early logger and returns them.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is intended to allow the caller to take ownership of the early logger writers</span>
+<span class="doccomment">/// such that they can switch to initializing the full logger.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_early_log_writers</span>() <span class="op">-</span><span class="op">&gt;</span> [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span>; <span class="ident">LOG_MAX_WRITERS</span>] {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">list</span> <span class="op">=</span> [<span class="prelude-val">None</span>, <span class="prelude-val">None</span>];
+    <span class="kw">for</span> (<span class="ident">opt</span>, <span class="ident">ret</span>) <span class="kw">in</span> <span class="ident">EARLY_LOGGER</span>.<span class="ident">lock</span>().<span class="number">0</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">list</span>) {
+        <span class="kw-2">*</span><span class="ident">ret</span> <span class="op">=</span> <span class="ident">opt</span>.<span class="ident">take</span>();
+    }
+    <span class="ident">list</span>
+}
+
+<span class="doccomment">/// The static instance of the dummy logger, as required by the `log` crate.</span>
+<span class="kw">static</span> <span class="ident">DUMMY_LOGGER</span>: <span class="ident">DummyLogger</span> <span class="op">=</span> <span class="ident">DummyLogger</span>;
+
+<span class="doccomment">/// An empty logger struct used to satisfy the requirements of the `log` crate.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This exists because the `log` crate only allows a logger implementation</span>
+<span class="doccomment">/// to be initialized once from a singleton static instance.</span>
+<span class="doccomment">/// To get around that limitation, we store the actual logger states</span>
+<span class="doccomment">/// **outside** of the logger struct, such that we can modify them later </span>
+<span class="doccomment">/// after the `log` crate has already been initialized.</span>
+<span class="kw">struct</span> <span class="ident">DummyLogger</span>;
+
+<span class="kw">impl</span> <span class="ident">DummyLogger</span> {
+    <span class="doccomment">/// A re-implementation of [`core::fmt::Write::write_fmt()`]</span>
+    <span class="doccomment">/// that doesn&#39;t require `&amp;mut self`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function writes to the real (fully-featured) [`LOGGER`] if it has been initialized;</span>
+    <span class="doccomment">/// otherwise, it falls back to writing to the [`EARLY_LOGGER`] instead.</span>
     <span class="kw">fn</span> <span class="ident">write_fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">arguments</span>: <span class="ident">fmt::Arguments</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-        <span class="kw">for</span> <span class="ident">writer</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">writers</span>.<span class="ident">iter</span>().<span class="ident">flatten</span>() {
-            <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">lock</span>().<span class="ident">write_fmt</span>(<span class="ident">arguments</span>);
-            <span class="comment">// If there was an error above, there&#39;s literally nothing we can do but ignore it,</span>
-            <span class="comment">// because there is no other lower-level way to log errors than this logger.</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">logger</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LOGGER</span>.<span class="ident">lock</span>() {
+            <span class="kw">for</span> <span class="ident">writer</span> <span class="kw">in</span> <span class="ident">logger</span>.<span class="ident">writers</span>.<span class="ident">iter</span>() {
+                <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">deref</span>().<span class="ident">borrow</span>().<span class="ident">lock</span>().<span class="ident">write_fmt</span>(<span class="ident">arguments</span>);
+            }
+        } <span class="kw">else</span> {
+            <span class="kw">for</span> <span class="ident">serial_port</span> <span class="kw">in</span> <span class="ident">EARLY_LOGGER</span>.<span class="ident">lock</span>().<span class="number">0</span>.<span class="ident">iter_mut</span>().<span class="ident">flatten</span>() {
+                <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="ident">serial_port</span>.<span class="ident">write_fmt</span>(<span class="ident">arguments</span>);
+            }
         }
+        <span class="comment">// If there was an error above, there&#39;s literally nothing we can do but ignore it,</span>
+        <span class="comment">// because there is no other lower-level way to log errors than this logger.</span>
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="kw">const</span> <span class="ident">N</span>: <span class="ident">usize</span><span class="op">&gt;</span> <span class="ident">Log</span> <span class="kw">for</span> <span class="ident">Logger</span><span class="op">&lt;</span>{<span class="ident">N</span>}<span class="op">&gt;</span> {
+<span class="kw">impl</span> <span class="ident">Log</span> <span class="kw">for</span> <span class="ident">DummyLogger</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">enabled</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">Metadata</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="ident">metadata</span>.<span class="ident">level</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">log::max_level</span>()
@@ -361,7 +435,36 @@
 }
 
 
-<span class="doccomment">/// Initialize the Theseus system logger.</span>
+<span class="doccomment">/// Initializes Theseus&#39;s early system logger, which only supports logging to basic serial ports.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Arguments</span>
+<span class="doccomment">/// * `log_level`: the log level that should be used.</span>
+<span class="doccomment">///    If `None`, the [`DEFAULT_LOG_LEVEL`] will be used.</span>
+<span class="doccomment">/// * `serial_ports`: an iterator of [`SerialPort`]s that the logger will write log messages to.</span>
+<span class="doccomment">///    Typically this is just a single serial port, e.g., `COM1`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This function will initialize the logger with a maximum of [`LOG_MAX_WRITERS`] serial ports;</span>
+<span class="doccomment">/// any additional ones in the given iterator beyond that will be ignored.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">early_init</span>(
+    <span class="ident">log_level</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Level</span><span class="op">&gt;</span>,
+    <span class="ident">serial_ports</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SerialPort</span><span class="op">&gt;</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span> {
+    <span class="comment">// Populate the fields of the early logger instance</span>
+    {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">EARLY_LOGGER</span>.<span class="ident">lock</span>();
+        <span class="kw">for</span> (<span class="ident">sp</span>, <span class="ident">logger_writer</span>) <span class="kw">in</span> <span class="ident">serial_ports</span>.<span class="ident">into_iter</span>().<span class="ident">take</span>(<span class="ident">LOG_MAX_WRITERS</span>).<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">logger</span>.<span class="number">0</span>) {
+            <span class="kw-2">*</span><span class="ident">logger_writer</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">sp</span>);
+        }
+    }
+
+    <span class="comment">// Once the early logger has been initialized, tell the `log` crate to use our dummy logger instance.</span>
+    <span class="ident">log::set_logger</span>(<span class="kw-2">&amp;</span><span class="ident">DUMMY_LOGGER</span>)<span class="question-mark">?</span>;
+    <span class="ident">set_log_level</span>(<span class="ident">log_level</span>.<span class="ident">unwrap_or</span>(<span class="ident">DEFAULT_LOG_LEVEL</span>));
+    <span class="prelude-val">Ok</span>(())
+}
+
+
+<span class="doccomment">/// Initialize the fully-featured Theseus system logger.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// # Arguments</span>
 <span class="doccomment">/// * `log_level`: the log level that should be used.</span>
@@ -369,23 +472,25 @@
 <span class="doccomment">/// * `writers`: an iterator over the backends that the system logger </span>
 <span class="doccomment">///    will write log messages to.</span>
 <span class="doccomment">///    Typically this is just a single writer, such as the COM1 serial port.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function will initialize the logger with a maximum of [`LOG_MAX_WRITERS`] writers;</span>
-<span class="doccomment">/// any additional writers in the given `writers` iterator will be ignored. </span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// This function accepts only static references to log writers in order to</span>
-<span class="doccomment">/// enable loggers to be used before dynamic heap allocation has been set up.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span>, <span class="ident">W</span>: <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">I</span>, <span class="ident">W</span><span class="op">&gt;</span>(
     <span class="ident">log_level</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Level</span><span class="op">&gt;</span>,
-    <span class="ident">writers</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;i</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">Logger::default</span>();
-    <span class="kw">for</span> (<span class="ident">writer</span>, <span class="ident">logger_writer</span>) <span class="kw">in</span> <span class="ident">writers</span>.<span class="ident">into_iter</span>().<span class="ident">take</span>(<span class="ident">LOG_MAX_WRITERS</span>).<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">logger</span>.<span class="ident">writers</span>) {
-        <span class="kw-2">*</span><span class="ident">logger_writer</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">writer</span>);
-    } 
+    <span class="ident">writers</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">I</span><span class="op">&gt;</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span>
+    <span class="kw">where</span> <span class="ident">W</span>: <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+          <span class="ident">I</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+{
+    <span class="comment">// Populate the fields of the real logger instance</span>
+    <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">Logger</span> {
+        <span class="ident">writers</span>: <span class="ident">writers</span>.<span class="ident">into_iter</span>()
+            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">i</span>.<span class="ident">into</span>() <span class="kw">as</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>)
+            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>(),
+    };
+    <span class="kw-2">*</span><span class="ident">LOGGER</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">logger</span>);
 
-    <span class="kw">let</span> <span class="ident">static_logger</span> <span class="op">=</span> <span class="ident">LOGGER</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">logger</span>);
-    <span class="ident">log::set_logger</span>(<span class="ident">static_logger</span>)<span class="question-mark">?</span>;
+    <span class="comment">// Once the real logger has been initialized, tell the `log` crate to use our dummy logger instance.</span>
+    <span class="comment">// Call `set_logger()` again, just in case we never ran the `early_init()` function;</span>
+    <span class="comment">// if `early_init()` has already been called, `set_logger()` will return an Error, which is okay.</span>
+    <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">log::set_logger</span>(<span class="kw-2">&amp;</span><span class="ident">DUMMY_LOGGER</span>);
     <span class="ident">set_log_level</span>(<span class="ident">log_level</span>.<span class="ident">unwrap_or</span>(<span class="ident">DEFAULT_LOG_LEVEL</span>));
     <span class="prelude-val">Ok</span>(())
 }
@@ -408,9 +513,7 @@
 <span class="doccomment">/// Tip: use the `format_args!()` macro from the core library to create</span>
 <span class="doccomment">/// the `Arguments` parameter needed here.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_fmt</span>(<span class="ident">args</span>: <span class="ident">fmt::Arguments</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-    <span class="ident">LOGGER</span>.<span class="ident">get</span>()
-        .<span class="ident">ok_or</span>(<span class="ident">fmt::Error</span>)
-        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">logger</span><span class="op">|</span> <span class="ident">logger</span>.<span class="ident">write_fmt</span>(<span class="ident">args</span>))
+    <span class="ident">DUMMY_LOGGER</span>.<span class="ident">write_fmt</span>(<span class="ident">args</span>)
 }
 
 <span class="doccomment">/// Convenience function for writing a simple string to the logger.</span>
@@ -420,6 +523,49 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
     <span class="kw">crate</span><span class="ident">::write_fmt</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">s</span>))
 }
+
+
+<span class="doccomment">/// ANSI style codes for basic colors.</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
+<span class="kw">enum</span> <span class="ident">LogColor</span> {
+    <span class="ident">Black</span>,
+    <span class="ident">Red</span>,
+    <span class="ident">Green</span>,
+    <span class="ident">Yellow</span>,
+    <span class="ident">Blue</span>,
+    <span class="ident">Purple</span>,
+    <span class="ident">Cyan</span>,
+    <span class="ident">White</span>,
+    <span class="ident">Reset</span>,
+}
+<span class="kw">impl</span> <span class="ident">LogColor</span> {
+    <span class="kw">fn</span> <span class="ident">as_terminal_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+        <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
+            <span class="comment">// \x1b is the ESC character (0x1B)</span>
+			<span class="ident">LogColor::Black</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[30m&quot;</span>,
+			<span class="ident">LogColor::Red</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[31m&quot;</span>,
+			<span class="ident">LogColor::Green</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[32m&quot;</span>,
+			<span class="ident">LogColor::Yellow</span>  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[33m&quot;</span>,
+			<span class="ident">LogColor::Blue</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[34m&quot;</span>,
+			<span class="ident">LogColor::Purple</span>  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[35m&quot;</span>,
+            <span class="ident">LogColor::Cyan</span>    <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[36m&quot;</span>,
+            <span class="ident">LogColor::White</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[37m&quot;</span>,
+            <span class="ident">LogColor::Reset</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[0m\n&quot;</span>, 
+        }
+    }
+}
+
+
+<span class="doccomment">/// Call this to enable mirroring logging macros to the screen</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mirror_to_vga</span>(<span class="ident">func</span>: <span class="ident">LogOutputFunc</span>) {
+    <span class="ident">MIRROR_VGA_FUNC</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">func</span>);
+}
+
+<span class="doccomment">/// The signature of a callback function that will optionally be invoked</span>
+<span class="doccomment">/// on every log statement to be printed, which enables log mirroring.</span>
+<span class="doccomment">/// See [`mirror_to_vga()`].</span>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">LogOutputFunc</span> <span class="op">=</span> <span class="kw">fn</span>(<span class="ident">fmt::Arguments</span>);
+<span class="kw">static</span> <span class="ident">MIRROR_VGA_FUNC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">LogOutputFunc</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="logger" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
     <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
