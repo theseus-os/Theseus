@@ -417,7 +417,8 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut Exc
         }
     };
 
-    loop { }
+    // TODO: use const generics here to know which IRQ to send an EOI for (only needed for PIC).
+    eoi(None); 
 }
 
 

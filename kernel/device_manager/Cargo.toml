@@ -30,6 +30,12 @@ path = "../memory"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.serial_port]
+path = "../serial_port"
+
+[dependencies.logger]
+path = "../logger"
+
 [dependencies.e1000]
 path = "../e1000"
 

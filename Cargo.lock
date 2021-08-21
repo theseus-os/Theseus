@@ -632,12 +632,14 @@ dependencies = [
  "ixgbe",
  "keyboard",
  "log",
+ "logger",
  "memory",
  "mlx5",
  "mouse",
  "mpmc",
  "network_manager",
  "pci",
+ "serial_port",
  "spin 0.9.0",
  "storage_manager",
 ]
@@ -1396,6 +1398,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
+ "serial_port_basic",
  "spin 0.9.0",
 ]
 
@@ -1723,7 +1726,7 @@ dependencies = [
  "mod_mgmt",
  "multiboot2",
  "panic_entry",
- "serial_port",
+ "serial_port_basic",
  "spin 0.9.0",
  "stack",
  "state_store",
@@ -2442,9 +2445,19 @@ dependencies = [
  "bare-io",
  "interrupts",
  "irq_safety",
- "port_io",
+ "log",
+ "serial_port_basic",
  "spin 0.9.0",
  "x86_64",
+]
+
+[[package]]
+name = "serial_port_basic"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "port_io",
+ "spin 0.9.0",
 ]
 
 [[package]]
