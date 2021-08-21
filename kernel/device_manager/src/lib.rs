@@ -44,7 +44,7 @@ const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-
 /// TODO: use DHCP to acquire gateway IP
 const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
 
-/// Perofrms early-stage initialization for simple devices needed during early boot.
+/// Performs early-stage initialization for simple devices needed during early boot.
 ///
 /// This includes:
 /// * local APICs ([`apic`]),
