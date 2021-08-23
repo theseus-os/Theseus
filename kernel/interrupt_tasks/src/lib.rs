@@ -120,7 +120,7 @@ mod test {
 */
 
 
-extern "x86-interrupt" fn test_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn test_interrupt_handler<const IRQ: u8>(_stack_frame: &mut ExceptionStackFrame) {
 
-    trace!("top of serial_port_interrupt_handler");
+    trace!("top of test_interrupt_handler for IRQ {:#X}", IRQ);
 }
