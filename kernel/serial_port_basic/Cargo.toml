@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "serial_port_basic"
-description = "Advanced support for serial ports (e.g., COM1, COM2) with full interrupt support"
+description = "Standalone, basic driver for serial ports (e.g., COM1, COM) with minimal dependencies"
 version = "0.1.0"
 build = "../../build.rs"
 

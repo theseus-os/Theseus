@@ -1,27 +1,18 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "serial_port_basic_x86"
-description = "Basic driver for serial ports, e.g., COM1, COM2"
+description = "Standalone, basic driver for x86 serial ports (e.g., COM1, COM) with minimal dependencies"
 version = "0.1.0"
 build = "../../../build.rs"
 
 [dependencies]
 spin = "0.9.0"
-bare-io = { version = "0.2.1", features = [ "alloc" ] }
-x86_64 = { path = "../../../libs/x86_64" }
 
 [dependencies.port_io]
 path = "../../../libs/port_io"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
-
-[dependencies.interrupts]
-path = "../../interrupts"
-
-# Dependencies below here are temporary, for console creation testing.
-[dependencies.async_channel]
-path = "../../async_channel"
 
 [lib]
 crate-type = ["rlib"]

@@ -1,10 +1,8 @@
 //! Support for basic serial port access, including initialization, transmit, and receive.
 //!
-//! Resources used for this implementation:
-//! * <https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming>
-//! * <https://tldp.org/HOWTO/Modem-HOWTO-4.html>
-//! * <https://wiki.osdev.org/Serial_Ports>
-//! * <https://www.sci.muni.cz/docs/pc/serport.txt>
+//! This is a near-standalone crate with very minimal dependencies and a basic feature set
+//! intended for use during early Theseus boot up and initialization.
+//! For a more featureful serial port driver, use the `serial_port` crate.
 //!
 //! # Notes
 //! Some serial port drivers use special cases for transmitting some byte values,
@@ -20,42 +18,22 @@
 //! such as a shell or TTY program. 
 //! We don't do anything like that here, in case a user of this crate wants to send binary data
 //! across the serial port, rather than "smartly-interpreted" ASCII characters.
-//! 
+//!
+//! # Resources
+//! * <https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming>
+//! * <https://tldp.org/HOWTO/Modem-HOWTO-4.html>
+//! * <https://wiki.osdev.org/Serial_Ports>
+//! * <https://www.sci.muni.cz/docs/pc/serport.txt>
 
 #![no_std]
-#![feature(abi_x86_interrupt)]
 
 extern crate spin;
 extern crate port_io;
 extern crate irq_safety;
-extern crate interrupts;
-extern crate bare_io;
-extern crate x86_64;
 
-use core::{convert::TryFrom, fmt::{self, Write}, str::FromStr};
+use core::{convert::TryFrom, fmt, str::FromStr};
 use port_io::Port;
 use irq_safety::MutexIrqSafe;
-use spin::Once;
-use interrupts::{IRQ_BASE_OFFSET, register_interrupt};
-use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
-
-// Dependencies below here are temporary and will be removed
-// after we have support for separate interrupt handling tasks.
-extern crate async_channel;
-use async_channel::Sender;
-
-/// A temporary hack to allow the serial port interrupt handler
-/// to inform a listener on the other end of this channel
-/// that a new connection has been detected on one of the serial ports,
-/// i.e., that it received some data on a serial port that 
-/// didn't expect it or wasn't yet set up to handle incoming data.
-pub fn set_connection_listener(
-    sender: Sender<SerialPortAddress>
-) -> &'static Sender<SerialPortAddress> {
-    NEW_CONNECTION_NOTIFIER.call_once(|| sender)
-}
-static NEW_CONNECTION_NOTIFIER: Once<Sender<SerialPortAddress>> = Once::new();
-
 
 /// The base port I/O addresses for COM serial ports.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -71,12 +49,13 @@ pub enum SerialPortAddress {
     COM4 = 0x2E8,
 }
 impl SerialPortAddress {
-    /// Returns the interrupt number (IRQ vector)
-    /// and the interrupt handler function for this serial port.
-    fn interrupt_number_handler(&self) -> (u8, HandlerFunc) {
+    /// Returns a reference to the static instance of this serial port.
+    fn to_static_port(&self) -> &'static MutexIrqSafe<TriState<SerialPort>> {
         match self {
-            Self::COM1 | Self::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_serial_handler),
-            Self::COM2 | Self::COM4 => (IRQ_BASE_OFFSET + 0x03, com2_serial_handler),
+            SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
+            SerialPortAddress::COM2 => &COM2_SERIAL_PORT,
+            SerialPortAddress::COM3 => &COM3_SERIAL_PORT,
+            SerialPortAddress::COM4 => &COM4_SERIAL_PORT,
         }
     }
 }
@@ -111,30 +90,47 @@ impl TryFrom<u16> for SerialPortAddress {
     }
 }
 
-static COM1_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-static COM2_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-static COM3_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-static COM4_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-
-
-/// Obtains a reference to the [`SerialPort`] specified by the given [`SerialPortAddress`].
-///
-/// This function initializes the given serial port if it has not yet been initialized. 
-pub fn get_serial_port(
-    serial_port_address: SerialPortAddress
-) -> &'static MutexIrqSafe<SerialPort> {
-    let sp = match serial_port_address {
-        SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
-        SerialPortAddress::COM2 => &COM2_SERIAL_PORT,
-        SerialPortAddress::COM3 => &COM3_SERIAL_PORT,
-        SerialPortAddress::COM4 => &COM4_SERIAL_PORT,
-    };
-    sp.call_once(|| {
-        let (n, h) = serial_port_address.interrupt_number_handler();
-        MutexIrqSafe::new(SerialPort::new(serial_port_address as u16, n, h))
-    })
+/// This type is used to ensure that an object of type `T` is only initialized once
+/// but allows for a caller to take ownership of the object `T`. 
+enum TriState<T> {
+    Uninited,
+    Inited(T),
+    Taken,
+}
+impl<T> TriState<T> {
+    fn take(&mut self) -> Option<T> {
+        if let Self::Inited(_) = self {
+            if let Self::Inited(v) = core::mem::replace(self, Self::Taken) {
+                return Some(v);
+            }
+        }
+        None
+    }
 }
 
+static COM1_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
+static COM2_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
+static COM3_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
+static COM4_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
+
+
+/// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
+///
+/// This function initializes the given serial port if it has not yet been initialized.
+/// If the serial port has already been initialized and taken by another crate,
+/// this returns `None`.
+///
+/// The returned [`SerialPort`] will be restored to this crate upon being dropped.
+pub fn take_serial_port(
+    serial_port_address: SerialPortAddress
+) -> Option<SerialPort> {
+    let sp = serial_port_address.to_static_port();
+    let mut locked = sp.lock();
+    if let TriState::Uninited = &*locked {
+        *locked = TriState::Inited(SerialPort::new(serial_port_address as u16));
+    }
+    locked.take()
+}
 
 // The E9 port can be used with the Bochs emulator for extra debugging info.
 // const PORT_E9: u16 = 0xE9; // for use with bochs
@@ -154,14 +150,28 @@ pub struct SerialPort {
     line_status:                Port<u8>,
     _modem_status:              Port<u8>,
     _scratch:                   Port<u8>,
-    /// The channel endpoint to which data received on this serial port will be pushed.
-    /// If `None`, received data will be ignored and a warning printed.
-    /// 
-    /// The format of data sent via this channel is effectively a slice of bytes,
-    /// but is represented without using references as a tuple:
-    ///  * the number of bytes actually being transmitted, to be used as an index into the array,
-    ///  * an array of bytes holding the actual data, up to 
-    data_sender:                Option<Sender<DataChunk>>,
+}
+
+impl Drop for SerialPort {
+    fn drop(&mut self) {
+        if let Ok(sp) = SerialPortAddress::try_from(self.data.port_address()).map(|spa| spa.to_static_port()) {
+            let mut sp_locked = sp.lock();
+            if let TriState::Taken = &*sp_locked {
+                let dummy = SerialPort { 
+                    data:                       Port::new(0),
+                    interrupt_enable:           Port::new(0),
+                    interrupt_id_fifo_control:  Port::new(0),
+                    line_control:               Port::new(0),
+                    modem_control:              Port::new(0),
+                    line_status:                Port::new(0),
+                    _modem_status:              Port::new(0),
+                    _scratch:                   Port::new(0),
+                };
+                let dropped = core::mem::replace(self, dummy);
+                *sp_locked = TriState::Inited(dropped);
+            }
+        }
+    }
 }
 
 impl SerialPort {
@@ -181,12 +191,8 @@ impl SerialPort {
     ///
     /// Note: if you are experiencing problems with serial port behavior,
     /// try enabling the loopback test part of this function to see if that passes.
-    pub fn new(
-        base_port: u16,
-        interrupt_number: u8,
-        interrupt_handler: HandlerFunc,
-    ) -> SerialPort {
-        let mut serial = SerialPort {
+    pub fn new(base_port: u16) -> SerialPort {
+        let serial = SerialPort {
             data:                       Port::new(base_port + 0),
             interrupt_enable:           Port::new(base_port + 1),
             interrupt_id_fifo_control:  Port::new(base_port + 2),
@@ -195,7 +201,6 @@ impl SerialPort {
             line_status:                Port::new(base_port + 5),
             _modem_status:              Port::new(base_port + 6),
             _scratch:                   Port::new(base_port + 7),
-            data_sender:                None,
         };
 
         // SAFE: we are just accessing this serial port's registers.
@@ -249,26 +254,8 @@ impl SerialPort {
             serial.interrupt_enable.write(0x01);
         }
 
-        // Register the interrupt handler for this serial port. 
-        let res = register_interrupt(interrupt_number, interrupt_handler);
-        if let Err(registered_handler_addr) = res {
-            if registered_handler_addr != interrupt_handler as u64 {
-                let _result = write!(
-                    &mut serial,
-                    "\x1b[31mBUG: failed to register interrupt handler at IRQ {:#X} for serial port {:#X}.
-                        Existing interrupt handler was at address {:#X}. \x1b[0m\n",
-                    interrupt_number, base_port, registered_handler_addr,
-                );
-            }
-        } else {
-            let _result = write!(
-                &mut serial,
-                "\x1b[36mRegistered interrupt handler at IRQ {:#X} for serial port {:#X}.\x1b[0m\n",
-                interrupt_number, base_port,
-            );
-        }
-
         serial
+
     }
 
     /// Write the given string to the serial port, blocking until data can be transmitted.
@@ -347,17 +334,10 @@ impl SerialPort {
         self.line_status.read() & 0x01 == 0x01
     }
 
-    /// Tells this `SerialPort` to push received data bytes
-    /// onto the given `sender` channel.
-    ///
-    /// If a sender already existed, it is replaced
-    /// by the given `sender` and returned.
-    pub fn set_data_sender(
-        &mut self,
-        sender: Sender<DataChunk>
-    ) -> Option<Sender<DataChunk>> {
-        self.data_sender.replace(sender)
+    pub fn base_port_address(&self) -> u16 {
+        self.data.port_address()
     }
+
 }
 
 impl fmt::Write for SerialPort {
@@ -365,122 +345,4 @@ impl fmt::Write for SerialPort {
         self.out_str(s); 
         Ok(())
     }
-}
-
-/// A non-blocking implementation of `Read` that will read bytes into the given `buf`
-/// so long as more bytes are available.
-/// The read operation will be completed when there are no more bytes to be read,
-/// or when the `buf` is filled, whichever comes first.
-///
-/// Because it's non-blocking, a [`bare_io::ErrorKind::WouldBlock`] error is returned
-/// if there are no bytes available to be read, indicating that the read would block.
-impl bare_io::Read for SerialPort {
-    fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize> {
-        if !self.data_available() {
-            return Err(bare_io::ErrorKind::WouldBlock.into());
-        }
-        Ok(self.in_bytes(buf))
-    }
-}
-
-/// A blocking implementation of `Write` that will write bytes from the given `buf`
-/// to the `SerialPort`, waiting until it is ready to transfer all bytes. 
-///
-/// The `flush()` function is a no-op, since the `SerialPort` does not have buffering. 
-impl bare_io::Write for SerialPort {
-    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
-        self.out_bytes(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> bare_io::Result<()> {
-        Ok(())
-    }    
-}
-
-
-/// This is called from the serial port interrupt handlers 
-/// when data has been received and is ready to read.
-fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
-    // Important notes:
-    //  * We read a chunk of multiple bytes at once.
-    //  * We MUST NOT use a blocking read operation in an interrupt handler. 
-    //  * We cannot hold the serial port lock while issuing a log statement.
-    let mut buf = [0; u8::MAX as usize];
-    let bytes_read;
-    
-    let mut input_was_ignored = false;
-    let mut send_result = Ok(());
-    let serial_port = get_serial_port(serial_port_address);
-
-    { 
-        let mut sp = serial_port.lock();
-        bytes_read = sp.in_bytes(&mut buf);
-        if bytes_read > 0 {
-            if let Some(ref sender) = sp.data_sender {
-                send_result = sender.try_send((bytes_read as u8, buf));
-            } else {
-                input_was_ignored = true;
-            }
-        } else {
-            // This was a "false" interrupt, no data was actually received.
-            return;
-        }
-    }
-
-    if let Err(e) = send_result {
-        let _result = write!(
-            &mut serial_port.lock(),
-            "\x1b[31mError: failed to send data received for serial port {:?}: {:?}.\x1b[0m\n",
-            serial_port_address, e.1
-        );
-    }
-
-    if input_was_ignored {
-        if let Some(sender) = NEW_CONNECTION_NOTIFIER.get() {
-            let _result = write!(
-                &mut serial_port.lock(),
-                "\x1b[36mRequesting new console to be spawned for this serial port ({:?})\x1b[0m\n",
-                serial_port_address
-            );
-            if let Err(err) = sender.try_send(serial_port_address) {
-                let _result = write!(
-                    &mut serial_port.lock(),
-                    "\x1b[31mError sending request for new console to be spawned for this serial port ({:?}): {:?}\x1b[0m\n",
-                    serial_port_address, err
-                );
-            }
-        } else {
-            let _result = write!(
-                &mut serial_port.lock(),
-                "\x1b[33mWarning: no connection detector; ignoring {}-byte input read from serial port {:?}: {:X?}\x1b[0m\n",
-                bytes_read, serial_port_address, &buf[..bytes_read]
-            );
-        }
-    }
-}
-
-/// A chunk of data read from a serial port
-/// that will be transmitted to a receiver.
-pub type DataChunk = (u8, [u8; u8::MAX as usize]);
-
-
-
-/// IRQ 0x23: COM2 serial port interrupt handler.
-///
-/// Note: this IRQ may also be used for COM4, but I haven't seen a machine with a COM4 port yet.
-extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // trace!("COM2 serial handler");
-    handle_receive_interrupt(SerialPortAddress::COM2);
-    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x3));
-}
-
-
-/// IRQ 0x24: COM1 serial port interrupt handler.
-///
-/// Note: this IRQ may also be used for COM3, but I haven't seen a machine with a COM3 port yet.
-extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // trace!("COM1 serial handler");
-    handle_receive_interrupt(SerialPortAddress::COM1);
-    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x4));
 }
