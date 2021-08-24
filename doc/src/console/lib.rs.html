@@ -233,8 +233,8 @@
 	<span class="kw">loop</span> {
 		<span class="comment">// Block until we receive the next data chunk from the sender.</span>
 		<span class="kw">match</span> <span class="ident">input_receiver</span>.<span class="ident">receive</span>() {
-			<span class="prelude-val">Ok</span>((<span class="ident">num_bytes</span>, <span class="ident">data</span>)) <span class="op">=</span><span class="op">&gt;</span> {
-				<span class="kw">let</span> <span class="ident">_res</span> <span class="op">=</span> <span class="ident">console</span>.<span class="ident">terminal</span>.<span class="ident">handle_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">&amp;</span><span class="ident">data</span>[.. (<span class="ident">num_bytes</span> <span class="kw">as</span> <span class="ident">usize</span>)]);
+			<span class="prelude-val">Ok</span>(<span class="ident">DataChunk</span> { <span class="ident">len</span>, <span class="ident">data</span> }) <span class="op">=</span><span class="op">&gt;</span> {
+				<span class="kw">let</span> <span class="ident">_res</span> <span class="op">=</span> <span class="ident">console</span>.<span class="ident">terminal</span>.<span class="ident">handle_input</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">&amp;</span><span class="ident">data</span>[.. (<span class="ident">len</span> <span class="kw">as</span> <span class="ident">usize</span>)]);
 			}
 			<span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span><span class="op">&gt;</span> {
 				<span class="macro">error!</span>(<span class="string">&quot;[LIKELY BUG] Error receiving input data on {:?}: {:?}. Retrying...&quot;</span>,

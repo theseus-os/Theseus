@@ -349,6 +349,8 @@
 <span id="346">346</span>
 <span id="347">347</span>
 <span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for basic serial port access, including initialization, transmit, and receive.</span>
 <span class="doccomment">//!</span>
@@ -442,8 +444,8 @@
     }
 }
 
-<span class="doccomment">/// This type is used to ensure that an object of type `T` is only initialized once</span>
-<span class="doccomment">/// but allows for a caller to take ownership of the object `T`. </span>
+<span class="doccomment">/// This type is used to ensure that an object of type `T` is only initialized once,</span>
+<span class="doccomment">/// but still allows for a caller to take ownership of the object `T`. </span>
 <span class="kw">enum</span> <span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="ident">Uninited</span>,
     <span class="ident">Inited</span>(<span class="ident">T</span>),
@@ -460,6 +462,8 @@
     }
 }
 
+<span class="comment">// Serial ports cannot be reliably probed (discovered dynamically), thus,</span>
+<span class="comment">// we ensure they are exposed safely as singletons through the below static instances.</span>
 <span class="kw">static</span> <span class="ident">COM1_SERIAL_PORT</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TriState::Uninited</span>);
 <span class="kw">static</span> <span class="ident">COM2_SERIAL_PORT</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TriState::Uninited</span>);
 <span class="kw">static</span> <span class="ident">COM3_SERIAL_PORT</span>: <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">TriState</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TriState::Uninited</span>);

@@ -320,6 +320,61 @@
 <span id="317">317</span>
 <span id="318">318</span>
 <span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.</span>
 <span class="doccomment">//!</span>
@@ -339,25 +394,28 @@
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">static_assertions</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">interrupts</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">deferred_interrupt_tasks</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bare_io</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">serial_port_basic</span>;
 
+<span class="kw">use</span> <span class="ident">deferred_interrupt_tasks::InterruptRegistrationError</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">serial_port_basic</span>::{
     <span class="ident">SerialPortAddress</span>,
     <span class="ident">SerialPort</span> <span class="kw">as</span> <span class="ident">SerialPortBasic</span>,
     <span class="ident">take_serial_port</span> <span class="kw">as</span> <span class="ident">take_serial_port_basic</span>,
 };
 
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">fmt</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>}};
+<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">boxed::Box</span>, <span class="ident">sync::Arc</span>};
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">convert::TryFrom</span>, <span class="ident">fmt</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>}};
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
-<span class="kw">use</span> <span class="ident">interrupts</span>::{<span class="ident">IRQ_BASE_OFFSET</span>, <span class="ident">register_interrupt</span>};
+<span class="kw">use</span> <span class="ident">interrupts::IRQ_BASE_OFFSET</span>;
 <span class="kw">use</span> <span class="ident">x86_64::structures::idt</span>::{<span class="ident">HandlerFunc</span>, <span class="ident">ExceptionStackFrame</span>};
 
 <span class="comment">// Dependencies below here are temporary and will be removed</span>
@@ -378,6 +436,8 @@
 <span class="kw">static</span> <span class="ident">NEW_CONNECTION_NOTIFIER</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">SerialPortAddress</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 
 
+<span class="comment">// Serial ports cannot be reliably probed (discovered dynamically), thus,</span>
+<span class="comment">// we ensure they are exposed safely as singletons through the below static instances.</span>
 <span class="kw">static</span> <span class="ident">COM1_SERIAL_PORT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 <span class="kw">static</span> <span class="ident">COM2_SERIAL_PORT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 <span class="kw">static</span> <span class="ident">COM3_SERIAL_PORT</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
@@ -394,6 +454,9 @@
 
 <span class="doccomment">/// Initializes the [`SerialPort`] specified by the given [`SerialPortAddress`].</span>
 <span class="doccomment">///</span>
+<span class="doccomment">/// This function also registers the interrupt handler for this serial port</span>
+<span class="doccomment">/// such that it can receive data using interrupts instead of busy-waiting or polling.</span>
+<span class="doccomment">///</span>
 <span class="doccomment">/// If the given serial port has already been initialized, this does nothing</span>
 <span class="doccomment">/// and simply returns a reference to the already-initialized serial port.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init_serial_port</span>(
@@ -401,10 +464,10 @@
     <span class="ident">serial_port</span>: <span class="ident">SerialPortBasic</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="ident">static_port_of</span>(<span class="kw-2">&amp;</span><span class="ident">serial_port_address</span>).<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sp</span> <span class="op">=</span> <span class="ident">SerialPort::new</span>(<span class="ident">serial_port</span>);
+        <span class="kw">let</span> <span class="ident">sp</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">SerialPort::new</span>(<span class="ident">serial_port</span>)));
         <span class="kw">let</span> (<span class="ident">int_num</span>, <span class="ident">int_handler</span>) <span class="op">=</span> <span class="ident">interrupt_number_handler</span>(<span class="kw-2">&amp;</span><span class="ident">serial_port_address</span>);
-        <span class="ident">sp</span>.<span class="ident">register_interrupt_handler</span>(<span class="ident">int_num</span>, <span class="ident">int_handler</span>).<span class="ident">unwrap</span>();
-        <span class="ident">Arc::new</span>(<span class="ident">MutexIrqSafe::new</span>(<span class="ident">sp</span>))
+        <span class="ident">SerialPort::register_interrupt_handler</span>(<span class="ident">sp</span>.<span class="ident">clone</span>(), <span class="ident">int_num</span>, <span class="ident">int_handler</span>).<span class="ident">unwrap</span>();
+        <span class="ident">sp</span>
     })
 }
 
@@ -426,8 +489,8 @@
     <span class="ident">serial_port_address</span>: <span class="kw-2">&amp;</span><span class="ident">SerialPortAddress</span>
 ) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">u8</span>, <span class="ident">HandlerFunc</span>) {
     <span class="kw">match</span> <span class="ident">serial_port_address</span> {
-        <span class="ident">SerialPortAddress::COM1</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM3</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x04</span>, <span class="ident">com1_serial_handler</span>),
-        <span class="ident">SerialPortAddress::COM2</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM4</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x03</span>, <span class="ident">com2_serial_handler</span>),
+        <span class="ident">SerialPortAddress::COM1</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM3</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x04</span>, <span class="ident">com1_com3_interrupt_handler</span>),
+        <span class="ident">SerialPortAddress::COM2</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM4</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x03</span>, <span class="ident">com2_com4_interrupt_handler</span>),
     }
 }
 
@@ -470,25 +533,56 @@
     <span class="doccomment">/// Register the interrupt handler for this serial port</span>
     <span class="doccomment">/// and spawn a deferrent interrupt task to handle its data receival. </span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_interrupt_handler</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">serial_port</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">interrupt_number</span>: <span class="ident">u8</span>,
         <span class="ident">interrupt_handler</span>: <span class="ident">HandlerFunc</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">base_port</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">base_port_address</span>();
+        <span class="kw">let</span> <span class="ident">base_port</span> <span class="op">=</span> { 
+            <span class="kw">let</span> <span class="ident">sp</span> <span class="op">=</span> <span class="ident">serial_port</span>.<span class="ident">lock</span>();
+            <span class="ident">sp</span>.<span class="ident">base_port_address</span>()
+        };
 
         <span class="comment">// Register the interrupt handler for this serial port. </span>
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">register_interrupt</span>(<span class="ident">interrupt_number</span>, <span class="ident">interrupt_handler</span>);
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">registered_handler_addr</span>) <span class="op">=</span> <span class="ident">res</span> {
-            <span class="kw">if</span> <span class="ident">registered_handler_addr</span> <span class="op">!</span><span class="op">=</span> <span class="ident">interrupt_handler</span> <span class="kw">as</span> <span class="ident">u64</span> {
-                <span class="macro">error!</span>(<span class="string">&quot;Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
-                    Existing interrupt handler was at address {:#X}.&quot;</span>,
-                    <span class="ident">interrupt_number</span>, <span class="ident">base_port</span>, <span class="ident">registered_handler_addr</span>,
+        <span class="kw">let</span> <span class="ident">registration_result</span> <span class="op">=</span> <span class="ident">deferred_interrupt_tasks::register_interrupt_handler</span>(
+            <span class="ident">interrupt_number</span>,
+            <span class="ident">interrupt_handler</span>,
+            <span class="ident">serial_port_receive_deferred</span>,
+            <span class="ident">serial_port</span>,
+            <span class="prelude-val">Some</span>(<span class="macro">format!</span>(<span class="string">&quot;serial_port_deferred_task_irq_{:#X}&quot;</span>, <span class="ident">interrupt_number</span>)),
+        );
+
+        <span class="kw">match</span> <span class="ident">registration_result</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">deferred_task</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="comment">// Now that we successfully registered the interrupt and spawned </span>
+                <span class="comment">// a deferred interrupt task, save some information for the </span>
+                <span class="comment">// immediate interrupt handler to use when it fires</span>
+                <span class="comment">// such that it triggers the deferred task to act. </span>
+                <span class="macro">info!</span>(<span class="string">&quot;Registered interrupt handler at IRQ {:#X} for serial port {:#X}.&quot;</span>, 
+                    <span class="ident">interrupt_number</span>, <span class="ident">base_port</span>,
                 );
+                <span class="kw">match</span> <span class="ident">SerialPortAddress::try_from</span>(<span class="ident">base_port</span>) {
+                    <span class="prelude-val">Ok</span>(<span class="ident">SerialPortAddress::COM1</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM3</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">INTERRUPT_ACTION_COM1_COM3</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> 
+                            <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> { <span class="ident">deferred_task</span>.<span class="ident">unblock</span>(); })
+                        );
+                    }
+                    <span class="prelude-val">Ok</span>(<span class="ident">SerialPortAddress::COM2</span> <span class="op">|</span> <span class="ident">SerialPortAddress::COM4</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">INTERRUPT_ACTION_COM2_COM4</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> 
+                            <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="op">|</span> { <span class="ident">deferred_task</span>.<span class="ident">unblock</span>(); })
+                        );
+                    }
+                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;Registering interrupt handler for unknown serial port at {:#X}&quot;</span>, <span class="ident">base_port</span>),
+                };                
             }
-        } <span class="kw">else</span> {
-            <span class="macro">info!</span>(<span class="string">&quot;Registered interrupt handler at IRQ {:#X} for serial port {:#X}.&quot;</span>, 
-                <span class="ident">interrupt_number</span>, <span class="ident">base_port</span>,
-            );
+            <span class="prelude-val">Err</span>(<span class="ident">InterruptRegistrationError::IrqInUse</span> { <span class="ident">irq</span>, <span class="ident">existing_handler_address</span> }) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="ident">existing_handler_address</span> <span class="op">!</span><span class="op">=</span> <span class="ident">interrupt_handler</span> <span class="kw">as</span> <span class="ident">u64</span> {
+                    <span class="macro">error!</span>(<span class="string">&quot;Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
+                        Existing interrupt handler was a different handler, at address {:#X}.&quot;</span>,
+                        <span class="ident">irq</span>, <span class="ident">base_port</span>, <span class="ident">existing_handler_address</span>,
+                    );
+                }
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">InterruptRegistrationError::SpawnError</span>(<span class="ident">e</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>),
         }
 
         <span class="prelude-val">Ok</span>(())
@@ -508,7 +602,6 @@
     }
 
 }
-
 
 
 <span class="doccomment">/// A non-blocking implementation of [`bare_io::Read`] that will read bytes into the given `buf`</span>
@@ -550,95 +643,112 @@
 }
 
 
-
-<span class="doccomment">/// This is called from the serial port interrupt handlers </span>
-<span class="doccomment">/// when data has been received and is ready to read.</span>
-<span class="kw">fn</span> <span class="ident">handle_receive_interrupt</span>(<span class="ident">serial_port_address</span>: <span class="ident">SerialPortAddress</span>) {
-    <span class="comment">// Important notes:</span>
-    <span class="comment">//  * We read a chunk of multiple bytes at once.</span>
-    <span class="comment">//  * We MUST NOT use a blocking read operation in an interrupt handler. </span>
-    <span class="comment">//  * We cannot hold the serial port lock while issuing a log statement.</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> [<span class="number">0</span>; <span class="ident">u8::MAX</span> <span class="kw">as</span> <span class="ident">usize</span>];
+<span class="doccomment">/// This function is invoked from the serial port&#39;s deferred interrupt task,</span>
+<span class="doccomment">/// and runs asynchronously after a serial port interrupt has occurred. </span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Currently, we only use interrupts for receiving data on a serial port.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This is responsible for actually reading the received data from the serial port</span>
+<span class="doccomment">/// and doing something with that data.</span>
+<span class="doccomment">/// On the other hand, the interrupt handler itself merely notifies the system </span>
+<span class="doccomment">/// that it&#39;s time to invoke this function soon.</span>
+<span class="kw">fn</span> <span class="ident">serial_port_receive_deferred</span>(
+    <span class="ident">serial_port</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span><span class="op">&gt;</span>
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">DataChunk::empty</span>();
     <span class="kw">let</span> <span class="ident">bytes_read</span>;
+    <span class="kw">let</span> <span class="ident">base_port</span>;
     
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">input_was_ignored</span> <span class="op">=</span> <span class="bool-val">false</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">send_result</span> <span class="op">=</span> <span class="prelude-val">Ok</span>(());
-    <span class="kw">let</span> <span class="ident">serial_port</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">get_serial_port</span>(<span class="ident">serial_port_address</span>) {
-        <span class="prelude-val">Some</span>(<span class="ident">sp</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">sp</span>,
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span>,
-    };
 
+    <span class="comment">// We shouldn&#39;t hold the serial port lock for long periods of time,</span>
+    <span class="comment">// and we cannot hold it at all while issuing a log statement.</span>
     { 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sp</span> <span class="op">=</span> <span class="ident">serial_port</span>.<span class="ident">lock</span>();
-        <span class="ident">bytes_read</span> <span class="op">=</span> <span class="ident">sp</span>.<span class="ident">in_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buf</span>);
+        <span class="ident">base_port</span> <span class="op">=</span> <span class="ident">sp</span>.<span class="ident">base_port_address</span>();
+        <span class="ident">bytes_read</span> <span class="op">=</span> <span class="ident">sp</span>.<span class="ident">in_bytes</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buf</span>.<span class="ident">data</span>);
         <span class="kw">if</span> <span class="ident">bytes_read</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">sender</span>) <span class="op">=</span> <span class="ident">sp</span>.<span class="ident">data_sender</span> {
-                <span class="ident">send_result</span> <span class="op">=</span> <span class="ident">sender</span>.<span class="ident">try_send</span>((<span class="ident">bytes_read</span> <span class="kw">as</span> <span class="ident">u8</span>, <span class="ident">buf</span>));
+                <span class="ident">buf</span>.<span class="ident">len</span> <span class="op">=</span> <span class="ident">bytes_read</span> <span class="kw">as</span> <span class="ident">u8</span>;
+                <span class="ident">send_result</span> <span class="op">=</span> <span class="ident">sender</span>.<span class="ident">try_send</span>(<span class="ident">buf</span>);
             } <span class="kw">else</span> {
                 <span class="ident">input_was_ignored</span> <span class="op">=</span> <span class="bool-val">true</span>;
             }
         } <span class="kw">else</span> {
             <span class="comment">// This was a &quot;false&quot; interrupt, no data was actually received.</span>
-            <span class="kw">return</span>;
+            <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
     }
 
-    <span class="kw">use</span> <span class="ident">fmt::Write</span>;
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">send_result</span> {
-        <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="macro">write!</span>(
-            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">serial_port</span>.<span class="ident">lock</span>(),
-            <span class="string">&quot;\x1b[31mError: failed to send data received for serial port {:?}: {:?}.\x1b[0m\n&quot;</span>,
-            <span class="ident">serial_port_address</span>, <span class="ident">e</span>.<span class="number">1</span>
-        );
+        <span class="macro">error!</span>(<span class="string">&quot;Failed to send data received for serial port at {:#X}: {:?}.&quot;</span>, <span class="ident">base_port</span>, <span class="ident">e</span>.<span class="number">1</span>);
     }
 
     <span class="kw">if</span> <span class="ident">input_was_ignored</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sender</span>) <span class="op">=</span> <span class="ident">NEW_CONNECTION_NOTIFIER</span>.<span class="ident">get</span>() {
-            <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="macro">write!</span>(
-                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">serial_port</span>.<span class="ident">lock</span>(),
-                <span class="string">&quot;\x1b[36mRequesting new console to be spawned for this serial port ({:?})\x1b[0m\n&quot;</span>,
-                <span class="ident">serial_port_address</span>
-            );
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">sender</span>.<span class="ident">try_send</span>(<span class="ident">serial_port_address</span>) {
-                <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="macro">write!</span>(
-                    <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">serial_port</span>.<span class="ident">lock</span>(),
-                    <span class="string">&quot;\x1b[31mError sending request for new console to be spawned for this serial port ({:?}): {:?}\x1b[0m\n&quot;</span>,
-                    <span class="ident">serial_port_address</span>, <span class="ident">err</span>
-                );
+            <span class="macro">info!</span>(<span class="string">&quot;Requesting new console to be spawned for this serial port ({:#X})&quot;</span>, <span class="ident">base_port</span>);
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">serial_port_address</span>) <span class="op">=</span> <span class="ident">SerialPortAddress::try_from</span>(<span class="ident">base_port</span>) {
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">sender</span>.<span class="ident">try_send</span>(<span class="ident">serial_port_address</span>) {
+                    <span class="macro">error!</span>(<span class="string">&quot;Error sending request for new console to be spawned for this serial port ({:#X}): {:?}&quot;</span>,
+                        <span class="ident">base_port</span>, <span class="ident">err</span>
+                    );
+                }
+            } <span class="kw">else</span> {
+                <span class="macro">error!</span>(<span class="string">&quot;Error: base port {:#X} was not a known serial port address.&quot;</span>, <span class="ident">base_port</span>);
             }
         } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="macro">write!</span>(
-                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">serial_port</span>.<span class="ident">lock</span>(),
-                <span class="string">&quot;\x1b[33mWarning: no connection detector; ignoring {}-byte input read from serial port {:?}: {:X?}\x1b[0m\n&quot;</span>,
-                <span class="ident">bytes_read</span>, <span class="ident">serial_port_address</span>, <span class="kw-2">&amp;</span><span class="ident">buf</span>[..<span class="ident">bytes_read</span>]
+            <span class="macro">warn!</span>(<span class="string">&quot;Warning: no connection detector; ignoring {}-byte input read from serial port {:#X}.&quot;</span>,
+                <span class="ident">bytes_read</span>, <span class="ident">base_port</span>
             );
         }
     }
+
+    <span class="prelude-val">Ok</span>(())
 }
 
-<span class="doccomment">/// A chunk of data read from a serial port</span>
-<span class="doccomment">/// that will be transmitted to a receiver.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DataChunk</span> <span class="op">=</span> (<span class="ident">u8</span>, [<span class="ident">u8</span>; <span class="ident">u8::MAX</span> <span class="kw">as</span> <span class="ident">usize</span>]);
-
-
-
-<span class="doccomment">/// IRQ 0x23: COM2 serial port interrupt handler.</span>
+<span class="doccomment">/// A chunk of data read from a serial port that will be transmitted to a receiver.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// Note: this IRQ may also be used for COM4, but I haven&#39;t seen a machine with a COM4 port yet.</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com2_serial_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
-    <span class="comment">// trace!(&quot;COM2 serial handler&quot;);</span>
-    <span class="ident">handle_receive_interrupt</span>(<span class="ident">SerialPortAddress::COM2</span>);
-    <span class="ident">interrupts::eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x3</span>));
+<span class="doccomment">/// For performance, this type is sized to and aligned to 64-byte boundaries </span>
+<span class="doccomment">/// such that it fits in a cache line. </span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">align</span>(<span class="number">64</span>))]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DataChunk</span> {
+    <span class="kw">pub</span> <span class="ident">len</span>: <span class="ident">u8</span>,
+    <span class="kw">pub</span> <span class="ident">data</span>: [<span class="ident">u8</span>; (<span class="number">64</span> <span class="op">-</span> <span class="number">1</span>)],
+}
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">DataChunk</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+<span class="macro">const_assert_eq!</span>(<span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">DataChunk</span><span class="op">&gt;</span>(), <span class="number">64</span>);
+<span class="kw">impl</span> <span class="ident">DataChunk</span> {
+    <span class="doccomment">/// Returns a new `DataChunk` filled with zeroes that can be written into.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+        <span class="ident">DataChunk</span> { <span class="ident">len</span>: <span class="number">0</span>, <span class="ident">data</span>: [<span class="number">0</span>; (<span class="number">64</span> <span class="op">-</span> <span class="number">1</span>)] }
+    }
 }
 
+<span class="doccomment">/// A closure specifying the action that will be taken when a serial port interrupt occurs</span>
+<span class="doccomment">/// (for COM1 or COM3 interrupts, since they share an IRQ line).</span>
+<span class="kw">static</span> <span class="ident">INTERRUPT_ACTION_COM1_COM3</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+<span class="doccomment">/// A closure specifying the action that will be taken when a serial port interrupt occurs</span>
+<span class="doccomment">/// (for COM2 or COM4 interrupts, since they share an IRQ line).</span>
+<span class="kw">static</span> <span class="ident">INTERRUPT_ACTION_COM2_COM4</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Fn</span>() <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 
-<span class="doccomment">/// IRQ 0x24: COM1 serial port interrupt handler.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Note: this IRQ may also be used for COM3, but I haven&#39;t seen a machine with a COM3 port yet.</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com1_serial_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
-    <span class="comment">// trace!(&quot;COM1 serial handler&quot;);</span>
-    <span class="ident">handle_receive_interrupt</span>(<span class="ident">SerialPortAddress::COM1</span>);
+
+<span class="doccomment">/// IRQ 0x24: COM1 and COM3 serial port interrupt handler.</span>
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com1_com3_interrupt_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
+    <span class="comment">// trace!(&quot;COM1/COM3 serial handler&quot;);</span>
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">func</span>) <span class="op">=</span> <span class="ident">INTERRUPT_ACTION_COM1_COM3</span>.<span class="ident">get</span>() {
+        <span class="ident">func</span>();
+    }
     <span class="ident">interrupts::eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x4</span>));
+}
+
+<span class="doccomment">/// IRQ 0x23: COM2 and COM4 serial port interrupt handler.</span>
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com2_com4_interrupt_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
+    <span class="comment">// trace!(&quot;COM2/COM4 serial handler&quot;);</span>
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">func</span>) <span class="op">=</span> <span class="ident">INTERRUPT_ACTION_COM2_COM4</span>.<span class="ident">get</span>() {
+        <span class="ident">func</span>();
+    }
+    <span class="ident">interrupts::eoi</span>(<span class="prelude-val">Some</span>(<span class="ident">IRQ_BASE_OFFSET</span> <span class="op">+</span> <span class="number">0x3</span>));
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="serial_port" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>

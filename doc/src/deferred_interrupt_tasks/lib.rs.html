@@ -1,0 +1,361 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/deferred_interrupt_tasks/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
+<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
+<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../deferred_interrupt_tasks/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
+                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
+<span id="2">  2</span>
+<span id="3">  3</span>
+<span id="4">  4</span>
+<span id="5">  5</span>
+<span id="6">  6</span>
+<span id="7">  7</span>
+<span id="8">  8</span>
+<span id="9">  9</span>
+<span id="10"> 10</span>
+<span id="11"> 11</span>
+<span id="12"> 12</span>
+<span id="13"> 13</span>
+<span id="14"> 14</span>
+<span id="15"> 15</span>
+<span id="16"> 16</span>
+<span id="17"> 17</span>
+<span id="18"> 18</span>
+<span id="19"> 19</span>
+<span id="20"> 20</span>
+<span id="21"> 21</span>
+<span id="22"> 22</span>
+<span id="23"> 23</span>
+<span id="24"> 24</span>
+<span id="25"> 25</span>
+<span id="26"> 26</span>
+<span id="27"> 27</span>
+<span id="28"> 28</span>
+<span id="29"> 29</span>
+<span id="30"> 30</span>
+<span id="31"> 31</span>
+<span id="32"> 32</span>
+<span id="33"> 33</span>
+<span id="34"> 34</span>
+<span id="35"> 35</span>
+<span id="36"> 36</span>
+<span id="37"> 37</span>
+<span id="38"> 38</span>
+<span id="39"> 39</span>
+<span id="40"> 40</span>
+<span id="41"> 41</span>
+<span id="42"> 42</span>
+<span id="43"> 43</span>
+<span id="44"> 44</span>
+<span id="45"> 45</span>
+<span id="46"> 46</span>
+<span id="47"> 47</span>
+<span id="48"> 48</span>
+<span id="49"> 49</span>
+<span id="50"> 50</span>
+<span id="51"> 51</span>
+<span id="52"> 52</span>
+<span id="53"> 53</span>
+<span id="54"> 54</span>
+<span id="55"> 55</span>
+<span id="56"> 56</span>
+<span id="57"> 57</span>
+<span id="58"> 58</span>
+<span id="59"> 59</span>
+<span id="60"> 60</span>
+<span id="61"> 61</span>
+<span id="62"> 62</span>
+<span id="63"> 63</span>
+<span id="64"> 64</span>
+<span id="65"> 65</span>
+<span id="66"> 66</span>
+<span id="67"> 67</span>
+<span id="68"> 68</span>
+<span id="69"> 69</span>
+<span id="70"> 70</span>
+<span id="71"> 71</span>
+<span id="72"> 72</span>
+<span id="73"> 73</span>
+<span id="74"> 74</span>
+<span id="75"> 75</span>
+<span id="76"> 76</span>
+<span id="77"> 77</span>
+<span id="78"> 78</span>
+<span id="79"> 79</span>
+<span id="80"> 80</span>
+<span id="81"> 81</span>
+<span id="82"> 82</span>
+<span id="83"> 83</span>
+<span id="84"> 84</span>
+<span id="85"> 85</span>
+<span id="86"> 86</span>
+<span id="87"> 87</span>
+<span id="88"> 88</span>
+<span id="89"> 89</span>
+<span id="90"> 90</span>
+<span id="91"> 91</span>
+<span id="92"> 92</span>
+<span id="93"> 93</span>
+<span id="94"> 94</span>
+<span id="95"> 95</span>
+<span id="96"> 96</span>
+<span id="97"> 97</span>
+<span id="98"> 98</span>
+<span id="99"> 99</span>
+<span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+</pre><pre class="rust">
+<span class="doccomment">//! Abstractions for deferred interrupt tasks, a companion to regular interrupt handlers.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Deferred interrupt tasks are similar to the concept of &quot;top half&quot; and &quot;bottom half&quot;</span>
+<span class="doccomment">//! interrupt handlers in other OSes, in which the top half is the short, latency-sensitive</span>
+<span class="doccomment">//! function that runs immediately when the interrupt request is serviced,</span>
+<span class="doccomment">//! while the bottom half is the more complex function that runs in a deferred manner</span>
+<span class="doccomment">//! to handle longer operations.</span>
+<span class="doccomment">//! Other terminology is often used, including &quot;first-level&quot; and</span>
+<span class="doccomment">//! &quot;second-level&quot; interrupt handlers, or &quot;hard&quot; and &quot;soft&quot; interrupt handlers.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! That being said, this implementation of deferred interrupt tasks</span>
+<span class="doccomment">//! differs from both tasklets and workqueues in Linux.</span>
+<span class="doccomment">//! We also do not use the &quot;top half&quot; or &quot;bottom half&quot; terminology</span>
+<span class="doccomment">//! because it is confusing and difficult to remember which is which.</span>
+<span class="doccomment">//! Instead, we refer to the first latency-sensitive part as the</span>
+<span class="doccomment">//! *interrupt handler* and the second later part as the *deferred task*.</span>
+<span class="doccomment">//! The &quot;interrupt handler&quot; runs immediately (in a synchronous fashion) </span>
+<span class="doccomment">//! when the interrupt occurs, while the deferred task runs asynchronously</span>
+<span class="doccomment">//! at some time in the future, ideally as soon as possible.</span>
+<span class="doccomment">//! </span>
+<span class="doccomment">//! The general idea is that an interrupt handler should be short</span>
+<span class="doccomment">//! and do the minimum amount of work possible in order to keep </span>
+<span class="doccomment">//! the system responsive, because all (or most) other interrupts</span>
+<span class="doccomment">//! are typically disabled while the interrupt handler executes to completion.</span>
+<span class="doccomment">//! Thus, most of the work should be deferred until later, such that the</span>
+<span class="doccomment">//! interrupt handler itself only does a couple of quick things:</span>
+<span class="doccomment">//!  * Notifies the deferred task that work is ready to be done,</span>
+<span class="doccomment">//!    optionally providing details about what work it needs to do,</span>
+<span class="doccomment">//!  * Acknowledges the interrupt such that the hardware knows it was handled.  </span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The deferred task is tied directly to a single interrupt handler in a 1-to-1 manner</span>
+<span class="doccomment">//! at the time of creation, which occurs in [`register_interrupt_handler()`].</span>
+<span class="doccomment">//! Therefore, it is both efficient and easy to use. </span>
+<span class="doccomment">//! In the simplest of cases, such as a serial port device, the interrupt handler</span>
+<span class="doccomment">//! only needs to mark the deferred task as unblocked (runnable)</span>
+<span class="doccomment">//! and then acknowledge the interrupt. </span>
+<span class="doccomment">//! No other data exchange is needed between the interrupt handler and the </span>
+<span class="doccomment">//! deferred task.</span>
+<span class="doccomment">//! For more complicated cases, the interrupt handler may need to do a minimal</span>
+<span class="doccomment">//! amount of bookkeeping tasks (such as advancing a ringbuffer index)</span>
+<span class="doccomment">//! and potentially send some information about what the deferred task should do.</span>
+<span class="doccomment">//! It is typically best to use a lock-free queue or an interrupt-safe mutex</span>
+<span class="doccomment">//! to share such information between the interrupt handler and deferred task.</span>
+<span class="doccomment">//!</span>
+
+<span class="attribute">#![<span class="ident">no_std</span>]</span>
+<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
+
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spawn</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">debugit</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">interrupts</span>;
+
+<span class="kw">use</span> <span class="ident">alloc::string::String</span>;
+<span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>, <span class="ident">get_my_current_task</span>};
+
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">InterruptHandlerFunction</span> <span class="op">=</span> <span class="ident">x86_64::structures::idt::HandlerFunc</span>;
+
+
+<span class="doccomment">/// The errors that may occur in [`register_interrupt_handler()`].</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">InterruptRegistrationError</span> {
+    <span class="doccomment">/// The given `irq` number was already in use and is registered to </span>
+    <span class="doccomment">/// the interrupt handler at the given `existing_handler_address`.</span>
+    <span class="ident">IrqInUse</span> {
+        <span class="ident">irq</span>: <span class="ident">u8</span>,
+        <span class="ident">existing_handler_address</span>: <span class="ident">u64</span>
+    },
+    <span class="doccomment">/// The given error occurred when spawning the deferred interrupt task.</span>
+    <span class="ident">SpawnError</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>),
+}
+
+
+<span class="doccomment">/// Registers an interrupt handler and spawns a companion &quot;deferred task&quot; </span>
+<span class="doccomment">/// that asynchronously handles the longer-running operations related to that interrupt.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// # Arguments </span>
+<span class="doccomment">/// * `interrupt_number`: the interrupt number (IRQ vector) that is being requested.</span>
+<span class="doccomment">/// * `interrupt_handler`: the handler to be registered,</span>
+<span class="doccomment">///    which will be invoked when the interrupt occurs.</span>
+<span class="doccomment">/// * `deferred_interrupt_action`: the closure/function callback that will be invoked</span>
+<span class="doccomment">///    in an asynchronous manner after the `interrupt_handler` runs. See the below section.</span>
+<span class="doccomment">/// * `deferred_action_argument`: the argument that will be passed to the above</span>
+<span class="doccomment">///    `deferred_interrupt_action` function.</span>
+<span class="doccomment">/// * `deferred_task_name`: the optional name that will be given to the newly-spawned deferred task.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// # How deferred interrupt tasks work</span>
+<span class="doccomment">/// This deferred interrupt task spawned and returned by this function</span>
+<span class="doccomment">/// is essentially an infinite loop that repeatedly invokes the `deferred_interrupt_action`.</span>
+<span class="doccomment">/// The task will put itself to sleep (block itself) in between each invocation,</span>
+<span class="doccomment">/// so it is the job of the given `interrupt_handler` to notify/wake up this task </span>
+<span class="doccomment">/// when there is work to be done. </span>
+<span class="doccomment">/// This design avoids the need for the `deferred_interrupt_action` to manually handle</span>
+<span class="doccomment">/// repeated calls in and amongst the sleep/wake behavior.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// It is the caller&#39;s responsibility to notify or otherwise wake up the deferred interrupt task</span>
+<span class="doccomment">/// in the given `interrupt_handler` (or elsewhere, arbitrarily). </span>
+<span class="doccomment">/// WIthout doing this, the `deferred_interrupt_action` will never be invoked.</span>
+<span class="doccomment">/// The returned [`TaskRef`] is useful for doing this, as you can `unblock` it when it needs to run,</span>
+<span class="doccomment">/// e.g., when an interrupt has occurred.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Return</span>
+<span class="doccomment">/// * `Ok(TaskRef)` if successfully registered, in which the returned task is the long-running</span>
+<span class="doccomment">///    loop that repeatedly invokes the given `deferred_interrupt_action`.</span>
+<span class="doccomment">/// * `Err(existing_handler_address)` if the given `interrupt_number` was already in use.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">register_interrupt_handler</span><span class="op">&lt;</span><span class="ident">DIA</span>, <span class="ident">Arg</span>, <span class="ident">Success</span>, <span class="ident">Failure</span>, <span class="ident">S</span><span class="op">&gt;</span>(
+    <span class="ident">interrupt_number</span>: <span class="ident">u8</span>,
+    <span class="ident">interrupt_handler</span>: <span class="ident">InterruptHandlerFunction</span>,
+    <span class="ident">deferred_interrupt_action</span>: <span class="ident">DIA</span>,
+    <span class="ident">deferred_action_argument</span>: <span class="ident">Arg</span>,
+    <span class="ident">deferred_task_name</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">S</span><span class="op">&gt;</span>,
+) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">TaskRef</span>, <span class="ident">InterruptRegistrationError</span><span class="op">&gt;</span> 
+    <span class="kw">where</span> <span class="ident">DIA</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">Arg</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Success</span>, <span class="ident">Failure</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+          <span class="ident">Arg</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+          <span class="ident">S</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
+{
+    <span class="comment">// First, attempt to register the interrupt handler.</span>
+    <span class="ident">interrupts::register_interrupt</span>(<span class="ident">interrupt_number</span>, <span class="ident">interrupt_handler</span>)
+        .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">existing_handler_address</span><span class="op">|</span> {
+            <span class="macro">error!</span>(<span class="string">&quot;Interrupt number {:#X} was already taken by handler at {:#X}! Sharing IRQs is currently unsupported.&quot;</span>,
+                <span class="ident">interrupt_number</span>, <span class="ident">existing_handler_address</span>
+            );
+            <span class="ident">InterruptRegistrationError::IrqInUse</span> {
+                <span class="ident">irq</span>: <span class="ident">interrupt_number</span>,
+                <span class="ident">existing_handler_address</span>,
+            }
+        })<span class="question-mark">?</span>;
+
+    <span class="comment">// Spawn the deferred task, which should be initially blocked from running.</span>
+    <span class="comment">// It will be unblocked by the interrupt handler whenever it needs to run.</span>
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tb</span> <span class="op">=</span> <span class="ident">spawn::new_task_builder</span>(
+        <span class="ident">deferred_task_entry_point</span>::<span class="op">&lt;</span><span class="ident">DIA</span>, <span class="ident">Arg</span>, <span class="ident">Success</span>, <span class="ident">Failure</span><span class="op">&gt;</span>,
+        (<span class="ident">deferred_interrupt_action</span>, <span class="ident">deferred_action_argument</span>),
+    ).<span class="ident">block</span>();
+    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="ident">deferred_task_name</span> {
+        <span class="ident">tb</span> <span class="op">=</span> <span class="ident">tb</span>.<span class="ident">name</span>(<span class="ident">name</span>.<span class="ident">into</span>());
+    }
+    <span class="ident">tb</span>.<span class="ident">spawn</span>().<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">InterruptRegistrationError::SpawnError</span>(<span class="ident">e</span>))
+}
+
+
+<span class="doccomment">/// The entry point for a new deferred interrupt task.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// TODO: upon entry, this function should set itself to high priority.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note: we could use restartable tasks for this, but the current requirement</span>
+<span class="doccomment">/// of the function itself and its arguments being `Clone`able may be overly restrictive. </span>
+<span class="kw">fn</span> <span class="ident">deferred_task_entry_point</span><span class="op">&lt;</span><span class="ident">DIA</span>, <span class="ident">Arg</span>, <span class="ident">Success</span>, <span class="ident">Failure</span><span class="op">&gt;</span>(
+    (<span class="ident">deferred_interrupt_action</span>, <span class="ident">deferred_action_argument</span>): (<span class="ident">DIA</span>, <span class="ident">Arg</span>),
+) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> 
+    <span class="kw">where</span> <span class="ident">DIA</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">Arg</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Success</span>, <span class="ident">Failure</span><span class="op">&gt;</span>,
+          <span class="ident">Arg</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: deferred_task_entry_point: couldn&#39;t get current task.&quot;</span>);
+    <span class="macro">trace!</span>(<span class="string">&quot;Entered {:?}:\n\t action: {:?}\n\t arg:    {:?}&quot;</span>, 
+        <span class="ident">curr_task</span>.<span class="ident">name</span>, <span class="macro">debugit!</span>(<span class="ident">deferred_interrupt_action</span>), <span class="macro">debugit!</span>(<span class="ident">deferred_action_argument</span>)
+    );
+
+    <span class="kw">loop</span> {
+        <span class="kw">let</span> <span class="ident">_res</span> <span class="op">=</span> <span class="ident">deferred_interrupt_action</span>(<span class="kw-2">&amp;</span><span class="ident">deferred_action_argument</span>);
+        
+        <span class="comment">// Note: here, upon failure, we could return from this loop task entirely instead of just logging the error.</span>
+        <span class="comment">// Or, we could accept a boolean/cfg that determines whether we should bail or continue looping.</span>
+        <span class="kw">match</span> <span class="ident">_res</span> {
+            <span class="prelude-val">Ok</span>(<span class="ident">_success</span>) <span class="op">=</span><span class="op">&gt;</span> { 
+                <span class="comment">// debug!(&quot;Deferred interrupt action returned success: {:?}&quot;, debugit!(_success));</span>
+            }
+            <span class="prelude-val">Err</span>(<span class="ident">failure</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error!</span>(<span class="string">&quot;Deferred interrupt action returned failure: {:?}&quot;</span>, <span class="macro">debugit!</span>(<span class="ident">failure</span>)),
+        }
+
+        <span class="ident">curr_task</span>.<span class="ident">block</span>();
+        <span class="ident">scheduler::schedule</span>();
+    }
+}
+</pre></div>
+</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="deferred_interrupt_tasks" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
+    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

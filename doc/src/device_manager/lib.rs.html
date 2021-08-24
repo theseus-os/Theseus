@@ -286,6 +286,7 @@
 <span id="283">283</span>
 <span id="284">284</span>
 <span id="285">285</span>
+<span id="286">286</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
@@ -367,6 +368,7 @@
         ).<span class="ident">map</span>(<span class="op">|</span><span class="ident">arc_ref</span><span class="op">|</span> <span class="ident">arc_ref</span>.<span class="ident">clone</span>());
 
     <span class="ident">logger::init</span>(<span class="prelude-val">None</span>, <span class="ident">logger_writers</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;BUG: logger::init() failed&quot;</span>)<span class="question-mark">?</span>;
+    <span class="macro">info!</span>(<span class="string">&quot;Initialized full logger.&quot;</span>);
 
     <span class="comment">// Ensure that COM1 is initialized, even if it wasn&#39;t used in [`logger::early_init()`].</span>
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">com1</span>) <span class="op">=</span> <span class="ident">take_serial_port_basic</span>(<span class="ident">SerialPortAddress::COM1</span>) {

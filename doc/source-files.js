@@ -25,6 +25,7 @@ sourcesIndex["crate_name_utils"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["crate_swap"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["debug_info"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["debugit"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["deferred_interrupt_tasks"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["device_manager"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["dfqueue"] = {"name":"","files":["lib.rs","mpsc_queue.rs"]};
 sourcesIndex["displayable"] = {"name":"","files":["lib.rs"]};
