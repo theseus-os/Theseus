@@ -48,15 +48,11 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-extern crate spin;
-extern crate irq_safety;
-extern crate mpmc;
 extern crate x86_64;
 extern crate task;
 extern crate spawn;
 extern crate scheduler;
 #[macro_use] extern crate debugit;
-extern crate async_channel;
 extern crate interrupts;
 
 use alloc::string::String;

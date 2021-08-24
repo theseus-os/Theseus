@@ -170,7 +170,7 @@ impl SerialPort {
             interrupt_handler,
             serial_port_receive_deferred,
             serial_port,
-            Some(format!("serial_port_interrupt_{:#X}_deferred_task", interrupt_number)),
+            Some(format!("serial_port_deferred_task_irq_{:#X}", interrupt_number)),
         );
 
         match registration_result {
