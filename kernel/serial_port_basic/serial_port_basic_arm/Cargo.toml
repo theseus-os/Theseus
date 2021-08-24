@@ -1,5 +1,5 @@
 [package]
-name = "serial_port_arm"
+name = "serial_port_basic_arm"
 version = "0.1.0"
 
 [dependencies]

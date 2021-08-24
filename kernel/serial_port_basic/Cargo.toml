@@ -1,0 +1,18 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "serial_port_basic"
+description = "Advanced support for serial ports (e.g., COM1, COM2) with full interrupt support"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+cfg-if = "1.0.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.serial_port_basic_x86]
+path = "./serial_port_basic_x86"
+
+[target.'cfg(target_arch = "arm")'.dependencies.serial_port_basic_arm]
+path = "./serial_port_basic_arm"
+
+[lib]
+crate-type = ["rlib"]

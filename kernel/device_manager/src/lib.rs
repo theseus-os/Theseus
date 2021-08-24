@@ -8,6 +8,8 @@ extern crate e1000;
 extern crate memory;
 extern crate apic;
 extern crate acpi;
+extern crate serial_port;
+extern crate logger;
 extern crate keyboard;
 extern crate pci;
 extern crate mouse;
@@ -23,6 +25,7 @@ extern crate bare_io;
 #[macro_use] extern crate derive_more;
 extern crate mlx5;
 
+use core::{array::IntoIter, convert::TryFrom};
 use mpmc::Queue;
 use event_types::Event;
 use memory::MemoryManagementInfo;
@@ -30,6 +33,7 @@ use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
 use alloc::vec::Vec;
 use io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
+use serial_port::{SerialPortAddress, take_serial_port_basic};
 use storage_manager::StorageDevice;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
@@ -40,7 +44,11 @@ const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-
 /// TODO: use DHCP to acquire gateway IP
 const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
 
-/// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
+/// Performs early-stage initialization for simple devices needed during early boot.
+///
+/// This includes:
+/// * local APICs ([`apic`]),
+/// * [`acpi`] tables for system configuration info, including the IOAPIC.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
     // First, initialize the local apic info.
     apic::init(&mut kernel_mmi.page_table)?;
@@ -52,9 +60,30 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 }
 
 
-/// Initializes all other devices, such as the keyboard and mouse
-/// as well as all devices discovered on the PCI bus.
+/// Initializes all other devices not initialized during [`early_init()`]. 
+///
+/// Devices include:
+/// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,
+/// * The fully-featured system [`logger`],
+/// * PS2 [`keyboard`] and [`mouse`],
+/// * All other devices discovered on the [`pci`] bus.
 pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
+
+    let serial_ports = logger::take_early_log_writers();
+    let logger_writers = IntoIter::new(serial_ports)
+        .flatten()
+        .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
+            .ok()
+            .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
+        ).map(|arc_ref| arc_ref.clone());
+
+    logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
+
+    // Ensure that COM1 is initialized, even if it wasn't used in [`logger::early_init()`].
+    if let Some(com1) = take_serial_port_basic(SerialPortAddress::COM1) {
+        serial_port::init_serial_port(SerialPortAddress::COM1, com1);
+    }
+
     keyboard::init(key_producer);
     mouse::init(mouse_producer);
 

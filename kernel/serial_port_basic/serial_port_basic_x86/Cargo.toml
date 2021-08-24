@@ -1,6 +1,6 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "serial_port_x86"
+name = "serial_port_basic_x86"
 description = "Basic driver for serial ports, e.g., COM1, COM2"
 version = "0.1.0"
 build = "../../../build.rs"

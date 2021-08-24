@@ -27,7 +27,7 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate stack;
-extern crate serial_port;
+extern crate serial_port_basic;
 extern crate mod_mgmt;
 extern crate exceptions_early;
 #[macro_use] extern crate vga_buffer;
@@ -37,8 +37,10 @@ extern crate memory_initialization;
 
 
 use core::ops::DerefMut;
+use core::array::IntoIter;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
+use serial_port_basic::{take_serial_port, SerialPortAddress};
 
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
@@ -95,8 +97,8 @@ pub extern "C" fn nano_core_start(
     println_raw!("Entered nano_core_start(). Interrupts disabled.");
 
     // Initialize the logger up front so we can see early log messages for debugging.
-    let logger_writers = [serial_port::get_serial_port(serial_port::SerialPortAddress::COM1)]; // some servers use COM2 instead. 
-    try_exit!(logger::init(None, &logger_writers).map_err(|_a| "couldn't init logger!"));
+    let logger_ports = [take_serial_port(SerialPortAddress::COM1)]; // some servers use COM2 instead. 
+    try_exit!(logger::early_init(None, IntoIter::new(logger_ports).flatten()).map_err(|_a| "logger::early_init() failed."));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
