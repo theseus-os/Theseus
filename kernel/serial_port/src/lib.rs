@@ -16,25 +16,28 @@
 #![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
-extern crate alloc;
+#[macro_use] extern crate alloc;
+#[macro_use] extern crate static_assertions;
 extern crate spin;
 extern crate irq_safety;
 extern crate interrupts;
+extern crate deferred_interrupt_tasks;
 extern crate bare_io;
 extern crate x86_64;
 extern crate serial_port_basic;
 
+use deferred_interrupt_tasks::InterruptRegistrationError;
 pub use serial_port_basic::{
     SerialPortAddress,
     SerialPort as SerialPortBasic,
     take_serial_port as take_serial_port_basic,
 };
 
-use alloc::sync::Arc;
-use core::{fmt, ops::{Deref, DerefMut}};
+use alloc::{boxed::Box, sync::Arc};
+use core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
-use interrupts::{IRQ_BASE_OFFSET, register_interrupt};
+use interrupts::IRQ_BASE_OFFSET;
 use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
 
 // Dependencies below here are temporary and will be removed
@@ -55,6 +58,8 @@ pub fn set_connection_listener(
 static NEW_CONNECTION_NOTIFIER: Once<Sender<SerialPortAddress>> = Once::new();
 
 
+// Serial ports cannot be reliably probed (discovered dynamically), thus,
+// we ensure they are exposed safely as singletons through the below static instances.
 static COM1_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
 static COM2_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
 static COM3_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
@@ -71,6 +76,9 @@ pub fn get_serial_port(
 
 /// Initializes the [`SerialPort`] specified by the given [`SerialPortAddress`].
 ///
+/// This function also registers the interrupt handler for this serial port
+/// such that it can receive data using interrupts instead of busy-waiting or polling.
+///
 /// If the given serial port has already been initialized, this does nothing
 /// and simply returns a reference to the already-initialized serial port.
 pub fn init_serial_port(
@@ -78,10 +86,10 @@ pub fn init_serial_port(
     serial_port: SerialPortBasic,
 ) -> &'static Arc<MutexIrqSafe<SerialPort>> {
     static_port_of(&serial_port_address).call_once(|| {
-        let mut sp = SerialPort::new(serial_port);
+        let sp = Arc::new(MutexIrqSafe::new(SerialPort::new(serial_port)));
         let (int_num, int_handler) = interrupt_number_handler(&serial_port_address);
-        sp.register_interrupt_handler(int_num, int_handler).unwrap();
-        Arc::new(MutexIrqSafe::new(sp))
+        SerialPort::register_interrupt_handler(sp.clone(), int_num, int_handler).unwrap();
+        sp
     })
 }
 
@@ -103,8 +111,8 @@ fn interrupt_number_handler(
     serial_port_address: &SerialPortAddress
 ) -> (u8, HandlerFunc) {
     match serial_port_address {
-        SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_serial_handler),
-        SerialPortAddress::COM2 | SerialPortAddress::COM4 => (IRQ_BASE_OFFSET + 0x03, com2_serial_handler),
+        SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_com3_interrupt_handler),
+        SerialPortAddress::COM2 | SerialPortAddress::COM4 => (IRQ_BASE_OFFSET + 0x03, com2_com4_interrupt_handler),
     }
 }
 
@@ -147,25 +155,56 @@ impl SerialPort {
     /// Register the interrupt handler for this serial port
     /// and spawn a deferrent interrupt task to handle its data receival. 
     pub fn register_interrupt_handler(
-        &mut self,
+        serial_port: Arc<MutexIrqSafe<SerialPort>>,
         interrupt_number: u8,
         interrupt_handler: HandlerFunc,
     ) -> Result<(), &'static str> {
-        let base_port = self.inner.base_port_address();
+        let base_port = { 
+            let sp = serial_port.lock();
+            sp.base_port_address()
+        };
 
         // Register the interrupt handler for this serial port. 
-        let res = register_interrupt(interrupt_number, interrupt_handler);
-        if let Err(registered_handler_addr) = res {
-            if registered_handler_addr != interrupt_handler as u64 {
-                error!("Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
-                    Existing interrupt handler was at address {:#X}.",
-                    interrupt_number, base_port, registered_handler_addr,
+        let registration_result = deferred_interrupt_tasks::register_interrupt_handler(
+            interrupt_number,
+            interrupt_handler,
+            serial_port_receive_deferred,
+            serial_port,
+            Some(format!("serial_port_deferred_task_irq_{:#X}", interrupt_number)),
+        );
+
+        match registration_result {
+            Ok(deferred_task) => {
+                // Now that we successfully registered the interrupt and spawned 
+                // a deferred interrupt task, save some information for the 
+                // immediate interrupt handler to use when it fires
+                // such that it triggers the deferred task to act. 
+                info!("Registered interrupt handler at IRQ {:#X} for serial port {:#X}.", 
+                    interrupt_number, base_port,
                 );
+                match SerialPortAddress::try_from(base_port) {
+                    Ok(SerialPortAddress::COM1 | SerialPortAddress::COM3) => {
+                        INTERRUPT_ACTION_COM1_COM3.call_once(|| 
+                            Box::new(move || { deferred_task.unblock(); })
+                        );
+                    }
+                    Ok(SerialPortAddress::COM2 | SerialPortAddress::COM4) => {
+                        INTERRUPT_ACTION_COM2_COM4.call_once(|| 
+                            Box::new(move || { deferred_task.unblock(); })
+                        );
+                    }
+                    Err(_) => warn!("Registering interrupt handler for unknown serial port at {:#X}", base_port),
+                };                
             }
-        } else {
-            info!("Registered interrupt handler at IRQ {:#X} for serial port {:#X}.", 
-                interrupt_number, base_port,
-            );
+            Err(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) => {
+                if existing_handler_address != interrupt_handler as u64 {
+                    error!("Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
+                        Existing interrupt handler was a different handler, at address {:#X}.",
+                        irq, base_port, existing_handler_address,
+                    );
+                }
+            }
+            Err(InterruptRegistrationError::SpawnError(e)) => return Err(e),
         }
 
         Ok(())
@@ -185,7 +224,6 @@ impl SerialPort {
     }
 
 }
-
 
 
 /// A non-blocking implementation of [`bare_io::Read`] that will read bytes into the given `buf`
@@ -227,93 +265,110 @@ impl fmt::Write for SerialPort {
 }
 
 
-
-/// This is called from the serial port interrupt handlers 
-/// when data has been received and is ready to read.
-fn handle_receive_interrupt(serial_port_address: SerialPortAddress) {
-    // Important notes:
-    //  * We read a chunk of multiple bytes at once.
-    //  * We MUST NOT use a blocking read operation in an interrupt handler. 
-    //  * We cannot hold the serial port lock while issuing a log statement.
-    let mut buf = [0; u8::MAX as usize];
+/// This function is invoked from the serial port's deferred interrupt task,
+/// and runs asynchronously after a serial port interrupt has occurred. 
+///
+/// Currently, we only use interrupts for receiving data on a serial port.
+///
+/// This is responsible for actually reading the received data from the serial port
+/// and doing something with that data.
+/// On the other hand, the interrupt handler itself merely notifies the system 
+/// that it's time to invoke this function soon.
+fn serial_port_receive_deferred(
+    serial_port: &Arc<MutexIrqSafe<SerialPort>>
+) -> Result<(), ()> {
+    let mut buf = DataChunk::empty();
     let bytes_read;
+    let base_port;
     
     let mut input_was_ignored = false;
     let mut send_result = Ok(());
-    let serial_port = match get_serial_port(serial_port_address) {
-        Some(sp) => sp,
-        _ => return,
-    };
 
+    // We shouldn't hold the serial port lock for long periods of time,
+    // and we cannot hold it at all while issuing a log statement.
     { 
         let mut sp = serial_port.lock();
-        bytes_read = sp.in_bytes(&mut buf);
+        base_port = sp.base_port_address();
+        bytes_read = sp.in_bytes(&mut buf.data);
         if bytes_read > 0 {
             if let Some(ref sender) = sp.data_sender {
-                send_result = sender.try_send((bytes_read as u8, buf));
+                buf.len = bytes_read as u8;
+                send_result = sender.try_send(buf);
             } else {
                 input_was_ignored = true;
             }
         } else {
             // This was a "false" interrupt, no data was actually received.
-            return;
+            return Ok(());
         }
     }
 
-    use fmt::Write;
     if let Err(e) = send_result {
-        let _result = write!(
-            &mut serial_port.lock(),
-            "\x1b[31mError: failed to send data received for serial port {:?}: {:?}.\x1b[0m\n",
-            serial_port_address, e.1
-        );
+        error!("Failed to send data received for serial port at {:#X}: {:?}.", base_port, e.1);
     }
 
     if input_was_ignored {
         if let Some(sender) = NEW_CONNECTION_NOTIFIER.get() {
-            let _result = write!(
-                &mut serial_port.lock(),
-                "\x1b[36mRequesting new console to be spawned for this serial port ({:?})\x1b[0m\n",
-                serial_port_address
-            );
-            if let Err(err) = sender.try_send(serial_port_address) {
-                let _result = write!(
-                    &mut serial_port.lock(),
-                    "\x1b[31mError sending request for new console to be spawned for this serial port ({:?}): {:?}\x1b[0m\n",
-                    serial_port_address, err
-                );
+            info!("Requesting new console to be spawned for this serial port ({:#X})", base_port);
+            if let Ok(serial_port_address) = SerialPortAddress::try_from(base_port) {
+                if let Err(err) = sender.try_send(serial_port_address) {
+                    error!("Error sending request for new console to be spawned for this serial port ({:#X}): {:?}",
+                        base_port, err
+                    );
+                }
+            } else {
+                error!("Error: base port {:#X} was not a known serial port address.", base_port);
             }
         } else {
-            let _result = write!(
-                &mut serial_port.lock(),
-                "\x1b[33mWarning: no connection detector; ignoring {}-byte input read from serial port {:?}: {:X?}\x1b[0m\n",
-                bytes_read, serial_port_address, &buf[..bytes_read]
+            warn!("Warning: no connection detector; ignoring {}-byte input read from serial port {:#X}.",
+                bytes_read, base_port
             );
         }
     }
+
+    Ok(())
 }
 
-/// A chunk of data read from a serial port
-/// that will be transmitted to a receiver.
-pub type DataChunk = (u8, [u8; u8::MAX as usize]);
-
-
-
-/// IRQ 0x23: COM2 serial port interrupt handler.
+/// A chunk of data read from a serial port that will be transmitted to a receiver.
 ///
-/// Note: this IRQ may also be used for COM4, but I haven't seen a machine with a COM4 port yet.
-extern "x86-interrupt" fn com2_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // trace!("COM2 serial handler");
-    handle_receive_interrupt(SerialPortAddress::COM2);
-    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x3));
+/// For performance, this type is sized to and aligned to 64-byte boundaries 
+/// such that it fits in a cache line. 
+#[repr(align(64))]
+pub struct DataChunk {
+    pub len: u8,
+    pub data: [u8; (64 - 1)],
+}
+const_assert_eq!(core::mem::size_of::<DataChunk>(), 64);
+const_assert_eq!(core::mem::align_of::<DataChunk>(), 64);
+impl DataChunk {
+    /// Returns a new `DataChunk` filled with zeroes that can be written into.
+    pub const fn empty() -> Self {
+        DataChunk { len: 0, data: [0; (64 - 1)] }
+    }
 }
 
+/// A closure specifying the action that will be taken when a serial port interrupt occurs
+/// (for COM1 or COM3 interrupts, since they share an IRQ line).
+static INTERRUPT_ACTION_COM1_COM3: Once<Box<dyn Fn() + Send + Sync>> = Once::new();
+/// A closure specifying the action that will be taken when a serial port interrupt occurs
+/// (for COM2 or COM4 interrupts, since they share an IRQ line).
+static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new();
 
-/// IRQ 0x24: COM1 serial port interrupt handler.
-///
-/// Note: this IRQ may also be used for COM3, but I haven't seen a machine with a COM3 port yet.
-extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // trace!("COM1 serial handler");
-    handle_receive_interrupt(SerialPortAddress::COM1);
+
+/// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
+extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+    // trace!("COM1/COM3 serial handler");
+    if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
+        func();
+    }
     interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x4));
+}
+
+/// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
+extern "x86-interrupt" fn com2_com4_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+    // trace!("COM2/COM4 serial handler");
+    if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
+        func();
+    }
+    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x3));
 }

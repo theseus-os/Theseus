@@ -78,6 +78,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         ).map(|arc_ref| arc_ref.clone());
 
     logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
+    info!("Initialized full logger.");
 
     // Ensure that COM1 is initialized, even if it wasn't used in [`logger::early_init()`].
     if let Some(com1) = take_serial_port_basic(SerialPortAddress::COM1) {

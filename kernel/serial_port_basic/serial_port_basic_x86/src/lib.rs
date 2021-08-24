@@ -90,8 +90,8 @@ impl TryFrom<u16> for SerialPortAddress {
     }
 }
 
-/// This type is used to ensure that an object of type `T` is only initialized once
-/// but allows for a caller to take ownership of the object `T`. 
+/// This type is used to ensure that an object of type `T` is only initialized once,
+/// but still allows for a caller to take ownership of the object `T`. 
 enum TriState<T> {
     Uninited,
     Inited(T),
@@ -108,6 +108,8 @@ impl<T> TriState<T> {
     }
 }
 
+// Serial ports cannot be reliably probed (discovered dynamically), thus,
+// we ensure they are exposed safely as singletons through the below static instances.
 static COM1_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
 static COM2_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
 static COM3_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
