@@ -1101,10 +1101,12 @@ name = "interrupt_tasks"
 version = "0.1.0"
 dependencies = [
  "async_channel",
+ "debugit",
  "interrupts",
  "irq_safety",
  "log",
  "mpmc",
+ "scheduler",
  "spawn",
  "spin 0.9.0",
  "task",
@@ -2459,6 +2461,7 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "bare-io",
+ "interrupt_tasks",
  "interrupts",
  "irq_safety",
  "log",

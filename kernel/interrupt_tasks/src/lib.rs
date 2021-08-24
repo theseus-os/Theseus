@@ -46,6 +46,7 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
+#![feature(never_type)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -55,72 +56,134 @@ extern crate mpmc;
 extern crate x86_64;
 extern crate task;
 extern crate spawn;
+extern crate scheduler;
+#[macro_use] extern crate debugit;
 extern crate async_channel;
 extern crate interrupts;
 
 
 use alloc::string::String;
-use task::TaskRef;
-use x86_64::structures::idt::{Idt, LockedIdt, ExceptionStackFrame, HandlerFunc};
+use task::{TaskRef, get_my_current_task};
+use x86_64::structures::idt::{ExceptionStackFrame};
 
 
 
 pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 
 
-pub fn register_interrupt_handler<DF, S>(
+pub enum InterruptRegistrationError {
+    AlreadyTaken {
+        irq: u8,
+        existing_handler_address: u64
+    },
+    SpawnFail(&'static str),
+}
+
+
+/// Registers an interrupt handler and a deferred task to handle
+/// the longer-running tasks related to that interrupt in an asynchronous context.
+///
+/// The function fails if the interrupt number is already in use. 
+/// 
+/// # Arguments 
+/// * `interrupt_num`: the interrupt number (IRQ vector) that is being requested.
+/// * `interrupt_handler`: the handler to be registered,
+///    which will be invoked when the interrupt occurs.
+/// * `deferred_interrupt_action`: the closure/function callback that will be invoked
+///    in an asynchronous manner after the `interrupt_handler` runs. 
+/// * `deferred_action_argument`: the argument that will be passed to the above
+///    `deferred_interrupt_action` function.
+/// 
+/// TODO: further document how the `deferred_interrupt_action` is actually invoked in a loop
+///       and what happens in between each invocation.
+///       Essentially, the returned `Task` runs an infinite loop that will sleep until notified
+///       by the given `interrupt_handler`. 
+///       When woken up, the task loop invokes the `deferred_interrupt_action`
+///       and then puts itself back to sleep (blocking itself) when the `deferred_interrupt_action`
+///       is complete and returns. 
+///       This avoids the need for the `deferred_interrupt_action` to manually handle repeated calls
+///       in and amongst the sleep/wake behavior.
+///
+///
+/// It is the caller's responsibility to notify or otherwise wake up the deferred interrupt task
+/// in the given `interrupt_handler` (or elsewhere, arbitrarily). 
+/// WIthout doing this, the `deferred_interrupt_action` will never be invoked.
+/// The returned [`TaskRef`] is useful for doing this, as you can `unblock` it when it needs to run,
+/// e.g., when an interrupt has occurred.
+///
+/// # Return
+/// * `Ok(TaskRef)` if successfully registered, in which the returned task is the long-running
+///    loop that repeatedly invokes the given `deferred_interrupt_action`.
+/// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
+pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
     interrupt_number: u8,
-    interrupt_handler_function: InterruptHandlerFunction,
-    deferred_task_function: DF,
+    interrupt_handler: InterruptHandlerFunction,
+    deferred_interrupt_action: DIA,
+    deferred_action_argument: Arg,
     deferred_task_name: Option<S>,
-) -> Result<TaskRef, &'static str> 
-    where DF: Fn(()),
+) -> Result<TaskRef, InterruptRegistrationError> 
+    where DIA: Fn(&Arg) -> Result<Success, Failure> + Send + 'static,
+          Arg: Send + 'static,
           S: Into<String>,
 {
     // First, attempt to register the interrupt handler.
-    interrupts::register_interrupt(interrupt_number, interrupt_handler_function).map_err(|_e| 
-        "register_interrupt_handler(): interrupt number was already taken! Sharing IRQs is currently unsupported."
-    )?;
+    interrupts::register_interrupt(interrupt_number, interrupt_handler)
+        .map_err(|existing_handler_address| {
+            error!("Interrupt number {:#X} was already taken by handler at {:#X}! Sharing IRQs is currently unsupported.",
+                interrupt_number, existing_handler_address
+            );
+            InterruptRegistrationError::AlreadyTaken {
+                irq: interrupt_number,
+                existing_handler_address,
+            }
+        })?;
 
     // Spawn the deferred task, which should be initially blocked from running.
     // It will be unblocked by the interrupt handler whenever it needs to run.
-    let mut tb = spawn::new_task_builder(deferred_task_function, ())
-        .block();
+    let mut tb = spawn::new_task_builder(
+        deferred_task_entry_point::<DIA, Arg, Success, Failure>,
+        (deferred_interrupt_action, deferred_action_argument),
+    ).block();
     if let Some(name) = deferred_task_name {
         tb = tb.name(name.into());
     }
-    tb.spawn()
+    tb.spawn().map_err(|e| InterruptRegistrationError::SpawnFail(e))
 }
 
 
-fn test_registration() {
-    
-}
 
+/// The entry point for a new deferred interrupt task.
+///
+/// Note: we could use restartable tasks for this, but the current requirement
+/// of the function itself and its arguments being `Clone`able may be overly restrictive. 
+fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
+    (deferred_interrupt_action, deferred_action_argument): (DIA, Arg),
+) -> ! 
+    where DIA: Fn(&Arg) -> Result<Success, Failure>,
+          Arg: Send + 'static,
+{
+    let curr_task = get_my_current_task().expect("BUG: deferred_task_entry_point: couldn't get current task.");
+    trace!("Entered {:?}:\n\t action: {:?}\n\t arg:    {:?}", 
+        curr_task.name, debugit!(deferred_interrupt_action), debugit!(deferred_action_argument)
+    );
 
-/*
-mod test {
-    use crate::*;
-
-    static 
-
-    pub fn test() {
-
+    loop {
+        let _res = deferred_interrupt_action(&deferred_action_argument);
+        // Note: here, upon failure, we could return from this loop task entirely instead of just logging the error.
+        // Or, we could accept a boolean/cfg that determines whether we should bail or continue looping.
+        
+        // match _res {
+        //     Ok(success) => debug!("Deferred interrupt action returned success: {:?}", debugit!(success)),
+        //     Err(failure) => error!("Deferred interrupt action returned failure: {:?}", debugit!(failure)),
+        // }
+        
+        curr_task.block();
+        scheduler::schedule();
     }
-
-
-    pub extern "x86-interrupt" fn test_interrupt_handler<F, R>(_stack_frame: &mut ExceptionStackFrame) 
-        where F: Fn() -> Option<R>
-    {
-
-
-        debug!("Hello from test_interrupt_handler");
-    }
 }
-*/
 
 
 extern "x86-interrupt" fn test_interrupt_handler<const IRQ: u8>(_stack_frame: &mut ExceptionStackFrame) {
-
     trace!("top of test_interrupt_handler for IRQ {:#X}", IRQ);
+    
 }

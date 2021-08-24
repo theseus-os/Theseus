@@ -20,6 +20,9 @@ git = "https://github.com/theseus-os/irq_safety"
 [dependencies.interrupts]
 path = "../interrupts"
 
+[dependencies.interrupt_tasks]
+path = "../interrupt_tasks"
+
 # Dependencies below here are temporary, for console creation testing.
 [dependencies.async_channel]
 path = "../async_channel"

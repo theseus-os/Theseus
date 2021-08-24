@@ -19,11 +19,17 @@ path = "../text_terminal"
 [dependencies.task]
 path = "../task"
 
+[dependencies.scheduler]
+path = "../scheduler"
+
 [dependencies.spawn]
 path = "../spawn"
 
 [dependencies.interrupts]
 path = "../interrupts"
+
+[dependencies.debugit]
+path = "../../libs/debugit"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
