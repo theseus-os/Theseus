@@ -202,12 +202,18 @@
 <span id="199">199</span>
 <span id="200">200</span>
 <span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A ZoneAllocator to allocate arbitrary object sizes (up to `ZoneAllocator::MAX_ALLOC_SIZE`)</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The ZoneAllocator achieves this by having many `SCAllocator`</span>
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::sc</span>::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// Creates an instance of a zone, we do this in a macro because we</span>
 <span class="doccomment">/// re-use the code in const and non-const functions</span>
@@ -377,7 +383,11 @@
     <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">///  * `ptr` - Address of the memory location to free.</span>
     <span class="doccomment">///  * `layout` - Memory layout of the block pointed to by `ptr`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]</span>
+    <span class="doccomment">/// and `layout` argument is correct.</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="ident">ZoneAllocator::get_slab</span>(<span class="ident">layout</span>.<span class="ident">size</span>()) {
             <span class="ident">Slab::Base</span>(<span class="ident">idx</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">small_slabs</span>[<span class="ident">idx</span>].<span class="ident">deallocate</span>(<span class="ident">ptr</span>, <span class="ident">layout</span>),
             <span class="ident">Slab::Large</span>(<span class="ident">_idx</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="string">&quot;AllocationError::InvalidLayout&quot;</span>),

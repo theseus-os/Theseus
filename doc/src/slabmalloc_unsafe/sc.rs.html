@@ -324,7 +324,6 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
-<span id="324">324</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A SCAllocator that can allocate fixed size objects.</span>
 
@@ -414,11 +413,6 @@
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;unstable&quot;</span>))]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SCAllocator</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">P</span><span class="op">&gt;</span> {
         <span class="macro">new_sc_allocator!</span>(<span class="ident">size</span>)
-    }
-
-    <span class="doccomment">/// Returns the maximum supported object size of this allocator.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">size</span>
     }
 
     <span class="doccomment">/// Add page to partial list.</span>
@@ -615,7 +609,11 @@
     <span class="doccomment">/// May return an error in case an invalid `layout` is provided.</span>
     <span class="doccomment">/// The function may also move internal slab pages between lists partial -&gt; empty</span>
     <span class="doccomment">/// or full -&gt; partial lists.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]</span>
+    <span class="doccomment">/// and `layout` argument is correct.</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="macro">assert!</span>(<span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">size</span>);
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">size</span> <span class="op">&lt;</span><span class="op">=</span> (<span class="ident">P::SIZE</span> <span class="op">-</span> <span class="ident">CACHE_LINE_SIZE</span>));
         <span class="comment">// trace!(</span>
@@ -630,8 +628,8 @@
 
         <span class="comment">// Figure out which page we are on and construct a reference to it</span>
         <span class="comment">// TODO: The linked list will have another &amp;mut reference</span>
-        <span class="kw">let</span> <span class="ident">slab_page</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">mem::transmute</span>::<span class="op">&lt;</span><span class="ident">VAddr</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span><span class="op">&gt;</span>(<span class="ident">page</span>) };
-        <span class="kw">let</span> <span class="ident">new_layout</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Layout::from_size_align_unchecked</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">layout</span>.<span class="ident">align</span>()) };
+        <span class="kw">let</span> <span class="ident">slab_page</span> <span class="op">=</span> <span class="ident">mem::transmute</span>::<span class="op">&lt;</span><span class="ident">VAddr</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">P</span><span class="op">&gt;</span>(<span class="ident">page</span>);
+        <span class="kw">let</span> <span class="ident">new_layout</span> <span class="op">=</span> <span class="ident">Layout::from_size_align_unchecked</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">layout</span>.<span class="ident">align</span>());
 
         <span class="kw">let</span> <span class="ident">slab_page_was_full</span> <span class="op">=</span> <span class="ident">slab_page</span>.<span class="ident">is_full</span>();
         <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">slab_page</span>.<span class="ident">deallocate</span>(<span class="ident">ptr</span>, <span class="ident">new_layout</span>);

@@ -334,7 +334,6 @@
 <span id="331">331</span>
 <span id="332">332</span>
 <span id="333">333</span>
-<span id="334">334</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A SCAllocator that can allocate fixed size objects.</span>
 
@@ -423,11 +422,6 @@
     <span class="doccomment">/// After initialization, the length of the list won&#39;t exceed the capacity. </span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SCAllocator</span> {
         <span class="macro">new_sc_allocator!</span>(<span class="ident">size</span>)
-    }
-
-    <span class="doccomment">/// Returns the maximum supported object size of this allocator.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">size</span>
     }
 
     <span class="doccomment">/// Add a page to the partial list</span>
@@ -616,7 +610,11 @@
     <span class="doccomment">/// May return an error in case an invalid `layout` is provided.</span>
     <span class="doccomment">/// The function may also move internal slab pages between lists partial -&gt; empty</span>
     <span class="doccomment">/// or full -&gt; partial lists.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]</span>
+    <span class="doccomment">/// and `layout` argument is correct.</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">deallocate</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">ptr</span>: <span class="ident">NonNull</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="ident">layout</span>: <span class="ident">Layout</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="macro">assert!</span>(<span class="ident">layout</span>.<span class="ident">size</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">size</span>);
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">size</span> <span class="op">&lt;</span><span class="op">=</span> (<span class="ident">MappedPages8k::SIZE</span> <span class="op">-</span> <span class="ident">CACHE_LINE_SIZE</span>));
         <span class="comment">// trace!(</span>
@@ -632,7 +630,7 @@
             .<span class="ident">ok_or</span>(<span class="string">&quot;pointer to deallocate was an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// Figure out which page we are on and retrieve a reference to it</span>
-        <span class="kw">let</span> <span class="ident">new_layout</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Layout::from_size_align_unchecked</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">layout</span>.<span class="ident">align</span>()) };
+        <span class="kw">let</span> <span class="ident">new_layout</span> <span class="op">=</span> <span class="ident">Layout::from_size_align_unchecked</span>(<span class="self">self</span>.<span class="ident">size</span>, <span class="ident">layout</span>.<span class="ident">align</span>());
 
         <span class="kw">let</span> (<span class="ident">ret</span>, <span class="ident">slab_page_is_empty</span>, <span class="ident">slab_page_was_full</span>, <span class="ident">list_id</span>) <span class="op">=</span> {
             <span class="comment">// find slab page from partial slabs</span>
