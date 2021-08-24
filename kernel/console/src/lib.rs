@@ -107,8 +107,8 @@ fn console_entry<I, O>(
 	loop {
 		// Block until we receive the next data chunk from the sender.
 		match input_receiver.receive() {
-			Ok((num_bytes, data)) => {
-				let _res = console.terminal.handle_input(&mut &data[.. (num_bytes as usize)]);
+			Ok(DataChunk { len, data }) => {
+				let _res = console.terminal.handle_input(&mut &data[.. (len as usize)]);
 			}
 			Err(_e) => {
 				error!("[LIKELY BUG] Error receiving input data on {:?}: {:?}. Retrying...",
