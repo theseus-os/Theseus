@@ -1,5 +1,6 @@
 [package]
 name = "serial_port_basic_arm"
+description = "Standalone, basic driver for ARM Cortex-M4 serial ports (e.g., COM1, COM) with minimal dependencies"
 version = "0.1.0"
 
 [dependencies]

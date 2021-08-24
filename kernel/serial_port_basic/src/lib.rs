@@ -18,7 +18,11 @@ cfg_if ! {
 	}
 
 	else if #[cfg(target_arch = "arm")] {
-		extern crate serial_port_arm;
-		pub use serial_port_arm::{get_serial_port, SerialPort, SerialPortAddress};
+		extern crate serial_port_basic_arm;
+		pub use serial_port_arm::{
+			take_serial_port, 
+			SerialPort, 
+			SerialPortAddress
+		};
 	}
 }
