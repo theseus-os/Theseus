@@ -14,10 +14,10 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
-#![feature(impl_trait_in_bindings)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
+#[macro_use] extern crate static_assertions;
 extern crate spin;
 extern crate irq_safety;
 extern crate interrupts;
@@ -37,7 +37,7 @@ use alloc::{boxed::Box, sync::Arc};
 use core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
-use interrupts::{IRQ_BASE_OFFSET, register_interrupt};
+use interrupts::IRQ_BASE_OFFSET;
 use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
 
 // Dependencies below here are temporary and will be removed
@@ -196,7 +196,7 @@ impl SerialPort {
                     Err(_) => warn!("Registering interrupt handler for unknown serial port at {:#X}", base_port),
                 };                
             }
-            Err(InterruptRegistrationError::AlreadyTaken { irq, existing_handler_address }) => {
+            Err(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) => {
                 if existing_handler_address != interrupt_handler as u64 {
                     error!("Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
                         Existing interrupt handler was a different handler, at address {:#X}.",
@@ -204,7 +204,7 @@ impl SerialPort {
                     );
                 }
             }
-            Err(InterruptRegistrationError::SpawnFail(e)) => return Err(e),
+            Err(InterruptRegistrationError::SpawnError(e)) => return Err(e),
         }
 
         Ok(())
@@ -277,24 +277,23 @@ impl fmt::Write for SerialPort {
 fn serial_port_receive_deferred(
     serial_port: &Arc<MutexIrqSafe<SerialPort>>
 ) -> Result<(), ()> {
-    // Important notes:
-    //  * We read a chunk of multiple bytes at once.
-    //  * We shouldn't hold the serial port lock for long periods,
-    //    and we cannot hold it at all while issuing a log statement.
-    let mut buf = [0; u8::MAX as usize];
+    let mut buf = DataChunk::empty();
     let bytes_read;
     let base_port;
     
     let mut input_was_ignored = false;
     let mut send_result = Ok(());
 
+    // We shouldn't hold the serial port lock for long periods of time,
+    // and we cannot hold it at all while issuing a log statement.
     { 
         let mut sp = serial_port.lock();
         base_port = sp.base_port_address();
-        bytes_read = sp.in_bytes(&mut buf);
+        bytes_read = sp.in_bytes(&mut buf.data);
         if bytes_read > 0 {
             if let Some(ref sender) = sp.data_sender {
-                send_result = sender.try_send((bytes_read as u8, buf));
+                buf.len = bytes_read as u8;
+                send_result = sender.try_send(buf);
             } else {
                 input_was_ignored = true;
             }
@@ -304,37 +303,25 @@ fn serial_port_receive_deferred(
         }
     }
 
-    use fmt::Write;
     if let Err(e) = send_result {
-        let _ = write!(&mut serial_port.lock(),
-            "\x1b[31mError: failed to send data received for serial port at {:#X}: {:?}.\x1b[0m\n",
-            base_port, e.1
-        );
+        error!("Failed to send data received for serial port at {:#X}: {:?}.", base_port, e.1);
     }
 
     if input_was_ignored {
         if let Some(sender) = NEW_CONNECTION_NOTIFIER.get() {
-            let _ = write!(&mut serial_port.lock(),
-                "\x1b[36mRequesting new console to be spawned for this serial port ({:#X})\x1b[0m\n",
-                base_port
-            );
+            info!("Requesting new console to be spawned for this serial port ({:#X})", base_port);
             if let Ok(serial_port_address) = SerialPortAddress::try_from(base_port) {
                 if let Err(err) = sender.try_send(serial_port_address) {
-                    let _ = write!(&mut serial_port.lock(),
-                        "\x1b[31mError sending request for new console to be spawned for this serial port ({:#X}): {:?}\x1b[0m\n",
+                    error!("Error sending request for new console to be spawned for this serial port ({:#X}): {:?}",
                         base_port, err
                     );
                 }
             } else {
-                let _ = write!(&mut serial_port.lock(),
-                    "\x1b[31mError: base port {:#X} was not a known serial port address.\x1b[0m\n",
-                    base_port,
-                );
+                error!("Error: base port {:#X} was not a known serial port address.", base_port);
             }
         } else {
-            let _ = write!(&mut serial_port.lock(),
-                "\x1b[33mWarning: no connection detector; ignoring {}-byte input read from serial port {:#X}: {:X?}\x1b[0m\n",
-                bytes_read, base_port, &buf[..bytes_read]
+            warn!("Warning: no connection detector; ignoring {}-byte input read from serial port {:#X}.",
+                bytes_read, base_port
             );
         }
     }
@@ -342,10 +329,23 @@ fn serial_port_receive_deferred(
     Ok(())
 }
 
-/// A chunk of data read from a serial port
-/// that will be transmitted to a receiver.
-pub type DataChunk = (u8, [u8; u8::MAX as usize]);
-
+/// A chunk of data read from a serial port that will be transmitted to a receiver.
+///
+/// For performance, this type is sized to and aligned to 64-byte boundaries 
+/// such that it fits in a cache line. 
+#[repr(align(64))]
+pub struct DataChunk {
+    pub len: u8,
+    pub data: [u8; (64 - 1)],
+}
+const_assert_eq!(core::mem::size_of::<DataChunk>(), 64);
+const_assert_eq!(core::mem::align_of::<DataChunk>(), 64);
+impl DataChunk {
+    /// Returns a new `DataChunk` filled with zeroes that can be written into.
+    pub const fn empty() -> Self {
+        DataChunk { len: 0, data: [0; (64 - 1)] }
+    }
+}
 
 /// A closure specifying the action that will be taken when a serial port interrupt occurs
 /// (for COM1 or COM3 interrupts, since they share an IRQ line).

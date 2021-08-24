@@ -2467,6 +2467,7 @@ dependencies = [
  "log",
  "serial_port_basic",
  "spin 0.9.0",
+ "static_assertions",
  "x86_64",
 ]
 
