@@ -568,6 +568,24 @@ name = "debugit"
 version = "0.1.0"
 
 [[package]]
+name = "deferred_interrupt_tasks"
+version = "0.1.0"
+dependencies = [
+ "async_channel",
+ "debugit",
+ "interrupts",
+ "irq_safety",
+ "log",
+ "mpmc",
+ "scheduler",
+ "spawn",
+ "spin 0.9.0",
+ "task",
+ "text_terminal",
+ "x86_64",
+]
+
+[[package]]
 name = "delegate"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1094,24 +1112,6 @@ dependencies = [
  "memory",
  "volatile",
  "zerocopy",
-]
-
-[[package]]
-name = "interrupt_tasks"
-version = "0.1.0"
-dependencies = [
- "async_channel",
- "debugit",
- "interrupts",
- "irq_safety",
- "log",
- "mpmc",
- "scheduler",
- "spawn",
- "spin 0.9.0",
- "task",
- "text_terminal",
- "x86_64",
 ]
 
 [[package]]
@@ -2461,7 +2461,7 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "bare-io",
- "interrupt_tasks",
+ "deferred_interrupt_tasks",
  "interrupts",
  "irq_safety",
  "log",

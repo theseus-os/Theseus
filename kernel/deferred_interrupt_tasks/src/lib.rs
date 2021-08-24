@@ -1,15 +1,14 @@
-//! Abstractions for deferred interrupt handler tasks.
+//! Abstractions for deferred interrupt tasks, a companion to regular interrupt handlers.
 //!
-//! Deferred interrupt handler tasks are similar to the concept of
-//! "top half" and "bottom half" interrupt handlers in other OSes,
-//! in which the top half is the short, latency-sensitive function
-//! that runs immediately when the interrupt request is serviced,
-//! while the bottom half is the more complex function that runs 
-//! in a deferred manner to handle longer operations.
+//! Deferred interrupt tasks are similar to the concept of "top half" and "bottom half"
+//! interrupt handlers in other OSes, in which the top half is the short, latency-sensitive
+//! function that runs immediately when the interrupt request is serviced,
+//! while the bottom half is the more complex function that runs in a deferred manner
+//! to handle longer operations.
 //! Other terminology is often used, including "first-level" and
 //! "second-level" interrupt handlers, or "hard" and "soft" interrupt handlers.
 //!
-//! That being said, this implementation of deferred interrupt handler tasks
+//! That being said, this implementation of deferred interrupt tasks
 //! differs from both tasklets and workqueues in Linux.
 //! We also do not use the "top half" or "bottom half" terminology
 //! because it is confusing and difficult to remember which is which.
@@ -29,8 +28,8 @@
 //!    optionally providing details about what work it needs to do,
 //!  * Acknowledges the interrupt such that the hardware knows it was handled.  
 //!
-//! The deferred handler task is tied directly to a single interrupt handler 
-//! in a 1-to-1 manner at the time of creation. 
+//! The deferred task is tied directly to a single interrupt handler in a 1-to-1 manner
+//! at the time of creation, which occurs in [`register_interrupt_handler()`].
 //! Therefore, it is both efficient and easy to use. 
 //! In the simplest of cases, such as a serial port device, the interrupt handler
 //! only needs to mark the deferred task as unblocked (runnable)

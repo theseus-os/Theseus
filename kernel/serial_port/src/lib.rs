@@ -21,12 +21,12 @@
 extern crate spin;
 extern crate irq_safety;
 extern crate interrupts;
-extern crate interrupt_tasks;
+extern crate deferred_interrupt_tasks;
 extern crate bare_io;
 extern crate x86_64;
 extern crate serial_port_basic;
 
-use interrupt_tasks::InterruptRegistrationError;
+use deferred_interrupt_tasks::InterruptRegistrationError;
 pub use serial_port_basic::{
     SerialPortAddress,
     SerialPort as SerialPortBasic,
@@ -165,7 +165,7 @@ impl SerialPort {
         };
 
         // Register the interrupt handler for this serial port. 
-        let registration_result = interrupt_tasks::register_interrupt_handler(
+        let registration_result = deferred_interrupt_tasks::register_interrupt_handler(
             interrupt_number,
             interrupt_handler,
             serial_port_receive_deferred,
