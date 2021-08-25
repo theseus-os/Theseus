@@ -112,7 +112,7 @@ cfg_if ! {
         }
 
         impl SerialPort {
-            pub fn new() -> SerialPort {
+            fn new() -> SerialPort {
                 SerialPort
             }
         } 

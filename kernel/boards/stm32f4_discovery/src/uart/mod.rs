@@ -124,7 +124,7 @@ fn uart_init() {
 pub struct SerialPort;
 
 impl SerialPort {
-    pub fn new() ->  SerialPort {
+    fn new() ->  SerialPort {
         uart_init();
         SerialPort
     }
