@@ -40,17 +40,15 @@ GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 RUSTC_VERSION := $(shell cat rust-toolchain)
-check_rustc:
-ifdef RUSTUP_TOOLCHAIN
-	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
-	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
-endif
+check-rustc:
 ## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
 ## If it still doesn't work, issue an error, since 'rustup' is probably missing.
-	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || (\
-	echo -e "\nError: 'rustup' isn't installed.";\
-	echo -e "Please install rustup and try again.\n";\
-	exit 1)
+	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || \
+	(\
+		echo -e "\nError: 'rustup' isn't installed.";\
+		echo -e "Please install rustup and try again.\n";\
+		exit 1 \
+	)
 
 
 
@@ -109,12 +107,14 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
-		check_rustc \
-		clean run run_pause iso build cargo grub \
+		check-rustc check-usb \
+		clean clean-doc clean-old-build \
+		run run_pause iso build cargo grub \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs book view-book clean-doc
+		gdb \
+		doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -131,7 +131,7 @@ iso: $(iso)
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): build
+$(iso): clean-old-build build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
@@ -202,7 +202,7 @@ endif
 
 
 ## This target invokes the actual Rust build process
-cargo: check_rustc 
+cargo: check-rustc 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
@@ -334,12 +334,20 @@ $(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
 
 
 
-### Removes all built source files
+### Removes the build directory and all compiled Rust objects.
 clean:
-	cargo clean
 	@rm -rf $(BUILD_DIR)
+	cargo clean
 	
 
+### Removes only the old files that were copied into the build directory from a previous build.
+### This is necessary to avoid lingering build files that aren't relevant to a new build,
+### and would thus cause incremental re-builds to not work correctly.
+### All other build files are left intact.
+clean-old-build:
+	@rm -rf $(OBJECT_FILES_BUILD_DIR)
+	@rm -rf $(DEPS_DIR)
+	@rm -rf $(DEBUG_SYMBOLS_DIR)
 
 
 # ## (This is currently not used in Theseus, since we don't run anything in userspace)
@@ -379,7 +387,7 @@ clean:
 simd_personality_sse : export TARGET := x86_64-theseus
 simd_personality_sse : export BUILD_MODE = release
 simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_personality_sse
-simd_personality_sse: build_sse build
+simd_personality_sse: clean-old-build build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -399,7 +407,7 @@ simd_personality_avx : export TARGET := x86_64-theseus
 simd_personality_avx : export BUILD_MODE = release
 simd_personality_avx : export override THESEUS_CONFIG += simd_personality simd_personality_avx
 simd_personality_avx : export override CFLAGS += -DENABLE_AVX
-simd_personality_avx: build_avx build
+simd_personality_avx: clean-old-build build_avx build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -461,7 +469,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
 doc: export override RUSTDOCFLAGS += -A private_intra_doc_links
-doc: check_rustc
+doc: check-rustc
 ## Build the docs for select library crates, namely those not hosted online.
 ## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
@@ -759,7 +767,7 @@ bochs: $(iso)
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
-check_usb:
+check-usb:
 ## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app.
 ifeq ($(IS_WSL), ) ## if we're not on WSL...
 ## now we need to check that the user has specified a USB drive that actually exists, not a partition of a USB drive.
@@ -776,7 +784,7 @@ endif  ## end of checking for WSL
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 boot : export override THESEUS_CONFIG += mirror_log_to_vga
-boot: check_usb $(iso)
+boot: check-usb $(iso)
 ifneq ($(IS_WSL), )
 ## building on WSL
 	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."
