@@ -23,7 +23,7 @@ extern crate cfg_if;
 cfg_if ! {
     if #[cfg(target_vendor = "stm32f407")] {
         extern crate stm32f4_discovery;
-        pub use stm32f4_discovery::uart::{get_serial_port, SerialPort, SerialPortAddress};
+        pub use stm32f4_discovery::uart::{take_serial_port, SerialPort, SerialPortAddress};
     } 
 
     // Dummy implementation for when no physical device is present, in which case semihosting will be used
@@ -37,23 +37,79 @@ cfg_if ! {
         use irq_safety::MutexIrqSafe;
         use spin::Once;
         
-        #[derive(Copy, Clone, Debug)]
+        /// Represents the serial ports available for use.
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         pub enum SerialPortAddress {
+            /// In this case, we are using semihosting as a dummy implementation of
+            /// serial ports, so there is only the single dummy address Semihost
             Semihost,
         }
 
-        static SEMIHOSTING_DUMMY_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
-
-        pub fn get_serial_port(
-            serial_port_address: SerialPortAddress
-        ) -> &'static MutexIrqSafe<SerialPort> {
-            let sp = match serial_port_address {
-                SerialPortAddress::Semihost => &SEMIHOSTING_DUMMY_PORT,
-            };
-            sp.call_once(|| MutexIrqSafe::new(SerialPort::new()))
+        impl SerialPortAddress {
+            /// Returns a reference to the static instance of this serial port.
+            fn to_static_port(&self) -> &'static MutexIrqSafe<TriState<SerialPort>> {
+                match self {
+                    SerialPortAddress::Semihost => &SEMIHOSTING_DUMMY_PORT,
+                }
+            }
         }
 
+        /// This type is used to ensure that an object of type `T` is only initialized once,
+        /// but still allows for a caller to take ownership of the object `T`. 
+        enum TriState<T> {
+            Uninited,
+            Inited(T),
+            Taken,
+        }
+        impl<T> TriState<T> {
+            fn take(&mut self) -> Option<T> {
+                if let Self::Inited(_) = self {
+                    if let Self::Inited(v) = core::mem::replace(self, Self::Taken) {
+                        return Some(v);
+                    }
+                }
+                None
+            }
+        }
+
+        // Serial ports cannot be reliably probed (discovered dynamically), thus,
+        // we ensure they are exposed safely as singletons through the below static instances.
+        static SEMIHOSTING_DUMMY_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
+
+
+        /// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
+        ///
+        /// This function initializes the given serial port if it has not yet been initialized.
+        /// If the serial port has already been initialized and taken by another crate,
+        /// this returns `None`.
+        ///
+        /// The returned [`SerialPort`] will be restored to this crate upon being dropped.
+        pub fn take_serial_port(
+            serial_port_address: SerialPortAddress
+        ) -> Option<SerialPort> {
+            let sp = serial_port_address.to_static_port();
+            let mut locked = sp.lock();
+            if let TriState::Uninited = &*locked {
+                *locked = TriState::Inited(SerialPort::new());
+            }
+            locked.take()
+        }
+
+
+        /// The `SerialPort` struct implements the `Write` trait for use with logging capabilities
         pub struct SerialPort;
+
+        impl Drop for SerialPort {
+            fn drop(&mut self) {
+                let sp = SerialPortAddress::Semihost.to_static_port();
+                let mut sp_locked = sp.lock();
+                if let TriState::Taken = &*sp_locked {
+                    let dummy = SerialPort;
+                    let dropped = core::mem::replace(self, dummy);
+                    *sp_locked = TriState::Inited(dropped);
+                }
+            }
+        }
 
         impl SerialPort {
             pub fn new() -> SerialPort {
