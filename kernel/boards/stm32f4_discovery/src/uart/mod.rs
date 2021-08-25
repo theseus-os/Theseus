@@ -14,8 +14,13 @@ use stm32f4::stm32f407;
 /// Exposes the board's USART2
 pub static BOARD_USART2: Once<MutexIrqSafe<stm32f407::USART2>> = Once::new();
 
-#[derive(Copy, Clone, Debug)]
+/// All available UART addresses
+/// Note: Although the board technically supports traditional UARTs,
+/// it is better to utilize the board's USARTs, as they support a higher
+/// data transfer rate.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SerialPortAddress {
+    /// The STM32F407 USART2, which has a TX pin at pin PA2 and an RX pin at PIN PA3
     USART2,
 }
 impl TryFrom<&str> for SerialPortAddress {
@@ -28,8 +33,54 @@ impl TryFrom<&str> for SerialPortAddress {
 		}
 	}
 }
+impl SerialPortAddress {
+    /// Returns a reference to a static instance of this serial port.
+    fn to_static_port(&self) -> &'static MutexIrqSafe<TriState<SerialPort>> {
+        match self {
+            SerialPortAddress::USART2 => &USART2_SERIAL_PORT,
+        }
+    }
+}
 
-static USART2_SERIAL_PORT: Once<MutexIrqSafe<SerialPort>> = Once::new();
+/// This type is used to ensure that an object of type `T` is only initialized once,
+/// but still allows for a caller to take ownership of the object `T`. 
+enum TriState<T> {
+    Uninited,
+    Inited(T),
+    Taken,
+}
+impl<T> TriState<T> {
+    fn take(&mut self) -> Option<T> {
+        if let Self::Inited(_) = self {
+            if let Self::Inited(v) = core::mem::replace(self, Self::Taken) {
+                return Some(v);
+            }
+        }
+        None
+    }
+}
+
+// Serial ports cannot be reliably probed (discovered dynamically), thus,
+// we ensure they are exposed safely as singletons through the below static instances.
+static USART2_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
+
+/// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
+///
+/// This function initializes the given serial port if it has not yet been initialized.
+/// If the serial port has already been initialized and taken by another crate,
+/// this returns `None`.
+///
+/// The returned [`SerialPort`] will be restored to this crate upon being dropped.
+pub fn take_serial_port(
+    serial_port_address: SerialPortAddress
+) -> Option<SerialPort> {
+    let sp = serial_port_address.to_static_port();
+    let mut locked = sp.lock();
+    if let TriState::Uninited = &*locked {
+        *locked = TriState::Inited(SerialPort::new());
+    }
+    locked.take()
+}
 
 
 /// Initialize UART for use.
@@ -69,20 +120,28 @@ fn uart_init() {
     uart.cr1.modify(|_,w| w.te().bit(true).re().bit(true));
 }
 
-pub fn get_serial_port(
-    serial_port_address: SerialPortAddress
-) -> &'static MutexIrqSafe<SerialPort> {
-    let sp = match serial_port_address {
-        SerialPortAddress::USART2 => &USART2_SERIAL_PORT,
-    };
-    sp.call_once(|| {
+/// The `SerialPort` struct implements the `Write` trait for use with logging capabilities
+pub struct SerialPort;
+
+impl SerialPort {
+    pub fn new() ->  SerialPort {
         uart_init();
-        MutexIrqSafe::new(SerialPort::new())
-    })
+        SerialPort
+    }
 }
 
-/// The `SerialPort` struct implements the Write trait that is necessary for use with uprint! macro.
-pub struct SerialPort;
+impl Drop for SerialPort {
+    fn drop(&mut self) {
+        let sp = SerialPortAddress::USART2.to_static_port();
+        let mut sp_locked = sp.lock();
+        if let TriState::Taken = &*sp_locked {
+            let dummy = SerialPort;
+            let dropped = core::mem::replace(self, dummy);
+            *sp_locked = TriState::Inited(dropped);
+        }
+    }
+}
+
 
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -93,11 +152,5 @@ impl fmt::Write for SerialPort {
             uart.dr.write(|w| w.dr().bits(u16::from(*byte)));
         }
         Ok(())
-    }
-}
-
-impl SerialPort {
-    pub fn new() ->  SerialPort {
-        SerialPort
     }
 }

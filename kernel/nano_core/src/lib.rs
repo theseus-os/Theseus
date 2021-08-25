@@ -280,6 +280,7 @@ mod boot;
 
 use alloc::string::String;
 use memfs::MemFile;
+use core::array::IntoIter;
 
 
 extern "C" fn main() -> ! {
@@ -294,13 +295,13 @@ extern "C" fn main() -> ! {
     }
 
     #[cfg(target_vendor = "stm32f407")]
-    let default_logger_port = serial_port::SerialPortAddress::USART2;
+    let default_logger_port = serial_port_basic::SerialPortAddress::USART2;
 
     #[cfg(target_vendor = "unknown")]
-    let default_logger_port = serial_port::SerialPortAddress::Semihost;
+    let default_logger_port = serial_port_basic::SerialPortAddress::Semihost;
 
-    let logger_serial_ports = [serial_port::get_serial_port(default_logger_port)];  // some servers use COM2 instead. 
-    logger::init(None, &logger_serial_ports).unwrap();
+    let logger_serial_ports = [serial_port_basic::take_serial_port(default_logger_port)];  // some servers use COM2 instead. 
+    logger::early_init(None, IntoIter::new(logger_serial_ports).flatten()).unwrap();
 
     info!("memory and logging initialized");
 
