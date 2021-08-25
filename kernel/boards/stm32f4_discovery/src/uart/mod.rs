@@ -1,4 +1,4 @@
-//! Implements UART specific functionality for the STM32F4 Discovery Board 
+//! Implements UART specific functionality for the STM32F4 Discovery board.
 use crate::{
     gpio::BOARD_GPIOA, 
     rcc::BOARD_RCC,
@@ -11,16 +11,16 @@ use irq_safety::MutexIrqSafe;
 use spin::Once;
 use stm32f4::stm32f407;
 
-/// Exposes the board's USART2
+/// Exposes the board's USART2.
 pub static BOARD_USART2: Once<MutexIrqSafe<stm32f407::USART2>> = Once::new();
 
-/// All available UART addresses
+/// All available UART addresses.
 /// Note: Although the board technically supports traditional UARTs,
 /// it is better to utilize the board's USARTs, as they support a higher
 /// data transfer rate.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SerialPortAddress {
-    /// The STM32F407 USART2, which has a TX pin at pin PA2 and an RX pin at PIN PA3
+    /// The STM32F407 USART2, which has a TX pin at pin PA2 and an RX pin at pin PA3.
     USART2,
 }
 impl TryFrom<&str> for SerialPortAddress {
@@ -120,7 +120,7 @@ fn uart_init() {
     uart.cr1.modify(|_,w| w.te().bit(true).re().bit(true));
 }
 
-/// The `SerialPort` struct implements the `Write` trait for use with logging capabilities
+/// The [`SerialPort`] struct implements the `Write` trait for use with logging capabilities.
 pub struct SerialPort;
 
 impl SerialPort {

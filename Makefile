@@ -458,6 +458,8 @@ arm :
 		-o target/thumbv7em-none-eabi/theseus.bin \
 		target/thumbv7em-none-eabi/release/libnano_core.a
 
+### Build for the STM32F407 microcontroller. As opposed to the arm target above, compiling for this custom target
+### enables access to device peripherals and other hardware-specific features.
 arm-hardware : export override TARGET := thumbv7em-stm32f407-theseus-eabi 
 arm-hardware :
 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) -p nano_core --target $(TARGET)

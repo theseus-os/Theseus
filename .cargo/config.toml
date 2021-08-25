@@ -1,3 +1,8 @@
+# This configuration is necessary to override the build script of `cortex-m`,
+# which relies on hardcoded values that prevent it from linking necessary
+# libraries when building for custom targets.
+# Thus, we will link to the library located at `./prebuilts/cortex_m/thumbv7em`
+# For more information on overriding build scripts, see https://doc.rust-lang.org/cargo/reference/build-scripts.html#overriding-build-scripts
 [target.thumbv7em-stm32f407-theseus-eabi.cortex-m]
 rustc-link-lib = ["cortex-m"]
 rustc-link-search = ["../prebuilts/cortex_m/thumbv7em"]
