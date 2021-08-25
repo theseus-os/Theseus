@@ -8,21 +8,21 @@
 extern crate cfg_if;
 
 cfg_if ! {
-	if #[cfg(target_arch = "x86_64")] {
+    if #[cfg(target_arch = "x86_64")] {
         extern crate serial_port_basic_x86;
         pub use serial_port_basic_x86::{
             take_serial_port, 
             SerialPort, 
             SerialPortAddress,
         };
-	}
+    }
 
-	else if #[cfg(target_arch = "arm")] {
-		extern crate serial_port_basic_arm;
-		pub use serial_port_basic_arm::{
-			take_serial_port, 
-			SerialPort, 
-			SerialPortAddress
-		};
-	}
+    else if #[cfg(target_arch = "arm")] {
+        extern crate serial_port_basic_arm;
+        pub use serial_port_basic_arm::{
+            take_serial_port, 
+            SerialPort, 
+            SerialPortAddress
+        };
+    }
 }
