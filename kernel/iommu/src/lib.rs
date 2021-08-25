@@ -40,16 +40,14 @@ pub struct IntelIommu {
 /// Singleton representing IOMMU (TODO: could there be more than one IOMMU?)
 static IOMMU: Once<MutexIrqSafe<IntelIommu>> = Once::new();
 
-/// Initialization of the IOMMU occurs in two stages. In the first stage, the
-/// relevant ACPI tables are parsed and are used to configure internal data
-/// structures.
+/// Initialize the IOMMU driver and hardware.
 ///
 /// # Arguments
 /// * `host_address_width`: number of address bits available for DMA
 /// * `pci_segment_number`: PCI segment associated with this IOMMU
 /// * `register_base_address`: base address of register set
 /// * `page_table`: page table to install mapping
-pub fn early_init(host_address_width: u8, pci_segment_number: u16, register_base_address: PhysicalAddress, 
+pub fn init(host_address_width: u8, pci_segment_number: u16, register_base_address: PhysicalAddress, 
                     page_table: &mut PageTable) -> Result<(), &'static str> {
 
     info!("IOMMU Init stage 1 begin.");
@@ -100,21 +98,12 @@ pub fn early_init(host_address_width: u8, pci_segment_number: u16, register_base
     // initialize the iommu singleton with this object
     IOMMU.call_once(|| {MutexIrqSafe::new(iommu)});
 
-    info!("IOMMU Init stage 1 complete.");
-
-    Ok(())
-}
-
-/// Second stage of IOMMU initializion, must be called after early_init()
-pub fn init() -> Result<(), &'static str> {
-    info!("IOMMU Init stage 2 begin.");
-
     // Ensure translation is disabled.
     //
     // TODO: This can be removed, it's only purpose is to test that set_command_bit works
     set_command_bit(GlobalCommand::TE, false, |x: GlobalStatus| { ! x.intersects(GlobalStatus::TES) })?;
 
-    info!("IOMMU Init stage 2 complete.");
+    info!("IOMMU Init stage 1 complete.");
 
     Ok(())
 }

@@ -125,7 +125,7 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
                         else {
                             let register_base_address = PhysicalAddress::new(drhd.register_base_address() as usize)
                                                             .ok_or("IOMMU register_base_address was invalid")?;
-                            iommu::early_init(
+                            iommu::init(
                                 dmar_table.host_address_width(), drhd.segment_number(), 
                                 register_base_address, page_table)?;
                         }
