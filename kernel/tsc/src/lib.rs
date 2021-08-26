@@ -7,15 +7,18 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 
 #[derive(Debug)]
-pub struct TscTicks(u64);
+pub struct TscTicks(u128);
 
 impl TscTicks {
     /// Converts ticks to nanoseconds. 
-    /// Returns None if the TSC tick frequency is unavailable.
-    pub fn to_ns(&self) -> Option<u64> {
-         get_tsc_frequency().ok().map(|freq| {
-            (self.0 * 1000000000) / freq 
-         })
+    /// Returns `None` if the TSC tick frequency is unavailable 
+    /// or if overflow occured.
+    pub fn to_ns(&self) -> Option<u128> {
+        get_tsc_frequency()
+            .ok()
+            .and_then(|freq| self.0.checked_mul(1000000000)
+                    .map(|checked_tsc| checked_tsc / freq)
+            )
     }
 
     /// Checked subtraction. Computes `self - other`, 
@@ -33,7 +36,7 @@ impl TscTicks {
     }
 
     /// Get the inner value, the number of ticks.
-    pub fn into(self) -> u64 {
+    pub fn into(self) -> u128 {
         self.0
     }
 }
@@ -44,17 +47,17 @@ impl TscTicks {
 pub fn tsc_ticks() -> TscTicks {
     let mut val = 0;
     // SAFE: just reading TSC value
-    let ticks = unsafe { core::arch::x86_64::__rdtscp(&mut val) };
+    let ticks = unsafe { core::arch::x86_64::__rdtscp(&mut val) as u128 };
     TscTicks(ticks)
 }
 
 /// Returns the frequency of the TSC for the system, 
 /// currently measured using the PIT clock for calibration.
-pub fn get_tsc_frequency() -> Result<u64, &'static str> {
+pub fn get_tsc_frequency() -> Result<u128, &'static str> {
     // this is a soft state, so it's not a form of state spill
     static TSC_FREQUENCY: AtomicUsize = AtomicUsize::new(0);
 
-    let freq = TSC_FREQUENCY.load(Ordering::SeqCst) as u64;
+    let freq = TSC_FREQUENCY.load(Ordering::SeqCst) as u128;
     
     if freq != 0 {
         Ok(freq)

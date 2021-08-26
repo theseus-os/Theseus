@@ -45,7 +45,7 @@ pub mod cursor;
 
 pub const FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
 pub const FONT_BACKGROUND_COLOR: Color = color::BLACK;
-const DEFAULT_CURSOR_FREQ: u64 = 400000000;
+const DEFAULT_CURSOR_FREQ: u128 = 400000000;
 
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.
