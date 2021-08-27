@@ -1,7 +1,7 @@
 //! Style and formatting of text displayed in a terminal,
 //! following the ANSI, VT100, and xterm standards.
 
-use core::fmt;
+use core::{convert::TryFrom, fmt};
 use alloc::borrow::Cow;
 use crate::{ForegroundColor, BackgroundColor, UnderlinedColor};
 
@@ -492,33 +492,36 @@ impl FormatFlags {
 
 /// The set of ASCII values that are non-printable characters 
 /// and require special handling by a terminal emulator. 
-#[derive(Debug)]
-pub enum AsciiControlCodes {
+pub struct AsciiControlCodes;
+
+// Use associated consts instead of an enum for easy matching.
+#[allow(non_upper_case_globals)]
+impl AsciiControlCodes {
     /// (BEL) Plays a terminal bell or beep.
     /// `Ctrl + G`, or `'\a'`.
-    Bell         = 0x07,
+    pub const Bell: u8 = 0x07;
     /// (BS) Backspaces over the previous character before (to the left of) the cursor.
     /// `Ctrl + H`, or `'\b'`.
-    Backspace    = 0x08,
+    pub const Backspace: u8 = 0x08;
     /// (HT) Inserts a horizontal tab.
     /// `Ctrl + I`, or `'\t'`.
-    Tab          = 0x09,
+    pub const Tab: u8 = 0x09;
     /// (LF) Moves the cursor to the next line, i.e., Line feed.
     /// `Ctrl + J`, or `'\n'`.
-    NewLine      = 0x0A,
+    pub const NewLine: u8 = 0x0A;
     /// (VT) Inserts a vertical tab.
     /// `Ctrl + K`, or `'\v'`.
-    VerticalTab  = 0x0B,
+    pub const VerticalTab: u8 = 0x0B;
     /// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).
     /// `Ctrl + K`, or `'\v'`.
-    NewPage  = 0x0C,
+    pub const NewPage: u8 = 0x0C;
     /// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.
     /// `Ctrl + M`, or `'\r'`.
-    CarriageReturn  = 0x0D,
+    pub const CarriageReturn: u8 = 0x0D;
     /// (ESC) The escape character.
     /// `ESC`, or `'\e'`.
-    Escape = 0x1B,
+    pub const Escape: u8 = 0x1B;
     /// (DEL) Deletes the next character after (to the right of) the cursor.
     /// `DEL`.
-    Delete = 0x7F,
+    pub const Delete: u8 = 0x7F;
 }

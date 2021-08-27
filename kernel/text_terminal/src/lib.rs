@@ -37,9 +37,10 @@ mod ansi_style;
 pub use ansi_colors::*;
 pub use ansi_style::*;
 
-use core::cmp::max;
+use core::cmp::{min, max};
+use core::convert::TryInto;
 use core::fmt;
-use core::ops::{Deref};
+use core::ops::{Deref, DerefMut, Index, IndexMut};
 use alloc::string::String;
 use alloc::vec::Vec;
 use bare_io::{Read, Write};
@@ -55,35 +56,41 @@ pub enum ScrollPosition {
     /// The terminal is scrolled all the way up.
     ///
     /// In this position, the terminal screen "viewport" is locked
-    /// and will **NOT** auto-scroll down to show any newly-outputted text.
+    /// and will **NOT** auto-scroll down to show any newly-outputted lines of text.
     Top,
     /// The terminal is scrolled to a specific point,
     /// for which the starting position is given by the `Unit`
-    /// located at the specified `line` and `column`:
-    /// * `line`: the index into the terminal's `scrollback_buffer`,
-    /// * `column`: the index into that `Line`. 
+    /// located at the specified point.
+    /// In other words, the contained `Point2D` points to the `Unit` that 
+    /// will be displayed in the upper-left hand corner of the screen viewport.
     ///
     /// In this position, the terminal screen "viewport" is locked
-    /// and will **NOT** auto-scroll down to show any newly-outputted text.
-    UnitIndex { line: usize, column: usize },
+    /// and will **NOT** auto-scroll down to show any newly-outputted lines of text.
+    UnitIndex(Point2D),
     /// The terminal position is scrolled all the way down.
     ///
     /// In this position, the terminal screen "viewport" is **NOT** locked
-    /// and will auto-scroll down to show any newly-outputted text.
-    Bottom,
+    /// and will auto-scroll down to show any newly-outputted lines of text.
+    ///
+    /// For convenience in calculating the screen viewport,
+    /// the contained `Point2D` points to the position of the `Unit` that 
+    /// will be displayed in the upper-left hand corner,
+    /// much like the above `UnitIndex` variant.
+    /// Thus, the contained point will need to be updated every time a new line
+    /// is displayed at the bottom and the rest of the content is shifted up.
+    Bottom(Point2D),
 }
 impl Default for ScrollPosition {
     fn default() -> Self {
-        ScrollPosition::Bottom
+        ScrollPosition::Bottom(Point2D { x: 0, y: 0 })
     }
 }
 
 
 /// An entire unbroken line of characters (`Unit`s) that has been written to a terminal.
 ///
-/// `Line`s *only* end at an actual line break, i.e., a newline character `'\n'`.
+/// `Line`s *only* end at an actual hard line break, i.e., a newline character `'\n'`.
 ///
-/// Note that when displaying a `Line`
 struct Line {
     /// The actual characters that comprise this `Line`.
     units: Vec<Unit>,
@@ -95,7 +102,23 @@ struct Line {
     /// whenever the characters (`units`) in this `Line` are modified.
     displayed_width: usize,
 }
+impl Index<u16> for Line {
+    type Output = Unit;
+    fn index(&self, index: u16) -> &Self::Output {
+        &self.units[index as usize]
+    }
+}
+impl IndexMut<u16> for Line {
+    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
+        &mut self.units[index as usize]
+    }
+}
 impl Line {
+    /// Returns a new empty Line.
+    fn new() -> Line {
+        Line { units: Vec::new(), displayed_width: 0 }
+    }
+
     /// Writes this entire `Line` to the given `writer` output stream.
     ///
     /// Returns the total number of bytes written.
@@ -149,6 +172,7 @@ impl Line {
 /// This representation helps avoid huge contiguous dynamic memory allocations. 
 ///
 pub struct TextTerminal<Output> where Output: bare_io::Write {
+    /// The actual terminal state. 
     inner: TerminalInner<Output>,
 
     /// The VTE parser for parsing VT100/ANSI/xterm control and escape sequences.
@@ -158,20 +182,72 @@ pub struct TextTerminal<Output> where Output: bare_io::Write {
     /// [`TextTerminal::handle_input()`] every time an input byte needs to be handled.
     parser: Parser,
 }
+impl<Output: bare_io::Write> Deref for TextTerminal<Output> {
+    type Target = TerminalInner<Output>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+impl<Output: bare_io::Write> DerefMut for TextTerminal<Output> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
 
-struct TerminalInner<Output> where Output: bare_io::Write {
+
+/// A row-major vector of [`Line`]s that allows custom indexing.
+///
+/// If indexed by a `u16` value representing the row index (y-value),
+/// it returns a [`Line`] reference, which itself can be indexed by a `u16` column index (x-value);
+///
+/// If indexed by a `Point2D` value, it returns a reference to the [`Unit`]
+struct Lines(Vec<Line>);
+impl Index<u16> for Lines {
+    type Output = Line;
+    fn index(&self, index: u16) -> &Self::Output {
+        &self.0[index as usize]
+    }
+}
+impl IndexMut<u16> for Lines {
+    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
+        &mut self.0[index as usize]
+    }
+}
+impl Index<Point2D> for Lines {
+    type Output = Unit;
+    fn index(&self, index: Point2D) -> &Self::Output {
+        &self.0[index.y as usize][index.x]
+    }
+}
+impl IndexMut<Point2D> for Lines {
+    fn index_mut(&mut self, index: Point2D) -> &mut Self::Output {
+        &mut self.0[index.y as usize][index.x]
+    }
+}
+impl Deref for Lines {
+    type Target = Vec<Line>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Lines {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+
+pub struct TerminalInner<Output> where Output: bare_io::Write {
     /// The buffer of all content that is currently displayed or has been previously displayed
     /// on this terminal's screen, including in-band control and escape sequences.
     /// This is what should be written out directly to the terminal backend.
     ///
     /// Because this includes control/escape sequences in addition to regular characters,
     /// the size of this scrollback buffer cannot be used to calculate line wrap lengths or scroll/cursor positions.
-    scrollback_buffer: Vec<Line>,
+    scrollback_buffer: Lines,
 
-    /// The width of this terminal's screen, i.e. how many columns of characters it can display. 
-    columns: u16,
-    /// The height of this terminal's screen, i.e. how many rows of characters it can display. 
-    rows: u16,
+    /// The width and height of this terminal's screen, i.e. how many columns and rows of characters it can display.
+    screen_size: Point2D,
 
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_position: ScrollPosition,
@@ -206,9 +282,8 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     pub fn new(width: u16, height: u16, backend: Output) -> TextTerminal<Output> {
         let mut terminal = TextTerminal {
             inner: TerminalInner {
-                scrollback_buffer: Vec::new(),
-                columns: width,
-                rows: height,
+                scrollback_buffer: Lines(vec![Line::new()]), // start with one empty line
+                screen_size: Point2D { x: width, y: height },
                 scroll_position: ScrollPosition::default(),
                 tab_size: 4,
                 cursor: Cursor::default(),
@@ -259,14 +334,14 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     ///
     /// Note: values will be adjusted to the minimum width and height of `2`. 
     pub fn resize(&mut self, width: u16, height: u16) {
-        self.inner.columns = max(2, width);
-        self.inner.rows = max(2, height);
+        self.screen_size.x = max(2, width);
+        self.screen_size.y = max(2, height);
     }
 
     /// Returns the size `(columns, rows)` of this terminal's screen, 
     /// in units of displayable characters.
-    pub fn screen_size(&self) -> (u16, u16) {
-        (self.inner.columns, self.inner.rows)
+    pub fn screen_size(&self) -> Point2D {
+        self.screen_size
     }
 
 
@@ -279,49 +354,126 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     }
 }
 
+impl<Output: bare_io::Write> TerminalInner<Output> {
+
+    fn get_unit_from_cursor(&self) {
+
+    }
+
+    /// Moves the cursor by adding the given `number` of units (columns)
+    /// to its horizontal `x` point.
+    ///
+    /// The cursor will wrap to the previous or next row it it encounters
+    /// the beginning or end of a line.
+    fn move_cursor_by(&mut self, number: i16) {
+        let Point2D { x: x_old, y: y_old } = self.cursor.position;
+        let new_x: i32 = x_old as i32 + number as i32;
+        let quotient  = new_x / self.screen_size.x as i32;
+        let remainder = new_x % self.screen_size.x as i32;
+        self.cursor.position.x = (x_old as i32 + remainder) as u16;
+        self.cursor.position.y = (y_old as i32 + quotient)  as u16;
+        debug!("Updated cursor: ({}, {}) + {} units --> ({}, {})",
+            x_old, y_old, number, self.cursor.position.x, self.cursor.position.y,
+        );
+    }
+
+    // TODO: implement function that calculates, retrieves, and/or creates a unit
+    //       in the scrollback buffer at the location corresponding to the current cursor position. 
+    //       Keep in mind that the cursor position is relative to the scroll position,
+    //       which itself is an index into the scrollback_buffer, so we should start there 
+    //       when calculating where in the scrollback_buffer a cursor is pointing to. 
+    fn get_unit_at_cursor(&self) {
+        let start_unit = match self.scroll_position {
+            ScrollPosition::Top => Point2D { x: 0, y: 0 },
+            ScrollPosition::UnitIndex(point) => point,
+            ScrollPosition::Bottom(point) => point,
+        };
+        
+    }
+
+
+    /// Moves the cursor to the given `new_position`.
+    ///
+    /// If the cursor position specified does not match an existing `Unit`,
+    /// the cursor will be moved back to the next closest `Unit` before the `new_position`.
+    fn move_cursor_to(&mut self, new_position: Point2D) {
+        self.cursor.position = Point2D { 
+            x: min(self.screen_size.x, new_position.x),
+            y: min(self.screen_size.y, new_position.y),
+        }
+    }
+}
+
 struct TerminalParserHandler<'term, Output: bare_io::Write> {
     terminal: &'term mut TerminalInner<Output>,
+}
+impl<'term, Output: bare_io::Write> Deref for TerminalParserHandler<'term, Output> {
+    type Target = TerminalInner<Output>;
+    fn deref(&self) -> &Self::Target {
+        &self.terminal
+    }
+}
+impl<'term, Output: bare_io::Write> DerefMut for TerminalParserHandler<'term, Output> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut *self.terminal
+    }
 }
 
 impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Output> {
     fn print(&mut self, c: char) {
-        // debug!("[PRINT]: char: {:?}", c);
+        debug!("[PRINT]: char: {:?}", c);
+        return; 
+
+        let pos = self.cursor.position;
+        let dest_unit = &mut self.scrollback_buffer.get(pos);
+        dest_unit.character = Character::Single(c);
+        self.move_cursor_by(1);
     }
 
     fn execute(&mut self, byte: u8) {
-        // debug!("[EXECUTE]: byte: {:#X}", byte);
+        match byte {
+            AsciiControlCodes::NewLine | AsciiControlCodes::CarriageReturn => {
+                let pos = self.cursor.position;
+                let new_y = pos.y + 1;
+                self.scrollback_buffer.insert(new_y as usize, Line::new());
+                
+                self.move_cursor_to(Point2D { x: 0, y: new_y });
+                
+            }
+            _ => debug!("[EXECUTE]: unhandled byte: {:#X}", byte),
+        }
     }
 
     fn hook(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
-        // debug!("[HOOK]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
-        //     _params, _intermediates, _ignore, _action,
-        // );
+        debug!("[HOOK]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
+            _params, _intermediates, _ignore, _action,
+        );
     }
 
     fn put(&mut self, byte: u8) {
-        // debug!("[PUT]: byte: {:#X?}", byte);
+        debug!("[PUT]: byte: {:#X?}", byte);
     }
 
     fn unhook(&mut self) {
-        // debug!("[UNHOOK]");
+        debug!("[UNHOOK]");
     }
 
     fn osc_dispatch(&mut self, _params: &[&[u8]], _bell_terminated: bool) {
-        // debug!("[OSC_DISPATCH]: bell_terminated?: {:?},\n\t params: {:X?}",
-        //     _bell_terminated, _params,
-        // );
+        debug!("[OSC_DISPATCH]: bell_terminated?: {:?},\n\t params: {:X?}",
+            _bell_terminated, _params,
+        );
     }
 
     fn csi_dispatch(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
-        // debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
-        //     _params, _intermediates, _ignore, _action,
-        // );
+        debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
+            _params, _intermediates, _ignore, _action,
+        );
     }
 
     fn esc_dispatch(&mut self, _intermediates: &[u8], _ignore: bool, _byte: u8) {
-        // debug!("[ESC_DISPATCH]: intermediates: {:X?}\n\t ignore?: {}, byte: {:#X}",
-        //     _intermediates, _ignore, _byte,
-        // );
+        debug!("[ESC_DISPATCH]: intermediates: {:X?}\n\t ignore?: {}, byte: {:#X}",
+            _intermediates, _ignore, _byte,
+        );
     }
 }
 
@@ -396,13 +548,21 @@ impl Deref for Unit {
     }
 }
 
+/// A 2D position point where `(0, 0)` represents the top-left corner.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct Point2D {
+    /// Horizontal position: column index.
+    x: u16,
+    /// Vertical position: row index.
+    y: u16,
+}
 
 #[derive(Debug, Default)]
 struct Cursor {
     /// The position of the cursor on the terminal screen,
     /// given as `(x, y)` where `x` is the line/row index
     /// and `y` is the column index.
-    position: (u16, u16),
+    position: Point2D,
     /// The character that is beneath the cursor,
     /// which is possibly occluded by the cursor (depending on its style).
     underneath: Unit,
