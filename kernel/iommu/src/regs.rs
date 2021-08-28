@@ -32,26 +32,26 @@ const_assert_eq!(core::mem::size_of::<IntelIommuRegisters>(), 4096);
 pub struct Capability(pub u64);
 
 impl Capability {
-    fn esrtps(&self)  -> bool { (self.0 >> 63) & 0x1 == 0x1 }
-    fn esirtps(&self) -> bool { (self.0 >> 62) & 0x1 == 0x1 }
-    fn fl5lp(&self)   -> bool { (self.0 >> 60) & 0x1 == 0x1 }
-    fn pi(&self)      -> bool { (self.0 >> 59) & 0x1 == 0x1 }
-    fn fl1gp(&self)   -> bool { (self.0 >> 56) & 0x1 == 0x1 }
-    fn drd(&self)     -> bool { (self.0 >> 55) & 0x1 == 0x1 }
-    fn dwd(&self)     -> bool { (self.0 >> 54) & 0x1 == 0x1 }
+    fn esrtps(&self)  -> bool { (self.0) & (1 << 63) != 0 }
+    fn esirtps(&self) -> bool { (self.0) & (1 << 62) != 0 }
+    fn fl5lp(&self)   -> bool { (self.0) & (1 << 60) != 0 }
+    fn pi(&self)      -> bool { (self.0) & (1 << 59) != 0 }
+    fn fl1gp(&self)   -> bool { (self.0) & (1 << 56) != 0 }
+    fn drd(&self)     -> bool { (self.0) & (1 << 55) != 0 }
+    fn dwd(&self)     -> bool { (self.0) & (1 << 54) != 0 }
     fn mamv(&self)    -> u64  { (self.0 >> 48) & 0x3f }
     fn nfr(&self)     -> u64  { ((self.0 >> 40) & 0xff) + 1 }
-    fn psi(&self)     -> bool { (self.0 >> 39) & 0x1 == 0x1 }
+    fn psi(&self)     -> bool { (self.0) & (1 << 39) != 0 }
     fn sllps(&self)   -> u64  { (self.0 >> 34) & 0xf }
     fn fro(&self)     -> u64  { (self.0 >> 24) & 0x3ff }
-    fn zlr(&self)     -> bool { (self.0 >> 22) & 0x1 == 0x1 }
+    fn zlr(&self)     -> bool { (self.0) & (1 << 22) != 0 }
     fn mgaw(&self)    -> u64  { ((self.0 >> 16) & 0x3f) + 1 }
     fn sagaw(&self)   -> u64  { (self.0 >> 8) & 0x1f }
-    fn cm(&self)      -> bool { (self.0 >> 7) & 0x1 == 0x1 }
-    fn phmr(&self)    -> bool { (self.0 >> 6) & 0x1 == 0x1 }
-    fn plmr(&self)    -> bool { (self.0 >> 5) & 0x1 == 0x1 }
-    fn rwbf(&self)    -> bool { (self.0 >> 4) & 0x1 == 0x1 }
-    fn afl(&self)     -> bool { (self.0 >> 3) & 0x1 == 0x1 }
+    fn cm(&self)      -> bool { (self.0) & (1 << 7) != 0 }
+    fn phmr(&self)    -> bool { (self.0) & (1 << 6) != 0 }
+    fn plmr(&self)    -> bool { (self.0) & (1 << 5) != 0 }
+    fn rwbf(&self)    -> bool { (self.0) & (1 << 4) != 0 }
+    fn afl(&self)     -> bool { (self.0) & (1 << 3) != 0 }
     fn nd(&self)      -> u64  { self.0 & 0x7 }
 }
 
@@ -89,35 +89,35 @@ impl core::fmt::Display for Capability {
 pub struct ExtendedCapability(pub u64);
 
 impl ExtendedCapability {
-    fn rprivs(&self)  -> bool { (self.0 >> 53) & 0x1 == 0x1 }
-    fn adms(&self)    -> bool { (self.0 >> 52) & 0x1 == 0x1 }
-    fn rps(&self)     -> bool { (self.0 >> 49) & 0x1 == 0x1 }
-    fn smpwcs(&self)  -> bool { (self.0 >> 48) & 0x1 == 0x1 }
-    fn flts(&self)    -> bool { (self.0 >> 47) & 0x1 == 0x1 }
-    fn slts(&self)    -> bool { (self.0 >> 46) & 0x1 == 0x1 }
-    fn slads(&self)   -> bool { (self.0 >> 45) & 0x1 == 0x1 }
-    fn vcs(&self)     -> bool { (self.0 >> 44) & 0x1 == 0x1 }
-    fn smts(&self)    -> bool { (self.0 >> 43) & 0x1 == 0x1 }
-    fn pds(&self)     -> bool { (self.0 >> 42) & 0x1 == 0x1 }
-    fn dit(&self)     -> bool { (self.0 >> 41) & 0x1 == 0x1 }
-    fn pasid(&self)   -> bool { (self.0 >> 40) & 0x1 == 0x1 }
+    fn rprivs(&self)  -> bool { (self.0) & (1 << 53) != 0 }
+    fn adms(&self)    -> bool { (self.0) & (1 << 52) != 0 }
+    fn rps(&self)     -> bool { (self.0) & (1 << 49) != 0 }
+    fn smpwcs(&self)  -> bool { (self.0) & (1 << 48) != 0 }
+    fn flts(&self)    -> bool { (self.0) & (1 << 47) != 0 }
+    fn slts(&self)    -> bool { (self.0) & (1 << 46) != 0 }
+    fn slads(&self)   -> bool { (self.0) & (1 << 45) != 0 }
+    fn vcs(&self)     -> bool { (self.0) & (1 << 44) != 0 }
+    fn smts(&self)    -> bool { (self.0) & (1 << 43) != 0 }
+    fn pds(&self)     -> bool { (self.0) & (1 << 42) != 0 }
+    fn dit(&self)     -> bool { (self.0) & (1 << 41) != 0 }
+    fn pasid(&self)   -> bool { (self.0) & (1 << 40) != 0 }
     fn pss(&self)     -> u64  { ((self.0 >> 35) & 0x1f) + 1 }
-    fn eafs(&self)    -> bool { (self.0 >> 34) & 0x1 == 0x1 }
-    fn nwfs(&self)    -> bool { (self.0 >> 33) & 0x1 == 0x1 }
-    fn srs(&self)     -> bool { (self.0 >> 31) & 0x1 == 0x1 }
-    fn ers(&self)     -> bool { (self.0 >> 30) & 0x1 == 0x1 }
-    fn prs(&self)     -> bool { (self.0 >> 29) & 0x1 == 0x1 }
-    fn nest(&self)    -> bool { (self.0 >> 26) & 0x1 == 0x1 }
-    fn mts(&self)     -> bool { (self.0 >> 25) & 0x1 == 0x1 }
+    fn eafs(&self)    -> bool { (self.0) & (1 << 34) != 0 }
+    fn nwfs(&self)    -> bool { (self.0) & (1 << 33) != 0 }
+    fn srs(&self)     -> bool { (self.0) & (1 << 31) != 0 }
+    fn ers(&self)     -> bool { (self.0) & (1 << 30) != 0 }
+    fn prs(&self)     -> bool { (self.0) & (1 << 29) != 0 }
+    fn nest(&self)    -> bool { (self.0) & (1 << 26) != 0 }
+    fn mts(&self)     -> bool { (self.0) & (1 << 25) != 0 }
     fn mhmv(&self)    -> u64  { (self.0 >> 20) & 0xf }
     fn iro(&self)     -> u64  { (self.0 >> 8) & 0x3ff }
-    fn sc(&self)      -> bool { (self.0 >> 7) & 0x1 == 0x1 }
-    fn pt(&self)      -> bool { (self.0 >> 6) & 0x1 == 0x1 }
-    fn eim(&self)     -> bool { (self.0 >> 4) & 0x1 == 0x1 }
-    fn ir(&self)      -> bool { (self.0 >> 3) & 0x1 == 0x1 }
-    fn dt(&self)      -> bool { (self.0 >> 2) & 0x1 == 0x1 }
-    fn qi(&self)      -> bool { (self.0 >> 1) & 0x1 == 0x1 }
-    fn c(&self)       -> bool { self.0 & 0x1 == 0x1 }
+    fn sc(&self)      -> bool { (self.0) & (1 << 7) != 0 }
+    fn pt(&self)      -> bool { (self.0) & (1 << 6) != 0 }
+    fn eim(&self)     -> bool { (self.0) & (1 << 4) != 0 }
+    fn ir(&self)      -> bool { (self.0) & (1 << 3) != 0 }
+    fn dt(&self)      -> bool { (self.0) & (1 << 2) != 0 }
+    fn qi(&self)      -> bool { (self.0) & (1 << 1) != 0 }
+    fn c(&self)       -> bool { (self.0) & (1 << 0) != 0 }
 }
 
 impl core::fmt::Display for ExtendedCapability {
