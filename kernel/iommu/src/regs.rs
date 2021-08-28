@@ -3,6 +3,7 @@
 use zerocopy::FromBytes;
 use volatile::{ReadOnly, WriteOnly};
 use bitflags::bitflags;
+use core::fmt;
 
 /// Struct which allows direct access to memory mapped registers when
 /// overlayed over corresponding page.
@@ -55,33 +56,31 @@ impl Capability {
     fn nd(&self)      -> u64  { self.0 & 0x7 }
 }
 
-impl core::fmt::Display for Capability {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        // TODO: Do we really want multiple lines, since this interferes with 
-        // logging interface?
-        writeln!(f, "ND:      {}", self.nd())?;
-        writeln!(f, "AFL:     {}", self.afl())?;
-        writeln!(f, "RWBF:    {}", self.rwbf())?;
-        writeln!(f, "PLMR:    {}", self.plmr())?;
-        writeln!(f, "PHMR:    {}", self.phmr())?;
-        writeln!(f, "CM:      {}", self.cm())?;
-        writeln!(f, "SAGAW:   {}", self.sagaw())?;
-        writeln!(f, "MGAW:    {}", self.mgaw())?;
-        writeln!(f, "ZLR:     {}", self.zlr())?;
-        writeln!(f, "FRO:     {}", self.fro())?;
-        writeln!(f, "SLLPS:   {}", self.sllps())?;
-        writeln!(f, "PSI:     {}", self.psi())?;
-        writeln!(f, "NFR:     {}", self.nfr())?;
-        writeln!(f, "MAMV:    {}", self.mamv())?;
-        writeln!(f, "DWD:     {}", self.dwd())?;
-        writeln!(f, "DRD:     {}", self.drd())?;
-        writeln!(f, "FL1GP:   {}", self.fl1gp())?;
-        writeln!(f, "PI:      {}", self.pi())?;
-        writeln!(f, "FL5LP:   {}", self.fl5lp())?;
-        writeln!(f, "ESIRTPS: {}", self.esirtps())?;
-        writeln!(f, "ESRTPS:  {}", self.esrtps())?;
-    
-        Ok(())
+impl fmt::Debug for Capability {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Capability")
+            .field("ND",       &self.nd())
+            .field("AFL",      &self.afl())
+            .field("RWBF",     &self.rwbf())
+            .field("PLMR",     &self.plmr())
+            .field("PHMR",     &self.phmr())
+            .field("CM",       &self.cm())
+            .field("SAGAW",    &self.sagaw())
+            .field("MGAW",     &self.mgaw())
+            .field("ZLR",      &self.zlr())
+            .field("FRO",      &self.fro())
+            .field("SLLPS",    &self.sllps())
+            .field("PSI",      &self.psi())
+            .field("NFR",      &self.nfr())
+            .field("MAMV",     &self.mamv())
+            .field("DWD",      &self.dwd())
+            .field("DRD",      &self.drd())
+            .field("FL1GP",    &self.fl1gp())
+            .field("PI",       &self.pi())
+            .field("FL5LP",    &self.fl5lp())
+            .field("ESIRTPS",  &self.esirtps())
+            .field("ESRTPS",   &self.esrtps())
+            .finish()
     }
 }
 
@@ -120,41 +119,39 @@ impl ExtendedCapability {
     fn c(&self)       -> bool { (self.0) & (1 << 0) != 0 }
 }
 
-impl core::fmt::Display for ExtendedCapability {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        // TODO: Do we really want multiple lines, since this interferes with 
-        // logging interface?
-        writeln!(f, "C:       {}", self.c())?;
-        writeln!(f, "QI:      {}", self.qi())?;
-        writeln!(f, "DT:      {}", self.dt())?;
-        writeln!(f, "IR:      {}", self.ir())?;
-        writeln!(f, "EIM:     {}", self.eim())?;
-        writeln!(f, "PT:      {}", self.pt())?;
-        writeln!(f, "SC:      {}", self.sc())?;
-        writeln!(f, "IRO:     {}", self.iro())?;
-        writeln!(f, "MHMV:    {}", self.mhmv())?;
-        writeln!(f, "MTS:     {}", self.mts())?;
-        writeln!(f, "NEST:    {}", self.nest())?;
-        writeln!(f, "PRS:     {}", self.prs())?;
-        writeln!(f, "ERS:     {}", self.ers())?;
-        writeln!(f, "SRS:     {}", self.srs())?;
-        writeln!(f, "NWFS:    {}", self.nwfs())?;
-        writeln!(f, "EAFS:    {}", self.eafs())?;
-        writeln!(f, "PSS:     {}", self.pss())?;
-        writeln!(f, "PASID:   {}", self.pasid())?;
-        writeln!(f, "DIT:     {}", self.dit())?;
-        writeln!(f, "PDS:     {}", self.pds())?;
-        writeln!(f, "SMTS:    {}", self.smts())?;
-        writeln!(f, "VCS:     {}", self.vcs())?;
-        writeln!(f, "SLADS:   {}", self.slads())?;
-        writeln!(f, "SLTS:    {}", self.slts())?;
-        writeln!(f, "FLTS:    {}", self.flts())?;
-        writeln!(f, "SMPWCS:  {}", self.smpwcs())?;
-        writeln!(f, "RPS:     {}", self.rps())?;
-        writeln!(f, "ADMS:    {}", self.adms())?;
-        writeln!(f, "RPRIVS:  {}", self.rprivs())?;
-
-        Ok(())
+impl fmt::Debug for ExtendedCapability {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ExtendedCapability")
+            .field("C",       &self.c())
+            .field("QI",      &self.qi())
+            .field("DT",      &self.dt())
+            .field("IR",      &self.ir())
+            .field("EIM",     &self.eim())
+            .field("PT",      &self.pt())
+            .field("SC",      &self.sc())
+            .field("IRO",     &self.iro())
+            .field("MHMV",    &self.mhmv())
+            .field("MTS",     &self.mts())
+            .field("NEST",    &self.nest())
+            .field("PRS",     &self.prs())
+            .field("ERS",     &self.ers())
+            .field("SRS",     &self.srs())
+            .field("NWFS",    &self.nwfs())
+            .field("EAFS",    &self.eafs())
+            .field("PSS",     &self.pss())
+            .field("PASID",   &self.pasid())
+            .field("DIT",     &self.dit())
+            .field("PDS",     &self.pds())
+            .field("SMTS",    &self.smts())
+            .field("VCS",     &self.vcs())
+            .field("SLADS",   &self.slads())
+            .field("SLTS",    &self.slts())
+            .field("FLTS",    &self.flts())
+            .field("SMPWCS",  &self.smpwcs())
+            .field("RPS",     &self.rps())
+            .field("ADMS",    &self.adms())
+            .field("RPRIVS",  &self.rprivs())
+            .finish()
     }
 }
 

@@ -73,12 +73,8 @@ pub fn init(host_address_width: u8, pci_segment_number: u16, register_base_addre
         let ec = ExtendedCapability(regs.ecap.read());
 
         // List capabilities and extended capabilities
-        // FIXME: Printing capabilities and extended capabilities produces
-        //        lines without a log prefix (e.g. [I]) which is not desirable.
-        info!("IOMMU Capabilities:");
-        info!("{}", c);
-        info!("IOMMU Extended Capabilities:");
-        info!("{}", ec);
+        info!("IOMMU Capabilities: {:?}", c);
+        info!("IOMMU Extended Capabilities: {:?}", ec);
     }
 
     // try reading the status register
