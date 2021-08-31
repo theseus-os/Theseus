@@ -11,13 +11,14 @@ pub struct TscTicks(u128);
 
 impl TscTicks {
     /// Converts ticks to nanoseconds. 
+    ///
     /// Returns `None` if the TSC tick frequency is unavailable 
-    /// or if overflow occured.
+    /// or if overflow occured during the conversion.
     pub fn to_ns(&self) -> Option<u128> {
         get_tsc_frequency()
             .ok()
             .and_then(|freq| self.0.checked_mul(1000000000)
-                    .map(|checked_tsc| checked_tsc / freq)
+                .map(|checked_tsc| checked_tsc / freq)
             )
     }
 
