@@ -76,6 +76,10 @@
 <span id="73">73</span>
 <span id="74">74</span>
 <span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -86,15 +90,19 @@
 
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TscTicks</span>(<span class="ident">u64</span>);
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TscTicks</span>(<span class="ident">u128</span>);
 
 <span class="kw">impl</span> <span class="ident">TscTicks</span> {
     <span class="doccomment">/// Converts ticks to nanoseconds. </span>
-    <span class="doccomment">/// Returns None if the TSC tick frequency is unavailable.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_ns</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
-         <span class="ident">get_tsc_frequency</span>().<span class="ident">ok</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">freq</span><span class="op">|</span> {
-            (<span class="self">self</span>.<span class="number">0</span> <span class="op">*</span> <span class="number">1000000000</span>) <span class="op">/</span> <span class="ident">freq</span> 
-         })
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns `None` if the TSC tick frequency is unavailable </span>
+    <span class="doccomment">/// or if overflow occured during the conversion.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_ns</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u128</span><span class="op">&gt;</span> {
+        <span class="ident">get_tsc_frequency</span>()
+            .<span class="ident">ok</span>()
+            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">freq</span><span class="op">|</span> <span class="self">self</span>.<span class="number">0</span>.<span class="ident">checked_mul</span>(<span class="number">1000000000</span>)
+                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">checked_tsc</span><span class="op">|</span> <span class="ident">checked_tsc</span> <span class="op">/</span> <span class="ident">freq</span>)
+            )
     }
 
     <span class="doccomment">/// Checked subtraction. Computes `self - other`, </span>
@@ -112,7 +120,7 @@
     }
 
     <span class="doccomment">/// Get the inner value, the number of ticks.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u128</span> {
         <span class="self">self</span>.<span class="number">0</span>
     }
 }
@@ -123,17 +131,17 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tsc_ticks</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TscTicks</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">val</span> <span class="op">=</span> <span class="number">0</span>;
     <span class="comment">// SAFE: just reading TSC value</span>
-    <span class="kw">let</span> <span class="ident">ticks</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">core::arch::x86_64::__rdtscp</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">val</span>) };
+    <span class="kw">let</span> <span class="ident">ticks</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">core::arch::x86_64::__rdtscp</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">val</span>) <span class="kw">as</span> <span class="ident">u128</span> };
     <span class="ident">TscTicks</span>(<span class="ident">ticks</span>)
 }
 
 <span class="doccomment">/// Returns the frequency of the TSC for the system, </span>
 <span class="doccomment">/// currently measured using the PIT clock for calibration.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_tsc_frequency</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_tsc_frequency</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u128</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// this is a soft state, so it&#39;s not a form of state spill</span>
     <span class="kw">static</span> <span class="ident">TSC_FREQUENCY</span>: <span class="ident">AtomicUsize</span> <span class="op">=</span> <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>);
 
-    <span class="kw">let</span> <span class="ident">freq</span> <span class="op">=</span> <span class="ident">TSC_FREQUENCY</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="kw">as</span> <span class="ident">u64</span>;
+    <span class="kw">let</span> <span class="ident">freq</span> <span class="op">=</span> <span class="ident">TSC_FREQUENCY</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="kw">as</span> <span class="ident">u128</span>;
     
     <span class="kw">if</span> <span class="ident">freq</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
         <span class="prelude-val">Ok</span>(<span class="ident">freq</span>)
