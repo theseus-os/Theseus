@@ -2949,6 +2949,7 @@ version = "0.1.0"
 dependencies = [
  "bare-io",
  "bitflags",
+ "derive_more",
  "event_types",
  "log",
  "unicode-width",

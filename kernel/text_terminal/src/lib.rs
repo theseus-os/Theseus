@@ -28,6 +28,7 @@ extern crate event_types;
 extern crate unicode_width;
 extern crate bare_io;
 extern crate vte;
+#[macro_use] extern crate derive_more;
 
 #[cfg(test)]
 #[macro_use] extern crate std;
@@ -40,6 +41,7 @@ pub use ansi_style::*;
 use core::cmp::{min, max};
 use core::convert::TryInto;
 use core::fmt;
+use core::num::NonZeroUsize;
 use core::ops::{Deref, DerefMut, Index, IndexMut};
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -58,31 +60,49 @@ pub enum ScrollPosition {
     /// In this position, the terminal screen "viewport" is locked
     /// and will **NOT** auto-scroll down to show any newly-outputted lines of text.
     Top,
-    /// The terminal is scrolled to a specific point,
-    /// for which the starting position is given by the `Unit`
-    /// located at the specified point.
-    /// In other words, the contained `Point2D` points to the `Unit` that 
-    /// will be displayed in the upper-left hand corner of the screen viewport.
+    /// The terminal is scrolled to a specific point, given by the 
+    /// contained `ScrollbackBufferPoint` that points to the `Unit` 
+    /// that will be displayed in the upper-left hand corner of the screen viewport.
+    ///
+    /// The contained `RowIndex` is the number of screen rows that the pointed-to `Unit`
+    /// is displayed after the beginning of that `Unit`'s line.
     ///
     /// In this position, the terminal screen "viewport" is locked
     /// and will **NOT** auto-scroll down to show any newly-outputted lines of text.
-    UnitIndex(Point2D),
+    AtUnit(ScrollbackBufferPoint, RowIndex),
     /// The terminal position is scrolled all the way down.
     ///
     /// In this position, the terminal screen "viewport" is **NOT** locked
     /// and will auto-scroll down to show any newly-outputted lines of text.
     ///
     /// For convenience in calculating the screen viewport,
-    /// the contained `Point2D` points to the position of the `Unit` that 
-    /// will be displayed in the upper-left hand corner,
-    /// much like the above `UnitIndex` variant.
-    /// Thus, the contained point will need to be updated every time a new line
-    /// is displayed at the bottom and the rest of the content is shifted up.
-    Bottom(Point2D),
+    /// the contained fields are the same as in the `AtUnit` varient.
+    ///
+    /// In this mode, the contained point must be updated whenever the screen is 
+    /// scrolled down by virtue of a new line being displayed at the bottom.
+    /// the screen viewport is scrolled up or down.
+    Bottom(ScrollbackBufferPoint, RowIndex),
 }
 impl Default for ScrollPosition {
     fn default() -> Self {
-        ScrollPosition::Bottom(Point2D { x: 0, y: 0 })
+        ScrollPosition::Bottom(ScrollbackBufferPoint::default(), RowIndex(0))
+    }
+}
+impl ScrollPosition {
+    /// Returns a two-item tuple:
+    /// 1. The point (`Unit`) in the scrollback_buffer at which the screen viewport starts,
+    ///    which maps to `ScreenPoint(0, 0)`. 
+    /// 2. The offset in number of displayed rows that the above `ScrollbackBufferPoint`
+    ///    is at from the beginning of its `Line`.  
+    ///    If `0`, the above point represents the first `Unit` at the beginning of its `Line`.
+    ///    This is useful for calculating how many more rows will be occupied by
+    ///    the remainder of the `Line` starting from the `Unit` at the point given above.
+    fn start_point(&self) -> (ScrollbackBufferPoint, RowIndex) {
+        match self {
+            ScrollPosition::Top => (ScrollbackBufferPoint::default(), RowIndex(0)), // (0,0)
+            ScrollPosition::AtUnit(point, row_offset) => (*point, *row_offset),
+            ScrollPosition::Bottom(point, row_offset) => (*point, *row_offset),
+        }
     }
 }
 
@@ -91,32 +111,74 @@ impl Default for ScrollPosition {
 ///
 /// `Line`s *only* end at an actual hard line break, i.e., a newline character `'\n'`.
 ///
+#[derive(Debug, Default, Deref, DerefMut)]
 struct Line {
     /// The actual characters that comprise this `Line`.
+    #[deref] #[deref_mut]
     units: Vec<Unit>,
-    /// The number of columns (character spaces) required to display this entire row.
-    /// This does NOT necessarily correspond to the number of units, 
-    /// because some wider characters like tabs may consume more than one column.
-    ///
-    /// This is a cached value that may need to be recalculated
-    /// whenever the characters (`units`) in this `Line` are modified.
-    displayed_width: usize,
+    /// The indices of the `Unit`s in the `Line` that come at the very beginning of a 
+    /// soft line break, i.e., a wrapped line. 
+    /// This is a cached value used to accelerate the calculations of which screen coordinates
+    /// point to which coordinates of lines/units in the scrollback buffer.
+    soft_line_breaks: Vec<UnitIndex>,
+    /// The "end bound" of this `Line` as if it were displayed on the current screen viewport.
+    /// This is expressed as a relative offset from the first `Unit` of this `Line`,
+    /// as if that unit occupied point `ScreenPoint(0, 0)`.
+    /// Thus, this can be used to calculate the number of rows and columns needed to display
+    /// this line; for example:
+    /// If this was `(1,17)`, it spans two rows (row `0` to row `1`), in which row `0` occupies
+    /// all columns (the entire `screen_width`) and row `1` spans the first 17 columns.
+    /// If this is `(0,0)`, this `Line` is empty.
+    displayed_bounds: ScreenPoint,
 }
-impl Index<u16> for Line {
+
+impl Index<UnitIndex> for Line {
     type Output = Unit;
-    fn index(&self, index: u16) -> &Self::Output {
-        &self.units[index as usize]
+    fn index(&self, index: UnitIndex) -> &Self::Output {
+        &self.units[index.0]
     }
 }
-impl IndexMut<u16> for Line {
-    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
-        &mut self.units[index as usize]
+impl IndexMut<UnitIndex> for Line {
+    fn index_mut(&mut self, index: UnitIndex) -> &mut Self::Output {
+        &mut self.units[index.0]
     }
 }
 impl Line {
     /// Returns a new empty Line.
     fn new() -> Line {
-        Line { units: Vec::new(), displayed_width: 0 }
+        Line::default()
+    }
+
+    /// Calculates and returns the displayabe width in columns 
+    /// of the `Unit`s in this `Line` from the given `start` index (inclusive)
+    /// to the given `end` index (exclusive).
+    fn calculate_displayed_width_starting_at_unit(&self, start: UnitIndex, end: UnitIndex, tab_width: u16) -> usize {
+        (&self.units[start.0 .. end.0])
+            .iter()
+            .map(|unit| match unit.displayable_width() {
+                0 => tab_width,
+                w => w,
+            } as usize)
+            .sum()
+    }
+
+    /// Iterates over all `Unit`s in this `Line` to recalculate where the soft line breaks
+    /// (i.e., line wraps) should occur.
+    fn recalculate_soft_line_breaks(&mut self, screen_width: ColumnIndex, tab_width: u16) {
+        let mut breaks = Vec::new();
+        let mut column_idx_of_unit = ColumnIndex(0);
+        for (i, unit) in self.units.iter().enumerate() {
+            let width = ColumnIndex(match unit.displayable_width() {
+                0 => tab_width,
+                w => w,
+            });
+            column_idx_of_unit += width;
+            if column_idx_of_unit >= screen_width {
+                breaks.push(UnitIndex(i));
+                column_idx_of_unit = ColumnIndex(0);
+            } 
+        }
+        self.soft_line_breaks = breaks;
     }
 
     /// Writes this entire `Line` to the given `writer` output stream.
@@ -171,8 +233,10 @@ impl Line {
 /// such that a `Line` is a `Vec<Unit>`, and the buffer itself is a `Vec<Line>`. 
 /// This representation helps avoid huge contiguous dynamic memory allocations. 
 ///
+#[derive(Deref, DerefMut)]
 pub struct TextTerminal<Output> where Output: bare_io::Write {
     /// The actual terminal state. 
+    #[deref] #[deref_mut]
     inner: TerminalInner<Output>,
 
     /// The VTE parser for parsing VT100/ANSI/xterm control and escape sequences.
@@ -182,57 +246,37 @@ pub struct TextTerminal<Output> where Output: bare_io::Write {
     /// [`TextTerminal::handle_input()`] every time an input byte needs to be handled.
     parser: Parser,
 }
-impl<Output: bare_io::Write> Deref for TextTerminal<Output> {
-    type Target = TerminalInner<Output>;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-impl<Output: bare_io::Write> DerefMut for TextTerminal<Output> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
 
 
 /// A row-major vector of [`Line`]s that allows custom indexing.
 ///
-/// If indexed by a `u16` value representing the row index (y-value),
-/// it returns a [`Line`] reference, which itself can be indexed by a `u16` column index (x-value);
+/// If indexed by a [`LineIndex`], it returns a [`Line`] reference,
+/// which itself can be indexed by a [`UnitIndex`].
 ///
-/// If indexed by a `Point2D` value, it returns a reference to the [`Unit`]
+/// If indexed by a [`ScrollbackBufferPoint`] value, 
+/// it returns a reference to the [`Unit`] at that point.
+#[derive(Deref, DerefMut)]
 struct Lines(Vec<Line>);
-impl Index<u16> for Lines {
+impl Index<LineIndex> for Lines {
     type Output = Line;
-    fn index(&self, index: u16) -> &Self::Output {
-        &self.0[index as usize]
+    fn index(&self, index: LineIndex) -> &Self::Output {
+        &self.0[index.0]
     }
 }
-impl IndexMut<u16> for Lines {
-    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
-        &mut self.0[index as usize]
+impl IndexMut<LineIndex> for Lines {
+    fn index_mut(&mut self, index: LineIndex) -> &mut Self::Output {
+        &mut self.0[index.0]
     }
 }
-impl Index<Point2D> for Lines {
+impl Index<ScrollbackBufferPoint> for Lines {
     type Output = Unit;
-    fn index(&self, index: Point2D) -> &Self::Output {
-        &self.0[index.y as usize][index.x]
+    fn index(&self, index: ScrollbackBufferPoint) -> &Self::Output {
+        &self[index.line_idx][index.unit_idx]
     }
 }
-impl IndexMut<Point2D> for Lines {
-    fn index_mut(&mut self, index: Point2D) -> &mut Self::Output {
-        &mut self.0[index.y as usize][index.x]
-    }
-}
-impl Deref for Lines {
-    type Target = Vec<Line>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl DerefMut for Lines {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl IndexMut<ScrollbackBufferPoint> for Lines {
+    fn index_mut(&mut self, index: ScrollbackBufferPoint) -> &mut Self::Output {
+        &mut self[index.line_idx][index.unit_idx]
     }
 }
 
@@ -247,13 +291,13 @@ pub struct TerminalInner<Output> where Output: bare_io::Write {
     scrollback_buffer: Lines,
 
     /// The width and height of this terminal's screen, i.e. how many columns and rows of characters it can display.
-    screen_size: Point2D,
+    screen_size: ScreenPoint,
 
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_position: ScrollPosition,
 
     /// The number of spaces a tab character `'\t'` occupies when displayed.
-    tab_size: u16,
+    tab_width: u16,
 
     /// The cursor of the terminal.
     ///
@@ -283,9 +327,9 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
         let mut terminal = TextTerminal {
             inner: TerminalInner {
                 scrollback_buffer: Lines(vec![Line::new()]), // start with one empty line
-                screen_size: Point2D { x: width, y: height },
+                screen_size: ScreenPoint { column: ColumnIndex(width), row: RowIndex(height) },
                 scroll_position: ScrollPosition::default(),
-                tab_size: 4,
+                tab_width: 4,
                 cursor: Cursor::default(),
                 // mode: TerminalMode::default(),
                 backend,
@@ -334,16 +378,15 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
     ///
     /// Note: values will be adjusted to the minimum width and height of `2`. 
     pub fn resize(&mut self, width: u16, height: u16) {
-        self.screen_size.x = max(2, width);
-        self.screen_size.y = max(2, height);
+        self.screen_size.column = ColumnIndex(max(2, width));
+        self.screen_size.row    = RowIndex(   max(2, height));
     }
 
     /// Returns the size `(columns, rows)` of this terminal's screen, 
     /// in units of displayable characters.
-    pub fn screen_size(&self) -> Point2D {
-        self.screen_size
+    pub fn screen_size(&self) -> (u16, u16) {
+        (self.screen_size.column.0, self.screen_size.row.0)
     }
-
 
     /// Flushes the entire viewable region of the terminal's screen
     /// to the backend output stream.
@@ -355,11 +398,7 @@ impl<Output: bare_io::Write> TextTerminal<Output> {
 }
 
 impl<Output: bare_io::Write> TerminalInner<Output> {
-
-    fn get_unit_from_cursor(&self) {
-
-    }
-
+    /*
     /// Moves the cursor by adding the given `number` of units (columns)
     /// to its horizontal `x` point.
     ///
@@ -376,20 +415,105 @@ impl<Output: bare_io::Write> TerminalInner<Output> {
             x_old, y_old, number, self.cursor.position.x, self.cursor.position.y,
         );
     }
+    */
+
+
+    /// Calculates the point in the scrollback buffer that the given `cursor_point`
+    /// is pointing to, based on the current position of the screen viewport.
+    ///
+    /// If the given `cursor_point` does not point to a `Unit` that exists in the scrollback buffer,
+    /// then it is adjusted to the nearest row and column that **does** align with a 
+    /// line and unit index that actually exist in the scrollback buffer. 
+    ///
+    /// Returns a tuple of the point in the scrollback buffer that corresponds to the 
+    /// adjusted cursor point, and the adjusted cursor point itself.
+    fn cursor_position_to_scrollback_position(
+        &self,
+        cursor_point: ScreenPoint
+    ) -> (ScrollbackBufferPoint, ScreenPoint) {
+        // The `start_point` corresponds to the unit that is currently displayed at `ScreenPoint(0,0)`
+        let (start_point, mut row_offset) = self.scroll_position.start_point();
+        let screen_width = self.screen_size.column.0 as usize;
+
+        let mut line_index   = start_point.line_idx;
+        let mut unit_index   = start_point.unit_idx;
+        let mut row_index    = RowIndex(0);
+        let mut line;
+        
+        loop {
+            // TODO: handle the case when the cursor point is beyond the bounds of the scrollback buffer 
+            line = &self.scrollback_buffer[start_point.line_idx];
+            row_index += line.displayed_bounds.row - row_offset;
+
+            // If this `line` (as displayed) contains the requested cursor row,
+            // then we're done iterating over the lines in the scrollback buffer.
+            if row_index >= cursor_point.row {
+                break;
+            }
+
+            // Advance to the next line in the scrollback buffer
+            line_index += LineIndex(1);
+            unit_index = UnitIndex(0);
+            row_offset = RowIndex(0);
+        }
+
+        let row_overshoot = row_index - cursor_point.row;
+        // TODO: handle the case when there are no soft line breaks in the given `line` 
+        let unit_idx_at_cursor = line.soft_line_breaks[line.soft_line_breaks.len() - 1 - row_overshoot.0 as usize];
+        let mut column_idx_of_unit = ColumnIndex(0);
+        let mut found_unit = None;
+        // TODO: set the end bound of the iteration at the next soft line break if there is one, or if not, stick with `..`.
+        for (i, unit) in (&line.units[unit_idx_at_cursor.0 ..]).iter().enumerate() {
+            let width = ColumnIndex(match unit.displayable_width() {
+                0 => self.tab_width,
+                w => w,
+            });
+            if cursor_point.column >= column_idx_of_unit 
+                && cursor_point.column < (column_idx_of_unit + width)
+            {
+                found_unit = Some(UnitIndex(unit_idx_at_cursor.0 + i));
+                break;
+            }
+            column_idx_of_unit += width;
+        }
+
+        let found_unit = if let Some(idx) = found_unit {
+            idx
+        } else {
+            // TODO: adjust the `column_idx_of_unit` when we change the 
+            UnitIndex(line.len() - 1)
+        };
+
+        (
+            ScrollbackBufferPoint { unit_idx: unit_index, line_idx: line_index },
+            ScreenPoint { column: column_idx_of_unit, row: cursor_point.row, }
+        )
+    }
 
     // TODO: implement function that calculates, retrieves, and/or creates a unit
     //       in the scrollback buffer at the location corresponding to the current cursor position. 
     //       Keep in mind that the cursor position is relative to the scroll position,
     //       which itself is an index into the scrollback_buffer, so we should start there 
     //       when calculating where in the scrollback_buffer a cursor is pointing to. 
-    fn get_unit_at_cursor(&self) {
-        let start_unit = match self.scroll_position {
-            ScrollPosition::Top => Point2D { x: 0, y: 0 },
-            ScrollPosition::UnitIndex(point) => point,
-            ScrollPosition::Bottom(point) => point,
-        };
-        
+
+
+    /*
+    /// Moves the cursor to the given position, snapping it to the nearest line and column 
+    /// that actually exist in the scrollback buffer. 
+    ///
+    /// This performs all the logic necessary to update the cursor:
+    /// * 
+    fn update_cursor_to_position(&mut self, new_cursor_point: ScreenPoint) {
+        let start_point = self.scroll_position.start_point();
+
+        let target_point = start_point + new_cursor_point;
+        let closest_line_idx = min(target_point.y, self.scrollback_buffer.len().saturating_sub(1) as u16);
+        let closest_line = &self.scrollback_buffer[closest_line_idx];
+        let closest_column_idx = min(target_point.x, closest_line.len().saturating_sub(1) as u16);
+        let closest_column = &closest_line[closest_column_idx];
+
     }
+
 
 
     /// Moves the cursor to the given `new_position`.
@@ -402,30 +526,22 @@ impl<Output: bare_io::Write> TerminalInner<Output> {
             y: min(self.screen_size.y, new_position.y),
         }
     }
+    */
 }
 
+#[derive(Deref, DerefMut)]
 struct TerminalParserHandler<'term, Output: bare_io::Write> {
     terminal: &'term mut TerminalInner<Output>,
-}
-impl<'term, Output: bare_io::Write> Deref for TerminalParserHandler<'term, Output> {
-    type Target = TerminalInner<Output>;
-    fn deref(&self) -> &Self::Target {
-        &self.terminal
-    }
-}
-impl<'term, Output: bare_io::Write> DerefMut for TerminalParserHandler<'term, Output> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.terminal
-    }
 }
 
 impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Output> {
     fn print(&mut self, c: char) {
         debug!("[PRINT]: char: {:?}", c);
-        return; 
+        let dest_line = &mut self.scrollback_buffer[self.cursor.scrollback_point.line_idx];
 
-        let pos = self.cursor.position;
-        let dest_unit = &mut self.scrollback_buffer.get(pos);
+        // TODO: here, either insert the new `Unit` with the character value
+        //       or create another function that inserts a new `Unit` for the next round by default. 
+
         dest_unit.character = Character::Single(c);
         self.move_cursor_by(1);
     }
@@ -548,21 +664,55 @@ impl Deref for Unit {
     }
 }
 
-/// A 2D position point where `(0, 0)` represents the top-left corner.
-#[derive(Copy, Clone, Debug, Default)]
-pub struct Point2D {
-    /// Horizontal position: column index.
-    x: u16,
-    /// Vertical position: row index.
-    y: u16,
+/// A 2D position value that represents a point on the screen,
+/// in which `(0, 0)` represents the top-left corner.
+/// Thus, a valid `ScreenPoint` must fit be the bounds of 
+/// the current screen dimensions.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Add, AddAssign, Sub, SubAssign)]
+pub struct ScreenPoint {
+    column: ColumnIndex,
+    row: RowIndex,
 }
+
+/// An index of a row in the screen viewport. 
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Add, AddAssign, Sub, SubAssign)]
+pub struct RowIndex(u16);
+/// An index of a column in the screen viewport. 
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Add, AddAssign, Sub, SubAssign)]
+pub struct ColumnIndex(u16);
+
+
+/// A 2D position value that represents a point in the scrollback buffer,
+/// in which `(0, 0)` represents the `Unit` at the first column of the first line.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Add, AddAssign, Sub, SubAssign)]
+pub struct ScrollbackBufferPoint {
+    unit_idx: UnitIndex,
+    line_idx: LineIndex,
+}
+
+/// An index of a `Line` in the scrollback buffer.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Add, AddAssign, Sub, SubAssign)]
+pub struct LineIndex(usize);
+/// An index of a `Unit` in a `Line` in the scrollback buffer.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Add, AddAssign, Sub, SubAssign)]
+pub struct UnitIndex(usize);
+
 
 #[derive(Debug, Default)]
 struct Cursor {
     /// The position of the cursor on the terminal screen,
     /// given as `(x, y)` where `x` is the line/row index
     /// and `y` is the column index.
-    position: Point2D,
+    screen_point: ScreenPoint,
+    /// The position in the scrollback buffer of the unit
+    /// that the cursor is currently pointing to.
+    scrollback_point: ScrollbackBufferPoint,
     /// The character that is beneath the cursor,
     /// which is possibly occluded by the cursor (depending on its style).
     underneath: Unit,
