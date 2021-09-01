@@ -84,6 +84,11 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     if let Some(com1) = take_serial_port_basic(SerialPortAddress::COM1) {
         serial_port::init_serial_port(SerialPortAddress::COM1, com1);
     }
+    // Also, for headless operation, ensure that COM2 is initialized.
+    if let Some(com2) = take_serial_port_basic(SerialPortAddress::COM2) {
+        serial_port::init_serial_port(SerialPortAddress::COM2, com2);
+    }
+
 
     keyboard::init(key_producer);
     mouse::init(mouse_producer);
