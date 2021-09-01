@@ -42,7 +42,7 @@ use core::cmp::{min, max};
 use core::convert::TryInto;
 use core::fmt;
 use core::num::NonZeroUsize;
-use core::ops::{Deref, DerefMut, Index, IndexMut};
+use core::ops::{Bound, Deref, DerefMut, Index, IndexMut};
 use alloc::string::String;
 use alloc::vec::Vec;
 use bare_io::{Read, Write};
@@ -64,12 +64,12 @@ pub enum ScrollPosition {
     /// contained `ScrollbackBufferPoint` that points to the `Unit` 
     /// that will be displayed in the upper-left hand corner of the screen viewport.
     ///
-    /// The contained `RowIndex` is the number of screen rows that the pointed-to `Unit`
+    /// The contained `usize` is the number of screen rows that the pointed-to `Unit`
     /// is displayed after the beginning of that `Unit`'s line.
     ///
     /// In this position, the terminal screen "viewport" is locked
     /// and will **NOT** auto-scroll down to show any newly-outputted lines of text.
-    AtUnit(ScrollbackBufferPoint, RowIndex),
+    AtUnit(ScrollbackBufferPoint, usize),
     /// The terminal position is scrolled all the way down.
     ///
     /// In this position, the terminal screen "viewport" is **NOT** locked
@@ -81,11 +81,11 @@ pub enum ScrollPosition {
     /// In this mode, the contained point must be updated whenever the screen is 
     /// scrolled down by virtue of a new line being displayed at the bottom.
     /// the screen viewport is scrolled up or down.
-    Bottom(ScrollbackBufferPoint, RowIndex),
+    Bottom(ScrollbackBufferPoint, usize),
 }
 impl Default for ScrollPosition {
     fn default() -> Self {
-        ScrollPosition::Bottom(ScrollbackBufferPoint::default(), RowIndex(0))
+        ScrollPosition::Bottom(ScrollbackBufferPoint::default(), 0)
     }
 }
 impl ScrollPosition {
@@ -97,9 +97,9 @@ impl ScrollPosition {
     ///    If `0`, the above point represents the first `Unit` at the beginning of its `Line`.
     ///    This is useful for calculating how many more rows will be occupied by
     ///    the remainder of the `Line` starting from the `Unit` at the point given above.
-    fn start_point(&self) -> (ScrollbackBufferPoint, RowIndex) {
+    fn start_point(&self) -> (ScrollbackBufferPoint, usize) {
         match self {
-            ScrollPosition::Top => (ScrollbackBufferPoint::default(), RowIndex(0)), // (0,0)
+            ScrollPosition::Top => (ScrollbackBufferPoint::default(), 0), // (0,0)
             ScrollPosition::AtUnit(point, row_offset) => (*point, *row_offset),
             ScrollPosition::Bottom(point, row_offset) => (*point, *row_offset),
         }
@@ -121,15 +121,6 @@ struct Line {
     /// This is a cached value used to accelerate the calculations of which screen coordinates
     /// point to which coordinates of lines/units in the scrollback buffer.
     soft_line_breaks: Vec<UnitIndex>,
-    /// The "end bound" of this `Line` as if it were displayed on the current screen viewport.
-    /// This is expressed as a relative offset from the first `Unit` of this `Line`,
-    /// as if that unit occupied point `ScreenPoint(0, 0)`.
-    /// Thus, this can be used to calculate the number of rows and columns needed to display
-    /// this line; for example:
-    /// If this was `(1,17)`, it spans two rows (row `0` to row `1`), in which row `0` occupies
-    /// all columns (the entire `screen_width`) and row `1` spans the first 17 columns.
-    /// If this is `(0,0)`, this `Line` is empty.
-    displayed_bounds: ScreenPoint,
 }
 
 impl Index<UnitIndex> for Line {
@@ -149,6 +140,42 @@ impl Line {
         Line::default()
     }
 
+    /// Inserts the given `Unit` into this `Line` at the given index. 
+    ///
+    /// This adjusts all soft line breaks (line wraps) as needed to properly
+    /// display this `Line` on screen, but does not actually re-display it.
+    ///
+    /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
+    /// all `Unit`s after it will be shifted to the right by one,
+    /// and the soft line breaks will be updated accordingly.
+    ///
+    /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
+    /// then the `Line` will be padded with enough empty `Units` such that the given `Unit`
+    /// will be inserted at the correct `UnitIndex`.
+    /// The empty padding `Unit`s will have the same [`Style`] as the given `Unit`.
+    fn insert_unit(&mut self, idx: UnitIndex, unit: Unit, screen_width: ColumnIndex, tab_width: u16) {
+        if idx.0 < self.units.len() {
+            // The unit index is withing the existing bounds of the Line, so insert it.
+            self.units.insert(idx.0, unit);
+            // TODO: there is definitely a more efficient way to recalculate the soft line breaks
+            //       rather than iterating over every single unit in this line.
+            self.recalculate_soft_line_breaks(screen_width, tab_width);
+        } 
+        else {
+            // The unit index is beyond the existing bounds of this Line, so fill it with empty Units as padding.
+            let range_of_empty_padding = self.units.len() .. idx.0;
+            warn!("Untested scenario: padding Line with {} empty Units from {:?}", 
+                range_of_empty_padding.len(), range_of_empty_padding,
+            );
+            self.units.reserve(range_of_empty_padding.len() + 1);
+            for _i in range_of_empty_padding {
+                self.units.push(Unit { character: Character::default(), style: unit.style });
+            }
+            self.units.push(unit);
+            self.recalculate_soft_line_breaks(screen_width, tab_width);
+        }
+    }
+
     /// Calculates and returns the displayabe width in columns 
     /// of the `Unit`s in this `Line` from the given `start` index (inclusive)
     /// to the given `end` index (exclusive).
@@ -160,6 +187,11 @@ impl Line {
                 w => w,
             } as usize)
             .sum()
+    }
+
+    /// Returns the number of rows on the screen that this `Line` will span when displayed.
+    fn num_rows_as_displayed(&self) -> usize {
+        self.soft_line_breaks.len() + 1
     }
 
     /// Iterates over all `Unit`s in this `Line` to recalculate where the soft line breaks
@@ -179,48 +211,6 @@ impl Line {
             } 
         }
         self.soft_line_breaks = breaks;
-    }
-
-    /// Writes this entire `Line` to the given `writer` output stream.
-    ///
-    /// Returns the total number of bytes written.
-    fn write_line_to<W: Write>(
-        &self,
-        writer: &mut W,
-        previous_style: Option<Style>
-    ) -> bare_io::Result<usize> {
-        let mut char_encode_buf = [0u8; 4];
-        let mut bytes_written = 0;
-
-        let mut previous_style = previous_style.unwrap_or_default();
-
-        for unit in &self.units {
-            // First, write out the escape sequences for the difference in style.
-            if unit.style != previous_style {
-                let mut diff_iter = unit.style.diff(&previous_style);
-                // Only write out the escape sequences if there is at least one style difference.
-                if let Some(first_code) = diff_iter.next() {
-                    bytes_written += writer.write(AnsiStyleCodes::ESCAPE_PREFIX)?;
-                    bytes_written += writer.write(first_code.to_escape_code().as_bytes())?;
-                    for code in diff_iter {
-                        bytes_written += writer.write(AnsiStyleCodes::ESCAPE_DELIM)?;
-                        bytes_written += writer.write(code.to_escape_code().as_bytes())?;
-                    }
-                    bytes_written += writer.write(AnsiStyleCodes::ESCAPE_SUFFIX)?;
-                }
-            }
-            previous_style = unit.style;
-
-            // Second, write out the actual character(s).
-            bytes_written += writer.write(match unit.character {
-                Character::Single(ref ch) => ch.encode_utf8(&mut char_encode_buf[..]).as_bytes(),
-                Character::Multi(ref s) => s.as_bytes(),
-            })?;
-        }
-        // At the end of the `Line`, write out a newline character.
-        bytes_written += writer.write(b"\n")?;
-        
-        Ok(bytes_written)
     }
 }
 
@@ -431,35 +421,37 @@ impl<Output: bare_io::Write> TerminalInner<Output> {
         &self,
         cursor_point: ScreenPoint
     ) -> (ScrollbackBufferPoint, ScreenPoint) {
+        let target_row = cursor_point.row.0 as usize;
+
         // The `start_point` corresponds to the unit that is currently displayed at `ScreenPoint(0,0)`
         let (start_point, mut row_offset) = self.scroll_position.start_point();
         let screen_width = self.screen_size.column.0 as usize;
 
         let mut line_index   = start_point.line_idx;
         let mut unit_index   = start_point.unit_idx;
-        let mut row_index    = RowIndex(0);
+        let mut row_index    = 0;
         let mut line;
         
         loop {
             // TODO: handle the case when the cursor point is beyond the bounds of the scrollback buffer 
             line = &self.scrollback_buffer[start_point.line_idx];
-            row_index += line.displayed_bounds.row - row_offset;
+            row_index += line.num_rows_as_displayed() - row_offset;
 
             // If this `line` (as displayed) contains the requested cursor row,
             // then we're done iterating over the lines in the scrollback buffer.
-            if row_index >= cursor_point.row {
+            if row_index >= target_row {
                 break;
             }
 
             // Advance to the next line in the scrollback buffer
             line_index += LineIndex(1);
             unit_index = UnitIndex(0);
-            row_offset = RowIndex(0);
+            row_offset = 0;
         }
 
-        let row_overshoot = row_index - cursor_point.row;
+        let row_overshoot = row_index.saturating_sub(target_row);
         // TODO: handle the case when there are no soft line breaks in the given `line` 
-        let unit_idx_at_cursor = line.soft_line_breaks[line.soft_line_breaks.len() - 1 - row_overshoot.0 as usize];
+        let unit_idx_at_cursor = line.soft_line_breaks[line.soft_line_breaks.len() - 1 - row_overshoot];
         let mut column_idx_of_unit = ColumnIndex(0);
         let mut found_unit = None;
         // TODO: set the end bound of the iteration at the next soft line break if there is one, or if not, stick with `..`.
@@ -488,6 +480,23 @@ impl<Output: bare_io::Write> TerminalInner<Output> {
             ScrollbackBufferPoint { unit_idx: unit_index, line_idx: line_index },
             ScreenPoint { column: column_idx_of_unit, row: cursor_point.row, }
         )
+    }
+
+    /// Advances the cursor's screen coordinate forward by one unit of the given width.
+    /// This does not modify the cursor's scrollback buffer position.
+    ///
+    /// Returns `true` if the screen needs to be scrolled down by one line.
+    fn increment_screen_cursor(&mut self, unit_width: u16) -> bool {
+        self.cursor.screen_point.column += ColumnIndex(unit_width);
+        if self.cursor.screen_point.column >= self.screen_size.column {
+            self.cursor.screen_point.column.0 %= self.screen_size.column.0;
+            self.cursor.screen_point.row.0 += 1;
+            if self.cursor.screen_point.row >= self.screen_size.row {
+                self.cursor.screen_point.row.0 = self.screen_size.row.0 - 1;
+                return true;
+            }
+        }
+        false
     }
 
     // TODO: implement function that calculates, retrieves, and/or creates a unit
@@ -527,6 +536,72 @@ impl<Output: bare_io::Write> TerminalInner<Output> {
         }
     }
     */
+
+    /// Displays the given range of `Unit`s in the scrollback buffer
+    /// by writing them to this terminal's backend.
+    ///
+    /// The `Unit` at the `scrollback_start` point will be displayed at `screen_start`,
+    /// and all `Unit`s up until the given `scrollback_end` point will be written to
+    /// successive points on the screen.
+    fn display(
+        &mut self,
+        scrollback_start: ScrollbackBufferPoint,
+        scrollback_end:   ScrollbackBufferPoint,
+        _screen_start:    ScreenPoint,
+        previous_style:   Option<Style>,
+    ) -> bare_io::Result<usize> {
+
+        let mut char_encode_buf = [0u8; 4];
+        let mut bytes_written = 0;
+        let mut previous_style = previous_style.unwrap_or_default();
+
+        // For now, we just assume that the backend output stream is a linear "file"
+        // that can't adjust its position, so we just write directly to it 
+        // whilst ignoring the `screen_start` parameter.
+        let mut start_unit = scrollback_start.unit_idx; 
+        for line_idx in scrollback_start.line_idx.0 ..= scrollback_end.line_idx.0 {
+            let line_idx = LineIndex(line_idx);
+            let line = &self.scrollback_buffer[line_idx];
+
+            // Write the requested part of this line, up to the entire line.
+            let end = if scrollback_end.line_idx == line_idx {
+                scrollback_end.unit_idx.0
+            } else {
+                line.units.len()
+            };
+            for unit in &line.units[start_unit.0 ..= end] {
+                // First, write out the escape sequences for the difference in style.
+                if unit.style != previous_style {
+                    let mut diff_iter = unit.style.diff(&previous_style);
+                    // Only write out the escape sequences if there is at least one style difference.
+                    if let Some(first_code) = diff_iter.next() {
+                        bytes_written += self.backend.write(AnsiStyleCodes::ESCAPE_PREFIX)?;
+                        bytes_written += self.backend.write(first_code.to_escape_code().as_bytes())?;
+                        for code in diff_iter {
+                            bytes_written += self.backend.write(AnsiStyleCodes::ESCAPE_DELIM)?;
+                            bytes_written += self.backend.write(code.to_escape_code().as_bytes())?;
+                        }
+                        bytes_written += self.backend.write(AnsiStyleCodes::ESCAPE_SUFFIX)?;
+                    }
+                }
+                previous_style = unit.style;
+    
+                // Second, write out the actual character(s).
+                bytes_written += self.backend.write(match unit.character {
+                    Character::Single(ref ch) => ch.encode_utf8(&mut char_encode_buf[..]).as_bytes(),
+                    Character::Multi(ref s) => s.as_bytes(),
+                })?;
+            }
+            // If we wrote out the entire `Line`, write out a newline character.
+            if line_idx < scrollback_end.line_idx {
+                bytes_written += self.backend.write(b"\n")?;
+            } 
+
+            start_unit = UnitIndex(0);
+        }
+
+        Ok(bytes_written)
+    }
 }
 
 #[derive(Deref, DerefMut)]
@@ -537,24 +612,46 @@ struct TerminalParserHandler<'term, Output: bare_io::Write> {
 impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Output> {
     fn print(&mut self, c: char) {
         debug!("[PRINT]: char: {:?}", c);
-        let dest_line = &mut self.scrollback_buffer[self.cursor.scrollback_point.line_idx];
+        let screen_size = self.screen_size;
+        let tab_width = self.tab_width;
+        let buf_pos = self.cursor.scrollback_point;
+        let dest_line = &mut self.scrollback_buffer[buf_pos.line_idx];
+        let new_unit = Unit { character: Character::Single(c), style: Style::default() };
+        let new_unit_width = new_unit.displayable_width();
+        dest_line.insert_unit(
+            buf_pos.unit_idx,
+            new_unit,
+            screen_size.column,
+            tab_width,
+        );
 
-        // TODO: here, either insert the new `Unit` with the character value
-        //       or create another function that inserts a new `Unit` for the next round by default. 
-
-        dest_unit.character = Character::Single(c);
-        self.move_cursor_by(1);
+        let orig_screen_pos = self.cursor.screen_point;
+        let needs_scroll_down = self.increment_screen_cursor(new_unit_width);
+        let new_buf_pos = self.cursor.scrollback_point;
+        self.display(buf_pos, new_buf_pos, orig_screen_pos, None).expect("print(): writing to backend failed"); // TODO: use previous style
     }
 
     fn execute(&mut self, byte: u8) {
         match byte {
             AsciiControlCodes::NewLine | AsciiControlCodes::CarriageReturn => {
-                let pos = self.cursor.position;
-                let new_y = pos.y + 1;
-                self.scrollback_buffer.insert(new_y as usize, Line::new());
+                // Insert a new line into the scrollback buffer
+                let new_line_idx = self.cursor.scrollback_point.line_idx + LineIndex(1); 
+                self.cursor.scrollback_point.line_idx = new_line_idx;
+                self.cursor.scrollback_point.unit_idx = UnitIndex(0); 
+                self.scrollback_buffer.insert(new_line_idx.0, Line::new());
+                self.cursor.underneath = Unit::default(); // TODO: use style from the previous unit
                 
-                self.move_cursor_to(Point2D { x: 0, y: new_y });
-                
+                // Adjust the screen cursor to the next row
+                let needs_scroll_down = {
+                    self.cursor.screen_point.column = ColumnIndex(0);
+                    self.cursor.screen_point.row.0 += 1;
+                    if self.cursor.screen_point.row >= self.screen_size.row {
+                        self.cursor.screen_point.row.0 = self.screen_size.row.0 - 1;
+                        true
+                    } else {
+                        false
+                    }
+                };
             }
             _ => debug!("[EXECUTE]: unhandled byte: {:#X}", byte),
         }
@@ -632,7 +729,7 @@ impl fmt::Display for Character {
 }
 impl Default for Character {
     fn default() -> Self {
-        Character::Single(' ')
+        Character::Single('\u{0}')
     }
 }
 
@@ -707,11 +804,12 @@ pub struct UnitIndex(usize);
 #[derive(Debug, Default)]
 struct Cursor {
     /// The position of the cursor on the terminal screen,
-    /// given as `(x, y)` where `x` is the line/row index
+    /// given as `(x, y)` where `x` is the row index
     /// and `y` is the column index.
     screen_point: ScreenPoint,
-    /// The position in the scrollback buffer of the unit
-    /// that the cursor is currently pointing to.
+    /// The position in the scrollback buffer of the `Line` and `Unit`
+    /// that the cursor is currently pointing to. 
+    /// This determines where the next printed character will be written.
     scrollback_point: ScrollbackBufferPoint,
     /// The character that is beneath the cursor,
     /// which is possibly occluded by the cursor (depending on its style).
