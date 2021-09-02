@@ -500,7 +500,8 @@ impl AsciiControlCodes {
     /// (BEL) Plays a terminal bell or beep.
     /// `Ctrl + G`, or `'\a'`.
     pub const Bell: u8 = 0x07;
-    /// (BS) Backspaces over the previous character before (to the left of) the cursor.
+    /// (BS) Moves the cursor backwards by one unit/character, but does not remove it.
+    /// Note that this is different than the typical behavior of the "Backspace" key on a keyboard.
     /// `Ctrl + H`, or `'\b'`.
     pub const Backspace: u8 = 0x08;
     /// (HT) Inserts a horizontal tab.
@@ -521,7 +522,8 @@ impl AsciiControlCodes {
     /// (ESC) The escape character.
     /// `ESC`, or `'\e'`.
     pub const Escape: u8 = 0x1B;
-    /// (DEL) Deletes the next character after (to the right of) the cursor.
+    /// (DEL) Backwards-deletes the character before (to the left of) the cursor.
+    /// This is equivalent to what the Backspace key on a keyboard typically does.
     /// `DEL`.
-    pub const Delete: u8 = 0x7F;
+    pub const BackwardsDelete: u8 = 0x7F;
 }

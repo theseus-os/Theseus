@@ -651,15 +651,15 @@ QEMU_FLAGS += -s
 
 ## Enable the first serial port (the default log) to be redirected to the host terminal's stdio.
 ## Optionally, use the below `mon:` prefix to have the host terminal forward escape/control sequences to this serial port.
-QEMU_FLAGS += -serial $(SERIAL1)
-# QEMU_FLAGS += -serial mon:$(SERIAL1)
+# QEMU_FLAGS += -serial $(SERIAL1)
+QEMU_FLAGS += -serial mon:$(SERIAL1)
 
 ## Attach a second serial port to QEMU, which can be used for a separate headless shell/terminal.
 ## For example, if this is `pty`, and QEMU chooses to allocate a new pseudo-terminal at /dev/pts/6,
 ## then you can connect to this serial port by running a tty connector application in a new window:
 ## -- `screen /dev/pts/6`
 ## -- `picocom /dev/pts/6`
-QEMU_FLAGS += -serial $(SERIAL2)
+QEMU_FLAGS += -serial mon:$(SERIAL2)
 
 ## Disable the graphical display (for testing headless server functionality)
 ## `-vga none`:      removes the VGA card

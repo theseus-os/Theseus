@@ -164,9 +164,9 @@ impl Line {
         else {
             // The unit index is beyond the existing bounds of this Line, so fill it with empty Units as padding.
             let range_of_empty_padding = self.units.len() .. idx.0;
-            warn!("Untested scenario: padding Line with {} empty Units from {:?}", 
-                range_of_empty_padding.len(), range_of_empty_padding,
-            );
+            // warn!("Untested scenario: padding Line with {} empty Units from {:?}", 
+            //     range_of_empty_padding.len(), range_of_empty_padding,
+            // );
             self.units.reserve(range_of_empty_padding.len() + 1);
             for _i in range_of_empty_padding {
                 self.units.push(Unit { character: Character::default(), style: unit.style });
@@ -499,6 +499,26 @@ impl<Output: bare_io::Write> TerminalInner<Output> {
         false
     }
 
+    /// Moves the cursor's screen coordinate backward by one unit of the given width.
+    /// This does not modify the cursor's scrollback buffer position.
+    ///
+    /// Returns `true` if the screen needs to be scrolled up by one line.
+    fn decrement_screen_cursor(&mut self, unit_width: u16) -> bool {
+        let mut needs_scroll_up = false;
+        let new_col = self.cursor.screen_point.column.0 as i32 - unit_width as i32;
+        if new_col < 0 {
+            self.cursor.screen_point.column.0 = (new_col + self.screen_size.column.0 as i32) as u16;
+            if self.cursor.screen_point.row.0 == 0 {
+                needs_scroll_up = true;
+            } else {
+                self.cursor.screen_point.row.0 -= 1;
+            }
+        } else {
+            self.cursor.screen_point.column.0 = new_col as u16;
+        }
+        needs_scroll_up
+    }
+
     // TODO: implement function that calculates, retrieves, and/or creates a unit
     //       in the scrollback buffer at the location corresponding to the current cursor position. 
     //       Keep in mind that the cursor position is relative to the scroll position,
@@ -611,13 +631,21 @@ struct TerminalParserHandler<'term, Output: bare_io::Write> {
 
 impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Output> {
     fn print(&mut self, c: char) {
-        debug!("[PRINT]: char: {:?}", c);
+        // debug!("[PRINT]: char: {:?}", c);
+        if c == AsciiControlCodes::BackwardsDelete as char {
+            return self.execute(AsciiControlCodes::BackwardsDelete);
+        }
+
         let screen_size = self.screen_size;
         let tab_width = self.tab_width;
         let buf_pos = self.cursor.scrollback_point;
         let dest_line = &mut self.scrollback_buffer[buf_pos.line_idx];
         let new_unit = Unit { character: Character::Single(c), style: Style::default() };
         let new_unit_width = new_unit.displayable_width();
+        let new_unit_width = match new_unit_width {
+            0 => tab_width,
+            w => w,
+        };
         dest_line.insert_unit(
             buf_pos.unit_idx,
             new_unit,
@@ -653,6 +681,22 @@ impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Out
                     }
                 };
             }
+            AsciiControlCodes::Tab => self.print('\t'),
+            AsciiControlCodes::Backspace => {
+                // TODO: move both the screen cursor and the scrollback cursor back by one unit
+                self.backend.write(&[b'\x1b', b'[', AsciiControlCodes::Backspace as u8]).unwrap();
+
+            }
+            AsciiControlCodes::BackwardsDelete => {
+                // TODO: move the screen cursor back by one unit
+                // TODO: delete the previous unit from the scrollback buffer
+                // debug!("writing 0x7F to backend");
+                self.backend.write(&[
+                    b'\x1b', b'[', AsciiControlCodes::Backspace as u8, b'm', 
+                    b' ', 
+                    b'\x1b', b'[', AsciiControlCodes::Backspace as u8, b'm'
+                ]).unwrap();
+            }
             _ => debug!("[EXECUTE]: unhandled byte: {:#X}", byte),
         }
     }
@@ -677,10 +721,30 @@ impl<'term, Output: bare_io::Write> Perform for TerminalParserHandler<'term, Out
         );
     }
 
-    fn csi_dispatch(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, _action: char) {
+    fn csi_dispatch(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, action: char) {
         debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
-            _params, _intermediates, _ignore, _action,
+            _params, _intermediates, _ignore, action,
         );
+
+        match action {
+            '~' => {
+                // TODO: forward delete was pressed
+            }
+            'A' => {
+                // TODO: up arrow was pressed
+            }
+            'B' => {
+                // TODO: down arrow as pressed
+            }
+            'C' => {
+                // TODO: right arrow was pressed
+            }
+            'D' => {
+                // TODO: left arrow was pressed
+            }
+            _ => debug!("[CSI_DISPATCH] unhandled action: {}", action),
+        }
+
     }
 
     fn esc_dispatch(&mut self, _intermediates: &[u8], _ignore: bool, _byte: u8) {
