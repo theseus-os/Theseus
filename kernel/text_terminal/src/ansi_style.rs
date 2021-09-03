@@ -3,7 +3,7 @@
 
 use core::{convert::TryFrom, fmt};
 use alloc::borrow::Cow;
-use crate::{ForegroundColor, BackgroundColor, UnderlinedColor};
+use crate::{BackgroundColor, ForegroundColor, ScreenPoint, ScrollbackBufferPoint, UnderlinedColor};
 
 /// The style of text, including formatting and color choice, 
 /// for the character(s) displayed in a `Unit`.
@@ -514,8 +514,8 @@ impl AsciiControlCodes {
     /// `Ctrl + K`, or `'\v'`.
     pub const VerticalTab: u8 = 0x0B;
     /// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).
-    /// `Ctrl + K`, or `'\v'`.
-    pub const NewPage: u8 = 0x0C;
+    /// `Ctrl + L`, or `'\f'`.
+    pub const PageBreak: u8 = 0x0C;
     /// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.
     /// `Ctrl + M`, or `'\r'`.
     pub const CarriageReturn: u8 = 0x0D;

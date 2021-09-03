@@ -21,7 +21,7 @@ use task::TaskRef;
 use async_channel::Receiver;
 use serial_port::{SerialPort, SerialPortAddress, get_serial_port, DataChunk};
 use io::LockableIo;
-use text_terminal::TextTerminal;
+use text_terminal::{TextTerminal, TtyBackend};
 use irq_safety::MutexIrqSafe;
 
 
@@ -48,16 +48,17 @@ impl<I, O> Console<I, O> where I: bare_io::Read, O: bare_io::Write {
 	/// Creates a new console that surrounds a terminal instance
 	/// with input 
 	///
-	/// To start running the console, invoke the [`Console::spanw()`] function.
+	/// To start running the console, invoke the [`Console::spawn()`] function.
 	pub fn new_serial_console<S: Into<String>>(
 		name: S,
 		input_stream: I,
 		output_stream: O,
 	) -> Console<I, O> {
+		let backend = TtyBackend::new(output_stream);
 		Console {
 			name: name.into(),
 			_input: input_stream,
-			terminal: TextTerminal::new(80, 25, output_stream),
+			terminal: TextTerminal::new(80, 25, backend),
 		}
 	}
 }
