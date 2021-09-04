@@ -113,7 +113,7 @@ impl ScrollPosition {
 /// `Line`s *only* end at an actual hard line break, i.e., a newline character `'\n'`.
 ///
 #[derive(Debug, Default, Deref, DerefMut)]
-struct Line {
+pub struct Line {
     /// The actual characters that comprise this `Line`.
     #[deref] #[deref_mut]
     units: Vec<Unit>,
@@ -191,16 +191,23 @@ impl Line {
     /// If the given `UnitIndex` is not at the end of this `Line`,
     /// all `Unit`s after it will be shifted to the left by one,
     /// and the soft line breaks will be updated accordingly.
+    ///
+    /// Returns the width of the deleted unit in number of columns,
+    /// which dictates how far back the screen cursor must be moved.
     fn delete_unit(
         &mut self,
         idx: UnitIndex,
         screen_width: Column,
         tab_width: u16
-    ) {
-        self.units.remove(idx.0);
+    ) -> Column {
+        let removed_unit = self.units.remove(idx.0);
         // TODO: there is definitely a more efficient way to recalculate the soft line breaks
         //       rather than iterating over every single unit in this line.
         self.recalculate_soft_line_breaks(screen_width, tab_width);
+        match removed_unit.displayable_width() {
+            0 => Column(tab_width),
+            w => Column(w),
+        }
     }
 
     /// Calculates and returns the displayabe width in columns 
@@ -250,62 +257,14 @@ impl Line {
 /// such that a `Line` is a `Vec<Unit>`, and the buffer itself is a `Vec<Line>`. 
 /// This representation helps avoid huge contiguous dynamic memory allocations. 
 ///
-#[derive(Deref, DerefMut)]
-pub struct TextTerminal<Output> where Output: TerminalBackend {
-    /// The actual terminal state. 
-    #[deref] #[deref_mut]
-    inner: TerminalInner<Output>,
-
-    /// The VTE parser for parsing VT100/ANSI/xterm control and escape sequences.
-    ///
-    /// The event handler for the [`Parser`] is a transient zero-cost object 
-    /// of type [`TerminalParserHandler`] that is created on demand in 
-    /// [`TextTerminal::handle_input()`] every time an input byte needs to be handled.
-    parser: Parser,
-}
-
-
-/// A row-major vector of [`Line`]s that allows custom indexing.
-///
-/// If indexed by a [`LineIndex`], it returns a [`Line`] reference,
-/// which itself can be indexed by a [`UnitIndex`].
-///
-/// If indexed by a [`ScrollbackBufferPoint`] value, 
-/// it returns a reference to the [`Unit`] at that point.
-#[derive(Deref, DerefMut)]
-struct Lines(Vec<Line>);
-impl Index<LineIndex> for Lines {
-    type Output = Line;
-    fn index(&self, index: LineIndex) -> &Self::Output {
-        &self.0[index.0]
-    }
-}
-impl IndexMut<LineIndex> for Lines {
-    fn index_mut(&mut self, index: LineIndex) -> &mut Self::Output {
-        &mut self.0[index.0]
-    }
-}
-impl Index<ScrollbackBufferPoint> for Lines {
-    type Output = Unit;
-    fn index(&self, index: ScrollbackBufferPoint) -> &Self::Output {
-        &self[index.line_idx][index.unit_idx]
-    }
-}
-impl IndexMut<ScrollbackBufferPoint> for Lines {
-    fn index_mut(&mut self, index: ScrollbackBufferPoint) -> &mut Self::Output {
-        &mut self[index.line_idx][index.unit_idx]
-    }
-}
-
-
-pub struct TerminalInner<Backend> where Backend: TerminalBackend {
+pub struct TextTerminal<Backend> where Backend: TerminalBackend {
     /// The buffer of all content that is currently displayed or has been previously displayed
     /// on this terminal's screen, including in-band control and escape sequences.
     /// This is what should be written out directly to the terminal backend.
     ///
     /// Because this includes control/escape sequences in addition to regular characters,
     /// the size of this scrollback buffer cannot be used to calculate line wrap lengths or scroll/cursor positions.
-    scrollback_buffer: Lines,
+    scrollback_buffer: ScrollbackBuffer,
 
     /// The current position in the scrollback buffer, i.e.,
     /// the specific `Line` and `Unit` that the cursor is pointing to.
@@ -332,7 +291,48 @@ pub struct TerminalInner<Backend> where Backend: TerminalBackend {
     /// The terminal backend to which display actions are sent to be handled 
     /// in a backend-specific manner.
     backend: Backend,
+
+    /// The VTE parser for parsing VT100/ANSI/xterm control and escape sequences.
+    ///
+    /// The event handler for the [`Parser`] is a transient zero-cost object 
+    /// of type [`TerminalParserHandler`] that is created on demand in 
+    /// [`TextTerminal::handle_input()`] every time an input byte needs to be handled.
+    parser: Parser,
 }
+
+
+/// The scrollback buffer is stored as a row-major vector of [`Line`]s.
+///
+/// If indexed by a [`LineIndex`], it returns a [`Line`] reference,
+/// which itself can be indexed by a [`UnitIndex`].
+///
+/// If indexed by a [`ScrollbackBufferPoint`] value, 
+/// it returns a reference to the [`Unit`] at that point.
+#[derive(Debug, Deref, DerefMut)]
+pub struct ScrollbackBuffer(Vec<Line>);
+impl Index<LineIndex> for ScrollbackBuffer {
+    type Output = Line;
+    fn index(&self, index: LineIndex) -> &Self::Output {
+        &self.0[index.0]
+    }
+}
+impl IndexMut<LineIndex> for ScrollbackBuffer {
+    fn index_mut(&mut self, index: LineIndex) -> &mut Self::Output {
+        &mut self.0[index.0]
+    }
+}
+impl Index<ScrollbackBufferPoint> for ScrollbackBuffer {
+    type Output = Unit;
+    fn index(&self, index: ScrollbackBufferPoint) -> &Self::Output {
+        &self[index.line_idx][index.unit_idx]
+    }
+}
+impl IndexMut<ScrollbackBufferPoint> for ScrollbackBuffer {
+    fn index_mut(&mut self, index: ScrollbackBufferPoint) -> &mut Self::Output {
+        &mut self[index.line_idx][index.unit_idx]
+    }
+}
+
 
 impl<Backend: TerminalBackend> TextTerminal<Backend> {
     /// Create an empty `TextTerminal` with no text content.
@@ -350,15 +350,13 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
         });
 
         let mut terminal = TextTerminal {
-            inner: TerminalInner {
-                scrollback_buffer: Lines(vec![Line::new()]), // start with one empty line
-                scrollback_cursor: ScrollbackBufferPoint::default(),
-                scroll_position: ScrollPosition::default(),
-                tab_width: 4,
-                cursor: Cursor::default(),
-                // mode: TerminalMode::default(),
-                backend,
-            },
+            scrollback_buffer: ScrollbackBuffer(vec![Line::new()]), // start with one empty line
+            scrollback_cursor: ScrollbackBufferPoint::default(),
+            scroll_position: ScrollPosition::default(),
+            tab_width: 4,
+            cursor: Cursor::default(),
+            // mode: TerminalMode::default(),
+            backend,
             parser: Parser::new(),
         };
 
@@ -381,7 +379,13 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
         let mut total_bytes_read = 0;
         let mut buf = [0; READ_BATCH_SIZE];
 
-        let mut handler = TerminalParserHandler { terminal: &mut self.inner };
+        let mut handler = TerminalParserHandler { 
+            scrollback_buffer: &mut self.scrollback_buffer,
+            scrollback_cursor: &mut self.scrollback_cursor,
+            cursor: &mut self.cursor,
+            backend: &mut self.backend,
+            tab_width: &mut self.tab_width,
+        };
 
         // Keep reading for as long as there are more bytes available.
         let mut n = READ_BATCH_SIZE;
@@ -404,9 +408,8 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
     pub fn flush(&mut self) -> bare_io::Result<usize> {
         unimplemented!()
     }
-}
 
-impl<Output: TerminalBackend> TerminalInner<Output> {
+
     /// Resizes this terminal's screen to be `width` columns and `height` rows (lines),
     /// in units of *number of characters*.
     ///
@@ -560,12 +563,19 @@ impl<Output: TerminalBackend> TerminalInner<Output> {
     */
 }
 
-#[derive(Deref, DerefMut)]
-struct TerminalParserHandler<'term, Output: TerminalBackend> {
-    terminal: &'term mut TerminalInner<Output>,
+struct TerminalParserHandler<'term, Backend: TerminalBackend> {
+    // Note: we capture a mutable reference to each relevant field from the [`TextTerminal`] 
+    //       struct because that gets around Rust's inability to split multiple mutable borrows.
+    scrollback_buffer: &'term mut ScrollbackBuffer,
+    scrollback_cursor: &'term mut ScrollbackBufferPoint,
+    cursor: &'term mut Cursor,
+    backend: &'term mut Backend,
+    tab_width: &'term mut u16,
 }
 
-impl<'term, Output: TerminalBackend> Perform for TerminalParserHandler<'term, Output> {
+impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, Backend> {
+
+    // The callback invoked when a single character is ready to be printed to the screen.
     fn print(&mut self, c: char) {
         // debug!("[PRINT]: char: {:?}", c);
 
@@ -575,15 +585,14 @@ impl<'term, Output: TerminalBackend> Perform for TerminalParserHandler<'term, Ou
             return self.execute(AsciiControlCodes::BackwardsDelete);
         }
 
-        let screen_size = self.screen_size();
-        let tab_width = self.tab_width;
-        let orig_scrollback_pos = self.scrollback_cursor;
+        let screen_size = self.backend.screen_size();
+        let tab_width = *self.tab_width;
+        let orig_scrollback_pos = *self.scrollback_cursor;
         let dest_line = &mut self.scrollback_buffer[orig_scrollback_pos.line_idx];
         let new_unit = Unit { character: Character::Single(c), style: Style::default() };
-        let new_unit_width = new_unit.displayable_width();
-        let new_unit_width = match new_unit_width {
-            0 => tab_width,
-            w => w,
+        let new_unit_width = match new_unit.displayable_width() {
+            0 => Column(tab_width),
+            w => Column(w),
         };
         dest_line.insert_unit(
             orig_scrollback_pos.unit_idx,
@@ -595,9 +604,9 @@ impl<'term, Output: TerminalBackend> Perform for TerminalParserHandler<'term, Ou
 
         // Now that we've handled inserting everything into the scrollback buffer,
         // we can move on to refreshing the display.
-        let display_action = DisplayAction::Insert { 
+        let display_action = DisplayAction::Insert {
             scrollback_start: orig_scrollback_pos,
-            scrollback_end:   self.scrollback_cursor,
+            scrollback_end:   *self.scrollback_cursor,
             screen_start:     self.cursor.position,
         };
         let lines = &self.scrollback_buffer;
@@ -605,11 +614,12 @@ impl<'term, Output: TerminalBackend> Perform for TerminalParserHandler<'term, Ou
 
         let (new_screen_cursor, scroll_action) = increment_screen_cursor(self.cursor.position, new_unit_width, screen_size);
         self.cursor.position = new_screen_cursor;
-        let new_buf_pos = self.scrollback_cursor;
+
+        // TODO: handle scroll_action appropriately
     }
 
     fn execute(&mut self, byte: u8) {
-        let ScreenSize { num_columns, num_rows } = self.screen_size();
+        let screen_size = self.backend.screen_size();
 
         match byte {
             AsciiControlCodes::NewLine | AsciiControlCodes::CarriageReturn => {
@@ -624,8 +634,8 @@ impl<'term, Output: TerminalBackend> Perform for TerminalParserHandler<'term, Ou
                 let needs_scroll_down = {
                     self.cursor.position.column = Column(0);
                     self.cursor.position.row.0 += 1;
-                    if self.cursor.position.row >= num_rows {
-                        self.cursor.position.row.0 = num_rows.0 - 1;
+                    if self.cursor.position.row >= screen_size.num_rows {
+                        self.cursor.position.row.0 = screen_size.num_rows.0 - 1;
                         true
                     } else {
                         false
@@ -637,31 +647,31 @@ impl<'term, Output: TerminalBackend> Perform for TerminalParserHandler<'term, Ou
                 // The backspace action simply moves the cursor back by one unit, 
                 // without modifying the content or wrapping to the previous line.
                 let wrap = WrapLine::No;
-                self.scrollback_cursor = decrement_scrollback_cursor(self.scrollback_cursor, &self.scrollback_buffer, wrap);
+                *self.scrollback_cursor = decrement_scrollback_cursor(*self.scrollback_cursor, &*self.scrollback_buffer, wrap);
                 let cursor_position = self.cursor.position;
-                self.backend.move_cursor_by(cursor_position, -1, 0, wrap);
+                self.cursor.position = self.backend.move_cursor_by(cursor_position, -1, 0, wrap);
             }
             AsciiControlCodes::BackwardsDelete => {
                 // Delete the previous unit from the scrollback buffer
                 let wrap = WrapLine::Yes;
-                let orig_buffer_pos = self.scrollback_cursor;
-                self.scrollback_cursor = decrement_scrollback_cursor(orig_buffer_pos, &self.scrollback_buffer, wrap);
-                if orig_buffer_pos == self.scrollback_cursor {
+                let orig_buffer_pos = *self.scrollback_cursor;
+                *self.scrollback_cursor = decrement_scrollback_cursor(orig_buffer_pos, &self.scrollback_buffer, wrap);
+                if orig_buffer_pos == *self.scrollback_cursor {
                     return;
                 }
 
-                let scrollback_cursor = self.scrollback_cursor;
-                let tab_width = self.tab_width;
-                self.scrollback_buffer[scrollback_cursor.line_idx].delete_unit(
+                let scrollback_cursor = *self.scrollback_cursor;
+                let tab_width = *self.tab_width;
+                let removed_unit_width = self.scrollback_buffer[scrollback_cursor.line_idx].delete_unit(
                     scrollback_cursor.unit_idx,
-                    num_columns,
+                    screen_size.num_columns,
                     tab_width,
                 );
 
-                let display_action = DisplayAction::Replace {
-                    scrollback_start: scrollback_cursor,
-                    scrollback_end:   orig_buffer_pos,
-                    screen_start:     self.cursor.position,
+                let (ending_screen_cursor, _scroll_action) = decrement_screen_cursor(self.cursor.position, removed_unit_width, screen_size); 
+                let display_action = DisplayAction::Delete {
+                    screen_start: self.cursor.position,
+                    screen_end:   ending_screen_cursor,
                 };
                 let screen_cursor_post_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
                 // After calling display(), the cursor will be at the end of the replaced region on screen,
@@ -798,12 +808,22 @@ impl Deref for Unit {
 
 /// The size of a terminal screen, expressed as the
 /// number of columns (x dimension) by the number of rows (y dimension).
+///
+/// The default screen size is 80 columns by 25 rows.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ScreenSize {
     /// The width of the screen viewport in number of columns (x dimension).
     pub num_columns: Column,
     /// The height of the screen viewport in number of rows (y dimension).
     pub num_rows: Row,
+}
+impl Default for ScreenSize {
+    fn default() -> Self {
+        ScreenSize {
+            num_columns: Column(80),
+            num_rows: Row(25),
+        }
+    }
 }
 
 /// A 2D position value that represents a point on the screen,
@@ -817,11 +837,11 @@ pub struct ScreenPoint {
     row: Row,
 }
 
-/// A row number in the y-dimension of the screen viewport. 
+/// A row index or number of rows in the y-dimension of the screen viewport. 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(Add, AddAssign, Sub, SubAssign)]
 pub struct Row(u16);
-/// A column number in the x-dimension of the screen viewport. 
+/// A column index or number of columns in the x-dimension of the screen viewport. 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(Add, AddAssign, Sub, SubAssign)]
 pub struct Column(u16);
@@ -886,11 +906,11 @@ impl Default for CursorStyle {
 /// to handle this screen cursor movement.
 fn increment_screen_cursor(
     mut cursor_position: ScreenPoint,
-    unit_width: u16,
+    unit_width: Column,
     screen_size: ScreenSize,
     // TODO: add wrapping support
 ) -> (ScreenPoint, ScrollAction) {
-    cursor_position.column += Column(unit_width);
+    cursor_position.column += unit_width;
     if cursor_position.column >= screen_size.num_columns {
         cursor_position.column.0 %= screen_size.num_columns.0;
         cursor_position.row.0 += 1;
@@ -910,11 +930,11 @@ fn increment_screen_cursor(
 /// to handle this screen cursor movement.
 fn decrement_screen_cursor(
     mut cursor_position: ScreenPoint,
-    unit_width: u16,
+    unit_width: Column,
     screen_size: ScreenSize,
     // TODO: add wrapping support
 ) -> (ScreenPoint, ScrollAction) {
-    let new_col = cursor_position.column.0 as i32 - unit_width as i32;
+    let new_col = cursor_position.column.0 as i32 - unit_width.0 as i32;
     if new_col < 0 {
         cursor_position.column.0 = (new_col + screen_size.num_columns.0 as i32) as u16;
         if cursor_position.row.0 == 0 {
@@ -935,11 +955,11 @@ fn decrement_screen_cursor(
 /// Returns the new position of the scrollback cursor.
 fn decrement_scrollback_cursor(
     mut scrollback_cursor: ScrollbackBufferPoint,
-    scrollback_buffer: &Lines,
+    scrollback_buffer: &ScrollbackBuffer,
     wrap_lines: WrapLine,
 ) -> ScrollbackBufferPoint {
     if wrap_lines == WrapLine::No {
-        scrollback_cursor.unit_idx.0.saturating_sub(1);
+        scrollback_cursor.unit_idx.0 = scrollback_cursor.unit_idx.0.saturating_sub(1);
         return scrollback_cursor;
     }
 
@@ -979,7 +999,7 @@ pub trait TerminalBackend {
     fn display(
         &mut self,
         display_action: DisplayAction,
-        scrollback_buffer: &Lines,
+        scrollback_buffer: &ScrollbackBuffer,
         previous_style: Option<Style>,
     ) -> Result<ScreenPoint, Self::DisplayError>;
 
@@ -1013,15 +1033,33 @@ pub trait TerminalBackend {
 /// TODO: offer a config option that determines whether the TTY endpoint support scrolling on the client side
 ///       such that we don't have to handle it 
 ///       and we cannot really handle it because it doesn't forward the control commands to us. 
-pub struct TtyBackend {
+pub struct TtyBackend<Output: bare_io::Write> {
     /// The width and height of this terminal's screen.
     screen_size: ScreenSize,
 
+    /// The actual position of the cursor on the real terminal backend screen.
+    real_screen_cursor: ScreenPoint,
+
     /// The output stream to which bytes are written,
     /// which will be read by a TTY backend on the other side of the stream.
-    output: Box<dyn bare_io::Write>,
+    output: Output,
 }
-impl TerminalBackend for TtyBackend {
+impl<Output: bare_io::Write> TtyBackend<Output> {
+    pub fn new(
+        screen_size: Option<ScreenSize>,
+        output_stream: Output,
+    ) -> TtyBackend<Output> {
+        TtyBackend {
+            screen_size: screen_size.unwrap_or_default(),
+            real_screen_cursor: ScreenPoint::default(),
+            output: output_stream,
+        }
+        // TODO: here, query the backend for the real cursor location,
+        //       which could be anywhere, e.g., if we connected to an existing terminal.
+        //       For now we just assume it's at the origin point of `(0,0)`.
+    }
+}
+impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
     type DisplayError = bare_io::Error;
 
     #[inline(always)]
@@ -1037,9 +1075,10 @@ impl TerminalBackend for TtyBackend {
     fn display(
         &mut self,
         display_action: DisplayAction,
-        scrollback_buffer: &Lines,
+        scrollback_buffer: &ScrollbackBuffer,
         previous_style: Option<Style>,
     ) -> Result<ScreenPoint, Self::DisplayError> {
+        debug!("DisplayAction::{:?}\nScrollback Buffer: {:?}", display_action, scrollback_buffer);
 
         let mut char_encode_buf = [0u8; 4];
         let mut bytes_written = 0;
@@ -1056,6 +1095,11 @@ impl TerminalBackend for TtyBackend {
             }
         };
 
+        if self.real_screen_cursor != screen_start {
+            warn!("Skipping required screen cursor movement from {:?} to {:?}", self.real_screen_cursor, screen_start);
+            // TODO: issue a command to move the screen cursor to `screen_start`
+        }
+
         // For now, we just assume that the backend output stream is a linear "file"
         // that can't adjust its position, so we just write directly to it 
         // whilst ignoring the `screen_start` parameter.
@@ -1063,14 +1107,17 @@ impl TerminalBackend for TtyBackend {
         for line_idx in scrollback_start.line_idx.0 ..= scrollback_end.line_idx.0 {
             let line_idx = LineIndex(line_idx);
             let line = &scrollback_buffer[line_idx];
-
+            
             // Write the requested part of this line, up to the entire line.
             let end = if scrollback_end.line_idx == line_idx {
                 scrollback_end.unit_idx.0
             } else {
                 line.units.len() - 1
             };
-            for unit in &line.units[start_unit.0 ..= end] {
+            
+            debug!("Looking at line {}, units {}..{}: {:?}", line_idx.0, start_unit.0, end, line);
+
+            for unit in &line.units[start_unit.0 .. end] {
                 // First, write out the escape sequences for the difference in style.
                 if unit.style != previous_style {
                     let mut diff_iter = unit.style.diff(&previous_style);
@@ -1101,14 +1148,21 @@ impl TerminalBackend for TtyBackend {
             start_unit = UnitIndex(0);
         }
 
-        Ok(screen_start) // TODO: Fix this function to actually update the screen cursor
+        // TODO: Fix this function to actually update the screen cursor
+        self.real_screen_cursor = screen_start;
+        Ok(screen_start) 
     }
 
     fn move_cursor_to(&mut self, new_cursor: ScreenPoint) -> ScreenPoint {
-        unimplemented!()
+        unimplemented!();
+        // TODO: Fix this function to actually update the screen cursor
+        // self.real_screen_cursor = screen_start;
     }
 
     fn move_cursor_by(&mut self, current_cursor: ScreenPoint, num_cols: i32, num_rows: i32, wrap: WrapLine) -> ScreenPoint {
+        // TODO: Fix this function to actually update the screen cursor
+        // self.real_screen_cursor = screen_start;
+
         if num_cols == -1 {
             self.output.write(&[b'\x1b', b'[', AsciiControlCodes::Backspace as u8]).unwrap();
             ScreenPoint {
@@ -1130,14 +1184,16 @@ is actually handled and processed."]
 pub enum DisplayAction {
     /// Delete the contents displayed on the screen in the given range of on-screen coordinates,
     /// setting the units to blank space of the default style.
-    /// Both bounds are inclusive.
+    ///
+    /// The start bound is inclusive, the end bound is exclusive.
     Delete {
         screen_start: ScreenPoint,
         screen_end:   ScreenPoint,
     },
     /// Replace the contents displayed on the screen starting at the given on-screen coordinate
     /// with the contents of the scrollback buffer.
-    /// All bounds are inclusive.
+    ///
+    /// The start bound is inclusive, the end bound is exclusive.
     Replace {
         scrollback_start: ScrollbackBufferPoint,
         scrollback_end:   ScrollbackBufferPoint,
@@ -1148,7 +1204,8 @@ pub enum DisplayAction {
     /// After the content from the scrollback buffer is inserted,
     /// all other content currently on the screen will be shifted to the right
     /// and reflowed such that nothing else is lost. 
-    /// All bounds are inclusive.
+    ///
+    /// The start bound is inclusive, the end bound is exclusive.
     Insert {
         scrollback_start: ScrollbackBufferPoint,
         scrollback_end:   ScrollbackBufferPoint,
