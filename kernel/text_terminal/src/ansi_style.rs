@@ -527,3 +527,50 @@ impl AsciiControlCodes {
     /// `DEL`.
     pub const BackwardsDelete: u8 = 0x7F;
 }
+
+
+/// The set of "frequently-supported" commands to switch terminal modes.
+///
+/// These are sometimes referred to as "ECMA-48" modes or commands.
+pub struct ModeSwitch;
+#[allow(non_upper_case_globals)]
+impl ModeSwitch {
+    /// (DECCRM) Display control characters.
+    /// This is off by default.
+    pub const DisplayControlChars: u8 = b'3';
+
+    /// (DECIM) Set insert mode.
+    /// This is off by default, meaning the terminal is in replace mode.
+    pub const InsertMode: u8 = b'4';
+
+    /// (LF/NL) Automatically follow a Line Feed (LF), Vertical Tab (VT),
+    /// and Form Feed (FF) with a Carriage Return (CR).
+    /// This is off by default.
+    pub const AutomaticCarriageReturn: &'static [u8; 2] = b"20";
+
+    /// If this value comes after one of the above command values,
+    /// it means that the mode should be set, replacing the default value.
+    pub const SET_SUFFIX: u8 = b'h';
+
+    /// If this value comes after one of the above command values,
+    /// it means that the mode should be "unset" or "reset" to the default.
+    pub const RESET_SUFFIX: u8 = b'h';
+}
+
+pub struct StatusReportCommands;
+#[allow(non_upper_case_globals)]
+impl StatusReportCommands {
+    /// (DSR) Queries the terminal device for its status.
+    /// A reply of `"ESC [ 0 n"` indicates the terminal is okay.
+    pub const DeviceStatusRequest: u8 = b'5';
+
+    /// The response to a [`DeviceStatusRequest`] indicating the terminal device is Ok.
+    pub const DeviceStatusOk: u8 = b'0';
+
+    /// (CSR) Queries the terminal device for a cursor position report.
+    /// A reply will be `"ESC [ y ; x R"`, in which `(x,y)` is the cursor position.
+    pub const CursosPositionReport: u8 = b'6';
+
+    /// The value that comes after one of the above command values.
+    pub const SUFFIX: u8 = b'n';
+}

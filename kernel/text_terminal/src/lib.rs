@@ -360,6 +360,8 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             parser: Parser::new(),
         };
 
+        // By default, we set the terminal backend to function in insert mode.
+        terminal.backend.set_mode(&[b'\x1B', b'[', ModeSwitch::InsertMode, ModeSwitch::SET_SUFFIX]);
         // TODO: test printing some formatted text to the terminal
         let welcome = "Welcome to Theseus's text terminal!";
         terminal.handle_input(&mut welcome.as_bytes()).expect("failed to write terminal welcome message");
@@ -564,8 +566,8 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
 }
 
 struct TerminalParserHandler<'term, Backend: TerminalBackend> {
-    // Note: we capture a mutable reference to each relevant field from the [`TextTerminal`] 
-    //       struct because that gets around Rust's inability to split multiple mutable borrows.
+    // Note: we capture a mutable reference to each relevant field from the [`TextTerminal`] struct
+    //       in order to work around Rust's inability to split multiple mutable borrows.
     scrollback_buffer: &'term mut ScrollbackBuffer,
     scrollback_cursor: &'term mut ScrollbackBufferPoint,
     cursor: &'term mut Cursor,
@@ -673,10 +675,9 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                     screen_start: self.cursor.position,
                     screen_end:   ending_screen_cursor,
                 };
-                let screen_cursor_post_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
-                // After calling display(), the cursor will be at the end of the replaced region on screen,
-                // so we need to move it backwards by one column to compensate.
-                self.cursor.position = self.backend.move_cursor_by(screen_cursor_post_display, -1, 0, wrap);
+                let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+                debug!("After BackwardsDelete, screen cursor moved from {:?} -> {:?}", self.cursor.position, screen_cursor_after_display);
+                self.cursor.position = screen_cursor_after_display;
             }
             _ => debug!("[EXECUTE]: unhandled byte: {:#X}", byte),
         }
@@ -709,7 +710,32 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
 
         match action {
             '~' => {
-                // TODO: forward delete was pressed
+                // TODO: forward delete was pressed, only if the params are '3'
+                // Delete the current unit from the scrollback buffer
+                let wrap = WrapLine::Yes;
+                let screen_size = self.backend.screen_size();
+                // Check that the scrollback_cursor is not at the end of a Line, as there'd be no Unit to delete.
+                let scrollback_cursor = *self.scrollback_cursor;
+                if scrollback_cursor.unit_idx.0 >= self.scrollback_buffer[scrollback_cursor.line_idx].len() {
+                    return;
+                }
+
+                let tab_width = *self.tab_width;
+                let removed_unit_width = self.scrollback_buffer[scrollback_cursor.line_idx].delete_unit(
+                    scrollback_cursor.unit_idx,
+                    screen_size.num_columns,
+                    tab_width,
+                );
+
+                let current_screen_cursor = self.cursor.position;
+                let (ending_screen_cursor, _scroll_action) = increment_screen_cursor(current_screen_cursor, removed_unit_width, screen_size); 
+                let display_action = DisplayAction::Delete {
+                    screen_start: current_screen_cursor,
+                    screen_end:   ending_screen_cursor,
+                };
+                let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+                // move the screen cursor back by one column, as the display() call above has advanced it forwad to `ending_screen_cursor`.
+                self.cursor.position = self.backend.move_cursor_by(current_screen_cursor, -1, 0, wrap);
             }
             'A' => {
                 // TODO: up arrow was pressed
@@ -949,10 +975,41 @@ fn decrement_screen_cursor(
 }
 
 
-/// Moves the scrollback cursor backward by one unit.
-/// This does not modify the on-screen cursor's position.
+// /// Returns the position of the given `scrollback_cursor` moved forward by one unit.
+// ///
+// /// This is a pure calculation that does not modify any cursor positions.
+// fn increment_scrollback_cursor(
+//     mut scrollback_cursor: ScrollbackBufferPoint,
+//     scrollback_buffer: &ScrollbackBuffer,
+//     wrap_lines: WrapLine,
+// ) -> ScrollbackBufferPoint {
+//     let line_length = UnitIndex(scrollback_buffer[scrollback_cursor.line_idx].len());
+
+//     if wrap_lines == WrapLine::No {
+//         scrollback_cursor.unit_idx = min(
+//             UnitIndex(scrollback_cursor.unit_idx.0.saturating_add(1)),
+//             line_length,
+//         );
+//         return scrollback_cursor;
+//     }
+
+//     if scrollback_cursor.unit_idx < line_length {
+//         scrollback_cursor.unit_idx += UnitIndex(1);
+//     } else {
+//         let next_line = scrollback_cursor.line_idx.0 + 1;
+//         if next_line < scrollback_buffer.len() {
+//             // wrap forwards to the beginning of the next line
+//             scrollback_cursor.unit_idx = UnitIndex(0);
+//             scrollback_cursor.line_idx = LineIndex(next_line);
+//         }
+//     }
+//     scrollback_cursor
+// }
+
+
+/// Returns the position of the given `scrollback_cursor` moved backward by one unit.
 ///
-/// Returns the new position of the scrollback cursor.
+/// This is a pure calculation that does not modify any cursor positions.
 fn decrement_scrollback_cursor(
     mut scrollback_cursor: ScrollbackBufferPoint,
     scrollback_buffer: &ScrollbackBuffer,
@@ -1021,6 +1078,9 @@ pub trait TerminalBackend {
     /// Returns the new position of the on-screen cursor.
     #[must_use]
     fn move_cursor_by(&mut self, current_cursor: ScreenPoint, num_columns: i32, num_rows: i32, wrap: WrapLine) -> ScreenPoint;
+
+    /// TODO: change this, just a temporary way of forwarding bytes directly to the backend.
+    fn set_mode(&mut self, mode_bytes: &[u8]);
 }
 
 
@@ -1043,8 +1103,26 @@ pub struct TtyBackend<Output: bare_io::Write> {
     /// The output stream to which bytes are written,
     /// which will be read by a TTY backend on the other side of the stream.
     output: Output,
+
+    insert_mode: bool,
 }
 impl<Output: bare_io::Write> TtyBackend<Output> {
+    const BACKWARDS_DELETE: &'static [u8] = &[
+        AsciiControlCodes::Escape,
+        b'[',
+        AsciiControlCodes::BackwardsDelete,
+    ];
+    // const BACKWARDS_DELETE: &'static [u8] = &[
+    //     AsciiControlCodes::BackwardsDelete,
+    // ];
+    const FORWARDS_DELETE: &'static [u8] = &[
+        AsciiControlCodes::Escape,
+        b'[',
+        b'3',
+        b'~',
+    ];
+
+
     pub fn new(
         screen_size: Option<ScreenSize>,
         output_stream: Output,
@@ -1053,10 +1131,39 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
             screen_size: screen_size.unwrap_or_default(),
             real_screen_cursor: ScreenPoint::default(),
             output: output_stream,
+            insert_mode: true,
         }
         // TODO: here, query the backend for the real cursor location,
         //       which could be anywhere, e.g., if we connected to an existing terminal.
         //       For now we just assume it's at the origin point of `(0,0)`.
+    }
+
+    /// Deletes the contents on screen from the given `screen_start` point (inclusive) 
+    /// to the given `screen_end` point (exclusive).
+    fn delete(&mut self, screen_start: ScreenPoint, screen_end: ScreenPoint) -> ScreenPoint {
+        debug!("Deleting from {:?} to {:?}", screen_start, screen_end);
+        let forward_delete = screen_start < screen_end;
+        
+        // TODO: move the cursor to `screen_start`
+        if self.real_screen_cursor != screen_start {
+            warn!("delete(): Skipping required screen cursor movement from {:?} to {:?}", self.real_screen_cursor, screen_start);
+        }
+
+        let mut current = screen_start;
+        while current != screen_end {
+            if forward_delete {
+                self.output.write(Self::FORWARDS_DELETE).unwrap();
+            } else {
+                self.output.write(Self::BACKWARDS_DELETE).unwrap();
+            }
+
+            current = if forward_delete {
+                increment_screen_cursor(current, Column(1), self.screen_size).0
+            } else {
+                decrement_screen_cursor(current, Column(1), self.screen_size).0
+            };
+        }
+        return screen_end;
     }
 }
 impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
@@ -1078,7 +1185,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
         scrollback_buffer: &ScrollbackBuffer,
         previous_style: Option<Style>,
     ) -> Result<ScreenPoint, Self::DisplayError> {
-        debug!("DisplayAction::{:?}\nScrollback Buffer: {:?}", display_action, scrollback_buffer);
+        // debug!("DisplayAction::{:?}\nScrollback Buffer: {:?}", display_action, scrollback_buffer);
 
         let mut char_encode_buf = [0u8; 4];
         let mut bytes_written = 0;
@@ -1090,8 +1197,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
                 (scrollback_start, scrollback_end, screen_start)
             }
             DisplayAction::Delete { screen_start, screen_end } => {
-                warn!("Skipping unimplemented {:?}", display_action);
-                return Ok(screen_start);
+                return Ok(self.delete(screen_start, screen_end));
             }
         };
 
@@ -1115,7 +1221,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
                 line.units.len() - 1
             };
             
-            debug!("Looking at line {}, units {}..{}: {:?}", line_idx.0, start_unit.0, end, line);
+            // debug!("Looking at line {}, units {}..{}: {:?}", line_idx.0, start_unit.0, end, line);
 
             for unit in &line.units[start_unit.0 .. end] {
                 // First, write out the escape sequences for the difference in style.
@@ -1173,11 +1279,17 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
             unimplemented!() // TODO: fix this, just temporary
         }
     }
+
+    fn set_mode(&mut self, mode_bytes: &[u8]) {
+        self.output.write(mode_bytes).expect("failed to write mode_bytes");
+    }
 }
 
 
 
 /// A pending action to display content from the terminal's scrollback buffer on the screen.
+///
+/// See the [`TerminalBackend::display()`] for more information on how this type is used.
 #[must_use = "`DisplayAction`s must be used to ensure the display action 
 is actually handled and processed."]
 #[derive(Debug)]
@@ -1185,7 +1297,19 @@ pub enum DisplayAction {
     /// Delete the contents displayed on the screen in the given range of on-screen coordinates,
     /// setting the units to blank space of the default style.
     ///
-    /// The start bound is inclusive, the end bound is exclusive.
+    /// A delete action can occur in both the forwards and backwards direction:
+    /// * If `screen_start` is less than `screen_end`, a forward delete should be performed.
+    /// * If `screen_start` is greater than `screen_end`, a backwards delete should be performed.
+    ///
+    /// The direction of the delete action matters for the following reasons:
+    /// * A [`TerminalBackend`] may use it to optimize which action occurs, and
+    /// * It also dictates where the screen cursor will end up after the delete action occurs;
+    ///   it will always be equal to `screen_end`.
+    ///
+    /// For example, if a user presses the "Backspace" key, they expect a backwards deletion,
+    /// but if they press the "Delete" key, they expect a forwards deletion.
+    ///
+    /// The `screen_start` bound is inclusive; the `screen_end` bound is exclusive.
     Delete {
         screen_start: ScreenPoint,
         screen_end:   ScreenPoint,
@@ -1193,7 +1317,8 @@ pub enum DisplayAction {
     /// Replace the contents displayed on the screen starting at the given on-screen coordinate
     /// with the contents of the scrollback buffer.
     ///
-    /// The start bound is inclusive, the end bound is exclusive.
+    /// The `scrollback_start` bound is inclusive; the `scrollback_end` bound is exclusive;
+    /// the `screen_start` bound is also inclusive.
     Replace {
         scrollback_start: ScrollbackBufferPoint,
         scrollback_end:   ScrollbackBufferPoint,
@@ -1205,19 +1330,20 @@ pub enum DisplayAction {
     /// all other content currently on the screen will be shifted to the right
     /// and reflowed such that nothing else is lost. 
     ///
-    /// The start bound is inclusive, the end bound is exclusive.
+    /// The `scrollback_start` bound is inclusive; the `scrollback_end` bound is exclusive;
+    /// the `screen_start` bound is also inclusive.
     Insert {
         scrollback_start: ScrollbackBufferPoint,
         scrollback_end:   ScrollbackBufferPoint,
         screen_start:     ScreenPoint,
     },
 }
-impl Drop for DisplayAction {
-    fn drop(&mut self) {
-        warn!("{:?} was dropped without being handled!", self);
-    }
+// impl Drop for DisplayAction {
+//     fn drop(&mut self) {
+//         warn!("{:?} was dropped without being handled!", self);
+//     }
     
-}
+// }
 
 /// A pending action to scroll the screen up or down by a number of rows.
 #[must_use = "`ScrollAction`s must be used to ensure the scroll action 
@@ -1232,14 +1358,14 @@ pub enum ScrollAction {
     Down(usize),
 }
 
-impl Drop for ScrollAction {
-    fn drop(&mut self) {
-        match self {
-            Self::None => { }
-            _ => warn!("{:?} was dropped without being handled!", self),
-        }
-    }
-}
+// impl Drop for ScrollAction {
+//     fn drop(&mut self) {
+//         match self {
+//             Self::None => { }
+//             _ => warn!("{:?} was dropped without being handled!", self),
+//         }
+//     }
+// }
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
