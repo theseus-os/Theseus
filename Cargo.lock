@@ -14,6 +14,7 @@ dependencies = [
  "fadt",
  "hpet",
  "ioapic",
+ "iommu",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -194,9 +195,9 @@ checksum = "a165d606cf084741d4ac3a28fb6e9b1eb0bd31f6cd999098cfddb0b2ab381dc0"
 
 [[package]]
 name = "bitflags"
-version = "1.1.0"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d155346769a6855b86399e9bc3814ab343cd3d62c7e985113d46a0ec3c281fd"
+checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "block-buffer"
@@ -642,6 +643,7 @@ dependencies = [
  "event_types",
  "fatfs",
  "io",
+ "iommu",
  "ixgbe",
  "keyboard",
  "log",
@@ -1167,6 +1169,21 @@ dependencies = [
  "memory",
  "owning_ref",
  "spin 0.9.0",
+ "volatile",
+ "zerocopy",
+]
+
+[[package]]
+name = "iommu"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "irq_safety",
+ "log",
+ "memory",
+ "owning_ref",
+ "spin 0.9.0",
+ "static_assertions",
  "volatile",
  "zerocopy",
 ]
