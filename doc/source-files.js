@@ -57,6 +57,7 @@ sourcesIndex["intel_ethernet"] = {"name":"","files":["descriptors.rs","lib.rs"]}
 sourcesIndex["interrupts"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["io"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["ioapic"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["iommu"] = {"name":"","files":["lib.rs","regs.rs"]};
 sourcesIndex["ixgbe"] = {"name":"","files":["lib.rs","queue_registers.rs","regs.rs","test_packets.rs","virtual_function.rs"]};
 sourcesIndex["kernel_config"] = {"name":"","files":["display.rs","lib.rs","memory.rs","time.rs"]};
 sourcesIndex["keyboard"] = {"name":"","files":["lib.rs"]};
