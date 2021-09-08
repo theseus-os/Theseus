@@ -1,12 +1,11 @@
-//! This file contains structs that simplify programming the IOMMU.
+//! Structures needed for interacting with the IOMMU.
 
 use zerocopy::FromBytes;
 use volatile::{ReadOnly, WriteOnly};
 use bitflags::bitflags;
 use core::fmt;
 
-/// Struct which allows direct access to memory mapped registers when
-/// overlayed over corresponding page.
+/// The layout of the IOMMU's MMIO registers.
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct IntelIommuRegisters {
@@ -26,7 +25,8 @@ pub struct IntelIommuRegisters {
     _unimplemented:         [u8; 4096-0x20],   // 0x20-0xFFF
 }
 // TODO: Hardware may use more than 4kB, which means the registers may occupy
-// more than one contiguous page.
+//       more than one contiguous page.
+//       Currently we assume the IOMMU registers occupy only a single page.
 const_assert_eq!(core::mem::size_of::<IntelIommuRegisters>(), 4096);
 
 /// Helper struct for decoding and printing capability register
@@ -180,12 +180,8 @@ pub enum GlobalCommand {
 bitflags! {
     /// Global status register flags.
     ///
-    /// The lowest 22 bits are `RsvdZ`. This is Intel parleance meaning that
-    /// they may be used in the future, but for now, all writes to these
-    /// bits must have the value 0. Since these bits may have values in the
-    /// future, the `from_bits_truncate()` method should be used to construct
-    /// this object from the underlying bit representation. Note of course
-    /// that this conversion is not invertible.
+    /// The least significant bits `[22:0]` are `RsvdZ`,
+    /// meaning that they are reserved for future usage and must be set to 0.
     pub struct GlobalStatus: u32 {
         /// Compatibility Format Interrupt Status
         const CFIS  = 1 << 23;

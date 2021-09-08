@@ -14,7 +14,7 @@ extern crate spin;
 extern crate volatile;
 extern crate zerocopy;
 extern crate owning_ref;
-#[macro_use] extern crate bitflags;
+extern crate bitflags;
 
 use spin::Once;
 use irq_safety::MutexIrqSafe;
@@ -40,24 +40,34 @@ pub struct IntelIommu {
 /// Singleton representing IOMMU (TODO: could there be more than one IOMMU?)
 static IOMMU: Once<MutexIrqSafe<IntelIommu>> = Once::new();
 
-/// Initialize the IOMMU driver and hardware.
+/// Initialize the IOMMU hardware.
+///
+/// Currently this just sets up basic structures and prints out information about the IOMMU;
+/// it doesn't actually create any I/O device page tables.
 ///
 /// # Arguments
 /// * `host_address_width`: number of address bits available for DMA
 /// * `pci_segment_number`: PCI segment associated with this IOMMU
 /// * `register_base_address`: base address of register set
 /// * `page_table`: page table to install mapping
-pub fn init(host_address_width: u8, pci_segment_number: u16, register_base_address: PhysicalAddress, 
-                    page_table: &mut PageTable) -> Result<(), &'static str> {
+pub fn init(host_address_width: u8,
+    pci_segment_number: u16,
+    register_base_address: PhysicalAddress,
+    page_table: &mut PageTable
+) -> Result<(), &'static str> {
 
     info!("IOMMU Init stage 1 begin.");
 
     // map memory-mapped registers into virtual address space
-    let mp = map_iommu_registers(page_table, register_base_address)?;
+    let mp = {
+        let frames = allocate_frames_at(register_base_address, 1)?;
+        let pages = allocate_pages(1).ok_or("Unable to find virtual page!")?;
+        let flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+        page_table.map_allocated_pages_to(pages, frames, flags)?
+    };
 
-    // pack into BoxRefMut
-    let regs = 
-        BoxRefMut::new(Box::new(mp)).try_map_mut(|mp| mp.as_type_mut::<IntelIommuRegisters>(0))?;
+    let regs = BoxRefMut::new(Box::new(mp))
+        .try_map_mut(|mp| mp.as_type_mut::<IntelIommuRegisters>(0))?;
 
     // get the version number
     {
@@ -96,7 +106,7 @@ pub fn init(host_address_width: u8, pci_segment_number: u16, register_base_addre
 
     // Ensure translation is disabled.
     //
-    // TODO: This can be removed, it's only purpose is to test that set_command_bit works
+    // TODO: This can be removed, its only purpose is to test that set_command_bit works
     set_command_bit(GlobalCommand::TE, false, |x: GlobalStatus| { ! x.intersects(GlobalStatus::TES) })?;
 
     info!("IOMMU Init stage 1 complete.");
@@ -104,23 +114,9 @@ pub fn init(host_address_width: u8, pci_segment_number: u16, register_base_addre
     Ok(())
 }
 
-/// Returns true if IOMMU present in system. Must be called after `iommu::early_init`.
+/// Returns `true` if an IOMMU exists and has been initialized.
 pub fn iommu_present() -> bool {
     IOMMU.is_completed()
-}
-
-/// Returns MappedPage(s) to IOMMU memory mapped register region
-///
-/// # Arguments:
-/// * `page_table`: page table to install mapping into
-/// * `phys_addr`: physical address of base of mapping (4kB aligned)
-fn map_iommu_registers(page_table: &mut PageTable, phys_addr: PhysicalAddress) -> Result<MappedPages, &'static str>
-{
-    let frames = allocate_frames_at(phys_addr, 1)?;
-    let pages = allocate_pages(1).ok_or("Unable to find virtual page!")?;
-    let flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-    let mapped_pages = page_table.map_allocated_pages_to(pages, frames, flags)?;
-    Ok(mapped_pages)
 }
 
 /// This function writes a command to the IOMMU Global Command register using
@@ -129,24 +125,25 @@ fn map_iommu_registers(page_table: &mut PageTable, phys_addr: PhysicalAddress) -
 /// 2. Clear all bits in temporary variable that have no effect on command register.
 /// 3. Set or clear the corresponding command bit depending on `x`.
 /// 4. Write the variable to the command register.
-/// 5. Wait until `cond` is met, where `cond` is a function of the status register.
-///
-/// The condition checked is passed into this function so that the command
-/// can be performed as a single atomic operation; there is no need for caller
-/// side locking.
+/// 5. Wait until `condition` is met, where `condition` is a function that 
+///    can test the value of the status register.
 ///
 /// # Arguments:
-/// * `c`: command bit to set/clear
-/// * `x`: value to set command bit to
-/// * `cond`: function which interprets status register and returns true when
-///           command has completed.
-fn set_command_bit(c: GlobalCommand, x: bool, cond: impl Fn(GlobalStatus) -> bool) -> Result<(), &'static str> {
+/// * `command`: command bit to set/clear
+/// * `bit_value`: value to set command bit to
+/// * `condition`: function which interprets status register and returns true when
+///    command has completed.
+fn set_command_bit(
+    command: GlobalCommand, 
+    bit_value: bool,
+    condition: impl Fn(GlobalStatus) -> bool
+) -> Result<(), &'static str> {
     let iommu = &mut IOMMU.get().ok_or("IOMMU not initialized!")?.lock();
     let tmp = iommu.regs.gstatus.read();
     let tmp = tmp & 0x96ffffff;
-    let bits = c as u32;
-    let cmd = if x { tmp | bits } else { tmp & (!bits) };
+    let bits = command as u32;
+    let cmd = if bit_value { tmp | bits } else { tmp & (!bits) };
     iommu.regs.gcommand.write(cmd);
-    while !cond(GlobalStatus::from_bits_truncate(iommu.regs.gstatus.read())) {}
+    while !condition(GlobalStatus::from_bits_truncate(iommu.regs.gstatus.read())) {}
     Ok(())
 }

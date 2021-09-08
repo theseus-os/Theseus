@@ -121,13 +121,15 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
                         );
                         if !drhd.include_pci_all() {
                             info!("No IOMMU support when INCLUDE_PCI_ALL not set in DRHD");
-                        }
-                        else {
+                        } else {
                             let register_base_address = PhysicalAddress::new(drhd.register_base_address() as usize)
-                                                            .ok_or("IOMMU register_base_address was invalid")?;
+                                .ok_or("IOMMU register_base_address was invalid")?;
                             iommu::init(
-                                dmar_table.host_address_width(), drhd.segment_number(), 
-                                register_base_address, page_table)?;
+                                dmar_table.host_address_width(),
+                                drhd.segment_number(), 
+                                register_base_address,
+                                page_table
+                            )?;
                         }
                         debug!("DRHD table has Device Scope entries:");
                         for (_idx, dev_scope) in drhd.iter().enumerate() {
