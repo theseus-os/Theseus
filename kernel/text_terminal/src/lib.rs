@@ -691,6 +691,10 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                 self.cursor.position = screen_cursor_after_display;
                 warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
             }
+            // Temp hack to handle Ctrl + C being pressed
+            0x03 => {
+                warn!("Note: QEMU is forwarding control sequences (like Ctrl+C) to Theseus. To exit QEMU, press Ctrl+A then X.");
+            }
             _ => {
                 debug!("[EXECUTE]: unhandled byte: {:#X}", byte);
                 self.backend.write_bytes(&[byte]);
