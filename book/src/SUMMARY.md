@@ -38,10 +38,11 @@
         - [Creating and Displaying Windows](subsystems/display/window_tutorial.md)
 
 
-## Running Theseus on Real Hardware
+## Running Theseus
 - [Running Theseus on Virtual Machines & Real Hardware](running/running.md)
     - [Running Theseus in a Virtual Machine](running/virtual_machine/virtual_machine.md)
         - [Using PCI device Passthrough on QEMU](running/virtual_machine/pci_passthrough.md)
+    - [Theseus on Headless Systems](running/headless.md)
     - [Booting via USB drive](running/usb.md)
     - [Booting over the network (PXE)](running/pxe.md)
 
