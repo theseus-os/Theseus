@@ -7,7 +7,7 @@ Theseus can also run in [headless mode](https://en.wikipedia.org/wiki/Headless_c
 This is useful for system environments like servers, embedded microcontrollers, certain virtual machine environments, and anything else without a monitor display.
 
 The current version of Theseus listens for incoming connections on serial ports only (COM1 and COM2).
-Upon receiving data (like a keypress) on a serial port, Theseus will spawn a terminal emulator to handle I/O on that port. 
+Upon receiving data (like a key press) on a serial port, Theseus will spawn a terminal emulator to handle I/O on that port. 
 
 > Note: headless interactive mode can coexist simultaneously with regular graphical display mode.
 
@@ -49,3 +49,5 @@ To change `minicom`'s default behavior, you can do the following:
 
 Either of these serial ports can be changed in QEMU using the environment variables `SERIAL1` and `SERIAL2` respectively, though again, we recommend only using `SERIAL2` in virtual environments.
 In real hardware, where there is only one serial port and therefore COM1 must be used, you can disable the log or initialize it with a different serial port, e.g., COM2, to avoid polluting the terminal emulator connected to COM1 with system log printouts.
+
+<!-- cspell:ignore microcontrollers, picocom, minicom -->
