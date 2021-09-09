@@ -15,6 +15,12 @@
 //! * Handling the command line user input.
 //! * Displaying the cursor at the right position
 //! * Handling events delivered from the window manager.
+//!
+//! # Resources
+//! * <https://www.gnu.org/software/screen/manual/screen.html#Control-Sequences>
+//! * <https://man7.org/linux/man-pages/man4/console_codes.4.html>
+//! * <https://vt100.net/docs/vt510-rm/chapter4.html>
+//! * <https://en.wikipedia.org/wiki/ANSI_escape_code>
 
 #![no_std]
 
