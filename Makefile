@@ -601,13 +601,14 @@ help:
 	@echo -e "   vfio=<pci_device_slot>:"
 	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
 	@echo -e "   SERIAL<N>=<backend>":
-	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL0' or 'SERIAL1') to a QEMU-supported backend."
-	@echo -e "\t For example, 'SERIAL1=pty' will connect the second serial port for the given architecture"
+	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL1' or 'SERIAL2') to a QEMU-supported backend."
+	@echo -e "\t For example, 'SERIAL2=pty' will connect the second serial port for the given architecture"
 	@echo -e "\t ('COM2 on x86) to a newly-allocated pseudo-terminal on Linux, e.g., '/dev/pts/6'."
 	@echo -e "\t For the 'pty' option, QEMU will print a statement like so:"
 	@echo -e "\t     char device redirected to /dev/pts/6 (label serial1)"
+	@echo -e "\t Note that QEMU uses 0-based indexing for serial ports, so its 'serial1' label refers to the second serial port, our 'SERIAL2'."
 	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6'."
-	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL0'), 'file', 'pipe', etc."
+	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
 	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
 
     

@@ -1145,8 +1145,10 @@ pub trait TerminalBackend {
     /// TODO: change this to support any arbitrary terminal mode
     fn set_insert_mode(&mut self, enable: bool);
 
+    /// Fully reset the terminal screen to its initial default state.
     fn reset_screen(&mut self);
 
+    /// Clears the entire terminal screen.
     fn clear_screen(&mut self);
 
     /// A temporary hack to allow direct writing to the backend's output stream.
@@ -1155,7 +1157,8 @@ pub trait TerminalBackend {
 }
 
 
-/// A terminal backend that is simply a character device TTY endpoint on the other side,
+/// A terminal backend that is simply a character device TTY endpoint 
+/// (a full terminal emulator) on the other side,
 /// which only allows writing a stream of bytes to it.
 ///
 /// A TTY backend doesn't support any form of random access or direct text rendering, 
@@ -1168,7 +1171,7 @@ pub struct TtyBackend<Output: bare_io::Write> {
     real_screen_cursor: ScreenPoint,
 
     /// The output stream to which bytes are written,
-    /// which will be read by a TTY backend on the other side of the stream.
+    /// which will be read by a TTY.terminal emulator on the other side of the stream.
     output: Output,
 
     insert_mode: bool,
