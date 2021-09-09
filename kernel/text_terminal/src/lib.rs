@@ -368,7 +368,6 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
         // as that may prevent proper operation of the backwards delete functionality.
         terminal.backend.set_insert_mode(false);
         
-        // TODO: test printing some formatted text to the terminal
         let welcome = "Welcome to Theseus's text terminal!";
         terminal.handle_input(&mut welcome.as_bytes()).expect("failed to write terminal welcome message");
 
@@ -531,13 +530,6 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             ScreenPoint { column: column_idx_of_unit, row: cursor_point.row, }
         )
     }
-
-    // TODO: implement function that calculates, retrieves, and/or creates a unit
-    //       in the scrollback buffer at the location corresponding to the current cursor position. 
-    //       Keep in mind that the cursor position is relative to the scroll position,
-    //       which itself is an index into the scrollback_buffer, so we should start there 
-    //       when calculating where in the scrollback_buffer a cursor is pointing to. 
-
 
     /*
     /// Moves the cursor to the given position, snapping it to the nearest line and column 
@@ -1168,10 +1160,6 @@ pub trait TerminalBackend {
 ///
 /// A TTY backend doesn't support any form of random access or direct text rendering, 
 /// so we can only issue regular ANSI/xterm control and escape sequences to it.
-///
-/// TODO: offer a config option that determines whether the TTY endpoint support scrolling on the client side
-///       such that we don't have to handle it 
-///       and we cannot really handle it because it doesn't forward the control commands to us. 
 pub struct TtyBackend<Output: bare_io::Write> {
     /// The width and height of this terminal's screen.
     screen_size: ScreenSize,
