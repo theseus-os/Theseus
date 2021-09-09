@@ -39,7 +39,7 @@ use alloc::boxed::Box;
 pub use ansi_colors::*;
 pub use ansi_style::*;
 
-use core::cmp::{min, max};
+use core::cmp::{Ordering, max, min};
 use core::convert::TryInto;
 use core::fmt;
 use core::num::NonZeroUsize;
@@ -360,8 +360,10 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             parser: Parser::new(),
         };
 
-        // By default, we set the terminal backend to function in insert mode.
-        terminal.backend.set_mode(&[b'\x1B', b'[', ModeSwitch::InsertMode, ModeSwitch::SET_SUFFIX]);
+        // By default, the terminal backend should not be in insert mode (aka replace mode),
+        // as that may prevent proper operation of the backwards delete functionality.
+        terminal.backend.set_insert_mode(false);
+        
         // TODO: test printing some formatted text to the terminal
         let welcome = "Welcome to Theseus's text terminal!";
         terminal.handle_input(&mut welcome.as_bytes()).expect("failed to write terminal welcome message");
@@ -579,7 +581,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
 
     // The callback invoked when a single character is ready to be printed to the screen.
     fn print(&mut self, c: char) {
-        // debug!("[PRINT]: char: {:?}", c);
+        debug!("[PRINT]: char: {:?}", c);
 
         // The parser treats the ASCII "DEL" (0x7F) as a printable char, but it's not.
         // We pass it along to the `execute` function, which handles non-printable terminal actions.
@@ -621,6 +623,8 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
     }
 
     fn execute(&mut self, byte: u8) {
+        debug!("[EXECUTE]: byte: {:#X} ({})", byte, byte as char);
+
         let screen_size = self.backend.screen_size();
 
         match byte {
@@ -649,9 +653,14 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                 // The backspace action simply moves the cursor back by one unit, 
                 // without modifying the content or wrapping to the previous line.
                 let wrap = WrapLine::No;
-                *self.scrollback_cursor = decrement_scrollback_cursor(*self.scrollback_cursor, &*self.scrollback_buffer, wrap);
-                let cursor_position = self.cursor.position;
-                self.cursor.position = self.backend.move_cursor_by(cursor_position, -1, 0, wrap);
+                let (intended_cursor_position, _scroll) = decrement_screen_cursor(self.cursor.position, Column(1), screen_size, wrap);
+                // Only move the scrollback cursor if the screen cursor actually needs to move.
+                if self.cursor.position != intended_cursor_position {
+                    let new_cursor_position = self.backend.move_cursor_by(-1, 0);
+                    assert_eq!(intended_cursor_position, new_cursor_position);
+                    self.cursor.position = new_cursor_position;
+                    *self.scrollback_cursor = decrement_scrollback_cursor(*self.scrollback_cursor, &*self.scrollback_buffer, wrap);
+                }
             }
             AsciiControlCodes::BackwardsDelete => {
                 // Delete the previous unit from the scrollback buffer
@@ -670,7 +679,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                     tab_width,
                 );
 
-                let (ending_screen_cursor, _scroll_action) = decrement_screen_cursor(self.cursor.position, removed_unit_width, screen_size); 
+                let (ending_screen_cursor, _scroll_action) = decrement_screen_cursor(self.cursor.position, removed_unit_width, screen_size, wrap); 
                 let display_action = DisplayAction::Delete {
                     screen_start: self.cursor.position,
                     screen_end:   ending_screen_cursor,
@@ -679,7 +688,10 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                 debug!("After BackwardsDelete, screen cursor moved from {:?} -> {:?}", self.cursor.position, screen_cursor_after_display);
                 self.cursor.position = screen_cursor_after_display;
             }
-            _ => debug!("[EXECUTE]: unhandled byte: {:#X}", byte),
+            _ => {
+                debug!("[EXECUTE]: unhandled byte: {:#X}", byte);
+                self.backend.write_bytes(&[byte]);
+            }
         }
     }
 
@@ -707,13 +719,13 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
         debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
             _params, _intermediates, _ignore, action,
         );
+        let screen_size = self.backend.screen_size();
 
         match action {
             '~' => {
                 // TODO: forward delete was pressed, only if the params are '3'
                 // Delete the current unit from the scrollback buffer
                 let wrap = WrapLine::Yes;
-                let screen_size = self.backend.screen_size();
                 // Check that the scrollback_cursor is not at the end of a Line, as there'd be no Unit to delete.
                 let scrollback_cursor = *self.scrollback_cursor;
                 if scrollback_cursor.unit_idx.0 >= self.scrollback_buffer[scrollback_cursor.line_idx].len() {
@@ -734,8 +746,6 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                     screen_end:   ending_screen_cursor,
                 };
                 let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
-                // move the screen cursor back by one column, as the display() call above has advanced it forwad to `ending_screen_cursor`.
-                self.cursor.position = self.backend.move_cursor_by(current_screen_cursor, -1, 0, wrap);
             }
             'A' => {
                 // TODO: up arrow was pressed
@@ -747,8 +757,27 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                 // TODO: right arrow was pressed
             }
             'D' => {
-                // TODO: left arrow was pressed
+                // left arrow was pressed, move the cursor left by one unit.
+                let wrap = WrapLine::Yes;
+                let scrollback_cursor = *self.scrollback_cursor;
+                let intended_scrollback_position = decrement_scrollback_cursor(scrollback_cursor, &*self.scrollback_buffer, wrap);
+                // Only move the screen cursor if the scrollback cursor would actually move.
+                if intended_scrollback_position != scrollback_cursor {
+                    *self.scrollback_cursor = intended_scrollback_position;
+                    // TODO: adjust the screen cursor if the scrollback cursor wrapped to the previous line, 
+                    //       since it wouldn't necessarily be displayed in the last column.
+                    if intended_scrollback_position.line_idx != scrollback_cursor.line_idx {
+                        warn!("Left arrow: unimplemented support for adjusting wrapped screen cursor properly based on buffer contents");
+                    }
+                    let screen_cursor = self.cursor.position;
+                    let (intended_cursor_position, _scroll) = decrement_screen_cursor(screen_cursor, Column(1), screen_size, wrap);
+                    let new_cursor_position = self.backend.move_cursor_by(-1, 0);
+                    assert_eq!(intended_cursor_position, new_cursor_position);
+                    self.cursor.position = new_cursor_position;
+                    debug!("Left arrow moved from:\n\t {:?} -> {:?}\n\t {:?} -> {:?}", scrollback_cursor, self.scrollback_cursor, screen_cursor, self.cursor.position);
+                }
             }
+
             _ => debug!("[CSI_DISPATCH] unhandled action: {}", action),
         }
 
@@ -856,11 +885,27 @@ impl Default for ScreenSize {
 /// in which `(0, 0)` represents the top-left corner.
 /// Thus, a valid `ScreenPoint` must fit be the bounds of 
 /// the current [`ScreenSize`].
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Ord)]
 #[derive(Add, AddAssign, Sub, SubAssign)]
 pub struct ScreenPoint {
     column: Column,
     row: Row,
+} 
+impl PartialOrd for ScreenPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        if self.row == other.row {
+            self.column.partial_cmp(&other.column)
+        } else if self.row < other.row {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Greater)
+        }
+    }
+}
+impl fmt::Debug for ScreenPoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({:?}, {:?})", self.column, self.row)
+    }
 }
 
 /// A row index or number of rows in the y-dimension of the screen viewport. 
@@ -875,11 +920,27 @@ pub struct Column(u16);
 
 /// A 2D position value that represents a point in the scrollback buffer,
 /// in which `(0, 0)` represents the `Unit` at the first column of the first line.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Ord)]
 #[derive(Add, AddAssign, Sub, SubAssign)]
 pub struct ScrollbackBufferPoint {
     unit_idx: UnitIndex,
     line_idx: LineIndex,
+}
+impl PartialOrd for ScrollbackBufferPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        if self.line_idx == other.line_idx {
+            self.unit_idx.partial_cmp(&other.unit_idx)
+        } else if self.line_idx < other.line_idx {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Greater)
+        }
+    }
+}
+impl fmt::Debug for ScrollbackBufferPoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({:?}, {:?})", self.unit_idx, self.line_idx)
+    }
 }
 
 /// An index of a `Line` in the scrollback buffer.
@@ -956,11 +1017,16 @@ fn increment_screen_cursor(
 /// to handle this screen cursor movement.
 fn decrement_screen_cursor(
     mut cursor_position: ScreenPoint,
-    unit_width: Column,
+    num_columns: Column,
     screen_size: ScreenSize,
-    // TODO: add wrapping support
+    wrap: WrapLine,
 ) -> (ScreenPoint, ScrollAction) {
-    let new_col = cursor_position.column.0 as i32 - unit_width.0 as i32;
+    if wrap == WrapLine::No {
+        cursor_position.column.0 = cursor_position.column.0.saturating_sub(num_columns.0);
+        return (cursor_position, ScrollAction::None);
+    }
+
+    let new_col = cursor_position.column.0 as i32 - num_columns.0 as i32;
     if new_col < 0 {
         cursor_position.column.0 = (new_col + screen_size.num_columns.0 as i32) as u16;
         if cursor_position.row.0 == 0 {
@@ -1062,25 +1128,28 @@ pub trait TerminalBackend {
 
     /// Moves the on-screen cursor to the given position.
     ///
-    /// The cursor's position will be bound to the actual size
+    /// The cursor's position will be clipped (not wrapped) to the actual size
     /// of the screen, in both the column (x) the row (y) dimensions.
     ///
     /// Returns the new position of the on-screen cursor.
-    fn move_cursor_to(&mut self, new_cursor: ScreenPoint) -> ScreenPoint;
+    fn move_cursor_to(&mut self, new_position: ScreenPoint) -> ScreenPoint;
 
     /// Moves the on-screen cursor by the given number of rows and columns,
     /// in which a value of `0` indicates no movement in that dimension.
     ///
-    /// The cursor's position will be bound to the actual size of the screen,
-    /// and the column movement will wrap in both directions to the previous or next row. 
-    /// In other words, if the screen size is 
+    /// The cursor's position will be clipped (not wrapped) to the actual size
+    /// of the screen, in both the column (x) the row (y) dimensions.
     ///
     /// Returns the new position of the on-screen cursor.
     #[must_use]
-    fn move_cursor_by(&mut self, current_cursor: ScreenPoint, num_columns: i32, num_rows: i32, wrap: WrapLine) -> ScreenPoint;
+    fn move_cursor_by(&mut self, num_columns: i32, num_rows: i32) -> ScreenPoint;
 
-    /// TODO: change this, just a temporary way of forwarding bytes directly to the backend.
-    fn set_mode(&mut self, mode_bytes: &[u8]);
+    /// TODO: change this to support any arbitrary terminal mode
+    fn set_insert_mode(&mut self, enable: bool);
+
+    /// A temporary hack to allow direct writing to the backend's output stream.
+    /// This is only relevant for TtyBackends.
+    fn write_bytes(&mut self, bytes: &[u8]);
 }
 
 
@@ -1107,19 +1176,23 @@ pub struct TtyBackend<Output: bare_io::Write> {
     insert_mode: bool,
 }
 impl<Output: bare_io::Write> TtyBackend<Output> {
-    const BACKWARDS_DELETE: &'static [u8] = &[
-        AsciiControlCodes::Escape,
-        b'[',
-        AsciiControlCodes::BackwardsDelete,
-    ];
-    // const BACKWARDS_DELETE: &'static [u8] = &[
-    //     AsciiControlCodes::BackwardsDelete,
+    // const FORWARDS_DELETE: &'static [u8] = &[
+    //     AsciiControlCodes::Escape,
+    //     b'[',
+    //     b'3',
+    //     b'~',
     // ];
-    const FORWARDS_DELETE: &'static [u8] = &[
+    const ERASE_CHARACTER: &'static [u8] = &[
         AsciiControlCodes::Escape,
         b'[',
-        b'3',
-        b'~',
+        b'1',
+        b'X',
+    ];
+    const DELETE_CHARACTER: &'static [u8] = &[
+        AsciiControlCodes::Escape,
+        b'[',
+        b'1',
+        b'P',
     ];
 
 
@@ -1131,39 +1204,55 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
             screen_size: screen_size.unwrap_or_default(),
             real_screen_cursor: ScreenPoint::default(),
             output: output_stream,
-            insert_mode: true,
+            insert_mode: false,
         }
         // TODO: here, query the backend for the real cursor location,
         //       which could be anywhere, e.g., if we connected to an existing terminal.
         //       For now we just assume it's at the origin point of `(0,0)`.
     }
+    
 
     /// Deletes the contents on screen from the given `screen_start` point (inclusive) 
     /// to the given `screen_end` point (exclusive).
     fn delete(&mut self, screen_start: ScreenPoint, screen_end: ScreenPoint) -> ScreenPoint {
         debug!("Deleting from {:?} to {:?}", screen_start, screen_end);
         let forward_delete = screen_start < screen_end;
+        let wrap = WrapLine::Yes;
+
+        if screen_start.row != screen_end.row {
+            todo!("TtyBackend::delete() doesn't yet support multiple rows");
+        }
         
         // TODO: move the cursor to `screen_start`
         if self.real_screen_cursor != screen_start {
-            warn!("delete(): Skipping required screen cursor movement from {:?} to {:?}", self.real_screen_cursor, screen_start);
+            warn!("TtyBackend::delete(): Skipping required screen cursor movement from {:?} to {:?}", self.real_screen_cursor, screen_start);
         }
 
         let mut current = screen_start;
-        while current != screen_end {
-            if forward_delete {
-                self.output.write(Self::FORWARDS_DELETE).unwrap();
-            } else {
-                self.output.write(Self::BACKWARDS_DELETE).unwrap();
-            }
 
-            current = if forward_delete {
-                increment_screen_cursor(current, Column(1), self.screen_size).0
-            } else {
-                decrement_screen_cursor(current, Column(1), self.screen_size).0
-            };
+        if forward_delete {
+            while current < screen_end {
+                // Forward-delete the current character unit, but do not move the real_screen_cursor, 
+                // because the backend terminal emulator will shift everything in the current line to the left.
+                self.output.write(Self::DELETE_CHARACTER).unwrap();
+                current = increment_screen_cursor(current, Column(1), self.screen_size /* , wrap */).0;
+            }
+        } 
+        else {
+            while current > screen_end {
+                // Backward-delete a character by moving the previous character unit
+                // and then issuing a delete command, upon which the backend terminal emulator 
+                // will shift everything in the current line to the left.
+                let (new_screen_cursor, _scroll) = decrement_screen_cursor(self.real_screen_cursor , Column(1), self.screen_size, wrap);
+                // self.real_screen_cursor = new_screen_cursor;
+                
+                let actual_screen_cursor = self.move_cursor_by(-1, 0);
+                self.output.write(Self::DELETE_CHARACTER).unwrap();
+                current = decrement_screen_cursor(current, Column(1), self.screen_size, wrap).0;
+            }
         }
-        return screen_end;
+
+        self.real_screen_cursor
     }
 }
 impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
@@ -1202,7 +1291,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
         };
 
         if self.real_screen_cursor != screen_start {
-            warn!("Skipping required screen cursor movement from {:?} to {:?}", self.real_screen_cursor, screen_start);
+            warn!("Unimplemented: need to move screen cursor from {:?} to {:?}", self.real_screen_cursor, screen_start);
             // TODO: issue a command to move the screen cursor to `screen_start`
         }
 
@@ -1245,43 +1334,93 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
                     Character::Single(ref ch) => ch.encode_utf8(&mut char_encode_buf[..]).as_bytes(),
                     Character::Multi(ref s) => s.as_bytes(),
                 })?;
+
+                // Adjust the screen cursor based on what we just printed to the screen.
+                let unit_width = match unit.displayable_width() {
+                    0 => 4, // TODO: use tab_width
+                    w => w,
+                };
+                let (new_screen_cursor, _scroll_action) = increment_screen_cursor(self.real_screen_cursor, Column(unit_width), self.screen_size);
+                self.real_screen_cursor = new_screen_cursor;
             }
             // If we wrote out the entire `Line`, write out a newline character.
             if line_idx < scrollback_end.line_idx {
                 bytes_written += self.output.write(b"\n")?;
+                // TODO: test for scroll action needed.
+                self.real_screen_cursor.row.0 += 1;
+                self.real_screen_cursor.column.0 = 0;
             } 
 
             start_unit = UnitIndex(0);
         }
 
-        // TODO: Fix this function to actually update the screen cursor
-        self.real_screen_cursor = screen_start;
-        Ok(screen_start) 
+        Ok(self.real_screen_cursor) 
     }
 
-    fn move_cursor_to(&mut self, new_cursor: ScreenPoint) -> ScreenPoint {
-        unimplemented!();
-        // TODO: Fix this function to actually update the screen cursor
-        // self.real_screen_cursor = screen_start;
+    fn move_cursor_to(&mut self, new_position: ScreenPoint) -> ScreenPoint {
+        let cursor_bounded = ScreenPoint {
+            column: min(new_position.column, self.screen_size.num_columns),
+            row:    min(new_position.row,    self.screen_size.num_rows),
+        };
+        write!(&mut self.output,
+            "\x1B[{};{}H", 
+            cursor_bounded.row.0,
+            cursor_bounded.column.0,
+        ).unwrap();
+        self.real_screen_cursor = cursor_bounded;
+        self.real_screen_cursor
     }
 
-    fn move_cursor_by(&mut self, current_cursor: ScreenPoint, num_cols: i32, num_rows: i32, wrap: WrapLine) -> ScreenPoint {
-        // TODO: Fix this function to actually update the screen cursor
-        // self.real_screen_cursor = screen_start;
-
-        if num_cols == -1 {
-            self.output.write(&[b'\x1b', b'[', AsciiControlCodes::Backspace as u8]).unwrap();
-            ScreenPoint {
-                column: current_cursor.column - Column(1),
-                row:    current_cursor.row,
-            }
+    fn move_cursor_by(
+        &mut self,
+        num_cols: i32,
+        num_rows: i32,
+    ) -> ScreenPoint {
+        let new_col = self.real_screen_cursor.column.0 as i32 + num_cols;
+        let col_bounded = if new_col <= 0 {
+            0
+        } else if new_col >= self.screen_size.num_columns.0 as i32 {
+            self.screen_size.num_columns.0 - 1
         } else {
-            unimplemented!() // TODO: fix this, just temporary
+            new_col as u16
+        };
+
+        let new_row = self.real_screen_cursor.row.0 as i32 + num_rows;
+        let row_bounded = if new_row <= 0 {
+            0
+        } else if new_row >= self.screen_size.num_rows.0 as i32 {
+            self.screen_size.num_rows.0 - 1
+        } else {
+            new_row as u16
+        };
+
+        let cursor_bounded = ScreenPoint {
+            column: Column(col_bounded),
+            row:    Row(row_bounded),
+        };
+        write!(&mut self.output,
+            "\x1B[{};{}H", 
+            cursor_bounded.row.0,
+            cursor_bounded.column.0,
+        ).unwrap();
+        self.real_screen_cursor = cursor_bounded;
+        self.real_screen_cursor
+    }
+
+    fn set_insert_mode(&mut self, enable: bool) {
+        if self.insert_mode != enable {
+            self.output.write(&[
+                AsciiControlCodes::Escape,
+                b'[',
+                ModeSwitch::InsertMode,
+                if enable { ModeSwitch::SET_SUFFIX } else { ModeSwitch::RESET_SUFFIX },
+            ]).expect("failed to write bytes for insert mode");
+            self.insert_mode = enable;
         }
     }
 
-    fn set_mode(&mut self, mode_bytes: &[u8]) {
-        self.output.write(mode_bytes).expect("failed to write mode_bytes");
+    fn write_bytes(&mut self, bytes: &[u8]) {
+        self.output.write(bytes).unwrap();
     }
 }
 
@@ -1303,11 +1442,12 @@ pub enum DisplayAction {
     ///
     /// The direction of the delete action matters for the following reasons:
     /// * A [`TerminalBackend`] may use it to optimize which action occurs, and
-    /// * It also dictates where the screen cursor will end up after the delete action occurs;
-    ///   it will always be equal to `screen_end`.
+    /// * It also dictates where the screen cursor will end up after the delete action occurs.
     ///
-    /// For example, if a user presses the "Backspace" key, they expect a backwards deletion,
-    /// but if they press the "Delete" key, they expect a forwards deletion.
+    /// For example, if a user presses the "Backspace" key, they expect a backwards deletion
+    /// in which the cursor is moved backwards to the previous unit and that unit is deleted.
+    /// If they press the "Delete" key, they expect a forwards deletion
+    /// in which the cursor is unchanged and the current unit is deleted.
     ///
     /// The `screen_start` bound is inclusive; the `screen_end` bound is exclusive.
     Delete {
