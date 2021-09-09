@@ -687,6 +687,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                 let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
                 debug!("After BackwardsDelete, screen cursor moved from {:?} -> {:?}", self.cursor.position, screen_cursor_after_display);
                 self.cursor.position = screen_cursor_after_display;
+                warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
             }
             _ => {
                 debug!("[EXECUTE]: unhandled byte: {:#X}", byte);
@@ -775,6 +776,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
                     assert_eq!(intended_cursor_position, new_cursor_position);
                     self.cursor.position = new_cursor_position;
                     debug!("Left arrow moved from:\n\t {:?} -> {:?}\n\t {:?} -> {:?}", scrollback_cursor, self.scrollback_cursor, screen_cursor, self.cursor.position);
+                    warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
                 }
             }
 
@@ -1215,8 +1217,8 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
     /// Deletes the contents on screen from the given `screen_start` point (inclusive) 
     /// to the given `screen_end` point (exclusive).
     fn delete(&mut self, screen_start: ScreenPoint, screen_end: ScreenPoint) -> ScreenPoint {
-        debug!("Deleting from {:?} to {:?}", screen_start, screen_end);
         let forward_delete = screen_start < screen_end;
+        debug!("Deleting {} from {:?} to {:?}", if forward_delete { "forwards" } else { "backwards" }, screen_start, screen_end);
         let wrap = WrapLine::Yes;
 
         if screen_start.row != screen_end.row {
@@ -1253,6 +1255,20 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
         }
 
         self.real_screen_cursor
+    }
+
+    /// Sets the cursor position directly using a `(1,1)` based coordinate system.
+    ///
+    /// This is needed because terminal backends use a different coordinate system than we do,
+    /// in which the origin point at the upper-left corner is `(1,1)`,
+    /// instead of our coordinate system of an origin at `(0,0)`. 
+    fn set_cursor_internal(&mut self, cursor: ScreenPoint) {
+        write!(&mut self.output,
+            "\x1B[{};{}H", 
+            cursor.row.0 + 1,
+            cursor.column.0 + 1,
+        ).unwrap();
+        self.real_screen_cursor = cursor;
     }
 }
 impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
@@ -1362,12 +1378,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
             column: min(new_position.column, self.screen_size.num_columns),
             row:    min(new_position.row,    self.screen_size.num_rows),
         };
-        write!(&mut self.output,
-            "\x1B[{};{}H", 
-            cursor_bounded.row.0,
-            cursor_bounded.column.0,
-        ).unwrap();
-        self.real_screen_cursor = cursor_bounded;
+        self.set_cursor_internal(cursor_bounded);
         self.real_screen_cursor
     }
 
@@ -1398,12 +1409,8 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
             column: Column(col_bounded),
             row:    Row(row_bounded),
         };
-        write!(&mut self.output,
-            "\x1B[{};{}H", 
-            cursor_bounded.row.0,
-            cursor_bounded.column.0,
-        ).unwrap();
-        self.real_screen_cursor = cursor_bounded;
+        debug!("move_cursor_by({},{}): moving cursor to {:?}", num_cols, num_rows, cursor_bounded);
+        self.set_cursor_internal(cursor_bounded);
         self.real_screen_cursor
     }
 
