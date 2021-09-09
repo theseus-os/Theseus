@@ -360,6 +360,10 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             parser: Parser::new(),
         };
 
+        // Reset and clear the terminal backend upon start.
+        terminal.backend.reset_screen();
+        terminal.backend.clear_screen();
+
         // By default, the terminal backend should not be in insert mode (aka replace mode),
         // as that may prevent proper operation of the backwards delete functionality.
         terminal.backend.set_insert_mode(false);
@@ -1149,6 +1153,10 @@ pub trait TerminalBackend {
     /// TODO: change this to support any arbitrary terminal mode
     fn set_insert_mode(&mut self, enable: bool);
 
+    fn reset_screen(&mut self);
+
+    fn clear_screen(&mut self);
+
     /// A temporary hack to allow direct writing to the backend's output stream.
     /// This is only relevant for TtyBackends.
     fn write_bytes(&mut self, bytes: &[u8]);
@@ -1424,6 +1432,24 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
             ]).expect("failed to write bytes for insert mode");
             self.insert_mode = enable;
         }
+    }
+
+    fn reset_screen(&mut self) {
+        self.real_screen_cursor = Default::default();
+        self.output.write(&[
+            AsciiControlCodes::Escape,
+            b'c',
+        ]).expect("failed to write bytes for reset screen");
+    }
+
+    fn clear_screen(&mut self) {
+        self.real_screen_cursor = Default::default();
+        self.output.write(&[
+            AsciiControlCodes::Escape,
+            b'[',
+            b'2',
+            b'J',
+        ]).expect("failed to write bytes for clear screen");
     }
 
     fn write_bytes(&mut self, bytes: &[u8]) {
