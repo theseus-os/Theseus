@@ -28,9 +28,10 @@ On Linux (Debian-like distros), do the following:
     ```
  4. Build and run (in QEMU):
     ```sh
-     cd Theseus
-     make run
-     ```
+    cd Theseus
+    make run
+    ```
+    To exit QEMU, press <kbd>Ctrl</kbd> + <kbd>A</kbd>, then <kbd>X</kbd>. 
 
 See below for more detailed instructions.
 
@@ -143,9 +144,12 @@ Run `make help` to see other make targets and the various command-line options.
 
 ## Using QEMU
 QEMU allows us to run Theseus quickly and easily in its own virtual machine.
-To exit Theseus in QEMU, press `Ctrl+Alt+G` (or `Ctrl+Alt` on some systems), which releases your keyboard and mouse focus from the QEMU window. Then press `Ctrl+C` in the terminal window that you ran `make run` from originally to kill QEMU, or you can also quit QEMU using the GUI `(x)` button on the title bar.
+To release, press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>G</kbd> (or just <kbd>Ctrl</kbd> + <kbd>Alt</kbd> on some systems), which releases your keyboard and mouse focus from the QEMU window. 
+To exit QEMU, in the terminal window that you originally ran `make run`, press <kbd>Ctrl</kbd> + <kbd>A</kbd> then <kbd>X</kbd>, or you can also click the GUI `ⓧ` button on the title bar if running QEMU in graphical mode.
 
-To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`. On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU menu bar.
+To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>2</kbd>.
+Switch back to the main window with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>1</kbd>.
+On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU menu bar.
 
 To access/expose a PCI device in QEMU using PCI passthrough via VFIO, see [these instructions](https://theseus-os.github.io/Theseus/book/running/virtual_machine/pci_passthrough.html).
 

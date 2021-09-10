@@ -606,7 +606,18 @@ help:
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
 	@echo -e "   vfio=<pci_device_slot>:"
 	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
+	@echo -e "   SERIAL<N>=<backend>":
+	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL1' or 'SERIAL2') to a QEMU-supported backend."
+	@echo -e "\t For example, 'SERIAL2=pty' will connect the second serial port for the given architecture"
+	@echo -e "\t ('COM2 on x86) to a newly-allocated pseudo-terminal on Linux, e.g., '/dev/pts/6'."
+	@echo -e "\t For the 'pty' option, QEMU will print a statement like so:"
+	@echo -e "\t     char device redirected to /dev/pts/6 (label serial1)"
+	@echo -e "\t Note that QEMU uses 0-based indexing for serial ports, so its 'serial1' label refers to the second serial port, our 'SERIAL2'."
+	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6'."
+	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
+	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
 
+    
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
@@ -627,7 +638,10 @@ help:
 ##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
 
-QEMU_FLAGS ?=
+QEMU_FLAGS ?= 
+QEMU_EXTRA ?= 
+SERIAL1 ?= stdio
+SERIAL2 ?= pty
 
 ifdef IOMMU
 ## Currently only the `q35` machine model supports a virtual IOMMU: <https://wiki.qemu.org/Features/VT-d>
@@ -641,10 +655,18 @@ QEMU_FLAGS += -cdrom $(iso) -boot d
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 
 QEMU_FLAGS += -s
-## Enable the serial log to be redirected to the host terminal's stdio, or you can
-## use `mon:stdio` to have the host terminal forward escape/control sequences to Theseus's serial port.
-QEMU_FLAGS += -serial stdio 
-# QEMU_FLAGS += -serial mon:stdio
+
+## Enable the first serial port (the default log) to be redirected to the host terminal's stdio.
+## Optionally, use the below `mon:` prefix to have the host terminal forward escape/control sequences to this serial port.
+# QEMU_FLAGS += -serial $(SERIAL1)
+QEMU_FLAGS += -serial mon:$(SERIAL1)
+
+## Attach a second serial port to QEMU, which can be used for a separate headless shell/terminal.
+## For example, if this is `pty`, and QEMU chooses to allocate a new pseudo-terminal at /dev/pts/6,
+## then you can connect to this serial port by running a tty connector application in a new window:
+## -- `screen /dev/pts/6`
+## -- `picocom /dev/pts/6`
+QEMU_FLAGS += -serial mon:$(SERIAL2)
 
 ## Disable the graphical display (for testing headless server functionality)
 ## `-vga none`:      removes the VGA card
@@ -713,7 +735,7 @@ ifdef vfio
 	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
 endif
 
-
+QEMU_FLAGS += $(QEMU_EXTRA)
 
 
 

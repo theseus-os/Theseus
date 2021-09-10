@@ -16,12 +16,14 @@ extern crate serial_port;
 extern crate io;
 extern crate text_terminal;
 
+use core::marker::PhantomData;
+
 use alloc::string::String;
 use task::TaskRef;
 use async_channel::Receiver;
 use serial_port::{SerialPort, SerialPortAddress, get_serial_port, DataChunk};
 use io::LockableIo;
-use text_terminal::TextTerminal;
+use text_terminal::{TerminalBackend, TextTerminal, TtyBackend};
 use irq_safety::MutexIrqSafe;
 
 
@@ -38,27 +40,38 @@ pub fn start_connection_detection() -> Result<TaskRef, &'static str> {
 		.spawn()
 }
 
-pub struct Console<I, O> where I: bare_io::Read, O: bare_io::Write {
+pub struct Console<I, O, Backend> 
+	where I: bare_io::Read,
+	      O: bare_io::Write,
+		  Backend: TerminalBackend,
+{
 	name: String,
 	_input: I,
-	terminal: TextTerminal<O>,
+	terminal: TextTerminal<Backend>,
+	_output: PhantomData<O>,
 }
 
-impl<I, O> Console<I, O> where I: bare_io::Read, O: bare_io::Write {
-	/// Creates a new console that surrounds a terminal instance
-	/// with input 
-	///
-	/// To start running the console, invoke the [`Console::spanw()`] function.
-	pub fn new_serial_console<S: Into<String>>(
-		name: S,
-		input_stream: I,
-		output_stream: O,
-	) -> Console<I, O> {
-		Console {
-			name: name.into(),
-			_input: input_stream,
-			terminal: TextTerminal::new(80, 25, output_stream),
-		}
+/// Creates a new console and a new [`TextTerminal`] that reads input data 
+/// from the given `input_stream`.
+///
+/// The terminal created by this function will use a [`TtyBackend`]
+/// that writes terminal output and control commands to the given `output_stream`.
+///
+/// To start running the console, invoke the [`Console::spawn()`] function.
+pub fn new_serial_console<S, I, O>(
+	name: S,
+	input_stream: I,
+	output_stream: O,
+) -> Console<I, O, TtyBackend<O>> 
+	where S: Into<String>,
+		  I: bare_io::Read,
+	      O: bare_io::Write + Send + 'static,
+{
+	Console {
+		name: name.into(),
+		_input: input_stream,
+		terminal: TextTerminal::new(80, 25, TtyBackend::new(None, output_stream)),
+		_output: PhantomData,
 	}
 }
 
@@ -79,7 +92,7 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 			}
 		};
 		
-		let new_console = Console::new_serial_console(
+		let new_console = new_serial_console(
 			alloc::format!("console_{:?}", serial_port_address),
 			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
 			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
@@ -98,11 +111,12 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 
 
 /// The entry point for the each new [`Console`] task.
-fn console_entry<I, O>(
-	(mut console, input_receiver): (Console<I, O>, Receiver<DataChunk>),
+fn console_entry<I, O, Backend>(
+	(mut console, input_receiver): (Console<I, O, Backend>, Receiver<DataChunk>),
 ) -> Result<(), &'static str> 
 	where I: bare_io::Read,
-	      O: bare_io::Write 
+	      O: bare_io::Write,
+		  Backend: TerminalBackend,
 {
 	loop {
 		// Block until we receive the next data chunk from the sender.
