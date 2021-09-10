@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["start_connection_detection","Starts a new task that detects new console connections by waiting for new data to be received on serial ports."]],"struct":[["Console",""]]});
+initSidebarItems({"fn":[["new_serial_console","Creates a new console and a new [`TextTerminal`] that reads input data  from the given `input_stream`."],["start_connection_detection","Starts a new task that detects new console connections by waiting for new data to be received on serial ports."]],"struct":[["Console",""]]});
