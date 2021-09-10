@@ -554,7 +554,7 @@ impl ModeSwitch {
 
     /// If this value comes after one of the above command values,
     /// it means that the mode should be "unset" or "reset" to the default.
-    pub const RESET_SUFFIX: u8 = b'h';
+    pub const RESET_SUFFIX: u8 = b'l';
 }
 
 pub struct StatusReportCommands;
