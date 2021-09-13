@@ -177,15 +177,52 @@ impl Line {
         else {
             // The unit index is beyond the existing bounds of this Line, so fill it with empty Units as padding.
             let range_of_empty_padding = self.units.len() .. idx.0;
-            // warn!("Untested scenario: padding Line with {} empty Units from {:?}", 
-            //     range_of_empty_padding.len(), range_of_empty_padding,
-            // );
             self.units.reserve(range_of_empty_padding.len() + 1);
+            if range_of_empty_padding.len() > 0 {
+                warn!("Untested scenario: pushing {} empty padding character(s) to line.", range_of_empty_padding.len());
+            }
             for _i in range_of_empty_padding {
                 self.units.push(Unit { character: Character::default(), style: unit.style });
             }
             self.units.push(unit);
             self.recalculate_soft_line_breaks(screen_width, tab_width);
+        }
+    }
+
+    /// Replaces the existing `Unit` at the given `idx` in this `Line` with the given `unit`.
+    ///
+    /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
+    /// the existing `Unit` at that index will be replaced and the soft line breaks
+    /// will be updated accordingly (if the new and existing units have different displayable widths).
+    ///
+    /// If needed, this function adjusts all soft line breaks (line wraps) to properly
+    /// display this `Line` on screen, but does not actually re-display it.
+    ///
+    /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
+    /// then the `Line` will be padded with enough empty `Units` such that the given `Unit`
+    /// will be inserted at the correct `UnitIndex`.
+    /// The empty padding `Unit`s will have the same [`Style`] as the given `Unit`.
+    fn replace_unit(
+        &mut self,
+        idx: UnitIndex,
+        unit: Unit,
+        screen_width: Column,
+        tab_width: u16
+    ) {
+        if let Some(unit_to_replace) = self.units.get_mut(idx.0) {
+            let old_width = unit_to_replace.displayable_width();
+            let new_width = match unit.displayable_width() {
+                0 => tab_width,
+                w => w,
+            };
+            *unit_to_replace = unit;
+            // If the new unit differs in displayable width, recalculate the soft line breaks.
+            if old_width != new_width {
+                self.recalculate_soft_line_breaks(screen_width, tab_width);
+            }
+        } else {
+            // Re-use the latter half of the `insert_unit` function. 
+            self.insert_unit(idx, unit, screen_width, tab_width);
         }
     }
 
@@ -290,6 +327,9 @@ pub struct TextTerminal<Backend> where Backend: TerminalBackend {
     /// The on-screen cursor of the terminal.
     cursor: Cursor,
 
+    /// The mode settings/options that define the terminal's behavior.
+    mode: TerminalMode,
+
     // /// The mode determines what specific action will be taken on receiving an input,
     // /// such as whether we should insert or overwrite new character input. 
     // mode: TerminalMode,
@@ -361,14 +401,14 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             scroll_position: ScrollPosition::default(),
             tab_width: 4,
             cursor: Cursor::default(),
-            // mode: TerminalMode::default(),
+            mode: TerminalMode::default(),
             backend,
             parser: Parser::new(),
         };
 
-        // Reset and clear the terminal backend upon start.
-        terminal.backend.reset_screen();
+        // Clear the terminal backend upon start.
         terminal.backend.clear_screen();
+        terminal.backend.move_cursor_to(ScreenPoint::default());
 
         // By default, the terminal backend should not be in insert mode (aka replace mode),
         // as that may prevent proper operation of the backwards delete functionality.
@@ -398,6 +438,7 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             cursor: &mut self.cursor,
             backend: &mut self.backend,
             tab_width: &mut self.tab_width,
+            mode: &mut self.mode,
         };
 
         // Keep reading for as long as there are more bytes available.
@@ -577,6 +618,7 @@ struct TerminalParserHandler<'term, Backend: TerminalBackend> {
     cursor: &'term mut Cursor,
     backend: &'term mut Backend,
     tab_width: &'term mut u16,
+    mode: &'term mut TerminalMode,
 }
 
 impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, Backend> {
@@ -600,12 +642,21 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
             0 => Column(tab_width),
             w => Column(w),
         };
-        dest_line.insert_unit(
-            orig_scrollback_pos.unit_idx,
-            new_unit,
-            screen_size.num_columns,
-            tab_width,
-        );
+        if self.mode.insert == InsertMode::Insert {
+            dest_line.insert_unit(
+                orig_scrollback_pos.unit_idx,
+                new_unit,
+                screen_size.num_columns,
+                tab_width,
+            );
+        } else {
+            dest_line.replace_unit(
+                orig_scrollback_pos.unit_idx,
+                new_unit,
+                screen_size.num_columns,
+                tab_width,
+            );
+        }
         self.scrollback_cursor.unit_idx.0 += 1;
 
         // Now that we've handled inserting everything into the scrollback buffer,
@@ -1542,8 +1593,44 @@ pub enum ScrollAction {
 // }
 
 
+/// Whether or not to wrap text to the next line/row when it extends
+/// past the column limit of the screen.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum WrapLine {
     Yes,
     No,
+}
+
+/// Whether text characters printed to the terminal will be inserted
+/// before other characters or will replace/overwrite existing characters.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum InsertMode {
+    /// Characters will be inserted at the current cursor,
+    /// preserving all existing characters by shifting them to the right.
+    Insert,
+    /// Characters will be overwritten in place.
+    /// Sometimes called "replace mode".
+    Overwrite,
+}
+
+/// Whether the screen cursor is visible.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ShowCursor {
+    Visible,
+    Hidden,
+}
+
+/// The set of options that determine terminal behavior.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TerminalMode {
+    insert: InsertMode,
+    show_cursor: ShowCursor,
+}
+impl Default for TerminalMode {
+    fn default() -> Self {
+        TerminalMode {
+            insert: InsertMode::Overwrite,
+            show_cursor: ShowCursor::Visible,
+        }
+    }
 }
