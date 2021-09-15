@@ -37,6 +37,7 @@ pub mod event_queue;
 pub mod completion_queue;
 pub mod send_queue;
 mod work_queue;
+mod uar;
 
 /// The initialization segment is located at offset 0 of PCI BAR0.
 /// It is used in the initialization procedure of the device,

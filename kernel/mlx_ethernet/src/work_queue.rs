@@ -74,7 +74,7 @@ enum SendOpMod {
 #[derive(FromBytes, Default)]
 #[repr(C)]
 pub(crate) struct WorkQueueEntry {
-    control: ControlSegment,
+    pub(crate) control: ControlSegment,
     eth: EthSegment,
     data: MemoryPointerDataSegment
 }
@@ -87,13 +87,17 @@ impl WorkQueueEntry {
         self.eth.init();
         self.data.init(lkey, local_address);
     }
+
+    pub fn nop(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32) {
+        self.control.nop(wqe_index, sqn, tisn);
+    }
 }
 
 #[derive(FromBytes, Default)]
 #[repr(C)]
 pub(crate) struct ControlSegment {
-    opcode:             Volatile<U32<BigEndian>>,
-    ds:                 Volatile<U32<BigEndian>>,
+    pub(crate) opcode:             Volatile<U32<BigEndian>>,
+    pub(crate) ds:                 Volatile<U32<BigEndian>>,
     se:                 Volatile<U32<BigEndian>>,
     ctrl_general_id:    Volatile<U32<BigEndian>>,
 }
@@ -104,8 +108,15 @@ impl ControlSegment {
     pub fn init(&mut self, wqe_index: u32, sqn: u32, tisn: u32) {
         self.opcode.write(U32::new((wqe_index << 8)| (WQEOpcode::Send as u32)));
         self.ds.write(U32::new((sqn << 8) | 4));
-        self.se.write(U32::new(2 << 2));
-        self.ctrl_general_id.write(U32::new(tisn << 8)); //?
+        self.se.write(U32::new(8));
+        // self.ctrl_general_id.write(U32::new(tisn << 8)); //?
+    }
+
+    pub fn nop(&mut self, wqe_index: u32, sqn: u32, tisn: u32) {
+        self.opcode.write(U32::new((wqe_index << 8)| (WQEOpcode::Nop as u32)));
+        self.ds.write(U32::new((sqn << 8) | 1));
+        self.se.write(U32::new(8));
+        // self.ctrl_general_id.write(U32::new(tisn << 8)); //?
     }
 }
 
@@ -120,7 +131,7 @@ pub(crate) struct EthSegment {
     inline_headers_1:       Volatile<U32<BigEndian>>,
     inline_headers_2:       Volatile<U32<BigEndian>>,
     inline_headers_3:       Volatile<U32<BigEndian>>,
-    _padding1:              u32
+    inline_headers_4:       Volatile<U32<BigEndian>>,
 }
 
 const_assert_eq!(core::mem::size_of::<EthSegment>(), 32);
@@ -129,13 +140,16 @@ impl EthSegment {
     pub fn init(&mut self) {
         let inline_headers_0 = (14 << 16) /* bytes in ethernet header*/ | 0xFFFF;
         let inline_headers_1 = 0xFFFF_FFFF;  
-        let inline_headers_2 = 0x043f_72a2;  // 04:3f:72:a2:b7:3a
-        let inline_headers_3 = (300 << 16) | 0xb73a;  // 04:3f:72:a2:b7:3a
+        let inline_headers_2 = 0x043f_72a2;  // 04:3f:72:a2:b4:3a
+        let inline_headers_3 = (300 << 16) | 0xb43a;  // 04:3f:72:a2:b4:3a
+        let inline_headers_4 = 0x4500;  // 
 
         self.inline_headers_0.write(U32::new(inline_headers_0));
         self.inline_headers_1.write(U32::new(inline_headers_1));
         self.inline_headers_2.write(U32::new(inline_headers_2));
         self.inline_headers_3.write(U32::new(inline_headers_3));
+        self.inline_headers_4.write(U32::new(inline_headers_4));
+
     }
 }
 
@@ -152,7 +166,7 @@ const_assert_eq!(core::mem::size_of::<MemoryPointerDataSegment>(), 16);
 
 impl MemoryPointerDataSegment {
     pub fn init(&mut self, lkey: u32, local_address: PhysicalAddress) {
-        self.byte_count.write(U32::new(300));
+        self.byte_count.write(U32::new(298));
         self.l_key.write(U32::new(lkey));
         self.local_address_h.write(U32::new((local_address.value() >> 32) as u32));
         self.local_address_l.write(U32::new((local_address.value() & 0xFFFF_FFFF) as u32));
