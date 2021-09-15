@@ -177,15 +177,52 @@ impl Line {
         else {
             // The unit index is beyond the existing bounds of this Line, so fill it with empty Units as padding.
             let range_of_empty_padding = self.units.len() .. idx.0;
-            // warn!("Untested scenario: padding Line with {} empty Units from {:?}", 
-            //     range_of_empty_padding.len(), range_of_empty_padding,
-            // );
             self.units.reserve(range_of_empty_padding.len() + 1);
+            if range_of_empty_padding.len() > 0 {
+                warn!("Untested scenario: pushing {} empty padding character(s) to line.", range_of_empty_padding.len());
+            }
             for _i in range_of_empty_padding {
                 self.units.push(Unit { character: Character::default(), style: unit.style });
             }
             self.units.push(unit);
             self.recalculate_soft_line_breaks(screen_width, tab_width);
+        }
+    }
+
+    /// Replaces the existing `Unit` at the given `idx` in this `Line` with the given `unit`.
+    ///
+    /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
+    /// the existing `Unit` at that index will be replaced and the soft line breaks
+    /// will be updated accordingly (if the new and existing units have different displayable widths).
+    ///
+    /// If needed, this function adjusts all soft line breaks (line wraps) to properly
+    /// display this `Line` on screen, but does not actually re-display it.
+    ///
+    /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
+    /// then the `Line` will be padded with enough empty `Units` such that the given `Unit`
+    /// will be inserted at the correct `UnitIndex`.
+    /// The empty padding `Unit`s will have the same [`Style`] as the given `Unit`.
+    fn replace_unit(
+        &mut self,
+        idx: UnitIndex,
+        unit: Unit,
+        screen_width: Column,
+        tab_width: u16
+    ) {
+        if let Some(unit_to_replace) = self.units.get_mut(idx.0) {
+            let old_width = unit_to_replace.displayable_width();
+            let new_width = match unit.displayable_width() {
+                0 => tab_width,
+                w => w,
+            };
+            *unit_to_replace = unit;
+            // If the new unit differs in displayable width, recalculate the soft line breaks.
+            if old_width != new_width {
+                self.recalculate_soft_line_breaks(screen_width, tab_width);
+            }
+        } else {
+            // Re-use the latter half of the `insert_unit` function. 
+            self.insert_unit(idx, unit, screen_width, tab_width);
         }
     }
 
@@ -290,6 +327,9 @@ pub struct TextTerminal<Backend> where Backend: TerminalBackend {
     /// The on-screen cursor of the terminal.
     cursor: Cursor,
 
+    /// The mode settings/options that define the terminal's behavior.
+    mode: TerminalMode,
+
     // /// The mode determines what specific action will be taken on receiving an input,
     // /// such as whether we should insert or overwrite new character input. 
     // mode: TerminalMode,
@@ -361,18 +401,17 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             scroll_position: ScrollPosition::default(),
             tab_width: 4,
             cursor: Cursor::default(),
-            // mode: TerminalMode::default(),
+            mode: TerminalMode::default(),
             backend,
             parser: Parser::new(),
         };
 
-        // Reset and clear the terminal backend upon start.
-        terminal.backend.reset_screen();
+        // Clear the terminal backend upon start.
         terminal.backend.clear_screen();
+        terminal.backend.move_cursor_to(ScreenPoint::default());
 
-        // By default, the terminal backend should not be in insert mode (aka replace mode),
-        // as that may prevent proper operation of the backwards delete functionality.
-        terminal.backend.set_insert_mode(false);
+        // By default, terminal backends typically operate in Overwrite mode, not Insert mode.
+        terminal.backend.set_insert_mode(InsertMode::Overwrite);
         
         let welcome = "Welcome to Theseus's text terminal!";
         terminal.handle_input(&mut welcome.as_bytes()).expect("failed to write terminal welcome message");
@@ -398,6 +437,7 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             cursor: &mut self.cursor,
             backend: &mut self.backend,
             tab_width: &mut self.tab_width,
+            mode: &mut self.mode,
         };
 
         // Keep reading for as long as there are more bytes available.
@@ -577,6 +617,7 @@ struct TerminalParserHandler<'term, Backend: TerminalBackend> {
     cursor: &'term mut Cursor,
     backend: &'term mut Backend,
     tab_width: &'term mut u16,
+    mode: &'term mut TerminalMode,
 }
 
 impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, Backend> {
@@ -600,12 +641,21 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
             0 => Column(tab_width),
             w => Column(w),
         };
-        dest_line.insert_unit(
-            orig_scrollback_pos.unit_idx,
-            new_unit,
-            screen_size.num_columns,
-            tab_width,
-        );
+        if self.mode.insert == InsertMode::Insert {
+            dest_line.insert_unit(
+                orig_scrollback_pos.unit_idx,
+                new_unit,
+                screen_size.num_columns,
+                tab_width,
+            );
+        } else {
+            dest_line.replace_unit(
+                orig_scrollback_pos.unit_idx,
+                new_unit,
+                screen_size.num_columns,
+                tab_width,
+            );
+        }
         self.scrollback_cursor.unit_idx.0 += 1;
 
         // Now that we've handled inserting everything into the scrollback buffer,
@@ -625,30 +675,22 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
     }
 
     fn execute(&mut self, byte: u8) {
-        debug!("[EXECUTE]: byte: {:#X} ({})", byte, byte as char);
+        debug!("[EXECUTE]: byte: {:#X} ({:?})", byte, byte as char);
 
         let screen_size = self.backend.screen_size();
 
         match byte {
-            AsciiControlCodes::NewLine | AsciiControlCodes::CarriageReturn => {
-                // Insert a new line into the scrollback buffer
-                let new_line_idx = self.scrollback_cursor.line_idx + LineIndex(1); 
-                self.scrollback_cursor.line_idx = new_line_idx;
-                self.scrollback_cursor.unit_idx = UnitIndex(0); 
-                self.scrollback_buffer.insert(new_line_idx.0, Line::new());
-                self.cursor.underneath = Unit::default(); // TODO: use style from the previous unit
-                
-                // Adjust the screen cursor to the next row
-                let needs_scroll_down = {
-                    self.cursor.position.column = Column(0);
-                    self.cursor.position.row.0 += 1;
-                    if self.cursor.position.row >= screen_size.num_rows {
-                        self.cursor.position.row.0 = screen_size.num_rows.0 - 1;
-                        true
-                    } else {
-                        false
-                    }
-                };
+            AsciiControlCodes::CarriageReturn => {
+                self.carriage_return();
+                if self.mode.cr_sends_lf == CarriageReturnSendsLineFeed::Yes {
+                    self.line_feed();
+                }
+            }
+            AsciiControlCodes::LineFeed | AsciiControlCodes::VerticalTab => {
+                self.line_feed();
+                if self.mode.lf_sends_cr == LineFeedSendsCarriageReturn::Yes {
+                    self.carriage_return();
+                }
             }
             AsciiControlCodes::Tab => self.print('\t'),
             AsciiControlCodes::Backspace => {
@@ -798,6 +840,149 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
     }
 }
 
+impl<'term, Backend: TerminalBackend> TerminalParserHandler<'term, Backend> {
+    /// Moves the screen cursor to the next row and adjusts the scrollback cursor position
+    /// to the `Unit` in the scrollback buffer at the corresponding position.
+    ///
+    /// The screen cursor's column position is not changed.
+    ///
+    /// If in Insert mode, a new `Line` will be inserted into the scrollback buffer,
+    /// with the remainder of the `Line` being reflowed onto the next new `Line`.
+    ///
+    /// In either Insert or Overwrite mode, a new `Line` will be added if the screen cursor
+    /// is already at the last displayable line of the scrollback buffer.
+    fn line_feed(&mut self) {
+        let screen_size = self.backend.screen_size();
+        let original_screen_cursor = self.cursor.position;
+
+        // Adjust the scrollback cursor position to the unit displayed one row beneath it
+        if self.mode.insert == InsertMode::Overwrite {
+            let unit_idx = self.scrollback_cursor.unit_idx;
+            let line = &self.scrollback_buffer[self.scrollback_cursor.line_idx];
+            let unit_idx_of_current_line_break = line.soft_line_breaks.iter()
+                .skip_while(|&&soft_break| unit_idx < soft_break)
+                .next();
+
+            // If there is a soft line break after the current unit, then use that to calculate 
+            // what the next unit is.
+            if let Some(next_soft_lb) = unit_idx_of_current_line_break {
+                // Iterate over all the units in this Line, starting from the next soft line break
+                // until we reach the displayed width specified by the current screen cursor's column position.
+                let mut width_so_far = 0;
+                let mut units_iterated = 0;
+                let mut previous_style = Style::default();
+                let mut target_unit = None;
+                for (i, unit) in (&line.units[next_soft_lb.0 ..]).iter().enumerate() {
+                    previous_style = unit.style;
+                    width_so_far += match unit.displayable_width() {
+                        0 => *self.tab_width,
+                        w => w,
+                    };
+                    if width_so_far >= original_screen_cursor.column.0 {
+                        // Found the proper unit
+                        target_unit = Some(unit);
+                        break;
+                    }
+                    units_iterated += 1;
+                }
+
+                if let Some(t) = target_unit {
+                    // We found a Unit that corresponds to the screen cursor's column.
+                    self.scrollback_cursor.unit_idx = UnitIndex(units_iterated);
+                    self.cursor.underneath = t.clone();
+                } else {
+                    // We didn't find a Unit that corresponds to the screen cursor's column.
+                    // Thus, the line was too short to reach that column, so we set the unit index of
+                    // the scrollback buffer such that it will be padded to that column point upon next print.
+                    self.scrollback_cursor.unit_idx = *next_soft_lb + UnitIndex(units_iterated) + 
+                        UnitIndex((original_screen_cursor.column.0 - width_so_far) as usize);
+                    self.cursor.underneath = Unit {
+                        character: Character::default(),
+                        style: previous_style,
+                    };
+                }
+            }
+            // If there are no future soft line breaks, then we're at the end of a displayed line,
+            // so we need to insert a new line into the scrollback_buffer.
+            else {
+                let next_line_idx = self.scrollback_cursor.line_idx + LineIndex(1);
+                let previous_style = line.last().cloned().unwrap_or_default().style;
+                self.scrollback_buffer.insert(next_line_idx.0, Line::new());
+                // This is not a carriage return, we don't move the cursor to column 0.
+                *self.scrollback_cursor = ScrollbackBufferPoint {
+                    line_idx: next_line_idx,
+                    unit_idx: UnitIndex(self.cursor.position.column.0 as usize),
+                };
+                self.cursor.underneath = Unit {
+                    character: Character::default(),
+                    style: previous_style,
+                };
+            }
+        }
+        else {
+            // If in Insert mode, we need to split the line at the current unit,
+            // insert a new line, and move the remainder of that Line's content into the new line.
+            let curr_line = &mut self.scrollback_buffer[self.scrollback_cursor.line_idx];
+            let new_line_units = curr_line.units.split_off(self.scrollback_cursor.unit_idx.0);
+            let mut new_line = Line {
+                units: new_line_units,
+                soft_line_breaks: Vec::new(),
+            };
+            // TODO: we can recalculate curr_line soft breaks faster by deleting all of the ones greater than the current unit_idx.
+            curr_line.recalculate_soft_line_breaks(screen_size.num_columns, *self.tab_width);
+            new_line.recalculate_soft_line_breaks(screen_size.num_columns, *self.tab_width);
+
+            // Insert the split-off new line into the scrollback buffer
+            let next_line_idx = self.scrollback_cursor.line_idx + LineIndex(1);
+            *self.scrollback_cursor = ScrollbackBufferPoint {
+                line_idx: next_line_idx,
+                unit_idx: UnitIndex(0),
+            };
+            self.scrollback_buffer.insert(next_line_idx.0, new_line);
+            
+            self.cursor.underneath = self.scrollback_buffer[*self.scrollback_cursor].clone();
+            self.cursor.position.column.0 = 0;
+        }
+
+        // Actually move the screen cursor down to the next row.
+        // The screen cursor's column has already been adjusted above.
+        let scroll_action = {
+            self.cursor.position.row.0 += 1;
+            if self.cursor.position.row >= screen_size.num_rows {
+                self.cursor.position.row = screen_size.num_rows - Row(1);
+                ScrollAction::Down(1)
+            } else {
+                ScrollAction::None
+            }
+        };
+        // TODO: process the `scroll_action`
+        self.backend.move_cursor_to(self.cursor.position);
+    }
+
+    /// Moves the screen cursor back to the beginning of the current row
+    /// and adjusts the scrollback cursor position to point to that corresponding Unit.
+    ///
+    /// Note that a carriage return alone does not move the screen cursor down to the next row,
+    /// only a line feed (new line) can do that.
+    fn carriage_return(&mut self) {
+        let unit_idx = self.scrollback_cursor.unit_idx;
+        let line = &self.scrollback_buffer[self.scrollback_cursor.line_idx];
+        let idx_of_preceding_line_break = line.soft_line_breaks.iter()
+            .rfind(|&&soft_break| unit_idx >= soft_break)
+            .cloned()
+            .unwrap_or_default(); // No soft line breaks --> cursor goes to the beginning of the line.
+        
+        debug!("carriage_return: setting scrollback buffer at {:?} from {:?} to {:?}",
+            self.scrollback_cursor.line_idx, self.scrollback_cursor.unit_idx, idx_of_preceding_line_break
+        );
+        self.scrollback_cursor.unit_idx = idx_of_preceding_line_break;
+
+        // Move the screen cursor to the beginning of the current row.
+        self.cursor.position.column = Column(0);
+        self.backend.move_cursor_to(self.cursor.position);
+    }
+}
+
 
 
 /// The character stored in each [`Unit`] of the terminal screen. 
@@ -808,7 +993,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
 /// In the rare case of a character that consist of multiple UTF-8 sequences, e.g., complex emoji,
 /// we store the entire character here as a dynamically-allocated `String`. 
 /// This saves space in the typical case of a character being 4 bytes or less (`char`-sized).
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Character {
     Single(char),
     Multi(String),
@@ -855,7 +1040,7 @@ impl Default for Character {
 /// Non-displayable control/escape sequences, i.e., bells, backspace, delete, etc,
 /// are **NOT** saved as `Unit`s in the terminal's scrollback buffer,
 /// as they cannot be displayed and are simply transient actions.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Unit {
     /// The displayable character(s) held in this `Unit`.
     character: Character,
@@ -1153,7 +1338,7 @@ pub trait TerminalBackend {
     fn move_cursor_by(&mut self, num_columns: i32, num_rows: i32) -> ScreenPoint;
 
     /// TODO: change this to support any arbitrary terminal mode
-    fn set_insert_mode(&mut self, enable: bool);
+    fn set_insert_mode(&mut self, mode: InsertMode);
 
     /// Fully reset the terminal screen to its initial default state.
     fn reset_screen(&mut self);
@@ -1184,7 +1369,7 @@ pub struct TtyBackend<Output: bare_io::Write> {
     /// which will be read by a TTY.terminal emulator on the other side of the stream.
     output: Output,
 
-    insert_mode: bool,
+    insert_mode: InsertMode,
 }
 impl<Output: bare_io::Write> TtyBackend<Output> {
     // const FORWARDS_DELETE: &'static [u8] = &[
@@ -1215,7 +1400,7 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
             screen_size: screen_size.unwrap_or_default(),
             real_screen_cursor: ScreenPoint::default(),
             output: output_stream,
-            insert_mode: false,
+            insert_mode: InsertMode::Overwrite,
         }
         // TODO: here, query the backend for the real cursor location,
         //       which could be anywhere, e.g., if we connected to an existing terminal.
@@ -1266,7 +1451,7 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
         self.real_screen_cursor
     }
 
-    /// Sets the cursor position directly using a `(1,1)` based coordinate system.
+    /// Sets the cursor position directly using a `(1,1)`-based coordinate system.
     ///
     /// This is needed because terminal backends use a different coordinate system than we do,
     /// in which the origin point at the upper-left corner is `(1,1)`,
@@ -1423,15 +1608,18 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
         self.real_screen_cursor
     }
 
-    fn set_insert_mode(&mut self, enable: bool) {
-        if self.insert_mode != enable {
+    fn set_insert_mode(&mut self, mode: InsertMode) {
+        if self.insert_mode != mode {
             self.output.write(&[
                 AsciiControlCodes::Escape,
                 b'[',
                 ModeSwitch::InsertMode,
-                if enable { ModeSwitch::SET_SUFFIX } else { ModeSwitch::RESET_SUFFIX },
+                match mode {
+                    InsertMode::Insert => ModeSwitch::SET_SUFFIX,
+                    InsertMode::Overwrite => ModeSwitch::RESET_SUFFIX,
+                },
             ]).expect("failed to write bytes for insert mode");
-            self.insert_mode = enable;
+            self.insert_mode = mode;
         }
     }
 
@@ -1542,8 +1730,62 @@ pub enum ScrollAction {
 // }
 
 
+/// Whether or not to wrap text to the next line/row when it extends
+/// past the column limit of the screen.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum WrapLine {
     Yes,
     No,
+}
+
+/// Whether text characters printed to the terminal will be inserted
+/// before other characters or will replace/overwrite existing characters.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum InsertMode {
+    /// Characters will be inserted at the current cursor,
+    /// preserving all existing characters by shifting them to the right.
+    Insert,
+    /// Characters will be overwritten in place.
+    /// Sometimes called "replace mode".
+    Overwrite,
+}
+
+/// Whether the screen cursor is visible.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ShowCursor {
+    Visible,
+    Hidden,
+}
+
+/// Whether a Carriage Return subsequently issues a Line Feed (newline / new line).
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum CarriageReturnSendsLineFeed {
+    Yes,
+    No,
+}
+
+/// Whether a Line Feed (newline / new line) subsequently issues a Carriage Return.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum LineFeedSendsCarriageReturn {
+    Yes,
+    No,
+}
+
+/// The set of options that determine terminal behavior.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TerminalMode {
+    insert:      InsertMode,
+    show_cursor: ShowCursor,
+    cr_sends_lf: CarriageReturnSendsLineFeed,
+    lf_sends_cr: LineFeedSendsCarriageReturn,
+}
+impl Default for TerminalMode {
+    fn default() -> Self {
+        TerminalMode {
+            insert: InsertMode::Overwrite,
+            show_cursor: ShowCursor::Visible,
+            cr_sends_lf: CarriageReturnSendsLineFeed::Yes,
+            lf_sends_cr: LineFeedSendsCarriageReturn::Yes,
+        }
+    }
 }

@@ -498,32 +498,41 @@ pub struct AsciiControlCodes;
 #[allow(non_upper_case_globals)]
 impl AsciiControlCodes {
     /// (BEL) Plays a terminal bell or beep.
+    ///
     /// `Ctrl + G`, or `'\a'`.
     pub const Bell: u8 = 0x07;
     /// (BS) Moves the cursor backwards by one unit/character, but does not remove it.
     /// Note that this is different than the typical behavior of the "Backspace" key on a keyboard.
+    ///
     /// `Ctrl + H`, or `'\b'`.
     pub const Backspace: u8 = 0x08;
     /// (HT) Inserts a horizontal tab.
+    ///
     /// `Ctrl + I`, or `'\t'`.
     pub const Tab: u8 = 0x09;
-    /// (LF) Moves the cursor to the next line, i.e., Line feed.
+    /// (LF) Moves the cursor to the next line, i.e., Line feed, or new line / newline.
+    ///
     /// `Ctrl + J`, or `'\n'`.
-    pub const NewLine: u8 = 0x0A;
+    pub const LineFeed: u8 = 0x0A;
     /// (VT) Inserts a vertical tab.
+    ///
     /// `Ctrl + K`, or `'\v'`.
     pub const VerticalTab: u8 = 0x0B;
     /// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).
+    ///
     /// `Ctrl + L`, or `'\f'`.
     pub const PageBreak: u8 = 0x0C;
     /// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.
+    ///
     /// `Ctrl + M`, or `'\r'`.
     pub const CarriageReturn: u8 = 0x0D;
     /// (ESC) The escape character.
+    ///
     /// `ESC`, or `'\e'`.
     pub const Escape: u8 = 0x1B;
     /// (DEL) Backwards-deletes the character before (to the left of) the cursor.
     /// This is equivalent to what the Backspace key on a keyboard typically does.
+    ///
     /// `DEL`.
     pub const BackwardsDelete: u8 = 0x7F;
 }
