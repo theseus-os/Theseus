@@ -577,6 +577,15 @@
 <span id="574">574</span>
 <span id="575">575</span>
 <span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Style and formatting of text displayed in a terminal,</span>
 <span class="doccomment">//! following the ANSI, VT100, and xterm standards.</span>
@@ -1078,32 +1087,41 @@
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">non_upper_case_globals</span>)]</span>
 <span class="kw">impl</span> <span class="ident">AsciiControlCodes</span> {
     <span class="doccomment">/// (BEL) Plays a terminal bell or beep.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `Ctrl + G`, or `&#39;\a&#39;`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Bell</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x07</span>;
     <span class="doccomment">/// (BS) Moves the cursor backwards by one unit/character, but does not remove it.</span>
     <span class="doccomment">/// Note that this is different than the typical behavior of the &quot;Backspace&quot; key on a keyboard.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `Ctrl + H`, or `&#39;\b&#39;`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Backspace</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x08</span>;
     <span class="doccomment">/// (HT) Inserts a horizontal tab.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `Ctrl + I`, or `&#39;\t&#39;`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Tab</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x09</span>;
-    <span class="doccomment">/// (LF) Moves the cursor to the next line, i.e., Line feed.</span>
+    <span class="doccomment">/// (LF) Moves the cursor to the next line, i.e., Line feed, or new line / newline.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `Ctrl + J`, or `&#39;\n&#39;`.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NewLine</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0A</span>;
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LineFeed</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0A</span>;
     <span class="doccomment">/// (VT) Inserts a vertical tab.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `Ctrl + K`, or `&#39;\v&#39;`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">VerticalTab</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0B</span>;
     <span class="doccomment">/// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `Ctrl + L`, or `&#39;\f&#39;`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PageBreak</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0C</span>;
     <span class="doccomment">/// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `Ctrl + M`, or `&#39;\r&#39;`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CarriageReturn</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x0D</span>;
     <span class="doccomment">/// (ESC) The escape character.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `ESC`, or `&#39;\e&#39;`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">Escape</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x1B</span>;
     <span class="doccomment">/// (DEL) Backwards-deletes the character before (to the left of) the cursor.</span>
     <span class="doccomment">/// This is equivalent to what the Backspace key on a keyboard typically does.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// `DEL`.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BackwardsDelete</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0x7F</span>;
 }
