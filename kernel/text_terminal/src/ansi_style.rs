@@ -9,11 +9,11 @@ use crate::{BackgroundColor, ForegroundColor, ScreenPoint, ScrollbackBufferPoint
 /// for the character(s) displayed in a `Unit`.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Style {
-    format_flags: FormatFlags,
     /// The color of the text itself.
     color_foreground: ForegroundColor,
     /// The color behind the text.
     color_background: BackgroundColor,
+    format_flags: FormatFlags,
 }
 impl Style {
     pub fn diff<'old, 'new>(&'old self, other: &'new Style) -> StyleDiff<'old, 'new> {

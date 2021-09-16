@@ -23,6 +23,7 @@
 //! * <https://en.wikipedia.org/wiki/ANSI_escape_code>
 
 #![no_std]
+#![feature(drain_filter)]
 
 // TODO: FIXME: remove this once the implementation is complete.
 #![allow(dead_code, unused_variables, unused_imports)]
@@ -48,6 +49,7 @@ pub use ansi_style::*;
 use core::cmp::{Ordering, max, min};
 use core::convert::TryInto;
 use core::fmt;
+use core::iter::repeat;
 use core::num::NonZeroUsize;
 use core::ops::{Bound, Deref, DerefMut, Index, IndexMut};
 use alloc::string::String;
@@ -116,18 +118,15 @@ impl ScrollPosition {
 
 /// An entire unbroken line of characters (`Unit`s) that has been written to a terminal.
 ///
-/// `Line`s *only* end at an actual hard line break, i.e., a newline character `'\n'`.
+/// `Line`s *only* end at an actual hard line break, i.e., a line feed / newline character.
 ///
+/// Because each `Unit` in a `Line` represents exactly one displayed `Column` on the screen,
+/// it is easy to calculate where soft line breaks (line wraps) will occur
+/// based on the width of the screen.
 #[derive(Debug, Default, Deref, DerefMut)]
 pub struct Line {
     /// The actual characters that comprise this `Line`.
-    #[deref] #[deref_mut]
     units: Vec<Unit>,
-    /// The indices of the `Unit`s in the `Line` that come at the very beginning of a 
-    /// soft line break, i.e., a wrapped line. 
-    /// This is a cached value used to accelerate the calculations of which screen coordinates
-    /// point to which coordinates of lines/units in the scrollback buffer.
-    soft_line_breaks: Vec<UnitIndex>,
 }
 
 impl Index<UnitIndex> for Line {
@@ -147,147 +146,191 @@ impl Line {
         Line::default()
     }
 
-    /// Inserts the given `Unit` into this `Line` at the given index. 
+    /// Iterates over the `Unit`s in this `Line` to find the next non-continuance `Unit`.
     ///
-    /// This adjusts all soft line breaks (line wraps) as needed to properly
-    /// display this `Line` on screen, but does not actually re-display it.
+    /// Returns the `UnitIndex` of that `Unit`.
+    #[inline(always)]
+    fn next_non_continuance(&self, mut index: UnitIndex) -> UnitIndex {
+        while self.units.get(index.0).map(|u| u.wide.is_continuance()).unwrap_or_default() {
+            warn!("Untested: forward skipping continuance Unit at {:?}", index);
+            index += UnitIndex(1);
+        }
+        index
+    }
+
+    /// Iterates over the `Unit`s in this `Line` to find the previous non-continuance `Unit`.
+    ///
+    /// Returns the `UnitIndex` of that `Unit`.
+    #[inline(always)]
+    fn previous_non_continuance(&self, mut index: UnitIndex) -> UnitIndex {
+        while self.units.get(index.0).map(|u| u.wide.is_continuance()).unwrap_or_default() {
+            warn!("Untested: backward skipping continuance Unit at {:?}", index);
+            index -= UnitIndex(1);
+        }
+        index
+    }
+
+    /// Inserts the given character with the given `Style` into this `Line` at the given `index`. 
     ///
     /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
-    /// all `Unit`s after it will be shifted to the right by one,
-    /// and the soft line breaks will be updated accordingly.
+    /// all `Unit`s after it will be shifted to the right by one.
     ///
     /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
     /// then the `Line` will be padded with enough empty `Units` such that the given `Unit`
     /// will be inserted at the correct `UnitIndex`.
-    /// The empty padding `Unit`s will have the same [`Style`] as the given `Unit`.
+    /// The empty padding `Unit`s will have the given `Style`.
+    ///
+    /// Returns the `UnitIndex` immediately following the newly-inserted `Unit`(s),
+    /// which is where the next `Unit` would be inserted on a future insert operation.
     fn insert_unit(
         &mut self,
-        idx: UnitIndex,
-        unit: Unit,
-        screen_width: Column,
-        tab_width: u16
-    ) {
-        if idx.0 < self.units.len() {
-            // The unit index is within the existing bounds of the Line, so insert it.
-            self.units.insert(idx.0, unit);
-            // TODO: there is definitely a more efficient way to recalculate the soft line breaks
-            //       rather than iterating over every single unit in this line.
-            self.recalculate_soft_line_breaks(screen_width, tab_width);
-        } 
-        else {
-            // The unit index is beyond the existing bounds of this Line, so fill it with empty Units as padding.
-            let range_of_empty_padding = self.units.len() .. idx.0;
+        index: UnitIndex,
+        c: char,
+        style: Style,
+        tab_width: u16,
+    ) -> UnitIndex {
+        let mut index = self.next_non_continuance(index);
+
+        // If the index is beyond the existing bounds of this Line, fill it with empty Units as padding.
+        if index.0 > self.units.len() {
+            let range_of_empty_padding = self.units.len() .. index.0;
             self.units.reserve(range_of_empty_padding.len() + 1);
             if range_of_empty_padding.len() > 0 {
                 warn!("Untested scenario: pushing {} empty padding character(s) to line.", range_of_empty_padding.len());
             }
             for _i in range_of_empty_padding {
-                self.units.push(Unit { character: Character::default(), style: unit.style });
+                self.units.push(Unit { style, ..Default::default() });
             }
-            self.units.push(unit);
-            self.recalculate_soft_line_breaks(screen_width, tab_width);
-        }
+            index += UnitIndex(range_of_empty_padding.len());
+        };
+        // Now that we've inserted any padding necessary, we simply insert the new Unit.
+
+        // The tab character '\t' requires special handling.
+        let num_units_added = if c == '\t' {
+            let tab_width = tab_width as usize;
+            self.units.reserve(tab_width);
+            // Insert one Unit to represent the actual start of the tab character.
+            self.units.insert(
+                index.0,
+                Unit {
+                    character: Character::Single(c),
+                    style,
+                    wide: WideDisplayedUnit::TabStart,
+                }
+            );
+            // Insert `tab_width - 1` empty units to represent the rest of the tab space.
+            self.units.splice(
+                (index.0 + 1) .. (index.0 + 1), 
+                core::iter::repeat(Unit {
+                    character: Character::default(),
+                    style,
+                    wide: WideDisplayedUnit::TabFill,
+                }).take(tab_width - 1)
+            );
+            tab_width
+        } 
+        else {
+            let character = Character::Single(c);
+            let displayed_width = character.displayable_width() as usize;
+            match displayed_width {
+                0 => panic!("Unsupported: inserting 0-width non-TAB character {} ({:?})", c, c),
+                1 => {
+                    // TODO: check for ligatures for certain characters, which need to be combined into the previous `Unit`.
+                    //       In this case, we won't insert `c` into a new Unit, we'll simply append it to the previous `Unit`'s
+                    //       contained Character::Multi(...), converting it from a Character::Single(...) as necessary.
+                    //       We would then insert a new empty unit with the WideDisplayedUnit::MultiFill tag set.
+
+                    self.units.insert(
+                        index.0,
+                        Unit { character, style, wide: WideDisplayedUnit::None }
+                    );
+                    1
+                }
+                width => {
+                    self.units.insert(
+                        index.0,
+                        Unit { character, style, wide: WideDisplayedUnit::MultiStart }
+                    );
+                    // Insert `width - 1` empty units to represent the rest of the space occupied by this wide character.
+                    self.units.splice(
+                        (index.0 + 1) .. (index.0 + 1), 
+                        core::iter::repeat(Unit {
+                            character: Character::default(),
+                            style,
+                            wide: WideDisplayedUnit::MultiFill,
+                        }).take(width - 1)
+                    );
+                    width
+                }
+            }
+        };
+
+        index + UnitIndex(num_units_added)
     }
 
-    /// Replaces the existing `Unit` at the given `idx` in this `Line` with the given `unit`.
+    /// Replaces the existing `Unit`(s) at the given `index` in this `Line` with the given character.
     ///
     /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
-    /// the existing `Unit` at that index will be replaced and the soft line breaks
-    /// will be updated accordingly (if the new and existing units have different displayable widths).
-    ///
-    /// If needed, this function adjusts all soft line breaks (line wraps) to properly
-    /// display this `Line` on screen, but does not actually re-display it.
+    /// the existing `Unit`(s) at that index will be replaced.
     ///
     /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
-    /// then the `Line` will be padded with enough empty `Units` such that the given `Unit`
-    /// will be inserted at the correct `UnitIndex`.
-    /// The empty padding `Unit`s will have the same [`Style`] as the given `Unit`.
+    /// this function does the same thing as [`Line::insert_unit()`].
+    ///
+    /// Returns the `UnitIndex` immediately following the newly-replaced `Unit`(s),
+    /// which is where the next `Unit` would be replaced on a future operation.
     fn replace_unit(
         &mut self,
-        idx: UnitIndex,
-        unit: Unit,
-        screen_width: Column,
+        index: UnitIndex,
+        c: char,
+        style: Style,
         tab_width: u16
-    ) {
-        if let Some(unit_to_replace) = self.units.get_mut(idx.0) {
+    ) -> UnitIndex {
+        let mut index = self.next_non_continuance(index);
+
+        if let Some(unit_to_replace) = self.units.get_mut(index.0) {
+            let character = Character::Single(c);
             let old_width = unit_to_replace.displayable_width();
-            let new_width = match unit.displayable_width() {
-                0 => tab_width,
-                w => w,
-            };
-            *unit_to_replace = unit;
-            // If the new unit differs in displayable width, recalculate the soft line breaks.
-            if old_width != new_width {
-                self.recalculate_soft_line_breaks(screen_width, tab_width);
+            let new_width = character.displayable_width();
+            if old_width == new_width {
+                unit_to_replace.character = character;
+                unit_to_replace.style = style;
+                self.next_non_continuance(index) // move to the next unit
+            } else {
+                // To handle the case when a new character has a different displayable width 
+                // than the existing character it's replacing,
+                // we simply remove the existing character's `Unit`(s) 
+                // and then insert the new character. 
+                self.delete_unit(index);
+                self.insert_unit(index, c, style, tab_width)
             }
         } else {
-            // Re-use the latter half of the `insert_unit` function. 
-            self.insert_unit(idx, unit, screen_width, tab_width);
+            self.insert_unit(index, c, style, tab_width)
         }
     }
 
     /// Deletes the given `Unit` from this `Line` at the given index. 
     ///
-    /// This adjusts all soft line breaks (line wraps) as needed to properly
-    /// display this `Line` on screen, but does not actually re-display it.
+    /// This also deletes all continuance characters that correspond to this `Unit`.
     ///
-    /// If the given `UnitIndex` is not at the end of this `Line`,
-    /// all `Unit`s after it will be shifted to the left by one,
-    /// and the soft line breaks will be updated accordingly.
-    ///
-    /// Returns the width of the deleted unit in number of columns,
-    /// which dictates how far back the screen cursor must be moved.
-    fn delete_unit(
-        &mut self,
-        idx: UnitIndex,
-        screen_width: Column,
-        tab_width: u16
-    ) -> Column {
-        let removed_unit = self.units.remove(idx.0);
-        // TODO: there is definitely a more efficient way to recalculate the soft line breaks
-        //       rather than iterating over every single unit in this line.
-        self.recalculate_soft_line_breaks(screen_width, tab_width);
-        match removed_unit.displayable_width() {
-            0 => Column(tab_width),
-            w => Column(w),
-        }
-    }
+    /// As with standard [`Vec`] behavior, all `Unit`s after the given `index` are
+    /// shifted to the left.
+    /// As such, the given `index` does not need to be moved after invoking this function,
+    /// as it will already point to the `Unit` right after the last deleted `Unit`.
+    fn delete_unit(&mut self, index: UnitIndex) {
+        let index = self.previous_non_continuance(index);
 
-    /// Calculates and returns the displayabe width in columns 
-    /// of the `Unit`s in this `Line` from the given `start` index (inclusive)
-    /// to the given `end` index (exclusive).
-    fn calculate_displayed_width_starting_at_unit(&self, start: UnitIndex, end: UnitIndex, tab_width: u16) -> usize {
-        (&self.units[start.0 .. end.0])
-            .iter()
-            .map(|unit| match unit.displayable_width() {
-                0 => tab_width,
-                w => w,
-            } as usize)
-            .sum()
+        let _removed_unit = self.units.remove(index.0);
+        let _removed_continuance_units = self.units.drain_filter(|&mut unit| unit.wide.is_continuance());
+
+        warn!("Deleted {}-width {:?}", _removed_unit.displayable_width(), _removed_unit);
+        for _u in _removed_continuance_units {
+            warn!("\t also deleted continuance {:?}", _u);
+        }
     }
 
     /// Returns the number of rows on the screen that this `Line` will span when displayed.
-    fn num_rows_as_displayed(&self) -> usize {
-        self.soft_line_breaks.len() + 1
-    }
-
-    /// Iterates over all `Unit`s in this `Line` to recalculate where the soft line breaks
-    /// (i.e., line wraps) should occur.
-    fn recalculate_soft_line_breaks(&mut self, screen_width: Column, tab_width: u16) {
-        let mut breaks = Vec::new();
-        let mut column_idx_of_unit = Column(0);
-        for (i, unit) in self.units.iter().enumerate() {
-            let width = Column(match unit.displayable_width() {
-                0 => tab_width,
-                w => w,
-            });
-            column_idx_of_unit += width;
-            if column_idx_of_unit >= screen_width {
-                breaks.push(UnitIndex(i));
-                column_idx_of_unit = Column(0);
-            } 
-        }
-        self.soft_line_breaks = breaks;
+    fn num_rows_as_displayed(&self, screen_width: Column) -> usize {
+        (self.units.len() / screen_width.0 as usize) + 1
     }
 }
 
@@ -329,10 +372,6 @@ pub struct TextTerminal<Backend> where Backend: TerminalBackend {
 
     /// The mode settings/options that define the terminal's behavior.
     mode: TerminalMode,
-
-    // /// The mode determines what specific action will be taken on receiving an input,
-    // /// such as whether we should insert or overwrite new character input. 
-    // mode: TerminalMode,
 
     /// The terminal backend to which display actions are sent to be handled 
     /// in a backend-specific manner.
@@ -502,7 +541,7 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
     }
     */
 
-
+    /*
     /// Calculates the point in the scrollback buffer that the given `cursor_point`
     /// is pointing to, based on the current position of the screen viewport.
     ///
@@ -576,6 +615,7 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             ScreenPoint { column: column_idx_of_unit, row: cursor_point.row, }
         )
     }
+    */
 
     /*
     /// Moves the cursor to the given position, snapping it to the nearest line and column 
@@ -632,38 +672,42 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
             return self.execute(AsciiControlCodes::BackwardsDelete);
         }
 
+        let style = Style::default(); // TODO: keep track of the current style changeset, if any, and use it here.
+
         let screen_size = self.backend.screen_size();
         let tab_width = *self.tab_width;
         let orig_scrollback_pos = *self.scrollback_cursor;
         let dest_line = &mut self.scrollback_buffer[orig_scrollback_pos.line_idx];
-        let new_unit = Unit { character: Character::Single(c), style: Style::default() };
-        let new_unit_width = match new_unit.displayable_width() {
-            0 => Column(tab_width),
-            w => Column(w),
+        let new_unit_index = match self.mode.insert { 
+            InsertMode::Insert => dest_line.insert_unit(
+                orig_scrollback_pos.unit_idx,
+                c,
+                style,
+                tab_width,
+            ),
+            InsertMode::Overwrite => dest_line.replace_unit(
+                orig_scrollback_pos.unit_idx,
+                c,
+                style,
+                tab_width,
+            ),
         };
-        if self.mode.insert == InsertMode::Insert {
-            dest_line.insert_unit(
-                orig_scrollback_pos.unit_idx,
-                new_unit,
-                screen_size.num_columns,
-                tab_width,
-            );
-        } else {
-            dest_line.replace_unit(
-                orig_scrollback_pos.unit_idx,
-                new_unit,
-                screen_size.num_columns,
-                tab_width,
-            );
-        }
-        self.scrollback_cursor.unit_idx.0 += 1;
+        self.scrollback_cursor.unit_idx = new_unit_index;
+
 
         // Now that we've handled inserting everything into the scrollback buffer,
         // we can move on to refreshing the display.
-        let display_action = DisplayAction::Insert {
-            scrollback_start: orig_scrollback_pos,
-            scrollback_end:   *self.scrollback_cursor,
-            screen_start:     self.cursor.position,
+        let display_action = match self.mode.insert { 
+            InsertMode::Insert => DisplayAction::Insert {
+                scrollback_start: orig_scrollback_pos,
+                scrollback_end:   *self.scrollback_cursor,
+                screen_start:     self.cursor.position,
+            },
+            InsertMode::Overwrite => DisplayAction::Replace {
+                scrollback_start: orig_scrollback_pos,
+                scrollback_end:   *self.scrollback_cursor,
+                screen_start:     self.cursor.position,
+            },
         };
         let lines = &self.scrollback_buffer;
         let new_screen_cursor = self.backend.display(display_action, lines, None).unwrap();
@@ -993,7 +1037,7 @@ impl<'term, Backend: TerminalBackend> TerminalParserHandler<'term, Backend> {
 /// In the rare case of a character that consist of multiple UTF-8 sequences, e.g., complex emoji,
 /// we store the entire character here as a dynamically-allocated `String`. 
 /// This saves space in the typical case of a character being 4 bytes or less (`char`-sized).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Character {
     Single(char),
     Multi(String),
@@ -1033,6 +1077,31 @@ impl Default for Character {
 /// but this is different from the concept of a `cell` because it may contain 
 /// more than just a single displayable character, in order to support complex Unicode/emoji.
 ///
+/// ## 1-to-1 Relationship between Units and Columns
+/// It is guaranteed that one `Unit` in the scrollback buffer corresponds to exactly one screen column,
+/// which makes it easy to calculate the conversions between screen cursor coordinate points
+/// and scrollback buffer coordinate points.
+/// For example, if the screen is 80 columns wide, a Line with 120 units will display across
+/// exactly 1.5 lines, displaying right up to the 40th column of the second row.
+///
+/// Because a complex Unicode character may require more than one column to display,
+/// such as a tab or emoji sequence, there are flags in a `Unit` that indicate whether it is 
+/// part of a wider display character sequence.
+/// There are flags for both the beginning unit and all of the placeholder units that follow it 
+/// (which exist solely to satisfy the 1-to-1 relationship between screen columns and scrollback buffer units).
+/// Thus, it is easy to determine where multi-column Unit sequences start and end.
+///
+/// Wide-display character sequences like tabs and emoji are **always** stored completely
+/// in the starting Unit (as a [`Character::Multi`] variant),
+/// with the following placeholder Units containing a default empty [`Character::Single`]
+/// with the null character within it.
+/// This conveniently allows the screen cursor to store a single `Unit` object within it
+/// that represents the entirety of that displayable Unit,
+/// instead of more complex storage strategy that splits up wide character sequences into
+/// multiple `Unit`s.
+///
+///
+/// ## What Units are Not
 /// Displayable control/escape sequences, i.e., those that affect text style,
 /// **do not** exist as individual `Unit`s,
 /// though their effects on text style are represented by a `Unit`'s `FormatFlags`.
@@ -1046,6 +1115,8 @@ pub struct Unit {
     character: Character,
     /// The style/formatting with which this `Unit`s character(s) should be displayed.
     style: Style,
+    /// Indicates if and how this `Unit` is part of a wide-displayed character sequence.
+    wide: WideDisplayedUnit,
 }
 impl Deref for Unit {
     type Target = Character;
@@ -1786,6 +1857,43 @@ impl Default for TerminalMode {
             show_cursor: ShowCursor::Visible,
             cr_sends_lf: CarriageReturnSendsLineFeed::Yes,
             lf_sends_cr: LineFeedSendsCarriageReturn::Yes,
+        }
+    }
+}
+
+/// The kinds of Units and how they correspond to previous Units in the same Line.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum WideDisplayedUnit {
+    /// (Default) This Unit is not part of any wide-displayed character sequence,
+    /// and is completely standlone with no relationship to other adjacent Units.
+    /// Thus, the character sequence in this `Unit` is guaranteed to display within one Column.
+    None,
+    /// This Unit is the beginning of a tab character.
+    /// As such, this unit contains a [`Character::Single`]`('\t')`.
+    TabStart,
+    /// This Unit is a continuance for a previously-existing tab character.
+    TabFill,
+    /// This Unit is the beginning of a wide non-tab character, e.g., emoji, Chinese character, etc.
+    /// As such, this unit contains a [`Character::Multi`]`(String)` that holds the entire
+    /// wide character's multi-byte sequence.
+    MultiStart,
+    /// This Unit is a continuance for a previously-existing wide non-tab character
+    ///, e.g., emoji, Chinese character, etc.
+    MultiFill,
+}
+impl Default for WideDisplayedUnit {
+    fn default() -> Self {
+        WideDisplayedUnit::None
+    }
+}
+impl WideDisplayedUnit {
+    /// A continuance Unit is one that occupies space as a continuance
+    /// of a previous character Unit, i.e., `TabFill` or `MultiFill`.
+    #[inline(always)]
+    fn is_continuance(&self) -> bool {
+        match self {
+            &Self::TabFill | &Self::MultiFill => true,
+            _ => false,
         }
     }
 }
