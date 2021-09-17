@@ -63,8 +63,8 @@ pub struct ConnectX5Nic {
     /// Init pages passed to the NIC. Once transferred, they should not be accessed by the driver.
     init_pages: Vec<MappedPages>,
     event_queue: EventQueue,
-    // completion_queue: CompletionQueue,
-    // send_queue: SendQueue
+    completion_queue: CompletionQueue,
+    send_queue: SendQueue
 }
 
 
@@ -128,14 +128,14 @@ impl ConnectX5Nic {
         // Execute ENABLE_HCA command
         let init_cmd = cmdq.create_command(CommandBuilder::new(CommandOpcode::EnableHca))?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        trace!("EnableHCA: {:?}", status);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        trace!("EnableHCA: {:?}", cmdq.get_command_status(completed_cmd)?);
 
         // execute QUERY_ISSI
         let init_cmd = cmdq.create_command( CommandBuilder::new(CommandOpcode::QueryIssi))?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let (current_issi, available_issi) = cmdq.get_query_issi_command_output(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (current_issi, available_issi, status) = cmdq.get_query_issi_command_output(completed_cmd)?;
         trace!("QueryISSI: {:?}, issi version :{}, available: {:#X}", status, current_issi, available_issi);
 
         // execute SET_ISSI
@@ -143,8 +143,8 @@ impl ConnectX5Nic {
         if available_issi & ISSI_VERSION_1 == ISSI_VERSION_1 {
             let init_cmd = cmdq.create_command( CommandBuilder::new(CommandOpcode::SetIssi))?;
             let posted_cmd = init_segment.post_command(init_cmd);
-            let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-            trace!("SetISSI: {:?}", status);
+            let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+            trace!("SetISSI: {:?}", cmdq.get_command_status(completed_cmd)?);
         } else {
             return Err("ISSI indicated by PRM is not supported");
         }
@@ -154,8 +154,8 @@ impl ConnectX5Nic {
             CommandBuilder::new(CommandOpcode::QueryPages).opmod(QueryPagesOpMod::BootPages as u16)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let num_boot_pages = cmdq.get_query_pages_command_output(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (num_boot_pages, status) = cmdq.get_query_pages_command_output(completed_cmd)?;
         trace!("Query pages status: {:?}, Boot pages: {:?}", status, num_boot_pages);
 
         // Allocate pages for boot
@@ -174,8 +174,8 @@ impl ConnectX5Nic {
                 .allocated_pages(boot_pa)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        trace!("Manage pages boot status: {:?}", status);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        trace!("Manage pages boot status: {:?}", cmdq.get_command_status(completed_cmd)?);
 
         // Query HCA capabilities
         let init_cmd = cmdq.create_command(
@@ -183,8 +183,8 @@ impl ConnectX5Nic {
                 .opmod(QueryHcaCapCurrentOpMod::GeneralDeviceCapabilities as u16), 
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let port_type = cmdq.get_port_type(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (port_type, status) = cmdq.get_port_type(completed_cmd)?;
         trace!("Query HCA cap status:{:?}, port_type: {:?}", status, port_type);
 
         // Query pages for init
@@ -193,8 +193,8 @@ impl ConnectX5Nic {
                 .opmod(QueryPagesOpMod::InitPages as u16)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let num_init_pages = cmdq.get_query_pages_command_output(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (num_init_pages, status) = cmdq.get_query_pages_command_output(completed_cmd)?;
         trace!("Query pages status: {:?}, init pages: {:?}", status, num_init_pages);
 
         let mut init_mp = Vec::with_capacity(num_init_pages as usize);
@@ -214,8 +214,8 @@ impl ConnectX5Nic {
                     .allocated_pages(init_pa)
             )?;
             let posted_cmd = init_segment.post_command(init_cmd);
-            let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-            trace!("Manage pages init status: {:?}", status);
+            let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+            trace!("Manage pages init status: {:?}", cmdq.get_command_status(completed_cmd)?);
         }
 
         // execute INIT_HCA
@@ -223,24 +223,24 @@ impl ConnectX5Nic {
             CommandBuilder::new(CommandOpcode::InitHca) 
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        trace!("Init HCA status: {:?}", status);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        trace!("Init HCA status: {:?}", cmdq.get_command_status(completed_cmd)?);
 
         // Set driver version 
         let init_cmd = cmdq.create_command(
             CommandBuilder::new(CommandOpcode::SetDriverVersion)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        trace!("Set Driver Version: {:?}", status);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        trace!("Set Driver Version: {:?}", cmdq.get_command_status(completed_cmd)?);
 
         // execute ALLOC_UAR
         let init_cmd = cmdq.create_command(
             CommandBuilder::new(CommandOpcode::AllocUar)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let uar = cmdq.get_uar(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (uar, status) = cmdq.get_uar(completed_cmd)?;
         trace!("UAR status: {:?}, UAR: {}", status, uar);        
 
         // execute CREATE_EQ for page request event
@@ -264,8 +264,8 @@ impl ConnectX5Nic {
                 .log_queue_size(7)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let eq_number = cmdq.get_eq_number(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (eq_number, status) = cmdq.get_eq_number(completed_cmd)?;
         trace!("Create EQ status: {:?}, number: {}", status, eq_number);
 
         // execute QUERY_VPORT_STATE
@@ -273,8 +273,8 @@ impl ConnectX5Nic {
             CommandBuilder::new(CommandOpcode::QueryVportState)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let (tx_speed, admin_state, state) = cmdq.get_vport_state(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)?;
         trace!("Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}", status, tx_speed, admin_state, state);  
         
         // execute QUERY_NIC_VPORT_CONTEXT
@@ -282,8 +282,8 @@ impl ConnectX5Nic {
             CommandBuilder::new(CommandOpcode::QueryNicVportContext)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let mac = cmdq.get_vport_mac_address(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (mac, status) = cmdq.get_vport_mac_address(completed_cmd)?;
         trace!("Query Nic Vport context status: {:?}, mac address: {:#X?}", status, mac);
 
         // execute ALLOC_PD
@@ -291,8 +291,8 @@ impl ConnectX5Nic {
             CommandBuilder::new(CommandOpcode::AllocPd)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let pd = cmdq.get_protection_domain(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (pd, status) = cmdq.get_protection_domain(completed_cmd)?;
         trace!("Alloc PD status: {:?}, protection domain num: {}", status, pd);
 
         // execute ALLOC_TRANSPORT_DOMAIN
@@ -300,8 +300,8 @@ impl ConnectX5Nic {
             CommandBuilder::new(CommandOpcode::AllocTransportDomain)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let td = cmdq.get_transport_domain(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (td, status) = cmdq.get_transport_domain(completed_cmd)?;
         trace!("Alloc TD status: {:?}, transport domain num: {}", status, td);
 
         // execute QUERY_SPECIAL_CONTEXTS
@@ -309,8 +309,8 @@ impl ConnectX5Nic {
             CommandBuilder::new(CommandOpcode::QuerySpecialContexts)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let rlkey = cmdq.get_reserved_lkey(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (rlkey, status) = cmdq.get_reserved_lkey(completed_cmd)?;
         trace!("Query Special Contexts status: {:?}, rlkey: {}", status, rlkey);
         
         // execute CREATE_CQ 
@@ -339,8 +339,8 @@ impl ConnectX5Nic {
                 .db_page(db_pa)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let cq_number = cmdq.get_cq_number(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (cq_number, status) = cmdq.get_cq_number(completed_cmd)?;
         trace!("Create CQ status: {:?}, number: {}", status, cq_number);
 
         // execute CREATE_TIS
@@ -349,8 +349,8 @@ impl ConnectX5Nic {
                 .td(td),
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let tisn = cmdq.get_tis_context_number(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (tisn, status) = cmdq.get_tis_context_number(completed_cmd)?;
         trace!("Create TIS status: {:?}, tisn: {}", status, tisn);
 
         // execute CREATE_SQ for page request event
@@ -383,8 +383,8 @@ impl ConnectX5Nic {
                 .pd(pd)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let sq_number = cmdq.get_send_queue_number(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (sq_number, status) = cmdq.get_send_queue_number(completed_cmd)?;
         trace!("Create SQ status: {:?}, number: {}", status, sq_number);
 
         // MODIFY_SQ
@@ -395,8 +395,8 @@ impl ConnectX5Nic {
                 .sqn(sq_number)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        trace!("Modify SQ status: {:?}", status);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        trace!("Modify SQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
 
         // QUERY_SQ
         let init_cmd = cmdq.create_command(
@@ -404,37 +404,37 @@ impl ConnectX5Nic {
                 .sqn(sq_number)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
-        let (completed_cmd, status) = cmdq.wait_for_command_completion(posted_cmd)?;
-        let state = cmdq.get_sq_state(completed_cmd)?;
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (state, status) = cmdq.get_sq_state(completed_cmd)?;
         trace!("Query SQ status: {:?}, state: {}", status, state);
 
-        let (mut packet, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
-        let buffer: &mut [u8] = packet.as_slice_mut(0, 298)?;
+        // let (mut packet, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+        // let buffer: &mut [u8] = packet.as_slice_mut(0, 298)?;
         
-        let dhcp_packet: [u8; 298] = [ 
-            0x01, 0x2c, 0xa8, 0x36, 0x00, 0x00, 0xfa, 0x11, 0x17, 0x8b, 0x00, 0x00, 0x00, 0x00,
-        0xff, 0xff, 0xff, 0xff, 0x00, 0x44, 0x00, 0x43, 0x01, 0x18, 0x59, 0x1f, 0x01, 0x01, 0x06,
-        0x00, 0x00, 0x00, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0xc6, 0x9c, 0x89,
-        0x4c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x63, 0x82, 0x53, 0x63, 0x35, 0x01, 0x01,
-        0x3d, 0x07, 0x01, 0x00, 0x1f, 0xc6, 0x9c, 0x89, 0x4c, 0x32, 0x04, 0x00, 0x00, 0x00, 0x00,
-        0x37, 0x04, 0x01, 0x03, 0x06, 0x2a, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
+        // let dhcp_packet: [u8; 298] = [ 
+        //     0x01, 0x2c, 0xa8, 0x36, 0x00, 0x00, 0xfa, 0x11, 0x17, 0x8b, 0x00, 0x00, 0x00, 0x00,
+        // 0xff, 0xff, 0xff, 0xff, 0x00, 0x44, 0x00, 0x43, 0x01, 0x18, 0x59, 0x1f, 0x01, 0x01, 0x06,
+        // 0x00, 0x00, 0x00, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0xc6, 0x9c, 0x89,
+        // 0x4c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x63, 0x82, 0x53, 0x63, 0x35, 0x01, 0x01,
+        // 0x3d, 0x07, 0x01, 0x00, 0x1f, 0xc6, 0x9c, 0x89, 0x4c, 0x32, 0x04, 0x00, 0x00, 0x00, 0x00,
+        // 0x37, 0x04, 0x01, 0x03, 0x06, 0x2a, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        // ];
         
-        buffer.copy_from_slice(&dhcp_packet);
+        // buffer.copy_from_slice(&dhcp_packet);
 
         // send_queue.send(sq_number, tisn, rlkey, pa)?;
         send_queue.nop(sq_number, tisn, rlkey)?;
@@ -448,8 +448,8 @@ impl ConnectX5Nic {
             boot_pages: boot_mp,
             init_pages: init_mp,
             event_queue: event_queue,
-            // completion_queue: completion_queue,
-            // send_queue: send_queue
+            completion_queue: completion_queue,
+            send_queue: send_queue
         };
         
         let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));

@@ -366,6 +366,11 @@ pub struct CompletedCommand {
     output_mailbox_buffers: Vec<MailboxBuffer>,
 }
 
+#[derive(Debug)]
+pub struct CommandCompletionStatus {
+    delivery_status: CommandDeliveryStatus,
+    return_status: CommandReturnStatus
+}
 
 pub struct CommandBuilder {
     opcode:                         CommandOpcode,
@@ -553,7 +558,7 @@ impl CommandQueue {
 
                 let num_mailboxes = libm::ceilf((pages_pa.len() * SIZE_PADDR_IN_BYTES) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
                 self.initialize_mailboxes(num_mailboxes, &mut input_mailbox_buffers)?;
-                Self::write_page_addr_to_mailbox(num_mailboxes, &mut input_mailbox_buffers, pages_pa)?; 
+                Self::write_page_addrs_to_mailboxes(&mut input_mailbox_buffers, pages_pa)?; 
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
             }
             CommandOpcode::QueryNicVportContext => { // only accesses your own vport
@@ -570,7 +575,6 @@ impl CommandQueue {
 
                 Self::write_event_queue_context_to_mailbox(
                     &mut input_mailbox_buffers, 
-                    num_mailboxes,
                     pages_pa,
                     parameters.user_access_region.ok_or(CommandQueueError::MissingInput)?,
                     parameters.log_queue_size.ok_or(CommandQueueError::MissingInput)?
@@ -586,7 +590,6 @@ impl CommandQueue {
                 
                 Self::write_completion_queue_context_to_mailbox(
                     &mut input_mailbox_buffers,
-                    num_mailboxes, 
                     pages_pa,
                     parameters.user_access_region.ok_or(CommandQueueError::MissingInput)?,
                     parameters.log_queue_size.ok_or(CommandQueueError::MissingInput)?,
@@ -600,8 +603,9 @@ impl CommandQueue {
                 const NUM_INPUT_MAILBOXES_CREATE_TIS: usize = 1;
                 self.initialize_mailboxes(NUM_INPUT_MAILBOXES_CREATE_TIS,&mut input_mailbox_buffers)?;
 
+                const TIS_MAILBOX_INDEX: usize = 0;
                 Self::write_transport_interface_send_context_to_mailbox(
-                    &mut input_mailbox_buffers,
+                    &mut input_mailbox_buffers[TIS_MAILBOX_INDEX],
                     parameters.transport_domain.ok_or(CommandQueueError::MissingInput)?
                 )?;
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
@@ -615,7 +619,6 @@ impl CommandQueue {
 
                 Self::write_send_queue_context_to_mailbox(
                     &mut input_mailbox_buffers,
-                    num_mailboxes, 
                     pages_pa, 
                     parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?, 
                     parameters.transport_interface_send_num.ok_or(CommandQueueError::MissingInput)?, 
@@ -634,8 +637,9 @@ impl CommandQueue {
                 const NUM_INPUT_MAILBOXES_MODIFY_SQ: usize = 1;
                 self.initialize_mailboxes(NUM_INPUT_MAILBOXES_MODIFY_SQ, &mut input_mailbox_buffers)?;
         
+                const SQ_CONTEXT_MAILBOX_INDEX: usize = 0;
                 Self::modify_sq_state(
-                    &mut input_mailbox_buffers,
+                    &mut input_mailbox_buffers[SQ_CONTEXT_MAILBOX_INDEX],
                     parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?, 
                     parameters.transport_interface_send_num.ok_or(CommandQueueError::MissingInput)?, 
                 )?;
@@ -666,18 +670,218 @@ impl CommandQueue {
 
         Ok(initialized_entry)
     }
+    
+    /// Allocates all the mailboxes required for a command and then initializes all the non-data fields (token, block number and next address fields).
+    fn initialize_mailboxes(&mut self, num_mailboxes: usize, command_mailbox_buffers: &mut Vec<MailboxBuffer>) -> Result<(), CommandQueueError> {
+        // Add pre-allocated mailbox buffers to the mailbox list for this command and add extra mailbox pages if required.      
+        // We create the list first since each mailbox needs to know the starting address of the next mailbox.
+        for _ in 0..num_mailboxes {
+            if let Some(mb_buffer) = self.mailbox_buffers.pop() {
+                command_mailbox_buffers.push(mb_buffer);
+            } else {
+                let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)
+                    .map_err(|_e| CommandQueueError::PageAllocationFailed)?;
+                command_mailbox_buffers.push(MailboxBuffer{mp, addr});
+            }
+        }
+        // Initialize the mailboxes
+        for block_num in 0..num_mailboxes {
+            // record the next page address to set pointer for the next mailbox
+            let next_mb_addr = if block_num < (num_mailboxes - 1) {
+                command_mailbox_buffers[block_num + 1].addr.value()
+            } else {
+                0
+            };
+            // initialize the mailbox fields except for data.
+            let mailbox = command_mailbox_buffers[block_num].mp.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)
+                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+            mailbox.init(block_num as u32, self.token, next_mb_addr);
+        }
+        Ok(())
+    }
+    
+    /*** Functions to write input values to mailboxes ***/
 
+    /// Initialize input mailboxes with the driver version for the [`CommandOpcode::SetDriverVersion`] command.
+    fn write_driver_version_to_mailbox(input_mailbox_buffers: &mut Vec<MailboxBuffer>) -> Result<(), CommandQueueError> {
+        let driver_version = "Theseus,mlx5,1.0.0".as_bytes(); // TODO: take as argument
+        let mut buffer: [u8; 512] = [0; 512];
+        buffer[0..driver_version.len()].copy_from_slice(driver_version);
+        
+        let mailbox = input_mailbox_buffers[0].mp.as_type_mut::<CommandInterfaceMailbox>(0)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        mailbox.mailbox_data.write(buffer);
+        Ok(())
+    }
+    
+    /// Initialize input mailboxes with the physical addresses of pages passed to the NIC.
+    fn write_page_addrs_to_mailboxes(input_mailbox_buffers: &mut [MailboxBuffer], mut pages: Vec<PhysicalAddress>) -> Result<(), CommandQueueError> {
+        for mb_buffer in input_mailbox_buffers {  
+            let mb_page = &mut mb_buffer.mp;
+            let mailbox_data = mb_page.as_type_mut::<[u8; MAILBOX_DATA_SIZE_IN_BYTES]>(MAILBOX_OFFSET_IN_PAGE)
+                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+            
+            Self::write_page_addrs_to_data_buffer(mailbox_data, &mut pages);
+        }
+        Ok(())
+    }
+    
+    /// Fills a data buffer with physical address values in the format specified by the PRM.
+    fn write_page_addrs_to_data_buffer(data_buffer: &mut [u8], pages:  &mut Vec<PhysicalAddress>) {
+        let paddr_per_buffer = data_buffer.len() / SIZE_PADDR_IN_BYTES;
+        for paddr_index in 0..paddr_per_buffer {
+            if let Some(paddr) = pages.pop() {
+                let start_offset = paddr_index * SIZE_PADDR_IN_BYTES;
+                Self::write_page_addr(paddr, &mut data_buffer[start_offset..]);
+            } else {
+                break;
+            }
+        }
+    }
+    
+    /// Writes the physical address `paddr` to the beginning of the `data` buffer.
+    /// The format specified in the PRM is that the 4 higher bytes are written first at the starting address in big endian format,
+    /// then the four lower bytes are written in the next 4 bytes in big endian format.
+    fn write_page_addr(paddr: PhysicalAddress, data: &mut [u8]) {
+        let end_offset_h = SIZE_PADDR_H_IN_BYTES;
+        let addr = (paddr.value() >> 32) as u32;
+        data[0..end_offset_h].copy_from_slice(&addr.to_be_bytes());
 
-
-    /// Waits for ownership bit to be cleared, and then returns the command delivery status and the command return status.
-    pub fn wait_for_command_completion(&mut self, command: PostedCommand) -> Result<(CompletedCommand, (CommandDeliveryStatus, CommandReturnStatus)), CommandQueueError> {
-        while self.entries[command.entry_num].owned_by_hw() {}
-        self.available_entries[command.entry_num] = true; // TODO!:: Move this
-        let delivery_status = self.entries[command.entry_num].get_delivery_status().ok_or(CommandQueueError::InvalidCommandDeliveryStatus)?;
-        let return_status = self.entries[command.entry_num].get_return_status().ok_or(CommandQueueError::InvalidCommandReturnStatus)?;
-        Ok((command.complete(), (delivery_status, return_status)))
+        let start_offset_l = end_offset_h;
+        let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
+        let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
+        data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
     }
 
+    fn write_event_queue_context_to_mailbox(
+        input_mailbox_buffers: &mut Vec<MailboxBuffer>,
+        mut pages: Vec<PhysicalAddress>, 
+        uar: u32, 
+        log_eq_size: u8
+    ) -> Result<(), CommandQueueError> 
+    {    
+        const EVENT_QUEUE_CONTEXT_MAILBOX_INDEX: usize = 0;
+        let mb_page = &mut input_mailbox_buffers[EVENT_QUEUE_CONTEXT_MAILBOX_INDEX].mp;
+        
+        // initialize the event queue context
+        const EVENT_QUEUE_CONTEXT_OFFSET: usize = 0;
+        let eq_context = mb_page.as_type_mut::<EventQueueContext>(EVENT_QUEUE_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        eq_context.init(uar, log_eq_size);
+
+        // initialize the bitmask. this function only activates the page request event
+        const BITMASK_OFFSET: usize  = 0x58 - 0x10;
+        let eq_bitmask = mb_page.as_type_mut::<U64<BigEndian>>(BITMASK_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
+        *eq_bitmask = U64::new(PAGE_REQUEST_BIT);
+
+        // Now use the remainder of the mailbox for page entries
+        const EQ_PADDR_OFFSET: usize = 0x110 - 0x10;
+        let data_buffer = mb_page.as_type_mut::<[u8;256]>(EQ_PADDR_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        Self::write_page_addrs_to_data_buffer(data_buffer, &mut pages);
+
+        // Write the remaining addresses to the next mailboxes
+        Self::write_page_addrs_to_mailboxes(&mut input_mailbox_buffers[1..], pages)?;
+        Ok(())
+    }
+
+
+    fn write_completion_queue_context_to_mailbox(
+        input_mailbox_buffers: &mut Vec<MailboxBuffer>,
+        mut pages: Vec<PhysicalAddress>, 
+        uar: u32, 
+        log_cq_size: u8,
+        c_eqn: u8,
+        doorbell_pa: PhysicalAddress
+    ) -> Result<(), CommandQueueError> {
+        const COMPLETION_QUEUE_CONTEXT_MAILBOX_INDEX: usize = 0;
+        let mb_page = &mut input_mailbox_buffers[COMPLETION_QUEUE_CONTEXT_MAILBOX_INDEX].mp;
+        
+        // initialize the completion queue context
+        const COMPLETION_QUEUE_CONTEXT_OFFSET: usize = 0;
+        let cq_context = mb_page.as_type_mut::<CompletionQueueContext>(COMPLETION_QUEUE_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        cq_context.init(uar, log_cq_size, c_eqn, doorbell_pa);
+
+        // Now use the remainder of the mailbox for page entries
+        const CQ_PADDR_OFFSET: usize = 0x110 - 0x10;
+        let data_buffer = mb_page.as_type_mut::<[u8;256]>(CQ_PADDR_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        Self::write_page_addrs_to_data_buffer(data_buffer, &mut pages);
+
+        // Write the remaining addresses to the next mailboxes
+        Self::write_page_addrs_to_mailboxes(&mut input_mailbox_buffers[1..], pages)?;
+
+        Ok(())
+    }
+
+    fn write_transport_interface_send_context_to_mailbox(input_mailbox_buffer: &mut MailboxBuffer, td: u32) -> Result<(), CommandQueueError> {
+        const TIS_OFFSET: usize = 0x10;
+        // initialize the TIS context
+        let tis_context = input_mailbox_buffer.mp.as_type_mut::<TransportInterfaceSendContext>(TIS_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        tis_context.init(td);
+        Ok(())
+    }
+
+    fn write_send_queue_context_to_mailbox(
+        input_mailbox_buffers: &mut Vec<MailboxBuffer>,
+        mut pages: Vec<PhysicalAddress>, 
+        cqn: u32,
+        tisn: u32,
+        pd: u32,
+        uar_page: u32,
+        db_addr: PhysicalAddress,
+        log_wq_size: u8
+    ) -> Result<(), CommandQueueError> {
+        const SEND_QUEUE_CONTEXT_MAILBOX_INDEX: usize = 0;
+        let mb_page = &mut input_mailbox_buffers[SEND_QUEUE_CONTEXT_MAILBOX_INDEX].mp;
+            
+        // initialize the send queue context
+        const SEND_QUEUE_CONTEXT_OFFSET: usize = 0x10;
+        let sq_context = mb_page.as_type_mut::<SendQueueContext>(SEND_QUEUE_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        sq_context.init(cqn, tisn);
+
+        // initialize the work queue
+        const WORK_QUEUE_OFFSET: usize = 0x10 + 0x30;
+        let wq = mb_page.as_type_mut::<WorkQueue>(WORK_QUEUE_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        wq.init(pd, uar_page, db_addr, log_wq_size);
+
+        // Now use the remainder of the mailbox for page entries
+        const SQ_PADDR_OFFSET: usize = 0x10 + 0x30 + 0xC0;
+        let data_buffer = mb_page.as_type_mut::<[u8;256]>(SQ_PADDR_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        Self::write_page_addrs_to_data_buffer(data_buffer, &mut pages);
+
+        // Write the remaining addresses to the next mailboxes
+        Self::write_page_addrs_to_mailboxes(&mut input_mailbox_buffers[1..], pages)?;
+        Ok(())
+    }
+
+    fn modify_sq_state(input_mailbox_buffer: &mut MailboxBuffer, cqn: u32, tisn: u32) -> Result<(), CommandQueueError> {        
+        const SEND_QUEUE_CONTEXT_OFFSET:usize = 0x10;
+        // initialize the TIS context
+        let sq_context = input_mailbox_buffer.mp.as_type_mut::<SendQueueContext>(SEND_QUEUE_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        sq_context.init(cqn, tisn);
+        sq_context.set_state(SendQueueState::Ready);
+
+        Ok(())
+    }
+
+    /*** Functions to retrieve output values ***/
+
+    /// Waits for ownership bit to be cleared, and then returns the command delivery status and the command return status.
+    pub fn wait_for_command_completion(&mut self, command: PostedCommand) -> CompletedCommand {
+        while self.entries[command.entry_num].owned_by_hw() {}
+        command.complete()
+    }
+
+    pub fn get_command_status(&mut self, command: CompletedCommand) -> Result<CommandCompletionStatus, CommandQueueError> {
+        self.available_entries[command.entry_num] = true;
+        let delivery_status = self.entries[command.entry_num].get_delivery_status().ok_or(CommandQueueError::InvalidCommandDeliveryStatus)?;
+        let return_status = self.entries[command.entry_num].get_return_status().ok_or(CommandQueueError::InvalidCommandReturnStatus)?;
+        Ok(CommandCompletionStatus{ delivery_status, return_status })
+    }
 
     /// When retrieving the output data of a command, checks that the correct opcode is written and that the command has completed.
     fn check_command_output_validity(&self, entry_num: usize, cmd_opcode: CommandOpcode) -> Result<(), CommandQueueError> {
@@ -692,238 +896,8 @@ impl CommandQueue {
         Ok(())
     }
 
-    /// Writes the physical address `paddr` to the given `start_offset` in the `data` buffer.
-    /// The format specified in the PRM is that the 4 higher bytes are written first at the starting address in big endian format,
-    /// then the four lower bytes are written in the next 4 bytes in big endian format.
-    fn write_paddr_in_mailbox_data(start_offset: usize, paddr: PhysicalAddress, data: &mut [u8]) {
-        let start_offset_h = start_offset;
-        let end_offset_h = start_offset_h + SIZE_PADDR_H_IN_BYTES;
-        let addr = (paddr.value() >> 32) as u32;
-        data[start_offset_h..end_offset_h].copy_from_slice(&addr.to_be_bytes());
-
-        let start_offset_l = end_offset_h;
-        let end_offset_l = start_offset_l + SIZE_PADDR_L_IN_BYTES;
-        let addr = (paddr.value() & 0xFFFF_FFFF) as u32;
-        data[start_offset_l..end_offset_l].copy_from_slice(&addr.to_be_bytes());
-    }
-
-    /// Clears fields of all mailboxes, then sets the token, block number and next address fields for all mailboxes.
-    fn initialize_mailboxes(&mut self, num_mailboxes: usize, command_mailbox_buffers: &mut Vec<MailboxBuffer>) -> Result<(), CommandQueueError> {
-        
-        // Adding extra mailbox pages if required
-        let num_mailbox_pages_required = num_mailboxes - self.mailbox_buffers.len();            
-        for _ in 0..num_mailbox_pages_required {
-            let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)
-                .map_err(|_e| CommandQueueError::PageAllocationFailed)?;
-            self.mailbox_buffers.push(MailboxBuffer{mp, addr});
-        }
-        
-        for block_num in 0..num_mailboxes {
-            let mut mb_buffer = self.mailbox_buffers.pop().ok_or(CommandQueueError::PageAllocationFailed)?;
-
-            // record the next page address to set pointer for the next mailbox (can't have two borrows in the same loop)
-            let next_mb_addr = if block_num < (num_mailboxes - 1) {
-                self.mailbox_buffers[self.mailbox_buffers.len()].addr.value()
-            } else {
-                0
-            };
-
-            let mailbox = mb_buffer.mp.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)
-                            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-            mailbox.init(block_num as u32, self.token, next_mb_addr);
-            command_mailbox_buffers.push(mb_buffer);
-        }
-        Ok(())
-    }
-
-    /// Initialize input mailboxes with the driver version for the [`CommandOpcode::SetDriverVersion`] command.
-    fn write_driver_version_to_mailbox(input_mailbox_buffers: &mut Vec<MailboxBuffer>) -> Result<(), CommandQueueError> {
-        let driver_version = "Theseus,mlx5,1.0.0".as_bytes(); // TODO: take as argument
-        let mut buffer: [u8; 512] = [0; 512];
-        buffer[0..driver_version.len()].copy_from_slice(driver_version);
-    
-        let mailbox = input_mailbox_buffers[0].mp.as_type_mut::<CommandInterfaceMailbox>(0).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        mailbox.mailbox_data.write(buffer);
-        Ok(())
-    }
-
-    /// Initialize input mailboxes with the physical addresses of pages passed to the NIC.
-    fn write_page_addr_to_mailbox(num_mailboxes: usize, input_mailbox_buffers: &mut [MailboxBuffer], mut pages: Vec<PhysicalAddress>) -> Result<(), CommandQueueError> {
-        let paddr_per_mailbox = MAILBOX_DATA_SIZE_IN_BYTES / SIZE_PADDR_IN_BYTES;
-
-        for block_num in 0..num_mailboxes {  
-            let mb_page = &mut input_mailbox_buffers[block_num].mp;
-            let mailbox = mb_page.as_type_mut::<CommandInterfaceMailbox>(MAILBOX_OFFSET_IN_PAGE)
-                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-
-            let mut data = [0; 512];
-            for page in 0..paddr_per_mailbox {
-                match pages.pop() {
-                    Some(paddr) => {
-                        Self::write_paddr_in_mailbox_data(page * SIZE_PADDR_IN_BYTES, paddr, &mut data);
-                    },
-                    None => { 
-                        // trace!("breaking out of loop on mailbox: {} and paddr: {}", block_num, page);
-                        break; 
-                    }
-                }
-            }
-            mailbox.mailbox_data.write(data);
-        }
-
-        Ok(())
-    }
-
-    fn write_event_queue_context_to_mailbox(
-        input_mailbox_buffers: &mut Vec<MailboxBuffer>,
-        num_mailboxes: usize,
-        mut pages: Vec<PhysicalAddress>, 
-        uar: u32, 
-        log_eq_size: u8
-    ) -> Result<(), CommandQueueError> 
-    {    
-        let mb_page = &mut input_mailbox_buffers[0].mp;
-        
-        // initialize the event queue context
-        let eq_context = mb_page.as_type_mut::<EventQueueContext>(0).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        eq_context.init(uar, log_eq_size);
-
-        // initialize the bitmask. this function only activates the page request event
-        let bitmask_offset_in_mailbox  = 0x58 - 0x10;
-        let eq_bitmask = mb_page.as_type_mut::<U64<BigEndian>>(bitmask_offset_in_mailbox).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
-        *eq_bitmask = U64::new(PAGE_REQUEST_BIT);
-
-        // Now use the remainder of the mailbox for page entries
-        let eq_pa_offset = 0x110 - 0x10;
-        let data = mb_page.as_type_mut::<[u8;256]>(eq_pa_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        let pages_in_mailbox_0 = (MAILBOX_DATA_SIZE_IN_BYTES - eq_pa_offset) / SIZE_PADDR_IN_BYTES;
-
-        for page in 0..pages_in_mailbox_0 {
-            let paddr = pages.pop();
-            match paddr {
-                Some(paddr) => {
-                    Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, data);
-                },
-                None => { 
-                    break; 
-                }
-            }
-        }
-
-        // Write the remaining addresses to the next mailboxes
-        Self::write_page_addr_to_mailbox(num_mailboxes - 1, &mut input_mailbox_buffers[1..], pages)?;
-        Ok(())
-    }
-
-
-    fn write_completion_queue_context_to_mailbox(
-        input_mailbox_buffers: &mut Vec<MailboxBuffer>,
-        num_mailboxes: usize,
-        mut pages: Vec<PhysicalAddress>, 
-        uar: u32, 
-        log_cq_size: u8,
-        c_eqn: u8,
-        doorbell_pa: PhysicalAddress
-    ) -> Result<(), CommandQueueError> {
-        let mb_page = &mut input_mailbox_buffers[0].mp;
-        
-        // initialize the event queue context
-        let cq_context = mb_page.as_type_mut::<CompletionQueueContext>(0).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        cq_context.init(uar, log_cq_size, c_eqn, doorbell_pa);
-
-        // Now use the remainder of the mailbox for page entries
-        let eq_pa_offset = 0x110 - 0x10;
-        let data = mb_page.as_type_mut::<[u8;256]>(eq_pa_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        let pages_in_mailbox_0 = (MAILBOX_DATA_SIZE_IN_BYTES - eq_pa_offset) / SIZE_PADDR_IN_BYTES;
-
-        for page in 0..pages_in_mailbox_0 {
-            let paddr = pages.pop();
-            match paddr {
-                Some(paddr) => {
-                    Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, data);
-                },
-                None => { 
-                    break; 
-                }
-            }
-        }
-
-        Self::write_page_addr_to_mailbox(num_mailboxes, &mut input_mailbox_buffers[1..], pages)?;
-
-        Ok(())
-    }
-
-    fn write_transport_interface_send_context_to_mailbox(input_mailbox_buffers: &mut Vec<MailboxBuffer>, td: u32) -> Result<(), CommandQueueError> {
-        let mb_page = &mut input_mailbox_buffers[0].mp;
-            
-        // initialize the TIS context
-        let tis_context = mb_page.as_type_mut::<TransportInterfaceSendContext>(0x10).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        tis_context.init(td);
-        Ok(())
-    }
-
-    fn write_send_queue_context_to_mailbox(
-        input_mailbox_buffers: &mut Vec<MailboxBuffer>,
-        num_mailboxes: usize,
-        mut pages: Vec<PhysicalAddress>, 
-        cqn: u32,
-        tisn: u32,
-        pd: u32,
-        uar_page: u32,
-        db_addr: PhysicalAddress,
-        log_wq_size: u8
-    ) -> Result<(), CommandQueueError> {
-        
-        let mb_page = &mut input_mailbox_buffers[0].mp;
-            
-        // initialize the send queue context
-        let sq_context_offset = 0x10;
-        let sq_context = mb_page.as_type_mut::<SendQueueContext>(sq_context_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        sq_context.init(cqn, tisn);
-
-        // initialize the work queue
-        let wq_offset = 0x10 + 0x30;
-        let wq = mb_page.as_type_mut::<WorkQueue>(wq_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        wq.init(pd, uar_page, db_addr, log_wq_size);
-
-        // Now use the remainder of the mailbox for page entries
-        let sq_pa_offset = 0x10 + 0x30 + 0xC0;
-        let data = mb_page.as_type_mut::<[u8;256]>(sq_pa_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        let pages_in_mailbox_0 = (MAILBOX_DATA_SIZE_IN_BYTES - sq_pa_offset) / SIZE_PADDR_IN_BYTES;
-
-        for page in 0..pages_in_mailbox_0 {
-            let paddr = pages.pop();
-            match paddr {
-                Some(paddr) => {
-                    Self::write_paddr_in_mailbox_data(page*SIZE_PADDR_IN_BYTES, paddr, data);
-                },
-                None => { 
-                    break; 
-                }
-            }
-        }            
-
-        Self::write_page_addr_to_mailbox(num_mailboxes - 1, &mut input_mailbox_buffers[1..], pages)?;
-        Ok(())
-    }
-
-    fn modify_sq_state(input_mailbox_buffers: &mut Vec<MailboxBuffer>, cqn: u32, tisn: u32) -> Result<(), CommandQueueError> {        
-        let mb_page = &mut input_mailbox_buffers[0].mp;
-            
-        // initialize the TIS context
-        let sq_context_offset = 0x10;
-        let sq_context = mb_page.as_type_mut::<SendQueueContext>(sq_context_offset).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        sq_context.init(cqn, tisn);
-        sq_context.set_state(SendQueueState::Ready);
-
-        Ok(())
-    }
-
-    /*** Functions to retrieve output values ***/
-
     /// Get the number of pages requested by the NIC, which is the output of the [`CommandOpcode::QueryHcaCap`] command.  
-    pub fn get_port_type(&self, command: CompletedCommand) -> Result<HcaPortType, CommandQueueError> {
+    pub fn get_port_type(&mut self, command: CompletedCommand) -> Result<(HcaPortType, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryHcaCap)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0x34; 
@@ -932,11 +906,13 @@ impl CommandQueue {
             mailbox.as_type::<U32<BigEndian>>(DATA_OFFSET_IN_MAILBOX)
             .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
         ).get();
-        HcaPortType::try_from(((port_type & 0x300) >> 8) as u8).map_err(|_e| CommandQueueError::InvalidPortType)
+        HcaPortType::try_from(((port_type & 0x300) >> 8) as u8)
+            .map_err(|_e| CommandQueueError::InvalidPortType)
+            .and_then(|port_type| Ok((port_type, self.get_command_status(command)?)))
     }
 
     /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
-    pub fn get_query_issi_command_output(&self, mut command: CompletedCommand) -> Result<(u16, u8), CommandQueueError> {
+    pub fn get_query_issi_command_output(&mut self, command: CompletedCommand) -> Result<(u16, u8, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryIssi)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0x6C - 0x10; 
@@ -947,60 +923,60 @@ impl CommandQueue {
         ).get();
 
         let current_issi = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((current_issi as u16, supported_issi as u8))
+        Ok((current_issi as u16, supported_issi as u8, self.get_command_status(command)?))
     }
 
     /// Get the number of pages requested by the NIC, which is the output of the [`CommandOpcode::QueryPages`] command.  
-    pub fn get_query_pages_command_output(&self, command: CompletedCommand) -> Result<u32, CommandQueueError> {
+    pub fn get_query_pages_command_output(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryPages)?;
 
         let num_pages = self.entries[command.entry_num].get_output_inline_data_1();
-        Ok(num_pages)
+        Ok((num_pages, self.get_command_status(command)?))
     }
 
     /// Get the User Access Region (UAR) number, which is the output of the [`CommandOpcode::AllocUar`] command.  
-    pub fn get_uar(&self, command: CompletedCommand) -> Result<u32, CommandQueueError> {
+    pub fn get_uar(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocUar)?;
         let uar = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok(uar & 0xFF_FFFF)
+        Ok((uar & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
     /// Get the protection domain number, which is the output of the [`CommandOpcode::AllocPd`] command.  
-    pub fn get_protection_domain(&self, command: CompletedCommand) -> Result<u32, CommandQueueError> {
+    pub fn get_protection_domain(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocPd)?;
 
         let pd = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok(pd & 0xFF_FFFF)
+        Ok((pd & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
     /// Get the transport domain number, which is the output of the [`CommandOpcode::AllocTransportDomain`] command.  
-    pub fn get_transport_domain(&self, command: CompletedCommand) -> Result<u32, CommandQueueError> {
+    pub fn get_transport_domain(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocTransportDomain)?;
 
         let td = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok(td & 0xFF_FFFF)
+        Ok((td & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
     /// Get the value of the reserved Lkey for Base Memory Management Extension, which is used when we are using physical addresses.
     /// It is taken as the output of the [`CommandOpcode::QuerySpecialContexts`] command.
-    pub fn get_reserved_lkey(&self, command: CompletedCommand) -> Result<u32, CommandQueueError> {
+    pub fn get_reserved_lkey(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QuerySpecialContexts)?;
 
         let resd_lkey = self.entries[command.entry_num].get_output_inline_data_1();
-        Ok(resd_lkey)
+        Ok((resd_lkey, self.get_command_status(command)?))
     }
 
     /// Get the Vport state in the format (max_tx_speed, admin_state, state)
     /// It is taken as the output of the [`CommandOpcode::QueryVportState`] command.
-    pub fn get_vport_state(&self, command: CompletedCommand) -> Result<(u16, u8, u8), CommandQueueError> {
+    pub fn get_vport_state(&mut self, command: CompletedCommand) -> Result<(u16, u8, u8, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryVportState)?;
 
         let state = self.entries[command.entry_num].get_output_inline_data_1();
-        Ok(((state  >> 16) as u16, (state as u8) >> 4, state as u8 & 0xF))
+        Ok(((state  >> 16) as u16, (state as u8) >> 4, state as u8 & 0xF, self.get_command_status(command)?))
     }
 
     /// Get the port mac address, which is the output of the [`CommandOpcode::QueryNicVportContext`] command.  
-    pub fn get_vport_mac_address(&self, command: CompletedCommand) -> Result<[u8; 6], CommandQueueError> {
+    pub fn get_vport_mac_address(&mut self, command: CompletedCommand) -> Result<([u8; 6], CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryNicVportContext)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0x0;
@@ -1009,51 +985,51 @@ impl CommandQueue {
         let mac_address_h = nic_vport_context.permanent_address_h.read().get();
         let mac_address_l = nic_vport_context.permanent_address_l.read().get();
 
-        Ok([
+        Ok(([
             (mac_address_h >> 8) as u8,
             (mac_address_h) as u8,
             (mac_address_l >> 24) as u8,
             (mac_address_l >> 16) as u8,
             (mac_address_l >> 8) as u8,
             mac_address_l as u8
-        ])
+        ], self.get_command_status(command)?))
     }
 
-    pub fn get_eq_number(&self, command: CompletedCommand) -> Result<u8, CommandQueueError> {
+    pub fn get_eq_number(&mut self, command: CompletedCommand) -> Result<(u8, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateEq)?;
 
         let eq_number = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok(eq_number as u8)
+        Ok((eq_number as u8, self.get_command_status(command)?))
     }
 
-    pub fn get_cq_number(&self, command:CompletedCommand) -> Result<u32, CommandQueueError> {
+    pub fn get_cq_number(&mut self, command:CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateCq)?;
 
         let cq_number = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok(cq_number & 0xFF_FFFF)
+        Ok((cq_number & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_tis_context_number(&self, command: CompletedCommand) -> Result<u32, CommandQueueError>  {
+    pub fn get_tis_context_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateTis)?;
         
         let tisn = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok(tisn & 0xFF_FFFF)
+        Ok((tisn & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_send_queue_number(&self, command: CompletedCommand) -> Result<u32, CommandQueueError>  {
+    pub fn get_send_queue_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateSq)?;
 
         let sqn = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok(sqn & 0xFF_FFFF)
+        Ok((sqn & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_sq_state(&self, command: CompletedCommand) -> Result<u8, CommandQueueError> {
+    pub fn get_sq_state(&mut self, command: CompletedCommand) -> Result<(u8, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QuerySq)?;
 
         let mailbox = &command.output_mailbox_buffers[0];
         let sq_context = mailbox.mp.as_type::<SendQueueContext>(0x10).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
         let state = sq_context.get_state();
-        Ok(state)
+        Ok((state, self.get_command_status(command)?))
     }
 }
 
