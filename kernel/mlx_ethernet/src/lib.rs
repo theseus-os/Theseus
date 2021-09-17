@@ -25,6 +25,7 @@ extern crate kernel_config;
 extern crate libm;
 extern crate num_enum;
 
+use command_queue::{InitializedCommand, PostedCommand};
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
 use bit_field::BitField;
@@ -120,9 +121,10 @@ impl InitializationSegment {
     ///
     /// ## Arguments
     /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
-    pub fn post_command(&mut self, command_bit: usize) {
+    pub fn post_command(&mut self, command: InitializedCommand) -> PostedCommand {
         let val = self.command_doorbell_vector.read().get();
-        self.command_doorbell_vector.write(U32::new(val | (1 << command_bit)));
+        self.command_doorbell_vector.write(U32::new(val | (1 << command.entry_num)));
+        command.post()
     }
 }
 
