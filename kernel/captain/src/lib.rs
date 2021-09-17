@@ -1,6 +1,9 @@
 #![no_std]
 
 #[macro_use] extern crate cfg_if;
+extern crate memory; // the virtual memory subsystem 
+extern crate stack;
+extern crate spawn;
 
 cfg_if!{
 
@@ -14,11 +17,8 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
 
 extern crate logger;
-extern crate memory; // the virtual memory subsystem 
-extern crate stack;
 extern crate apic; 
 extern crate mod_mgmt;
-extern crate spawn;
 extern crate tsc;
 extern crate task; 
 extern crate interrupts;

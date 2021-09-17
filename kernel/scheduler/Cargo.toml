@@ -26,7 +26,7 @@ path = "../scheduler_round_robin"
 path = "../scheduler_priority"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.apic]
 path= "../apic"
