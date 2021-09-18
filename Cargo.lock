@@ -2970,6 +2970,7 @@ dependencies = [
  "event_types",
  "log",
  "unicode-width",
+ "util",
  "vte",
 ]
 
