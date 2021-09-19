@@ -1,4 +1,6 @@
 use alloc_cortex_m::CortexMHeap;
+use page_allocator;
+use memory_structs::VirtualAddress;
 
 #[global_allocator]
 static ALLOCATOR: CortexMHeap = CortexMHeap::empty();
@@ -15,4 +17,6 @@ pub fn init_memory_management(heap_start: usize, heap_end: usize) {
     // assert!(heap_start >= heap_start_low_bound);
     let heap_size = heap_end - heap_start;
     unsafe { ALLOCATOR.init(heap_start, heap_size); }
+
+    page_allocator::init(VirtualAddress::new_canonical(0x2001_0000)).unwrap();
 }

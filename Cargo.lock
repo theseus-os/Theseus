@@ -348,6 +348,7 @@ dependencies = [
  "log",
  "logger",
  "memory",
+ "memory_structs",
  "mod_mgmt",
  "multicore_bringup",
  "multiple_heaps",
@@ -1604,7 +1605,9 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
+ "memory_structs",
  "multiboot2 0.10.1",
+ "page_allocator",
  "stack",
 ]
 
@@ -2014,7 +2017,6 @@ dependencies = [
  "cfg-if 1.0.0",
  "intrusive-collections",
  "kernel_config",
- "lazy_static",
  "log",
  "memory_structs",
  "spin 0.9.0",
@@ -2499,7 +2501,6 @@ dependencies = [
  "apic",
  "cfg-if 1.0.0",
  "irq_safety",
- "log",
  "runqueue",
  "scheduler_priority",
  "scheduler_round_robin",

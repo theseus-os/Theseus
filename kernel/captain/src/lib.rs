@@ -5,6 +5,7 @@
 extern crate memory; // the virtual memory subsystem 
 extern crate stack;
 extern crate spawn;
+extern crate scheduler;
 
 cfg_if!{
 
@@ -25,7 +26,6 @@ extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
-extern crate scheduler;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate first_application;
 extern crate exceptions_full;
@@ -40,7 +40,9 @@ pub use x86_64::*;
 } else if #[cfg(target_arch="arm")] {
 
 #[macro_use] extern crate lazy_static;
+extern crate alloc;
 extern crate cortex_m;
+extern crate memory_structs;
 
 mod armv7em;
 pub use armv7em::*;

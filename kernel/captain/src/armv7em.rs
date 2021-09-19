@@ -1,7 +1,8 @@
 use core::cell::RefCell;
 use cortex_m::interrupt::Mutex as ExcpCell;
 use cortex_m::{self, interrupt, peripheral::syst::SystClkSource, Peripherals};
-use memory::{allocate_pages_by_bytes, get_kernel_mmi_ref, EntryFlags};
+use memory::{allocate_pages_by_bytes_at, get_kernel_mmi_ref, EntryFlags};
+use memory_structs::VirtualAddress;
 use spawn::{self, new_task_builder};
 use stack::Stack;
 
@@ -17,24 +18,36 @@ pub fn init() -> ! {
     let kernel_mmi_ref = get_kernel_mmi_ref().unwrap();
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    let stack_pages = allocate_pages_by_bytes(512).unwrap();
+    // Allocate "pages" for the bootstrap task. Note that the position of these "pages"
+    // should be placed at the end of the SRAM region, which is consistent with
+    // kernellink.ld linker script. These "pages" are not real pages, but are only
+    // 64-byte chunks as the unit of memory management. We are operating directly
+    // on physical memory.
+    let stack_pages =
+        allocate_pages_by_bytes_at(VirtualAddress::new_canonical(0x2001_f800), 2048).unwrap();
     let mapped_stack_pages = kernel_mmi
         .page_table
         .map_allocated_pages(stack_pages, EntryFlags::WRITABLE)
         .unwrap();
     let stack = Stack::from_pages(mapped_stack_pages).unwrap();
 
-    let _bootstrap_task = spawn::init(0, stack).unwrap();
+    drop(kernel_mmi);
+    drop(kernel_mmi_ref);
 
+    // Initialize the bootstrap task. It represents the code currently running.
+    // We only have one CPU, which is numbered 0.
+    let bootstrap_task = spawn::init(0, stack).unwrap();
+
+    // Create an idle task on CPU 0.
     spawn::create_idle_task(Some(0)).unwrap();
 
+    // Build and spawn two tasks.
     let tb1 = new_task_builder(task_hello, 233);
-    let _tr1 = tb1.spawn().unwrap();
-
+    tb1.spawn().unwrap();
     let tb2 = new_task_builder(task_world, 466);
-    let _tr2 = tb2.spawn().unwrap();
+    tb2.spawn().unwrap();
 
-    interrupt::free(|cs| {
+    interrupt::free(move |cs| {
         let mut p = PERIPHERALS.borrow(cs).borrow_mut();
         let syst = &mut p.SYST;
 
@@ -45,12 +58,24 @@ pub fn init() -> ! {
         syst.clear_current();
         syst.enable_counter();
         syst.enable_interrupt();
+
+        // Now that we've created a new idle task for this core, we can drop ourself's bootstrapped task.
+        drop(bootstrap_task);
     });
 
-    loop {}
+    // ****************************************************
+    // NOTE: nothing below here is guaranteed to run again!
+    // ****************************************************
+    scheduler::schedule();
+
+    loop {
+        error!("BUG: captain::init(): captain's bootstrap task was rescheduled after being dead!");
+    }
 }
 
 fn task_hello(arg: usize) {
+    use alloc::string::ToString;
+    let arg = arg.to_string();
     loop {
         use cortex_m::asm;
         for _ in 0..100000000 {
