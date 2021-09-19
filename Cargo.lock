@@ -334,6 +334,7 @@ dependencies = [
  "acpi",
  "apic",
  "cfg-if 1.0.0",
+ "cortex-m 0.7.2",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -343,6 +344,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "keycodes_ascii",
+ "lazy_static",
  "log",
  "logger",
  "memory",
@@ -1215,6 +1217,7 @@ dependencies = [
  "tss",
  "vga_buffer",
  "x86_64",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1824,6 +1827,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "cortex-m 0.7.2",
  "exceptions_early",
+ "interrupts",
  "irq_safety",
  "kernel_config",
  "log",
@@ -2727,6 +2731,7 @@ dependencies = [
  "fault_crate_swap",
  "fault_log",
  "fs_node",
+ "interrupts",
  "irq_safety",
  "lazy_static",
  "log",

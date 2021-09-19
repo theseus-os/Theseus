@@ -2,6 +2,7 @@
 #![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate cfg_if;
+extern crate scheduler;
 
 cfg_if!{
 
@@ -21,7 +22,6 @@ extern crate tss;
 extern crate gdt;
 extern crate exceptions_early;
 extern crate pic;
-extern crate scheduler;
 extern crate keyboard;
 extern crate mouse;
 extern crate ps2;
@@ -31,6 +31,8 @@ mod arch_x86_64;
 pub use arch_x86_64::*;
 
 } else if #[cfg(target_arch="arm")] {
+
+extern crate zerocopy;
 
 mod arch_armv7em;
 pub use arch_armv7em::*;

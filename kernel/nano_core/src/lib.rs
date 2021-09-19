@@ -278,6 +278,7 @@ extern crate cortex_m;
 extern crate panic_halt;
 extern crate memory_initialization;
 extern crate captain;
+extern crate interrupts;
 
 mod boot;
 
