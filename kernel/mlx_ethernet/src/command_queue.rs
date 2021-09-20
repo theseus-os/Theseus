@@ -117,11 +117,8 @@ pub enum CommandDeliveryStatus {
 #[repr(u32)]
 pub enum CommandOpcode {
     QueryHcaCap             = 0x100,
-    QueryAdapter            = 0x101,
     InitHca                 = 0x102,
-    TeardownHca             = 0x103,
     EnableHca               = 0x104,
-    DisableHca              = 0x105,
     QueryPages              = 0x107,
     ManagePages             = 0x108,
     QueryIssi               = 0x10A,
@@ -136,11 +133,13 @@ pub enum CommandOpcode {
     AllocPd                 = 0x800,
     AllocUar                = 0x802,
     AllocTransportDomain    = 0x816,
+    CreateTir               = 0x900,
     CreateSq                = 0x904,
     ModifySq                = 0x905,
     QuerySq                 = 0x907,
     CreateRq                = 0x908,
     ModifyRq                = 0x909,
+    QueryRq                 = 0x90B,
     CreateTis               = 0x912,
 }
 
@@ -157,29 +156,36 @@ impl CommandOpcode {
             }
             Self::QueryIssi => 8, 
             Self::SetIssi => 12,
-            Self::SetDriverVersion =>  80,    
+            Self::SetDriverVersion =>  0x50,    
             Self::QuerySpecialContexts => 8,              
-            Self::QueryVportState => 12,        
-            Self::QueryNicVportContext => 16,  
-            Self::ModifyNicVportContext => 0x100 + 0x108,        
-            Self::AllocUar => 8,              
-            Self::AllocPd => 8,               
-            Self::AllocTransportDomain => 8,
             Self::CreateEq => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
-                0x110 + num_pages * 8
+                0x110 + num_pages * SIZE_PADDR_IN_BYTES as u32
             }
             Self::CreateCq => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
-                0x110 + num_pages * 8
+                0x110 + num_pages * SIZE_PADDR_IN_BYTES as u32
             }
-            Self::CreateTis => 0x20 + 0xA0,
+            Self::QueryVportState => 12,        
+            Self::QueryNicVportContext => 16,  
+            Self::ModifyNicVportContext => 0x100 + 0x108,        
+            Self::AllocPd => 8,               
+            Self::AllocUar => 8,              
+            Self::AllocTransportDomain => 8,
+            Self::CreateTir => 0x20 + 0xF0,
             Self::CreateSq => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
-                0x20 + 0x30 + 0xC0 + num_pages * 8
+                0x20 + 0x30 + 0xC0 + num_pages * SIZE_PADDR_IN_BYTES as u32
             }
             Self::ModifySq => 0x20 + 0x30 + 0xC0,
             Self::QuerySq => 12,
+            Self::CreateRq => {
+                let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
+                0x20 + 0x30 + 0xC0 + num_pages * SIZE_PADDR_IN_BYTES as u32
+            },
+            Self::ModifyRq => 0x20 + 0x30 + 0xC0,
+            Self::QueryRq => 12,
+            Self::CreateTis => 0x20 + 0xA0,
             _ => return Err(CommandQueueError::NotImplemented)           
         };
         Ok(len)
@@ -192,22 +198,26 @@ impl CommandOpcode {
             Self::EnableHca => 8,
             Self::QueryPages => 16,
             Self::ManagePages => 16,
-            Self::QueryIssi => 112, 
+            Self::QueryIssi => 0x70, 
             Self::SetIssi => 8,   
             Self::SetDriverVersion =>  8,
-            Self::QuerySpecialContexts => 12,              
+            Self::QuerySpecialContexts => 16,              
+            Self::CreateEq => 16,
+            Self::CreateCq => 16,
             Self::QueryVportState => 16,   
             Self::QueryNicVportContext => 16 + 0x108,      
             Self::ModifyNicVportContext => 16,        
-            Self::AllocUar => 12,              
             Self::AllocPd => 12,               
+            Self::AllocUar => 12,              
             Self::AllocTransportDomain => 12,
-            Self::CreateEq => 16,
-            Self::CreateCq => 16,
-            Self::CreateTis => 16,
+            Self::CreateTir => 16,
             Self::CreateSq => 16,
             Self::ModifySq => 8,
-            Self::QuerySq => 16 + MAILBOX_DATA_SIZE_IN_BYTES as u32,
+            Self::QuerySq => 0x10 + MAILBOX_DATA_SIZE_IN_BYTES as u32,
+            Self::CreateRq => 16,
+            Self::ModifyRq => 16,
+            Self::QueryRq => 0x10 + MAILBOX_DATA_SIZE_IN_BYTES as u32,
+            Self::CreateTis => 16,
             _ => return Err(CommandQueueError::NotImplemented)         
         };
         Ok(len)
@@ -878,8 +888,8 @@ impl CommandQueue {
 
     pub fn get_command_status(&mut self, command: CompletedCommand) -> Result<CommandCompletionStatus, CommandQueueError> {
         self.available_entries[command.entry_num] = true;
-        let delivery_status = self.entries[command.entry_num].get_delivery_status().ok_or(CommandQueueError::InvalidCommandDeliveryStatus)?;
-        let return_status = self.entries[command.entry_num].get_return_status().ok_or(CommandQueueError::InvalidCommandReturnStatus)?;
+        let delivery_status = self.entries[command.entry_num].get_delivery_status()?;
+        let return_status = self.entries[command.entry_num].get_return_status()?;
         Ok(CommandCompletionStatus{ delivery_status, return_status })
     }
 
@@ -889,8 +899,8 @@ impl CommandQueue {
             error!("the command hasn't completed yet!");
             return Err(CommandQueueError::CommandNotCompleted);
         }
-        if self.entries[entry_num].get_command_opcode().ok_or(CommandQueueError::InvalidCommandOpcode)? != cmd_opcode {
-            error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode());
+        if self.entries[entry_num].get_command_opcode()? != cmd_opcode {
+            error!("Incorrect Command!: {:?}", self.entries[entry_num].get_command_opcode()?);
             return Err(CommandQueueError::IncorrectCommandOpcode);
         }
         Ok(())
@@ -1124,7 +1134,7 @@ impl CommandQueueEntry {
         // This bit will be cleared when the command is complete.
         cmdq_entry.change_ownership_to_hw();
         
-        //Sets length of input data in bytes. This value is different for every command, and can be taken from Chapter 23 of the PRM. 
+        // Sets length of input data in bytes. This value is different for every command, and can be taken from Chapter 23 of the PRM. 
         cmdq_entry.input_length.write(U32::new(opcode.input_bytes(num_pages)?));
 
         // Sets length of output data in bytes. This value is different for every command, and can be taken from Chapter 23 of the PRM. 
@@ -1166,11 +1176,10 @@ impl CommandQueueEntry {
         self.output_mailbox_pointer_l.write(U32::new((mailbox_ptr.value() & 0xFFFF_FFFF) as u32));
     }
 
-    /// Returns the value written to the input opcode field of the command
-    /// A `None` returned value indicates that there was no valid value in the bitfield.
-    fn get_command_opcode(&self) -> Option<CommandOpcode> {
+    /// Returns the value written to the input opcode field of the command.
+    fn get_command_opcode(&self) -> Result<CommandOpcode, CommandQueueError> {
         let opcode = self.command_input_opcode.read().get() >> 16;
-        CommandOpcode::try_from(opcode).ok()
+        CommandOpcode::try_from(opcode).map_err(|_e| CommandQueueError::InvalidCommandOpcode)
     }
 
     /// Returns the first 16 bytes of output data that are written inline in the command.
@@ -1198,10 +1207,9 @@ impl CommandQueueEntry {
    
     /// Returns the status of command delivery.
     /// This only informs us if the command was delivered to the NIC successfully, not if it was completed successfully.
-    /// A `None` returned value indicates that there was no valid value in the bitfield.
-    pub fn get_delivery_status(&self) -> Option<CommandDeliveryStatus> {
+    pub fn get_delivery_status(&self) -> Result<CommandDeliveryStatus, CommandQueueError> {
         let status = (self.token_signature_status_own.read().get() & 0xFE) >> 1;
-        CommandDeliveryStatus::try_from(status).ok()
+        CommandDeliveryStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandDeliveryStatus)
     }
 
     /// Sets the ownership bit so that HW can take control of the command entry
@@ -1217,9 +1225,9 @@ impl CommandQueueEntry {
 
     /// Returns the status of command execution.
     /// A `None` returned value indicates that there was no valid value in the bitfield.
-    pub fn get_return_status(&self) -> Option<CommandReturnStatus> {
+    pub fn get_return_status(&self) -> Result<CommandReturnStatus, CommandQueueError> {
         let (status, _syndrome, _, _) = self.get_output_inline_data();
-        CommandReturnStatus::try_from(status).ok()
+        CommandReturnStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandReturnStatus)
     }
 }
 

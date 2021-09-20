@@ -62,7 +62,7 @@ pub struct InitializationSegment {
     /// Bit per command in the cmdq.
     /// When the bit is set, that command entry in the queue is moved to HW ownership.
     command_doorbell_vector:    Volatile<U32<BigEndian>>,
-    _padding2:                  [u8; 484],
+    _padding2:                  [u8; 480],
     /// If bit 31 is set, the device is still initializing and driver should not post commands
     initializing_state:         ReadOnly<U32<BigEndian>>,
     /// Advanced debug information.
@@ -82,7 +82,7 @@ pub struct InitializationSegment {
     _padding6:                  [u8; 12228],
 }
 
-const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16400);
+const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16396);
 
 impl InitializationSegment {
     /// Returns the maximum number of entries that can be in the command queue
