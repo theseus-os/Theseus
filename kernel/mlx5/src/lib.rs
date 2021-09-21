@@ -9,7 +9,7 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
 extern crate memory;
@@ -29,7 +29,12 @@ use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use pci::PciDevice;
 use owning_ref::BoxRefMut;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
-use mlx_ethernet::{InitializationSegment, command_queue::{CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryPagesOpMod}, completion_queue::CompletionQueue, event_queue::EventQueue, send_queue::SendQueue};
+use mlx_ethernet::{InitializationSegment, command_queue::{CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryPagesOpMod}, 
+    completion_queue::CompletionQueue, 
+    event_queue::EventQueue, 
+    send_queue::SendQueue,
+    receive_queue::ReceiveQueue
+};
 use kernel_config::memory::PAGE_SIZE;
 use core::sync::atomic::fence;
 use core::sync::atomic::Ordering;
@@ -73,7 +78,9 @@ impl ConnectX5Nic {
 
     /// Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.
     /// (steps taken from the PRM, Section 7.2: HCA Driver Start-up)
-    pub fn init(mlx5_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<ConnectX5Nic>, &'static str> {
+    pub fn init(mlx5_pci_dev: &PciDevice) -> Result</*&'static MutexIrqSafe<ConnectX5Nic>*/ (), &'static str> {
+        let sq_size = 1024;
+        let rq_size = 1024;
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         mlx5_pci_dev.pci_set_command_bus_master_bit();
@@ -313,35 +320,55 @@ impl ConnectX5Nic {
         let (rlkey, status) = cmdq.get_reserved_lkey(completed_cmd)?;
         trace!("Query Special Contexts status: {:?}, rlkey: {}", status, rlkey);
         
-        // execute CREATE_CQ 
+        // execute CREATE_CQ for SQ
         // Allocate pages for CQ
-        let num_cq_pages = 1;
-        let mut cq_mp = Vec::with_capacity(num_cq_pages as usize);
-        let mut cq_pa = Vec::with_capacity(num_cq_pages as usize);
-        for _ in 0..num_cq_pages {
-            let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
-            cq_mp.push(page);
-            cq_pa.push(pa);
-        }
+        let size_cq = 1; 
+        let (cq_mp, cq_pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+
         // Allocate page for doorbell
         let (db_page, db_pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
         
         // Initialize the CQ
-        let mut completion_queue = CompletionQueue::create(cq_mp, db_page)?;
+        let mut completion_queue = CompletionQueue::create(cq_mp, size_cq, db_page)?;
         completion_queue.init();
 
         let init_cmd = cmdq.create_command(
             CommandBuilder::new(CommandOpcode::CreateCq) 
-                .allocated_pages(cq_pa)
+                .allocated_pages(vec!(cq_pa))
                 .uar(uar)
                 .log_queue_size(0)
+                .eqn(eq_number)
+                .db_page(db_pa)
+                .collapsed_cq()
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (cq_number_s, status) = cmdq.get_cq_number(completed_cmd)?;
+        trace!("Create CQ status: {:?}, number: {}", status, cq_number_s);
+
+        // execute CREATE_CQ for RQ
+        // Allocate pages for CQ
+        let size_cq = rq_size; 
+        let (cq_mp, cq_pa) = create_contiguous_mapping(size_cq * 64, NIC_MAPPING_FLAGS)?;
+        // Allocate page for doorbell
+        let (db_page, db_pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+        
+        // Initialize the CQ
+        let mut completion_queue_r = CompletionQueue::create(cq_mp, size_cq, db_page)?;
+        completion_queue_r.init();
+
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::CreateCq) 
+                .allocated_pages(vec!(cq_pa))
+                .uar(uar)
+                .log_queue_size(10)
                 .eqn(eq_number)
                 .db_page(db_pa)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        let (cq_number, status) = cmdq.get_cq_number(completed_cmd)?;
-        trace!("Create CQ status: {:?}, number: {}", status, cq_number);
+        let (cq_number_r, status) = cmdq.get_cq_number(completed_cmd)?;
+        trace!("Create CQ status: {:?}, number: {}", status, cq_number_r);
 
         // execute CREATE_TIS
         let init_cmd = cmdq.create_command(
@@ -353,20 +380,20 @@ impl ConnectX5Nic {
         let (tisn, status) = cmdq.get_tis_context_number(completed_cmd)?;
         trace!("Create TIS status: {:?}, tisn: {}", status, tisn);
 
-        // execute CREATE_SQ for page request event
-        // Allocate pages for SQ
-        let num_sq_pages = 2;
-        let mut sq_mp = Vec::with_capacity(num_sq_pages as usize);
-        let mut sq_pa = Vec::with_capacity(num_sq_pages as usize);
-        for _ in 0..num_sq_pages {
-            let (page, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
-            sq_mp.push(page);
-            sq_pa.push(pa);
-        }
-        // Allocate page for doorbell
+        // Allocate pages for RQ and SQ
+        let sq_size_in_bytes = sq_size * 64;
+        
+        let rq_size_in_bytes = rq_size * 64;
+        
+        let (rq_mp, rq_pa) = create_contiguous_mapping(rq_size_in_bytes, NIC_MAPPING_FLAGS)?;
+        let sq_pa = PhysicalAddress::new(rq_pa.value() + rq_size_in_bytes).ok_or("Could not create starting address for SQ")?; 
+        let sq_mp = allocate_memory(sq_pa, sq_size_in_bytes)?;
+        
+        // Allocate page for SQ/RQ doorbell
         let (db_page, db_pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+
         // Allocate page for UAR
-        let uar_mem_base = mem_base.value() + ((uar as usize - 1) * 4096);
+        let uar_mem_base = mem_base.value() + ((uar as usize) * 4096);
         let uar_page = allocate_memory(PhysicalAddress::new(uar_mem_base).ok_or("Could not create starting address for uar")?, 4096)?;
         
         // Create the SQ
@@ -374,11 +401,11 @@ impl ConnectX5Nic {
 
         let init_cmd = cmdq.create_command(
             CommandBuilder::new(CommandOpcode::CreateSq) 
-                .allocated_pages(sq_pa) 
+                .allocated_pages(vec!(sq_pa)) 
                 .uar(uar) 
-                .log_queue_size(7)
+                .log_queue_size(10)
                 .db_page(db_pa)
-                .cqn(cq_number) 
+                .cqn(cq_number_s) 
                 .tisn(tisn) 
                 .pd(pd)
         )?;
@@ -387,16 +414,41 @@ impl ConnectX5Nic {
         let (sq_number, status) = cmdq.get_send_queue_number(completed_cmd)?;
         trace!("Create SQ status: {:?}, number: {}", status, sq_number);
 
+        // Create the RQ
+        let mut receive_queue = ReceiveQueue::create(rq_mp)?;
+
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::CreateRq) 
+                .allocated_pages(vec!(rq_pa)) 
+                .log_queue_size(10)
+                .db_page(db_pa)
+                .cqn(cq_number_r) 
+                .pd(pd)
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (rq_number, status) = cmdq.get_receive_queue_number(completed_cmd)?;
+        trace!("Create RQ status: {:?}, number: {}", status, rq_number);
+
         // MODIFY_SQ
         let init_cmd = cmdq.create_command(
             CommandBuilder::new(CommandOpcode::ModifySq) 
-                .cqn(cq_number) 
+                .cqn(cq_number_s) 
                 .tisn(tisn) 
                 .sqn(sq_number)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         trace!("Modify SQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
+
+        // MODIFY_RQ
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::ModifyRq) 
+                .rqn(rq_number)
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        trace!("Modify RQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
 
         // QUERY_SQ
         let init_cmd = cmdq.create_command(
@@ -438,22 +490,24 @@ impl ConnectX5Nic {
 
         // send_queue.send(sq_number, tisn, rlkey, pa)?;
         send_queue.nop(sq_number, tisn, rlkey)?;
-        while completion_queue.hw_owned() {}
-        completion_queue.check_packet_transmission();
+        while completion_queue.hw_owned(0) {}
+        // completion_queue.check_packet_transmission();
 
-        let mlx5_nic = ConnectX5Nic {
-            mem_base: mem_base,
-            init_segment: init_segment,
-            command_queue: cmdq, 
-            boot_pages: boot_mp,
-            init_pages: init_mp,
-            event_queue: event_queue,
-            completion_queue: completion_queue,
-            send_queue: send_queue
-        };
+        // let mlx5_nic = ConnectX5Nic {
+        //     mem_base: mem_base,
+        //     init_segment: init_segment,
+        //     command_queue: cmdq, 
+        //     boot_pages: boot_mp,
+        //     init_pages: init_mp,
+        //     event_queue: event_queue,
+        //     completion_queue: completion_queue,
+        //     send_queue: send_queue
+        // };
         
-        let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
-        Ok(nic_ref)
+        // let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
+        // Ok(nic_ref)
+
+        Ok(())
     }
     
     /// Returns the memory-mapped initialization segment of the NIC

@@ -33,9 +33,14 @@ pub(crate) struct CompletionQueueContext {
 const_assert_eq!(core::mem::size_of::<CompletionQueueContext>(), 64);
 
 impl CompletionQueueContext {
-    pub fn init(&mut self, uar_page: u32, log_cq_size: u8, c_eqn: u8, db_addr: PhysicalAddress) {
+    pub fn init(&mut self, uar_page: u32, log_cq_size: u8, c_eqn: u8, db_addr: PhysicalAddress, collapsed: bool) {
         *self = CompletionQueueContext::default();
-        self.status.write(U32::new(1 << 20 | 1 << 17)); // collapse all CQE to first | overrun ignore 
+        let status = if collapsed {
+            1 << 20 | 1 << 17 // collapse all CQE to first | overrun ignore 
+        } else {
+            1 << 17
+        };
+        self.status.write(U32::new(status)); 
 
         let uar = uar_page & 0xFF_FFFF;
         let size = ((log_cq_size & 0x1F) as u32) << 24;
@@ -43,8 +48,14 @@ impl CompletionQueueContext {
 
         self.c_eqn.write(U32::new(c_eqn as u32));
 
+        let x = libm::ceil((2_usize.pow(log_cq_size as u32) * 64) as f64/ PAGE_SIZE as f64);
+        let log_page_size = libm::log2(x) as u32;
+        self.log_page_size.write(U32::new(log_page_size << 24));
+        
         self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
         self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
+
+        trace!("cq context: size: {} {} pg size: {}", x, log_cq_size, log_page_size);
     }
 }
 
@@ -72,7 +83,7 @@ struct CompletionQueueEntry {
 const_assert_eq!(core::mem::size_of::<CompletionQueueEntry>(), 64);
 
 #[repr(u8)]
-enum CommandQueueEntryOpcode {
+enum CompletionQueueEntryOpcode {
     Requester = 0x0,
     ResponderRDMAWriteWithImmediate = 0x1,
     ResponderSend = 0x2,
@@ -88,7 +99,7 @@ enum CommandQueueEntryOpcode {
 impl CompletionQueueEntry {
     pub fn init(&mut self) {
         *self = CompletionQueueEntry::default();
-        let invalid_cqe = (CommandQueueEntryOpcode::InvalidCQE as u32) << 4;
+        let invalid_cqe = (CompletionQueueEntryOpcode::InvalidCQE as u32) << 4;
         let hw_ownership = 0x1;
         self.owner.write(U32::new(invalid_cqe | hw_ownership));
     }
@@ -105,39 +116,32 @@ const_assert_eq!(core::mem::size_of::<CompletionQueueDoorbellRecord>(), 8);
 
 pub struct CompletionQueue {
     /// Physically-contiguous completion queue entries
-    entries: Vec<BoxRefMut<MappedPages, [CompletionQueueEntry]>>,
+    entries: BoxRefMut<MappedPages, [CompletionQueueEntry]>,
     doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>
 }
 
 impl CompletionQueue {
-    pub fn create(entries_mp: Vec<MappedPages>, doorbell_mp: MappedPages) -> Result<CompletionQueue, &'static str> {
-        let mut entries = Vec::with_capacity(entries_mp.len());
-        let num_entries_in_page = PAGE_SIZE / core::mem::size_of::<CompletionQueueEntry>();
-        for page in entries_mp {
-            entries.push(BoxRefMut::new(Box::new(page)).try_map_mut(|mp| mp.as_slice_mut::<CompletionQueueEntry>(0, num_entries_in_page))?);
-        }
+    pub fn create(entries_mp: MappedPages, num_entries: usize, doorbell_mp: MappedPages) -> Result<CompletionQueue, &'static str> {
+        let entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<CompletionQueueEntry>(0, num_entries))?;
 
         let doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<CompletionQueueDoorbellRecord>(0))?;
         Ok( CompletionQueue{entries, doorbell} )
     }
 
     pub fn init(&mut self) {
-        for queue_page in self.entries.iter_mut() {
-            for entry in queue_page.iter_mut() {
-                entry.init()
-        
-            }
+        for entry in self.entries.iter_mut() {
+            entry.init()
         }
         self.doorbell.update_ci.write(U32::new(0));
         self.doorbell.arm_ci.write(U32::new(0));
     }
 
-    pub fn hw_owned(&self) -> bool {
-        self.entries[0][0].owner.read().get() & 0x1 == 0x1
+    pub fn hw_owned(&self, entry_num: usize) -> bool {
+        self.entries[entry_num].owner.read().get() & 0x1 == 0x1
     }
 
-    pub fn check_packet_transmission(&mut self) {
-        debug!("CQ owner: {:#X}", self.entries[0][0].owner.read().get());
-        debug!("CQ flow_tag: {:#X}", self.entries[0][0].flow_tag.read().get());
+    pub fn check_packet_transmission(&mut self, entry_num: usize) {
+        debug!("CQ owner: {:#X}", self.entries[entry_num].owner.read().get());
+        debug!("CQ flow_tag: {:#X}", self.entries[entry_num].flow_tag.read().get());
     }
 }

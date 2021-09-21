@@ -37,6 +37,7 @@ pub mod command_queue;
 pub mod event_queue;
 pub mod completion_queue;
 pub mod send_queue;
+pub mod receive_queue;
 mod work_queue;
 mod uar;
 

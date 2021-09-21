@@ -9,7 +9,6 @@ use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref:: BoxRefMut;
 
-
 #[derive(FromBytes, Default)]
 #[repr(C)]
 pub(crate) struct WorkQueue {
@@ -33,15 +32,27 @@ pub(crate) struct WorkQueue {
 const_assert_eq!(core::mem::size_of::<WorkQueue>(), 192);
 
 impl WorkQueue {
-    pub fn init(&mut self, pd: u32, uar_page: u32, db_addr: PhysicalAddress, log_wq_size: u8) {
+    pub fn init_sq(&mut self, pd: u32, uar_page: u32, db_addr: PhysicalAddress, log_wq_size: u8) {
         *self = WorkQueue::default();
         self.wq_type_signature.write(U32::new(0x1 << 28)); //cyclic
         self.pd.write(U32::new(pd & 0xFF_FFFF));
         self.uar_page.write(U32::new(uar_page & 0xFF_FFFF));
         self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
         self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
-        let log_wq_stride = 6; //=64
-        self.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride << 16) |  (log_wq_size as u32 & 0x1F)));
+        let log_wq_stride = libm::log2(64.0) as u32; //=64
+        let log_wq_page_size = libm::log2(libm::ceil((2_usize.pow(log_wq_size as u32) * 64) as f64 / PAGE_SIZE as f64)) as u32;
+        self.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride << 16) | (log_wq_page_size << 8) | (log_wq_size as u32 & 0x1F)));
+    }
+
+    pub fn init_rq(&mut self, pd: u32, db_addr: PhysicalAddress, log_wq_size: u8) {
+        *self = WorkQueue::default();
+        self.wq_type_signature.write(U32::new(0x1 << 28)); //cyclic
+        self.pd.write(U32::new(pd & 0xFF_FFFF));
+        self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
+        self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
+        let log_wq_stride = libm::log2(64.0) as u32; //=64 ?????
+        let log_wq_page_size = libm::log2(libm::ceil((2_usize.pow(log_wq_size as u32) * 64) as f64 / PAGE_SIZE as f64)) as u32;
+        self.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride << 16) | (log_wq_page_size << 8) | (log_wq_size as u32 & 0x1F)));
     }
 }
 

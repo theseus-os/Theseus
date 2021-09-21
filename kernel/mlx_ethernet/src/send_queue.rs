@@ -110,14 +110,14 @@ const_assert_eq!(core::mem::size_of::<DoorbellRecord>(), 8);
 
 pub struct SendQueue {
     /// Physically-contiguous queue entries
-    entries: Vec<MappedPages>, //Vec<BoxRefMut<MappedPages, [CompletionQueueEntry]>>,
+    entries: MappedPages, 
     doorbell: BoxRefMut<MappedPages, DoorbellRecord>,
     uar: BoxRefMut<MappedPages, UserAccessRegion>,
     wqe_index: u32
 }
 
 impl SendQueue {
-    pub fn create(entries_mp: Vec<MappedPages>, doorbell_mp: MappedPages, uar_mp: MappedPages) -> Result<SendQueue, &'static str> {
+    pub fn create(entries_mp: MappedPages, doorbell_mp: MappedPages, uar_mp: MappedPages) -> Result<SendQueue, &'static str> {
         let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<DoorbellRecord>(0))?;
         doorbell.send_counter.write(U32::new(0));
         doorbell.rcv_counter.write(U32::new(0));
@@ -130,7 +130,7 @@ impl SendQueue {
     }
 
     pub fn send(&mut self, sqn: u32, tisn: u32, lkey: u32, packet_address: PhysicalAddress) -> Result<(), &'static str> {
-        let mut wqe = self.entries[0].as_type_mut::<WorkQueueEntry>(0).map_err(|_e| "Could not map to WQE")?;
+        let mut wqe = self.entries.as_type_mut::<WorkQueueEntry>(0).map_err(|_e| "Could not map to WQE")?;
         wqe.init(self.wqe_index, sqn, tisn, lkey, packet_address);
         self.wqe_index += 1; // need to wrap around 0xFFFF
         self.doorbell.send_counter.write(U32::new(self.wqe_index));
@@ -143,7 +143,7 @@ impl SendQueue {
     }
 
     pub fn nop(&mut self, sqn: u32, tisn: u32, lkey: u32) -> Result<(), &'static str> {
-        let mut wqe = self.entries[0].as_type_mut::<WorkQueueEntry>(0).map_err(|_e| "Could not map to WQE")?;
+        let mut wqe = self.entries.as_type_mut::<WorkQueueEntry>(0).map_err(|_e| "Could not map to WQE")?;
         wqe.nop(self.wqe_index, sqn, tisn, lkey);
         self.wqe_index += 1; // need to wrap around 0xFFFF
         self.doorbell.send_counter.write(U32::new(self.wqe_index));

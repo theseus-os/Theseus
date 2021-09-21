@@ -20,6 +20,7 @@ use crate::event_queue::*;
 use crate::completion_queue::*;
 use crate::send_queue::*;
 use crate::work_queue::*;
+use crate::receive_queue::*;
 
 /// Size of mailboxes, including both control fields and data.
 #[allow(dead_code)]
@@ -175,7 +176,7 @@ impl CommandOpcode {
             Self::CreateTir => 0x20 + 0xF0,
             Self::CreateSq => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
-                0x20 + 0x30 + 0xC0 + num_pages * SIZE_PADDR_IN_BYTES as u32
+                0x20 + 0x30 + 0xC0 + (num_pages * SIZE_PADDR_IN_BYTES as u32)
             }
             Self::ModifySq => 0x20 + 0x30 + 0xC0,
             Self::QuerySq => 12,
@@ -395,6 +396,8 @@ pub struct CommandBuilder {
     transport_interface_send_num:   Option<u32>,
     protection_domain:              Option<u32>,
     send_queue_num:                 Option<u32>,
+    collapsed_cq:                   bool,
+    receive_queue_num:              Option<u32>
 }
 
 impl CommandBuilder {
@@ -412,6 +415,8 @@ impl CommandBuilder {
             transport_interface_send_num: None, 
             protection_domain: None, 
             send_queue_num: None, 
+            collapsed_cq: false,
+            receive_queue_num: None
         }
     }
 
@@ -467,6 +472,16 @@ impl CommandBuilder {
 
     pub fn sqn(mut self, sqn: u32) -> CommandBuilder {
         self.send_queue_num = Some(sqn);
+        self
+    }
+
+    pub fn collapsed_cq(mut self) -> CommandBuilder {
+        self.collapsed_cq = true;
+        self
+    }
+    
+    pub fn rqn(mut self, rqn: u32) -> CommandBuilder {
+        self.receive_queue_num = Some(rqn);
         self
     }
 }
@@ -604,7 +619,8 @@ impl CommandQueue {
                     parameters.user_access_region.ok_or(CommandQueueError::MissingInput)?,
                     parameters.log_queue_size.ok_or(CommandQueueError::MissingInput)?,
                     parameters.event_queue_num.ok_or(CommandQueueError::MissingInput)?,
-                    parameters.doorbell_page.ok_or(CommandQueueError::MissingInput)?
+                    parameters.doorbell_page.ok_or(CommandQueueError::MissingInput)?,
+                    parameters.collapsed_cq
                 )?;
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
 
@@ -662,6 +678,43 @@ impl CommandQueue {
                 self.initialize_mailboxes(NUM_OUTPUT_MAILBOXES_QUERY_SQ, &mut output_mailbox_buffers)?;
                 cmdq_entry.set_output_mailbox_pointer(output_mailbox_buffers[0].addr);
             },
+            CommandOpcode::CreateRq => {
+                let pages_pa = parameters.allocated_pages.ok_or(CommandQueueError::MissingInputPages)?;
+
+                let size_of_mailbox_data = 0x10 + 0x30 + 0xC0 + SIZE_PADDR_IN_BYTES * pages_pa.len();
+                let num_mailboxes = libm::ceilf(size_of_mailbox_data as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+                self.initialize_mailboxes(num_mailboxes, &mut input_mailbox_buffers)?;
+
+                Self::write_receive_queue_context_to_mailbox(
+                    &mut input_mailbox_buffers,
+                    pages_pa, 
+                    parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?, 
+                    parameters.protection_domain.ok_or(CommandQueueError::MissingInput)?, 
+                    parameters.doorbell_page.ok_or(CommandQueueError::MissingInput)?, 
+                    parameters.log_queue_size.ok_or(CommandQueueError::MissingInput)?
+                )?;
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+            }
+            CommandOpcode::ModifyRq => {
+                let rq_state = 0 << 28;
+                cmdq_entry.set_input_inline_data_0(rq_state | parameters.receive_queue_num.ok_or(CommandQueueError::MissingInput)?);
+
+                const NUM_INPUT_MAILBOXES_MODIFY_RQ: usize = 1;
+                self.initialize_mailboxes(NUM_INPUT_MAILBOXES_MODIFY_RQ, &mut input_mailbox_buffers)?;
+        
+                const RQ_CONTEXT_MAILBOX_INDEX: usize = 0;
+                Self::modify_rq_state(
+                    &mut input_mailbox_buffers[RQ_CONTEXT_MAILBOX_INDEX]
+                )?;
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+
+            },
+            // CommandOpcode::QuerySq => {
+            //     cmdq_entry.set_input_inline_data_0(parameters.send_queue_num.ok_or(CommandQueueError::MissingInput)?);
+            //     const NUM_OUTPUT_MAILBOXES_QUERY_SQ: usize = 1;
+            //     self.initialize_mailboxes(NUM_OUTPUT_MAILBOXES_QUERY_SQ, &mut output_mailbox_buffers)?;
+            //     cmdq_entry.set_output_mailbox_pointer(output_mailbox_buffers[0].addr);
+            // },
             _=> {
                 error!("unimplemented opcode");
                 return Err(CommandQueueError::UnimplementedOpcode);
@@ -802,7 +855,8 @@ impl CommandQueue {
         uar: u32, 
         log_cq_size: u8,
         c_eqn: u8,
-        doorbell_pa: PhysicalAddress
+        doorbell_pa: PhysicalAddress,
+        collapsed: bool
     ) -> Result<(), CommandQueueError> {
         const COMPLETION_QUEUE_CONTEXT_MAILBOX_INDEX: usize = 0;
         let mb_page = &mut input_mailbox_buffers[COMPLETION_QUEUE_CONTEXT_MAILBOX_INDEX].mp;
@@ -811,7 +865,7 @@ impl CommandQueue {
         const COMPLETION_QUEUE_CONTEXT_OFFSET: usize = 0;
         let cq_context = mb_page.as_type_mut::<CompletionQueueContext>(COMPLETION_QUEUE_CONTEXT_OFFSET)
             .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        cq_context.init(uar, log_cq_size, c_eqn, doorbell_pa);
+        cq_context.init(uar, log_cq_size, c_eqn, doorbell_pa, collapsed);
 
         // Now use the remainder of the mailbox for page entries
         const CQ_PADDR_OFFSET: usize = 0x110 - 0x10;
@@ -855,7 +909,7 @@ impl CommandQueue {
         // initialize the work queue
         const WORK_QUEUE_OFFSET: usize = 0x10 + 0x30;
         let wq = mb_page.as_type_mut::<WorkQueue>(WORK_QUEUE_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        wq.init(pd, uar_page, db_addr, log_wq_size);
+        wq.init_sq(pd, uar_page, db_addr, log_wq_size);
 
         // Now use the remainder of the mailbox for page entries
         const SQ_PADDR_OFFSET: usize = 0x10 + 0x30 + 0xC0;
@@ -872,9 +926,51 @@ impl CommandQueue {
         // initialize the TIS context
         let sq_context = input_mailbox_buffer.mp.as_type_mut::<SendQueueContext>(SEND_QUEUE_CONTEXT_OFFSET)
             .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        sq_context.init(cqn, tisn);
+        // sq_context.init(cqn, tisn);
         sq_context.set_state(SendQueueState::Ready);
 
+        Ok(())
+    }
+
+    fn modify_rq_state(input_mailbox_buffer: &mut MailboxBuffer) -> Result<(), CommandQueueError> {        
+        const RECEIVE_QUEUE_CONTEXT_OFFSET:usize = 0x10;
+        let rq_context = input_mailbox_buffer.mp.as_type_mut::<ReceiveQueueContext>(RECEIVE_QUEUE_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        // sq_context.init(cqn, tisn);
+        rq_context.set_state(ReceiveQueueState::Ready);
+
+        Ok(())
+    }
+
+    fn write_receive_queue_context_to_mailbox(
+        input_mailbox_buffers: &mut Vec<MailboxBuffer>,
+        mut pages: Vec<PhysicalAddress>, 
+        cqn: u32,
+        pd: u32,
+        db_addr: PhysicalAddress,
+        log_wq_size: u8
+    ) -> Result<(), CommandQueueError> {
+        const RECEIVE_QUEUE_CONTEXT_MAILBOX_INDEX: usize = 0;
+        let mb_page = &mut input_mailbox_buffers[RECEIVE_QUEUE_CONTEXT_MAILBOX_INDEX].mp;
+            
+        // initialize the send queue context
+        const RECEIVE_QUEUE_CONTEXT_OFFSET: usize = 0x10;
+        let rq_context = mb_page.as_type_mut::<ReceiveQueueContext>(RECEIVE_QUEUE_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        rq_context.init(cqn);
+
+        // initialize the work queue
+        const WORK_QUEUE_OFFSET: usize = 0x10 + 0x30;
+        let wq = mb_page.as_type_mut::<WorkQueue>(WORK_QUEUE_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        wq.init_rq(pd, db_addr, log_wq_size);
+
+        // Now use the remainder of the mailbox for page entries
+        const SQ_PADDR_OFFSET: usize = 0x10 + 0x30 + 0xC0;
+        let data_buffer = mb_page.as_type_mut::<[u8;256]>(SQ_PADDR_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        Self::write_page_addrs_to_data_buffer(data_buffer, &mut pages);
+
+        // Write the remaining addresses to the next mailboxes
+        Self::write_page_addrs_to_mailboxes(&mut input_mailbox_buffers[1..], pages)?;
         Ok(())
     }
 
@@ -1031,6 +1127,13 @@ impl CommandQueue {
 
         let sqn = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((sqn & 0xFF_FFFF, self.get_command_status(command)?))
+    }
+
+    pub fn get_receive_queue_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+        self.check_command_output_validity(command.entry_num, CommandOpcode::CreateRq)?;
+
+        let rqn = self.entries[command.entry_num].get_output_inline_data_0();
+        Ok((rqn & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
     pub fn get_sq_state(&mut self, command: CompletedCommand) -> Result<(u8, CommandCompletionStatus), CommandQueueError> {
