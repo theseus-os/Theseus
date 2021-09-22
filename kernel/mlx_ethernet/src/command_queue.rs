@@ -731,6 +731,14 @@ impl CommandQueue {
         // claim the command entry as in use
         self.available_entries[entry_num] = false;
 
+        debug!("command INPUT: {:?}", parameters.opcode);
+        self.entries[entry_num].dump_command();
+        for mb in &initialized_entry.input_mailbox_buffers {
+            mb.mp.as_type::<CommandInterfaceMailbox>(0)
+                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
+                .dump_mailbox()
+        }
+
         Ok(initialized_entry)
     }
     
@@ -983,6 +991,15 @@ impl CommandQueue {
     }
 
     pub fn get_command_status(&mut self, command: CompletedCommand) -> Result<CommandCompletionStatus, CommandQueueError> {
+        debug!("command OUTPUT");
+        
+        self.entries[command.entry_num].dump_command();
+        for mb in command.output_mailbox_buffers {
+            mb.mp.as_type::<CommandInterfaceMailbox>(0)
+                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
+                .dump_mailbox()
+        }
+
         self.available_entries[command.entry_num] = true;
         let delivery_status = self.entries[command.entry_num].get_delivery_status()?;
         let return_status = self.entries[command.entry_num].get_return_status()?;
@@ -1015,6 +1032,18 @@ impl CommandQueue {
         HcaPortType::try_from(((port_type & 0x300) >> 8) as u8)
             .map_err(|_e| CommandQueueError::InvalidPortType)
             .and_then(|port_type| Ok((port_type, self.get_command_status(command)?)))
+    }
+
+    /// Get the device capabilities, which is the output of the [`CommandOpcode::QueryHcaCap`] command.  
+    pub fn get_device_capabilities(&mut self, command: CompletedCommand) -> Result<(HCACapabilities, CommandCompletionStatus), CommandQueueError> {
+        self.check_command_output_validity(command.entry_num, CommandOpcode::QueryHcaCap)?;
+
+        const DATA_OFFSET_IN_MAILBOX: usize = 0; 
+        let mailbox = &command.output_mailbox_buffers[0].mp;
+        let capabilities = mailbox.as_type::<HCACapabilitiesLayout>(DATA_OFFSET_IN_MAILBOX)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+
+        Ok((capabilities.get_capabilities(), self.get_command_status(command)?))
     }
 
     /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
@@ -1332,6 +1361,16 @@ impl CommandQueueEntry {
         let (status, _syndrome, _, _) = self.get_output_inline_data();
         CommandReturnStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandReturnStatus)
     }
+
+    fn dump_command(&self) {
+        unsafe {
+            let ptr = self as *const CommandQueueEntry as *const u32;
+            debug!("000: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr).to_be(), (*ptr.offset(1)).to_be(), (*ptr.offset(2)).to_be(), (*ptr.offset(3)).to_be());
+            debug!("010: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr.offset(4)).to_be(), (*ptr.offset(5)).to_be(), (*ptr.offset(6)).to_be(), (*ptr.offset(7)).to_be());
+            debug!("020: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr.offset(8)).to_be(), (*ptr.offset(9)).to_be(), (*ptr.offset(10)).to_be(), (*ptr.offset(11)).to_be());
+            debug!("030: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr.offset(12)).to_be(), (*ptr.offset(13)).to_be(), (*ptr.offset(14)).to_be(), (*ptr.offset(15)).to_be());
+        }
+    }
 }
 
 
@@ -1374,6 +1413,16 @@ impl CommandInterfaceMailbox {
         self.next_pointer_h.write(U32::new((next_mb_addr >> 32) as u32));
         self.next_pointer_l.write(U32::new((next_mb_addr & 0xFFFF_FFFF) as u32));
     }
+
+    fn dump_mailbox(&self) {
+        unsafe {
+            let ptr = self as *const CommandInterfaceMailbox as *const u32;
+            for i in 0..MAILBOX_SIZE_IN_BYTES/16 {
+                let x = (i * 4) as isize;
+                debug!("{:#03}: {:#010X} {:#010X} {:#010X} {:#010X}", i*16, (*ptr.offset(x)).to_be(), (*ptr.offset(x+1)).to_be(), (*ptr.offset(x+2)).to_be(), (*ptr.offset(x+3)).to_be());
+            }
+        }
+    }
 }
 
 impl fmt::Debug for CommandInterfaceMailbox {
@@ -1388,4 +1437,206 @@ impl fmt::Debug for CommandInterfaceMailbox {
     }
 }
 
+#[derive(FromBytes)]
+#[repr(C)]
+struct HCACapabilitiesLayout {
+    vhca_resource_manager:          Volatile<U32<BigEndian>>,
+    transpose_max_element_size:     Volatile<U32<BigEndian>>,
+    transpose_max_size:             Volatile<U32<BigEndian>>,
+    _padding0:                      u32,
+    log_max_qp:                     Volatile<U32<BigEndian>>,
+    scatter_fcs:                    Volatile<U32<BigEndian>>,
+    log_max_cq:                     Volatile<U32<BigEndian>>,
+    log_max_eq:                     Volatile<U32<BigEndian>>,
+    log_max_klm:                    Volatile<U32<BigEndian>>,
+    log_max_ra_res_dc:              Volatile<U32<BigEndian>>,
+    log_max_ra_res_qp:              Volatile<U32<BigEndian>>,
+    gid_table_size:                 Volatile<U32<BigEndian>>,
+    pkey_table_size:                Volatile<U32<BigEndian>>,
+    num_ports:                      Volatile<U32<BigEndian>>,
+    wol_p:                          Volatile<U32<BigEndian>>,
+    cqe_version:                    Volatile<U32<BigEndian>>,
+    extended_retry_count:           Volatile<U32<BigEndian>>,
+    rc:                             Volatile<U32<BigEndian>>,
+    log_pg_sz:                      Volatile<U32<BigEndian>>,
+    lag_native:                     Volatile<U32<BigEndian>>,
+    max_wqe_sz_sq:                  Volatile<U32<BigEndian>>,
+    max_wqe_sz_rq:                  Volatile<U32<BigEndian>>,
+    max_wqe_sz_sq_dc:               Volatile<U32<BigEndian>>,
+    max_qp_mcg:                     Volatile<U32<BigEndian>>,
+    log_max_mcg:                    Volatile<U32<BigEndian>>,
+    log_max_xrcd:                   Volatile<U32<BigEndian>>,
+    max_flow_counter_15_0:          Volatile<U32<BigEndian>>,
+    log_max_tis:                    Volatile<U32<BigEndian>>,
+    log_max_tis_per_sq:             Volatile<U32<BigEndian>>,
+    log_min_stride_sz_sq:           Volatile<U32<BigEndian>>,
+    log_max_wq_sz:                  Volatile<U32<BigEndian>>,
+    log_max_current_uc_list:        Volatile<U32<BigEndian>>,
+    _padding1:                      u64,
+    create_qp_start_hint:           Volatile<U32<BigEndian>>,
+    max_num_eqs:                    Volatile<U32<BigEndian>>,
+    log_uar_page_sz:                Volatile<U32<BigEndian>>,
+    _padding2:                      u32,
+    device_frequency_mhz:           Volatile<U32<BigEndian>>,
+    device_frequency_khz:           Volatile<U32<BigEndian>>,
+    nvmf_target:                    Volatile<U32<BigEndian>>,
+    _padding3:                      u32,
+    flex_parser_protocols:          Volatile<U32<BigEndian>>,
+    flex_parser_header:             Volatile<U32<BigEndian>>,
+    _padding4:                      u32,
+    cqe_compression:                Volatile<U32<BigEndian>>,
+    cqe_compression_max_num:        Volatile<U32<BigEndian>>,
+    log_max_xrq:                    Volatile<U32<BigEndian>>,
+    sw_owner_id:                    Volatile<U32<BigEndian>>,
+    num_ppcnt:                      Volatile<U32<BigEndian>>,
+    num_q:                          Volatile<U32<BigEndian>>,
+    max_num_sf:                     Volatile<U32<BigEndian>>,
+    _padding5:                      u32,
+    flex_parser_id:                 Volatile<U32<BigEndian>>,
+    sf_base_id:                     Volatile<U32<BigEndian>>,
+    num_total_dynamic:              Volatile<U32<BigEndian>>,
+    dynmaic_msix_table:             Volatile<U32<BigEndian>>,
+    max_dynamic_vf:                 Volatile<U32<BigEndian>>,
+    max_flow_execute:               Volatile<U32<BigEndian>>,
+    _padding6:                      u64,
+    match_definer:                  Volatile<U32<BigEndian>>, 
+}
 
+const_assert_eq!(core::mem::size_of::<HCACapabilitiesLayout>(), 256);
+
+#[derive(Debug)]
+pub struct HCACapabilities {
+    log_max_cq_sz:                  u8,
+    log_max_cq:                     u8,               
+    log_max_eq_sz:                  u8,            
+    log_max_mkey:                   u8,             
+    log_max_eq:                     u8,               
+    max_indirection:                u8,          
+    log_max_mrw_sz:                 u8,           
+    log_max_klm_list_size:          u8,
+    end_pad:                        bool,   
+    start_pad:                      bool,                
+    cache_line_128byte:             bool,       
+    vport_counters:                 bool,           
+    vport_group_manager:            bool,      
+    nic_flow_table:                 bool,           
+    port_type:                      u8,                
+    num_ports:                      u8,                
+    log_max_msg:                    u8,              
+    max_tc:                         u8,                   
+    cqe_version:                    u8,              
+    cmdif_checksum:                 u8,           
+    wq_signature:                   bool,             
+    sctr_data_cqe:                  bool,            
+    eth_net_offloads:               bool,         
+    cq_oi:                          bool,                    
+    cq_resize:                      bool,                
+    cq_moderation:                  bool,            
+    cq_eq_remap:                    bool,              
+    scqe_break_moderation:          bool,    
+    cq_period_start_from_cqe:       bool, 
+    imaicl:                         bool,                   
+    xrc:                            bool,                      
+    ud:                             bool,                       
+    uc:                             bool,                       
+    rc:                             bool,                       
+    uar_sz:                         u8,                   
+    log_pg_sz:                      u8,                
+    bf:                             bool,                       
+    driver_version:                 bool,           
+    pad_tx_eth_packet:              bool,        
+    log_bf_reg_size:                u8,          
+    log_max_transport_domain:       u8, 
+    log_max_pd:                     u8,               
+    max_flow_counter:               u16,         
+    log_max_rq:                     u8,               
+    log_max_sq:                     u8,               
+    log_max_tir:                    u8,              
+    log_max_tis:                    u8,              
+    basic_cyclic_rcv_wqe:           bool,     
+    log_max_rmp:                    u8,              
+    log_max_rqt:                    u8,              
+    log_max_rqt_size:               u8,         
+    log_max_tis_per_sq:             u8,       
+    log_max_stride_sz_rq:           u8,     
+    log_min_stride_sz_rq:           u8,     
+    log_max_stride_sz_sq:           u8,     
+    log_min_stride_sz_sq:           u8,     
+    log_max_wq_sz:                  u8,            
+    log_max_vlan_list:              u8,        
+    log_max_current_mc_list:        u8,  
+    log_max_current_uc_list:        u8,  
+    log_max_l2_table:               u8,         
+    log_uar_page_sz:                u16,          
+    device_frequency_mhz:           u32,     
+}
+
+impl HCACapabilitiesLayout {
+    fn get_capabilities(&self) -> HCACapabilities {
+        HCACapabilities {
+            log_max_cq_sz:                  ((self.log_max_cq.read().get() >> 16) & 0xFF) as u8,
+            log_max_cq:                     (self.log_max_cq.read().get() & 0x1F) as u8,               
+            log_max_eq_sz:                  ((self.log_max_eq.read().get() >> 24) & 0xFF) as u8,            
+            log_max_mkey:                   ((self.log_max_eq.read().get() >> 16) & 0x3F) as u8,             
+            log_max_eq:                     (self.log_max_eq.read().get() & 0xF) as u8,               
+            max_indirection:                ((self.log_max_klm.read().get() >> 24) & 0xFF) as u8,          
+            log_max_mrw_sz:                 ((self.log_max_klm.read().get() >> 16) & 0x7F) as u8,               
+            log_max_klm_list_size:          (self.log_max_klm.read().get() & 0x3F) as u8,
+            end_pad:                        self.gid_table_size.read().get().get_bit(31),   
+            start_pad:                      self.gid_table_size.read().get().get_bit(28),                
+            cache_line_128byte:             self.gid_table_size.read().get().get_bit(27),       
+            vport_counters:                 self.pkey_table_size.read().get().get_bit(30),           
+            vport_group_manager:            self.num_ports.read().get().get_bit(31),      
+            nic_flow_table:                 self.num_ports.read().get().get_bit(25),           
+            port_type:                      ((self.num_ports.read().get() >> 8) & 0x3) as u8,                
+            num_ports:                      (self.num_ports.read().get() & 0xFF) as u8,                
+            log_max_msg:                    ((self.wol_p.read().get() >> 24) & 0x1F) as u8,              
+            max_tc:                         ((self.wol_p.read().get() >> 16) & 0xF) as u8,                   
+            cqe_version:                    (self.cqe_version.read().get() & 0xF) as u8,              
+            cmdif_checksum:                 ((self.extended_retry_count.read().get() >> 14) & 0x3) as u8,           
+            wq_signature:                   self.extended_retry_count.read().get().get_bit(11),             
+            sctr_data_cqe:                  self.extended_retry_count.read().get().get_bit(10),            
+            eth_net_offloads:               self.extended_retry_count.read().get().get_bit(3),         
+            cq_oi:                          self.rc.read().get().get_bit(31),                    
+            cq_resize:                      self.rc.read().get().get_bit(30),                
+            cq_moderation:                  self.rc.read().get().get_bit(29),            
+            cq_eq_remap:                    self.rc.read().get().get_bit(25),              
+            scqe_break_moderation:          self.rc.read().get().get_bit(21),    
+            cq_period_start_from_cqe:       self.rc.read().get().get_bit(20), 
+            imaicl:                         self.rc.read().get().get_bit(14),                   
+            xrc:                            self.rc.read().get().get_bit(3),                      
+            ud:                             self.rc.read().get().get_bit(2),                       
+            uc:                             self.rc.read().get().get_bit(1),                       
+            rc:                             self.rc.read().get().get_bit(0),                       
+            uar_sz:                         ((self.log_pg_sz.read().get() >> 16) & 0x3F) as u8,                   
+            log_pg_sz:                      (self.log_pg_sz.read().get() & 0xFF) as u8,                
+            bf:                             self.lag_native.read().get().get_bit(31),                       
+            driver_version:                 self.lag_native.read().get().get_bit(30),           
+            pad_tx_eth_packet:              self.lag_native.read().get().get_bit(29),        
+            log_bf_reg_size:                ((self.lag_native.read().get() >> 16) & 0x1F) as u8,          
+            log_max_transport_domain:       ((self.log_max_xrcd.read().get() >> 24) & 0x1F) as u8, 
+            log_max_pd:                     ((self.log_max_xrcd.read().get() >> 16) & 0x1F) as u8,               
+            max_flow_counter:               (self.max_flow_counter_15_0.read().get() & 0xFFFF) as u16,         
+            log_max_rq:                     ((self.log_max_tis.read().get() >> 24) & 0x1F) as u8,               
+            log_max_sq:                     ((self.log_max_tis.read().get() >> 16) & 0x1F) as u8,               
+            log_max_tir:                    ((self.log_max_tis.read().get() >> 8) & 0x1F) as u8,              
+            log_max_tis:                    (self.log_max_tis.read().get() & 0x1F) as u8,              
+            basic_cyclic_rcv_wqe:           self.log_max_tis_per_sq.read().get().get_bit(31),     
+            log_max_rmp:                    ((self.log_max_tis_per_sq.read().get() >> 24) & 0x1F) as u8,              
+            log_max_rqt:                    ((self.log_max_tis_per_sq.read().get() >> 16) & 0x1F) as u8,              
+            log_max_rqt_size:               ((self.log_max_tis_per_sq.read().get() >> 8) & 0x1F) as u8,         
+            log_max_tis_per_sq:             (self.log_max_tis_per_sq.read().get() & 0x1F) as u8,       
+            log_max_stride_sz_rq:           ((self.log_min_stride_sz_sq.read().get() >> 24) & 0x1F) as u8,     
+            log_min_stride_sz_rq:           ((self.log_min_stride_sz_sq.read().get() >> 16) & 0x1F) as u8,     
+            log_max_stride_sz_sq:           ((self.log_min_stride_sz_sq.read().get() >> 8) & 0x1F) as u8,     
+            log_min_stride_sz_sq:           (self.log_min_stride_sz_sq.read().get() & 0x1F) as u8,     
+            log_max_wq_sz:                  (self.log_max_wq_sz.read().get() & 0x1F) as u8,
+            log_max_vlan_list:              ((self.log_max_current_uc_list.read().get() >> 16) & 0x1F) as u8,
+            log_max_current_mc_list:        ((self.log_max_current_uc_list.read().get() >> 8) & 0x1F) as u8,  
+            log_max_current_uc_list:        (self.log_max_current_uc_list.read().get() & 0x1F) as u8,
+            log_max_l2_table:               ((self.log_uar_page_sz.read().get() >> 24) & 0x1F) as u8,         
+            log_uar_page_sz:                (self.log_uar_page_sz.read().get() & 0xFFFF) as u16,          
+            device_frequency_mhz:           self.device_frequency_mhz.read().get()     
+        }
+    }
+}

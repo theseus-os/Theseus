@@ -29,7 +29,7 @@ use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use pci::PciDevice;
 use owning_ref::BoxRefMut;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
-use mlx_ethernet::{InitializationSegment, command_queue::{CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryPagesOpMod}, 
+use mlx_ethernet::{InitializationSegment, command_queue::{CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
     completion_queue::CompletionQueue, 
     event_queue::EventQueue, 
     send_queue::SendQueue,
@@ -191,8 +191,18 @@ impl ConnectX5Nic {
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        let (port_type, status) = cmdq.get_port_type(completed_cmd)?;
-        trace!("Query HCA cap status:{:?}, port_type: {:?}", status, port_type);
+        let (current_capabilities, status) = cmdq.get_device_capabilities(completed_cmd)?;
+        trace!("Query HCA cap status:{:?}, current_capabilities: {:?}", status, current_capabilities);
+
+        // Query HCA capabilities
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::QueryHcaCap)
+                .opmod(QueryHcaCapMaxOpMod::GeneralDeviceCapabilities as u16), 
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (max_capabilities, status) = cmdq.get_device_capabilities(completed_cmd)?;
+        trace!("Query HCA cap status:{:?}, max_capabilities: {:?}", status, max_capabilities);
 
         // Query pages for init
         let init_cmd = cmdq.create_command(
@@ -232,6 +242,37 @@ impl ConnectX5Nic {
         let posted_cmd = init_segment.post_command(init_cmd);
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         trace!("Init HCA status: {:?}", cmdq.get_command_status(completed_cmd)?);
+
+        // Query regular pages
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::QueryPages)
+                .opmod(QueryPagesOpMod::RegularPages as u16)
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (num_reg_pages, status) = cmdq.get_query_pages_command_output(completed_cmd)?;
+        trace!("Query pages status: {:?}, regular pages: {:?}", status, num_reg_pages);
+
+        let mut reg_mp = Vec::with_capacity(num_reg_pages as usize);
+        if num_reg_pages != 0 {
+            // Allocate pages for init
+            let mut reg_pa = Vec::with_capacity(num_reg_pages as usize);
+            for _ in 0..num_reg_pages {
+                let (page, pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
+                reg_mp.push(page);
+                reg_pa.push(pa);
+            }
+
+            // execute MANAGE_PAGES command to transfer init pages to device
+            let init_cmd = cmdq.create_command(
+                CommandBuilder::new(CommandOpcode::ManagePages)
+                    .opmod(ManagePagesOpMod::AllocationSuccess as u16)
+                    .allocated_pages(reg_pa)
+            )?;
+            let posted_cmd = init_segment.post_command(init_cmd);
+            let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+            trace!("Manage pages reg status: {:?}", cmdq.get_command_status(completed_cmd)?);
+        }
 
         // Set driver version 
         let init_cmd = cmdq.create_command(
