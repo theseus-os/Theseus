@@ -473,8 +473,10 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
         terminal.screen_cursor.position = terminal.backend.move_cursor_to(ScreenPoint::default());
 
         // By default, terminal backends typically operate in Overwrite mode, not Insert mode.
-        terminal.backend.set_insert_mode(InsertMode::Overwrite);
-        
+        let insert_mode = InsertMode::Overwrite;
+        terminal.backend.set_insert_mode(insert_mode);
+        terminal.mode.insert = insert_mode;
+
         let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah 12345";
         // let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah\nTesting a new line here";
         terminal.handle_input(&mut welcome.as_bytes()).expect("failed to write terminal welcome message");
@@ -726,7 +728,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, B
                 let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
                 debug!("After BackwardsDelete, screen cursor moved from {:?} -> {:?}", self.screen_cursor.position, screen_cursor_after_display);
                 self.screen_cursor.position = screen_cursor_after_display;
-                warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
+                // warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
                 assert_eq!(screen_cursor_after_display, new_screen_position);
             }
             // Temp hack to handle Ctrl + C being pressed
@@ -768,7 +770,6 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, B
 
         let mut params_iter = params.into_iter();
         let first_param = params_iter.next();
-        trace!("first_param: {:?}", first_param);
 
         const FORWARD_DELETE_PARAM: u16 = 3;
 
