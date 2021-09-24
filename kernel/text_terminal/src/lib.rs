@@ -1130,13 +1130,15 @@ fn increment_both_cursors(
     let screen_width = screen_size.num_columns.0 as usize;
 
     if wrap == Wrap::No {
-        // Don't increment past the last screen column. 
-        let new_scrollback_position = min(
-            util::round_up(scrollback_position.unit_idx.0, screen_width) - 1,
-            scrollback_position.unit_idx.0.saturating_add(num_units)
+        let line = &scrollback_buffer[scrollback_position.line_idx];
+        // Don't increment past the last screen column or past the end of this line.
+        let new_scrollback_unit_idx = min(min(
+            util::round_down(scrollback_position.unit_idx.0, screen_width) + screen_width - 1,
+            line.len() - 1),
+            scrollback_position.unit_idx.0.saturating_add(num_units),
         );
-        let new_scrollback_unit_idx = scrollback_buffer[scrollback_position.line_idx]
-            .next_non_continuance_unit(UnitIndex(new_scrollback_position));
+        debug!("increment_both_cursors({}): {:?} -> {:?}", num_units, scrollback_position.unit_idx, new_scrollback_unit_idx);
+        let new_scrollback_unit_idx = line.next_non_continuance_unit(UnitIndex(new_scrollback_unit_idx));
         let units_moved = new_scrollback_unit_idx - scrollback_position.unit_idx;
         let new_screen_column = screen_position.column.0.saturating_add(units_moved.0 as u16);
         return (
