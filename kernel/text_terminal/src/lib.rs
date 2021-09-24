@@ -1137,7 +1137,6 @@ fn increment_both_cursors(
             line.len() - 1),
             scrollback_position.unit_idx.0.saturating_add(num_units),
         );
-        debug!("increment_both_cursors({}): {:?} -> {:?}", num_units, scrollback_position.unit_idx, new_scrollback_unit_idx);
         let new_scrollback_unit_idx = line.next_non_continuance_unit(UnitIndex(new_scrollback_unit_idx));
         let units_moved = new_scrollback_unit_idx - scrollback_position.unit_idx;
         let new_screen_column = screen_position.column.0.saturating_add(units_moved.0 as u16);
