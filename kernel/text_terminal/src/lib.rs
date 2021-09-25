@@ -476,8 +476,8 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
         terminal.backend.set_insert_mode(insert_mode);
         terminal.mode.insert = insert_mode;
 
-        let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah 12345";
-        // let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah\nTesting a new line here";
+        // let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah 12345";
+        let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah\nTesting a new line here";
         terminal.handle_input(&mut welcome.as_bytes()).expect("failed to write terminal welcome message");
 
         // TODO: issue a term info command to the terminal backend
@@ -688,6 +688,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, B
             }
             AsciiControlCodes::LineFeed | AsciiControlCodes::VerticalTab => {
                 self.line_feed();
+                debug!("After line_feed(): {:?}, {:?}", self.scrollback_cursor, self.screen_cursor);
                 if self.mode.lf_sends_cr == LineFeedSendsCarriageReturn::Yes {
                     self.carriage_return();
                 }
@@ -851,35 +852,26 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
         let screen_width = screen_size.num_columns.0 as usize;
         let original_screen_cursor = self.screen_cursor.position;
 
-        // Adjust the scrollback cursor position to the unit displayed one row beneath it
-        if self.mode.insert == InsertMode::Overwrite {
-            let line = &self.scrollback_buffer[self.scrollback_cursor.line_idx];
-            let new_unit_index = self.scrollback_cursor.unit_idx + UnitIndex(screen_width);
+        debug!("line_feed(): current position: {:?} {:?}", self.scrollback_cursor, self.screen_cursor);
 
-            if let Some(unit) = line.get(new_unit_index.0) {
-                // We're still within the bounds of the current Line, so we're done.
-                self.scrollback_cursor.unit_idx = line.previous_non_continuance_unit(new_unit_index);
-                self.screen_cursor.underneath = unit.clone();
-            } else {
-                // We've exceeded the bounds of the current Line, so try to move to the next Line.
-                self.scrollback_cursor.line_idx.0 += 1;
-                // This is not a carriage return, we don't move the unit index to column 0.
-                // We bound the unit index to the first row of the new line.
-                let new_unit_index = self.scrollback_cursor.unit_idx.0 % screen_width; 
-                if let Some(next_line) = self.scrollback_buffer.get(self.scrollback_cursor.line_idx.0) {
-                    self.scrollback_cursor.unit_idx = next_line.previous_non_continuance_unit(UnitIndex(new_unit_index));
-                    self.screen_cursor.underneath = next_line.get(self.scrollback_cursor.unit_idx.0)
-                        .cloned()
-                        .unwrap_or_else(|| Unit {
-                            style: next_line.last().map(|last_unit| last_unit.style).unwrap_or_default(),
-                            ..Default::default()
-                        });
-                } else {
-                    // If there is no next line, append a new one.
-                    self.screen_cursor.underneath = Unit {
+        if self.mode.insert == InsertMode::Overwrite {
+            // Adjust the scrollback cursor position to the unit displayed one row beneath it
+            self.move_down(Row(1));
+            debug!("line_feed(): after move_down() position: {:?} {:?}", self.scrollback_cursor, self.screen_cursor);
+
+            if let Some(line) = self.scrollback_buffer.get(self.scrollback_cursor.line_idx.0) {
+                // We're within the bounds of an existing Line, so there's nothing else to do.
+                self.screen_cursor.underneath = line.get(self.scrollback_cursor.unit_idx.0)
+                    .map(|unit| unit.clone())
+                    .unwrap_or_else(|| Unit {
                         style: line.last().map(|last_unit| last_unit.style).unwrap_or_default(),
                         ..Default::default()
-                    };
+                    });
+            } else {
+                // There weren't enough existing Lines, so we need to insert them.
+                let num_empty_lines_to_insert = self.scrollback_cursor.line_idx.0 - self.scrollback_buffer.len() + 1;
+                debug!("line_feed(): inserting {} empty lines", num_empty_lines_to_insert);
+                for _i in 0..num_empty_lines_to_insert {
                     self.scrollback_buffer.push(Line::new());
                 }
             }
@@ -896,25 +888,24 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
             let next_line_idx = self.scrollback_cursor.line_idx + LineIndex(1);
             *self.scrollback_cursor = ScrollbackBufferPoint {
                 line_idx: next_line_idx,
-                unit_idx: UnitIndex(0), // could also keep the unit index as is, and insert padding into new_line_units
+                unit_idx: UnitIndex(0), // could also keep the unit index as is, and insert padding into `new_line_units`
             };
             self.scrollback_buffer.insert(next_line_idx.0, new_line);
-            self.screen_cursor.position.column.0 = 0;
-        }
 
-        // Actually move the screen cursor down to the next row.
-        // The screen cursor's column has already been adjusted above.
-        let scroll_action = {
+            // Actually move the screen cursor down to the next row.
+            // The screen cursor's column has already been adjusted above.
+            self.screen_cursor.position.column.0 = 0;
             self.screen_cursor.position.row.0 += 1;
-            if self.screen_cursor.position.row >= screen_size.num_rows {
-                self.screen_cursor.position.row = screen_size.num_rows - Row(1);
-                ScrollAction::Down(1)
+            let scroll_action = if self.screen_cursor.position.row > screen_size.last_row() {
+                let scroll_down = ScrollAction::Down(self.screen_cursor.position.row.0 as usize - screen_size.last_row().0 as usize);
+                self.screen_cursor.position.row = screen_size.last_row();
+                scroll_down
             } else {
                 ScrollAction::None
-            }
-        };
-        // TODO: process the `scroll_action`
-        self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
+            };
+            // TODO: handle scroll action
+            self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
+        }
     }
 
     /// Moves the screen cursor back to the beginning of the current row
@@ -933,7 +924,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
             self.scrollback_cursor.line_idx, self.scrollback_cursor.unit_idx, index_of_previous_wrap
         );
         self.scrollback_cursor.unit_idx = UnitIndex(index_of_previous_wrap);
-        self.screen_cursor.underneath = self.scrollback_buffer[*self.scrollback_cursor].clone();
+        // self.screen_cursor.underneath = self.scrollback_buffer[*self.scrollback_cursor].clone();
 
         // Move the screen cursor to the beginning of the current row.
         self.screen_cursor.position.column = Column(0);
@@ -941,11 +932,79 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
     }
 
 
+    /// Moves the screen cursor up by the given number of rows
+    /// and sets the scrollback buffer position to the corresponding line and unit index.
+    ///
+    /// This is a free-floating move operation that **does not** align the 
+    /// screen cursor to existing units in the scrollback buffer.
+    /// That must be done separately if desired. 
     fn move_up(&mut self, num_rows: Row) {
         
     }
 
+    /// Moves the screen cursor down by the given number of rows
+    /// and sets the scrollback buffer position to the corresponding line and unit index.
+    ///
+    /// This is a free-floating move operation that **does not** align the 
+    /// screen cursor to existing units in the scrollback buffer.
+    /// That must be done separately if desired. 
     fn move_down(&mut self, num_rows: Row) {
+        let screen_size = self.backend.screen_size();
+        // First, adjust the screen cursor down by `num_rows`.
+        let orig_row = self.screen_cursor.position.row.0 as usize;
+        let last_row = screen_size.last_row().0 as usize;
+        let target_row = orig_row + num_rows.0 as usize;
+        let (new_screen_row, scroll_action) = if target_row > last_row {
+            (screen_size.last_row(), ScrollAction::Down(target_row - last_row))
+        } else {
+            (Row(target_row as u16), ScrollAction::None)
+        };
+
+        self.screen_cursor.position.row = new_screen_row;
+        let target_column = self.screen_cursor.position.column.0 as usize;
+
+        // TODO: handle scroll action
+
+        ///////// Copied from ScreenPoint::to_scrollback_point()
+        let mut row = 0;
+        let screen_width = screen_size.num_columns.0 as usize;
+        let ScrollbackBufferPoint { mut line_idx, mut unit_idx } = *self.scrollback_cursor;
+
+        // Iterate over the lines in the scrollback buffer starting at the current position
+        // to determine how many displayed rows on screen each line takes up.
+        for line in self.scrollback_buffer.get(line_idx.0 ..) {
+            let start_row = unit_idx.0 / screen_width; 
+            let last_unit = line.len().saturating_sub(1);
+            let end_row = last_unit / screen_width;
+            let rows_occupied = end_row.saturating_sub(start_row) + 1;
+            row += rows_occupied;
+
+            if row >= target_row {
+                let row_overshoot = row - target_row;
+                unit_idx = UnitIndex(last_unit.saturating_sub(row_overshoot * screen_width));
+                break;
+            }
+
+            line_idx += LineIndex(1);
+            unit_idx = UnitIndex(0);
+        }
+
+        *self.scrollback_cursor = if row < target_row {
+            // The scrollback buffer didn't have enough lines.
+            // Currently, `line_idx` is right after the last line.
+            // We calculate the target line index as: `line_idx - 1 + (target_row - row)`.
+            let target_line = line_idx.0.saturating_add(target_row).saturating_sub(row).saturating_sub(1);
+            ScrollbackBufferPoint {
+                line_idx: LineIndex(target_line),
+                unit_idx: UnitIndex(target_column),
+            }
+        } else {
+            // The scrollback buffer had enough lines.
+            ScrollbackBufferPoint {
+                line_idx,
+                unit_idx: UnitIndex(util::round_down(unit_idx.0, screen_width) + target_column),
+            }
+        };
 
     }
 
@@ -1134,7 +1193,7 @@ fn increment_both_cursors(
         // Don't increment past the last screen column or past the end of this line.
         let new_scrollback_unit_idx = min(min(
             util::round_down(scrollback_position.unit_idx.0, screen_width) + screen_width - 1,
-            line.len() - 1),
+            line.len()), // not `len() - 1` because we want to move the cursor to right after the last unit
             scrollback_position.unit_idx.0.saturating_add(num_units),
         );
         let new_scrollback_unit_idx = line.next_non_continuance_unit(UnitIndex(new_scrollback_unit_idx));
@@ -1203,12 +1262,12 @@ fn increment_both_cursors(
     // Finally, use `screen_rows_moved_down` to calculate the new screen cursor position
     // and whether a scroll action is necessary.
     let orig_row = screen_position.row.0 as usize;
-    let dest_row = orig_row + screen_rows_moved_down;
+    let target_row = orig_row + screen_rows_moved_down;
     let last_row = screen_size.last_row().0 as usize;
-    let (new_screen_row, scroll_action) = if dest_row > last_row {
-        (screen_size.last_row(), ScrollAction::Down(dest_row - last_row))
+    let (new_screen_row, scroll_action) = if target_row > last_row {
+        (screen_size.last_row(), ScrollAction::Down(target_row - last_row))
     } else {
-        (Row(dest_row as u16), ScrollAction::None)
+        (Row(target_row as u16), ScrollAction::None)
     };
     
     (
@@ -1410,6 +1469,7 @@ impl ScreenPoint {
         // Iterate over all lines in the scrollback buffer starting at the origin point
         // to determine how many displayed rows on screen each line takes up.
         for line in scrollback_buffer.get(line_idx.0 ..) {
+            // TODO FIXME: this is probably wrong, see the code in `move_down()`
             let rows_occupied = (line.len().saturating_sub(unit_idx.0) / screen_width) + 1;
             row += rows_occupied;
 
