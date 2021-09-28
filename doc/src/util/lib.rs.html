@@ -22,6 +22,20 @@
 <span id="19">19</span>
 <span id="20">20</span>
 <span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -43,6 +57,21 @@
 <span class="doccomment">/// which must be a power of two</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">round_up_power_of_two</span>(<span class="ident">value</span>: <span class="ident">usize</span>, <span class="ident">base</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
     (<span class="ident">value</span> <span class="op">+</span> (<span class="ident">base</span> <span class="op">-</span> <span class="number">1</span>)) <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">base</span> <span class="op">-</span> <span class="number">1</span>)
-}</pre></div>
+}
+
+
+<span class="doccomment">/// Rounds the given `value` up to the nearest `multiple`.</span>
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">round_up</span>(<span class="ident">value</span>: <span class="ident">usize</span>, <span class="ident">multiple</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    ((<span class="ident">value</span> <span class="op">+</span> <span class="ident">multiple</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">/</span> <span class="ident">multiple</span>) <span class="op">*</span> <span class="ident">multiple</span>
+}
+
+
+<span class="doccomment">/// Rounds the given `value` down to the nearest `multiple`.</span>
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">round_down</span>(<span class="ident">value</span>: <span class="ident">usize</span>, <span class="ident">multiple</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    (<span class="ident">value</span> <span class="op">/</span> <span class="ident">multiple</span>) <span class="op">*</span> <span class="ident">multiple</span>
+}
+</pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="util" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
     <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

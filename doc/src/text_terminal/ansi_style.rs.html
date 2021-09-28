@@ -598,11 +598,11 @@
 <span class="doccomment">/// for the character(s) displayed in a `Unit`.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Style</span> {
-    <span class="ident">format_flags</span>: <span class="ident">FormatFlags</span>,
     <span class="doccomment">/// The color of the text itself.</span>
     <span class="ident">color_foreground</span>: <span class="ident">ForegroundColor</span>,
     <span class="doccomment">/// The color behind the text.</span>
     <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>,
+    <span class="ident">format_flags</span>: <span class="ident">FormatFlags</span>,
 }
 <span class="kw">impl</span> <span class="ident">Style</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">diff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
