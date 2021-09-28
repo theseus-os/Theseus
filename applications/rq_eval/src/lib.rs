@@ -165,11 +165,9 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     for _i in 0..iterations {
         runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
 
-        #[cfg(runqueue_spillful)] 
-        {   
-            let task_on_rq = { taskref.lock().on_runqueue.clone() };
+        #[cfg(runqueue_spillful)] {   
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = task_on_rq {
+                if let Some(rq) = taskref.on_runqueue() {
                     remove_from_runqueue(&taskref, rq)?;
                 }
             }

@@ -77,6 +77,11 @@ impl<T: PortIn + PortOut> Port<T> {
         Port { port: port, _phantom: PhantomData }
     }
 
+    /// Returns the address of this port.
+    pub const fn port_address(&self) -> u16 { 
+        self.port
+    }
+
     /// Read data of size `T` from the port.
     pub fn read(&self) -> T {
         unsafe { T::port_in(self.port) }
@@ -104,6 +109,11 @@ impl<T: PortIn> PortReadOnly<T> {
         PortReadOnly { port: port, _phantom: PhantomData }
     }
 
+    /// Returns the address of this port.
+    pub const fn port_address(&self) -> u16 { 
+        self.port
+    }
+
     /// Read data of size `T` from the port.
     pub fn read(&self) -> T {
         unsafe { T::port_in(self.port) }
@@ -123,6 +133,11 @@ impl<T: PortOut> PortWriteOnly<T> {
     /// Create a new read-only I/O port.
     pub const fn new(port: u16) -> PortWriteOnly<T> {
         PortWriteOnly { port: port, _phantom: PhantomData }
+    }
+
+    /// Returns the address of this port.
+    pub const fn port_address(&self) -> u16 { 
+        self.port
     }
 
     /// Write data of size `T` to the port.

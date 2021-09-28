@@ -702,7 +702,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    namespace,
+                    Arc::clone(&namespace),
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 
@@ -909,11 +909,8 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     let (stack_frame_iter, cause, current_task) = unwinding_context.into();
     drop(stack_frame_iter);
 
-    let failure_cleanup_function = {
-        let t = current_task.lock();
-        t.failure_cleanup_function.clone()
-    };
     #[cfg(not(downtime_eval))]
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
-    failure_cleanup_function(current_task, cause)
+    
+    (current_task.failure_cleanup_function)(current_task, cause)
 }

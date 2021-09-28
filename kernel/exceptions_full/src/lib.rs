@@ -16,6 +16,7 @@ extern crate debug_info;
 extern crate gimli;
 
 extern crate memory;
+extern crate tss;
 extern crate stack_trace;
 extern crate fault_log;
 
@@ -43,7 +44,10 @@ pub fn init(idt_ref: &'static LockedIdt) {
         idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded_handler);
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
-        idt.double_fault.set_handler_fn(double_fault_handler);
+        let options = idt.double_fault.set_handler_fn(double_fault_handler);
+        unsafe { 
+            options.set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16);
+        }
         // reserved: 0x09 coprocessor segment overrun exception
         idt.invalid_tss.set_handler_fn(invalid_tss_handler);
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
@@ -104,10 +108,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame, print_
     // and test out using debug info for recovery
     if false {
         let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
-        let app_crate = {
-            let t = curr_task.lock();
-            t.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow()
-        };
+        let app_crate = curr_task.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow();
         let debug_symbols_file = {
             let krate = app_crate.lock_as_ref();
             trace!("============== Crate {} =================", krate.crate_name);
@@ -212,7 +213,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame, print_
 fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
     let page = Page::containing_address(vaddr);
     task::get_my_current_task()
-        .map(|curr_task| curr_task.lock().kstack.guard_page().contains(&page))
+        .map(|curr_task| curr_task.with_kstack(|kstack| kstack.guard_page().contains(&page)))
         .unwrap_or(false)
 }
 
@@ -322,7 +323,9 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
 }
 
 /// exception 0x07
-/// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
+///
+/// For more information about "spurious interrupts", 
+/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).
 pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#X}\n{:#?}\n",
              stack_frame.instruction_pointer,

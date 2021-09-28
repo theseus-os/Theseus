@@ -58,7 +58,7 @@ pub fn do_self_swap(
     curr_dir: &DirRef, 
     override_namespace_crate_dir: Option<NamespaceDir>, 
     state_transfer_functions: Vec<String>,
-    namespace: Arc<CrateNamespace>,
+    namespace: &Arc<CrateNamespace>,
     verbose_log: bool
 ) -> Result<SwapRanges, String> {
 
@@ -83,7 +83,7 @@ pub fn do_self_swap(
 
         let swap_req = SwapRequest::new(
             Some(crate_name),
-            Arc::clone(&namespace),
+            Arc::clone(namespace),
             into_new_crate_file,
             new_namespace,
             false, //reexport
@@ -98,7 +98,7 @@ pub fn do_self_swap(
     };
 
 
-    let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
+    let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, crate_name);
 
     // There can be only one matching crate for a given crate name
     if matching_crates.len() == 0 {
@@ -127,7 +127,7 @@ pub fn do_self_swap(
 
     // Swap crates
     let swap_result = swap_crates(
-        &namespace,
+        namespace,
         swap_requests, 
         override_namespace_crate_dir,
         state_transfer_functions,
@@ -139,7 +139,7 @@ pub fn do_self_swap(
     let ocn = crate_name;
 
     // Find the new crate loaded. It should have the exact same name as the old crate
-    let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, ocn);
+    let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, ocn);
 
     // There can be only one matching crate for a given crate name
     if matching_crates.len() == 0 {
@@ -311,11 +311,7 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
     #[cfg(not(downtime_eval))]
     debug!("The taskref is {:?}",taskref);
 
-    let curr_dir = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let curr_dir = Arc::clone(&taskref.get_env().lock().working_dir);
 
     let override_namespace_crate_dir = Option::<NamespaceDir>::None;
 
@@ -329,16 +325,13 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
     #[cfg(not(downtime_eval))]
     debug!("tuples: {:?}", tuples);
 
-
-    let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();    
-
     // 1) Call generic crate swapping routine
     let swap_result = do_self_swap(
         crate_name, 
         &curr_dir, 
         override_namespace_crate_dir,
         state_transfer_functions,
-        namespace,
+        &taskref.namespace,
         verbose
     );
 
@@ -356,14 +349,14 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
     };
 
     for (_id, taskref) in task::TASKLIST.lock().iter() {
-        let locked_task = taskref.lock();
-        let bottom = locked_task.kstack.bottom().value();
-        let top = locked_task.kstack.top_usable().value();
-        // debug!("Bottom and top of stack of task {} are {:X} {:X}", locked_task.name, bottom, top);
+        let (bottom, top) = taskref.with_kstack(|kstack| 
+            (kstack.bottom().value(), kstack.top_usable().value())
+        ); 
+        // debug!("Bottom and top of stack of task {} are {:X} {:X}", taskref.name, bottom, top);
 
         match constant_offset_fix(&swap_ranges, bottom, top) {
             Err (e) => {
-                debug! {"Failed to perform constant offset fix for the stack for task {} due to {}",locked_task.name, e.to_string()};
+                debug! {"Failed to perform constant offset fix for the stack for task {} due to {}", taskref.name, e.to_string()};
             },
             _ => {},
         }

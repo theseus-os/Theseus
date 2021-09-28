@@ -44,6 +44,7 @@ extern crate exceptions_full;
 extern crate network_manager;
 extern crate window_manager;
 extern crate multiple_heaps;
+extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
@@ -152,7 +153,9 @@ pub fn init(
             .spawn()?;
     }
 
-    // Now that initialization is complete, we can spawn the first application(s)
+    // Now that initialization is complete, we can spawn various system tasks/daemons
+    // and then the first application(s).
+    console::start_connection_detection()?;
     first_application::start()?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_apic_id);

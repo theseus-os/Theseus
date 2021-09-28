@@ -3,6 +3,7 @@
 //! The ZoneAllocator achieves this by having many `SCAllocator`
 
 use crate::*;
+use crate::sc::*;
 
 /// Creates an instance of a zone, we do this in a macro because we
 /// re-use the code in const and non-const functions
@@ -172,7 +173,11 @@ impl ZoneAllocator {
     /// # Arguments
     ///  * `ptr` - Address of the memory location to free.
     ///  * `layout` - Memory layout of the block pointed to by `ptr`.
-    pub fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
+    ///
+    /// # Safety
+    /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
+    /// and `layout` argument is correct.
+    pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
         match ZoneAllocator::get_slab(layout.size()) {
             Slab::Base(idx) => self.small_slabs[idx].deallocate(ptr, layout),
             Slab::Large(_idx) => Err("AllocationError::InvalidLayout"),

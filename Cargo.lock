@@ -14,6 +14,7 @@ dependencies = [
  "fadt",
  "hpet",
  "ioapic",
+ "iommu",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -81,9 +82,9 @@ dependencies = [
 name = "apic"
 version = "0.1.0"
 dependencies = [
- "atomic",
  "atomic_linked_list",
  "bit_field 0.7.0",
+ "crossbeam-utils",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -128,15 +129,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrayvec"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
+
+[[package]]
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
- "atomic",
+ "crossbeam-utils",
  "debugit",
  "hpet",
  "log",
  "mpmc",
  "spin 0.9.0",
+ "static_assertions",
  "task",
  "wait_queue",
 ]
@@ -152,15 +160,6 @@ dependencies = [
  "port_io",
  "spin 0.9.0",
  "storage_device",
-]
-
-[[package]]
-name = "atomic"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3410529e8288c463bedb5930f82833bc0c90e5d2fe639a56582a4d09220b281"
-dependencies = [
- "autocfg",
 ]
 
 [[package]]
@@ -196,9 +195,9 @@ checksum = "a165d606cf084741d4ac3a28fb6e9b1eb0bd31f6cd999098cfddb0b2ab381dc0"
 
 [[package]]
 name = "bitflags"
-version = "1.1.0"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d155346769a6855b86399e9bc3814ab343cd3d62c7e985113d46a0ec3c281fd"
+checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "block-buffer"
@@ -287,6 +286,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "console",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -295,7 +295,6 @@ dependencies = [
  "interrupts",
  "irq_safety",
  "kernel_config",
- "keycodes_ascii",
  "log",
  "logger",
  "memory",
@@ -363,6 +362,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "channel_app"
 version = "0.1.0"
 dependencies = [
@@ -388,10 +393,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "console"
+version = "0.1.0"
+dependencies = [
+ "async_channel",
+ "bare-io",
+ "io",
+ "irq_safety",
+ "log",
+ "mpmc",
+ "serial_port",
+ "spawn",
+ "spin 0.9.0",
+ "task",
+ "text_terminal",
+]
+
+[[package]]
 name = "context_switch"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "context_switch_avx",
  "context_switch_regular",
  "context_switch_sse",
@@ -491,6 +513,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-utils"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d82cfc11ce7f2c3faef78d8a684447b40d503d9681acebed6cb728d45940c4db"
+dependencies = [
+ "cfg-if 1.0.0",
+]
+
+[[package]]
 name = "cstr_core"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -536,6 +567,19 @@ dependencies = [
 [[package]]
 name = "debugit"
 version = "0.1.0"
+
+[[package]]
+name = "deferred_interrupt_tasks"
+version = "0.1.0"
+dependencies = [
+ "debugit",
+ "interrupts",
+ "log",
+ "scheduler",
+ "spawn",
+ "task",
+ "x86_64",
+]
 
 [[package]]
 name = "delegate"
@@ -599,15 +643,19 @@ dependencies = [
  "event_types",
  "fatfs",
  "io",
+ "iommu",
  "ixgbe",
  "keyboard",
  "log",
+ "logger",
  "memory",
  "mlx5",
  "mouse",
  "mpmc",
  "network_manager",
  "pci",
+ "serial_port",
+ "spin 0.9.0",
  "storage_manager",
 ]
 
@@ -656,7 +704,6 @@ checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 name = "e1000"
 version = "0.1.0"
 dependencies = [
- "apic",
  "intel_ethernet",
  "interrupts",
  "irq_safety",
@@ -671,7 +718,6 @@ dependencies = [
  "nic_queues",
  "owning_ref",
  "pci",
- "pic",
  "spin 0.9.0",
  "static_assertions",
  "volatile",
@@ -764,6 +810,7 @@ dependencies = [
  "stack_trace",
  "task",
  "tlb_shootdown",
+ "tss",
  "unwind",
  "vga_buffer",
  "x86_64",
@@ -943,7 +990,7 @@ version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "162d18ae5f2e3b90a993d202f1ba17a5633c2484426f8bcae201f86194bacd00"
 dependencies = [
- "arrayvec",
+ "arrayvec 0.4.11",
  "byteorder",
  "fallible-iterator",
  "stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1107,6 +1154,7 @@ dependencies = [
  "bare-io",
  "delegate",
  "lazy_static",
+ "lockable",
  "log",
  "spin 0.9.0",
 ]
@@ -1126,9 +1174,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "iommu"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "irq_safety",
+ "log",
+ "memory",
+ "owning_ref",
+ "spin 0.9.0",
+ "static_assertions",
+ "volatile",
+ "zerocopy",
+]
+
+[[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#253d482f1c1192181f6db1e12296edab00661095"
+source = "git+https://github.com/theseus-os/irq_safety#598d714463fbf07555f3359358662e00a7a8baee"
 dependencies = [
  "owning_ref",
  "spin 0.9.0",
@@ -1297,7 +1360,6 @@ name = "libtest"
 version = "0.1.0"
 dependencies = [
  "apic",
- "atomic",
  "bit_field 0.10.0",
  "hashbrown",
  "hpet",
@@ -1344,12 +1406,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "lockable"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "spin 0.9.0",
+]
+
+[[package]]
 name = "log"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
 ]
 
 [[package]]
@@ -1358,7 +1428,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
- "serial_port",
+ "serial_port_basic",
  "spin 0.9.0",
 ]
 
@@ -1399,7 +1469,7 @@ checksum = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
 name = "mapper_spillful"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "irq_safety",
  "kernel_config",
  "lazy_static",
@@ -1548,7 +1618,7 @@ name = "mm_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cfg-if",
+ "cfg-if 0.1.10",
  "getopts",
  "hpet",
  "kernel_config",
@@ -1643,7 +1713,7 @@ name = "multiple_heaps"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cfg-if",
+ "cfg-if 0.1.10",
  "hashbrown",
  "heap",
  "intrusive-collections",
@@ -1686,12 +1756,11 @@ dependencies = [
  "mod_mgmt",
  "multiboot2",
  "panic_entry",
- "serial_port",
+ "serial_port_basic",
  "spin 0.9.0",
  "stack",
  "state_store",
  "vga_buffer",
- "x86_64",
 ]
 
 [[package]]
@@ -1998,7 +2067,6 @@ name = "pmu_x86"
 version = "0.1.0"
 dependencies = [
  "apic",
- "atomic",
  "bit_field 0.10.0",
  "irq_safety",
  "lazy_static",
@@ -2403,7 +2471,25 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
+ "async_channel",
+ "bare-io",
+ "deferred_interrupt_tasks",
+ "interrupts",
+ "irq_safety",
+ "log",
+ "serial_port_basic",
+ "spin 0.9.0",
+ "static_assertions",
+ "x86_64",
+]
+
+[[package]]
+name = "serial_port_basic"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
  "port_io",
+ "spin 0.9.0",
 ]
 
 [[package]]
@@ -2456,7 +2542,7 @@ name = "simd_personality"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cfg-if",
+ "cfg-if 0.1.10",
  "fs_node",
  "log",
  "memory",
@@ -2470,7 +2556,7 @@ dependencies = [
 name = "simd_test"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "core_simd",
  "log",
  "pit_clock",
@@ -2488,7 +2574,7 @@ dependencies = [
 name = "single_simd_task_optimization"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "log",
  "task",
 ]
@@ -2616,7 +2702,7 @@ dependencies = [
 name = "stack_trace_frame_pointers"
 version = "0.1.0"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "memory",
 ]
 
@@ -2730,6 +2816,7 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "context_switch",
+ "crossbeam-utils",
  "environment",
  "irq_safety",
  "kernel_config",
@@ -2740,6 +2827,7 @@ dependencies = [
  "root",
  "spin 0.9.0",
  "stack",
+ "static_assertions",
  "tss",
  "x86_64",
 ]
@@ -2847,6 +2935,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_serial_echo"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "io",
+ "irq_safety",
+ "log",
+ "serial_port",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
 name = "text_display"
 version = "0.1.0"
 dependencies = [
@@ -2857,6 +2958,20 @@ dependencies = [
  "framebuffer_printer",
  "shapes",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "text_terminal"
+version = "0.1.0"
+dependencies = [
+ "bare-io",
+ "bitflags",
+ "derive_more",
+ "event_types",
+ "log",
+ "unicode-width",
+ "util",
+ "vte",
 ]
 
 [[package]]
@@ -2901,9 +3016,9 @@ checksum = "612d636f949607bdf9b123b4a6f6d966dedf3ff669f7f045890d3a4a73948169"
 
 [[package]]
 name = "unicode-width"
-version = "0.1.5"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
+checksum = "9337591893a19b88d8d87f2cec1e73fad5cdfd10e5a6f349f498ad6ea2ffb1e3"
 
 [[package]]
 name = "unicode-xid"
@@ -2916,7 +3031,7 @@ name = "unified_channel"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "cfg-if",
+ "cfg-if 0.1.10",
  "rendezvous",
 ]
 
@@ -2976,6 +3091,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "utf8parse"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
+
+[[package]]
 name = "util"
 version = "0.1.0"
 
@@ -3024,6 +3145,27 @@ version = "0.2.7"
 source = "git+https://github.com/theseus-os/volatile#73a307a2906c9f67fa4b951ce858d642c2fa669b"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "vte"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cbce692ab4ca2f1f3047fcf732430249c0e971bfdd2b234cf2c47ad93af5983"
+dependencies = [
+ "arrayvec 0.5.2",
+ "utf8parse",
+ "vte_generate_state_changes",
+]
+
+[[package]]
+name = "vte_generate_state_changes"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d257817081c7dffcdbab24b9e62d2def62e2ff7d00b1c20062551e6cccc145ff"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]

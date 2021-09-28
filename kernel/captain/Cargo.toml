@@ -71,8 +71,8 @@ path = "../task"
 [dependencies.scheduler]
 path = "../scheduler"
 
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
+[dependencies.console]
+path = "../console"
 
 [dependencies.print]
 path = "../print"
