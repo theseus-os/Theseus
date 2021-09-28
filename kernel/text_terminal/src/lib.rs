@@ -557,56 +557,6 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
     pub fn screen_size(&self) -> ScreenSize {
         self.backend.screen_size()
     }
-
-    /*
-    /// Moves the cursor by adding the given `number` of units (columns)
-    /// to its horizontal `x` point.
-    ///
-    /// The cursor will wrap to the previous or next row it it encounters
-    /// the beginning or end of a line.
-    fn move_cursor_by(&mut self, number: i16) {
-        let Point2D { x: x_old, y: y_old } = self.cursor.position;
-        let new_x: i32 = x_old as i32 + number as i32;
-        let quotient  = new_x / self.screen_size.x as i32;
-        let remainder = new_x % self.screen_size.x as i32;
-        self.cursor.position.x = (x_old as i32 + remainder) as u16;
-        self.cursor.position.y = (y_old as i32 + quotient)  as u16;
-        debug!("Updated cursor: ({}, {}) + {} units --> ({}, {})",
-            x_old, y_old, number, self.cursor.position.x, self.cursor.position.y,
-        );
-    }
-    */
-
-    /*
-    /// Moves the cursor to the given position, snapping it to the nearest line and column 
-    /// that actually exist in the scrollback buffer. 
-    ///
-    /// This performs all the logic necessary to update the cursor:
-    /// * 
-    fn update_cursor_to_position(&mut self, new_cursor_point: ScreenPoint) {
-        let start_point = self.scroll_position.start_point();
-
-        let target_point = start_point + new_cursor_point;
-        let closest_line_idx = min(target_point.y, self.scrollback_buffer.len().saturating_sub(1) as u16);
-        let closest_line = &self.scrollback_buffer[closest_line_idx];
-        let closest_column_idx = min(target_point.x, closest_line.len().saturating_sub(1) as u16);
-        let closest_column = &closest_line[closest_column_idx];
-
-    }
-
-
-
-    /// Moves the cursor to the given `new_position`.
-    ///
-    /// If the cursor position specified does not match an existing `Unit`,
-    /// the cursor will be moved back to the next closest `Unit` before the `new_position`.
-    fn move_cursor_to(&mut self, new_position: Point2D) {
-        self.cursor.position = Point2D { 
-            x: min(self.screen_size.x, new_position.x),
-            y: min(self.screen_size.y, new_position.y),
-        }
-    }
-    */
 }
 
 /// A struct that implements handlers for all terminal emulator actions, 
@@ -1012,58 +962,6 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
             screen_size
         );
         *self.scrollback_cursor = new_scrollback_position;
-
-        /*
-        let mut row = orig_row;
-        let screen_width = screen_size.num_columns.0 as usize;
-        let ScrollbackBufferPoint { mut line_idx, mut unit_idx } = *self.scrollback_cursor;
-
-        // Iterate over the lines in the scrollback buffer starting at the current position
-        // to determine how many displayed rows on screen each line takes up.
-        while let Some(line) = self.scrollback_buffer.get(line_idx.0) {
-            let start_row = unit_idx.0 / screen_width;
-            let last_unit = line.last_unit().0;
-            let end_row = last_unit / screen_width;
-            let additional_rows = end_row.saturating_sub(start_row);
-            row += additional_rows;
-
-            trace!("move_down(): {:?}: start_row: {:?}, last_unit: {:?}, end_row: {:?}, additional_rows: {:?}, row: {:?}, target_row: {:?}", 
-                line_idx, start_row, last_unit, end_row, additional_rows, row, target_row
-            );
-
-            if row >= target_row {
-                let row_overshoot = row - target_row;
-                trace!("move_down(): row_overshoot: {:?}", row_overshoot);
-                unit_idx = UnitIndex(last_unit.saturating_sub(row_overshoot * screen_width));
-                break;
-            }
-
-            // This `line` didn't cover enough displayed rows, so we move to the next one and keep going.
-            row += 1;
-            line_idx += LineIndex(1);
-            unit_idx = UnitIndex(0);
-        }
-
-        trace!("move_down(): after iterating, row: {:?}, target_row: {:?}, line_idx: {:?}", row, target_row, line_idx);
-
-        *self.scrollback_cursor = if row < target_row {
-            // The scrollback buffer didn't have enough lines.
-            // Currently, `line_idx` is right after the last line.
-            // We calculate the target line index as: `line_idx - 1 + (target_row - row)`.
-            let target_line = line_idx.0.saturating_add(target_row).saturating_sub(row).saturating_sub(1);
-            trace!("move_down(): target_line: {:?}", target_line);
-            ScrollbackBufferPoint {
-                line_idx: LineIndex(target_line),
-                unit_idx: UnitIndex(target_column),
-            }
-        } else {
-            // The scrollback buffer had enough lines.
-            ScrollbackBufferPoint {
-                line_idx,
-                unit_idx: UnitIndex(util::round_down(unit_idx.0, screen_width) + target_column),
-            }
-        };
-        */
     }
 
     fn move_left(&mut self, num_units: usize, wrap: Wrap) {
@@ -2121,7 +2019,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
                     Character::Multi(ref s) => s.as_bytes(),
                 })?;
 
-                // Adjust our the screen cursor based on what we just printed to the screen.
+                // Adjust the screen cursor based on what we just printed to the screen.
                 let unit_width = match unit.displayable_width() {
                     0 => 4, // TODO: use tab_width
                     w => w,
