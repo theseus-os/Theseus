@@ -59,7 +59,7 @@ impl CompletionQueueContext {
     }
 }
 
-#[derive(FromBytes, Default)]
+#[derive(FromBytes, Debug)]
 #[repr(C)]
 struct CompletionQueueEntry {
     eth_wqe_id:             Volatile<U32<BigEndian>>,
@@ -72,7 +72,7 @@ struct CompletionQueueEntry {
     vid:                    Volatile<U32<BigEndian>>,
     srqn_user_index:        Volatile<U32<BigEndian>>,
     flow_table_metadata:    Volatile<U32<BigEndian>>,
-    _padding1:              u32,
+    _padding1:              Volatile<U32<BigEndian>>,
     mini_cqe_num:           Volatile<U32<BigEndian>>,
     timestamp_h:            Volatile<U32<BigEndian>>,
     timestamp_l:            Volatile<U32<BigEndian>>,
@@ -99,9 +99,43 @@ enum CompletionQueueEntryOpcode {
 impl CompletionQueueEntry {
     pub fn init(&mut self) {
         *self = CompletionQueueEntry::default();
-        let invalid_cqe = (CompletionQueueEntryOpcode::InvalidCQE as u32) << 4;
-        let hw_ownership = 0x1;
-        self.owner.write(U32::new(invalid_cqe | hw_ownership));
+        // let invalid_cqe = (CompletionQueueEntryOpcode::InvalidCQE as u32) << 4;
+        // let hw_ownership = 0x1;
+        // self.owner.write(U32::new(invalid_cqe | hw_ownership));
+    }
+
+    pub fn dump(&self, i: usize) {
+        debug!("CQE {}", i);
+        unsafe {
+            let ptr = self as *const CompletionQueueEntry as *const u32;
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr).to_be(), (*ptr.offset(1)).to_be(), (*ptr.offset(2)).to_be(), (*ptr.offset(3)).to_be());
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr.offset(4)).to_be(), (*ptr.offset(5)).to_be(), (*ptr.offset(6)).to_be(), (*ptr.offset(7)).to_be());
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr.offset(8)).to_be(), (*ptr.offset(9)).to_be(), (*ptr.offset(10)).to_be(), (*ptr.offset(11)).to_be());
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x} \n", (*ptr.offset(12)).to_be(), (*ptr.offset(13)).to_be(), (*ptr.offset(14)).to_be(), (*ptr.offset(15)).to_be());
+        }
+    }
+}
+
+impl Default for CompletionQueueEntry {
+    fn default() -> Self {
+        CompletionQueueEntry{
+            eth_wqe_id:             Volatile::new(U32::new(0xFFFF_FFFF)),
+            lro_tcp_win:            Volatile::new(U32::new(0xFFFF_FFFF)),
+            lro_ack_seq_num:        Volatile::new(U32::new(0xFFFF_FFFF)),
+            rx_hash_result:         Volatile::new(U32::new(0xFFFF_FFFF)),
+            ml_path:                Volatile::new(U32::new(0xFFFF_FFFF)),
+            slid_smac:              Volatile::new(U32::new(0xFFFF_FFFF)),
+            rqpn:                   Volatile::new(U32::new(0xFFFF_FFFF)),
+            vid:                    Volatile::new(U32::new(0xFFFF_FFFF)),
+            srqn_user_index:        Volatile::new(U32::new(0xFFFF_FFFF)),
+            flow_table_metadata:    Volatile::new(U32::new(0xFFFF_FFFF)),
+            _padding1:              Volatile::new(U32::new(0xFFFF_FFFF)),
+            mini_cqe_num:           Volatile::new(U32::new(0xFFFF_FFFF)),
+            timestamp_h:            Volatile::new(U32::new(0xFFFF_FFFF)),
+            timestamp_l:            Volatile::new(U32::new(0xFFFF_FFFF)),
+            flow_tag:               Volatile::new(U32::new(0xFFFF_FFFF)),
+            owner:                  Volatile::new(U32::new(0xFFFF_FFFF)),
+        }
     }
 }
 
@@ -137,11 +171,18 @@ impl CompletionQueue {
     }
 
     pub fn hw_owned(&self, entry_num: usize) -> bool {
+        // debug!("{:#x?}", self.entries[entry_num]);
         self.entries[entry_num].owner.read().get() & 0x1 == 0x1
     }
 
     pub fn check_packet_transmission(&mut self, entry_num: usize) {
         debug!("CQ owner: {:#X}", self.entries[entry_num].owner.read().get());
         debug!("CQ flow_tag: {:#X}", self.entries[entry_num].flow_tag.read().get());
+    }
+
+    pub fn dump(&self) {
+        for (i, entry) in self.entries.iter().enumerate() {
+            entry.dump(i)
+        }
     }
 }

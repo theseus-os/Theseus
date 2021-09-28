@@ -110,14 +110,14 @@ const_assert_eq!(core::mem::size_of::<DoorbellRecord>(), 8);
 
 pub struct SendQueue {
     /// Physically-contiguous queue entries
-    entries: MappedPages, 
+    entries: BoxRefMut<MappedPages, [WorkQueueEntry]>, 
     doorbell: BoxRefMut<MappedPages, DoorbellRecord>,
     uar: BoxRefMut<MappedPages, UserAccessRegion>,
     wqe_index: u32
 }
 
 impl SendQueue {
-    pub fn create(entries_mp: MappedPages, doorbell_mp: MappedPages, uar_mp: MappedPages) -> Result<SendQueue, &'static str> {
+    pub fn create(entries_mp: MappedPages, doorbell_mp: MappedPages, uar_mp: MappedPages, num_entries: usize) -> Result<SendQueue, &'static str> {
         let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<DoorbellRecord>(0))?;
         doorbell.send_counter.write(U32::new(0));
         doorbell.rcv_counter.write(U32::new(0));
@@ -126,12 +126,17 @@ impl SendQueue {
         uar.db_blueflame_buffer0_even.write([U32::new(0); 64]);
         uar.db_blueflame_buffer0_odd.write([U32::new(0); 64]);
 
-        Ok( SendQueue{entries: entries_mp, doorbell, uar, wqe_index: 0} )
+        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntry>(0, num_entries))?;
+        for entry in entries.iter_mut() {
+            entry.init()
+        }
+
+        Ok( SendQueue{entries: entries, doorbell, uar, wqe_index: 0} )
     }
 
     pub fn send(&mut self, sqn: u32, tisn: u32, lkey: u32, packet_address: PhysicalAddress) -> Result<(), &'static str> {
-        let mut wqe = self.entries.as_type_mut::<WorkQueueEntry>(0).map_err(|_e| "Could not map to WQE")?;
-        wqe.init(self.wqe_index, sqn, tisn, lkey, packet_address);
+        let mut wqe = &mut self.entries[0];
+        wqe.init_send(self.wqe_index, sqn, tisn, lkey, packet_address);
         self.wqe_index += 1; // need to wrap around 0xFFFF
         self.doorbell.send_counter.write(U32::new(self.wqe_index));
         let mut doorbell = [U32::new(0);64];
@@ -143,7 +148,7 @@ impl SendQueue {
     }
 
     pub fn nop(&mut self, sqn: u32, tisn: u32, lkey: u32) -> Result<(), &'static str> {
-        let mut wqe = self.entries.as_type_mut::<WorkQueueEntry>(0).map_err(|_e| "Could not map to WQE")?;
+        let mut wqe = &mut self.entries[0];
         wqe.nop(self.wqe_index, sqn, tisn, lkey);
         self.wqe_index += 1; // need to wrap around 0xFFFF
         self.doorbell.send_counter.write(U32::new(self.wqe_index));
@@ -153,5 +158,11 @@ impl SendQueue {
         self.uar.db_blueflame_buffer0_even.write(doorbell);
 
         Ok(())
+    }
+
+    pub fn dump(&self) {
+        for (i, entry) in self.entries.iter().enumerate() {
+            entry.dump(i)
+        }
     }
 }

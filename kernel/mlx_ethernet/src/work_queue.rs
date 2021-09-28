@@ -93,7 +93,10 @@ pub(crate) struct WorkQueueEntry {
 const_assert_eq!(core::mem::size_of::<WorkQueueEntry>(), 64);
 
 impl WorkQueueEntry {
-    pub fn init(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32, local_address: PhysicalAddress) {
+    pub fn init(&mut self) {
+        *self = WorkQueueEntry::default();
+    }
+    pub fn init_send(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32, local_address: PhysicalAddress) {
         self.control.init(wqe_index, sqn, tisn);
         self.eth.init();
         self.data.init(lkey, local_address);
@@ -101,6 +104,17 @@ impl WorkQueueEntry {
 
     pub fn nop(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32) {
         self.control.nop(wqe_index, sqn, tisn);
+    }
+
+    pub fn dump(&self, i: usize) {
+        debug!("WQE {}", i);
+        unsafe {
+            let ptr = self as *const WorkQueueEntry as *const u32;
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr).to_be(), (*ptr.offset(1)).to_be(), (*ptr.offset(2)).to_be(), (*ptr.offset(3)).to_be());
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr.offset(4)).to_be(), (*ptr.offset(5)).to_be(), (*ptr.offset(6)).to_be(), (*ptr.offset(7)).to_be());
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr.offset(8)).to_be(), (*ptr.offset(9)).to_be(), (*ptr.offset(10)).to_be(), (*ptr.offset(11)).to_be());
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x} \n", (*ptr.offset(12)).to_be(), (*ptr.offset(13)).to_be(), (*ptr.offset(14)).to_be(), (*ptr.offset(15)).to_be());
+        }
     }
 }
 
@@ -125,8 +139,8 @@ impl ControlSegment {
 
     pub fn nop(&mut self, wqe_index: u32, sqn: u32, tisn: u32) {
         self.opcode.write(U32::new((wqe_index << 8)| (WQEOpcode::Nop as u32)));
-        self.ds.write(U32::new((sqn << 8) | 1));
-        self.se.write(U32::new(8));
+        // self.ds.write(U32::new((sqn << 8) | 1));
+        // self.se.write(U32::new(8));
         // self.ctrl_general_id.write(U32::new(tisn << 8)); //?
     }
 }

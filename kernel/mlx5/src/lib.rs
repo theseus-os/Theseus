@@ -29,7 +29,7 @@ use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use pci::PciDevice;
 use owning_ref::BoxRefMut;
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
-use mlx_ethernet::{InitializationSegment, command_queue::{CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
+use mlx_ethernet::{InitializationSegment, command_queue::{CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod, AccessRegisterOpMod}, 
     completion_queue::CompletionQueue, 
     event_queue::EventQueue, 
     send_queue::SendQueue,
@@ -138,12 +138,13 @@ impl ConnectX5Nic {
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         trace!("EnableHCA: {:?}", cmdq.get_command_status(completed_cmd)?);
 
-        // execute QUERY_ISSI
-        let init_cmd = cmdq.create_command( CommandBuilder::new(CommandOpcode::QueryIssi))?;
-        let posted_cmd = init_segment.post_command(init_cmd);
-        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        let (current_issi, available_issi, status) = cmdq.get_query_issi_command_output(completed_cmd)?;
-        trace!("QueryISSI: {:?}, issi version :{}, available: {:#X}", status, current_issi, available_issi);
+        // // execute QUERY_ISSI
+        // let init_cmd = cmdq.create_command( CommandBuilder::new(CommandOpcode::QueryIssi))?;
+        // let posted_cmd = init_segment.post_command(init_cmd);
+        // let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        // let (current_issi, available_issi, status) = cmdq.get_query_issi_command_output(completed_cmd)?;
+        // trace!("QueryISSI: {:?}, issi version :{}, available: {:#X}", status, current_issi, available_issi);
+        let available_issi = 0x2;
 
         // execute SET_ISSI
         const ISSI_VERSION_1: u8 = 0x2;
@@ -274,13 +275,52 @@ impl ConnectX5Nic {
             trace!("Manage pages reg status: {:?}", cmdq.get_command_status(completed_cmd)?);
         }
 
-        // Set driver version 
+        // // Set driver version 
+        // let init_cmd = cmdq.create_command(
+        //     CommandBuilder::new(CommandOpcode::SetDriverVersion)
+        // )?;
+        // let posted_cmd = init_segment.post_command(init_cmd);
+        // let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        // trace!("Set Driver Version: {:?}", cmdq.get_command_status(completed_cmd)?);
+        
+        // execute QUERY_NIC_VPORT_CONTEXT
         let init_cmd = cmdq.create_command(
-            CommandBuilder::new(CommandOpcode::SetDriverVersion)
+            CommandBuilder::new(CommandOpcode::QueryNicVportContext)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        trace!("Set Driver Version: {:?}", cmdq.get_command_status(completed_cmd)?);
+        let (mac, status) = cmdq.get_vport_mac_address(completed_cmd)?;
+        trace!("Query Nic Vport context status: {:?}, mac address: {:#X?}", status, mac);
+
+        // execute QUERY_VPORT_STATE
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::QueryVportState)
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)?;
+        trace!("Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}", status, tx_speed, admin_state, state); 
+
+        // execute ACCESS_REGISTER to set the mtu
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::AccessRegister)
+                .opmod(AccessRegisterOpMod::Write as u16)
+                .mtu(9000)
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let status = cmdq.get_command_status(completed_cmd)?;
+        trace!("Access register status: {:?}", status); 
+    
+        // execute modify nic vport context to set the mtu
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::ModifyNicVportContext)
+                .mtu(9000)
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let status = cmdq.get_command_status(completed_cmd)?;
+        trace!("modify nic vport status: {:?}", status); 
 
         // execute ALLOC_UAR
         let init_cmd = cmdq.create_command(
@@ -314,25 +354,12 @@ impl ConnectX5Nic {
         let posted_cmd = init_segment.post_command(init_cmd);
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         let (eq_number, status) = cmdq.get_eq_number(completed_cmd)?;
-        trace!("Create EQ status: {:?}, number: {}", status, eq_number);
+        trace!("Create EQ status: {:?}, number: {}", status, eq_number); 
 
-        // execute QUERY_VPORT_STATE
-        let init_cmd = cmdq.create_command(
-            CommandBuilder::new(CommandOpcode::QueryVportState)
-        )?;
-        let posted_cmd = init_segment.post_command(init_cmd);
-        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        let (tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)?;
-        trace!("Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}", status, tx_speed, admin_state, state);  
-        
-        // execute QUERY_NIC_VPORT_CONTEXT
-        let init_cmd = cmdq.create_command(
-            CommandBuilder::new(CommandOpcode::QueryNicVportContext)
-        )?;
-        let posted_cmd = init_segment.post_command(init_cmd);
-        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        let (mac, status) = cmdq.get_vport_mac_address(completed_cmd)?;
-        trace!("Query Nic Vport context status: {:?}, mac address: {:#X?}", status, mac);
+        #[cfg(mlx_logger)]
+        {
+            event_queue.dump()
+        }
 
         // execute ALLOC_PD
         let init_cmd = cmdq.create_command(
@@ -387,6 +414,11 @@ impl ConnectX5Nic {
         let (cq_number_s, status) = cmdq.get_cq_number(completed_cmd)?;
         trace!("Create CQ status: {:?}, number: {}", status, cq_number_s);
 
+        #[cfg(mlx_logger)]
+        {
+            completion_queue.dump()
+        }
+
         // execute CREATE_CQ for RQ
         // Allocate pages for CQ
         let size_cq = rq_size; 
@@ -437,8 +469,9 @@ impl ConnectX5Nic {
         let uar_mem_base = mem_base.value() + ((uar as usize) * 4096);
         let uar_page = allocate_memory(PhysicalAddress::new(uar_mem_base).ok_or("Could not create starting address for uar")?, 4096)?;
         
+        debug!("mmio: {:#x}, uar: {:#x}", mem_base.value(), uar_mem_base);
         // Create the SQ
-        let mut send_queue = SendQueue::create(sq_mp, db_page, uar_page)?;
+        let mut send_queue = SendQueue::create(sq_mp, db_page, uar_page, sq_size)?;
 
         let init_cmd = cmdq.create_command(
             CommandBuilder::new(CommandOpcode::CreateSq) 
@@ -454,6 +487,11 @@ impl ConnectX5Nic {
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         let (sq_number, status) = cmdq.get_send_queue_number(completed_cmd)?;
         trace!("Create SQ status: {:?}, number: {}", status, sq_number);
+
+        #[cfg(mlx_logger)]
+        {
+            send_queue.dump()
+        }
 
         // Create the RQ
         let mut receive_queue = ReceiveQueue::create(rq_mp)?;
@@ -500,6 +538,15 @@ impl ConnectX5Nic {
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         let (state, status) = cmdq.get_sq_state(completed_cmd)?;
         trace!("Query SQ status: {:?}, state: {}", status, state);
+
+        // execute QUERY_VPORT_STATE
+        let init_cmd = cmdq.create_command(
+            CommandBuilder::new(CommandOpcode::QueryVportState)
+        )?;
+        let posted_cmd = init_segment.post_command(init_cmd);
+        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        let (tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)?;
+        trace!("Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}", status, tx_speed, admin_state, state); 
 
         // let (mut packet, pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
         // let buffer: &mut [u8] = packet.as_slice_mut(0, 298)?;

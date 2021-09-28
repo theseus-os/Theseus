@@ -133,6 +133,7 @@ pub enum CommandOpcode {
     ModifyNicVportContext   = 0x755,
     AllocPd                 = 0x800,
     AllocUar                = 0x802,
+    AccessRegister          = 0x805,
     AllocTransportDomain    = 0x816,
     CreateTir               = 0x900,
     CreateSq                = 0x904,
@@ -147,18 +148,20 @@ pub enum CommandOpcode {
 impl CommandOpcode {
     fn input_bytes(&self, num_pages: Option<usize>) -> Result<u32, CommandQueueError> {
         let len = match self {
-            Self::QueryHcaCap => 12,
-            Self::InitHca => 12,
-            Self::EnableHca => 12,
-            Self::QueryPages => 12,
+            Self::QueryHcaCap => 16, //12,
+            Self::InitHca => 16, //12,
+            Self::EnableHca => 16, //12,
+            Self::QueryPages => 16, //12,
             Self::ManagePages => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
-                0x10 + num_pages * SIZE_PADDR_IN_BYTES as u32
+                // 0x10 + num_pages * SIZE_PADDR_IN_BYTES as u32
+                0x18 + num_pages * SIZE_PADDR_IN_BYTES as u32
+            
             }
             Self::QueryIssi => 8, 
-            Self::SetIssi => 12,
+            Self::SetIssi => 16, //12,
             Self::SetDriverVersion =>  0x50,    
-            Self::QuerySpecialContexts => 8,              
+            Self::QuerySpecialContexts => 16, //8,              
             Self::CreateEq => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
                 0x110 + num_pages * SIZE_PADDR_IN_BYTES as u32
@@ -167,24 +170,25 @@ impl CommandOpcode {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
                 0x110 + num_pages * SIZE_PADDR_IN_BYTES as u32
             }
-            Self::QueryVportState => 12,        
+            Self::QueryVportState => 16, //12,        
             Self::QueryNicVportContext => 16,  
-            Self::ModifyNicVportContext => 0x100 + 0x108,        
-            Self::AllocPd => 8,               
-            Self::AllocUar => 8,              
-            Self::AllocTransportDomain => 8,
+            Self::ModifyNicVportContext => 0x200, //0x100 + 0x108,        
+            Self::AllocPd => 16, //8,               
+            Self::AllocUar => 16, //8,    
+            Self::AccessRegister => 0x20, //8,              
+            Self::AllocTransportDomain => 16, //8,
             Self::CreateTir => 0x20 + 0xF0,
             Self::CreateSq => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
                 0x20 + 0x30 + 0xC0 + (num_pages * SIZE_PADDR_IN_BYTES as u32)
             }
-            Self::ModifySq => 0x20 + 0x30 + 0xC0,
+            Self::ModifySq => 0x118, //0x20 + 0x30 + 0xC0,
             Self::QuerySq => 12,
             Self::CreateRq => {
                 let num_pages = num_pages.ok_or(CommandQueueError::MissingInput)? as u32;
                 0x20 + 0x30 + 0xC0 + num_pages * SIZE_PADDR_IN_BYTES as u32
             },
-            Self::ModifyRq => 0x20 + 0x30 + 0xC0,
+            Self::ModifyRq => 0x118, //0x20 + 0x30 + 0xC0,
             Self::QueryRq => 12,
             Self::CreateTis => 0x20 + 0xA0,
             _ => return Err(CommandQueueError::NotImplemented)           
@@ -195,12 +199,12 @@ impl CommandOpcode {
     fn output_bytes(&self) -> Result<u32, CommandQueueError> {
         let len = match self {
             Self::QueryHcaCap => 16 + 0x100,
-            Self::InitHca => 8,
-            Self::EnableHca => 8,
+            Self::InitHca => 16, //8,
+            Self::EnableHca => 12, //8,
             Self::QueryPages => 16,
             Self::ManagePages => 16,
             Self::QueryIssi => 0x70, 
-            Self::SetIssi => 8,   
+            Self::SetIssi => 16, //8,   
             Self::SetDriverVersion =>  8,
             Self::QuerySpecialContexts => 16,              
             Self::CreateEq => 16,
@@ -208,9 +212,10 @@ impl CommandOpcode {
             Self::QueryVportState => 16,   
             Self::QueryNicVportContext => 16 + 0x108,      
             Self::ModifyNicVportContext => 16,        
-            Self::AllocPd => 12,               
-            Self::AllocUar => 12,              
-            Self::AllocTransportDomain => 12,
+            Self::AllocPd => 16, //12,               
+            Self::AllocUar => 16, //12,  
+            Self::AccessRegister =>  16,           
+            Self::AllocTransportDomain => 16, //12,
             Self::CreateTir => 16,
             Self::CreateSq => 16,
             Self::ModifySq => 8,
@@ -286,6 +291,12 @@ pub enum QueryHcaCapCurrentOpMod {
     EthernetOffloadCapabilities     = (0x1 << 1) | 0x1
 }
 
+/// Possible values of the opcode modifer when the opcode is [`CommandOpcode::AccessRegister`].
+#[derive(Copy, Clone)]
+pub enum AccessRegisterOpMod{
+    Write = 0,
+    Read = 1
+}
 
 /// Possible values of the port type field returned when retrieving device capabilities using the command [`CommandOpcode::QueryHcaCap`].
 #[derive(Debug, TryFromPrimitive)]
@@ -310,7 +321,12 @@ enum MailboxType {
 #[repr(C)]
 struct NicVportContext {
     /// This field is not necessarily padding, just unused fields that are not relevant.
-    _padding0: [u8; 244],
+    _padding0: [u8; 36],
+    /// Maximum transmission unit size in bytes
+    mtu: Volatile<U32<BigEndian>>,
+    /// This field is not necessarily padding, just unused fields that are not relevant.
+    _padding1: [u8; 200],
+    allowed_list_size: Volatile<U32<BigEndian>>,
     /// The upper bytes of the NIC's MAC address
     permanent_address_h: Volatile<U32<BigEndian>>,
     /// The lower four bytes of the NIC's MAC address
@@ -324,6 +340,11 @@ struct MailboxBuffer {
     addr: PhysicalAddress
 }
 
+// 22.10 Network Ports Registers
+enum NetworkPortRegisters {
+    PMTU = 0x5003,
+    PAOS = 0x5006,
+}
 pub struct InitializedCommand {
     pub(crate) entry_num: usize,
     input_mailbox_buffers: Vec<MailboxBuffer>,
@@ -397,7 +418,8 @@ pub struct CommandBuilder {
     protection_domain:              Option<u32>,
     send_queue_num:                 Option<u32>,
     collapsed_cq:                   bool,
-    receive_queue_num:              Option<u32>
+    receive_queue_num:              Option<u32>,
+    mtu:                            Option<u16>
 }
 
 impl CommandBuilder {
@@ -416,7 +438,8 @@ impl CommandBuilder {
             protection_domain: None, 
             send_queue_num: None, 
             collapsed_cq: false,
-            receive_queue_num: None
+            receive_queue_num: None,
+            mtu: None
         }
     }
 
@@ -484,6 +507,11 @@ impl CommandBuilder {
         self.receive_queue_num = Some(rqn);
         self
     }
+
+    pub fn mtu(mut self, mtu: u16) -> CommandBuilder {
+        self.mtu = Some(mtu);
+        self
+    }
 }
 
 /// A buffer of fixed-size entries that is used to pass commands to the HCA.
@@ -541,6 +569,17 @@ impl CommandQueue {
         let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
         let num_pages = parameters.allocated_pages.as_ref().and_then(|pages| Some(pages.len())); 
 
+        #[cfg(mlx_logger)]
+        {
+            if let Some(pages) = parameters.allocated_pages.as_ref() {
+                debug!("pages: {:?}", pages);
+            }
+
+            if let Some(pages) = parameters.doorbell_page.as_ref() {
+                debug!("db page: {:?}", pages);
+            }
+        }
+
         // create a command queue entry with the fields initialized for the given opcode and opmod
         let mut cmdq_entry = CommandQueueEntry::init(parameters.opcode, parameters.opmod, self.token, num_pages)?;
         let mut input_mailbox_buffers: Vec<MailboxBuffer> = Vec::new();
@@ -591,6 +630,33 @@ impl CommandQueue {
                 self.initialize_mailboxes(NUM_OUTPUT_MAILBOXES_QUERY_NIC_VPORT_CONTEXT, &mut output_mailbox_buffers)?;
                 cmdq_entry.set_output_mailbox_pointer(output_mailbox_buffers[0].addr);
             },
+            CommandOpcode::ModifyNicVportContext => {
+                cmdq_entry.set_input_inline_data_1((1 << 6) | (1 << 4)); // mtu | promisc (in old PRM)
+
+                const NUM_INPUT_MAILBOXES_MODIFY_NIC_VPORT_CONTEXT: usize = 1;
+                self.initialize_mailboxes(NUM_INPUT_MAILBOXES_MODIFY_NIC_VPORT_CONTEXT, &mut input_mailbox_buffers)?;
+                
+                const NIC_VPORT_CONTEXT_OFFSET: usize = 0x100 - 0x10;
+                let context= input_mailbox_buffers[0].mp.as_type_mut::<NicVportContext>(NIC_VPORT_CONTEXT_OFFSET)
+                    .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+                
+                context.mtu.write(U32::new(parameters.mtu.ok_or(CommandQueueError::MissingInput)? as u32));
+                context.allowed_list_size.write(U32::new((1 << 31) | (1 << 30) | (1 << 29))); // promisc_uc | promisc_mc | promisc_all
+                
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+            }            
+            CommandOpcode::AccessRegister => {
+                cmdq_entry.set_input_inline_data_0(NetworkPortRegisters::PMTU as u32);
+
+                const NUM_INPUT_MAILBOXES_SET_MTU: usize = 1;
+                self.initialize_mailboxes(NUM_INPUT_MAILBOXES_SET_MTU, &mut input_mailbox_buffers)?;
+                let register_data = input_mailbox_buffers[0].mp.as_type_mut::<[U32<BigEndian>;3]>(0)
+                    .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+                register_data[0] = U32::new(1 << 16);
+                register_data[2] = U32::new((parameters.mtu.ok_or(CommandQueueError::MissingInput)? as u32) << 16);
+                
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+            }
             CommandOpcode::CreateEq => {
                 let pages_pa = parameters.allocated_pages.ok_or(CommandQueueError::MissingInputPages)?;    
 
@@ -731,12 +797,15 @@ impl CommandQueue {
         // claim the command entry as in use
         self.available_entries[entry_num] = false;
 
-        debug!("command INPUT: {:?}", parameters.opcode);
-        self.entries[entry_num].dump_command();
-        for mb in &initialized_entry.input_mailbox_buffers {
-            mb.mp.as_type::<CommandInterfaceMailbox>(0)
-                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
-                .dump_mailbox()
+        #[cfg(mlx_logger)]
+        {
+            debug!("command INPUT: {:?}", parameters.opcode);
+            self.entries[entry_num].dump_command();
+            for (i,mb) in initialized_entry.input_mailbox_buffers.iter().enumerate() {
+                mb.mp.as_type::<CommandInterfaceMailbox>(0)
+                    .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
+                    .dump_mailbox(i)
+            }
         }
 
         Ok(initialized_entry)
@@ -841,10 +910,16 @@ impl CommandQueue {
         eq_context.init(uar, log_eq_size);
 
         // initialize the bitmask. this function only activates the page request event
-        const BITMASK_OFFSET: usize  = 0x58 - 0x10;
-        let eq_bitmask = mb_page.as_type_mut::<U64<BigEndian>>(BITMASK_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
-        *eq_bitmask = U64::new(PAGE_REQUEST_BIT);
+        // const BITMASK_OFFSET: usize  = 0x58 - 0x10;
+        // let eq_bitmask = mb_page.as_type_mut::<U64<BigEndian>>(BITMASK_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        // const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
+        // *eq_bitmask = U64::new(PAGE_REQUEST_BIT);
+
+        // TODO: I think this is wrong but matches the snabb
+        const BITMASK_OFFSET: usize  = 0x6C - 0x10;
+        let eq_bitmask = mb_page.as_type_mut::<U32<BigEndian>>(BITMASK_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        const PAGE_REQUEST_BIT: u32 = 1 << 0xB;
+        *eq_bitmask = U32::new(PAGE_REQUEST_BIT);
 
         // Now use the remainder of the mailbox for page entries
         const EQ_PADDR_OFFSET: usize = 0x110 - 0x10;
@@ -991,13 +1066,15 @@ impl CommandQueue {
     }
 
     pub fn get_command_status(&mut self, command: CompletedCommand) -> Result<CommandCompletionStatus, CommandQueueError> {
-        debug!("command OUTPUT");
-        
-        self.entries[command.entry_num].dump_command();
-        for mb in command.output_mailbox_buffers {
-            mb.mp.as_type::<CommandInterfaceMailbox>(0)
-                .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
-                .dump_mailbox()
+        #[cfg(mlx_logger)]
+        {
+            debug!("command OUTPUT");
+            self.entries[command.entry_num].dump_command();
+            for (i, mb) in command.output_mailbox_buffers.iter().enumerate() {
+                mb.mp.as_type::<CommandInterfaceMailbox>(0)
+                    .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?
+                    .dump_mailbox(i)
+            }
         }
 
         self.available_entries[command.entry_num] = true;
@@ -1362,13 +1439,14 @@ impl CommandQueueEntry {
         CommandReturnStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandReturnStatus)
     }
 
+    #[cfg(mlx_logger)]
     fn dump_command(&self) {
         unsafe {
             let ptr = self as *const CommandQueueEntry as *const u32;
-            debug!("000: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr).to_be(), (*ptr.offset(1)).to_be(), (*ptr.offset(2)).to_be(), (*ptr.offset(3)).to_be());
-            debug!("010: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr.offset(4)).to_be(), (*ptr.offset(5)).to_be(), (*ptr.offset(6)).to_be(), (*ptr.offset(7)).to_be());
-            debug!("020: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr.offset(8)).to_be(), (*ptr.offset(9)).to_be(), (*ptr.offset(10)).to_be(), (*ptr.offset(11)).to_be());
-            debug!("030: {:#010X} {:#010X} {:#010X} {:#010X}", (*ptr.offset(12)).to_be(), (*ptr.offset(13)).to_be(), (*ptr.offset(14)).to_be(), (*ptr.offset(15)).to_be());
+            debug!("000: {:#010x} {:#010x} {:#010x} {:#010x}", (*ptr).to_be(), (*ptr.offset(1)).to_be(), (*ptr.offset(2)).to_be(), (*ptr.offset(3)).to_be());
+            debug!("010: {:#010x} {:#010x} {:#010x} {:#010x}", (*ptr.offset(4)).to_be(), (*ptr.offset(5)).to_be(), (*ptr.offset(6)).to_be(), (*ptr.offset(7)).to_be());
+            debug!("020: {:#010x} {:#010x} {:#010x} {:#010x}", (*ptr.offset(8)).to_be(), (*ptr.offset(9)).to_be(), (*ptr.offset(10)).to_be(), (*ptr.offset(11)).to_be());
+            debug!("030: {:#010x} {:#010x} {:#010x} {:#010x} \n", (*ptr.offset(12)).to_be(), (*ptr.offset(13)).to_be(), (*ptr.offset(14)).to_be(), (*ptr.offset(15)).to_be());
         }
     }
 }
@@ -1414,13 +1492,16 @@ impl CommandInterfaceMailbox {
         self.next_pointer_l.write(U32::new((next_mb_addr & 0xFFFF_FFFF) as u32));
     }
 
-    fn dump_mailbox(&self) {
+    #[cfg(mlx_logger)]
+    fn dump_mailbox(&self, block_num: usize) {
+        debug!("Mailbox {}", block_num);
         unsafe {
             let ptr = self as *const CommandInterfaceMailbox as *const u32;
             for i in 0..MAILBOX_SIZE_IN_BYTES/16 {
                 let x = (i * 4) as isize;
-                debug!("{:#03}: {:#010X} {:#010X} {:#010X} {:#010X}", i*16, (*ptr.offset(x)).to_be(), (*ptr.offset(x+1)).to_be(), (*ptr.offset(x+2)).to_be(), (*ptr.offset(x+3)).to_be());
+                debug!("{:#05x}: {:#010x} {:#010x} {:#010x} {:#010x}", i*16 + 0x40 + (block_num * MAILBOX_SIZE_IN_BYTES), (*ptr.offset(x)).to_be(), (*ptr.offset(x+1)).to_be(), (*ptr.offset(x+2)).to_be(), (*ptr.offset(x+3)).to_be());
             }
+            debug!("")
         }
     }
 }
