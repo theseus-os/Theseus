@@ -947,7 +947,36 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
     /// screen cursor to existing units in the scrollback buffer.
     /// That must be done separately if desired. 
     fn move_up(&mut self, num_rows: Row) {
-        trace!("Move up by {:?} is unimplemented", num_rows);
+        let screen_size = self.backend.screen_size();
+        let orig_screen_position = self.screen_cursor.position;
+        let orig_scrollback_position = *self.scrollback_cursor;
+        if orig_screen_position.row == Row(0) { return; }
+
+        // First, adjust the screen cursor up by `num_rows`.
+        let num_rows = num_rows.0 as usize;
+        let orig_row = orig_screen_position.row.0 as usize;
+        let (new_screen_row, scroll_action) = if num_rows > orig_row {
+            (Row(0), ScrollAction::Up(num_rows - orig_row))
+        } else {
+            (Row((orig_row - num_rows) as u16), ScrollAction::None)
+        };
+
+        self.screen_cursor.position.row = new_screen_row;
+        trace!("move_up({:?}): orig_row: {:?}, new_screen_row: {:?}", num_rows, orig_row, new_screen_row);
+        self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
+
+        // TODO: handle scroll action
+
+        let new_scrollback_position = self.screen_cursor.position.to_scrollback_point(
+            // TODO: after `to_scrollback_point()` supports backwards navigation from a point below the current screen point,
+            //       then we can use the original positions. But since it doesn't support that, we must use the current scroll position.
+            //
+            // (orig_scrollback_position, orig_screen_position),
+            (self.scroll_position.start_point(), ScreenPoint::default()),
+            &self.scrollback_buffer,
+            screen_size
+        );
+        *self.scrollback_cursor = new_scrollback_position;
     }
 
     /// Moves the screen cursor down by the given number of rows
@@ -958,8 +987,11 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
     /// That must be done separately if desired. 
     fn move_down(&mut self, num_rows: Row) {
         let screen_size = self.backend.screen_size();
+        let orig_screen_position = self.screen_cursor.position;
+        let orig_scrollback_position = *self.scrollback_cursor;
+
         // First, adjust the screen cursor down by `num_rows`.
-        let orig_row = self.screen_cursor.position.row.0 as usize;
+        let orig_row = orig_screen_position.row.0 as usize;
         let last_row = screen_size.last_row().0 as usize;
         let target_row = orig_row + num_rows.0 as usize;
         let (new_screen_row, scroll_action) = if target_row > last_row {
@@ -969,13 +1001,19 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
         };
 
         self.screen_cursor.position.row = new_screen_row;
-        let target_column = self.screen_cursor.position.column.0 as usize;
         trace!("move_down({:?}): orig_row: {:?} target_row: {:?}, new_screen_row: {:?}", num_rows, orig_row, target_row, new_screen_row);
         self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
 
         // TODO: handle scroll action
 
-        ///////// Copied from ScreenPoint::to_scrollback_point()
+        let new_scrollback_position = self.screen_cursor.position.to_scrollback_point(
+            (orig_scrollback_position, orig_screen_position),
+            &self.scrollback_buffer,
+            screen_size
+        );
+        *self.scrollback_cursor = new_scrollback_position;
+
+        /*
         let mut row = orig_row;
         let screen_width = screen_size.num_columns.0 as usize;
         let ScrollbackBufferPoint { mut line_idx, mut unit_idx } = *self.scrollback_cursor;
@@ -1025,6 +1063,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
                 unit_idx: UnitIndex(util::round_down(unit_idx.0, screen_width) + target_column),
             }
         };
+        */
     }
 
     fn move_left(&mut self, num_units: usize, wrap: Wrap) {
@@ -1468,45 +1507,58 @@ impl ScreenPoint {
     /// A `Unit` may or may not exist at the returned `ScrollbackBufferPoint`.
     ///
     /// If the scrollback buffer does not have sufficient lines (rows) or units (columns),
-    /// this returns a `ScrollbackBufferPoint` based on the assumption that sufficient 
-    /// empty lines (that occupy one row each) and empty units (that occupy one column each) 
+    /// this returns a `ScrollbackBufferPoint` based on the assumption that 
+    /// sufficient empty lines (that occupy one row each) and empty units (that occupy one column each) 
     /// would be inserted into the scrollback buffer.
     fn to_scrollback_point(
         &self,
-        origin_point: ScrollbackBufferPoint, 
+        known_prior_point: (ScrollbackBufferPoint, ScreenPoint), 
         scrollback_buffer: &ScrollbackBuffer,
-        screen_width: Column,
+        screen_size: ScreenSize,
     ) -> ScrollbackBufferPoint {
-        let screen_point = *self;
-        let screen_width = screen_width.0 as usize;
-        let target_row = screen_point.row.0 as usize;
-        let target_column = screen_point.column.0 as usize;
+        let screen_width = screen_size.num_columns.0 as usize;
+        let target_row = self.row.0 as usize;
+        let target_column = self.column.0 as usize;
 
-        let mut row = 0;
-        let ScrollbackBufferPoint { mut line_idx, mut unit_idx } = origin_point;
+        assert!(known_prior_point.1 <= *self); // TODO: support calculations if `self` is before the known screen point
+
+        let mut row = known_prior_point.1.row.0 as usize;
+        let ScrollbackBufferPoint { mut line_idx, mut unit_idx } = known_prior_point.0;
         
-        // Iterate over all lines in the scrollback buffer starting at the origin point
+        // Iterate over the lines in the scrollback buffer starting at the current position
         // to determine how many displayed rows on screen each line takes up.
-        for line in scrollback_buffer.get(line_idx.0 ..) {
-            // TODO FIXME: this is probably wrong, see the code in `move_down()`
-            let rows_occupied = (line.len().saturating_sub(unit_idx.0) / screen_width) + 1;
-            row += rows_occupied;
+        while let Some(line) = scrollback_buffer.get(line_idx.0) {
+            let start_row = unit_idx.0 / screen_width;
+            let last_unit = line.last_unit().0;
+            let end_row = last_unit / screen_width;
+            let additional_rows = end_row.saturating_sub(start_row);
+            row += additional_rows;
+
+            trace!("to_scrollback_point(): {:?}: start_row: {:?}, last_unit: {:?}, end_row: {:?}, additional_rows: {:?}, row: {:?}, target_row: {:?}", 
+                line_idx, start_row, last_unit, end_row, additional_rows, row, target_row
+            );
 
             if row >= target_row {
                 let row_overshoot = row - target_row;
-                unit_idx = UnitIndex(line.len().saturating_sub(row_overshoot * screen_width));
+                trace!("to_scrollback_point(): row_overshoot: {:?}", row_overshoot);
+                unit_idx = UnitIndex(last_unit.saturating_sub(row_overshoot * screen_width));
                 break;
             }
 
+            // This `line` didn't cover enough displayed rows, so we move to the next one and keep going.
+            row += 1;
             line_idx += LineIndex(1);
             unit_idx = UnitIndex(0);
         }
+
+        trace!("to_scrollback_point(): after iterating, row: {:?}, target_row: {:?}, line_idx: {:?}", row, target_row, line_idx);
 
         if row < target_row {
             // The scrollback buffer didn't have enough lines.
             // Currently, `line_idx` is right after the last line.
             // We calculate the target line index as: `line_idx - 1 + (target_row - row)`.
             let target_line = line_idx.0.saturating_add(target_row).saturating_sub(row).saturating_sub(1);
+            trace!("to_scrollback_point(): target_line: {:?}", target_line);
             ScrollbackBufferPoint {
                 line_idx: LineIndex(target_line),
                 unit_idx: UnitIndex(target_column),
@@ -1515,7 +1567,7 @@ impl ScreenPoint {
             // The scrollback buffer had enough lines.
             ScrollbackBufferPoint {
                 line_idx,
-                unit_idx: UnitIndex(min(target_column, unit_idx.0)),
+                unit_idx: UnitIndex(util::round_down(unit_idx.0, screen_width) + target_column),
             }
         }
     }
