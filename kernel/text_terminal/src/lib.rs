@@ -23,6 +23,7 @@
 //! * <https://en.wikipedia.org/wiki/ANSI_escape_code>
 
 #![no_std]
+#![feature(drain_filter)]
 
 // TODO: FIXME: remove this once the implementation is complete.
 #![allow(dead_code, unused_variables, unused_imports)]
@@ -34,6 +35,7 @@ extern crate event_types;
 extern crate unicode_width;
 extern crate bare_io;
 extern crate vte;
+extern crate util;
 #[macro_use] extern crate derive_more;
 
 #[cfg(test)]
@@ -48,6 +50,7 @@ pub use ansi_style::*;
 use core::cmp::{Ordering, max, min};
 use core::convert::TryInto;
 use core::fmt;
+use core::iter::repeat;
 use core::num::NonZeroUsize;
 use core::ops::{Bound, Deref, DerefMut, Index, IndexMut};
 use alloc::string::String;
@@ -61,6 +64,7 @@ use vte::{Parser, Perform};
 /// 
 /// By default, the terminal starts at the `Bottom`, 
 /// such that it will auto-scroll upon new characters being displayed.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ScrollPosition {
     /// The terminal is scrolled all the way up.
     ///
@@ -71,44 +75,35 @@ pub enum ScrollPosition {
     /// contained `ScrollbackBufferPoint` that points to the `Unit` 
     /// that will be displayed in the upper-left hand corner of the screen viewport.
     ///
-    /// The contained `usize` is the number of screen rows that the pointed-to `Unit`
-    /// is displayed after the beginning of that `Unit`'s line.
-    ///
     /// In this position, the terminal screen "viewport" is locked
     /// and will **NOT** auto-scroll down to show any newly-outputted lines of text.
-    AtUnit(ScrollbackBufferPoint, usize),
+    AtUnit(ScrollbackBufferPoint),
     /// The terminal position is scrolled all the way down.
     ///
     /// In this position, the terminal screen "viewport" is **NOT** locked
     /// and will auto-scroll down to show any newly-outputted lines of text.
     ///
     /// For convenience in calculating the screen viewport,
-    /// the contained fields are the same as in the `AtUnit` varient.
+    /// the contained fields are the same as in the `AtUnit` variant.
     ///
     /// In this mode, the contained point must be updated whenever the screen is 
     /// scrolled down by virtue of a new line being displayed at the bottom.
     /// the screen viewport is scrolled up or down.
-    Bottom(ScrollbackBufferPoint, usize),
+    Bottom(ScrollbackBufferPoint),
 }
 impl Default for ScrollPosition {
     fn default() -> Self {
-        ScrollPosition::Bottom(ScrollbackBufferPoint::default(), 0)
+        ScrollPosition::Bottom(ScrollbackBufferPoint::default())
     }
 }
 impl ScrollPosition {
-    /// Returns a two-item tuple:
-    /// 1. The point (`Unit`) in the scrollback_buffer at which the screen viewport starts,
-    ///    which maps to `ScreenPoint(0, 0)`. 
-    /// 2. The offset in number of displayed rows that the above `ScrollbackBufferPoint`
-    ///    is at from the beginning of its `Line`.  
-    ///    If `0`, the above point represents the first `Unit` at the beginning of its `Line`.
-    ///    This is useful for calculating how many more rows will be occupied by
-    ///    the remainder of the `Line` starting from the `Unit` at the point given above.
-    fn start_point(&self) -> (ScrollbackBufferPoint, usize) {
+    /// Returns the `ScrollbackBufferPoint` at which the screen viewport starts,
+    /// i.e., the coordinate in the scrollback buffer that maps to `ScreenPoint(0, 0)`. 
+    fn start_point(&self) -> ScrollbackBufferPoint {
         match self {
-            ScrollPosition::Top => (ScrollbackBufferPoint::default(), 0), // (0,0)
-            ScrollPosition::AtUnit(point, row_offset) => (*point, *row_offset),
-            ScrollPosition::Bottom(point, row_offset) => (*point, *row_offset),
+            ScrollPosition::Top => ScrollbackBufferPoint::default(), // (0,0)
+            ScrollPosition::AtUnit(point) => *point,
+            ScrollPosition::Bottom(point) => *point,
         }
     }
 }
@@ -116,18 +111,15 @@ impl ScrollPosition {
 
 /// An entire unbroken line of characters (`Unit`s) that has been written to a terminal.
 ///
-/// `Line`s *only* end at an actual hard line break, i.e., a newline character `'\n'`.
+/// `Line`s *only* end at an actual hard line break, i.e., a line feed / newline character.
 ///
+/// Because each `Unit` in a `Line` represents exactly one displayed `Column` on the screen,
+/// it is easy to calculate where soft line breaks (line wraps) will occur
+/// based on the width of the screen.
 #[derive(Debug, Default, Deref, DerefMut)]
 pub struct Line {
     /// The actual characters that comprise this `Line`.
-    #[deref] #[deref_mut]
     units: Vec<Unit>,
-    /// The indices of the `Unit`s in the `Line` that come at the very beginning of a 
-    /// soft line break, i.e., a wrapped line. 
-    /// This is a cached value used to accelerate the calculations of which screen coordinates
-    /// point to which coordinates of lines/units in the scrollback buffer.
-    soft_line_breaks: Vec<UnitIndex>,
 }
 
 impl Index<UnitIndex> for Line {
@@ -147,147 +139,223 @@ impl Line {
         Line::default()
     }
 
-    /// Inserts the given `Unit` into this `Line` at the given index. 
-    ///
-    /// This adjusts all soft line breaks (line wraps) as needed to properly
-    /// display this `Line` on screen, but does not actually re-display it.
-    ///
-    /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
-    /// all `Unit`s after it will be shifted to the right by one,
-    /// and the soft line breaks will be updated accordingly.
-    ///
-    /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
-    /// then the `Line` will be padded with enough empty `Units` such that the given `Unit`
-    /// will be inserted at the correct `UnitIndex`.
-    /// The empty padding `Unit`s will have the same [`Style`] as the given `Unit`.
-    fn insert_unit(
-        &mut self,
-        idx: UnitIndex,
-        unit: Unit,
-        screen_width: Column,
-        tab_width: u16
-    ) {
-        if idx.0 < self.units.len() {
-            // The unit index is within the existing bounds of the Line, so insert it.
-            self.units.insert(idx.0, unit);
-            // TODO: there is definitely a more efficient way to recalculate the soft line breaks
-            //       rather than iterating over every single unit in this line.
-            self.recalculate_soft_line_breaks(screen_width, tab_width);
-        } 
-        else {
-            // The unit index is beyond the existing bounds of this Line, so fill it with empty Units as padding.
-            let range_of_empty_padding = self.units.len() .. idx.0;
-            self.units.reserve(range_of_empty_padding.len() + 1);
-            if range_of_empty_padding.len() > 0 {
-                warn!("Untested scenario: pushing {} empty padding character(s) to line.", range_of_empty_padding.len());
-            }
-            for _i in range_of_empty_padding {
-                self.units.push(Unit { character: Character::default(), style: unit.style });
-            }
-            self.units.push(unit);
-            self.recalculate_soft_line_breaks(screen_width, tab_width);
-        }
+    /// Returns the `UnitIndex` of the last `Unit` in this `Line`,
+    /// effectively the length of this `Line` minus 1.
+    #[inline(always)]
+    fn last_unit(&self) -> UnitIndex {
+        UnitIndex(self.units.len().saturating_sub(1))
     }
 
-    /// Replaces the existing `Unit` at the given `idx` in this `Line` with the given `unit`.
+    /// Iterates over the `Unit`s in this `Line` to find the next non-continuance `Unit`.
+    ///
+    /// Returns the `UnitIndex` of that `Unit`.
+    #[inline(always)]
+    fn next_non_continuance_unit(&self, mut index: UnitIndex) -> UnitIndex {
+        while self.units.get(index.0).map(|u| u.wide.is_continuance()).unwrap_or_default() {
+            warn!("Untested: forward skipping continuance Unit at {:?}", index);
+            index += UnitIndex(1);
+        }
+        index
+    }
+
+    /// Iterates over the `Unit`s in this `Line` to find the previous non-continuance `Unit`.
+    ///
+    /// Returns the `UnitIndex` of that `Unit`.
+    #[inline(always)]
+    fn previous_non_continuance_unit(&self, mut index: UnitIndex) -> UnitIndex {
+        while self.units.get(index.0).map(|u| u.wide.is_continuance()).unwrap_or_default() {
+            warn!("Untested: backward skipping continuance Unit at {:?}", index);
+            index -= UnitIndex(1);
+        }
+        index
+    }
+
+    /// Inserts the given character `c` with the given `Style` into this `Line` at the given `index`. 
     ///
     /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
-    /// the existing `Unit` at that index will be replaced and the soft line breaks
-    /// will be updated accordingly (if the new and existing units have different displayable widths).
-    ///
-    /// If needed, this function adjusts all soft line breaks (line wraps) to properly
-    /// display this `Line` on screen, but does not actually re-display it.
+    /// all `Unit`s after it will be shifted to the right by one.
     ///
     /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
     /// then the `Line` will be padded with enough empty `Units` such that the given `Unit`
     /// will be inserted at the correct `UnitIndex`.
-    /// The empty padding `Unit`s will have the same [`Style`] as the given `Unit`.
+    /// The empty padding `Unit`s will have the given `Style`.
+    ///
+    /// Returns the `UnitIndex` immediately following the newly-inserted `Unit`(s),
+    /// which is where the next `Unit` would be inserted on a future insert operation.
+    fn insert_unit(
+        &mut self,
+        index: UnitIndex,
+        c: char,
+        style: Style,
+        tab_width: u16,
+    ) -> UnitIndex {
+        let index = self.next_non_continuance_unit(index);
+
+        // If the index is beyond the existing bounds of this Line, fill it with empty Units as padding.
+        if index.0 > self.units.len() {
+            let range_of_empty_padding = self.units.len() .. index.0;
+            let num_padding_units = range_of_empty_padding.len();
+            self.units.reserve(num_padding_units + 1);
+            if num_padding_units > 0 {
+                warn!("Untested scenario: pushing {} empty padding character(s) to line.", num_padding_units);
+            }
+            for _i in range_of_empty_padding {
+                self.units.push(Unit { style, ..Default::default() });
+            }
+        };
+        // Now that we've inserted any padding necessary, we simply insert the new Unit.
+
+        // The tab character '\t' requires special handling.
+        let num_units_added = if c == '\t' {
+            let tab_width = tab_width as usize;
+            self.units.reserve(tab_width);
+            // Insert one Unit to represent the actual start of the tab character.
+            self.units.insert(
+                index.0,
+                Unit {
+                    character: Character::Single(c),
+                    style,
+                    wide: WideDisplayedUnit::TabStart,
+                }
+            );
+            // Insert `tab_width - 1` empty units to represent the rest of the tab space.
+            self.units.splice(
+                (index.0 + 1) .. (index.0 + 1), 
+                core::iter::repeat(Unit {
+                    character: Character::default(),
+                    style,
+                    wide: WideDisplayedUnit::TabFill,
+                }).take(tab_width - 1)
+            );
+            tab_width
+        } 
+        else {
+            let character = Character::Single(c);
+            let displayed_width = character.displayable_width() as usize;
+            match displayed_width {
+                0 => panic!("Unsupported: inserting 0-width non-TAB character {} ({:?})", c, c),
+                1 => {
+                    // TODO: check for ligatures for certain characters, which need to be combined into the previous `Unit`.
+                    //       In this case, we won't insert `c` into a new Unit, we'll simply append it to the previous `Unit`'s
+                    //       contained Character::Multi(...), converting it from a Character::Single(...) as necessary.
+                    //       We would then insert a new empty unit with the WideDisplayedUnit::MultiFill tag set.
+
+                    self.units.insert(
+                        index.0,
+                        Unit { character, style, wide: WideDisplayedUnit::None }
+                    );
+                    1
+                }
+                width => {
+                    self.units.insert(
+                        index.0,
+                        Unit { character, style, wide: WideDisplayedUnit::MultiStart }
+                    );
+                    // Insert `width - 1` empty units to represent the rest of the space occupied by this wide character.
+                    self.units.splice(
+                        (index.0 + 1) .. (index.0 + 1), 
+                        core::iter::repeat(Unit {
+                            character: Character::default(),
+                            style,
+                            wide: WideDisplayedUnit::MultiFill,
+                        }).take(width - 1)
+                    );
+                    width
+                }
+            }
+        };
+
+        index + UnitIndex(num_units_added)
+    }
+
+    /// Replaces the existing `Unit`(s) at the given `index` in this `Line` with the given character.
+    ///
+    /// If the given `UnitIndex` is within the existing bounds of this `Line`, 
+    /// the existing `Unit`(s) at that index will be replaced.
+    ///
+    /// If the given `UnitIndex` is beyond the existing bounds of this `Line`,
+    /// this function does the same thing as [`Line::insert_unit()`].
+    ///
+    /// Returns a tuple of:
+    /// 1. The `UnitIndex` immediately following the newly-replaced `Unit`(s),
+    ///    which is where the next `Unit` would be replaced on a future operation.
+    /// 2. The difference in widths when replacing the old unit(s) with the new unit(s),
+    ///    i.e., `new_unit_width - old_unit_width`.
+    ///    If `0`, the units are the same width or there is no existing `Unit` to replace.
+    ///    If positive, the new unit is wider than the old unit.
+    ///    If negative, the old unit is wider than the new unit.
     fn replace_unit(
         &mut self,
-        idx: UnitIndex,
-        unit: Unit,
-        screen_width: Column,
+        index: UnitIndex,
+        c: char,
+        style: Style,
         tab_width: u16
-    ) {
-        if let Some(unit_to_replace) = self.units.get_mut(idx.0) {
+    ) -> (UnitIndex, i32) {
+        let index = self.next_non_continuance_unit(index);
+
+        if let Some(unit_to_replace) = self.units.get_mut(index.0) {
+            let character = Character::Single(c);
             let old_width = unit_to_replace.displayable_width();
-            let new_width = match unit.displayable_width() {
-                0 => tab_width,
-                w => w,
-            };
-            *unit_to_replace = unit;
-            // If the new unit differs in displayable width, recalculate the soft line breaks.
-            if old_width != new_width {
-                self.recalculate_soft_line_breaks(screen_width, tab_width);
+            let new_width = character.displayable_width();
+            let width_diff = new_width as i32 - old_width as i32;
+            if old_width == new_width {
+                unit_to_replace.character = character;
+                unit_to_replace.style = style;
+                let next_unit_index = self.next_non_continuance_unit(index + UnitIndex(1));
+                (next_unit_index, width_diff)
+            } else {
+                // To handle the case when a new character has a different displayable width 
+                // than the existing character it's replacing,
+                // we simply remove the existing character's `Unit`(s) 
+                // and then insert the new character. 
+                self.delete_unit(index);
+                let new_unit_index = self.insert_unit(index, c, style, tab_width);
+                (new_unit_index, width_diff)
             }
         } else {
-            // Re-use the latter half of the `insert_unit` function. 
-            self.insert_unit(idx, unit, screen_width, tab_width);
+            // We're past the bounds of this line, so we insert a new unit at the end.
+            let new_unit_index = self.insert_unit(index, c, style, tab_width);
+            (new_unit_index, 0)
         }
     }
 
     /// Deletes the given `Unit` from this `Line` at the given index. 
     ///
-    /// This adjusts all soft line breaks (line wraps) as needed to properly
-    /// display this `Line` on screen, but does not actually re-display it.
+    /// This also deletes all continuance characters that correspond to this `Unit`.
     ///
-    /// If the given `UnitIndex` is not at the end of this `Line`,
-    /// all `Unit`s after it will be shifted to the left by one,
-    /// and the soft line breaks will be updated accordingly.
+    /// As with standard [`Vec`] behavior, all `Unit`s after the given `index` are
+    /// shifted to the left.
+    /// As such, the given `index` does not need to be moved after invoking this function,
+    /// as it will already point to the `Unit` right after the last deleted `Unit`.
     ///
-    /// Returns the width of the deleted unit in number of columns,
-    /// which dictates how far back the screen cursor must be moved.
-    fn delete_unit(
-        &mut self,
-        idx: UnitIndex,
-        screen_width: Column,
-        tab_width: u16
-    ) -> Column {
-        let removed_unit = self.units.remove(idx.0);
-        // TODO: there is definitely a more efficient way to recalculate the soft line breaks
-        //       rather than iterating over every single unit in this line.
-        self.recalculate_soft_line_breaks(screen_width, tab_width);
-        match removed_unit.displayable_width() {
-            0 => Column(tab_width),
-            w => Column(w),
-        }
-    }
+    /// Returns the number of units that were actually deleted (including continuance units).
+    fn delete_unit(&mut self, index: UnitIndex) -> usize {
+        let index = self.previous_non_continuance_unit(index);
 
-    /// Calculates and returns the displayabe width in columns 
-    /// of the `Unit`s in this `Line` from the given `start` index (inclusive)
-    /// to the given `end` index (exclusive).
-    fn calculate_displayed_width_starting_at_unit(&self, start: UnitIndex, end: UnitIndex, tab_width: u16) -> usize {
-        (&self.units[start.0 .. end.0])
-            .iter()
-            .map(|unit| match unit.displayable_width() {
-                0 => tab_width,
-                w => w,
-            } as usize)
-            .sum()
+        // TODO: if the scrollback cursor is at the end of the line,
+        //       merge the next line into the current line.
+
+        let _removed_unit = self.units.remove(index.0);
+        let _removed_continuance_units = self.units.drain_filter(|unit| unit.wide.is_continuance());
+
+        let num_removed_continuance_units = if false {
+            _removed_continuance_units.count()
+        } else {
+            let mut count = 0;
+            warn!("Deleted {}-width {:?}", _removed_unit.displayable_width(), _removed_unit);
+            for _u in _removed_continuance_units {
+                count += 1;
+                warn!("\t also deleted continuance {:?}", _u);
+            }
+            count
+        };
+
+        1 + num_removed_continuance_units
     }
 
     /// Returns the number of rows on the screen that this `Line` will span when displayed.
-    fn num_rows_as_displayed(&self) -> usize {
-        self.soft_line_breaks.len() + 1
-    }
-
-    /// Iterates over all `Unit`s in this `Line` to recalculate where the soft line breaks
-    /// (i.e., line wraps) should occur.
-    fn recalculate_soft_line_breaks(&mut self, screen_width: Column, tab_width: u16) {
-        let mut breaks = Vec::new();
-        let mut column_idx_of_unit = Column(0);
-        for (i, unit) in self.units.iter().enumerate() {
-            let width = Column(match unit.displayable_width() {
-                0 => tab_width,
-                w => w,
-            });
-            column_idx_of_unit += width;
-            if column_idx_of_unit >= screen_width {
-                breaks.push(UnitIndex(i));
-                column_idx_of_unit = Column(0);
-            } 
-        }
-        self.soft_line_breaks = breaks;
+    fn num_rows_as_displayed(&self, screen_width: Column) -> usize {
+        (self.units.len() / screen_width.0 as usize) + 1
     }
 }
 
@@ -325,14 +393,10 @@ pub struct TextTerminal<Backend> where Backend: TerminalBackend {
     tab_width: u16,
 
     /// The on-screen cursor of the terminal.
-    cursor: Cursor,
+    screen_cursor: ScreenCursor,
 
     /// The mode settings/options that define the terminal's behavior.
     mode: TerminalMode,
-
-    // /// The mode determines what specific action will be taken on receiving an input,
-    // /// such as whether we should insert or overwrite new character input. 
-    // mode: TerminalMode,
 
     /// The terminal backend to which display actions are sent to be handled 
     /// in a backend-specific manner.
@@ -378,6 +442,13 @@ impl IndexMut<ScrollbackBufferPoint> for ScrollbackBuffer {
         &mut self[index.line_idx][index.unit_idx]
     }
 }
+impl ScrollbackBuffer {
+    /// Returns the `LineIndex` of the last `Line` in this `ScrollbackBuffer`.
+    #[inline(always)]
+    fn last_line(&self) -> LineIndex {
+        LineIndex(self.0.len().saturating_sub(1))
+    }
+}
 
 
 impl<Backend: TerminalBackend> TextTerminal<Backend> {
@@ -400,7 +471,7 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
             scrollback_cursor: ScrollbackBufferPoint::default(),
             scroll_position: ScrollPosition::default(),
             tab_width: 4,
-            cursor: Cursor::default(),
+            screen_cursor: ScreenCursor::default(),
             mode: TerminalMode::default(),
             backend,
             parser: Parser::new(),
@@ -408,12 +479,15 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
 
         // Clear the terminal backend upon start.
         terminal.backend.clear_screen();
-        terminal.backend.move_cursor_to(ScreenPoint::default());
+        terminal.screen_cursor.position = terminal.backend.move_cursor_to(ScreenPoint::default());
 
         // By default, terminal backends typically operate in Overwrite mode, not Insert mode.
-        terminal.backend.set_insert_mode(InsertMode::Overwrite);
-        
-        let welcome = "Welcome to Theseus's text terminal!";
+        let insert_mode = InsertMode::Overwrite;
+        terminal.backend.set_insert_mode(insert_mode);
+        terminal.mode.insert = insert_mode;
+
+        // let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah 12345";
+        let welcome = "Welcome to Theseus's text terminal! This is a long string that should overflow lines blah blah\nTesting a new line here";
         terminal.handle_input(&mut welcome.as_bytes()).expect("failed to write terminal welcome message");
 
         // TODO: issue a term info command to the terminal backend
@@ -431,10 +505,11 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
         let mut total_bytes_read = 0;
         let mut buf = [0; READ_BATCH_SIZE];
 
-        let mut handler = TerminalParserHandler { 
+        let mut handler = TerminalActionHandler { 
             scrollback_buffer: &mut self.scrollback_buffer,
             scrollback_cursor: &mut self.scrollback_cursor,
-            cursor: &mut self.cursor,
+            scroll_position: &mut self.scroll_position,
+            screen_cursor: &mut self.screen_cursor,
             backend: &mut self.backend,
             tab_width: &mut self.tab_width,
             mode: &mut self.mode,
@@ -482,145 +557,23 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
     pub fn screen_size(&self) -> ScreenSize {
         self.backend.screen_size()
     }
-
-    /*
-    /// Moves the cursor by adding the given `number` of units (columns)
-    /// to its horizontal `x` point.
-    ///
-    /// The cursor will wrap to the previous or next row it it encounters
-    /// the beginning or end of a line.
-    fn move_cursor_by(&mut self, number: i16) {
-        let Point2D { x: x_old, y: y_old } = self.cursor.position;
-        let new_x: i32 = x_old as i32 + number as i32;
-        let quotient  = new_x / self.screen_size.x as i32;
-        let remainder = new_x % self.screen_size.x as i32;
-        self.cursor.position.x = (x_old as i32 + remainder) as u16;
-        self.cursor.position.y = (y_old as i32 + quotient)  as u16;
-        debug!("Updated cursor: ({}, {}) + {} units --> ({}, {})",
-            x_old, y_old, number, self.cursor.position.x, self.cursor.position.y,
-        );
-    }
-    */
-
-
-    /// Calculates the point in the scrollback buffer that the given `cursor_point`
-    /// is pointing to, based on the current position of the screen viewport.
-    ///
-    /// If the given `cursor_point` does not point to a `Unit` that exists in the scrollback buffer,
-    /// then it is adjusted to the nearest row and column that **does** align with a 
-    /// line and unit index that actually exist in the scrollback buffer. 
-    ///
-    /// Returns a tuple of the point in the scrollback buffer that corresponds to the 
-    /// adjusted cursor point, and the adjusted cursor point itself.
-    fn cursor_position_to_scrollback_position(
-        &self,
-        cursor_point: ScreenPoint
-    ) -> (ScrollbackBufferPoint, ScreenPoint) {
-        let target_row = cursor_point.row.0 as usize;
-
-        // The `start_point` corresponds to the unit that is currently displayed at `ScreenPoint(0,0)`
-        let (start_point, mut row_offset) = self.scroll_position.start_point();
-        let screen_width = self.screen_size().num_columns.0 as usize;
-
-        let mut line_index   = start_point.line_idx;
-        let mut unit_index   = start_point.unit_idx;
-        let mut row_index    = 0;
-        let mut line;
-        
-        loop {
-            // TODO: handle the case when the cursor point is beyond the bounds of the scrollback buffer 
-            line = &self.scrollback_buffer[start_point.line_idx];
-            row_index += line.num_rows_as_displayed() - row_offset;
-
-            // If this `line` (as displayed) contains the requested cursor row,
-            // then we're done iterating over the lines in the scrollback buffer.
-            if row_index >= target_row {
-                break;
-            }
-
-            // Advance to the next line in the scrollback buffer
-            line_index += LineIndex(1);
-            unit_index = UnitIndex(0);
-            row_offset = 0;
-        }
-
-        let row_overshoot = row_index.saturating_sub(target_row);
-        // TODO: handle the case when there are no soft line breaks in the given `line` 
-        let unit_idx_at_cursor = line.soft_line_breaks[line.soft_line_breaks.len() - 1 - row_overshoot];
-        let mut column_idx_of_unit = Column(0);
-        let mut found_unit = None;
-        // TODO: set the end bound of the iteration at the next soft line break if there is one, or if not, stick with `..`.
-        for (i, unit) in (&line.units[unit_idx_at_cursor.0 ..]).iter().enumerate() {
-            let width = Column(match unit.displayable_width() {
-                0 => self.tab_width,
-                w => w,
-            });
-            if cursor_point.column >= column_idx_of_unit 
-                && cursor_point.column < (column_idx_of_unit + width)
-            {
-                found_unit = Some(UnitIndex(unit_idx_at_cursor.0 + i));
-                break;
-            }
-            column_idx_of_unit += width;
-        }
-
-        let found_unit = if let Some(idx) = found_unit {
-            idx
-        } else {
-            // TODO: adjust the `column_idx_of_unit` when we change the 
-            UnitIndex(line.len() - 1)
-        };
-
-        (
-            ScrollbackBufferPoint { unit_idx: unit_index, line_idx: line_index },
-            ScreenPoint { column: column_idx_of_unit, row: cursor_point.row, }
-        )
-    }
-
-    /*
-    /// Moves the cursor to the given position, snapping it to the nearest line and column 
-    /// that actually exist in the scrollback buffer. 
-    ///
-    /// This performs all the logic necessary to update the cursor:
-    /// * 
-    fn update_cursor_to_position(&mut self, new_cursor_point: ScreenPoint) {
-        let start_point = self.scroll_position.start_point();
-
-        let target_point = start_point + new_cursor_point;
-        let closest_line_idx = min(target_point.y, self.scrollback_buffer.len().saturating_sub(1) as u16);
-        let closest_line = &self.scrollback_buffer[closest_line_idx];
-        let closest_column_idx = min(target_point.x, closest_line.len().saturating_sub(1) as u16);
-        let closest_column = &closest_line[closest_column_idx];
-
-    }
-
-
-
-    /// Moves the cursor to the given `new_position`.
-    ///
-    /// If the cursor position specified does not match an existing `Unit`,
-    /// the cursor will be moved back to the next closest `Unit` before the `new_position`.
-    fn move_cursor_to(&mut self, new_position: Point2D) {
-        self.cursor.position = Point2D { 
-            x: min(self.screen_size.x, new_position.x),
-            y: min(self.screen_size.y, new_position.y),
-        }
-    }
-    */
 }
 
-struct TerminalParserHandler<'term, Backend: TerminalBackend> {
+/// A struct that implements handlers for all terminal emulator actions, 
+/// e.g., printing input characters, scrolling, moving the cursor, etc. 
+struct TerminalActionHandler<'term, Backend: TerminalBackend> {
     // Note: we capture a mutable reference to each relevant field from the [`TextTerminal`] struct
     //       in order to work around Rust's inability to split multiple mutable borrows.
     scrollback_buffer: &'term mut ScrollbackBuffer,
     scrollback_cursor: &'term mut ScrollbackBufferPoint,
-    cursor: &'term mut Cursor,
+    scroll_position: &'term mut ScrollPosition,
+    screen_cursor: &'term mut ScreenCursor,
     backend: &'term mut Backend,
     tab_width: &'term mut u16,
     mode: &'term mut TerminalMode,
 }
 
-impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, Backend> {
+impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, Backend> {
 
     // The callback invoked when a single character is ready to be printed to the screen.
     fn print(&mut self, c: char) {
@@ -632,44 +585,51 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
             return self.execute(AsciiControlCodes::BackwardsDelete);
         }
 
+        let style = Style::default(); // TODO: keep track of the current style changeset, if any, and use it here.
+
         let screen_size = self.backend.screen_size();
         let tab_width = *self.tab_width;
         let orig_scrollback_pos = *self.scrollback_cursor;
         let dest_line = &mut self.scrollback_buffer[orig_scrollback_pos.line_idx];
-        let new_unit = Unit { character: Character::Single(c), style: Style::default() };
-        let new_unit_width = match new_unit.displayable_width() {
-            0 => Column(tab_width),
-            w => Column(w),
+        let display_action = match self.mode.insert { 
+            InsertMode::Insert => {
+                self.scrollback_cursor.unit_idx = dest_line.insert_unit(
+                    orig_scrollback_pos.unit_idx,
+                    c,
+                    style,
+                    tab_width,
+                );
+                DisplayAction::Insert {
+                    scrollback_start: orig_scrollback_pos,
+                    scrollback_end:   *self.scrollback_cursor,
+                    screen_start:     self.screen_cursor.position,
+                }
+            }
+            InsertMode::Overwrite => {
+                let (new_unit_index, width_diff) = dest_line.replace_unit(
+                    orig_scrollback_pos.unit_idx,
+                    c,
+                    style,
+                    tab_width,
+                );
+                self.scrollback_cursor.unit_idx = new_unit_index;
+                DisplayAction::Overwrite {
+                    scrollback_start: orig_scrollback_pos,
+                    scrollback_end:   *self.scrollback_cursor,
+                    screen_start:     self.screen_cursor.position,
+                    width_difference: width_diff,
+                }
+            }
         };
-        if self.mode.insert == InsertMode::Insert {
-            dest_line.insert_unit(
-                orig_scrollback_pos.unit_idx,
-                new_unit,
-                screen_size.num_columns,
-                tab_width,
-            );
-        } else {
-            dest_line.replace_unit(
-                orig_scrollback_pos.unit_idx,
-                new_unit,
-                screen_size.num_columns,
-                tab_width,
-            );
-        }
-        self.scrollback_cursor.unit_idx.0 += 1;
 
-        // Now that we've handled inserting everything into the scrollback buffer,
-        // we can move on to refreshing the display.
-        let display_action = DisplayAction::Insert {
-            scrollback_start: orig_scrollback_pos,
-            scrollback_end:   *self.scrollback_cursor,
-            screen_start:     self.cursor.position,
-        };
-        let lines = &self.scrollback_buffer;
-        let new_screen_cursor = self.backend.display(display_action, lines, None).unwrap();
+        // Now that we've handled modifying the scrollback buffer, we can move refresh the display.
+        let _orig_screen_cursor = self.screen_cursor.position;
+        let new_screen_cursor = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+        self.screen_cursor.position = new_screen_cursor;
 
-        let (new_screen_cursor, scroll_action) = increment_screen_cursor(self.cursor.position, new_unit_width, screen_size);
-        self.cursor.position = new_screen_cursor;
+        debug!("print({:?}): moved cursors from:\n\t {:?} -> {:?} \n\t {:?} -> {:?}",
+            c, orig_scrollback_pos, self.scrollback_cursor, _orig_screen_cursor, self.screen_cursor.position
+        );
 
         // TODO: handle scroll_action appropriately
     }
@@ -688,6 +648,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
             }
             AsciiControlCodes::LineFeed | AsciiControlCodes::VerticalTab => {
                 self.line_feed();
+                debug!("After line_feed(): {:?}, {:?}", self.scrollback_cursor, self.screen_cursor.position);
                 if self.mode.lf_sends_cr == LineFeedSendsCarriageReturn::Yes {
                     self.carriage_return();
                 }
@@ -696,42 +657,39 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
             AsciiControlCodes::Backspace => {
                 // The backspace action simply moves the cursor back by one unit, 
                 // without modifying the content or wrapping to the previous line.
-                let wrap = WrapLine::No;
-                let (intended_cursor_position, _scroll) = decrement_screen_cursor(self.cursor.position, Column(1), screen_size, wrap);
-                // Only move the scrollback cursor if the screen cursor actually needs to move.
-                if self.cursor.position != intended_cursor_position {
-                    let new_cursor_position = self.backend.move_cursor_by(-1, 0);
-                    assert_eq!(intended_cursor_position, new_cursor_position);
-                    self.cursor.position = new_cursor_position;
-                    *self.scrollback_cursor = decrement_scrollback_cursor(*self.scrollback_cursor, &*self.scrollback_buffer, wrap);
+                if self.screen_cursor.position.column != Column(0) {
+                    self.move_left(1, Wrap::No);
                 }
             }
             AsciiControlCodes::BackwardsDelete => {
-                // Delete the previous unit from the scrollback buffer
-                let wrap = WrapLine::Yes;
-                let orig_buffer_pos = *self.scrollback_cursor;
-                *self.scrollback_cursor = decrement_scrollback_cursor(orig_buffer_pos, &self.scrollback_buffer, wrap);
-                if orig_buffer_pos == *self.scrollback_cursor {
-                    return;
-                }
-
-                let scrollback_cursor = *self.scrollback_cursor;
-                let tab_width = *self.tab_width;
-                let removed_unit_width = self.scrollback_buffer[scrollback_cursor.line_idx].delete_unit(
-                    scrollback_cursor.unit_idx,
-                    screen_size.num_columns,
-                    tab_width,
+                // Move to the previous "whole" unit (skipping over continuance units) in the scrollback buffer and delete it.
+                let wrap = Wrap::Yes;
+                let (new_scrollback_position, new_screen_position, scroll_action) = decrement_both_cursors(
+                    *self.scrollback_cursor,
+                    self.screen_cursor.position,
+                    1,
+                    &self.scrollback_buffer,
+                    screen_size,
+                    wrap,
                 );
+                *self.scrollback_cursor = new_scrollback_position;
+                // Note that we don't need to separately move the screen cursor here,
+                // as the below call to `display()` will automatically move it for us.
 
-                let (ending_screen_cursor, _scroll_action) = decrement_screen_cursor(self.cursor.position, removed_unit_width, screen_size, wrap); 
+                // TODO: handle scroll_action here
+
+                // After we've moved back one unit, delete that unit and then issue a corresponding display action.
+                let num_units_removed = self.scrollback_buffer[new_scrollback_position.line_idx].delete_unit(new_scrollback_position.unit_idx);
                 let display_action = DisplayAction::Delete {
-                    screen_start: self.cursor.position,
-                    screen_end:   ending_screen_cursor,
+                    screen_start: new_screen_position,
+                    scrollback_start: new_scrollback_position,
+                    num_units: num_units_removed,
                 };
                 let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
-                debug!("After BackwardsDelete, screen cursor moved from {:?} -> {:?}", self.cursor.position, screen_cursor_after_display);
-                self.cursor.position = screen_cursor_after_display;
-                warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
+                debug!("After BackwardsDelete, screen cursor moved from {:?} -> {:?}", self.screen_cursor.position, screen_cursor_after_display);
+                self.screen_cursor.position = screen_cursor_after_display;
+                // warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
+                assert_eq!(screen_cursor_after_display, new_screen_position);
             }
             // Temp hack to handle Ctrl + C being pressed
             0x03 => {
@@ -764,71 +722,63 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
         );
     }
 
-    fn csi_dispatch(&mut self, _params: &vte::Params, _intermediates: &[u8], _ignore: bool, action: char) {
+    fn csi_dispatch(&mut self, params: &vte::Params, _intermediates: &[u8], _ignore: bool, action: char) {
         debug!("[CSI_DISPATCH]: parameters: {:?}\n\t intermediates: {:X?}\n\t ignore?: {}, action: {:?}",
-            _params, _intermediates, _ignore, action,
+            params, _intermediates, _ignore, action,
         );
         let screen_size = self.backend.screen_size();
 
-        match action {
-            '~' => {
-                // TODO: forward delete was pressed, only if the params are '3'
-                // Delete the current unit from the scrollback buffer
-                let wrap = WrapLine::Yes;
-                // Check that the scrollback_cursor is not at the end of a Line, as there'd be no Unit to delete.
+        let mut params_iter = params.into_iter();
+        let first_param = params_iter.next();
+        let first_param_value = match first_param.into_iter().flatten().copied().next() {
+            Some(x) if x != 0 => x,
+            other => 1, // the default parameter is `1` (for when the parameter is absent or 0).
+        };
+
+        const FORWARD_DELETE_PARAM: u16 = 3;
+        const HOME_KEY_PARAM: u16 = 1;
+        const END_KEY_PARAM: u16 = 4;
+
+        match (action, first_param_value) {
+            ('~', FORWARD_DELETE_PARAM) => {
+                // Forward delete (the "Delete" key) was pressed, so delete the current unit from the scrollback buffer.
+                let wrap = Wrap::Yes;
                 let scrollback_cursor = *self.scrollback_cursor;
-                if scrollback_cursor.unit_idx.0 >= self.scrollback_buffer[scrollback_cursor.line_idx].len() {
-                    return;
-                }
-
-                let tab_width = *self.tab_width;
-                let removed_unit_width = self.scrollback_buffer[scrollback_cursor.line_idx].delete_unit(
-                    scrollback_cursor.unit_idx,
-                    screen_size.num_columns,
-                    tab_width,
-                );
-
-                let current_screen_cursor = self.cursor.position;
-                let (ending_screen_cursor, _scroll_action) = increment_screen_cursor(current_screen_cursor, removed_unit_width, screen_size); 
+                let num_units_removed = self.scrollback_buffer[scrollback_cursor.line_idx].delete_unit(scrollback_cursor.unit_idx);
                 let display_action = DisplayAction::Delete {
-                    screen_start: current_screen_cursor,
-                    screen_end:   ending_screen_cursor,
+                    screen_start: self.screen_cursor.position,
+                    num_units: num_units_removed,
+                    scrollback_start: scrollback_cursor,
                 };
-                let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+                let _screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+                assert_eq!(self.screen_cursor.position, _screen_cursor_after_display);
             }
-            'A' => {
-                // TODO: up arrow was pressed
+            ('~', HOME_KEY_PARAM) => {
+                // Home key was pressed, move to the beginning of the current row.
+                self.move_left(screen_size.num_columns.0 as usize, Wrap::No);
             }
-            'B' => {
-                // TODO: down arrow as pressed
+            ('~', END_KEY_PARAM) => {
+                // End key was pressed, move to the end (after the last unit) of the current row.
+                self.move_right(screen_size.num_columns.0 as usize, Wrap::No);
             }
-            'C' => {
-                // TODO: right arrow was pressed
+            ('A', num_rows) => {
+                // Down arrow was pressed, move the cursor up.
+                self.move_up(Row(1));
             }
-            'D' => {
-                // left arrow was pressed, move the cursor left by one unit.
-                let wrap = WrapLine::Yes;
-                let scrollback_cursor = *self.scrollback_cursor;
-                let intended_scrollback_position = decrement_scrollback_cursor(scrollback_cursor, &*self.scrollback_buffer, wrap);
-                // Only move the screen cursor if the scrollback cursor would actually move.
-                if intended_scrollback_position != scrollback_cursor {
-                    *self.scrollback_cursor = intended_scrollback_position;
-                    // TODO: adjust the screen cursor if the scrollback cursor wrapped to the previous line, 
-                    //       since it wouldn't necessarily be displayed in the last column.
-                    if intended_scrollback_position.line_idx != scrollback_cursor.line_idx {
-                        warn!("Left arrow: unimplemented support for adjusting wrapped screen cursor properly based on buffer contents");
-                    }
-                    let screen_cursor = self.cursor.position;
-                    let (intended_cursor_position, _scroll) = decrement_screen_cursor(screen_cursor, Column(1), screen_size, wrap);
-                    let new_cursor_position = self.backend.move_cursor_by(-1, 0);
-                    assert_eq!(intended_cursor_position, new_cursor_position);
-                    self.cursor.position = new_cursor_position;
-                    debug!("Left arrow moved from:\n\t {:?} -> {:?}\n\t {:?} -> {:?}", scrollback_cursor, self.scrollback_cursor, screen_cursor, self.cursor.position);
-                    warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
-                }
+            ('B', num_rows) => {
+                // Down arrow was pressed, move the cursor down.
+                self.move_down(Row(1));
+            }
+            ('C', num_units) => {
+                // Right arrow was pressed, move the cursor right.
+                self.move_right(num_units as usize, Wrap::Yes);
+            }
+            ('D', num_units) => {
+                // Left arrow was pressed, move the cursor left.
+                self.move_left(num_units as usize, Wrap::Yes);
             }
 
-            _ => debug!("[CSI_DISPATCH] unhandled action: {}", action),
+            (_action, _first_param) => debug!("[CSI_DISPATCH] unhandled action: {}, first param: {}", _action, _first_param),
         }
 
     }
@@ -840,123 +790,80 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalParserHandler<'term, B
     }
 }
 
-impl<'term, Backend: TerminalBackend> TerminalParserHandler<'term, Backend> {
-    /// Moves the screen cursor to the next row and adjusts the scrollback cursor position
-    /// to the `Unit` in the scrollback buffer at the corresponding position.
-    ///
-    /// The screen cursor's column position is not changed.
+impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
+    /// Moves the screen cursor down one row.
     ///
     /// If in Insert mode, a new `Line` will be inserted into the scrollback buffer,
     /// with the remainder of the `Line` being reflowed onto the next new `Line`.
+    /// The column will be set back to `Column(0)`.
     ///
-    /// In either Insert or Overwrite mode, a new `Line` will be added if the screen cursor
+    /// If in Overwrite mode, only the cursor's row position will be moved;
+    /// no line will be inserted and the column position will not change.
+    ///
+    /// In either Insert or Overwrite mode, a new `Line` will be added if the cursor
     /// is already at the last displayable line of the scrollback buffer.
+    ///
+    /// As expected, this also adjusts the scrollback cursor position to the `Unit`
+    /// in the scrollback buffer at the corresponding new position of the screen cursor.
     fn line_feed(&mut self) {
         let screen_size = self.backend.screen_size();
-        let original_screen_cursor = self.cursor.position;
+        let screen_width = screen_size.num_columns.0 as usize;
+        let original_screen_cursor = self.screen_cursor.position;
 
-        // Adjust the scrollback cursor position to the unit displayed one row beneath it
+        debug!("line_feed(): current position: {:?} {:?}", self.scrollback_cursor, self.screen_cursor.position);
+
         if self.mode.insert == InsertMode::Overwrite {
-            let unit_idx = self.scrollback_cursor.unit_idx;
-            let line = &self.scrollback_buffer[self.scrollback_cursor.line_idx];
-            let unit_idx_of_current_line_break = line.soft_line_breaks.iter()
-                .skip_while(|&&soft_break| unit_idx < soft_break)
-                .next();
+            // Adjust the scrollback cursor position to the unit displayed one row beneath it
+            self.move_down(Row(1));
+            debug!("line_feed(): after move_down() position: {:?} {:?}", self.scrollback_cursor, self.screen_cursor.position);
 
-            // If there is a soft line break after the current unit, then use that to calculate 
-            // what the next unit is.
-            if let Some(next_soft_lb) = unit_idx_of_current_line_break {
-                // Iterate over all the units in this Line, starting from the next soft line break
-                // until we reach the displayed width specified by the current screen cursor's column position.
-                let mut width_so_far = 0;
-                let mut units_iterated = 0;
-                let mut previous_style = Style::default();
-                let mut target_unit = None;
-                for (i, unit) in (&line.units[next_soft_lb.0 ..]).iter().enumerate() {
-                    previous_style = unit.style;
-                    width_so_far += match unit.displayable_width() {
-                        0 => *self.tab_width,
-                        w => w,
-                    };
-                    if width_so_far >= original_screen_cursor.column.0 {
-                        // Found the proper unit
-                        target_unit = Some(unit);
-                        break;
-                    }
-                    units_iterated += 1;
+            if let Some(line) = self.scrollback_buffer.get(self.scrollback_cursor.line_idx.0) {
+                // We're within the bounds of an existing Line, so there's nothing else to do.
+                self.screen_cursor.underneath = line.get(self.scrollback_cursor.unit_idx.0)
+                    .map(|unit| unit.clone())
+                    .unwrap_or_else(|| Unit {
+                        style: line.last().map(|last_unit| last_unit.style).unwrap_or_default(),
+                        ..Default::default()
+                    });
+            } else {
+                // There weren't enough existing Lines, so we need to insert them.
+                let num_empty_lines_to_insert = self.scrollback_cursor.line_idx.0 - self.scrollback_buffer.len() + 1;
+                debug!("line_feed(): inserting {} empty lines", num_empty_lines_to_insert);
+                for _i in 0..num_empty_lines_to_insert {
+                    self.scrollback_buffer.push(Line::new());
                 }
-
-                if let Some(t) = target_unit {
-                    // We found a Unit that corresponds to the screen cursor's column.
-                    self.scrollback_cursor.unit_idx = UnitIndex(units_iterated);
-                    self.cursor.underneath = t.clone();
-                } else {
-                    // We didn't find a Unit that corresponds to the screen cursor's column.
-                    // Thus, the line was too short to reach that column, so we set the unit index of
-                    // the scrollback buffer such that it will be padded to that column point upon next print.
-                    self.scrollback_cursor.unit_idx = *next_soft_lb + UnitIndex(units_iterated) + 
-                        UnitIndex((original_screen_cursor.column.0 - width_so_far) as usize);
-                    self.cursor.underneath = Unit {
-                        character: Character::default(),
-                        style: previous_style,
-                    };
-                }
-            }
-            // If there are no future soft line breaks, then we're at the end of a displayed line,
-            // so we need to insert a new line into the scrollback_buffer.
-            else {
-                let next_line_idx = self.scrollback_cursor.line_idx + LineIndex(1);
-                let previous_style = line.last().cloned().unwrap_or_default().style;
-                self.scrollback_buffer.insert(next_line_idx.0, Line::new());
-                // This is not a carriage return, we don't move the cursor to column 0.
-                *self.scrollback_cursor = ScrollbackBufferPoint {
-                    line_idx: next_line_idx,
-                    unit_idx: UnitIndex(self.cursor.position.column.0 as usize),
-                };
-                self.cursor.underneath = Unit {
-                    character: Character::default(),
-                    style: previous_style,
-                };
             }
         }
         else {
             // If in Insert mode, we need to split the line at the current unit,
             // insert a new line, and move the remainder of that Line's content into the new line.
             let curr_line = &mut self.scrollback_buffer[self.scrollback_cursor.line_idx];
+            self.scrollback_cursor.unit_idx = curr_line.previous_non_continuance_unit(self.scrollback_cursor.unit_idx);
             let new_line_units = curr_line.units.split_off(self.scrollback_cursor.unit_idx.0);
-            let mut new_line = Line {
-                units: new_line_units,
-                soft_line_breaks: Vec::new(),
-            };
-            // TODO: we can recalculate curr_line soft breaks faster by deleting all of the ones greater than the current unit_idx.
-            curr_line.recalculate_soft_line_breaks(screen_size.num_columns, *self.tab_width);
-            new_line.recalculate_soft_line_breaks(screen_size.num_columns, *self.tab_width);
+            let new_line = Line { units: new_line_units };
 
             // Insert the split-off new line into the scrollback buffer
             let next_line_idx = self.scrollback_cursor.line_idx + LineIndex(1);
             *self.scrollback_cursor = ScrollbackBufferPoint {
                 line_idx: next_line_idx,
-                unit_idx: UnitIndex(0),
+                unit_idx: UnitIndex(0), // could also keep the unit index as is, and insert padding into `new_line_units`
             };
             self.scrollback_buffer.insert(next_line_idx.0, new_line);
-            
-            self.cursor.underneath = self.scrollback_buffer[*self.scrollback_cursor].clone();
-            self.cursor.position.column.0 = 0;
-        }
 
-        // Actually move the screen cursor down to the next row.
-        // The screen cursor's column has already been adjusted above.
-        let scroll_action = {
-            self.cursor.position.row.0 += 1;
-            if self.cursor.position.row >= screen_size.num_rows {
-                self.cursor.position.row = screen_size.num_rows - Row(1);
-                ScrollAction::Down(1)
+            // Actually move the screen cursor down to the next row.
+            // The screen cursor's column has already been adjusted above.
+            self.screen_cursor.position.column.0 = 0;
+            self.screen_cursor.position.row.0 += 1;
+            let scroll_action = if self.screen_cursor.position.row > screen_size.last_row() {
+                let scroll_down = ScrollAction::Down(self.screen_cursor.position.row.0 as usize - screen_size.last_row().0 as usize);
+                self.screen_cursor.position.row = screen_size.last_row();
+                scroll_down
             } else {
                 ScrollAction::None
-            }
-        };
-        // TODO: process the `scroll_action`
-        self.backend.move_cursor_to(self.cursor.position);
+            };
+            // TODO: handle scroll action
+            self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
+        }
     }
 
     /// Moves the screen cursor back to the beginning of the current row
@@ -965,22 +872,368 @@ impl<'term, Backend: TerminalBackend> TerminalParserHandler<'term, Backend> {
     /// Note that a carriage return alone does not move the screen cursor down to the next row,
     /// only a line feed (new line) can do that.
     fn carriage_return(&mut self) {
+        if self.screen_cursor.position.column == Column(0) { return; }
+
         let unit_idx = self.scrollback_cursor.unit_idx;
-        let line = &self.scrollback_buffer[self.scrollback_cursor.line_idx];
-        let idx_of_preceding_line_break = line.soft_line_breaks.iter()
-            .rfind(|&&soft_break| unit_idx >= soft_break)
-            .cloned()
-            .unwrap_or_default(); // No soft line breaks --> cursor goes to the beginning of the line.
+        let screen_width = self.backend.screen_size().num_columns.0 as usize;
+        let index_of_previous_wrap = util::round_down(unit_idx.0, screen_width); 
         
         debug!("carriage_return: setting scrollback buffer at {:?} from {:?} to {:?}",
-            self.scrollback_cursor.line_idx, self.scrollback_cursor.unit_idx, idx_of_preceding_line_break
+            self.scrollback_cursor.line_idx, self.scrollback_cursor.unit_idx, index_of_previous_wrap
         );
-        self.scrollback_cursor.unit_idx = idx_of_preceding_line_break;
+        self.scrollback_cursor.unit_idx = UnitIndex(index_of_previous_wrap);
+        // self.screen_cursor.underneath = self.scrollback_buffer[*self.scrollback_cursor].clone();
 
         // Move the screen cursor to the beginning of the current row.
-        self.cursor.position.column = Column(0);
-        self.backend.move_cursor_to(self.cursor.position);
+        self.screen_cursor.position.column = Column(0);
+        self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
     }
+
+
+    /// Moves the screen cursor up by the given number of rows
+    /// and sets the scrollback buffer position to the corresponding line and unit index.
+    ///
+    /// This is a free-floating move operation that **does not** align the 
+    /// screen cursor to existing units in the scrollback buffer.
+    /// That must be done separately if desired. 
+    fn move_up(&mut self, num_rows: Row) {
+        let screen_size = self.backend.screen_size();
+        let orig_screen_position = self.screen_cursor.position;
+        let orig_scrollback_position = *self.scrollback_cursor;
+        if orig_screen_position.row == Row(0) { return; }
+
+        // First, adjust the screen cursor up by `num_rows`.
+        let num_rows = num_rows.0 as usize;
+        let orig_row = orig_screen_position.row.0 as usize;
+        let (new_screen_row, scroll_action) = if num_rows > orig_row {
+            (Row(0), ScrollAction::Up(num_rows - orig_row))
+        } else {
+            (Row((orig_row - num_rows) as u16), ScrollAction::None)
+        };
+
+        self.screen_cursor.position.row = new_screen_row;
+        trace!("move_up({:?}): orig_row: {:?}, new_screen_row: {:?}", num_rows, orig_row, new_screen_row);
+        self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
+
+        // TODO: handle scroll action
+
+        let new_scrollback_position = self.screen_cursor.position.to_scrollback_point(
+            // TODO: after `to_scrollback_point()` supports backwards navigation from a point below the current screen point,
+            //       then we can use the original positions. But since it doesn't support that, we must use the current scroll position.
+            //
+            // (orig_scrollback_position, orig_screen_position),
+            (self.scroll_position.start_point(), ScreenPoint::default()),
+            &self.scrollback_buffer,
+            screen_size
+        );
+        *self.scrollback_cursor = new_scrollback_position;
+    }
+
+    /// Moves the screen cursor down by the given number of rows
+    /// and sets the scrollback buffer position to the corresponding line and unit index.
+    ///
+    /// This is a free-floating move operation that **does not** align the 
+    /// screen cursor to existing units in the scrollback buffer.
+    /// That must be done separately if desired. 
+    fn move_down(&mut self, num_rows: Row) {
+        let screen_size = self.backend.screen_size();
+        let orig_screen_position = self.screen_cursor.position;
+        let orig_scrollback_position = *self.scrollback_cursor;
+
+        // First, adjust the screen cursor down by `num_rows`.
+        let orig_row = orig_screen_position.row.0 as usize;
+        let last_row = screen_size.last_row().0 as usize;
+        let target_row = orig_row + num_rows.0 as usize;
+        let (new_screen_row, scroll_action) = if target_row > last_row {
+            (screen_size.last_row(), ScrollAction::Down(target_row - last_row))
+        } else {
+            (Row(target_row as u16), ScrollAction::None)
+        };
+
+        self.screen_cursor.position.row = new_screen_row;
+        trace!("move_down({:?}): orig_row: {:?} target_row: {:?}, new_screen_row: {:?}", num_rows, orig_row, target_row, new_screen_row);
+        self.screen_cursor.position = self.backend.move_cursor_to(self.screen_cursor.position);
+
+        // TODO: handle scroll action
+
+        let new_scrollback_position = self.screen_cursor.position.to_scrollback_point(
+            (orig_scrollback_position, orig_screen_position),
+            &self.scrollback_buffer,
+            screen_size
+        );
+        *self.scrollback_cursor = new_scrollback_position;
+    }
+
+    fn move_left(&mut self, num_units: usize, wrap: Wrap) {
+        let (new_scrollback_position, new_screen_position, scroll_action) = decrement_both_cursors(
+            *self.scrollback_cursor,
+            self.screen_cursor.position,
+            num_units,
+            &self.scrollback_buffer,
+            self.backend.screen_size(),
+            wrap,
+        );
+
+        debug!("move_left({}, Wrap::{:?}): moving from\n\t {:?} -> {:?}\n\t {:?} -> {:?} \n\t scroll action: {:?}",
+            num_units, wrap, self.scrollback_cursor, new_scrollback_position, self.screen_cursor.position, new_screen_position, scroll_action
+        );
+
+        *self.scrollback_cursor = new_scrollback_position;
+        self.screen_cursor.position = self.backend.move_cursor_to(new_screen_position);
+
+        // TODO: handle or return scroll_action here
+    }
+
+    fn move_right(&mut self, num_units: usize, wrap: Wrap) {
+        let (new_scrollback_position, new_screen_position, scroll_action) = increment_both_cursors(
+            *self.scrollback_cursor,
+            self.screen_cursor.position,
+            num_units,
+            &self.scrollback_buffer,
+            self.backend.screen_size(),
+            wrap,
+        );
+
+        debug!("move_right({}, Wrap::{:?}): moving from\n\t {:?} -> {:?}\n\t {:?} -> {:?} \n\t scroll action: {:?}",
+            num_units, wrap, self.scrollback_cursor, new_scrollback_position, self.screen_cursor.position, new_screen_position, scroll_action
+        );
+
+        *self.scrollback_cursor = new_scrollback_position;
+        self.screen_cursor.position = self.backend.move_cursor_to(new_screen_position);
+
+        // TODO: handle or return scroll_action here
+    }
+
+
+    #[inline]
+    fn get_unit_underneath_cursor(&mut self) {
+
+    }
+
+}
+
+
+/// Decrements the scrollback cursor by the given number of units
+/// and moves the screen cursor correspondingly (in conjunction) with the scrollback cursor.
+///
+/// Returns the new positions of the scrollback cursor and the screen cursor,
+/// as well as a `ScrollAction` describing what, if any, scrolling action needs to occur
+/// based on the cursor movement.
+///
+/// After moving the scrollback cursor by `num_units`, its position will be auto-snapped
+/// to the closest previous non-continuance unit to ensure it is validly aligned.
+/// 
+fn decrement_both_cursors(
+    scrollback_position: ScrollbackBufferPoint,
+    screen_position: ScreenPoint,
+    mut num_units: usize,
+    scrollback_buffer: &ScrollbackBuffer,
+    screen_size: ScreenSize,
+    wrap: Wrap,
+) -> (ScrollbackBufferPoint, ScreenPoint, ScrollAction) {
+    let screen_width = screen_size.num_columns.0 as usize;
+
+    if wrap == Wrap::No {
+        // Don't decrement past the beginning of a screen row. 
+        let new_scrollback_position = max(
+            util::round_down(scrollback_position.unit_idx.0, screen_width),
+            scrollback_position.unit_idx.0.saturating_sub(num_units)
+        );
+        let new_scrollback_unit_idx = scrollback_buffer[scrollback_position.line_idx]
+            .previous_non_continuance_unit(UnitIndex(new_scrollback_position));
+        let units_moved = scrollback_position.unit_idx - new_scrollback_unit_idx;
+        let new_screen_column = screen_position.column.0.saturating_sub(units_moved.0 as u16);
+        return (
+            ScrollbackBufferPoint { line_idx: scrollback_position.line_idx, unit_idx: new_scrollback_unit_idx },
+            ScreenPoint { row: screen_position.row, column: Column(new_screen_column) },
+            ScrollAction::None
+        );
+    }
+
+    // Here, we handle the more complex case of cursor movement that may wrap backwards to a previous row/line.
+    let mut scrollback_position = scrollback_position;
+    let mut screen_rows_moved_up = 0;
+    let mut screen_column = screen_position.column;
+
+    while num_units > 0 {
+        // Move backwards in this Line by up to `num_units`, not exceeding the bounds of this Line's units vector.  
+        let original_unit_idx = scrollback_position.unit_idx.0;
+        let new_unit_idx = original_unit_idx.saturating_sub(num_units);
+        scrollback_position.unit_idx.0 = new_unit_idx;
+
+        num_units = num_units.saturating_sub(original_unit_idx); // we've "handled" `original_unit_idx` units worth of movement
+
+        // Calculate how many screen rows we just moved up when moving backwards in this Line's unit index.
+        let old_row = original_unit_idx / screen_width;
+        let new_row = new_unit_idx / screen_width;
+        screen_rows_moved_up += old_row - new_row;
+        screen_column = Column((scrollback_position.unit_idx.0 % screen_width) as u16);
+
+        // If we still have more units to move backwards by, 
+        // then we need to wrap back to the previous Line in the scrollback buffer (if there is one).
+        if num_units > 0 {
+            if scrollback_position.line_idx > LineIndex(0) {
+                // wrap backwards to the end of the previous line
+                scrollback_position.line_idx -= LineIndex(1);
+                scrollback_position.unit_idx = scrollback_buffer[scrollback_position.line_idx].last_unit();
+                num_units = num_units.saturating_sub(1);
+
+                // Calculate the corresponding screen position
+                screen_column = Column((scrollback_position.unit_idx.0 % screen_width) as u16);
+                screen_rows_moved_up += 1;
+            } else {
+                // we're at the first line, so there's nowhere to wrap backwards to.
+                break;
+            }
+        }
+    }
+
+    // Adjust the cursor to the closest previous non-continuance unit boundary.
+    let original_unit_idx = scrollback_position.unit_idx;
+    let new_unit_idx = scrollback_buffer[scrollback_position.line_idx]
+        .previous_non_continuance_unit(scrollback_position.unit_idx);
+
+    if new_unit_idx != original_unit_idx {
+        scrollback_position.unit_idx = new_unit_idx;
+
+        // Calculate how many screen rows we just moved up when moving to the previous non-continuance unit.
+        let old_row = original_unit_idx.0 / screen_width;
+        let new_row = new_unit_idx.0 / screen_width;
+        screen_rows_moved_up += old_row - new_row;
+        screen_column = Column((new_unit_idx.0 % screen_width) as u16);
+    }
+
+    // Finally, use `screen_rows_moved_up` to calculate the new screen cursor position
+    // and whether a scroll action is necessary.
+    let orig_row = screen_position.row;
+    let (new_screen_row, scroll_action) = if screen_rows_moved_up > orig_row.0 as usize {
+        (Row(0), ScrollAction::Up(screen_rows_moved_up - orig_row.0 as usize))
+    } else {
+        (Row(orig_row.0 - screen_rows_moved_up as u16), ScrollAction::None)
+    };
+    
+    (
+        scrollback_position,
+        ScreenPoint {
+            row:    new_screen_row,
+            column: screen_column,
+        },
+        scroll_action,
+    )
+}
+
+
+
+/// Increments the scrollback cursor by the given number of units
+/// and moves the screen cursor correspondingly (in conjunction) with the scrollback cursor.
+///
+/// Returns the new positions of the scrollback cursor and the screen cursor,
+/// as well as a `ScrollAction` describing what, if any, scrolling action needs to occur
+/// based on the cursor movement.
+///
+/// After moving the scrollback cursor by `num_units`, its position will be auto-snapped
+/// to the next closest non-continuance unit to ensure it is validly aligned.
+/// 
+fn increment_both_cursors(
+    scrollback_position: ScrollbackBufferPoint,
+    screen_position: ScreenPoint,
+    mut num_units: usize,
+    scrollback_buffer: &ScrollbackBuffer,
+    screen_size: ScreenSize,
+    wrap: Wrap,
+) -> (ScrollbackBufferPoint, ScreenPoint, ScrollAction) {
+    let screen_width = screen_size.num_columns.0 as usize;
+
+    if wrap == Wrap::No {
+        let line = &scrollback_buffer[scrollback_position.line_idx];
+        // Don't increment past the last screen column or past the end of this line.
+        let new_scrollback_unit_idx = min(min(
+            util::round_down(scrollback_position.unit_idx.0, screen_width) + screen_width - 1,
+            line.len()), // not `len() - 1` because we want to move the cursor to right after the last unit
+            scrollback_position.unit_idx.0.saturating_add(num_units),
+        );
+        let new_scrollback_unit_idx = line.next_non_continuance_unit(UnitIndex(new_scrollback_unit_idx));
+        let units_moved = new_scrollback_unit_idx - scrollback_position.unit_idx;
+        let new_screen_column = screen_position.column.0.saturating_add(units_moved.0 as u16);
+        return (
+            ScrollbackBufferPoint { line_idx: scrollback_position.line_idx, unit_idx: new_scrollback_unit_idx },
+            ScreenPoint { row: screen_position.row, column: Column(new_screen_column) },
+            ScrollAction::None
+        );
+    }
+
+    // Here, we handle the more complex case of cursor movement that may wrap forwards to a future row/line.
+    let mut scrollback_position = scrollback_position;
+    let mut screen_rows_moved_down = 0;
+    let mut screen_column = screen_position.column;
+
+    while num_units > 0 {
+        // Move forwards in this Line by up to `num_units`, not exceeding the bounds of this Line's units vector.  
+        let original_unit_idx = scrollback_position.unit_idx.0;
+        let new_unit_idx = original_unit_idx.saturating_add(num_units);
+        scrollback_position.unit_idx = min(UnitIndex(new_unit_idx), scrollback_buffer[scrollback_position.line_idx].last_unit());
+
+        num_units = num_units.saturating_sub(scrollback_position.unit_idx.0 - original_unit_idx); // we've "handled" this many units worth of movement
+
+        // Calculate how many screen rows we just moved down when moving forwards through this Line's units.
+        let old_row = original_unit_idx / screen_width;
+        let new_row = new_unit_idx / screen_width;
+        screen_rows_moved_down += new_row - old_row;
+        screen_column = Column((scrollback_position.unit_idx.0 % screen_width) as u16);
+
+        // If we still have more units to move forwards by, 
+        // then we need to wrap forwards to the next Line in the scrollback buffer (if there is one).
+        if num_units > 0 {
+            if scrollback_position.line_idx >= scrollback_buffer.last_line() {
+                // we're at the last line, so there's nowhere to wrap forwards to.
+                break;
+            } else {
+                // wrap forwards to the beginning of the next line
+                scrollback_position.line_idx += LineIndex(1);
+                scrollback_position.unit_idx = UnitIndex(0);
+                num_units = num_units.saturating_sub(1);
+
+                // Calculate the corresponding screen position
+                screen_column = Column(0);
+                screen_rows_moved_down += 1;
+            }
+        }
+    }
+
+    // Adjust the cursor to the next closest non-continuance unit boundary.
+    let original_unit_idx = scrollback_position.unit_idx;
+    let new_unit_idx = scrollback_buffer[scrollback_position.line_idx]
+        .next_non_continuance_unit(scrollback_position.unit_idx);
+
+    if new_unit_idx != original_unit_idx {
+        scrollback_position.unit_idx = new_unit_idx;
+
+        // Calculate how many screen rows we just moved down when moving to the next non-continuance unit.
+        let old_row = original_unit_idx.0 / screen_width;
+        let new_row = new_unit_idx.0 / screen_width;
+        screen_rows_moved_down += new_row - old_row;
+        screen_column = Column((new_unit_idx.0 % screen_width) as u16);
+    }
+
+    // Finally, use `screen_rows_moved_down` to calculate the new screen cursor position
+    // and whether a scroll action is necessary.
+    let orig_row = screen_position.row.0 as usize;
+    let target_row = orig_row + screen_rows_moved_down;
+    let last_row = screen_size.last_row().0 as usize;
+    let (new_screen_row, scroll_action) = if target_row > last_row {
+        (screen_size.last_row(), ScrollAction::Down(target_row - last_row))
+    } else {
+        (Row(target_row as u16), ScrollAction::None)
+    };
+    
+    (
+        scrollback_position,
+        ScreenPoint {
+            row:    new_screen_row,
+            column: screen_column,
+        },
+        scroll_action,
+    )
 }
 
 
@@ -993,7 +1246,7 @@ impl<'term, Backend: TerminalBackend> TerminalParserHandler<'term, Backend> {
 /// In the rare case of a character that consist of multiple UTF-8 sequences, e.g., complex emoji,
 /// we store the entire character here as a dynamically-allocated `String`. 
 /// This saves space in the typical case of a character being 4 bytes or less (`char`-sized).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Character {
     Single(char),
     Multi(String),
@@ -1033,6 +1286,31 @@ impl Default for Character {
 /// but this is different from the concept of a `cell` because it may contain 
 /// more than just a single displayable character, in order to support complex Unicode/emoji.
 ///
+/// ## 1-to-1 Relationship between Units and Columns
+/// It is guaranteed that one `Unit` in the scrollback buffer corresponds to exactly one screen column,
+/// which makes it easy to calculate the conversions between screen cursor coordinate points
+/// and scrollback buffer coordinate points.
+/// For example, if the screen is 80 columns wide, a Line with 120 units will display across
+/// exactly 1.5 lines, displaying right up to the 40th column of the second row.
+///
+/// Because a complex Unicode character may require more than one column to display,
+/// such as a tab or emoji sequence, there are flags in a `Unit` that indicate whether it is 
+/// part of a wider display character sequence.
+/// There are flags for both the beginning unit and all of the placeholder units that follow it 
+/// (which exist solely to satisfy the 1-to-1 relationship between screen columns and scrollback buffer units).
+/// Thus, it is easy to determine where multi-column Unit sequences start and end.
+///
+/// Wide-display character sequences like tabs and emoji are **always** stored completely
+/// in the starting Unit (as a [`Character::Multi`] variant),
+/// with the following placeholder Units containing a default empty [`Character::Single`]
+/// with the null character within it.
+/// This conveniently allows the screen cursor to store a single `Unit` object within it
+/// that represents the entirety of that displayable Unit,
+/// instead of more complex storage strategy that splits up wide character sequences into
+/// multiple `Unit`s.
+///
+///
+/// ## What Units are Not
 /// Displayable control/escape sequences, i.e., those that affect text style,
 /// **do not** exist as individual `Unit`s,
 /// though their effects on text style are represented by a `Unit`'s `FormatFlags`.
@@ -1046,6 +1324,8 @@ pub struct Unit {
     character: Character,
     /// The style/formatting with which this `Unit`s character(s) should be displayed.
     style: Style,
+    /// Indicates if and how this `Unit` is part of a wide-displayed character sequence.
+    wide: WideDisplayedUnit,
 }
 impl Deref for Unit {
     type Target = Character;
@@ -1073,6 +1353,19 @@ impl Default for ScreenSize {
         }
     }
 }
+impl ScreenSize {
+    /// Returns the index of the final `Row`, which is `num_rows - 1`.
+    #[inline(always)]
+    pub fn last_row(&self) -> Row {
+        self.num_rows - Row(1)
+    }
+
+    /// Returns the index of the final `Column`, which is `num_columns - 1`.
+    #[inline(always)]
+    pub fn last_column(&self) -> Column {
+        self.num_columns - Column(1)
+    }
+}
 
 /// A 2D position value that represents a point on the screen,
 /// in which `(0, 0)` represents the top-left corner.
@@ -1098,6 +1391,83 @@ impl PartialOrd for ScreenPoint {
 impl fmt::Debug for ScreenPoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({:?}, {:?})", self.column, self.row)
+    }
+}
+impl ScreenPoint {
+    /// Returns the point in the scrollback buffer that this `ScreenPoint` points to
+    /// based on the given known origin point.
+    ///
+    /// The `origin_point` is the `ScrollbackBufferPoint` that is currently displayed at `ScreenPoint(0,0)`,
+    /// i.s., the coordinate of the `Unit` in the scrollback buffer that is at the upper-left corner of the screen.
+    /// Typically, this can be obtained using the current screen `ScrollPosition`,
+    /// see [`ScrollPosition::start_point()`].
+    ///
+    /// A `Unit` may or may not exist at the returned `ScrollbackBufferPoint`.
+    ///
+    /// If the scrollback buffer does not have sufficient lines (rows) or units (columns),
+    /// this returns a `ScrollbackBufferPoint` based on the assumption that 
+    /// sufficient empty lines (that occupy one row each) and empty units (that occupy one column each) 
+    /// would be inserted into the scrollback buffer.
+    fn to_scrollback_point(
+        &self,
+        known_prior_point: (ScrollbackBufferPoint, ScreenPoint), 
+        scrollback_buffer: &ScrollbackBuffer,
+        screen_size: ScreenSize,
+    ) -> ScrollbackBufferPoint {
+        let screen_width = screen_size.num_columns.0 as usize;
+        let target_row = self.row.0 as usize;
+        let target_column = self.column.0 as usize;
+
+        assert!(known_prior_point.1 <= *self); // TODO: support calculations if `self` is before the known screen point
+
+        let mut row = known_prior_point.1.row.0 as usize;
+        let ScrollbackBufferPoint { mut line_idx, mut unit_idx } = known_prior_point.0;
+        
+        // Iterate over the lines in the scrollback buffer starting at the current position
+        // to determine how many displayed rows on screen each line takes up.
+        while let Some(line) = scrollback_buffer.get(line_idx.0) {
+            let start_row = unit_idx.0 / screen_width;
+            let last_unit = line.last_unit().0;
+            let end_row = last_unit / screen_width;
+            let additional_rows = end_row.saturating_sub(start_row);
+            row += additional_rows;
+
+            trace!("to_scrollback_point(): {:?}: start_row: {:?}, last_unit: {:?}, end_row: {:?}, additional_rows: {:?}, row: {:?}, target_row: {:?}", 
+                line_idx, start_row, last_unit, end_row, additional_rows, row, target_row
+            );
+
+            if row >= target_row {
+                let row_overshoot = row - target_row;
+                trace!("to_scrollback_point(): row_overshoot: {:?}", row_overshoot);
+                unit_idx = UnitIndex(last_unit.saturating_sub(row_overshoot * screen_width));
+                break;
+            }
+
+            // This `line` didn't cover enough displayed rows, so we move to the next one and keep going.
+            row += 1;
+            line_idx += LineIndex(1);
+            unit_idx = UnitIndex(0);
+        }
+
+        trace!("to_scrollback_point(): after iterating, row: {:?}, target_row: {:?}, line_idx: {:?}", row, target_row, line_idx);
+
+        if row < target_row {
+            // The scrollback buffer didn't have enough lines.
+            // Currently, `line_idx` is right after the last line.
+            // We calculate the target line index as: `line_idx - 1 + (target_row - row)`.
+            let target_line = line_idx.0.saturating_add(target_row).saturating_sub(row).saturating_sub(1);
+            trace!("to_scrollback_point(): target_line: {:?}", target_line);
+            ScrollbackBufferPoint {
+                line_idx: LineIndex(target_line),
+                unit_idx: UnitIndex(target_column),
+            }
+        } else {
+            // The scrollback buffer had enough lines.
+            ScrollbackBufferPoint {
+                line_idx,
+                unit_idx: UnitIndex(util::round_down(unit_idx.0, screen_width) + target_column),
+            }
+        }
     }
 }
 
@@ -1147,7 +1517,7 @@ pub struct UnitIndex(usize);
 
 
 #[derive(Debug, Default)]
-struct Cursor {
+struct ScreenCursor {
     /// The position of the cursor on the terminal screen,
     /// given as `(x, y)` where `x` is the row index
     /// and `y` is the column index.
@@ -1178,28 +1548,39 @@ impl Default for CursorStyle {
 
 
 
-/// Advances the cursor's screen coordinate forward by one unit of the given width.
-/// This does not modify the cursor's scrollback buffer position.
+/// Advances the cursor's screen coordinate forward by the given number of columns,
+/// ignoring the contents of the scrollback buffer.
 ///
-/// Returns a tuple of the cursor's new screen position
-/// and a `ScrollAction` describing what kind of scrolling action needs to be taken
-/// to handle this screen cursor movement.
+/// Returns a tuple of:
+/// 1. the new position of the screen cursor,
+/// 2. a `ScrollAction` describing what kind of scrolling action needs to be taken
+///    to handle this screen cursor movement.
 fn increment_screen_cursor(
     mut cursor_position: ScreenPoint,
-    unit_width: Column,
+    num_columns: usize,
     screen_size: ScreenSize,
-    // TODO: add wrapping support
+    wrap: Wrap,
 ) -> (ScreenPoint, ScrollAction) {
-    cursor_position.column += unit_width;
-    if cursor_position.column >= screen_size.num_columns {
-        cursor_position.column.0 %= screen_size.num_columns.0;
-        cursor_position.row.0 += 1;
-        if cursor_position.row >= screen_size.num_rows {
-            cursor_position.row.0 = screen_size.num_rows.0 - 1;
-            return (cursor_position, ScrollAction::Down(1));
-        }
+    if wrap == Wrap::No {
+        cursor_position.column.0 = cursor_position.column.0.saturating_add(num_columns as u16);
+        return (cursor_position, ScrollAction::None);
     }
-    (cursor_position, ScrollAction::None)
+
+    let screen_width = screen_size.num_columns.0 as usize;
+    let last_row = screen_size.last_row().0 as usize;
+
+    let end_column = cursor_position.column.0 as usize + num_columns;
+    let rows_added = end_column / screen_width;
+    let new_column = Column((end_column % screen_width) as u16);
+
+    let current_row = cursor_position.row.0 as usize;
+    let new_row = cursor_position.row.0 as usize + rows_added;
+    if new_row > last_row {
+        let diff = new_row - last_row;
+        (ScreenPoint { column: new_column, row: Row(last_row as u16) }, ScrollAction::Down(diff))
+    } else {
+        (ScreenPoint { column: new_column, row: Row(new_row as u16) }, ScrollAction::None)
+    }
 }
 
 /// Moves the cursor's screen coordinate backward by one unit of the given width.
@@ -1212,9 +1593,9 @@ fn decrement_screen_cursor(
     mut cursor_position: ScreenPoint,
     num_columns: Column,
     screen_size: ScreenSize,
-    wrap: WrapLine,
+    wrap: Wrap,
 ) -> (ScreenPoint, ScrollAction) {
-    if wrap == WrapLine::No {
+    if wrap == Wrap::No {
         cursor_position.column.0 = cursor_position.column.0.saturating_sub(num_columns.0);
         return (cursor_position, ScrollAction::None);
     }
@@ -1266,29 +1647,109 @@ fn decrement_screen_cursor(
 // }
 
 
-/// Returns the position of the given `scrollback_cursor` moved backward by one unit.
+/// Returns the position of the given `scrollback_cursor` moved backward by `num_units` units.
+///
+/// After the basic movement and line wrapping calculations, this function automatically aligns
+/// the returned scrollback cursor position to the closest previous non-continuance `Unit`.
 ///
 /// This is a pure calculation that does not modify any cursor positions.
 fn decrement_scrollback_cursor(
     mut scrollback_cursor: ScrollbackBufferPoint,
     scrollback_buffer: &ScrollbackBuffer,
-    wrap_lines: WrapLine,
+    mut num_units: usize,
+    screen_width: Column,
+    wrap_lines: Wrap,
 ) -> ScrollbackBufferPoint {
-    if wrap_lines == WrapLine::No {
-        scrollback_cursor.unit_idx.0 = scrollback_cursor.unit_idx.0.saturating_sub(1);
-        return scrollback_cursor;
+
+    if wrap_lines == Wrap::No {
+        // Don't decrement past the beginning of a screen row. 
+        scrollback_cursor.unit_idx.0 = max(
+            util::round_down(scrollback_cursor.unit_idx.0, screen_width.0 as usize),
+            scrollback_cursor.unit_idx.0.saturating_sub(num_units)
+        );
+    } else {
+        while num_units > 0 {
+            let unit_idx = scrollback_cursor.unit_idx;
+            scrollback_cursor.unit_idx.0 = unit_idx.0.saturating_sub(num_units);
+
+            if num_units > unit_idx.0 {
+                // Wrap backwards to the previous line
+                if scrollback_cursor.line_idx > LineIndex(0) {
+                    // wrap backwards to the end of the previous line
+                    scrollback_cursor.line_idx -= LineIndex(1);
+                    scrollback_cursor.unit_idx = scrollback_buffer[scrollback_cursor.line_idx].last_unit();
+                } else {
+                    // we're at the first line, so there's nowhere to wrap backwards to.
+                    break;
+                }
+            } else {
+                // Not enough remaining units of movement to require backwards line wrapping, so we're done.
+                break;
+            }
+
+            // we've handled "unit_idx" units worth of backwards movement.
+            num_units = num_units.saturating_sub(unit_idx.0);
+        }
     }
 
-    if scrollback_cursor.unit_idx == UnitIndex(0) {
-        if scrollback_cursor.line_idx > LineIndex(0) {
-            // wrap backwards to the end of the previous line
-            scrollback_cursor.line_idx -= LineIndex(1);
-            scrollback_cursor.unit_idx.0 = scrollback_buffer[scrollback_cursor.line_idx].len();
-        }
-    } else {
-        scrollback_cursor.unit_idx -= UnitIndex(1);
-    }
+    scrollback_cursor.unit_idx = scrollback_buffer[scrollback_cursor.line_idx]
+        .previous_non_continuance_unit(scrollback_cursor.unit_idx);
+
     scrollback_cursor
+}
+
+
+/// Computes the screen cursor movement required to move from the given `start` point 
+/// to the given `end` point in the scrollback buffer.
+///
+/// Returns a tuple of `(num_columns, num_rows)` that the screen cursor should move.
+fn relative_screen_movement(
+    scrollback_buffer: &ScrollbackBuffer,
+    start: ScrollbackBufferPoint,
+    end: ScrollbackBufferPoint,
+    screen_width: Column,
+) -> (i32, i32) {
+    let screen_width = screen_width.0 as usize;
+
+    // TODO THIS IS WRONG, must use the scrollback buffer to check each line's length.
+
+    let start_column = start.unit_idx.0 % screen_width;
+    let start_row    = start.line_idx.0 + (start.unit_idx.0 / screen_width);
+    let end_column   = end.unit_idx.0 % screen_width;
+    let end_row      = end.line_idx.0 + (end.unit_idx.0 / screen_width); 
+
+    let column_diff = end_column as isize - start_column as isize;
+    let row_diff    = end_row as isize - start_row as isize;
+    (column_diff as i32, row_diff as i32)
+}
+
+
+enum ScreenToScrollbackConversion {
+    ExactMatch(ScrollbackBufferPoint),
+    ClosestPrevious(ScrollbackBufferPoint, ScreenPoint),
+}
+impl ScreenToScrollbackConversion {
+    fn to_option(self) -> Option<ScrollbackBufferPoint> {
+        match self {
+            Self::ExactMatch(sbp) => Some(sbp),
+            _ => None,
+        }
+    }
+}
+
+
+/// Returns the point on the screen where the given point in the scrollback buffer
+/// is displayed, based on the current position of the screen viewport.
+///
+/// Returns `None` if the given `scrollback_point` would be displayed beyond the screen bounds.
+fn scrollback_point_to_screen_point(
+    scroll_position: ScrollPosition,
+    scrollback_point: ScrollbackBufferPoint,
+    scrollback_buffer: &ScrollbackBuffer
+) -> Option<ScreenPoint> {
+    let start_point = scroll_position.start_point();
+    
+    unimplemented!()
 }
 
 
@@ -1325,6 +1786,7 @@ pub trait TerminalBackend {
     /// of the screen, in both the column (x) the row (y) dimensions.
     ///
     /// Returns the new position of the on-screen cursor.
+    #[must_use]
     fn move_cursor_to(&mut self, new_position: ScreenPoint) -> ScreenPoint;
 
     /// Moves the on-screen cursor by the given number of rows and columns,
@@ -1390,6 +1852,12 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
         b'1',
         b'P',
     ];
+    const INSERT_CHARACTER: &'static [u8] = &[
+        AsciiControlCodes::Escape,
+        b'[',
+        b'1',
+        b'@',
+    ];
 
 
     pub fn new(
@@ -1408,44 +1876,32 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
     }
     
 
-    /// Deletes the contents on screen from the given `screen_start` point (inclusive) 
-    /// to the given `screen_end` point (exclusive).
-    fn delete(&mut self, screen_start: ScreenPoint, screen_end: ScreenPoint) -> ScreenPoint {
-        let forward_delete = screen_start < screen_end;
-        debug!("Deleting {} from {:?} to {:?}", if forward_delete { "forwards" } else { "backwards" }, screen_start, screen_end);
-        let wrap = WrapLine::Yes;
-
-        if screen_start.row != screen_end.row {
-            todo!("TtyBackend::delete() doesn't yet support multiple rows");
-        }
+    /// Deletes the given number of units from the screen starting at the given screen coordinate.
+    ///
+    /// Returns the new position of the screen cursor, which should be equivalent to `screen_start`
+    /// unless `screen_start` is beyond the bounds of the screen.
+    /// 
+    /// See [`DisplayAction::Delete`] for more information on how this works.
+    fn delete(
+        &mut self,
+        screen_start: ScreenPoint,
+        num_units_to_delete: usize,
+        _scrollback_start: ScrollbackBufferPoint,
+        _scrollback_buffer: &ScrollbackBuffer,
+    ) -> ScreenPoint {
+        debug!("Deleting {} units forwards at {:?}", num_units_to_delete, screen_start);
+        let wrap = Wrap::Yes;
         
-        // TODO: move the cursor to `screen_start`
+        // move the cursor to `screen_start`
         if self.real_screen_cursor != screen_start {
-            warn!("TtyBackend::delete(): Skipping required screen cursor movement from {:?} to {:?}", self.real_screen_cursor, screen_start);
+            warn!("TtyBackend::delete(): moving screen cursor from {:?} to {:?}", self.real_screen_cursor, screen_start);
+            self.real_screen_cursor = self.move_cursor_to(screen_start);
         }
 
-        let mut current = screen_start;
-
-        if forward_delete {
-            while current < screen_end {
-                // Forward-delete the current character unit, but do not move the real_screen_cursor, 
-                // because the backend terminal emulator will shift everything in the current line to the left.
-                self.output.write(Self::DELETE_CHARACTER).unwrap();
-                current = increment_screen_cursor(current, Column(1), self.screen_size /* , wrap */).0;
-            }
-        } 
-        else {
-            while current > screen_end {
-                // Backward-delete a character by moving the previous character unit
-                // and then issuing a delete command, upon which the backend terminal emulator 
-                // will shift everything in the current line to the left.
-                let (new_screen_cursor, _scroll) = decrement_screen_cursor(self.real_screen_cursor , Column(1), self.screen_size, wrap);
-                // self.real_screen_cursor = new_screen_cursor;
-                
-                let actual_screen_cursor = self.move_cursor_by(-1, 0);
-                self.output.write(Self::DELETE_CHARACTER).unwrap();
-                current = decrement_screen_cursor(current, Column(1), self.screen_size, wrap).0;
-            }
+        for _i in 0..num_units_to_delete {
+            // Forward-delete the current character unit, but do not move the actual screen cursor, 
+            // because the backend terminal emulator will shift everything in the current line to the left.
+            self.output.write(Self::DELETE_CHARACTER).unwrap();
         }
 
         self.real_screen_cursor
@@ -1490,24 +1946,42 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
         let mut bytes_written = 0;
         let mut previous_style = previous_style.unwrap_or_default();
 
-        let (scrollback_start, scrollback_end, screen_start) = match display_action {
-            DisplayAction::Insert { scrollback_start, scrollback_end, screen_start } |
-            DisplayAction::Replace { scrollback_start, scrollback_end, screen_start } => {
-                (scrollback_start, scrollback_end, screen_start)
+        let (scrollback_start, scrollback_end, screen_start, width_diff) = match display_action {
+            DisplayAction::Insert { scrollback_start, scrollback_end, screen_start } => {
+                (scrollback_start, scrollback_end, screen_start, None)
             }
-            DisplayAction::Delete { screen_start, screen_end } => {
-                return Ok(self.delete(screen_start, screen_end));
+            DisplayAction::Overwrite { scrollback_start, scrollback_end, screen_start, width_difference } => {
+                (scrollback_start, scrollback_end, screen_start, Some(width_difference))
             }
+            DisplayAction::Delete { screen_start, num_units, scrollback_start } => {
+                return Ok(self.delete(screen_start, num_units, scrollback_start, scrollback_buffer));
+            }
+            _other => panic!("display(): unimplemented DisplayAction: {:?}", _other),
         };
 
         if self.real_screen_cursor != screen_start {
-            warn!("Unimplemented: need to move screen cursor from {:?} to {:?}", self.real_screen_cursor, screen_start);
+            error!("Unimplemented: need to move screen cursor from {:?} to {:?}", self.real_screen_cursor, screen_start);
             // TODO: issue a command to move the screen cursor to `screen_start`
         }
 
-        // For now, we just assume that the backend output stream is a linear "file"
-        // that can't adjust its position, so we just write directly to it 
-        // whilst ignoring the `screen_start` parameter.
+        // Handle the possible width difference that may occur in an Overwrite operation.
+        match width_diff {
+            Some(d) if d > 0 => {
+                warn!("Untested: positive width diff of {} columns", d);
+                for _i in 0..d {
+                    self.output.write(Self::INSERT_CHARACTER).unwrap();
+                }
+            }
+            Some(d) if d < 0 => {
+                warn!("Untested: negative width diff of {} columns", d);
+                for _i in d..0 {
+                    self.output.write(Self::DELETE_CHARACTER).unwrap();
+                }
+            }
+            _=> { } // do nothing
+        }
+
+        // Actually write out the contents from the requested lines of the scrollback buffer.
         let mut start_unit = scrollback_start.unit_idx; 
         for line_idx in scrollback_start.line_idx.0 ..= scrollback_end.line_idx.0 {
             let line_idx = LineIndex(line_idx);
@@ -1517,7 +1991,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
             let end = if scrollback_end.line_idx == line_idx {
                 scrollback_end.unit_idx.0
             } else {
-                line.units.len() - 1
+                line.units.len()
             };
             
             // debug!("Looking at line {}, units {}..{}: {:?}", line_idx.0, start_unit.0, end, line);
@@ -1550,15 +2024,32 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
                     0 => 4, // TODO: use tab_width
                     w => w,
                 };
-                let (new_screen_cursor, _scroll_action) = increment_screen_cursor(self.real_screen_cursor, Column(unit_width), self.screen_size);
-                self.real_screen_cursor = new_screen_cursor;
+                let (new_screen_cursor, scroll_action) = increment_screen_cursor(self.real_screen_cursor, unit_width as usize, self.screen_size, Wrap::Yes);
+                debug!("display(): moving from {:?} -> {:?}", self.real_screen_cursor, new_screen_cursor);
+                // If we wrapped to the next screen row, move the screen cursor.
+                if new_screen_cursor.row != self.real_screen_cursor.row {
+                    self.real_screen_cursor = self.move_cursor_to(new_screen_cursor);
+                } else {
+                    self.real_screen_cursor = new_screen_cursor;
+                }
+
+                // TODO: handle scroll action
             }
-            // If we wrote out the entire `Line`, write out a newline character.
+
+            // Once we finish writing out the whole line, if there is another line to be written out,
+            // move to the beginning of the next row on screen.
             if line_idx < scrollback_end.line_idx {
-                bytes_written += self.output.write(b"\n")?;
-                // TODO: test for scroll action needed.
-                self.real_screen_cursor.row.0 += 1;
-                self.real_screen_cursor.column.0 = 0;
+                let (mut new_screen_cursor, scroll_action) = increment_screen_cursor(
+                    self.real_screen_cursor,
+                    self.screen_size.num_columns.0 as usize, // move one row down
+                    self.screen_size,
+                    Wrap::Yes
+                );
+                new_screen_cursor.column = Column(0);
+                warn!("display(): at end of line {:?}, moving from {:?} -> {:?}", line_idx, self.real_screen_cursor, new_screen_cursor);
+                self.real_screen_cursor = self.move_cursor_to(new_screen_cursor);
+
+                // TODO: handle scroll action
             } 
 
             start_unit = UnitIndex(0);
@@ -1585,7 +2076,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
         let col_bounded = if new_col <= 0 {
             0
         } else if new_col >= self.screen_size.num_columns.0 as i32 {
-            self.screen_size.num_columns.0 - 1
+            self.screen_size.last_column().0
         } else {
             new_col as u16
         };
@@ -1594,7 +2085,7 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
         let row_bounded = if new_row <= 0 {
             0
         } else if new_row >= self.screen_size.num_rows.0 as i32 {
-            self.screen_size.num_rows.0 - 1
+            self.screen_size.last_row().0
         } else {
             new_row as u16
         };
@@ -1655,24 +2146,28 @@ impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
 is actually handled and processed."]
 #[derive(Debug)]
 pub enum DisplayAction {
-    /// Delete the contents displayed on the screen in the given range of on-screen coordinates,
-    /// setting the units to blank space of the default style.
+    /// Remove the given number of units from the screen starting at the given screen coordinate.
     ///
-    /// A delete action can occur in both the forwards and backwards direction:
-    /// * If `screen_start` is less than `screen_end`, a forward delete should be performed.
-    /// * If `screen_start` is greater than `screen_end`, a backwards delete should be performed.
+    /// After the delete operation, all other units coming after that point in the current `Line`
+    /// are left-shifted by `num_units`.
+    /// At that point, the `Unit`s starting at the given `scrollback_start` point in the scrollback buffer 
+    /// should be displayed at the given `screen_start` coordinate on screen.
     ///
-    /// The direction of the delete action matters for the following reasons:
-    /// * A [`TerminalBackend`] may use it to optimize which action occurs, and
-    /// * It also dictates where the screen cursor will end up after the delete action occurs.
-    ///
-    /// For example, if a user presses the "Backspace" key, they expect a backwards deletion
-    /// in which the cursor is moved backwards to the previous unit and that unit is deleted.
-    /// If they press the "Delete" key, they expect a forwards deletion
-    /// in which the cursor is unchanged and the current unit is deleted.
+    /// For simplicity, this only supports a "forward" delete operation, in which 
+    /// the screen cursor position does not change because only the units
+    /// at or after that screen cursor position are removed.
+    /// A "backwards" delete operation can be achieved by moving the cursor backwards by a few units
+    /// and then issuing a regular forward delete operation.
+    Delete {
+        screen_start: ScreenPoint,
+        num_units: usize,
+        scrollback_start: ScrollbackBufferPoint,
+    },
+    /// Erases the contents displayed on the screen in the given range of on-screen coordinates,
+    /// setting those units to blank space without changing their display style.
     ///
     /// The `screen_start` bound is inclusive; the `screen_end` bound is exclusive.
-    Delete {
+    Erase {
         screen_start: ScreenPoint,
         screen_end:   ScreenPoint,
     },
@@ -1681,10 +2176,18 @@ pub enum DisplayAction {
     ///
     /// The `scrollback_start` bound is inclusive; the `scrollback_end` bound is exclusive;
     /// the `screen_start` bound is also inclusive.
-    Replace {
+    ///
+    /// The `width_difference` represents the difference in the displayable width of the new unit(s) 
+    /// vs. the old unit(s) that existed in the scrollback buffer and were previously displayed at `screen_start`.
+    /// This is effectively `new_unit_width - old_unit_width`.
+    /// * If `0`, the units are the same width. 
+    /// * If positive, the new unit is wider than the old unit.
+    /// * If negative, the old unit is wider than the new unit.
+    Overwrite {
         scrollback_start: ScrollbackBufferPoint,
         scrollback_end:   ScrollbackBufferPoint,
         screen_start:     ScreenPoint,
+        width_difference: i32,
     },
     /// Inserts the content from the given range in the scrollback buffer
     /// into the screen, starting at the given on-screen coordinate.
@@ -1710,7 +2213,7 @@ pub enum DisplayAction {
 /// A pending action to scroll the screen up or down by a number of rows.
 #[must_use = "`ScrollAction`s must be used to ensure the scroll action 
 is actually handled and processed."]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScrollAction {
     /// Do nothing, do not scroll the screen.
     None,
@@ -1720,22 +2223,22 @@ pub enum ScrollAction {
     Down(usize),
 }
 
-// impl Drop for ScrollAction {
-//     fn drop(&mut self) {
-//         match self {
-//             Self::None => { }
-//             _ => warn!("{:?} was dropped without being handled!", self),
-//         }
-//     }
-// }
+impl Drop for ScrollAction {
+    fn drop(&mut self) {
+        match self {
+            Self::None => { }
+            _ => warn!("{:?} was dropped without being handled!", self),
+        }
+    }
+}
 
 
-/// Whether or not to wrap text to the next line/row when it extends
-/// past the column limit of the screen.
+/// Whether or not to wrap cursor movement or text display
+/// to the previous/next line or row.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum WrapLine {
+pub enum Wrap {
     Yes,
-    No,
+    No
 }
 
 /// Whether text characters printed to the terminal will be inserted
@@ -1786,6 +2289,43 @@ impl Default for TerminalMode {
             show_cursor: ShowCursor::Visible,
             cr_sends_lf: CarriageReturnSendsLineFeed::Yes,
             lf_sends_cr: LineFeedSendsCarriageReturn::Yes,
+        }
+    }
+}
+
+/// The kinds of Units and how they correspond to previous Units in the same Line.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum WideDisplayedUnit {
+    /// (Default) This Unit is not part of any wide-displayed character sequence,
+    /// and is completely standlone with no relationship to other adjacent Units.
+    /// Thus, the character sequence in this `Unit` is guaranteed to display within one Column.
+    None,
+    /// This Unit is the beginning of a tab character.
+    /// As such, this unit contains a [`Character::Single`]`('\t')`.
+    TabStart,
+    /// This Unit is a continuance for a previously-existing tab character.
+    TabFill,
+    /// This Unit is the beginning of a wide non-tab character, e.g., emoji, Chinese character, etc.
+    /// As such, this unit contains a [`Character::Multi`]`(String)` that holds the entire
+    /// wide character's multi-byte sequence.
+    MultiStart,
+    /// This Unit is a continuance for a previously-existing wide non-tab character
+    ///, e.g., emoji, Chinese character, etc.
+    MultiFill,
+}
+impl Default for WideDisplayedUnit {
+    fn default() -> Self {
+        WideDisplayedUnit::None
+    }
+}
+impl WideDisplayedUnit {
+    /// A continuance Unit is one that occupies space as a continuance
+    /// of a previous character Unit, i.e., `TabFill` or `MultiFill`.
+    #[inline(always)]
+    fn is_continuance(&self) -> bool {
+        match self {
+            &Self::TabFill | &Self::MultiFill => true,
+            _ => false,
         }
     }
 }
