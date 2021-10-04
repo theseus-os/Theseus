@@ -59,9 +59,10 @@ This ensures that the `VirtualAddress` and `PhysicalAddress` have the same inter
 [`Frame`]: https://theseus-os.github.io/Theseus/doc/memory_structs/struct.Frame.html
 [`PageRange`]: https://theseus-os.github.io/Theseus/doc/memory_structs/struct.PageRange.html
 [`FrameRange`]: https://theseus-os.github.io/Theseus/doc/memory_structs/struct.FrameRange.html
-[Iterator]: https://doc.rust-lang.org/std/iter/trait.Iterator.html
 [`page_allocator`]:  https://theseus-os.github.io/Theseus/doc/page_allocator/index.html
 [`frame_allocator`]: https://theseus-os.github.io/Theseus/doc/frame_allocator/index.html
+[Iterator]: https://doc.rust-lang.org/std/iter/trait.Iterator.html
+[RangeInclusive]: https://doc.rust-lang.org/std/ops/struct.RangeInclusive.html
 
 
 ### Page and Frame allocators
