@@ -12,7 +12,7 @@ Although Theseus could technically operate directly on physical memory addresses
 
 ## Virtual vs. Physical Memory
 Theseus uses precise, specific terminology and dedicated types to avoid confusion and correctness errors related to mixing up physical and virtual memory.
-Below is a table that concisely describes the basic types related to memory management with links to their source-level documentation:
+The following table concisely describes the basic memory types with links to their source-level documentation:
 
 
 | Description of Type          | Virtual Memory Type   | Physical Memory Type |
@@ -22,10 +22,17 @@ Below is a table that concisely describes the basic types related to memory mana
 | A range of contiguous chunks | [`PageRange`]         | [`FrameRange`]       |
 | Allocator for memory chunks  | [`page_allocator`]    | [`frame_allocator`]  |
 
+### Addresses
 In Theseus, virtual and physical addresses are given dedicated, separate types that are not interoperable. 
 This is to ensure that programmers are intentional about which type of address they are using and cannot accidentally mix them up.
+The constructors for `VirtualAddress` and `PhysicalAddress` also ensure that you cannot create an invalid address and that all addresses used across the system are canonical in form, which is based on the hardware architecture's expectations.
 
-A chunk of virtual memory is called a `Page`, while a chunk of physical memory is called a `Frame`.
+For 64-bit architectures, the set of possible `VirtualAddress`es goes from `0` to `0xFFFFFFFFFFFFFFFF`, and all canonical addresses in that range can be used.
+However, while the set of possible `PhysicalAddress` has the same range, there are large "holes" across the physical address space that correspond to unusable physical addresses, depending on hardware. 
+Thus, you can be guaranteed that every canonical virtual address actually exists and is usable, but not every canonical physical address.
+
+### `Page`s and `Frame`s
+A chunk of virtual memory is called a `Page`, while a chunk of physical memory is called a `Frame`. 
 `Page`s and `Frame`s have the same size, typically 4KiB (4096 bytes) but ultimately dependent upon hardware.
 These chunks are the smallest elementary unit that the hardware's Memory Management Unit (MMU) can operate on, i.e., they are indivisible from the hardware's point of view. 
 In other words, the MMU hardware cannot map any chunk of memory smaller than a single `Page` to any chunk of memory smaller than a single `Frame`. 
@@ -36,8 +43,6 @@ A `Page` can be said to contain a `VirtualAddress` within its bounds, and likewi
 Intrinsically, `Page`s have no relation to `PhysicalAddress`es, and similarly, `Frame`s have no relation to `VirtualAddress`es.
 
 Although `Page`s and `Frame`s have inner numbers, we typically identify them by their starting address, e.g., "the page starting at `v0x9000`" instead of "page 9".
-For 64-bit architectures, the set of possible `VirtualAddress`es (and thus `Page`s) goes from `0` to `0xFFFFFFFFFFFFFFFF`, while the set of possible `PhysicalAddresses
-
 
 For convenience, Theseus provides dedicated "range" types to represent a contiguous range of virtual `Page`s or physical `Frame`s. 
 They are inclusive ranges on both sides; see Rust's built-in [RangeInclusive] type for more information.
@@ -99,9 +104,9 @@ As such, if you have a `PageRange` from `v0x6000` to `v0x8000`, you are guarante
 That is a powerful guarantee that allows us to build stronger isolation and safety invariants when allocating, mapping, and accessing memory.
 
 
-[AllocatedFrames]: https://theseus-os.github.io/Theseus/doc/frame_allocator/struct.AllocatedFrames.html
-[AllocatedPages]: https://theseus-os.github.io/Theseus/doc/page_allocator/struct.AllocatedPages.html
-[MappedPages]: https://theseus-os.github.io/Theseus/doc/memory/struct.MappedPages.html
+[`AllocatedFrames`]: https://theseus-os.github.io/Theseus/doc/frame_allocator/struct.AllocatedFrames.html
+[`AllocatedPages`]: https://theseus-os.github.io/Theseus/doc/page_allocator/struct.AllocatedPages.html
+[`MappedPages`]: https://theseus-os.github.io/Theseus/doc/memory/struct.MappedPages.html
 
 
 
