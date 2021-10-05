@@ -15,7 +15,7 @@ Using page faults is how on-demand paging is realized; Theseus currently does no
 Theseus's memory subsystem specifies three key types for mapping memory:
 * [`Mapper`]: provides functions to map virtual memory to physical memory, which create and return `MappedPages` objects.
 * [`PageTable`]: a top-level page table, which owns the root frame of the page table and a `Mapper` instance that uses that page table frame to create new page table entries.
-    * This auto-derefs into a `Mapper`, allowing all `Mapper` functions to be called on a `PageTable` object.
+    * This auto-dereferences into a `Mapper`, allowing all `Mapper` functions to be called on a `PageTable` object.
 * [`MappedPages`]: an object that represents a range of virtually-contiguous pages that are mapped to physical frames and have a single exclusive owner. 
 
 

@@ -45,5 +45,3 @@ Another unique aspect of heaps in Theseus is that all entities across the system
 [exchange heaps]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/EuroSys2007_SealedProcesses.pdf
 [`multiple_heaps`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/index.html
 [`switch_to_multiple_heaps()`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/fn.switch_to_multiple_heaps.html
-
-<!-- cspell:ignore FFFD   -->
