@@ -1,0 +1,284 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Memory Management - The Theseus OS Book</title>
+                
+
+        <!-- Custom HTML head -->
+        
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="Describes the design principles and implementation details of Theseus, a companion to its source-level docs.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+                <link rel="icon" href="../favicon.svg">
+                        <link rel="shortcut icon" href="../favicon.png">
+                <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+                <link rel="stylesheet" href="../css/print.css" media="print">
+        
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+                <link rel="stylesheet" href="../fonts/fonts.css">
+        
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+            </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">Introduction to Theseus OS</a></li><li class="chapter-item expanded "><a href="../design/design.html"><strong aria-hidden="true">1.</strong> Design and Structure of Theseus</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../design/source_code_organization.html"><strong aria-hidden="true">1.1.</strong> Source Code Repository Organization</a></li><li class="chapter-item expanded "><a href="../design/booting.html"><strong aria-hidden="true">1.2.</strong> Boot-up Procedure</a></li><li class="chapter-item expanded "><a href="../design/idea.html"><strong aria-hidden="true">1.3.</strong> Safe-language OS Principles</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">1.4.</strong> Intralingual Design</div></li></ol></li><li class="chapter-item expanded "><a href="../app/app.html"><strong aria-hidden="true">2.</strong> Developing a Theseus Application</a></li><li class="chapter-item expanded "><a href="../building/building.html"><strong aria-hidden="true">3.</strong> The Theseus Build Process</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../building/configuration.html"><strong aria-hidden="true">3.1.</strong> Configuring Theseus</a></li><li class="chapter-item expanded "><a href="../building/rust_builds_out_of_tree.html"><strong aria-hidden="true">3.2.</strong> theseus_cargo: Building Rust Crates Out-of-Tree</a></li></ol></li><li class="chapter-item expanded "><a href="../c/programs.html"><strong aria-hidden="true">4.</strong> Experimental Support for C programs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../c/cross_compiler.html"><strong aria-hidden="true">4.1.</strong> Building a C cross compiler for Theseus</a></li><li class="chapter-item expanded "><a href="../c/tlibc.html"><strong aria-hidden="true">4.2.</strong> tlibc: Theseus's libc and how it works</a></li><li class="chapter-item expanded "><a href="../c/compiler_linker.html"><strong aria-hidden="true">4.3.</strong> Compiling and linking C programs</a></li></ol></li><li class="chapter-item expanded "><a href="../subsystems/subsystems.html"><strong aria-hidden="true">5.</strong> Overview of Key Subsystems</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../subsystems/memory.html" class="active"><strong aria-hidden="true">5.1.</strong> Memory Management</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../subsystems/memory_mapping.html"><strong aria-hidden="true">5.1.1.</strong> Mapping Virtual to Physical Memory</a></li><li class="chapter-item expanded "><a href="../subsystems/heap.html"><strong aria-hidden="true">5.1.2.</strong> Heap Allocators</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.2.</strong> Task Management</div></li><li class="chapter-item expanded "><a href="../subsystems/display/display.html"><strong aria-hidden="true">5.3.</strong> Display and Window Management</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../subsystems/display/window_manager.html"><strong aria-hidden="true">5.3.1.</strong> The Window Manager</a></li><li class="chapter-item expanded "><a href="../subsystems/display/window_tutorial.html"><strong aria-hidden="true">5.3.2.</strong> Creating and Displaying Windows</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../running/running.html"><strong aria-hidden="true">6.</strong> Running Theseus on Virtual Machines &amp; Real Hardware</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../running/virtual_machine/virtual_machine.html"><strong aria-hidden="true">6.1.</strong> Running Theseus in a Virtual Machine</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../running/virtual_machine/pci_passthrough.html"><strong aria-hidden="true">6.1.1.</strong> Using PCI device Passthrough on QEMU</a></li></ol></li><li class="chapter-item expanded "><a href="../running/headless.html"><strong aria-hidden="true">6.2.</strong> Theseus on Headless Systems</a></li><li class="chapter-item expanded "><a href="../running/usb.html"><strong aria-hidden="true">6.3.</strong> Booting via USB drive</a></li><li class="chapter-item expanded "><a href="../running/pxe.html"><strong aria-hidden="true">6.4.</strong> Booting over the network (PXE)</a></li></ol></li><li class="chapter-item expanded "><a href="../contribute/contribute.html"><strong aria-hidden="true">7.</strong> How to Contribute</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../contribute/git.html"><strong aria-hidden="true">7.1.</strong> Git Guidelines</a></li><li class="spacer"></li></ol></li><li class="chapter-item expanded "><a href="../misc/papers_presentations.html">Papers and Presentations/Slides</a></li><li class="chapter-item expanded affix "><a href="../misc/quick_start.html">Theseus README + Quick Start ↗️</a></li></ol>            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                                                <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                                            </div>
+
+                    <h1 class="menu-title">The Theseus OS Book</h1>
+
+                    <div class="right-buttons">
+                                                <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                                                                        
+                    </div>
+                </div>
+
+                                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="memory-management-in-theseus"><a class="header" href="#memory-management-in-theseus">Memory Management in Theseus</a></h1>
+<p>Memory management is one of the most unique aspects of Theseus's design, compared to how other OSes manage memory. </p>
+<h2 id="single-virtual-address-space"><a class="header" href="#single-virtual-address-space">Single <em>Virtual</em> Address Space</a></h2>
+<p>As previously mentioned, Theseus is a Single Address Space (SAS) OS, meaning that all kernel entities, libraries, and applications are loaded into and execute within a single address space. This is possible due to careful design combined with isolation based on Rust's type and memory safety instead of hardware-based memory protection.</p>
+<p>That being said, Theseus's single address space is a <em>virtual</em> address space, not a physical address space; 
+all Rust-level pointers that are dereferenced and addresses that are accessed are virtual addresses. 
+Although Theseus could technically operate directly on physical memory addresses without using virtual memory at all, the use of virtual addresses affords us many benefits, e.g., easier contiguous memory allocation, guard pages to catch stack overflow, etc. </p>
+<h2 id="types-and-terminology"><a class="header" href="#types-and-terminology">Types and Terminology</a></h2>
+<p>Theseus uses precise, specific terminology and dedicated types to avoid confusion and correctness errors related to mixing up physical and virtual memory.
+The following table concisely describes the basic memory types with links to their source-level documentation:</p>
+<table><thead><tr><th>Description of Type</th><th>Virtual Memory Type</th><th>Physical Memory Type</th></tr></thead><tbody>
+<tr><td>A memory address</td><td><a href="https://theseus-os.github.io/Theseus/doc/memory_structs/struct.VirtualAddress.html"><code>VirtualAddress</code></a></td><td><a href="https://theseus-os.github.io/Theseus/doc/memory_structs/struct.PhysicalAddress.html"><code>PhysicalAddress</code></a></td></tr>
+<tr><td>A chunk of memory</td><td><a href="https://theseus-os.github.io/Theseus/doc/memory_structs/struct.Page.html"><code>Page</code></a></td><td><a href="https://theseus-os.github.io/Theseus/doc/memory_structs/struct.Frame.html"><code>Frame</code></a></td></tr>
+<tr><td>A range of contiguous chunks</td><td><a href="https://theseus-os.github.io/Theseus/doc/memory_structs/struct.PageRange.html"><code>PageRange</code></a></td><td><a href="https://theseus-os.github.io/Theseus/doc/memory_structs/struct.FrameRange.html"><code>FrameRange</code></a></td></tr>
+<tr><td>Allocator for memory chunks</td><td><a href="https://theseus-os.github.io/Theseus/doc/page_allocator/index.html"><code>page_allocator</code></a></td><td><a href="https://theseus-os.github.io/Theseus/doc/frame_allocator/index.html"><code>frame_allocator</code></a></td></tr>
+</tbody></table>
+<h3 id="addresses"><a class="header" href="#addresses">Addresses</a></h3>
+<p>In Theseus, virtual and physical addresses are given dedicated, separate types that are <strong>not interoperable</strong>. 
+This is to ensure that programmers are intentional about which type of address they are using and cannot accidentally mix them up.
+The constructors for <code>VirtualAddress</code> and <code>PhysicalAddress</code> also ensure that you cannot create an invalid address and that all addresses used across the system are canonical in form, which is based on the hardware architecture's expectations.</p>
+<p>For 64-bit architectures, the set of possible <code>VirtualAddress</code>es goes from <code>0</code> to <code>0xFFFFFFFFFFFFFFFF</code>, and all canonical addresses in that range can be used.
+However, while the set of possible <code>PhysicalAddress</code> has the same range, there are large &quot;holes&quot; across the physical address space that correspond to non-existent, unusable physical addresses; the locations of specific holes is hardware-dependent and generally not known until the OS asks the bootloader at runtime. 
+Thus, you can be guaranteed that every canonical virtual address actually exists and is usable, but not every canonical physical address.</p>
+<h3 id="pages-frames-and-ranges"><a class="header" href="#pages-frames-and-ranges"><code>Page</code>s, <code>Frame</code>s, and ranges</a></h3>
+<p>A chunk of virtual memory is called a <code>Page</code>, while a chunk of physical memory is called a <code>Frame</code>. 
+<code>Page</code>s and <code>Frame</code>s have the same size, typically 4KiB (4096 bytes) but ultimately dependent upon hardware.
+These chunks are the smallest elementary unit that the hardware's Memory Management Unit (MMU) can operate on, i.e., they are indivisible from the hardware's point of view. 
+In other words, the MMU hardware cannot map any chunk of memory smaller than a single <code>Page</code> to any chunk of memory smaller than a single <code>Frame</code>. </p>
+<p>A <code>Page</code> has a starting <code>VirtualAddress</code> and an ending <code>VirtualAddress</code>; for example, a <code>Page</code> may start (inclusively) at address <code>v0x5000</code> and end (exclusively) at <code>v0x6000</code> 
+Similarly, a <code>Frame</code> has a starting <code>PhysicalAddress</code> and an ending <code>PhysicalAddress</code>, for example from <code>p0x101000</code> to <code>p0x102000</code>.
+A <code>Page</code> can be said to contain a <code>VirtualAddress</code> within its bounds, and likewise a <code>Frame</code> can be said to contain a <code>PhysicalAddress</code>.
+Although <code>Page</code>s and <code>Frame</code>s have internal numbers, we typically identify them by their starting address, e.g., &quot;the page starting at <code>v0x9000</code>&quot; instead of &quot;page 9&quot;.
+Intrinsically, <code>Page</code>s have no relation to <code>PhysicalAddress</code>es, and similarly, <code>Frame</code>s have no relation to <code>VirtualAddress</code>es.</p>
+<p>For convenience, Theseus provides dedicated &quot;range&quot; types to represent a contiguous range of virtual <code>Page</code>s or physical <code>Frame</code>s. 
+They are inclusive ranges on both sides; see Rust's built-in <a href="https://doc.rust-lang.org/std/ops/struct.RangeInclusive.html"><code>RangeInclusive</code></a> type for more information.
+These types implement the standard Rust <a href="https://doc.rust-lang.org/std/iter/trait.Iterator.html"><code>Iterator</code></a> trait, allowing for easy iteration over all pages or frames in a range.</p>
+<p>Theseus employs macros to generate the implementation of the above basic types,
+as they are symmetric across the virtual memory and physical memory categories.
+This ensures that the <code>VirtualAddress</code> and <code>PhysicalAddress</code> have the same interface (public methods); the same is true for <code>Page</code> and<code>Frame</code>, and so on.</p>
+<h3 id="page-and-frame-allocators"><a class="header" href="#page-and-frame-allocators">Page and Frame allocators</a></h3>
+<p>Theseus's <a href="https://theseus-os.github.io/Theseus/doc/page_allocator/index.html">page allocator</a> and <a href="https://theseus-os.github.io/Theseus/doc/frame_allocator/index.html">frame allocator</a> are effectively identical in their design and implementation, but the former allocates virtual memory <code>Page</code>s while the latter allocates physical memory <code>Frame</code>s.</p>
+<p>While the underlying implementation may change over time, the general interface for both allocators is the same. </p>
+<ul>
+<li>You can request a new allocation of one or more <code>Page</code>s or <code>Frame</code>s at any address, which will only fail if there is no remaining virtual or physical memory. </li>
+<li>You can request that allocation to start at the <code>Page</code> or <code>Frame</code> containing a specific address, but it will fail if the <code>Page</code> or <code>Frame</code> containing that address has already been allocated.</li>
+<li>You can also specify the minimum number of bytes that the new allocation must cover, which will be rounded up to the nearest <code>Page</code> or <code>Frame</code> granularity.
+<ul>
+<li>These allocators cannot allocate anything smaller than a single <code>Page</code> or <code>Frame</code>; for smaller allocations, you would want to use dynamically-allocated heap memory.</li>
+</ul>
+</li>
+<li>Both allocators support the concept of &quot;reserved&quot; regions of memory, which are only usable by specific kernel entities, e.g., memory handling functions that run at early boot/init time.
+<ul>
+<li>The <code>frame_allocator</code> uses reserved regions to preserve some ranges of physical memory for specific usage, e.g., memory that contains early boot information from the bootloader, or memory that contains the actual executable kernel code.</li>
+</ul>
+</li>
+<li>Both allocators also support early memory allocation before the heap is set up, allowing Theseus to bootstrap its dynamic memory management system with a series of small statically-tracked allocations in a static array.</li>
+</ul>
+<p>The page allocator and frame allocator in Theseus do not directly allow you to <em>access</em> memory; you still must <em>map</em> the virtual <code>Page</code>(s) to the physical <code>Frame</code>(s) in order to access the memory therein.
+We use more dedicated types to represent this, described below.</p>
+<p>In Theseus, like other OSes, there is a single frame allocator because there is only one set of physical memory -- the actual system RAM connected to your computer's motherboard. 
+It would be logically invalid and unsound to have multiple frame allocators that could independently allocate chunks of physical memory from the same single physical address space. 
+Unlike other multi-address space OSes, Theseus also has a single page allocator, because we only have one virtual address space. 
+All pages must be allocated from that one space of virtual addresses, therefore only a single page allocator is needed.</p>
+<h2 id="advanced-memory-types"><a class="header" href="#advanced-memory-types">Advanced memory types</a></h2>
+<p>While the above &quot;basic&quot; types focus on preventing simple programmer mistakes through type-enforced clarity,
+the below &quot;advanced&quot; types strive to prevent much more complex errors through type-specific invariants. </p>
+<ul>
+<li><a href="https://theseus-os.github.io/Theseus/doc/page_allocator/struct.AllocatedPages.html"><code>AllocatedPages</code></a>: a range of <code>Page</code>s contiguous in virtual memory that have a single exclusive owner.
+<ul>
+<li>This can only be obtained by requesting an allocation from the <code>page_allocator</code>.</li>
+</ul>
+</li>
+<li><a href="https://theseus-os.github.io/Theseus/doc/frame_allocator/struct.AllocatedFrames.html"><code>AllocatedFrames</code></a>: a range of <code>Frame</code>s contiguous in physical memory that have a single exclusive owner. 
+<ul>
+<li>This can only be obtained by requesting an allocation from the <code>frame_allocator</code>.</li>
+</ul>
+</li>
+<li><a href="https://theseus-os.github.io/Theseus/doc/memory/struct.MappedPages.html"><code>MappedPages</code></a>: a range of virtually-contiguous pages that are mapped to physical frames and have a single exclusive owner. 
+<ul>
+<li>We will discuss <code>MappedPages</code> in the next section about memory mapping.</li>
+</ul>
+</li>
+</ul>
+<p>The main difference between the basic types and advanced types is that the advanced types guarantee <em>exclusivity</em>.
+As such, if you have a <code>PageRange</code> from <code>v0x6000</code> to <code>v0x8000</code>, there is nothing preventing another entity from creating a similar <code>PageRange</code> that overlaps it, e.g., from <code>v0x7000 to v0x9000</code>. 
+However, if you have an <code>AllocatedPages</code> from <code>v0x6000</code> to <code>v0x8000</code>, you are guaranteed that <strong>no other entity across the entire system</strong> has an <code>AllocatedPages</code> object that contains any of those pages.
+That is a powerful guarantee that allows us to build stronger isolation and safety invariants when allocating, mapping, and accessing memory, as shown in the next section.</p>
+<!-- Links below -->
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                                                    <a rel="prev" href="../subsystems/subsystems.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+                                                    <a rel="next" href="../subsystems/memory_mapping.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                                    <a rel="prev" href="../subsystems/subsystems.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+                                    <a rel="next" href="../subsystems/memory_mapping.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                            </nav>
+
+        </div>
+
+        
+        
+        
+                <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+        
+                <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        
+    </body>
+</html>
