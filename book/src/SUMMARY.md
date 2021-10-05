@@ -32,6 +32,8 @@
 ## Overview of Key Subsystems 
 - [Overview of Key Subsystems](subsystems/subsystems.md)
     - [Memory Management](subsystems/memory.md)
+        - [Mapping Virtual to Physical Memory](subsystems/memory_mapping.md)
+        - [Heap Allocators](subsystems/heap.md)
     - [Task Management]() <!-- TODO: task.md -->
     - [Display and Window Management](subsystems/display/display.md)
         - [The Window Manager](subsystems/display/window_manager.md)
