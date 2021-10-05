@@ -37,7 +37,7 @@ A chunk of virtual memory is called a `Page`, while a chunk of physical memory i
 These chunks are the smallest elementary unit that the hardware's Memory Management Unit (MMU) can operate on, i.e., they are indivisible from the hardware's point of view. 
 In other words, the MMU hardware cannot map any chunk of memory smaller than a single `Page` to any chunk of memory smaller than a single `Frame`. 
 
-A `Page` has a starting `VirtualAddress` and an ending `VirtualAddress`; for example, a `Page` may start (inclusively) at address `v0x5000` and end (exlusively) at `v0x6000` 
+A `Page` has a starting `VirtualAddress` and an ending `VirtualAddress`; for example, a `Page` may start (inclusively) at address `v0x5000` and end (exclusively) at `v0x6000` 
 Similarly, a `Frame` has a starting `PhysicalAddress` and an ending `PhysicalAddress`, for example from `p0xFFFD1000` to `p0xFFFD2000`.
 A `Page` can be said to contain a `VirtualAddress` within its bounds, and likewise a `Frame` can be said to contain a `PhysicalAddress`.
 Although `Page`s and `Frame`s have internal numbers, we typically identify them by their starting address, e.g., "the page starting at `v0x9000`" instead of "page 9".
