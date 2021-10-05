@@ -20,7 +20,7 @@ Heap allocators must implement Rust's [`GlobalAlloc`] trait in order to be used 
 
 
 One unique aspect of Theseus's "combination" heap design is that the early heap, fully-featured heap, and per-core dedicated heaps are all combined into a single heap abstraction that can be accessed via singleton global heap instance.
-It starts out with the simple block allocator described above, and then once more key system functionality has been ininitialized during OS boot, the [`switch_to_multiple_heaps()`] function is invoked to transparently activate the more complex, per-core heap allocators.
+It starts out with the simple block allocator described above, and then once more key system functionality has been initialized during OS boot, the [`switch_to_multiple_heaps()`] function is invoked to transparently activate the more complex, per-core heap allocators.
 
 Another unique aspect of heaps in Theseus is that all entities across the system use and share the same set of global heaps. This allows allocations to seamlessly flow and be passed among applications, libraries, and kernel entities without the need for inefficient and complex [exchange heaps] used in other SAS OSes. 
 
@@ -28,7 +28,7 @@ Another unique aspect of heaps in Theseus is that all entities across the system
 
 > Note: Theseus's combination heap design was implemented before Rust's `alloc` types supported non-global allocators and placement constructors.
 > 
-> We haven't yet investigated how to break these heap instances down into individual allocators that can be used with specific allocation palcement functions like [`Box::new_in()`](https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new_in).
+> We haven't yet investigated how to break these heap instances down into individual allocators that can be used with specific allocation placement functions like [`Box::new_in()`](https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new_in).
 > 
 > If you're interested in working on this, please file an issue on GitHub or otherwise contact the Theseus maintainers.
 
@@ -45,3 +45,5 @@ Another unique aspect of heaps in Theseus is that all entities across the system
 [exchange heaps]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/EuroSys2007_SealedProcesses.pdf
 [`multiple_heaps`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/index.html
 [`switch_to_multiple_heaps()`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/fn.switch_to_multiple_heaps.html
+
+<!-- cspell:ignore FFFD   -->
