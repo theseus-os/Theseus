@@ -591,6 +591,7 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "\t If the book doesn't open in your browser, install the latest version of mdbook."
 	@echo -e "   clean-doc:"
 	@echo -e "\t Remove all generated documentation files."
 	@echo ""
