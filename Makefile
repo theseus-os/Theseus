@@ -523,11 +523,7 @@ endif
 ### Opens the Theseus book.
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
-ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT_FILE)")" &
-else
-	@xdg-open $(BOOK_OUT_FILE) > /dev/null 2>&1 || open $(BOOK_OUT_FILE) &
-endif
+	@mdbook build --open $(BOOK_SRC) -d $(BOOK_OUT)
 
 
 ### Removes all built documentation
@@ -627,6 +623,7 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "\t If the book doesn't open in your browser, install the latest version of mdbook."
 	@echo -e "   clean-doc:"
 	@echo -e "\t Remove all generated documentation files."
 	@echo ""
