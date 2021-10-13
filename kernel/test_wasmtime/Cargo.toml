@@ -1,0 +1,17 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "test_wasmtime"
+description = "A crate for testing the build of wasmtime ported to Theseus"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.wasmtime]
+path = "../../libs/wasmtime/crates/wasmtime"
+default-features = false
+
+
+[lib]
+crate-type = ["rlib"]
