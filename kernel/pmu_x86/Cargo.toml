@@ -17,8 +17,8 @@ path = "../apic"
 git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.log]
 version = "0.4.8"
