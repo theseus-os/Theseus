@@ -249,6 +249,6 @@ extern {
 /// `__truncdfsf2` function in the `compiler_builtins` crate.
 mod truncate;
 
-/// This module is a hack to solve no_std issue with libm by
-/// exposing no_mangle libm functions
+/// This module is a hack to get around the issue of no_mangle symbols
+/// not being exported properly from the `libm` crate in no_std environments.
 mod libm;
