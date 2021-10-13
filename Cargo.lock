@@ -1749,6 +1749,7 @@ dependencies = [
  "exceptions_early",
  "irq_safety",
  "kernel_config",
+ "libm",
  "log",
  "logger",
  "memory",

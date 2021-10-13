@@ -248,3 +248,7 @@ extern {
 /// This module is a hack to get around the lack of the 
 /// `__truncdfsf2` function in the `compiler_builtins` crate.
 mod truncate;
+
+/// This module is a hack to solve no_std issue with libm by
+/// exposing no_mangle libm functions
+mod libm;
