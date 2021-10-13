@@ -251,6 +251,10 @@
 <span id="248">248</span>
 <span id="249">249</span>
 <span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.</span>
 <span class="doccomment">//! </span>
@@ -502,6 +506,10 @@
 <span class="doccomment">/// This module is a hack to get around the lack of the </span>
 <span class="doccomment">/// `__truncdfsf2` function in the `compiler_builtins` crate.</span>
 <span class="kw">mod</span> <span class="ident">truncate</span>;
+
+<span class="doccomment">/// This module is a hack to get around the issue of no_mangle symbols</span>
+<span class="doccomment">/// not being exported properly from the `libm` crate in no_std environments.</span>
+<span class="kw">mod</span> <span class="ident">libm</span>;
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="nano_core" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
     <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
