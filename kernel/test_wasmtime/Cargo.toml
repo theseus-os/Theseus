@@ -8,17 +8,20 @@ build = "../../build.rs"
 [dependencies.log]
 version = "0.4.8"
 
+## working!
 [dependencies.wasmparser]
 path = "../../libs/wasm-tools/crates/wasmparser"
 default-features = false
 
+## working!
 [dependencies.cranelift-entity]
 path = "../../libs/wasmtime/cranelift/entity"
 features = ['enable-serde']
 
-# [dependencies.wasmtime-types]
-# path = "../../libs/wasmtime/crates/types"
-# default-features = false
+## working!
+[dependencies.wasmtime-types]
+path = "../../libs/wasmtime/crates/types"
+default-features = false
 
 # [dependencies.wasmtime]
 # path = "../../libs/wasmtime/crates/wasmtime"

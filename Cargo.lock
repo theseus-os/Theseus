@@ -2982,6 +2982,7 @@ dependencies = [
  "cranelift-entity",
  "log",
  "wasmparser",
+ "wasmtime-types",
 ]
 
 [[package]]
@@ -3228,6 +3229,15 @@ name = "wasmparser"
 version = "0.81.0"
 dependencies = [
  "hashbrown",
+]
+
+[[package]]
+name = "wasmtime-types"
+version = "0.30.0"
+dependencies = [
+ "cranelift-entity",
+ "serde",
+ "wasmparser",
 ]
 
 [[package]]
