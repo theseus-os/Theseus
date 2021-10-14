@@ -473,6 +473,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cranelift-entity"
+version = "0.77.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "crate_metadata"
 version = "0.1.0"
 dependencies = [
@@ -2469,6 +2476,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
+name = "serde"
+version = "1.0.118"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06c64263859d87aa2eb554587e2d23183398d617427327cf2b3d0ed8c69e4800"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.118"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c84d3526699cd55261af4b941e4e725444df67aa4f9e6a3564f18030d12672df"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
@@ -2952,6 +2979,7 @@ dependencies = [
 name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
+ "cranelift-entity",
  "log",
  "wasmparser",
 ]

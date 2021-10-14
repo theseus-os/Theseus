@@ -12,6 +12,14 @@ version = "0.4.8"
 path = "../../libs/wasm-tools/crates/wasmparser"
 default-features = false
 
+[dependencies.cranelift-entity]
+path = "../../libs/wasmtime/cranelift/entity"
+features = ['enable-serde']
+
+# [dependencies.wasmtime-types]
+# path = "../../libs/wasmtime/crates/types"
+# default-features = false
+
 # [dependencies.wasmtime]
 # path = "../../libs/wasmtime/crates/wasmtime"
 # default-features = false
