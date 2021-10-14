@@ -8,9 +8,13 @@ build = "../../build.rs"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.wasmtime]
-path = "../../libs/wasmtime/crates/wasmtime"
+[dependencies.wasmparser]
+path = "../../libs/wasm-tools/crates/wasmparser"
 default-features = false
+
+# [dependencies.wasmtime]
+# path = "../../libs/wasmtime/crates/wasmtime"
+# default-features = false
 
 
 [lib]

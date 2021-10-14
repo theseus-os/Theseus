@@ -5,4 +5,6 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-extern crate wasmtime;
+
+extern crate wasmparser;
+// extern crate wasmtime;

@@ -13,3 +13,6 @@
 [submodule "libs/wasmtime"]
 	path = libs/wasmtime
 	url = git@github.com:theseus-os/wasmtime.git
+[submodule "libs/wasm-tools"]
+	path = libs/wasm-tools
+	url = git@github.com:theseus-os/wasm-tools.git
