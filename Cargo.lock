@@ -61,6 +61,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
+name = "anyhow"
+version = "1.0.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61604a8f862e1d5c3229fdd78f8b02c68dcf73a4c4b05fd636d12240aaa242c1"
+
+[[package]]
 name = "ap_start"
 version = "0.1.0"
 dependencies = [
@@ -231,7 +237,7 @@ dependencies = [
 name = "block_cache"
 version = "0.1.0"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.9.1",
  "lazy_static",
  "log",
  "storage_device",
@@ -486,7 +492,7 @@ dependencies = [
  "cow_arc",
  "fs_node",
  "goblin",
- "hashbrown",
+ "hashbrown 0.9.1",
  "log",
  "memory",
  "spin 0.9.0",
@@ -508,7 +514,7 @@ version = "0.1.0"
 dependencies = [
  "by_address",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "lazy_static",
  "log",
@@ -517,6 +523,13 @@ dependencies = [
  "path",
  "qp-trie",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "crc32fast"
+version = "1.2.1"
+dependencies = [
+ "cfg-if 1.0.0",
 ]
 
 [[package]]
@@ -559,9 +572,9 @@ dependencies = [
  "by_address",
  "crate_metadata",
  "fs_node",
- "gimli",
+ "gimli 0.19.0",
  "goblin",
- "hashbrown",
+ "hashbrown 0.9.1",
  "log",
  "memory",
  "mod_mgmt",
@@ -808,7 +821,7 @@ dependencies = [
  "apic",
  "debug_info",
  "fault_log",
- "gimli",
+ "gimli 0.19.0",
  "log",
  "memory",
  "pmu_x86",
@@ -925,7 +938,7 @@ version = "0.1.0"
 dependencies = [
  "compositor",
  "framebuffer",
- "hashbrown",
+ "hashbrown 0.9.1",
  "lazy_static",
  "shapes",
  "spin 0.9.0",
@@ -1004,6 +1017,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "gimli"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0a01e0497841a3b2db4f8afa483cce65f7e96a3498bd6c541734792aeac8fe7"
+
+[[package]]
 name = "goblin"
 version = "0.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1021,6 +1040,12 @@ checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 dependencies = [
  "ahash",
 ]
+
+[[package]]
+name = "hashbrown"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "heap"
@@ -1096,6 +1121,17 @@ dependencies = [
  "bare-io",
  "log",
  "stdio",
+]
+
+[[package]]
+name = "indexmap"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
+dependencies = [
+ "autocfg",
+ "hashbrown 0.11.2",
+ "serde",
 ]
 
 [[package]]
@@ -1221,7 +1257,7 @@ dependencies = [
  "acpi",
  "apic",
  "bit_field 0.7.0",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "intel_ethernet",
  "interrupts",
@@ -1368,7 +1404,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.0",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "libm",
  "log",
@@ -1649,7 +1685,7 @@ dependencies = [
  "crate_name_utils",
  "cstr_core",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.9.1",
  "kernel_config",
  "log",
  "memfs",
@@ -1721,7 +1757,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cfg-if 0.1.10",
- "hashbrown",
+ "hashbrown 0.9.1",
  "heap",
  "intrusive-collections",
  "irq_safety",
@@ -1877,6 +1913,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "object"
+version = "0.26.2"
+dependencies = [
+ "crc32fast",
+ "hashbrown 0.9.1",
+ "indexmap",
+ "memchr",
+]
+
+[[package]]
 name = "opaque-debug"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2024,7 +2070,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "getopts",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "log",
  "network_manager",
@@ -2840,6 +2886,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "target-lexicon"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9bffcddbc2458fa3e6058414599e3c838a022abae82e5c67b4f7f80298d5bff"
+
+[[package]]
 name = "task"
 version = "0.1.0"
 dependencies = [
@@ -2982,6 +3034,7 @@ dependencies = [
  "cranelift-entity",
  "log",
  "wasmparser",
+ "wasmtime-environ",
  "wasmtime-types",
 ]
 
@@ -3088,7 +3141,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "fallible-iterator",
- "gimli",
+ "gimli 0.19.0",
  "interrupts",
  "log",
  "memory",
@@ -3228,7 +3281,25 @@ dependencies = [
 name = "wasmparser"
 version = "0.81.0"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.9.1",
+]
+
+[[package]]
+name = "wasmtime-environ"
+version = "0.30.0"
+dependencies = [
+ "anyhow",
+ "cfg-if 1.0.0",
+ "cranelift-entity",
+ "gimli 0.25.0",
+ "hashbrown 0.9.1",
+ "indexmap",
+ "log",
+ "object",
+ "serde",
+ "target-lexicon",
+ "wasmparser",
+ "wasmtime-types",
 ]
 
 [[package]]

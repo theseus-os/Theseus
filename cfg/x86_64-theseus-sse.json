@@ -11,6 +11,7 @@
   "target-c-int-width": "32",
   "arch": "x86_64",
   "os": "redox",
+  "__features": "TODO: may also need sse4.1",
   "features": "+sse2",
   "disable-redzone": true,
   "panic": "unwind"

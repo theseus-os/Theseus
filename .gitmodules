@@ -16,3 +16,9 @@
 [submodule "libs/wasm-tools"]
 	path = libs/wasm-tools
 	url = git@github.com:theseus-os/wasm-tools.git
+[submodule "libs/object"]
+	path = libs/object
+	url = git@github.com:theseus-os/object.git
+[submodule "libs/crc32fast"]
+	path = libs/crc32fast
+	url = git@github.com:theseus-os/rust-crc32fast.git

@@ -3,6 +3,7 @@
               "enable the `libc` crate to build correctly, such that we can use its various c_* type definitions" ],
 
   "llvm-target": "x86_64-unknown-none-gnu",
+  "__data-layout": "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   "data-layout": "e-m:e-i64:64-f80:128-n8:16:32:64-S128",
   "linker-flavor": "gcc",
   "target-family": "unix",
@@ -11,7 +12,8 @@
   "target-c-int-width": "32",
   "arch": "x86_64",
   "os": "redox",
-  "features": "-mmx,-sse,+soft-float",
+  "__features": "-mmx,-sse,+soft-float",
+  "features": "-pclmulqdq,-mmx,-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-3dnow,-3dnowa,-avx,-avx2,+soft-float",
   "disable-redzone": true,
   "panic": "unwind"
 }
