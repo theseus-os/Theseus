@@ -40,17 +40,15 @@ GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 RUSTC_VERSION := $(shell cat rust-toolchain)
-check_rustc:
-ifdef RUSTUP_TOOLCHAIN
-	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
-	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
-endif
+check-rustc:
 ## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
 ## If it still doesn't work, issue an error, since 'rustup' is probably missing.
-	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || (\
-	echo -e "\nError: 'rustup' isn't installed.";\
-	echo -e "Please install rustup and try again.\n";\
-	exit 1)
+	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || \
+	(\
+		echo -e "\nError: 'rustup' isn't installed.";\
+		echo -e "Please install rustup and try again.\n";\
+		exit 1 \
+	)
 
 
 
@@ -109,12 +107,14 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
-		check_rustc \
-		clean run run_pause iso build cargo grub \
+		check-rustc check-usb \
+		clean clean-doc clean-old-build \
+		run run_pause iso build cargo grub \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
-		gdb doc docs view-doc view-docs book view-book clean-doc
+		gdb \
+		doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -131,7 +131,7 @@ iso: $(iso)
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): build
+$(iso): clean-old-build build
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
@@ -202,7 +202,7 @@ endif
 
 
 ## This target invokes the actual Rust build process
-cargo: check_rustc 
+cargo: check-rustc 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
@@ -240,8 +240,6 @@ cargo: check_rustc
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
-## If we remove the OBJECT_FILES_BUILD_DIR here, then the simd_personality_* builds do not work.
-# @rm -rf $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@mkdir -p $(DEPS_DIR)
 
@@ -334,12 +332,20 @@ $(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
 
 
 
-### Removes all built source files
+### Removes the build directory and all compiled Rust objects.
 clean:
-	cargo clean
 	@rm -rf $(BUILD_DIR)
+	cargo clean
 	
 
+### Removes only the old files that were copied into the build directory from a previous build.
+### This is necessary to avoid lingering build files that aren't relevant to a new build,
+### and would thus cause incremental re-builds to not work correctly.
+### All other build files are left intact.
+clean-old-build:
+	@rm -rf $(OBJECT_FILES_BUILD_DIR)
+	@rm -rf $(DEPS_DIR)
+	@rm -rf $(DEBUG_SYMBOLS_DIR)
 
 
 # ## (This is currently not used in Theseus, since we don't run anything in userspace)
@@ -379,7 +385,7 @@ clean:
 simd_personality_sse : export TARGET := x86_64-theseus
 simd_personality_sse : export BUILD_MODE = release
 simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_personality_sse
-simd_personality_sse: build_sse build
+simd_personality_sse: clean-old-build build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -399,7 +405,7 @@ simd_personality_avx : export TARGET := x86_64-theseus
 simd_personality_avx : export BUILD_MODE = release
 simd_personality_avx : export override THESEUS_CONFIG += simd_personality simd_personality_avx
 simd_personality_avx : export override CFLAGS += -DENABLE_AVX
-simd_personality_avx: build_avx build
+simd_personality_avx: clean-old-build build_avx build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
@@ -460,8 +466,23 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
-doc: check_rustc
-	@RUSTDOCFLAGS="$$RUSTDOCFLAGS -A private_intra_doc_links" cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+doc: export override RUSTDOCFLAGS += -A private_intra_doc_links
+doc: check-rustc
+## Build the docs for select library crates, namely those not hosted online.
+## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/cow_arc/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/debugit/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dfqueue/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/keycodes_ascii/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
+	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
+## Now, build the docs for all of Theseus's main kernel crates.
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
@@ -502,11 +523,7 @@ endif
 ### Opens the Theseus book.
 view-book: book
 	@echo -e "Opening the Theseus book in your browser..."
-ifneq ($(IS_WSL), )
-	wslview "$(shell realpath --relative-to="$(ROOT_DIR)" "$(BOOK_OUT_FILE)")" &
-else
-	@xdg-open $(BOOK_OUT_FILE) > /dev/null 2>&1 || open $(BOOK_OUT_FILE) &
-endif
+	@mdbook build --open $(BOOK_SRC) -d $(BOOK_OUT)
 
 
 ### Removes all built documentation
@@ -585,7 +602,18 @@ help:
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
 	@echo -e "   vfio=<pci_device_slot>:"
 	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
+	@echo -e "   SERIAL<N>=<backend>":
+	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL1' or 'SERIAL2') to a QEMU-supported backend."
+	@echo -e "\t For example, 'SERIAL2=pty' will connect the second serial port for the given architecture"
+	@echo -e "\t ('COM2 on x86) to a newly-allocated pseudo-terminal on Linux, e.g., '/dev/pts/6'."
+	@echo -e "\t For the 'pty' option, QEMU will print a statement like so:"
+	@echo -e "\t     char device redirected to /dev/pts/6 (label serial1)"
+	@echo -e "\t Note that QEMU uses 0-based indexing for serial ports, so its 'serial1' label refers to the second serial port, our 'SERIAL2'."
+	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6'."
+	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
+	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
 
+    
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
@@ -595,6 +623,7 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "\t If the book doesn't open in your browser, install the latest version of mdbook."
 	@echo -e "   clean-doc:"
 	@echo -e "\t Remove all generated documentation files."
 	@echo ""
@@ -606,17 +635,41 @@ help:
 ##################### This section has QEMU arguments and configuration ###########################
 ###################################################################################################
 
-## Specify a basic machine/platform, which currently is the `q35` machine
-## because it's the only one that supports a guest OS vIOMMU: <https://wiki.qemu.org/Features/VT-d>
-QEMU_FLAGS := -machine q35,kernel-irqchip=split 
+QEMU_FLAGS ?= 
+QEMU_EXTRA ?= 
+SERIAL1 ?= stdio
+SERIAL2 ?= pty
+
+ifdef IOMMU
+## Currently only the `q35` machine model supports a virtual IOMMU: <https://wiki.qemu.org/Features/VT-d>
+	QEMU_FLAGS += -machine q35,kernel-irqchip=split
+	QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
+endif
+
 ## Boot from the cd-rom drive
 QEMU_FLAGS += -cdrom $(iso) -boot d
 ## Don't reboot or shutdown upon failure or a triple reset
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 
 QEMU_FLAGS += -s
-## Enable the serial log to be redirected to the host terminal's stdio
-QEMU_FLAGS += -serial stdio 
+
+## Enable the first serial port (the default log) to be redirected to the host terminal's stdio.
+## Optionally, use the below `mon:` prefix to have the host terminal forward escape/control sequences to this serial port.
+# QEMU_FLAGS += -serial $(SERIAL1)
+QEMU_FLAGS += -serial mon:$(SERIAL1)
+
+## Attach a second serial port to QEMU, which can be used for a separate headless shell/terminal.
+## For example, if this is `pty`, and QEMU chooses to allocate a new pseudo-terminal at /dev/pts/6,
+## then you can connect to this serial port by running a tty connector application in a new window:
+## -- `screen /dev/pts/6`
+## -- `picocom /dev/pts/6`
+QEMU_FLAGS += -serial mon:$(SERIAL2)
+
+## Disable the graphical display (for testing headless server functionality)
+## `-vga none`:      removes the VGA card
+## `-display none`:  disables QEMU's graphical display
+## `-nographic`:     disables QEMU's graphical display and redirects VGA text mode output to serial.
+# QEMU_FLAGS += -display none -vga none
 
 ## Set the amount of system memory (RAM) provided to the QEMU guest OS
 QEMU_MEMORY ?= 512M
@@ -679,10 +732,7 @@ ifdef vfio
 	QEMU_FLAGS += -device vfio-pci,host=$(vfio)
 endif
 
-## Enable the IOMMU, e.g., Intel VT-d. 
-## See more here: <https://wiki.qemu.org/Features/VT-d>
-QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
-
+QEMU_FLAGS += $(QEMU_EXTRA)
 
 
 
@@ -734,7 +784,7 @@ bochs: $(iso)
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
-check_usb:
+check-usb:
 ## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app.
 ifeq ($(IS_WSL), ) ## if we're not on WSL...
 ## now we need to check that the user has specified a USB drive that actually exists, not a partition of a USB drive.
@@ -751,7 +801,7 @@ endif  ## end of checking for WSL
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
 boot : export override THESEUS_CONFIG += mirror_log_to_vga
-boot: check_usb $(iso)
+boot: check-usb $(iso)
 ifneq ($(IS_WSL), )
 ## building on WSL
 	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."

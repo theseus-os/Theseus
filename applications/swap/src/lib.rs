@@ -72,11 +72,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     let taskref = task::get_my_current_task()
         .ok_or_else(|| format!("failed to get current task"))?;
 
-    let curr_dir = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let curr_dir = Arc::clone(&taskref.get_env().lock().working_dir);
 
     let override_namespace_crate_dir = if let Some(path) = matches.opt_str("d") {
         let path = Path::new(path);

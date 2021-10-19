@@ -19,3 +19,17 @@ pub fn log2(value: usize) -> usize {
 pub fn round_up_power_of_two(value: usize, base: usize) -> usize {
     (value + (base - 1)) & !(base - 1)
 }
+
+
+/// Rounds the given `value` up to the nearest `multiple`.
+#[inline(always)]
+pub fn round_up(value: usize, multiple: usize) -> usize {
+    ((value + multiple - 1) / multiple) * multiple
+}
+
+
+/// Rounds the given `value` down to the nearest `multiple`.
+#[inline(always)]
+pub fn round_down(value: usize, multiple: usize) -> usize {
+    (value / multiple) * multiple
+}

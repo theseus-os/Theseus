@@ -1,0 +1,12 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "lockable"
+version = "0.1.0"
+keywords = ["lock", "mutex", "no_std", "locking"]
+description = "A trait that represents any lockable type, like Mutex or RwLock"
+categories = ["no-std", "concurrency"]
+license = "MIT"
+
+[dependencies]
+spin = "0.9.0"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }

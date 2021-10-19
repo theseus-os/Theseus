@@ -10,7 +10,7 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]
-version = "1.0"
+version = "1.4.0"
 
 [dependencies.fs_node]
 path = "../fs_node"

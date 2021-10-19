@@ -33,7 +33,6 @@ mod sc;
 mod zone;
 
 pub use pages::*;
-pub use sc::*;
 pub use zone::*;
 
 use core::alloc::Layout;

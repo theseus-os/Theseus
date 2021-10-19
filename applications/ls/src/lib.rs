@@ -42,12 +42,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    // grabs the current working directory pointer; this is scoped so that we drop the lock on the "cd" task
-    let curr_wd = {
-        let locked_task = taskref.lock();
-        let curr_env = locked_task.env.lock();
-        Arc::clone(&curr_env.working_dir)
-    };
+    let curr_wd = Arc::clone(&taskref.get_env().lock().working_dir);
     
     // print children of working directory if no child is specified
     if matches.free.is_empty() {

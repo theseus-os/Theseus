@@ -9,7 +9,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.9.0"
 multiboot2 = "0.10.1"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+libm = "0.2.1"
 
 
 # [dependencies.compiler_builtins]
@@ -35,8 +35,8 @@ path = "../state_store"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.serial_port]
-path = "../serial_port"
+[dependencies.serial_port_basic]
+path = "../serial_port_basic"
 
 [dependencies.stack]
 path = "../stack"

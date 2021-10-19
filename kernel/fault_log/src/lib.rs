@@ -161,13 +161,12 @@ fn update_and_insert_fault_entry_internal(
 
     // Add name of current task
     fe.running_task = {
-        Some(curr_task.lock().name.clone())
+        Some(curr_task.name.clone())
     };
 
     // If task is from an application add application crate name. `None` if not 
     fe.running_app_crate = {
-        let t = curr_task.lock();
-        t.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.clone())
+        curr_task.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.clone())
     };
 
     if let Some(instruction_pointer) = instruction_pointer {

@@ -31,7 +31,7 @@ pub fn simd_tasks_added_to_core<'t, I>(tasks_on_core: I, _which_core: u8)
 	where I: Iterator<Item = &'t TaskRef>
 {
 	let num_simd_tasks = &tasks_on_core
-		.filter(|taskref| taskref.lock().simd)
+		.filter(|taskref| taskref.simd)
 		.count();
 	warn!("simd_tasks_added_to_core(): core {} now has {} SIMD tasks total.", 
 		_which_core, num_simd_tasks);
@@ -68,7 +68,7 @@ pub fn simd_tasks_removed_from_core<'t, I>(tasks_on_core: I, _which_core: u8)
 	where I: Iterator<Item = &'t TaskRef>
 {
 	let num_simd_tasks = &tasks_on_core
-		.filter(|taskref| taskref.lock().simd)
+		.filter(|taskref| taskref.simd)
 		.count();
 	warn!("simd_tasks_removed_from_core(): core {} now has {} SIMD tasks total.", 
 		_which_core, num_simd_tasks);
