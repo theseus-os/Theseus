@@ -98,7 +98,7 @@ impl WorkQueueEntry {
     }
     pub fn init_send(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32, local_address: PhysicalAddress) {
         self.control.init(wqe_index, sqn, tisn);
-        self.eth.init();
+        self.eth.init(local_address);
         self.data.init(lkey, local_address);
     }
 
@@ -139,8 +139,9 @@ impl ControlSegment {
 
     pub fn nop(&mut self, wqe_index: u32, sqn: u32, tisn: u32) {
         self.opcode.write(U32::new((wqe_index << 8)| (WQEOpcode::Nop as u32)));
-        // self.ds.write(U32::new((sqn << 8) | 1));
-        // self.se.write(U32::new(8));
+        debug!("{:#X}", (sqn << 8) | 4);
+        self.ds.write(U32::new((sqn << 8) | 4));
+        self.se.write(U32::new(8));
         // self.ctrl_general_id.write(U32::new(tisn << 8)); //?
     }
 }
@@ -162,7 +163,7 @@ pub(crate) struct EthSegment {
 const_assert_eq!(core::mem::size_of::<EthSegment>(), 32);
 
 impl EthSegment {
-    pub fn init(&mut self) {
+    pub fn init(&mut self, packet: PhysicalAddress) {
         let inline_headers_0 = (14 << 16) /* bytes in ethernet header*/ | 0xFFFF;
         let inline_headers_1 = 0xFFFF_FFFF;  
         let inline_headers_2 = 0x043f_72a2;  // 04:3f:72:a2:b4:3a

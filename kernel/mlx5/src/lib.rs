@@ -40,9 +40,11 @@ use core::sync::atomic::fence;
 use core::sync::atomic::Ordering;
 
 /// Vendor ID for Mellanox
-pub const MLX_VEND:           u16 = 0x15B3;
+pub const MLX_VEND:             u16 = 0x15B3;
 /// Device ID for the ConnectX-5 NIC
-pub const CONNECTX5_DEV:      u16 = 0x1019; //7;
+pub const CONNECTX5_EX_DEV:     u16 = 0x1019; 
+pub const CONNECTX5_DEV:        u16 = 0x1017;
+
 
 /// The singleton connectx-5 NIC.
 /// TODO: Allow for multiple NICs
@@ -460,54 +462,58 @@ impl ConnectX5Nic {
         
         let (rq_mp, rq_pa) = create_contiguous_mapping(rq_size_in_bytes, NIC_MAPPING_FLAGS)?;
         let sq_pa = PhysicalAddress::new(rq_pa.value() + rq_size_in_bytes).ok_or("Could not create starting address for SQ")?; 
+        debug!("Trying to create SQ at: {:#x}", sq_pa);
         let sq_mp = allocate_memory(sq_pa, sq_size_in_bytes)?;
         
         // Allocate page for SQ/RQ doorbell
+        debug!("Allocate doorbell anywhere");
         let (db_page, db_pa) = create_contiguous_mapping(4096, NIC_MAPPING_FLAGS)?;
+        debug!("doorbell: {:#x}", db_pa);
 
         // Allocate page for UAR
         let uar_mem_base = mem_base.value() + ((uar as usize) * 4096);
         let uar_page = allocate_memory(PhysicalAddress::new(uar_mem_base).ok_or("Could not create starting address for uar")?, 4096)?;
         
         debug!("mmio: {:#x}, uar: {:#x}", mem_base.value(), uar_mem_base);
-        // Create the SQ
-        let mut send_queue = SendQueue::create(sq_mp, db_page, uar_page, sq_size)?;
 
+        // Create the SQ
+        
         let init_cmd = cmdq.create_command(
             CommandBuilder::new(CommandOpcode::CreateSq) 
-                .allocated_pages(vec!(sq_pa)) 
-                .uar(uar) 
-                .log_queue_size(10)
-                .db_page(db_pa)
-                .cqn(cq_number_s) 
-                .tisn(tisn) 
-                .pd(pd)
+            .allocated_pages(vec!(sq_pa)) 
+            .uar(uar) 
+            .log_queue_size(10)
+            .db_page(db_pa)
+            .cqn(cq_number_s) 
+            .tisn(tisn) 
+            .pd(pd)
         )?;
         let posted_cmd = init_segment.post_command(init_cmd);
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         let (sq_number, status) = cmdq.get_send_queue_number(completed_cmd)?;
+        let mut send_queue = SendQueue::create(sq_mp, db_page, uar_page, sq_size, sq_number)?;
         trace!("Create SQ status: {:?}, number: {}", status, sq_number);
-
+        
         #[cfg(mlx_logger)]
         {
             send_queue.dump()
         }
 
-        // Create the RQ
-        let mut receive_queue = ReceiveQueue::create(rq_mp)?;
+        // // Create the RQ
+        // let mut receive_queue = ReceiveQueue::create(rq_mp)?;
 
-        let init_cmd = cmdq.create_command(
-            CommandBuilder::new(CommandOpcode::CreateRq) 
-                .allocated_pages(vec!(rq_pa)) 
-                .log_queue_size(10)
-                .db_page(db_pa)
-                .cqn(cq_number_r) 
-                .pd(pd)
-        )?;
-        let posted_cmd = init_segment.post_command(init_cmd);
-        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        let (rq_number, status) = cmdq.get_receive_queue_number(completed_cmd)?;
-        trace!("Create RQ status: {:?}, number: {}", status, rq_number);
+        // let init_cmd = cmdq.create_command(
+        //     CommandBuilder::new(CommandOpcode::CreateRq) 
+        //         .allocated_pages(vec!(rq_pa)) 
+        //         .log_queue_size(10)
+        //         .db_page(db_pa)
+        //         .cqn(cq_number_r) 
+        //         .pd(pd)
+        // )?;
+        // let posted_cmd = init_segment.post_command(init_cmd);
+        // let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        // let (rq_number, status) = cmdq.get_receive_queue_number(completed_cmd)?;
+        // trace!("Create RQ status: {:?}, number: {}", status, rq_number);
 
         // MODIFY_SQ
         let init_cmd = cmdq.create_command(
@@ -520,14 +526,14 @@ impl ConnectX5Nic {
         let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
         trace!("Modify SQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
 
-        // MODIFY_RQ
-        let init_cmd = cmdq.create_command(
-            CommandBuilder::new(CommandOpcode::ModifyRq) 
-                .rqn(rq_number)
-        )?;
-        let posted_cmd = init_segment.post_command(init_cmd);
-        let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
-        trace!("Modify RQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
+        // // MODIFY_RQ
+        // let init_cmd = cmdq.create_command(
+        //     CommandBuilder::new(CommandOpcode::ModifyRq) 
+        //         .rqn(rq_number)
+        // )?;
+        // let posted_cmd = init_segment.post_command(init_cmd);
+        // let completed_cmd = cmdq.wait_for_command_completion(posted_cmd);
+        // trace!("Modify RQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
 
         // QUERY_SQ
         let init_cmd = cmdq.create_command(
@@ -579,6 +585,7 @@ impl ConnectX5Nic {
         // send_queue.send(sq_number, tisn, rlkey, pa)?;
         send_queue.nop(sq_number, tisn, rlkey)?;
         while completion_queue.hw_owned(0) {}
+        completion_queue.dump();
         // completion_queue.check_packet_transmission();
 
         // let mlx5_nic = ConnectX5Nic {

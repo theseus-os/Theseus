@@ -113,11 +113,12 @@ pub struct SendQueue {
     entries: BoxRefMut<MappedPages, [WorkQueueEntry]>, 
     doorbell: BoxRefMut<MappedPages, DoorbellRecord>,
     uar: BoxRefMut<MappedPages, UserAccessRegion>,
-    wqe_index: u32
+    wqe_index: u32,
+    sqn: u32
 }
 
 impl SendQueue {
-    pub fn create(entries_mp: MappedPages, doorbell_mp: MappedPages, uar_mp: MappedPages, num_entries: usize) -> Result<SendQueue, &'static str> {
+    pub fn create(entries_mp: MappedPages, doorbell_mp: MappedPages, uar_mp: MappedPages, num_entries: usize, sqn: u32) -> Result<SendQueue, &'static str> {
         let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<DoorbellRecord>(0))?;
         doorbell.send_counter.write(U32::new(0));
         doorbell.rcv_counter.write(U32::new(0));
@@ -131,7 +132,7 @@ impl SendQueue {
             entry.init()
         }
 
-        Ok( SendQueue{entries: entries, doorbell, uar, wqe_index: 0} )
+        Ok( SendQueue{entries: entries, doorbell, uar, wqe_index: 0, sqn} )
     }
 
     pub fn send(&mut self, sqn: u32, tisn: u32, lkey: u32, packet_address: PhysicalAddress) -> Result<(), &'static str> {
@@ -150,12 +151,25 @@ impl SendQueue {
     pub fn nop(&mut self, sqn: u32, tisn: u32, lkey: u32) -> Result<(), &'static str> {
         let mut wqe = &mut self.entries[0];
         wqe.nop(self.wqe_index, sqn, tisn, lkey);
+        wqe.dump(0);
+
         self.wqe_index += 1; // need to wrap around 0xFFFF
-        self.doorbell.send_counter.write(U32::new(self.wqe_index));
+
+        wqe.dump(0);
+        
         let mut doorbell = [U32::new(0);64];
         doorbell[0] = wqe.control.opcode.read(); 
         doorbell[1] = wqe.control.ds.read();
+        self.doorbell.send_counter.write(U32::new(self.wqe_index));
+
+        wqe.dump(0);
+
         self.uar.db_blueflame_buffer0_even.write(doorbell);
+
+        debug!("{:#X}", self.uar.db_blueflame_buffer0_even.read()[0].get());
+        debug!("{:#X}", self.uar.db_blueflame_buffer0_even.read()[1].get());
+
+        wqe.dump(0);
 
         Ok(())
     }

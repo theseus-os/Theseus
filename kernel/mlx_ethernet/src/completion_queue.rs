@@ -171,7 +171,7 @@ impl CompletionQueue {
     }
 
     pub fn hw_owned(&self, entry_num: usize) -> bool {
-        // debug!("{:#x?}", self.entries[entry_num]);
+        // self.entries[entry_num].dump(0);
         self.entries[entry_num].owner.read().get() & 0x1 == 0x1
     }
 
