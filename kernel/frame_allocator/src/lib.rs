@@ -671,9 +671,9 @@ fn allocate_from_chosen_chunk(
 /// An inner function that breaks up the given chunk into multiple smaller chunks.
 /// 
 /// Returns a tuple of three chunks:
-/// 1. The `Chunk` containing the requested range of frames, from `start_frame` to `start_frame + num_frames`.
-/// 2. The `Chunk` of frames that may come before the beginning of the requested frame range.
-/// 3. The `Chunk` of frames that may come after the end of the requested frame range.
+/// 1. The `Chunk` containing the requested range of frames starting at `start_frame`.
+/// 2. The range of frames in the `chosen_chunk` that came before the beginning of the requested frame range.
+/// 3. The range of frames in the `chosen_chunk` that came after the end of the requested frame range.
 fn split_chosen_chunk(
     start_frame: Frame,
     num_frames: usize,
