@@ -621,7 +621,7 @@ fn find_any_chunk<'list>(
             // This results in an O(1) allocation time in the general case, until all address ranges are already in use.
             let mut cursor = tree.upper_bound_mut(Bound::<&Chunk>::Unbounded);
             while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-                if num_frames < chunk.size_in_frames() && chunk.typ == MemoryRegionType::Free {
+                if num_frames <= chunk.size_in_frames() && chunk.typ == MemoryRegionType::Free {
                     return allocate_from_chosen_chunk(*chunk.start(), num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor));
                 }
                 warn!("Frame allocator: inefficient scenario: had to search multiple chunks \
@@ -904,7 +904,7 @@ pub fn allocate_frames_deferred(
                 // This prevents the logical error of allocating the same frame multiple times, 
                 // once from the reserved list and once from the free list.
                 remove_free_frames(&mut FREE_FRAMES_LIST.lock(), frames.clone())?;
-                trace!("Removed frames from the FREE_FRAMES_LIST: {:X?}", frames);
+                trace!("Removed now-reserved frames from the free frames list: {:X?}", frames);
                 find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames)
             }
             success => success,
