@@ -1588,6 +1588,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
+ "memory_structs",
  "mlx_ethernet",
  "nic_initialization",
  "owning_ref",

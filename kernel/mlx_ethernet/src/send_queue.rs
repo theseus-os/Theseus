@@ -135,9 +135,9 @@ impl SendQueue {
         Ok( SendQueue{entries: entries, doorbell, uar, wqe_index: 0, sqn} )
     }
 
-    pub fn send(&mut self, sqn: u32, tisn: u32, lkey: u32, packet_address: PhysicalAddress) -> Result<(), &'static str> {
+    pub fn send(&mut self, sqn: u32, tisn: u32, lkey: u32, packet_address: PhysicalAddress, packet: &mut [u8]) -> Result<(), &'static str> {
         let mut wqe = &mut self.entries[0];
-        wqe.init_send(self.wqe_index, sqn, tisn, lkey, packet_address);
+        wqe.init_send(self.wqe_index, sqn, tisn, lkey, packet_address, packet);
         self.wqe_index += 1; // need to wrap around 0xFFFF
         self.doorbell.send_counter.write(U32::new(self.wqe_index));
         let mut doorbell = [U32::new(0);64];
@@ -151,18 +151,15 @@ impl SendQueue {
     pub fn nop(&mut self, sqn: u32, tisn: u32, lkey: u32) -> Result<(), &'static str> {
         let mut wqe = &mut self.entries[0];
         wqe.nop(self.wqe_index, sqn, tisn, lkey);
-        wqe.dump(0);
 
         self.wqe_index += 1; // need to wrap around 0xFFFF
 
-        wqe.dump(0);
         
         let mut doorbell = [U32::new(0);64];
         doorbell[0] = wqe.control.opcode.read(); 
         doorbell[1] = wqe.control.ds.read();
         self.doorbell.send_counter.write(U32::new(self.wqe_index));
 
-        wqe.dump(0);
 
         self.uar.db_blueflame_buffer0_even.write(doorbell);
 

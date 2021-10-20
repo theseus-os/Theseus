@@ -96,10 +96,10 @@ impl WorkQueueEntry {
     pub fn init(&mut self) {
         *self = WorkQueueEntry::default();
     }
-    pub fn init_send(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32, local_address: PhysicalAddress) {
+    pub fn init_send(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32, local_address: PhysicalAddress, packet: &mut [u8]) {
         self.control.init(wqe_index, sqn, tisn);
-        self.eth.init(local_address);
-        self.data.init(lkey, local_address);
+        self.eth.init(packet);
+        self.data.init(lkey, local_address, packet.len() as u32);
     }
 
     pub fn nop(&mut self, wqe_index: u32, sqn: u32, tisn: u32, lkey: u32) {
@@ -163,12 +163,16 @@ pub(crate) struct EthSegment {
 const_assert_eq!(core::mem::size_of::<EthSegment>(), 32);
 
 impl EthSegment {
-    pub fn init(&mut self, packet: PhysicalAddress) {
-        let inline_headers_0 = (14 << 16) /* bytes in ethernet header*/ | 0xFFFF;
-        let inline_headers_1 = 0xFFFF_FFFF;  
-        let inline_headers_2 = 0x043f_72a2;  // 04:3f:72:a2:b4:3a
-        let inline_headers_3 = (300 << 16) | 0xb43a;  // 04:3f:72:a2:b4:3a
-        let inline_headers_4 = 0x4500;  // 
+    pub fn init(&mut self, packet: &mut [u8]) {
+
+        // Size of Ethernet Segment in transmit descriptor
+        let ninline: u32 = 16;
+
+        let inline_headers_0 = (ninline << 16) /* bytes in ethernet header*/ | (packet[0] as u32) << 8 | (packet[1] as u32);
+        let inline_headers_1 = (packet[2] as u32) << 24 | (packet[3] as u32) << 16 | (packet[4] as u32) << 8 | packet[5] as u32; 
+        let inline_headers_2 = (packet[6] as u32) << 24 | (packet[7] as u32) << 16 | (packet[8] as u32) << 8 | packet[9] as u32;
+        let inline_headers_3 = (packet[10] as u32) << 24 | (packet[11] as u32) << 16 | (packet[12] as u32) << 8 | packet[13] as u32;
+        let inline_headers_4 = (packet[14] as u32) << 24 | (packet[15] as u32) << 16;
 
         self.inline_headers_0.write(U32::new(inline_headers_0));
         self.inline_headers_1.write(U32::new(inline_headers_1));
@@ -191,8 +195,8 @@ pub(crate) struct MemoryPointerDataSegment {
 const_assert_eq!(core::mem::size_of::<MemoryPointerDataSegment>(), 16);
 
 impl MemoryPointerDataSegment {
-    pub fn init(&mut self, lkey: u32, local_address: PhysicalAddress) {
-        self.byte_count.write(U32::new(298));
+    pub fn init(&mut self, lkey: u32, local_address: PhysicalAddress, len: u32) {
+        self.byte_count.write(U32::new(len));
         self.l_key.write(U32::new(lkey));
         self.local_address_h.write(U32::new((local_address.value() >> 32) as u32));
         self.local_address_l.write(U32::new((local_address.value() & 0xFFFF_FFFF) as u32));
