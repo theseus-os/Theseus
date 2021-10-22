@@ -108,6 +108,8 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
     let mut text_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut rodata_start:      Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut rodata_end:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut tls_data_start:    Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut tls_data_end:      Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut stack_start:       Option<(VirtualAddress, PhysicalAddress)> = None;
@@ -115,9 +117,10 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
     let mut page_table_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut page_table_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
-    let mut text_flags:   Option<EntryFlags> = None;
-    let mut rodata_flags: Option<EntryFlags> = None;
-    let mut data_flags:   Option<EntryFlags> = None;
+    let mut text_flags:        Option<EntryFlags> = None;
+    let mut rodata_flags:      Option<EntryFlags> = None;
+    let mut data_flags:        Option<EntryFlags> = None;
+    let mut tls_data_flags:    Option<EntryFlags> = None;
 
     let mut sections_memory_bounds: [Option<SectionMemoryBounds>; 32] = Default::default();
 
@@ -163,20 +166,22 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         }
 
         // The linker script (linker_higher_half.ld) defines the following order of sections:
-        // |-----|-------------------|------------------------------|
-        // | Sec |    Sec Name       |    Description / purpose     |
-        // | Num |                   |                              |
-        // |-----|--------------------------------------------------|
-        // | (1) | .init             | start of executable pages    |
-        // | (2) | .text             | end of executable pages      |
-        // | (3) | .rodata           | start of read-only pages     |
-        // | (4) | .eh_frame         | part of read-only pages      |
-        // | (5) | .gcc_except_table | end of read-only pages       |
-        // | (6) | .data             | start of read-write pages    | 
-        // | (7) | .bss              | end of read-write pages      |
-        // | (8) | .page_table       | separate .data-like section  |
-        // | (9) | .stack            | separate .data-like section  |
-        // |-----|-------------------|------------------------------|
+        // |------|-------------------|-------------------------------|
+        // | Sec  |    Sec Name       |    Description / purpose      |
+        // | Num  |                   |                               |
+        // |------|---------------------------------------------------|
+        // | (1)  | .init             | start of executable pages     |
+        // | (2)  | .text             | end of executable pages       |
+        // | (3)  | .rodata           | start of read-only pages      |
+        // | (4)  | .eh_frame         | part of read-only pages       |
+        // | (5)  | .gcc_except_table | end of read-only pages        |
+        // | (6)  | .tdata            | start of TLS read-write pages |
+        // | (7)  | .tbss             | end of TLS read-write pages   |
+        // | (8)  | .data             | start of read-write pages     | 
+        // | (9)  | .bss              | end of read-write pages       |
+        // | (10) | .page_table       | separate .data-like section   |
+        // | (11) | .stack            | separate .data-like section   |
+        // |------|-------------------|-------------------------------|
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
@@ -200,6 +205,20 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 rodata_end   = Some((end_virt_addr, end_phys_addr));
                 rodata_flags = Some(flags);
                 "nano_core .gcc_except_table"
+            }
+            ".tdata" => {
+                // if .tdata exists, it comes before .tbss
+                tls_data_start = Some((start_virt_addr, start_phys_addr));
+                tls_data_end   = Some((end_virt_addr, end_phys_addr));
+                tls_data_flags = Some(flags);
+                "nano_core .tdata"
+            }
+            ".tbss" =>{
+                // if .tbss exists, it comes after .tdata
+                tls_data_start.get_or_insert((start_virt_addr, start_phys_addr));
+                tls_data_end = Some((end_virt_addr, end_phys_addr));
+                tls_data_flags = Some(flags);
+                "nano_core .tbss"
             }
             ".data" => {
                 data_start = Some((start_virt_addr, start_phys_addr));

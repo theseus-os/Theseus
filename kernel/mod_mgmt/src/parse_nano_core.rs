@@ -95,6 +95,7 @@ pub fn parse_nano_core(
         rodata_pages:        Some((rodata_pages.clone(), mp_range(&rodata_pages))),
         data_pages:          Some((data_pages.clone(),   mp_range(&data_pages))),
         global_sections:     BTreeSet::new(),
+        tls_sections:        BTreeSet::new(),
         data_sections:       BTreeSet::new(),
         reexported_symbols:  BTreeSet::new(),
     });

@@ -222,6 +222,10 @@ pub struct LoadedCrate {
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
     pub global_sections: BTreeSet<Shndx>,
+    /// The set of thread-local storage (TLS) symbols in this crate.
+    /// The `Shndx` values in this set are the section index (shndx) numbers, 
+    /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
+    pub tls_sections: BTreeSet<Shndx>,
     /// The set of `.data` and `.bss` sections in this crate.
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
@@ -415,6 +419,7 @@ impl LoadedCrate {
             rodata_pages:            new_rodata_pages_range,
             data_pages:              new_data_pages_range,
             global_sections:         self.global_sections.clone(),
+            tls_sections:            self.tss_sections.clone(),
             data_sections:           self.data_sections.clone(),
             reexported_symbols:      self.reexported_symbols.clone(),
         });
@@ -569,6 +574,10 @@ pub enum SectionType {
     Data,
     /// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.
     Bss,
+    /// A `data` section that holds the initial data for a thread-local storage area.
+    TlsData,
+    /// A `bss` section that holds the all-zeroed initial data for a thread-local storage area.
+    TlsBss,
     /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process

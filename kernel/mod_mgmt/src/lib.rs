@@ -33,10 +33,7 @@ use alloc::{
     sync::{Arc, Weak},
 };
 use spin::{Mutex, Once};
-use xmas_elf::{
-    ElfFile,
-    sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
-};
+use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use memory_initialization::BootloaderModule;
@@ -986,10 +983,13 @@ impl CrateNamespace {
             for entry in symtab.iter() {
                 // Include all symbols with "GLOBAL" binding, regardless of visibility.  
                 if entry.get_binding() == Ok(xmas_elf::symbol_table::Binding::Global) {
-                    if let Ok(typ) = entry.get_type() {
-                        if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
+                    match entry.get_type() {
+                        Ok(xmas_elf::symbol_table::Type::Func 
+                            | xmas_elf::symbol_table::Type::Object
+                            | xmas_elf::symbol_table::Type::Tls) => {
                             globals.insert(entry.shndx() as Shndx);
                         }
+                        _ => continue,
                     }
                 }
             }
@@ -1024,7 +1024,9 @@ impl CrateNamespace {
         const RODATA_PREFIX:           &'static str = ".rodata.";
         const DATA_PREFIX:             &'static str = ".data.";
         const BSS_PREFIX:              &'static str = ".bss.";
-        const RELRO_PREFIX:            &'static str = "rel.ro.";
+        const TLS_DATA_PREFIX:         &'static str = ".tdata.";
+        const TLS_BSS_PREFIX:          &'static str = ".tbss.";
+        // const RELRO_PREFIX:            &'static str = "rel.ro.";
         const GCC_EXCEPT_TABLE_PREFIX: &'static str = ".gcc_except_table.";
         const EH_FRAME_NAME:           &'static str = ".eh_frame";
 
@@ -1037,6 +1039,7 @@ impl CrateNamespace {
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
             global_sections:         BTreeSet::new(),
+            tls_sections:            BTreeSet::new(),
             data_sections:           BTreeSet::new(),
             reexported_symbols:      BTreeSet::new(),
         });
@@ -1046,6 +1049,8 @@ impl CrateNamespace {
         let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
         // the set of Shndxes for .data and .bss sections
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
+        // the set of Shndxes for TLS sections (.tdata, .tbss)
+        let mut tls_sections: BTreeSet<Shndx> = BTreeSet::new();
 
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
@@ -1143,29 +1148,32 @@ impl CrateNamespace {
                 }
             }
 
-            // Second, if not executable, handle writable .data/.bss sections
+            // Second, if not executable, handle writable .data/.bss sections, including TLS .data/.bss
             else if write {
                 // check if this section is .bss or .data
                 let is_bss = sec.get_type() == Ok(ShType::NoBits);
+                let is_tls = sec_flags & SHF_TLS == SHF_TLS;
                 let name = if is_bss {
-                    if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
-                        name
-                    } else {
-                        error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
-                        return Err("Failed to get the .bss section's name after \".bss.\"!");
-                    }
+                    let prefix_len = if is_tls { TLS_BSS_PREFIX.len() } else { BSS_PREFIX.len() };
+                    sec_name.get(prefix_len ..).ok_or_else(|| {
+                        error!("Failed to get the .bss section's name: {:?}", sec_name);
+                        "Failed to get the .bss section's name"
+                    })?
                 } else {
-                    if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
-                        if name.starts_with(RELRO_PREFIX) {
-                            let relro_name = name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?;
-                            relro_name
-                        } else {
-                            name
-                        }
-                    } else {
-                        error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
-                        return Err("Failed to get the .data section's name after \".data.\"!");
-                    }
+                    let prefix_len = if is_tls { TLS_DATA_PREFIX.len() } else { DATA_PREFIX.len() };
+                    sec_name.get(prefix_len ..)
+                        // Currently, .rel.ro sections no longer exist in object files compiled for Theseus.
+                        // .and_then(|name| {
+                        //     if name.starts_with(RELRO_PREFIX) {
+                        //         name.get(RELRO_PREFIX.len() ..)
+                        //     } else {
+                        //         Some(name)
+                        //     }
+                        // })
+                        .ok_or_else(|| {
+                            error!("Failed to get the .data section's name: {:?}", sec_name);
+                            "Failed to get the .data section's name"
+                        })?
                 };
                 let demangled = demangle(name).to_string();
                 
@@ -1176,21 +1184,24 @@ impl CrateNamespace {
                     let dest_slice: &mut [u8] = dp.as_slice_mut(data_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                        Ok(SectionData::Empty) => {
-                            for b in dest_slice {
-                                *b = 0;
-                            }
-                        },
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
                         _other => {
                             error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, _other);
                             return Err("couldn't get section data in .data section");
                         }
                     }
+
+                    let section_typ = match (is_bss, is_tls) {
+                        (true, true)   => SectionType::TlsBss,
+                        (true, false)  => SectionType::Bss,
+                        (false, true)  => SectionType::TlsData,
+                        (false, false) => SectionType::Data,
+                    };
                     
                     loaded_sections.insert(
                         shndx,
                         Arc::new(LoadedSection::new(
-                            if is_bss { SectionType::Bss } else { SectionType::Data },
+                            section_typ,
                             demangled.clone(),
                             Arc::clone(dp_ref),
                             data_offset,
@@ -1201,6 +1212,10 @@ impl CrateNamespace {
                         ))
                     );
                     data_sections.insert(shndx);
+
+                    if is_tls {
+                        tls_sections.insert(shndx);
+                    }
 
                     data_offset += round_up_power_of_two(sec_size, sec_align);
                 }
@@ -1221,11 +1236,7 @@ impl CrateNamespace {
                         let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
                         match sec.get_data(&elf_file) {
                             Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => {
-                                for b in dest_slice {
-                                    *b = 0;
-                                }
-                            },
+                            Ok(SectionData::Empty) => dest_slice.fill(0),
                             _other => {
                                 error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, _other);
                                 return Err("couldn't get section data in .rodata section");
@@ -1271,11 +1282,7 @@ impl CrateNamespace {
                         let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
                         match sec.get_data(&elf_file) {
                             Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => {
-                                for b in dest_slice {
-                                    *b = 0;
-                                }
-                            },
+                            Ok(SectionData::Empty) => dest_slice.fill(0),
                             _other => {
                                 error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, _other);
                                 return Err("couldn't get section data in .gcc_except_table section");
@@ -1318,11 +1325,7 @@ impl CrateNamespace {
                     let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                        Ok(SectionData::Empty) => {
-                            for b in dest_slice {
-                                *b = 0;
-                            }
-                        },
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
                         _other => {
                             error!("load_crate_sections(): Couldn't get section data for .eh_frame section [{}] {}: {:?}", shndx, sec_name, _other);
                             return Err("couldn't get section data in .eh_frame section");
@@ -1365,9 +1368,10 @@ impl CrateNamespace {
         {
             let mut new_crate_mut = new_crate.lock_as_mut()
                 .ok_or_else(|| "BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
-            new_crate_mut.sections = loaded_sections;
+            new_crate_mut.sections        = loaded_sections;
             new_crate_mut.global_sections = global_sections;
-            new_crate_mut.data_sections = data_sections;
+            new_crate_mut.tls_sections    = tls_sections;
+            new_crate_mut.data_sections   = data_sections;
         }
 
         Ok((new_crate, elf_file))
