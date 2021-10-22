@@ -1146,30 +1146,26 @@ impl CrateNamespace {
             // Second, if not executable, handle writable .data/.bss sections
             else if write {
                 // check if this section is .bss or .data
-                let (name, is_bss) = if sec_name.starts_with(BSS_PREFIX) {
+                let is_bss = sec.get_type() == Ok(ShType::NoBits);
+                let name = if is_bss {
                     if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
-                        (name, true) // true means it is .bss
+                        name
                     } else {
                         error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
                         return Err("Failed to get the .bss section's name after \".bss.\"!");
                     }
-                } else if sec_name.starts_with(DATA_PREFIX) {
+                } else {
                     if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
-                        let name = if name.starts_with(RELRO_PREFIX) {
+                        if name.starts_with(RELRO_PREFIX) {
                             let relro_name = name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?;
                             relro_name
                         } else {
                             name
-                        };
-                        (name, false) // false means it's not .bss
-                    }
-                    else {
+                        }
+                    } else {
                         error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
                         return Err("Failed to get the .data section's name after \".data.\"!");
                     }
-                } else {
-                    error!("Unsupported: found writable section that wasn't .data or .bss: [{}] {:?}", shndx, sec_name);
-                    return Err("Unsupported: found writable section that wasn't .data or .bss");
                 };
                 let demangled = demangle(name).to_string();
                 
@@ -1185,8 +1181,8 @@ impl CrateNamespace {
                                 *b = 0;
                             }
                         },
-                        _ => {
-                            error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, _other);
                             return Err("couldn't get section data in .data section");
                         }
                     }
@@ -1230,8 +1226,8 @@ impl CrateNamespace {
                                     *b = 0;
                                 }
                             },
-                            _ => {
-                                error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, _other);
                                 return Err("couldn't get section data in .rodata section");
                             }
                         }
@@ -1280,8 +1276,8 @@ impl CrateNamespace {
                                     *b = 0;
                                 }
                             },
-                            _ => {
-                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, _other);
                                 return Err("couldn't get section data in .gcc_except_table section");
                             }
                         }
@@ -1327,8 +1323,8 @@ impl CrateNamespace {
                                 *b = 0;
                             }
                         },
-                        _ => {
-                            error!("load_crate_sections(): Couldn't get section data for .eh_frame section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for .eh_frame section [{}] {}: {:?}", shndx, sec_name, _other);
                             return Err("couldn't get section data in .eh_frame section");
                         }
                     }
