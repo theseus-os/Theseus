@@ -1761,6 +1761,7 @@ dependencies = [
  "spin 0.9.0",
  "stack",
  "state_store",
+ "thread_local_storage",
  "vga_buffer",
 ]
 
@@ -2973,6 +2974,15 @@ dependencies = [
  "unicode-width",
  "util",
  "vte",
+]
+
+[[package]]
+name = "thread_local_storage"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "spawn",
+ "task",
 ]
 
 [[package]]
