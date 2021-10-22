@@ -225,6 +225,7 @@ pub extern "C" fn nano_core_start(
         );
     }
 
+    thread_local_storage::test_tls();
 
     // the captain shouldn't return ...
     try_exit!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
