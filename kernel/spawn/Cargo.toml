@@ -16,7 +16,7 @@ features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
 [dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.debugit]
 path = "../../libs/debugit"
@@ -27,14 +27,8 @@ path = "../memory"
 [dependencies.stack]
 path = "../stack"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.task]
 path = "../task"
-
-[dependencies.catch_unwind]
-path = "../catch_unwind"
 
 [dependencies.runqueue]
 path = "../runqueue"
@@ -42,26 +36,32 @@ path = "../runqueue"
 [dependencies.scheduler]
 path = "../scheduler"
 
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
 [dependencies.context_switch]
 path = "../context_switch"
 
-[dependencies.path]
-path = "../path"
-
-[dependencies.fs_node]
-path = "../fs_node"
-
-[dependencies.fault_crate_swap]
-path = "../fault_crate_swap"
-
-[dependencies.fault_log]
-path = "../fault_log"
-
 [dependencies.pause]
 path = "../pause"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.path]
+path = "../path"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.fs_node]
+path = "../fs_node"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.apic]
+path = "../apic"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.catch_unwind]
+path = "../catch_unwind"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.fault_crate_swap]
+path = "../fault_crate_swap"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies.fault_log]
+path = "../fault_log"
 
 [lib]
 crate-type = ["rlib"]

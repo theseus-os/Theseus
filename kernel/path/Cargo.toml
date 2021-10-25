@@ -7,7 +7,6 @@ description = "contains functions for navigating the filesystem / getting pointe
 
 [dependencies]
 spin = "0.9.0"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

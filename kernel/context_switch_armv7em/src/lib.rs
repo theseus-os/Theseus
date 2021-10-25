@@ -1,7 +1,7 @@
 //! This crate contains structures and routines for context switching on ARM.
 
 #![no_std]
-#![feature(llvm_asm, naked_functions)]
+#![feature(asm, naked_functions)]
 
 #[macro_use] extern crate cfg_if;
 
@@ -17,8 +17,7 @@ use zerocopy::FromBytes;
 #[repr(C, packed)]
 pub struct ContextRegular {
     // The order of the registers here MUST MATCH the order of 
-    // registers popped in the restore_registers_regular!() macro below. 
-    lr: usize,   // return address to return from `context_switch()`
+    // registers popped in the restore_registers_regular!() macro below.
     r4: usize,   // the registers below are callee-saved in extern "C" calling convention
     r5: usize,
     r6: usize,
@@ -35,7 +34,6 @@ impl ContextRegular {
     /// Task containing it to begin its execution at the given `pc`.
     pub fn new(pc: usize) -> ContextRegular {
         ContextRegular {
-            lr: 0,
             r4: 0,
             r5: 0,
             r6: 0,
@@ -55,13 +53,11 @@ impl ContextRegular {
 #[macro_export]
 macro_rules! save_registers_regular {
     () => (
-        llvm_asm!("
-            # save all general purpose registers into the previous task
-            push {r4-r11}
-            push {lr}
-            "
-            : : : "memory" : "volatile"
-        );
+        // save all general purpose registers into the previous task
+        r#"
+            push {{lr}}
+            push {{r4-r11}}
+        "#
     );
 }
 
@@ -74,29 +70,25 @@ macro_rules! save_registers_regular {
 #[macro_export]
 macro_rules! switch_stacks {
     () => (
-        llvm_asm!("
-            # switch the stack pointers
+        // switch the stack pointers
+        r#"
             str sp, [r0]
             mov sp, r1
-            "
-            : : : "memory" : "volatile"
-        );
+        "#
     );
 }
 
 
-/// An assembly macro for saving regular ARM registers.
-/// by pushing them onto the stack.
+/// An assembly block for restoring regular ARM registers
+/// by popping them off of the stack.
 #[macro_export]
 macro_rules! restore_registers_regular {
     () => (
-        llvm_asm!("
-            # restore the next task's general purpose registers
-            pop {lr}
-            pop {r4-r11}
-            "
-            : : : "memory" : "volatile"
-        );
+        // restore the next task's general purpose registers
+        r#"
+            pop {{r4-r11}}
+            pop {{pc}}
+        "#
     );
 }
 
@@ -111,13 +103,16 @@ macro_rules! restore_registers_regular {
 /// This function is unsafe because it changes the content on both task's stacks. 
 #[naked]
 #[inline(never)]
-pub unsafe fn context_switch_armv7em(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
+pub unsafe extern "C" fn context_switch_armv7em(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     // Since this is a naked function that expects its arguments in two registers,
     // you CANNOT place any log statements or other instructions here,
     // or at any point before, in between, or after the following macros.
-    save_registers_regular!();
-    switch_stacks!();
-    restore_registers_regular!();
+    asm!(
+        save_registers_regular!(),
+        switch_stacks!(),
+        restore_registers_regular!(),
+        options(noreturn)
+    );
 }
 
 }

@@ -30,7 +30,7 @@ multiboot2 = "0.10.1"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.irq_safety]
-path = "../../libs/irq_safety"
+git = "https://github.com/theseus-os/irq_safety"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies.state_store]
 path = "../state_store"
@@ -75,6 +75,9 @@ path = "../task"
 
 [target.'cfg(target_arch = "arm")'.dependencies.scheduler]
 path = "../scheduler"
+
+[target.'cfg(target_arch = "arm")'.dependencies.spawn]
+path = "../spawn"
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

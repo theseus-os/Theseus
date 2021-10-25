@@ -13,7 +13,6 @@ use spin::Mutex;
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use core::ops::Deref;
 use environment::Environment;
-use mod_mgmt::{CrateNamespace, AppCrateRef};
 
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
@@ -106,6 +105,9 @@ pub enum RunState {
     Reaped,
 }
 
+/// The signature of a Task's failure cleanup function.
+pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
+
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
     /// the unique id of this Task.
@@ -131,14 +133,13 @@ pub struct Task {
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
-    /// For application `Task`s, this is a reference to the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
-    /// that contains the entry function for this `Task`.
-    pub app_crate: Option<Arc<AppCrateRef>>,
-    /// This `Task` is linked into and runs within the context of 
-    /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
-    pub namespace: Arc<CrateNamespace>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
+    /// The function that should be run as a last-ditch attempt to recover from this task's failure,
+    /// e.g., this can be called when unwinding itself fails. 
+    /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
+    /// which has generic type parameters that describe its function signature, argument type, and return type.
+    pub failure_cleanup_function: FailureCleanupFunction,
 }
 
 impl fmt::Debug for Task {
@@ -163,12 +164,13 @@ impl Task {
     /// 
     /// However, it requires tasking to already be set up, i.e., the current task must be known.
     pub fn new(
-        kstack: Option<Stack>
+        kstack: Option<Stack>,
+        failure_cleanup_function: FailureCleanupFunction
     ) -> Result<Task, &'static str> {
         let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
-        let (namespace, env, app_crate) = {
+        let env = {
             let t = curr_task.lock();
-            (Arc::clone(&t.namespace), Arc::clone(&t.env), t.app_crate.clone())
+            Arc::clone(&t.env)
         };
 
         let kstack = kstack
@@ -177,7 +179,7 @@ impl Task {
             ))
             .ok_or("couldn't allocate kernel stack!")?;
 
-        Ok(Task::new_internal(kstack, namespace, env, app_crate))
+        Ok(Task::new_internal(kstack, env, failure_cleanup_function))
     }
     
     /// The internal routine for creating a `Task`, which does not make assumptions 
@@ -185,9 +187,8 @@ impl Task {
     /// should inherit any states from it.
     fn new_internal(
         kstack: Stack, 
-        namespace: Arc<CrateNamespace>,
         env: Arc<Mutex<Environment>>,
-        app_crate: Option<Arc<AppCrateRef>>
+        failure_cleanup_function: FailureCleanupFunction,
     ) -> Self {
          /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -211,9 +212,8 @@ impl Task {
             kstack,
             pinned_core: None,
             is_an_idle_task: false,
-            app_crate,
-            namespace,
-            env
+            env,
+            failure_cleanup_function
         }
     }
 
@@ -243,13 +243,6 @@ impl Task {
             RunState::Exited(_) | RunState::Reaped => true,
             _ => false,
         }
-    }
-
-    /// Returns `true` if this is an application `Task`. 
-    /// This will also return `true` if this task was spawned by an application task,
-    /// since a task inherits the "application crate" field from its "parent" who spawned it.
-    pub fn is_application(&self) -> bool {
-        self.app_crate.is_some()
     }
 
     /// Returns true if this is a userspace`Task`.
@@ -384,57 +377,6 @@ impl Task {
         #[cfg(not(simd_personality))]
         {
             call_context_switch!(context_switch::context_switch);
-        }
-        // If `simd_personality` is enabled, all `context_switch*` routines are available,
-        // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
-        #[cfg(simd_personality)]
-        {
-            match (&self.simd, &next.simd) {
-                (SimdExt::None, SimdExt::None) => {
-                    // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_regular);
-                }
-
-                (SimdExt::None, SimdExt::SSE)  => {
-                    // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_regular_to_sse);
-                }
-                
-                (SimdExt::None, SimdExt::AVX)  => {
-                    // warn!("SWITCHING from REGULAR to AVX task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_regular_to_avx);
-                }
-
-                (SimdExt::SSE, SimdExt::None)  => {
-                    // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_sse_to_regular);
-                }
-
-                (SimdExt::SSE, SimdExt::SSE)   => {
-                    // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_sse);
-                }
-
-                (SimdExt::SSE, SimdExt::AVX) => {
-                    warn!("SWITCHING from SSE to AVX task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_sse_to_avx);
-                }
-
-                (SimdExt::AVX, SimdExt::None) => {
-                    // warn!("SWITCHING from AVX to REGULAR task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_avx_to_regular);
-                }
-
-                (SimdExt::AVX, SimdExt::SSE) => {
-                    warn!("SWITCHING from AVX to SSE task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_avx_to_sse);
-                }
-
-                (SimdExt::AVX, SimdExt::AVX) => {
-                    // warn!("SWITCHING from AVX to AVX task {:?} -> {:?}", self, next);
-                    call_context_switch!(context_switch::context_switch_avx);
-                }
-            }
         }
         
         // Here, `self` (curr) is now `next` because the stacks have been switched, 
@@ -687,11 +629,6 @@ impl TaskRef {
     pub fn get_env(&self) -> Arc<Mutex<Environment>> {
         Arc::clone(&self.0.deref().0.lock().env)
     }
-
-    /// Gets a reference to this task's `CrateNamespace`.
-    pub fn get_namespace(&self) -> Arc<CrateNamespace> {
-        Arc::clone(&self.0.deref().0.lock().namespace)
-    }
     
     /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
     #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
@@ -712,6 +649,59 @@ impl PartialEq for TaskRef {
 }
 
 impl Eq for TaskRef { }
+
+
+/// Bootstrap a new task from the current thread of execution.
+/// 
+/// # Note
+/// This function does not add the new task to any runqueue.
+pub fn bootstrap_task(
+    apic_id: u8, 
+    stack: Stack,
+) -> Result<TaskRef, &'static str> {
+    // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
+    // Instead, we generate all of the `Task` states manually, and create an initial task directly.
+    let default_env = Arc::new(Mutex::new(Environment::default()));
+    let mut bootstrap_task = Task::new_internal(stack, default_env, bootstrap_task_cleanup_failure);
+    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.runstate = RunState::Runnable;
+    bootstrap_task.running_on_cpu = Some(apic_id); 
+    bootstrap_task.pinned_core = Some(apic_id); // can only run on this CPU core
+    let bootstrap_task_id = bootstrap_task.id;
+    let task_ref = TaskRef::new(bootstrap_task);
+
+    // set this as this core's current task, since it's obviously running
+    task_ref.0.deref().0.lock().set_as_current_task();
+    if get_my_current_task().is_none() {
+        error!("BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}", apic_id);
+        return Err("BUG: bootstrap_task(): failed to properly set the new idle task as the current task");
+    }
+
+    // insert the new task into the task list
+    let old_task = TASKLIST.lock().insert(bootstrap_task_id, task_ref.clone());
+    if let Some(ot) = old_task {
+        error!("BUG: bootstrap_task(): TASKLIST already contained a task {:?} with the same id {} as bootstrap_task_core_{}!", 
+            ot, bootstrap_task_id, apic_id
+        );
+        return Err("BUG: bootstrap_task(): TASKLIST already contained a task with the new bootstrap_task's ID");
+    }
+    
+    Ok(task_ref)
+}
+
+
+/// This is just like `spawn::task_cleanup_failure()`,
+/// but for the initial tasks bootstrapped from each core's first execution context.
+/// 
+/// However, for a bootstrapped task, we don't know its function signature, argument type, or return value type
+/// because it was invoked from assembly and may not even have one. 
+/// 
+/// Therefore there's not much we can actually do.
+fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
+    error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    loop { }
+}
+
 
 /// The structure that holds information local to each Task,
 /// effectively a form of thread-local storage (TLS).
