@@ -2282,10 +2282,6 @@
 <span id="2279">2279</span>
 <span id="2280">2280</span>
 <span id="2281">2281</span>
-<span id="2282">2282</span>
-<span id="2283">2283</span>
-<span id="2284">2284</span>
-<span id="2285">2285</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">rustc_private</span>)]</span>
@@ -3435,30 +3431,26 @@
             <span class="comment">// Second, if not executable, handle writable .data/.bss sections</span>
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">write</span> {
                 <span class="comment">// check if this section is .bss or .data</span>
-                <span class="kw">let</span> (<span class="ident">name</span>, <span class="ident">is_bss</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">sec_name</span>.<span class="ident">starts_with</span>(<span class="ident">BSS_PREFIX</span>) {
+                <span class="kw">let</span> <span class="ident">is_bss</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">get_type</span>() <span class="op">=</span><span class="op">=</span> <span class="prelude-val">Ok</span>(<span class="ident">ShType::NoBits</span>);
+                <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_bss</span> {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">BSS_PREFIX</span>.<span class="ident">len</span>() ..) {
-                        (<span class="ident">name</span>, <span class="bool-val">true</span>) <span class="comment">// true means it is .bss</span>
+                        <span class="ident">name</span>
                     } <span class="kw">else</span> {
                         <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .bss section&#39;s name after \&quot;.bss.\&quot;: {:?}&quot;</span>, <span class="ident">sec_name</span>);
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get the .bss section&#39;s name after \&quot;.bss.\&quot;!&quot;</span>);
                     }
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_name</span>.<span class="ident">starts_with</span>(<span class="ident">DATA_PREFIX</span>) {
+                } <span class="kw">else</span> {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">DATA_PREFIX</span>.<span class="ident">len</span>() ..) {
-                        <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">name</span>.<span class="ident">starts_with</span>(<span class="ident">RELRO_PREFIX</span>) {
+                        <span class="kw">if</span> <span class="ident">name</span>.<span class="ident">starts_with</span>(<span class="ident">RELRO_PREFIX</span>) {
                             <span class="kw">let</span> <span class="ident">relro_name</span> <span class="op">=</span> <span class="ident">name</span>.<span class="ident">get</span>(<span class="ident">RELRO_PREFIX</span>.<span class="ident">len</span>() ..).<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get name of .data.rel.ro. section&quot;</span>)<span class="question-mark">?</span>;
                             <span class="ident">relro_name</span>
                         } <span class="kw">else</span> {
                             <span class="ident">name</span>
-                        };
-                        (<span class="ident">name</span>, <span class="bool-val">false</span>) <span class="comment">// false means it&#39;s not .bss</span>
-                    }
-                    <span class="kw">else</span> {
+                        }
+                    } <span class="kw">else</span> {
                         <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .data section&#39;s name after \&quot;.data.\&quot;: {:?}&quot;</span>, <span class="ident">sec_name</span>);
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get the .data section&#39;s name after \&quot;.data.\&quot;!&quot;</span>);
                     }
-                } <span class="kw">else</span> {
-                    <span class="macro">error!</span>(<span class="string">&quot;Unsupported: found writable section that wasn&#39;t .data or .bss: [{}] {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Unsupported: found writable section that wasn&#39;t .data or .bss&quot;</span>);
                 };
                 <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
                 
@@ -3474,8 +3466,8 @@
                                 <span class="kw-2">*</span><span class="ident">b</span> <span class="op">=</span> <span class="number">0</span>;
                             }
                         },
-                        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .data section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>));
+                        <span class="ident">_other</span> <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .data section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
                             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .data section&quot;</span>);
                         }
                     }
@@ -3519,8 +3511,8 @@
                                     <span class="kw-2">*</span><span class="ident">b</span> <span class="op">=</span> <span class="number">0</span>;
                                 }
                             },
-                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .rodata section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>));
+                            <span class="ident">_other</span> <span class="op">=</span><span class="op">&gt;</span> {
+                                <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .rodata section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
                                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .rodata section&quot;</span>);
                             }
                         }
@@ -3569,8 +3561,8 @@
                                     <span class="kw-2">*</span><span class="ident">b</span> <span class="op">=</span> <span class="number">0</span>;
                                 }
                             },
-                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                                <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .gcc_except_table section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>));
+                            <span class="ident">_other</span> <span class="op">=</span><span class="op">&gt;</span> {
+                                <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .gcc_except_table section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
                                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .gcc_except_table section&quot;</span>);
                             }
                         }
@@ -3616,8 +3608,8 @@
                                 <span class="kw-2">*</span><span class="ident">b</span> <span class="op">=</span> <span class="number">0</span>;
                             }
                         },
-                        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .eh_frame section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>));
+                        <span class="ident">_other</span> <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .eh_frame section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
                             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .eh_frame section&quot;</span>);
                         }
                     }
