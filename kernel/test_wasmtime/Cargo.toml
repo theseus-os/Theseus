@@ -23,12 +23,16 @@ features = ['enable-serde']
 path = "../../libs/wasmtime/crates/types"
 default-features = false
 
-[dependencies]
-
 ## working!
 [dependencies.wasmtime-environ]
 path = "../../libs/wasmtime/crates/environ"
 default-features = false
+
+## working!
+[dependencies.wasmtime-runtime]
+path = "../../libs/wasmtime/crates/runtime"
+default-features = false
+
 
 # [dependencies.wasmtime]
 # path = "../../libs/wasmtime/crates/wasmtime"
