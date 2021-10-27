@@ -1,4 +1,4 @@
-//! Implements UART specific functionality for the STM32F4 Discovery Board 
+//! Implements UART specific functionality for the STM32F4 Discovery board.
 use crate::{
     gpio::BOARD_GPIOA, 
     rcc::BOARD_RCC,
@@ -11,16 +11,16 @@ use irq_safety::MutexIrqSafe;
 use spin::Once;
 use stm32f4::stm32f407;
 
-/// Exposes the board's USART2
+/// Exposes the board's USART2.
 pub static BOARD_USART2: Once<MutexIrqSafe<stm32f407::USART2>> = Once::new();
 
-/// All available UART addresses
+/// All available UART addresses.
 /// Note: Although the board technically supports traditional UARTs,
 /// it is better to utilize the board's USARTs, as they support a higher
 /// data transfer rate.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SerialPortAddress {
-    /// The STM32F407 USART2, which has a TX pin at pin PA2 and an RX pin at PIN PA3
+    /// The STM32F407 USART2, which has a TX pin at pin PA2 and an RX pin at pin PA3.
     USART2,
 }
 impl TryFrom<&str> for SerialPortAddress {
@@ -75,17 +75,20 @@ pub fn take_serial_port(
     serial_port_address: SerialPortAddress
 ) -> Option<SerialPort> {
     let sp = serial_port_address.to_static_port();
+    let physical_uart = match serial_port_address {
+        SerialPortAddress::USART2 => &BOARD_USART2,
+    };
     let mut locked = sp.lock();
     if let TriState::Uninited = &*locked {
-        *locked = TriState::Inited(SerialPort::new());
+        *locked = TriState::Inited(SerialPort::new(physical_uart));
     }
     locked.take()
 }
 
 
 /// Initialize UART for use.
-fn uart_init() {
-    let uart = BOARD_USART2.get().unwrap().lock();
+fn uart_init(uart_wrapped: &'static Once<MutexIrqSafe<stm32f407::USART2>>) {
+    let uart = uart_wrapped.get().unwrap().lock();
     let gpioa = BOARD_GPIOA.get().unwrap().lock();
     let rcc = BOARD_RCC.get().unwrap().lock();
 
@@ -120,13 +123,15 @@ fn uart_init() {
     uart.cr1.modify(|_,w| w.te().bit(true).re().bit(true));
 }
 
-/// The `SerialPort` struct implements the `Write` trait for use with logging capabilities
-pub struct SerialPort;
+/// The [`SerialPort`] struct implements the `Write` trait for use with logging capabilities.
+pub struct SerialPort {
+    uart_wrapped_or_none: Option<&'static Once<MutexIrqSafe<stm32f407::USART2>>>,
+}
 
 impl SerialPort {
-    pub fn new() ->  SerialPort {
-        uart_init();
-        SerialPort
+    fn new(uart_wrapped: &'static Once<MutexIrqSafe<stm32f407::USART2>>) ->  SerialPort {
+        uart_init(uart_wrapped);
+        SerialPort {uart_wrapped_or_none: Some(uart_wrapped)}
     }
 }
 
@@ -135,7 +140,7 @@ impl Drop for SerialPort {
         let sp = SerialPortAddress::USART2.to_static_port();
         let mut sp_locked = sp.lock();
         if let TriState::Taken = &*sp_locked {
-            let dummy = SerialPort;
+            let dummy = SerialPort{uart_wrapped_or_none: None};
             let dropped = core::mem::replace(self, dummy);
             *sp_locked = TriState::Inited(dropped);
         }
@@ -145,11 +150,13 @@ impl Drop for SerialPort {
 
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let uart = BOARD_USART2.get().unwrap().lock();
-        for byte in s.as_bytes().iter() {
-            while uart.sr.read().txe().bit_is_clear() {} 
+        if let Some(uart_wrapped) = self.uart_wrapped_or_none {
+            let uart = uart_wrapped.get().unwrap().lock();
+            for byte in s.as_bytes().iter() {
+                while uart.sr.read().txe().bit_is_clear() {} 
 
-            uart.dr.write(|w| w.dr().bits(u16::from(*byte)));
+                uart.dr.write(|w| w.dr().bits(u16::from(*byte)));
+            }
         }
         Ok(())
     }

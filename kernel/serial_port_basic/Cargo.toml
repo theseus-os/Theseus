@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "serial_port_basic"
-description = "Standalone, basic driver for serial ports (e.g., COM1, COM) with minimal dependencies"
+description = "Standalone, basic driver for serial ports on x86 and ARM with minimal dependencies"
 version = "0.1.0"
 build = "../../build.rs"
 

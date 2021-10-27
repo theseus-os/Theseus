@@ -1,4 +1,4 @@
-//! Implements platform specific functionalities for the STM32F4_Discovery board,
+//! Implements platform specific functionalities for the STM32F4 Discovery board,
 //! exposing its peripherals and providing ways of interacting with them.
 #![no_std]
 #[macro_use] extern crate cfg_if;
@@ -18,9 +18,10 @@ if #[cfg(target_vendor = "stm32f407")] {
     pub mod uart;
 
     /// Initializes device peripherals for use.
+    /// Since the `svd2rust` API enforces that all peripherals are singletons that
+    /// can only be taken once, they must all be taken and exposed at the same time.
     /// TODO: As we add support for more peripherals,
-    /// we can figure out how to initialize them together.
-    /// For now however, we initialize te devices individually as needed.
+    /// we will add them into the initialization routine.
     pub fn init_peripherals () {
         let p = stm32f407::Peripherals::take().unwrap();
 

@@ -1,4 +1,4 @@
-//! Implementation of serial ports on arm microcontrollers
+//! Implementation of serial ports on arm microcontrollers.
 //! At the moment, the implementation is simple and does not allow
 //! for interrupts or DMA buffering.
 //! However, it is sufficient for use with Theseus's logger.
@@ -6,14 +6,14 @@
 //! When compiling for a specific microcontroller, we distinguish the platform
 //! by using the value of `target_vendor` specified by the custom cargo target.
 //! When a `target_vendor` is specified, we rely upon the implementations of 
-//! `get_serial_port`, `SerialPort`, and `SerialPortAddress` provided by
+//! `take_serial_port`, `SerialPort`, and `SerialPortAddress` provided by
 //! the platform's associated subcrate in `kernel/boards`. This is necessary because
 //! each platform has its own peculiarities in working with the UART, so serial port
 //! code must be implemented for each platform.
 //!
 //! When the `target_vendor` is unknown, we rely on a dummy implementation using semihosting,
 //! a form of communication that allows a microcontroller to simulate
-//! i/o operations on a host device and is supported by most cortex_m CPUs.
+//! i/o operations on a host device and is supported by most Cortex-M CPUs.
 //! For more info on semihosting, read (here)[https://www.keil.com/support/man/docs/armcc/armcc_pge1358787046598.htm]
 #![no_std]
 
@@ -41,7 +41,7 @@ cfg_if ! {
         #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         pub enum SerialPortAddress {
             /// In this case, we are using semihosting as a dummy implementation of
-            /// serial ports, so there is only the single dummy address Semihost
+            /// serial ports, so there is only the single dummy address, `Semihost`.
             Semihost,
         }
 
@@ -96,7 +96,7 @@ cfg_if ! {
         }
 
 
-        /// The `SerialPort` struct implements the `Write` trait for use with logging capabilities
+        /// The `SerialPort` struct implements the `Write` trait for use with logging capabilities.
         pub struct SerialPort;
 
         impl Drop for SerialPort {
@@ -112,7 +112,7 @@ cfg_if ! {
         }
 
         impl SerialPort {
-            pub fn new() -> SerialPort {
+            fn new() -> SerialPort {
                 SerialPort
             }
         } 
