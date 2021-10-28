@@ -1148,20 +1148,17 @@ impl CrateNamespace {
                 }
             }
 
-            // Second, if not executable, handle writable .data/.bss sections, including TLS .data/.bss
+            // Second, if not executable, handle writable .data/.bss sections.
             else if write {
                 // check if this section is .bss or .data
                 let is_bss = sec.get_type() == Ok(ShType::NoBits);
-                let is_tls = sec_flags & SHF_TLS == SHF_TLS;
                 let name = if is_bss {
-                    let prefix_len = if is_tls { TLS_BSS_PREFIX.len() } else { BSS_PREFIX.len() };
-                    sec_name.get(prefix_len ..).ok_or_else(|| {
+                    sec_name.get(BSS_PREFIX.len() ..).ok_or_else(|| {
                         error!("Failed to get the .bss section's name: {:?}", sec_name);
                         "Failed to get the .bss section's name"
                     })?
                 } else {
-                    let prefix_len = if is_tls { TLS_DATA_PREFIX.len() } else { DATA_PREFIX.len() };
-                    sec_name.get(prefix_len ..)
+                    sec_name.get(DATA_PREFIX.len() ..)
                         // Currently, .rel.ro sections no longer exist in object files compiled for Theseus.
                         // .and_then(|name| {
                         //     if name.starts_with(RELRO_PREFIX) {
@@ -1190,18 +1187,11 @@ impl CrateNamespace {
                             return Err("couldn't get section data in .data section");
                         }
                     }
-
-                    let section_typ = match (is_bss, is_tls) {
-                        (true, true)   => SectionType::TlsBss,
-                        (true, false)  => SectionType::Bss,
-                        (false, true)  => SectionType::TlsData,
-                        (false, false) => SectionType::Data,
-                    };
                     
                     loaded_sections.insert(
                         shndx,
                         Arc::new(LoadedSection::new(
-                            section_typ,
+                            if is_bss { SectionType::Bss } else { SectionType::Data },
                             demangled.clone(),
                             Arc::clone(dp_ref),
                             data_offset,
@@ -1213,10 +1203,6 @@ impl CrateNamespace {
                     );
                     data_sections.insert(shndx);
 
-                    if is_tls {
-                        tls_sections.insert(shndx);
-                    }
-
                     data_offset += round_up_power_of_two(sec_size, sec_align);
                 }
                 else {
@@ -1224,16 +1210,23 @@ impl CrateNamespace {
                 }
             }
 
-            // Third, if neither executable nor writable, handle .rodata sections
+            // Third, if neither executable nor writable, handle .rodata sections, including TLS .tdata/.tbss
             else if sec_name.starts_with(RODATA_PREFIX) {
-                if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
+                let is_tls = sec_flags & SHF_TLS == SHF_TLS;
+                let is_bss = sec.get_type() == Ok(ShType::NoBits);
+                let prefix_len = match (is_tls, is_bss) {
+                    (true, true)  => TLS_BSS_PREFIX.len(),
+                    (true, false) => TLS_DATA_PREFIX.len(),
+                    (false, _)    => RODATA_PREFIX.len(),
+                };
+                if let Some(name) = sec_name.get(prefix_len..) {
                     let demangled = demangle(name).to_string();
 
                     if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                         // here: we're ready to copy the rodata section to the proper address
                         let dest_vaddr = rp.address_at_offset(rodata_offset)
                             .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
                         match sec.get_data(&elf_file) {
                             Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                             Ok(SectionData::Empty) => dest_slice.fill(0),
@@ -1243,19 +1236,25 @@ impl CrateNamespace {
                             }
                         }
                         
+                        let new_section = Arc::new(LoadedSection::new(
+                            SectionType::Rodata,
+                            demangled,
+                            Arc::clone(rp_ref),
+                            rodata_offset,
+                            dest_vaddr,
+                            sec_size,
+                            global_sections.contains(&shndx),
+                            new_crate_weak_ref.clone(),
+                        ));
                         loaded_sections.insert(
                             shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::Rodata,
-                                demangled,
-                                Arc::clone(rp_ref),
-                                rodata_offset,
-                                dest_vaddr,
-                                sec_size,
-                                global_sections.contains(&shndx),
-                                new_crate_weak_ref.clone(),
-                            ))
+                            new_section.clone(),
                         );
+
+                        if is_tls {
+                            trace!("New TLS section: {:?}", new_section);
+                            tls_sections.insert(shndx);
+                        }
 
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
