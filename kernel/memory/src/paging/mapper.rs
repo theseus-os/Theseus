@@ -20,7 +20,7 @@ use paging::{
     PageRange,
     table::{P4, Table, Level4},
 };
-use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
+use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
 use super::{EntryFlags, tlb_flush_virt_addr};
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
@@ -99,10 +99,10 @@ impl Mapper {
                 if let Some(start_frame) = p3_entry.pointed_frame() {
                     if p3_entry.flags().is_huge() {
                         // address must be 1GiB aligned
-                        assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
-                        return Some(Frame {
-                            number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index(),
-                        });
+                        assert!(start_frame.number() % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
+                        return Some(Frame::containing_address(PhysicalAddress::new_canonical(
+                            PAGE_SIZE * (start_frame.number() + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index())
+                        )));
                     }
                 }
                 if let Some(p2) = p3.next_table(page.p3_index()) {
@@ -111,8 +111,10 @@ impl Mapper {
                     if let Some(start_frame) = p2_entry.pointed_frame() {
                         if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
-                            assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
-                            return Some(Frame { number: start_frame.number + page.p1_index() });
+                            assert!(start_frame.number() % ENTRIES_PER_PAGE_TABLE == 0);
+                            return Some(Frame::containing_address(PhysicalAddress::new_canonical(
+                                PAGE_SIZE * (start_frame.number() + page.p1_index())
+                            )));
                         }
                     }
                 }
@@ -416,7 +418,7 @@ impl MappedPages {
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
     ///
-    /// Note that attempting to change certain flags will have no effect. 
+    /// Note that attempting to change certain "reserved" flags will have no effect. 
     /// For example, arbitrarily setting the `EXCLUSIVE` bit would cause unsafety, so it cannot be changed.
     pub fn remap(&mut self, active_table_mapper: &mut Mapper, new_flags: EntryFlags) -> Result<(), &'static str> {
         if self.size_in_pages() == 0 { return Ok(()); }
@@ -745,83 +747,6 @@ impl MappedPages {
         };
 
         Ok(slc)
-    }
-
-
-    /// Reinterprets this `MappedPages`'s underlying memory region as an executable function with any signature.
-    /// 
-    /// # Arguments
-    /// * `offset`: the offset (in number of bytes) into the memory region at which the function starts.
-    /// * `space`: a hack to satisfy the borrow checker's lifetime requirements.
-    /// 
-    /// Returns a reference to the function that is formed from the underlying memory region,
-    /// with a lifetime dependent upon the lifetime of the given `space` object. 
-    ///
-    /// TODO FIXME: this isn't really safe as it stands now. 
-    /// Ideally, we need to have an integrated function that checks with the mod_mgmt crate 
-    /// to see if the size of the function can fit (not just the size of the function POINTER, which will basically always fit)
-    /// within the bounds of this `MappedPages` object;
-    /// this integrated function would be based on the given string name of the function, like "task::this::foo",
-    /// and would invoke this as_func() function directly.
-    /// 
-    /// We have to accept space for the function pointer to exist, because it cannot live in this function's stack. 
-    /// It has to live in stack of the function that invokes the actual returned function reference,
-    /// otherwise there would be a lifetime issue and a guaranteed page fault. 
-    /// So, the `space` arg is a hack to ensure lifetimes;
-    /// we don't care about the actual value of `space`, as the value will be overwritten,
-    /// and it doesn't matter both before and after the call to this `as_func()`.
-    /// 
-    /// The generic `F` parameter is the function type signature itself, e.g., `fn(String) -> u8`.
-    /// 
-    /// # Examples
-    /// Here's how you might call this function:
-    /// ```
-    /// type PrintFuncSignature = fn(&str) -> Result<(), &'static str>;
-    /// let mut space = 0; // this must persist throughout the print_func being called
-    /// let print_func: &PrintFuncSignature = mapped_pages.as_func(func_offset, &mut space).unwrap();
-    /// print_func("hi");
-    /// ```
-    /// Because Rust has lexical lifetimes, the `space` variable must have a lifetime at least as long as the  `print_func` variable,
-    /// meaning that `space` must still be in scope in order for `print_func` to be invoked.
-    /// 
-    #[doc(hidden)]
-    pub fn as_func<'a, F>(&self, offset: usize, space: &'a mut usize) -> Result<&'a F, &'static str> {
-        let size = mem::size_of::<F>();
-        if true {
-            #[cfg(not(downtime_eval))]
-            debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
-                core::any::type_name::<F>(),
-                size, offset, self.size_in_bytes()
-            );
-        }
-
-        // check flags to make sure these pages are executable (otherwise a page fault would occur when this func is called)
-        if !self.flags.is_executable() {
-            error!("MappedPages::as_func(): requested {}, but MappedPages weren't executable (flags: {:?})",
-                core::any::type_name::<F>(),
-                self.flags
-            );
-            return Err("as_func(): MappedPages were not executable");
-        }
-
-        // check that size of the type F fits within the size of the mapping
-        let end = offset + size;
-        if end > self.size_in_bytes() {
-            error!("MappedPages::as_func(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                core::any::type_name::<F>(),
-                size, offset, self.size_in_bytes()
-            );
-            return Err("requested type and offset would not fit within the MappedPages bounds");
-        }
-
-        *space = self.pages.start_address().value() + offset; 
-
-        // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
-        let t: &'a F = unsafe {
-            mem::transmute(space)
-        };
-
-        Ok(t)
     }
 }
 

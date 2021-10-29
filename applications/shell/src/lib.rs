@@ -416,7 +416,7 @@ impl Shell {
 
                     // Kill all tasks in the job.
                     for task_ref in &task_refs {
-                        if task_ref.lock().has_exited() { continue; }
+                        if task_ref.has_exited() { continue; }
                         match task_ref.kill(KillReason::Requested) {
                             Ok(_) => {
                                 if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
@@ -433,7 +433,7 @@ impl Shell {
                         // removed from the run queue. We can thereafter release the lock.
                         loop {
                             scheduler::schedule(); // yield the CPU
-                            if !task_ref.lock().is_running() {
+                            if !task_ref.is_running() {
                                 break;
                             }
                         }
@@ -468,7 +468,7 @@ impl Shell {
                     
                     // Stop all tasks in the job.
                     for task_ref in &task_refs {
-                        if task_ref.lock().has_exited() { continue; }
+                        if task_ref.has_exited() { continue; }
                         task_ref.block();
 
                         // Here we must wait for the running application to stop before releasing the lock,
@@ -478,7 +478,7 @@ impl Shell {
                         // truly blocked. We can thereafter release the lock.
                         loop {
                             scheduler::schedule(); // yield the CPU
-                            if !task_ref.lock().is_running() {
+                            if !task_ref.is_running() {
                                 break;
                             }
                         }
@@ -731,7 +731,7 @@ impl Shell {
                 let mut stderr_queues = Vec::new();
 
                 for task_ref in &task_refs {
-                    task_ids.push(task_ref.lock().id);
+                    task_ids.push(task_ref.id);
                 }
 
                 // Set up the chain of queues between applications, and between shell and applications.
@@ -871,11 +871,7 @@ impl Shell {
         };
 
         // Get current working dir.
-        let mut curr_wd = {
-            let locked_task = taskref.lock();
-            let curr_env = locked_task.env.lock();
-            Arc::clone(&curr_env.working_dir)
-        };
+        let mut curr_wd = Arc::clone(&taskref.get_env().lock().working_dir);
 
         // Check if the last character is a slash.
         let slash_ending = match incomplete_cmd.chars().last() {
@@ -1061,8 +1057,8 @@ impl Shell {
 
             let task_refs = job.tasks.clone();
             for task_ref in task_refs {
-                if task_ref.lock().has_exited() { // a task has exited
-                    let exited_task_id = task_ref.lock().id;
+                if task_ref.has_exited() { // a task has exited
+                    let exited_task_id = task_ref.id;
                     if let Some(exit_val) = task_ref.take_exit_value() {
                         match exit_val {
                             ExitValue::Completed(exit_status) => {
@@ -1072,11 +1068,9 @@ impl Shell {
                                 let val: Option<&isize> = exit_status.downcast_ref::<isize>();
                                 info!("terminal: task [{}] returned exit value: {:?}", exited_task_id, val);
                                 if let Some(val) = val {
-                                    if *val < 0 {
-                                        self.terminal.lock().print_to_terminal(
-                                            format!("task [{}] returned error value {:?}\n", exited_task_id, val)
-                                        );
-                                    }
+                                    self.terminal.lock().print_to_terminal(
+                                        format!("task [{}] exited with code {} ({:#X})\n", exited_task_id, val, val)
+                                    );
                                 }
                             },
 
@@ -1126,7 +1120,7 @@ impl Shell {
                         }
                     }
 
-                } else if !task_ref.lock().is_runnable() && job.status != JobStatus::Stopped { // task has just stopped
+                } else if !task_ref.is_runnable() && job.status != JobStatus::Stopped { // task has just stopped
 
                     // One task in this job is stopped, but the status of the Job has not been set to
                     // `Stopped`. Let's set it now.
@@ -1435,7 +1429,7 @@ impl Shell {
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     for task_ref in &job.tasks {
-                        if !task_ref.lock().has_exited() {
+                        if !task_ref.has_exited() {
                             task_ref.unblock();
                         }
                         job.status = JobStatus::Running;
@@ -1468,7 +1462,7 @@ impl Shell {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     self.fg_job_num = Some(job_num);
                     for task_ref in &job.tasks {
-                        if !task_ref.lock().has_exited() {
+                        if !task_ref.has_exited() {
                             task_ref.unblock();
                         }
                         job.status = JobStatus::Running;

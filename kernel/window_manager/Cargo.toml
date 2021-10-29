@@ -42,8 +42,8 @@ path = "../event_types"
 path = "../font"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

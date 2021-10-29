@@ -87,11 +87,6 @@ impl SCAllocator {
         new_sc_allocator!(size)
     }
 
-    /// Returns the maximum supported object size of this allocator.
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
     /// Add a page to the partial list
     fn insert_partial(&mut self, new_page: MappedPages8k) {
         self.slabs.push(new_page);
@@ -278,7 +273,11 @@ impl SCAllocator {
     /// May return an error in case an invalid `layout` is provided.
     /// The function may also move internal slab pages between lists partial -> empty
     /// or full -> partial lists.
-    pub fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
+    ///
+    /// # Safety
+    /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
+    /// and `layout` argument is correct.
+    pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
         assert!(layout.size() <= self.size);
         assert!(self.size <= (MappedPages8k::SIZE - CACHE_LINE_SIZE));
         // trace!(
@@ -290,10 +289,11 @@ impl SCAllocator {
         // );
 
         // let page_addr = (ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize;
-        let page_vaddr = VirtualAddress::new((ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize)?;
+        let page_vaddr = VirtualAddress::new((ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize)
+            .ok_or("pointer to deallocate was an invalid virtual address")?;
 
         // Figure out which page we are on and retrieve a reference to it
-        let new_layout = unsafe { Layout::from_size_align_unchecked(self.size, layout.align()) };
+        let new_layout = Layout::from_size_align_unchecked(self.size, layout.align());
 
         let (ret, slab_page_is_empty, slab_page_was_full, list_id) = {
             // find slab page from partial slabs

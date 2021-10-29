@@ -16,8 +16,8 @@ by_address = "1.0.4"
 version = "0.4.8"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.hashbrown]
 version = "0.9.1"
@@ -36,7 +36,7 @@ path = "../path"
 path = "../mod_mgmt"
 
 [dependencies.hpet]
-path = "../hpet"
+path = "../acpi/hpet"
 
 [lib]
 crate-type = ["rlib"]

@@ -513,12 +513,7 @@ pub fn swap_crates(
             // as a backup, search fuzzily to accommodate state transfer function symbol names without full hashes
             .or_else(|| namespace_of_new_crates.get_symbol_starting_with(&symbol).upgrade())
             .ok_or("couldn't find specified state transfer function in the new CrateNamespace")?;
-        
-        let mut space: usize = 0;
-        let st_fn = {
-            let mapped_pages = state_transfer_fn_sec.mapped_pages.lock();
-            mapped_pages.as_func::<StateTransferFunction>(state_transfer_fn_sec.mapped_pages_offset, &mut space)?
-        };
+        let st_fn = state_transfer_fn_sec.as_func::<StateTransferFunction>()?;
         #[cfg(not(loscd_eval))]
         debug!("swap_crates(): invoking the state transfer function {:?} with old_ns: {:?}, new_ns: {:?}", symbol, this_namespace.name(), namespace_of_new_crates.name());
         st_fn(this_namespace, &namespace_of_new_crates)?;

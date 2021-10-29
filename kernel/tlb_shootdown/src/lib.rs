@@ -76,7 +76,12 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: Pag
 
     // acquire lock
     // TODO: add timeout!!
-    while TLB_SHOOTDOWN_IPI_LOCK.compare_and_swap(false, true, Ordering::SeqCst) { 
+    let mut old_lock_val = TLB_SHOOTDOWN_IPI_LOCK.load(Ordering::Relaxed);
+    loop {
+        match TLB_SHOOTDOWN_IPI_LOCK.compare_exchange_weak(old_lock_val, true, Ordering::AcqRel, Ordering::Relaxed) { 
+            Ok(_) => break,
+            Err(v) => old_lock_val = v,
+        }
         spin_loop_hint();
     }
 
@@ -89,7 +94,7 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: Pag
     // wait for all other cores to handle this IPI
     // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
     // TODO: add timeout!!
-    while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::SeqCst) > 0 { 
+    while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::Relaxed) > 0 { 
         spin_loop_hint();
     }
 
@@ -97,5 +102,5 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: Pag
     *TLB_SHOOTDOWN_IPI_PAGES.write() = None;
 
     // release lock
-    TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::SeqCst); 
+    TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::Release); 
 }

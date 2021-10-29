@@ -12,7 +12,12 @@ extern crate x86_64;
 use core::fmt;
 
 
-pub const PIC_MASTER_OFFSET: u8 = 0x20;
+/// The offset added to the first IRQ: `0x20`.
+/// 
+/// This is needed to shift the start of all IRQ vectors 
+/// to after the end of the CPU exception vectors,
+/// which occupy the first 32 IRQ vectors.
+pub const IRQ_BASE_OFFSET: u8 = 0x20;
 
 
 /// Command sent to read the Interrupt Request Register.
@@ -36,13 +41,18 @@ const SLAVE_CMD:   u16 = 0xA0;
 const SLAVE_DATA:  u16 = 0xA1;
 
 
+/// The set of status registers for both PIC chips.
+///
 /// Each PIC chip has two interrupt status registers: 
-/// the In-Service Register (ISR) and the Interrupt Request Register (IRR). 
-/// The ISR tells us which interrupts are currently being serviced, meaning IRQs sent to the CPU. 
-/// The IRR tells us which interrupts have been raised, but not necessarily serviced yet. 
+///  * `ISR`: the In-Service Register: specifies which interrupts are currently being serviced,
+///     meaning IRQs sent to the CPU. 
+///  * `IRR`: the Interrupt Request Register: specifies which interrupts have been raised
+///     but not necessarily serviced yet.
+///
 /// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU, 
 /// at which point they are marked in the ISR.
-/// see http://wiki.osdev.org/8259_PIC#ISR_and_IRR
+///
+/// For more, [see this explanation](http://wiki.osdev.org/8259_PIC#ISR_and_IRR).
 pub struct IrqStatusRegisters {
     pub master_isr: u8,
     pub master_irr: u8,
@@ -91,7 +101,7 @@ impl Pic {
     }
 }
 
-/// A pair of chained PIC controllers.  This is the standard setup on x86.
+/// A pair of chained PIC chips, which represents the standard x86 configuration.
 pub struct ChainedPics {
     pics: [Pic; 2],
 }
@@ -107,12 +117,12 @@ impl ChainedPics {
         let mut cpic = ChainedPics {
             pics: [
                 Pic {
-                    offset: PIC_MASTER_OFFSET,
+                    offset: IRQ_BASE_OFFSET,
                     command: port_io::Port::new(MASTER_CMD),
                     data: port_io::Port::new(MASTER_DATA),
                 },
                 Pic {
-                    offset: PIC_MASTER_OFFSET + 8, // 8 IRQ lines per PIC
+                    offset: IRQ_BASE_OFFSET + 8, // 8 IRQ lines per PIC
                     command: port_io::Port::new(SLAVE_CMD),
                     data: port_io::Port::new(SLAVE_DATA),
                 },

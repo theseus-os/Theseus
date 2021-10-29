@@ -6,6 +6,14 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
+spin = "0.9.0"
+bare-io = { version = "0.2.1", features = [ "alloc" ] }
+derive_more = "0.99.0"
+
+[dependencies.fatfs]
+git = "https://github.com/rafalh/rust-fatfs"
+default-features = false
+features = [ "alloc", "lfn", "unicode", "log_level_warn" ]
 
 [dependencies.log]
 version = "0.4.8"
@@ -21,6 +29,12 @@ path = "../memory"
 
 [dependencies.apic]
 path = "../apic"
+
+[dependencies.serial_port]
+path = "../serial_port"
+
+[dependencies.logger]
+path = "../logger"
 
 [dependencies.e1000]
 path = "../e1000"
@@ -49,6 +63,14 @@ path = "../ethernet_smoltcp_device"
 [dependencies.ixgbe]
 path = "../ixgbe"
 
+[dependencies.io]
+path = "../io"
+
+[dependencies.mlx5]
+path = "../mlx5"
+
+[dependencies.iommu]
+path = "../iommu"
 
 [lib]
 crate-type = ["rlib"]

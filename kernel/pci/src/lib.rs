@@ -330,16 +330,19 @@ impl fmt::Debug for PciLocation {
 
 /// Contains information common to every type of PCI Device,
 /// and offers functions for reading/writing to the PCI configuration space.
+///
+/// For more, see [this partial table](http://wiki.osdev.org/PCI#Class_Codes)
+/// of `class`, `subclass`, and `prog_if` codes, 
 #[derive(Debug)]
 pub struct PciDevice {
     /// the bus, slot, and function number that locates this PCI device in the bus tree.
     pub location: PciLocation,
 
-    /// The class code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    /// The class code, used to determine device type.
     pub class: u8,
-    /// The subclass code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    /// The subclass code, used to determine device type.
     pub subclass: u8,
-    /// The programming interface of this PCI device
+    /// The programming interface of this PCI device, also used to determine device type.
     pub prog_if: u8,
     /// The six Base Address Registers (BARs)
     pub bars: [u32; 6],
@@ -362,7 +365,7 @@ impl PciDevice {
     ///
     /// # Argument
     /// * `bar_index` must be between `0` and `5` inclusively, as each PCI device 
-    /// can only have 6 BARs at the most.  
+    ///   can only have 6 BARs at the most.  
     ///
     /// Note that if the given `BAR` actually indicates it is part of a 64-bit address,
     /// it will be used together with the BAR right above it (`bar + 1`), e.g., `BAR1:BAR0`.
@@ -385,13 +388,13 @@ impl PciDevice {
             let next_bar = *self.bars.get(bar_index + 1).ok_or("next highest BAR index is out of range")?;
             // Clear the bottom 4 bits because it's a 16-byte aligned address
             PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize | ((next_bar as usize) << 32))
-                .map_err(|_e| "determine_mem_base(): [64-bit] BAR physical address was invalid")?
+                .ok_or("determine_mem_base(): [64-bit] BAR physical address was invalid")?
         } else {
             // Here: this BAR is the lower 32-bit part of a 64-bit address, 
             // so we need to access the next highest BAR to get the address's upper 32 bits.
             // Also, clear the bottom 4 bits because it's a 16-byte aligned address.
             PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize)
-                .map_err(|_e| "determine_mem_base(): [32-bit] BAR physical address was invalid")?
+                .ok_or("determine_mem_base(): [32-bit] BAR physical address was invalid")?
         };  
         Ok(mem_base)
     }

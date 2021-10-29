@@ -72,7 +72,6 @@ extern crate apic;
 #[macro_use] extern crate log;
 extern crate mod_mgmt;
 extern crate bit_field;
-extern crate atomic;
 
 use x86_64::registers::msr::*;
 use x86_64::VirtualAddress;
@@ -771,7 +770,7 @@ pub fn print_samples(sample_results: &SampleResults) {
 
 /// Finds the corresponding function for each instruction pointer and calculates the percentage amount each function occured in the samples
 pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Result<(), &'static str> {
-    let taskref = task::get_my_current_task() .ok_or("pmu_x86::get_function_names_from_samples: Could not get reference to current task")?;
+    let taskref = task::get_my_current_task().ok_or("pmu_x86::get_function_names_from_samples: Could not get reference to current task")?;
     let namespace = taskref.get_namespace();
     debug!("Analyze Samples:");
 
@@ -779,7 +778,10 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
     let total_samples = sample_results.instruction_pointers.len();
 
     for ip in sample_results.instruction_pointers.iter() {
-        let (section_ref, _offset) = namespace.get_section_containing_address(memory::VirtualAddress::new(ip.0)?, true).ok_or("Can't find section containing address")?;
+        let (section_ref, _offset) = namespace.get_section_containing_address(
+            memory::VirtualAddress::new(ip.0).ok_or("sampled instruction pointer was an invalid virtual address")?,
+            true
+        ).ok_or("Can't find section containing sampled instruction pointer")?;
         let section_name = section_ref.name_without_hash().to_string();
 
         sections.entry(section_name).and_modify(|e| {*e += 1}).or_insert(1);
@@ -846,7 +848,7 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<bool, &'st
     if let Some(taskref) = task::get_my_current_task() {
         let requested_task_id = samples.task_id;
         
-        let task_id = taskref.lock().id;
+        let task_id = taskref.id;
         if (requested_task_id == 0) | (requested_task_id == task_id) {
             samples.ip_list.push(stack_frame.instruction_pointer);
             samples.task_id_list.push(task_id);

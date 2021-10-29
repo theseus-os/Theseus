@@ -10,7 +10,6 @@ spin = "0.9.0"
 
 [dependencies.volatile]
 version = "0.2.7"
-features = ["const_fn"]
 
 [dependencies.logger]
 path = "../logger"

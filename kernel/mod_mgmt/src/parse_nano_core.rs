@@ -49,7 +49,10 @@ fn mp_range(mp_ref: &Arc<Mutex<MappedPages>>) -> Range<VirtualAddress> {
 
 
 /// Parses the nano_core object file that represents the already loaded (and currently running) nano_core code.
+///
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
+/// We consider both `GLOBAL` and `WEAK` symbols to be global public symbols; this is necessary because symbols that are 
+/// compiler builtins, such as memset, memcpy, etc, are symbols with weak linkage in newer versions of Rust (2021 and later).
 /// 
 /// # Return
 /// If successful, this returns a tuple of the following:
@@ -182,7 +185,7 @@ fn parse_nano_core_symbol_file(
         let size_hex_str = tokens.next();
         // parse both the Address and Size fields as hex strings
         addr_hex_str.and_then(|a| usize::from_str_radix(a, 16).ok())
-            .and_then(|addr| VirtualAddress::new(addr).ok())
+            .and_then(VirtualAddress::new)
             .and_then(|vaddr| {
                 size_hex_str.and_then(|s| usize::from_str_radix(s, 16).ok())
                     .and_then(|size| Some((vaddr, size)))
@@ -267,8 +270,9 @@ fn parse_nano_core_symbol_file(
     let bss_shndx    = bss_shndx   .ok_or("parse_nano_core_symbol_file(): couldn't find .bss section index")?;
     let shndxs = MainShndx { text_shndx, rodata_shndx, data_shndx, bss_shndx };
 
-    // second, skip ahead to the start of the symbol table 
-    let mut file_iterator = file_iterator.skip_while(|(_line_num, line)|  !line.starts_with("Symbol table"));
+    // second, skip ahead to the start of the symbol table: a line which contains ".symtab" but does NOT contain "SYMTAB"
+    let is_start_of_symbol_table = |line: &str| { line.contains(".symtab") && !line.contains("SYMTAB") };
+    let mut file_iterator = file_iterator.skip_while(|(_line_num, line)|  !is_start_of_symbol_table(line));
     // skip the symbol table start line, e.g., "Symbol table '.symtab' contains N entries:"
     if let Some((_num, _line)) = file_iterator.next() {
         // trace!("SKIPPING LINE {}: {}", _num + 1, _line);
@@ -321,7 +325,7 @@ fn parse_nano_core_symbol_file(
             let sec_ndx   = parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 6 'Ndx'")?;
             let name      = parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 7 'Name'")?;
             
-            let global = bind == "GLOBAL";
+            let global = bind == "GLOBAL" || bind == "WEAK";
             let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
                 error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                 "parse_nano_core_symbol_file(): couldn't parse virtual address (value column)"
@@ -450,7 +454,8 @@ fn parse_nano_core_binary(
                 bss_shndx = Some(shndx);
             }
             Ok(".gcc_except_table") => {
-                let sec_vaddr = VirtualAddress::new(sec.address() as usize)?;
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .gcc_except_table section had an invalid physical address")?;
                 let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                     .ok_or("the nano_core .gcc_except_table section wasn't covered by the read-only mapped pages!")?;
                 crate_items.sections.insert(
@@ -469,7 +474,8 @@ fn parse_nano_core_binary(
                 section_counter += 1;
             }
             Ok(".eh_frame") => {
-                let sec_vaddr = VirtualAddress::new(sec.address() as usize)?;
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .eh_frame section had an invalid physical address")?;
                 let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                     .ok_or("the nano_core .eh_frame section wasn't covered by the read-only mapped pages!")?;
                 crate_items.sections.insert(
@@ -505,15 +511,15 @@ fn parse_nano_core_binary(
         let data_pages_locked = data_pages.lock();
 
         // Iterate through the symbol table so we can find which sections are global (publicly visible).
-        use xmas_elf::symbol_table::Entry;
+        use xmas_elf::symbol_table::{Entry, Binding};
         for entry in symtab.iter() {
-            // public symbols can have any visibility setting, but it's the binding that matters (GLOBAL or LOCAL)
+            // public symbols can have any visibility setting, but it's the binding that matters (GLOBAL/WEAK vs. LOCAL)
             if let (Ok(bind), Ok(typ)) = (entry.get_binding(), entry.get_type()) {
                 if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
                     let sec_vaddr_value = entry.value() as usize;
                     let sec_size = entry.size() as usize;
                     let name = entry.get_name(&elf_file)?;
-                    let global = bind == xmas_elf::symbol_table::Binding::Global;
+                    let global = bind == Binding::Global || bind == Binding::Weak;
 
                     let demangled = demangle(name).to_string();
                     // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_value, sec_size);
@@ -595,7 +601,8 @@ fn add_new_section(
     global: bool,
 ) -> Result<(), &'static str> {
     let new_section = if sec_ndx == shndxs.text_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new text section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Text,
             sec_name,
@@ -608,7 +615,8 @@ fn add_new_section(
         ))
     }
     else if sec_ndx == shndxs.rodata_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new rodata section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Rodata,
             sec_name,
@@ -621,7 +629,8 @@ fn add_new_section(
         ))
     }
     else if sec_ndx == shndxs.data_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new data section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Data,
             sec_name,
@@ -634,7 +643,8 @@ fn add_new_section(
         ))
     }
     else if sec_ndx == shndxs.bss_shndx {
-        let sec_vaddr = VirtualAddress::new(sec_vaddr)?;
+        let sec_vaddr = VirtualAddress::new(sec_vaddr)
+            .ok_or("new bss section had invalid virtual address")?;
         Some(LoadedSection::new(
             SectionType::Bss,
             sec_name,

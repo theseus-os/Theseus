@@ -110,6 +110,7 @@ pub enum CrateType {
     Kernel,
     Application,
     Userspace,
+    Executable,
 }
 impl CrateType {
     fn first_char(&self) -> &'static str {
@@ -117,6 +118,7 @@ impl CrateType {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
             CrateType::Userspace    => "u",
+            CrateType::Executable   => "e",
         }
     }
     
@@ -127,6 +129,7 @@ impl CrateType {
             CrateType::Kernel       => "_kernel",
             CrateType::Application  => "_applications",
             CrateType::Userspace    => "_userspace",
+            CrateType::Executable   => "_executables",
         }
     }
     
@@ -161,25 +164,13 @@ impl CrateType {
         else if prefix.starts_with(CrateType::Userspace.first_char()) {
             Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
+        else if prefix.starts_with(CrateType::Executable.first_char()) {
+            Ok((CrateType::Executable, namespace_prefix, crate_name))
+        }
         else {
             error!("module_name {:?} didn't start with a known CrateType prefix", module_name);
             Err("module_name didn't start with a known CrateType prefix")
         }
-    }
-
-    /// Returns `true` if the given `module_name` indicates an application crate.
-    pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a kernel crate.
-    pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.first_char())
-    }
-
-    /// Returns `true` if the given `module_name` indicates a userspace crate.
-    pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.first_char())
     }
 }
 
@@ -570,11 +561,15 @@ impl LoadedCrate {
 /// The possible types of sections that can be loaded from a crate object file.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SectionType {
+    /// A `text` section contains executable code, i.e., functions. 
     Text,
+    /// An `rodata` section contains read-only data, i.e., constants.
     Rodata,
+    /// A `data` section contains data that is both readable and writable, i.e., static variables. 
     Data,
+    /// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.
     Bss,
-    /// The ".gcc_except_table" contains landing pads for exception handling,
+    /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process
     /// (e.g., "catching" an exception). 
@@ -586,7 +581,7 @@ pub enum SectionType {
     /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
     /// 
     GccExceptTable,
-    /// The ".eh_frame" contains information about stack unwinding and destructor functions
+    /// The `.eh_frame` section contains information about stack unwinding and destructor functions
     /// that should be called when traversing up the stack for cleanup. 
     /// 
     /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>
@@ -794,6 +789,64 @@ impl LoadedSection {
                 self.name, self.size(), destination_section.name, destination_section.size());
             Err("this source section has a different length than the destination section")
         }
+    }
+
+    /// Reinterprets this section's underlying `MappedPages` memory region as an executable function.
+    ///
+    /// The generic `F` parameter is the function type signature itself, e.g., `fn(String) -> u8`.
+    /// 
+    /// Returns a reference to the function that is formed from the underlying memory region,
+    /// with a lifetime dependent upon the lifetime of this section.
+    ///
+    /// # Locking
+    /// Obtains the lock on this section's `MappedPages` object.
+    ///
+    /// # Note
+    /// Ideally, we would use debug information to know the size of the entire function
+    /// and test whether that fits within the bounds of the memory region, rather than just checking
+    /// the size of `F`, the function pointer/signature.
+    /// Without debug information, checking the size is restricted to in-bounds memory safety 
+    /// rather than actual functional correctness. 
+    ///
+    /// # Examples
+    /// Here's how you might call this function:
+    /// ```
+    /// type MyPrintFuncSignature = fn(&str) -> Result<(), &'static str>;
+    /// let section = mod_mgmt::get_symbol_starting_with("my_crate::print::").upgrade().unwrap();
+    /// let print_func: &MyPrintFuncSignature = section.as_func().unwrap();
+    /// print_func("hello there");
+    /// ```
+    /// 
+    pub fn as_func<F>(&self) -> Result<&F, &'static str> {
+        if false {
+            debug!("Requested LoadedSection {:#X?} as function {:?}", self, core::any::type_name::<F>());
+        }
+
+        let mp = self.mapped_pages.lock();
+        // Check flags to make sure these pages are executable (otherwise a page fault would occur when this func is called)
+        if self.typ != SectionType::Text || !mp.flags().is_executable() {
+            error!("Requested LoadedSection as function {:?}, but was not an executable text section! (flags: {:?})",
+                core::any::type_name::<F>(), mp.flags()
+            );
+            return Err("as_func(): section was not an executable text section");
+        }
+
+        // Check that the bounds of this entire section fit within its MappedPages
+        let end = self.mapped_pages_offset + self.size();
+        if end > mp.size_in_bytes() {
+            error!("Requested LoadedSection as function {:?}, but section's end offset ({:X?}) was beyond its MappedPages ({:X?})",
+                core::any::type_name::<F>(), end, mp.size_in_bytes()
+            );
+            return Err("requested type and offset would not fit within the MappedPages bounds");
+        }
+
+        // SAFE: above, we check the section type, executability, and size bounds of its underlying MappedPages
+        //       and tie the lifetime of the returned function reference to this section's lifetime.
+        Ok(unsafe { 
+            core::mem::transmute(
+                &(mp.start_address().value() + self.mapped_pages_offset)
+            )
+        })
     }
 }
 

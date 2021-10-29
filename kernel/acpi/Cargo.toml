@@ -14,8 +14,8 @@ volatile = "0.2.7"
 version = "0.4.8"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
@@ -41,29 +41,35 @@ path = "../pic"
 [dependencies.ap_start]
 path = "../ap_start"
 
-[dependencies.acpi_table]
-path = "../acpi_table"
-
-[dependencies.acpi_table_handler]
-path = "../acpi_table_handler"
-
-[dependencies.rsdp]
-path = "../rsdp"
-
-[dependencies.rsdt]
-path = "../rsdt"
-
-[dependencies.fadt]
-path = "../fadt"
-
-[dependencies.madt]
-path = "../madt"
-
-[dependencies.hpet]
-path = "../hpet"
-
 [dependencies.pause]
 path = "../pause"
+
+[dependencies.acpi_table]
+path = "acpi_table"
+
+[dependencies.acpi_table_handler]
+path = "acpi_table_handler"
+
+[dependencies.rsdp]
+path = "rsdp"
+
+[dependencies.rsdt]
+path = "rsdt"
+
+[dependencies.fadt]
+path = "fadt"
+
+[dependencies.madt]
+path = "madt"
+
+[dependencies.hpet]
+path = "hpet"
+
+[dependencies.dmar]
+path = "dmar"
+
+[dependencies.iommu]
+path = "../iommu"
 
 [lib]
 crate-type = ["rlib"]

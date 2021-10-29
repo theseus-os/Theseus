@@ -26,19 +26,20 @@ extern crate ps2;
 extern crate tlb_shootdown;
 
 
+pub use pic::IRQ_BASE_OFFSET;
 
 use ps2::handle_mouse_packet;
-use x86_64::structures::idt::{Idt, LockedIdt, ExceptionStackFrame, HandlerFunc};
+use x86_64::structures::idt::{ExceptionStackFrame, HandlerFunc, Idt, LockedIdt};
 use spin::Once;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
-use pic::PIC_MASTER_OFFSET;
 
 
-/// The single system-wide IDT
+/// The single system-wide Interrupt Descriptor Table (IDT).
+///
 /// Note: this could be per-core instead of system-wide, if needed.
 pub static IDT: LockedIdt = LockedIdt::new();
 
@@ -66,26 +67,69 @@ pub fn is_exception_handler_with_error_code(address: u64) -> bool {
 }
 
 
-/// initializes the interrupt subsystem and properly sets up safer early exception handlers, but no other IRQ handlers.
+/// Initializes the interrupt subsystem and sets up an initial Interrupt Descriptor Table (IDT).
+///
+/// The new IDT will be initialized with the same contents as the early IDT 
+/// created in [`exceptions_early::init()`].
+/// Any other interrupt handler entries that are missing (not yet initialized) will be filled with
+/// a default placeholder handler, which is useful to catch interrupts that need to be implemented.
+///
 /// # Arguments: 
-/// * `double_fault_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack.
-/// * `privilege_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack).
-pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
-    -> Result<&'static LockedIdt, &'static str> 
-{
+/// * `double_fault_stack_top_unusable`: the address of the top of a newly allocated stack,
+///    to be used as the double fault exception handler stack.
+/// * `privilege_stack_top_unusable`: the address of the top of a newly allocated stack,
+///    to be used as the privilege stack (Ring 3 -> Ring 0 stack).
+pub fn init(
+    double_fault_stack_top_unusable: VirtualAddress,
+    privilege_stack_top_unusable: VirtualAddress
+) -> Result<&'static LockedIdt, &'static str> {
     let bsp_id = apic::get_bsp_id().ok_or("couldn't get BSP's id")?;
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
-    // initialize early exception handlers
-    exceptions_early::init(&IDT, Some(double_fault_stack_top_unusable));
+    // Copy over all exception handlers from the early IDT,
+    // but preserve any handlers that were registered to this real IDT during early boot.
     {
-        // set the special double fault handler's stack
-        let mut idt = IDT.lock(); // withholds interrupts
+        let mut new_idt = IDT.lock();
+        let early_idt = exceptions_early::EARLY_IDT.lock();
 
-        // fill all IDT entries with an unimplemented IRQ handler
-        for i in 32..255 {
-            idt[i].set_handler_fn(unimplemented_interrupt_handler);
+        new_idt.divide_by_zero           = early_idt.divide_by_zero;
+        new_idt.debug                    = early_idt.debug;
+        new_idt.non_maskable_interrupt   = early_idt.non_maskable_interrupt;
+        new_idt.breakpoint               = early_idt.breakpoint;
+        new_idt.overflow                 = early_idt.overflow;
+        new_idt.bound_range_exceeded     = early_idt.bound_range_exceeded;
+        new_idt.invalid_opcode           = early_idt.invalid_opcode;
+        new_idt.device_not_available     = early_idt.device_not_available;
+        // double fault handler is dealt with below.
+        new_idt.invalid_tss              = early_idt.invalid_tss;
+        new_idt.segment_not_present      = early_idt.segment_not_present;
+        new_idt.stack_segment_fault      = early_idt.stack_segment_fault;
+        new_idt.general_protection_fault = early_idt.general_protection_fault;
+        new_idt.page_fault               = early_idt.page_fault;
+        new_idt.x87_floating_point       = early_idt.x87_floating_point;
+        new_idt.alignment_check          = early_idt.alignment_check;
+        new_idt.machine_check            = early_idt.machine_check;
+        new_idt.simd_floating_point      = early_idt.simd_floating_point;
+        new_idt.virtualization           = early_idt.virtualization;
+        new_idt.security_exception       = early_idt.security_exception;
+
+        // The only special case is the double fault handler, 
+        // as it needs to use the newly-provided double fault stack.
+        let double_fault_options = new_idt.double_fault.set_handler_fn(exceptions_early::double_fault_handler);
+        unsafe { 
+            double_fault_options.set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16);
+        }
+
+        // Fill only missing IDT entries with a default unimplemented interrupt handler.
+        for (_idx, new_entry) in new_idt.interrupts.iter_mut().enumerate() {
+            if new_entry.handler_address() != 0 {
+                debug!("Preserved early registered interrupt handler for IRQ {:#X} at address {:#X}", 
+                    _idx + IRQ_BASE_OFFSET as usize, new_entry.handler_address(),
+                );
+            } else {
+                new_entry.set_handler_fn(unimplemented_interrupt_handler);
+            }
         }
     }
 
@@ -97,7 +141,6 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
     }
 
     Ok(&IDT)
-
 }
 
 
@@ -120,29 +163,13 @@ pub fn init_ap(
 
 /// Establishes the default interrupt handlers that are statically known.
 fn set_handlers(idt: &mut Idt) {
-    // exceptions (IRQS from 0-31) have already been inited before
-
-    // fill all IDT entries with an unimplemented IRQ handler
-    for i in 32..255 {
-        idt[i].set_handler_fn(unimplemented_interrupt_handler);
-    }
-
     idt[0x20].set_handler_fn(pit_timer_handler);
     idt[0x21].set_handler_fn(ps2_keyboard_handler);
     idt[0x22].set_handler_fn(lapic_timer_handler);
-    idt[0x23].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x24].set_handler_fn(com1_serial_handler);
-    idt[0x25].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x26].set_handler_fn(unimplemented_interrupt_handler);
     idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
 
     // idt[0x28].set_handler_fn(rtc_handler);
-    idt[0x28].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x29].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x2A].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x2B].set_handler_fn(unimplemented_interrupt_handler);
     idt[0x2C].set_handler_fn(ps2_mouse_handler);
-    idt[0x2D].set_handler_fn(unimplemented_interrupt_handler);
     idt[0x2E].set_handler_fn(primary_ata_handler);
     idt[0x2F].set_handler_fn(secondary_ata_handler);
 
@@ -176,19 +203,25 @@ pub fn init_handlers_pic() {
 /// The function fails if the interrupt number is already in use. 
 /// 
 /// # Arguments 
-/// * `interrupt_num` - the interrupt that is being requested
-/// * `func` - the handler to be registered for 'interrupt_num'
-pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'static str> {
+/// * `interrupt_num` - the interrupt (IRQ vector) that is being requested.
+/// * `func` - the handler to be registered, which will be invoked when the interrupt occurs.
+/// 
+/// # Return
+/// * `Ok(())` if successfully registered, or
+/// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
+pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u64> {
     let mut idt = IDT.lock();
 
-    // checks if the handler stored is the default apic handler which signifies that the interrupt hasn't been used yet
-    if idt[interrupt_num as usize].handler_eq(unimplemented_interrupt_handler) {
-        idt[interrupt_num as usize].set_handler_fn(func);
+    // If the existing handler stored in the IDT either missing (has an address of `0`)
+    // or is the default handler, that signifies the interrupt number is available.
+    let idt_entry = &mut idt[interrupt_num as usize];
+    let existing_handler_addr = idt_entry.handler_address();
+    if existing_handler_addr == 0 || existing_handler_addr == unimplemented_interrupt_handler as u64 {
+        idt_entry.set_handler_fn(func);
         Ok(())
-    }
-    else {
-        error!("register_interrupt: the requested interrupt IRQ {} is not available", interrupt_num);
-        Err("register_interrupt: the requested interrupt is not available")
+    } else {
+        trace!("register_interrupt: the requested interrupt IRQ {} was already in use", interrupt_num);
+        Err(existing_handler_addr)
     }
 } 
 
@@ -229,16 +262,33 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
     }
 }
 
-/// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
-/// irq arg is only used for PIC
+/// Send an end of interrupt signal, notifying the interrupt chip that
+/// the given interrupt request `irq` has been serviced. 
+/// 
+/// This function supports all types of interrupt chips -- APIC, x2apic, PIC --
+/// and will perform the correct EOI operation based on which chip is currently active.
+///
+/// The `irq` argument is only used if the `PIC` chip is active,
+/// but it doesn't hurt to always provide it.
 pub fn eoi(irq: Option<u8>) {
-    match INTERRUPT_CHIP.load(Ordering::Acquire) {
-        InterruptChip::APIC |
-        InterruptChip::X2APIC => {
-            apic::get_my_apic().expect("eoi(): couldn't get my apic to send EOI!").write().eoi();
+    match INTERRUPT_CHIP.load() {
+        InterruptChip::APIC | InterruptChip::X2APIC => {
+            if let Some(my_apic) = apic::get_my_apic() {
+                my_apic.write().eoi();
+            } else {
+                error!("BUG: couldn't get my LocalApic instance to send EOI!");
+            }
         }
         InterruptChip::PIC => {
-            PIC.get().expect("eoi(): PIC not initialized").notify_end_of_interrupt(irq.expect("PIC eoi, but no arg provided"));
+            if let Some(_pic) = PIC.get() {
+                if let Some(irq) = irq {
+                    _pic.notify_end_of_interrupt(irq);
+                } else {
+                    error!("BUG: missing required IRQ argument for PIC EOI!");
+                }   
+            } else {
+                error!("BUG: couldn't get PIC instance to send EOI!");
+            }  
         }
     }
 }
@@ -248,7 +298,7 @@ pub fn eoi(irq: Option<u8>) {
 extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
 
-	eoi(Some(PIC_MASTER_OFFSET));
+	eoi(Some(IRQ_BASE_OFFSET + 0x0));
 }
 
 
@@ -296,7 +346,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
         }
     }
     
-    eoi(Some(PIC_MASTER_OFFSET + 0x1));
+    eoi(Some(IRQ_BASE_OFFSET + 0x1));
 }
 
 /// 0x2C
@@ -322,7 +372,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
 
     }
 
-    eoi(Some(PIC_MASTER_OFFSET + 0xc));
+    eoi(Some(IRQ_BASE_OFFSET + 0xc));
 }
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
@@ -337,14 +387,6 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     scheduler::schedule();
 }
 
-
-/// 0x24
-extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    info!("COM1 serial handler");
-
-    eoi(Some(PIC_MASTER_OFFSET + 0x4));
-}
-
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     warn!("APIC SPURIOUS INTERRUPT HANDLER!");
 
@@ -353,7 +395,7 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut Exc
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
-	match apic::INTERRUPT_CHIP.load(Ordering::Acquire) {
+	match apic::INTERRUPT_CHIP.load() {
         apic::InterruptChip::PIC => {
             let irq_regs = PIC.get().map(|pic| pic.read_isr_irr());  
             println_raw!("PIC IRQ Registers: {:?}", irq_regs);
@@ -375,7 +417,8 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut Exc
         }
     };
 
-    loop { }
+    // TODO: use const generics here to know which IRQ to send an EOI for (only needed for PIC).
+    eoi(None); 
 }
 
 
@@ -394,7 +437,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut Exce
         if irq_regs.master_isr & 0x80 == 0x80 {
             println_raw!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
             error!("Got real IRQ7, not spurious! (Unexpected behavior)");
-            eoi(Some(PIC_MASTER_OFFSET + 0x7));
+            eoi(Some(IRQ_BASE_OFFSET + 0x7));
         }
         else {
             // do nothing. Do not send an EOI. 
@@ -419,7 +462,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut Exce
 //     // we must ack the interrupt and send EOI before calling the handler, 
 //     // because the handler will not return.
 //     rtc::rtc_ack_irq();
-//     eoi(Some(PIC_MASTER_OFFSET + 0x8));
+//     eoi(Some(IRQ_BASE_OFFSET + 0x8));
     
 //     rtc::handle_rtc_interrupt();
 // }
@@ -429,7 +472,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut Exce
 extern "x86-interrupt" fn primary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
     info!("Primary ATA Interrupt (0x2E)");
 
-    eoi(Some(PIC_MASTER_OFFSET + 0xE));
+    eoi(Some(IRQ_BASE_OFFSET + 0xE));
 }
 
 
@@ -437,7 +480,7 @@ extern "x86-interrupt" fn primary_ata_handler(_stack_frame: &mut ExceptionStackF
 extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
     info!("Secondary ATA Interrupt (0x2F)");
     
-    eoi(Some(PIC_MASTER_OFFSET + 0xF));
+    eoi(Some(IRQ_BASE_OFFSET + 0xF));
 }
 
 

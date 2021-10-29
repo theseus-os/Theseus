@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(const_fn)]
 
 #[macro_use] extern crate lazy_static;
 // #[macro_use] extern crate log;
@@ -168,6 +167,9 @@ pub fn create_gdt(tss: &TaskStateSegment) -> (
 }
 
 /// The Global Descriptor Table, as specified by the x86_64 architecture.
+/// 
+/// See more info about GDT [here](http://wiki.osdev.org/Global_Descriptor_Table)
+/// and [here](http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/).
 pub struct Gdt {
     table: [u64; 10],  // max size is 8192 entries, but we don't need that many.
     next_free: usize,
@@ -229,14 +231,12 @@ impl fmt::Display for Gdt {
     }
 }
 
-/// We need 6 GDT segments even for 64-bit: http://tunes.org/~qz/search/?view=1&c=osdev&y=17&m=1&d=2
-/// See more info about GDT here: http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/
-///                     and here: http://wiki.osdev.org/Global_Descriptor_Table
+/// The two kinds of descriptor entries in the GDT.
 pub enum Descriptor {
     /// UserSegment is used for both code and data segments, 
-    /// in both the kernel and in user space
+    /// in both the kernel and in user space.
     UserSegment(u64),
-    /// SystemSegment is used only for TSS
+    /// SystemSegment is used only for TSS.
     SystemSegment(u64, u64),
 }
 

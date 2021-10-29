@@ -44,6 +44,7 @@ extern crate exceptions_full;
 extern crate network_manager;
 extern crate window_manager;
 extern crate multiple_heaps;
+extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
@@ -141,16 +142,20 @@ pub fn init(
     drop(identity_mapped_pages);
     
     // create a SIMD personality
-    #[cfg(simd_personality)]
-    {
+    #[cfg(simd_personality)] {
+        #[cfg(simd_personality_sse)]
         let simd_ext = task::SimdExt::SSE;
+        #[cfg(simd_personality_avx)]
+        let simd_ext = task::SimdExt::AVX;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
-        spawn::spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
-            .name(alloc::string::String::from("setup_simd_personality"))
+        spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
+            .name(alloc::format!("setup_simd_personality_{:?}", simd_ext))
             .spawn()?;
     }
 
-    // Now that initialization is complete, we can spawn the first application(s)
+    // Now that initialization is complete, we can spawn various system tasks/daemons
+    // and then the first application(s).
+    console::start_connection_detection()?;
     first_application::start()?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_apic_id);

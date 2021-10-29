@@ -45,7 +45,7 @@ use alloc::{
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
+use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -136,8 +136,7 @@ pub fn new_application_task_builder(
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
-    let namespace = new_namespace.clone()
-        .or_else(|| task::get_my_current_task().map(|taskref| taskref.get_namespace()))
+    let namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
         .ok_or("spawn::new_application_task_builder(): couldn't get current task to use its CrateNamespace")?;
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
@@ -163,12 +162,7 @@ pub fn new_application_task_builder(
     };
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
         --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)")?;
-
-    let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
-    let main_func = {
-        let mapped_pages = main_func_sec.mapped_pages.lock();
-        mapped_pages.as_func::<MainFunc>(main_func_sec.mapped_pages_offset, &mut space)?
-    };
+    let main_func = main_func_sec.as_func::<MainFunc>()?;
 
     // Create the underlying task builder. 
     // Give it a default name based on the app crate's name, but that can be changed later. 
@@ -293,21 +287,19 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Currently we're using the very bottom of the kstack for kthread arguments. 
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
         // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
-        {
-            let bottom_of_stack: &mut usize = new_task.kstack.as_type_mut(0)?;
-            let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
-                arg:  self.argument,
-                func: self.func,
-                _rettype: PhantomData,
-            }));
-            *bottom_of_stack = box_ptr as usize;
-        }
+        let bottom_of_stack: &mut usize = new_task.inner_mut().kstack.as_type_mut(0)?;
+        let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
+            arg:  self.argument,
+            func: self.func,
+            _rettype: PhantomData,
+        }));
+        *bottom_of_stack = box_ptr as usize;
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
         if self.blocked {
-            new_task.runstate = RunState::Blocked;
+            new_task.block();
         } else {
-            new_task.runstate = RunState::Runnable;
+            new_task.unblock();
         }
 
         // The new task is marked as idle
@@ -379,7 +371,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // and tell it to use the restartable version of the final task cleanup function.
         self.post_build_function = Some(Box::new(
             move |new_task| {
-                new_task.restart_info = Some(restart_info);
+                new_task.inner_mut().restart_info = Some(restart_info);
                 new_task.failure_cleanup_function = task_restartable_cleanup_failure::<F, A, R>;
                 setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
                 Ok(())
@@ -433,10 +425,10 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
         ($ContextType:ty) => (
             // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages. 
             // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
-            let mp_offset = new_task.kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
-            let new_context_destination: &mut $ContextType = new_task.kstack.as_type_mut(mp_offset)?;
+            let mp_offset = new_task.inner_mut().kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
+            let new_context_destination: &mut $ContextType = new_task.inner_mut().kstack.as_type_mut(mp_offset)?;
             *new_context_destination = <$ContextType>::new(entry_point_function as usize);
-            new_task.saved_sp = new_context_destination as *const _ as usize; 
+            new_task.inner_mut().saved_sp = new_context_destination as *const _ as usize;
         );
     }
 
@@ -479,22 +471,21 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
     // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
     let (func, arg) = {
-        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
+        let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
-        let task_func_arg = {
-            let t = curr_task_ref.lock();
-            let tfa_box_raw_ptr: &usize = t.kstack.as_type(0)
-                .expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
-            // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
-            let tfa_boxed = unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
-            *tfa_boxed // un-box it
-        };
+        let task_func_arg = curr_task.with_kstack(|kstack| {
+            kstack.as_type(0).map(|tfa_box_raw_ptr: &usize| {
+                // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
+                let tfa_boxed = unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
+                *tfa_boxed // un-box it
+            })
+        }).expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
         let (func, arg) = (task_func_arg.func, task_func_arg.arg);
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task_ref.lock().name.clone(), debugit!(func), core::any::type_name::<F>(), debugit!(arg)
+            curr_task.name.clone(), debugit!(func), core::any::type_name::<F>(), debugit!(arg)
         );
 
         (func, arg)
@@ -563,9 +554,9 @@ fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (ir
     let held_interrupts = hold_interrupts();
 
     #[cfg(not(rq_eval))]
-    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.lock().name, debugit!(exit_value));
+    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.name, debugit!(exit_value));
     if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
-        error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.lock().name);
+        error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.name);
     }
 
     (held_interrupts, current_task)
@@ -600,10 +591,10 @@ fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillR
     let held_interrupts = hold_interrupts();
 
     #[cfg(not(downtime_eval))]
-    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
+    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name, kill_reason);
 
     if current_task.mark_as_killed(kill_reason).is_err() {
-        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
+        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.name);
     }
 
     (held_interrupts, current_task)
@@ -689,17 +680,15 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
 
         // Re-spawn a new instance of the task if it was spawned as a restartable task. 
         // We must not hold the current task's lock when calling spawn().
-        let restartable_info = {
-            let t = current_task.lock();
-            if let Some(restart_info) = t.restart_info.as_ref() {
+        let restartable_info = current_task.with_restart_info(|restart_info_opt| {
+            restart_info_opt.map(|restart_info| {
                 #[cfg(use_crate_replacement)] {
                     let func_ptr = &(restart_info.func) as *const _ as usize;
                     let arg_ptr = &(restart_info.argument) as *const _ as usize;
 
-                    let arg_size = mem::size_of::<A>();
                     #[cfg(not(downtime_eval))] {
                         debug!("func_ptr {:#X}", func_ptr);
-                        debug!("arg_ptr {:#X} , {}", arg_ptr, arg_size);
+                        debug!("arg_ptr {:#X} , {}", arg_ptr, mem::size_of::<A>());
                     }
 
                     // func_ptr is of size 16. Argument is of the argument_size + 8.
@@ -710,30 +699,23 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
                         debug!("Function and argument addresses corrected");
                     }
                 }
-                
 
                 let func: &F = restart_info.func.downcast_ref().expect("BUG: failed to downcast restartable task's function");
                 let arg : &A = restart_info.argument.downcast_ref().expect("BUG: failed to downcast restartable task's argument");
-                Some((t.name.clone(), func.clone(), arg.clone(), t.pinned_core.clone()))
-            } else {
-                None
-            }
-        };
+                (func.clone(), arg.clone())
+            })
+        });
 
-        if let Some((name, func, arg, pinned_core)) = restartable_info {
-            let new_task = new_task_builder(func, arg)
-                    .name(name);
-
-            if let Some(core) = pinned_core {
-                new_task.pin_on_core(core)
-                .spawn_restartable()
-                .expect("Could not restart the task");
-            } else {
-                new_task.spawn_restartable()
-                .expect("Could not restart the task");
+        if let Some((func, arg)) = restartable_info {
+            let mut new_task = new_task_builder(func, arg)
+                .name(current_task.name.clone());
+            if let Some(core) = current_task.pinned_core() {
+                new_task = new_task.pin_on_core(core);
             }
+            new_task.spawn_restartable()
+                .expect("Failed to respawn the restartable task");
         } else {
-            error!("BUG : Restartable task has no restart information available");
+            error!("BUG: Restartable task has no restart information available");
         }
     }
 

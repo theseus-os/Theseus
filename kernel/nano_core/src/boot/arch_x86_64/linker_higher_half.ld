@@ -38,7 +38,7 @@ SECTIONS {
 
 	.gcc_except_table ALIGN(4K) : AT(ADDR(.gcc_except_table) - KERNEL_OFFSET)
 	{
-		*(.gcc_except_table)
+		*(.gcc_except_table .gcc_except_table.*)
 	}
 
 	.data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)

@@ -61,8 +61,8 @@ path = "../../kernel/scheduler"
 path = "../../libs/stdio"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.app_io]
 path = "../app_io"
