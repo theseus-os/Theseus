@@ -26,12 +26,7 @@ use core::{
     fmt,
     ops::{Deref, Range},
 };
-use alloc::{
-    vec::Vec,
-    collections::{BTreeMap, btree_map, BTreeSet},
-    string::{String, ToString},
-    sync::{Arc, Weak},
-};
+use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
@@ -388,6 +383,12 @@ pub struct CrateNamespace {
     /// its `recursive_namespace` could contain the set of kernel crates that these application crates rely on.
     recursive_namespace: Option<Arc<CrateNamespace>>,
 
+    /// The thread-local storage (TLS) area "image" that is used as the initial data for each `Task`
+    /// that is spawned and runs within this `CrateNamespace`.
+    /// When spawning a new task, the new task will create its own local TLS area
+    /// with this `tls_initializer` as the local data.
+    tls_initializer: TlsInitializer,
+
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
     /// For example, if `true`, the symbol `my_crate::foo::h123` will be used to satisfy a dependency 
     /// on any other `my_crate::foo::*` regardless of hash value. 
@@ -413,6 +414,7 @@ impl CrateNamespace {
             name,
             dir,
             recursive_namespace,
+            tls_initializer: TlsInitializer::empty(),
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: false,
@@ -832,6 +834,7 @@ impl CrateNamespace {
         CrateNamespace {
             name: self.name.clone(),
             dir: self.dir.clone(),
+            tls_initializer: self.tls_initializer.clone(),
             recursive_namespace: self.recursive_namespace.clone(),
             crate_tree: Mutex::new(self.crate_tree.lock().clone()),
             symbol_map: Mutex::new(self.symbol_map.lock().clone()),
@@ -1110,11 +1113,12 @@ impl CrateNamespace {
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
 
-            let write: bool = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let exec:  bool = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
 
             // First, check for executable sections, which can only be .text sections.
-            if exec && !write {
+            if is_exec && !is_write {
                 if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
 
@@ -1148,8 +1152,63 @@ impl CrateNamespace {
                 }
             }
 
-            // Second, if not executable, handle writable .data/.bss sections.
-            else if write {
+            // Second, if not executable, handle TLS sections.
+            // Although TLS sections have "WAT" flags (write, alloc, TLS),
+            // we load TLS sections into the same read-only pages as other read-only sections (e.g., .rodata)
+            // because they contain thread-local storage initializer data that is only read from.
+            else if is_tls {
+                // check if this TLS section is .bss or .data
+                let is_bss = sec.get_type() == Ok(ShType::NoBits);
+                let name = if is_bss {
+                    sec_name.get(TLS_BSS_PREFIX.len() ..).ok_or_else(|| {
+                        error!("Failed to get the .tbss section's name: {:?}", sec_name);
+                        "Failed to get the .tbss section's name"
+                    })?
+                } else {
+                    sec_name.get(TLS_DATA_PREFIX.len() ..).ok_or_else(|| {
+                        error!("Failed to get the .tdata section's name: {:?}", sec_name);
+                        "Failed to get the .tdata section's name"
+                    })?
+                };
+                let demangled = demangle(name).to_string();
+
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    // here: we're ready to copy the TLS section to the proper address in the read-only pages
+                    let dest_vaddr = rp.address_at_offset(rodata_offset)
+                        .ok_or_else(|| "BUG: for TLS section, rodata_offset wasn't within rodata_mapped_pages")?;
+                    let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
+                    match sec.get_data(&elf_file) {
+                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for TLS section [{}] {}: {:?}", shndx, sec_name, _other);
+                            return Err("couldn't get section data in TLS section");
+                        }
+                    }
+                    
+                    let new_tls_section = Arc::new(LoadedSection::new(
+                        SectionType::Tls,
+                        demangled,
+                        Arc::clone(rp_ref),
+                        rodata_offset,
+                        dest_vaddr,
+                        sec_size,
+                        global_sections.contains(&shndx),
+                        new_crate_weak_ref.clone(),
+                    ));
+                    trace!("New TLS section: {:?}", new_tls_section);
+                    loaded_sections.insert(shndx, new_tls_section);
+                    tls_sections.insert(shndx);
+
+                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                }
+                else {
+                    return Err("no rodata_pages were allocated when handling .rodata section");
+                }
+            }
+
+            // Third, if not executable nor TLS, handle writable .data/.bss sections.
+            else if is_write {
                 // check if this section is .bss or .data
                 let is_bss = sec.get_type() == Ok(ShType::NoBits);
                 let name = if is_bss {
@@ -1210,16 +1269,9 @@ impl CrateNamespace {
                 }
             }
 
-            // Third, if neither executable nor writable, handle .rodata sections, including TLS .tdata/.tbss
+            // Fourth, if neither executable nor TLS nor writable, handle .rodata sections.
             else if sec_name.starts_with(RODATA_PREFIX) {
-                let is_tls = sec_flags & SHF_TLS == SHF_TLS;
-                let is_bss = sec.get_type() == Ok(ShType::NoBits);
-                let prefix_len = match (is_tls, is_bss) {
-                    (true, true)  => TLS_BSS_PREFIX.len(),
-                    (true, false) => TLS_DATA_PREFIX.len(),
-                    (false, _)    => RODATA_PREFIX.len(),
-                };
-                if let Some(name) = sec_name.get(prefix_len..) {
+                if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
 
                     if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -1236,25 +1288,19 @@ impl CrateNamespace {
                             }
                         }
                         
-                        let new_section = Arc::new(LoadedSection::new(
-                            SectionType::Rodata,
-                            demangled,
-                            Arc::clone(rp_ref),
-                            rodata_offset,
-                            dest_vaddr,
-                            sec_size,
-                            global_sections.contains(&shndx),
-                            new_crate_weak_ref.clone(),
-                        ));
                         loaded_sections.insert(
                             shndx, 
-                            new_section.clone(),
+                            Arc::new(LoadedSection::new(
+                                SectionType::Rodata,
+                                demangled,
+                                Arc::clone(rp_ref),
+                                rodata_offset,
+                                dest_vaddr,
+                                sec_size,
+                                global_sections.contains(&shndx),
+                                new_crate_weak_ref.clone(),
+                            ))
                         );
-
-                        if is_tls {
-                            trace!("New TLS section: {:?}", new_section);
-                            tls_sections.insert(shndx);
-                        }
 
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
@@ -1268,7 +1314,7 @@ impl CrateNamespace {
                 }
             }
 
-            // Fourth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` sections
+            // Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections
             else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
                 if let Some(name) = sec_name.get(GCC_EXCEPT_TABLE_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
@@ -1314,7 +1360,7 @@ impl CrateNamespace {
                 }
             }
 
-            // Fifth, if neither executable nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
+            // Fifth, if neither executable nor TLS nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
             else if sec_name == EH_FRAME_NAME {
                 // The eh_frame section is read-only, so we put it in the .rodata pages
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -2182,14 +2228,19 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             let addend = round_up_power_of_two(size, align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-            let write: bool = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let exec:  bool = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
             // trace!("  Looking at sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
-            if exec {
+            if is_exec {
                 // this includes only .text sections
                 text_max_offset = core::cmp::max(text_max_offset, (sec.offset() as usize) + addend);
             }
-            else if write {
+            else if is_tls {
+                // TLS sections are included as part of read-only pages
+                ro_bytes += addend;
+            }
+            else if is_write {
                 // this includes both .bss and .data sections
                 rw_bytes += addend;
             }
@@ -2280,5 +2331,36 @@ pub fn find_symbol_table<'e>(elf_file: &'e ElfFile)
         _ => {
             Err("no symbol table found. Was file stripped?")
         }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+struct TlsInitializer {
+    data: Vec<u8>,
+    needs_generating: bool,
+    offsets_of_sections: BTreeMap<usize, (WeakSectionRef, u8)>,
+    next_free_offset: usize,
+}
+impl TlsInitializer {
+    fn empty() -> TlsInitializer {
+        TlsInitializer {
+            data: Vec::new(),
+            needs_generating: false,
+            offsets_of_sections: BTreeMap::new(),
+            next_free_offset: 0,
+        }
+    }
+
+    fn add_new_tls_section(&mut self, section: StrongSectionRef) -> (VirtualAddress, usize) {
+        todo!("add_new_tls_section")
+    }
+
+    fn get_data(&mut self) -> &[u8] {
+        if self.needs_generating {
+            todo!("generate TLS initializer data");
+        }
+
+        &self.data
     }
 }
