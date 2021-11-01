@@ -1,16 +1,17 @@
 #![no_std]
 
 #[macro_use] extern crate cfg_if;
+#[macro_use] extern crate log;
 extern crate memory; // the virtual memory subsystem 
 extern crate stack;
 extern crate spawn;
+extern crate scheduler;
 
 cfg_if!{
 
 if #[cfg(target_arch="x86_64")] {
 
 extern crate alloc;
-#[macro_use] extern crate log;
 
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
@@ -25,7 +26,6 @@ extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
-extern crate scheduler;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate first_application;
 extern crate exceptions_full;
@@ -39,7 +39,10 @@ pub use x86_64::*;
 
 } else if #[cfg(target_arch="arm")] {
 
-extern crate interrupts;
+#[macro_use] extern crate lazy_static;
+extern crate alloc;
+extern crate cortex_m;
+extern crate memory_structs;
 
 mod armv7em;
 pub use armv7em::*;

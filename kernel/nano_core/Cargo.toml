@@ -79,6 +79,9 @@ path = "../scheduler"
 [target.'cfg(target_arch = "arm")'.dependencies.spawn]
 path = "../spawn"
 
+[target.'cfg(target_arch = "arm")'.dependencies.interrupts]
+path = "../interrupts"
+
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
 # that we can jump to from the bootloader.

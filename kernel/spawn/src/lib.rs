@@ -29,6 +29,8 @@ pub use arch_x86_64::*;
 
 } else if #[cfg(target_arch="arm")] {
 
+extern crate interrupts;
+
 mod arch_armv7em;
 pub use arch_armv7em::*;
 

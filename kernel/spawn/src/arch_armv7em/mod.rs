@@ -21,6 +21,7 @@ use alloc::{
 use irq_safety::{hold_interrupts, enable_interrupts};
 use stack::Stack;
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST};
+use interrupts;
 
 const APIC_ID: u8 = 0;
 
@@ -268,23 +269,18 @@ struct TaskFuncArg<F, A, R> {
 /// It also sets the given `new_task`'s `saved_sp` (its saved stack pointer, which holds the Context for task switching).
 /// 
 fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !) -> Result<(), &'static str> {
-    
-    /// A private macro that actually creates the Context and sets it up in the `new_task`.
-    /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
-    /// which is useful for both the simd_personality config and regular/SSE configs.
-    macro_rules! set_context {
-        ($ContextType:ty) => (
-            // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages. 
-            // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
-            let mp_offset = new_task.kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
-            let new_context_destination: &mut $ContextType = new_task.kstack.as_type_mut(mp_offset)?;
-            *new_context_destination = <$ContextType>::new(entry_point_function as usize);
-            new_task.saved_sp = new_context_destination as *const _ as usize; 
-        );
-    }
 
-    // The context_switch crate exposes the proper TARGET-specific `Context` type here.
-    set_context!(context_switch::Context);
+    // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages. 
+    // We subtract "size of usize" bytes to ensure the new Context struct doesn't spill over past the top of the stack.
+    let ef_offset = new_task.kstack.size_in_bytes()
+                    - mem::size_of::<usize>()
+                    - mem::size_of::<interrupts::ExceptionFrame>();
+    let ctx_offset = ef_offset - mem::size_of::<context_switch::Context>();
+    let new_exception_frame_destination: &mut interrupts::ExceptionFrame = new_task.kstack.as_type_mut(ef_offset)?;
+    *new_exception_frame_destination = <interrupts::ExceptionFrame>::new(entry_point_function as usize);
+    let new_context_destination: &mut context_switch::Context = new_task.kstack.as_type_mut(ctx_offset)?;
+    *new_context_destination = <context_switch::Context>::new(0xFFFF_FFF9 as usize);
+    new_task.saved_sp = new_context_destination as *const _ as usize;
 
     Ok(())
 }

@@ -2,7 +2,6 @@
 
 #[macro_use] extern crate cfg_if;
 extern crate alloc;
-// #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate task;
 extern crate runqueue;

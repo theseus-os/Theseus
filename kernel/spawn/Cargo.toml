@@ -63,5 +63,8 @@ path = "../fault_crate_swap"
 [target.'cfg(target_arch = "x86_64")'.dependencies.fault_log]
 path = "../fault_log"
 
+[target.'cfg(target_arch = "arm")'.dependencies.interrupts]
+path = "../interrupts"
+
 [lib]
 crate-type = ["rlib"]

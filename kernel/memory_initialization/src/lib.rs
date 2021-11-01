@@ -56,6 +56,8 @@ else if #[cfg(target_arch="arm")] {
 
 extern crate alloc;
 extern crate alloc_cortex_m;
+extern crate page_allocator;
+extern crate memory_structs;
 
 mod armv7em;
 

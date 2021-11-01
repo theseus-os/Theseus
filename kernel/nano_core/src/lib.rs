@@ -278,6 +278,7 @@ extern crate cortex_m;
 extern crate panic_halt;
 extern crate memory_initialization;
 extern crate captain;
+extern crate interrupts;
 
 mod boot;
 
@@ -286,22 +287,29 @@ use memfs::MemFile;
 
 
 extern "C" fn main() -> ! {
+    // Heap controls the address range
+    // from heap_start (inclusive) to heap_end (exclusive).
+    // The page allocator controls the rest of the RAM.
+    // It works for now but need a re-design.
     let heap_start = boot::heap_start();
-    memory_initialization::init_memory_management(heap_start, kernel_config::memory::KERNEL_HEAP_INITIAL_SIZE + heap_start);
+    let heap_end = 0x2001_0000usize;
+    assert!(heap_end >= heap_start);
+    memory_initialization::init_memory_management(heap_start, heap_end);
+
     logger::init().unwrap();
+    info!("logger initialized");
 
-    info!("memory and logging initialized");
-
+    // Test the heap.
     let heap_hello = String::from("hello world!");
+    info!("heap: {}", &heap_hello);
 
+    // Test the page allocator with memfile.
     let file = MemFile::new("filename".into(), root::get_root()).unwrap();
     file.lock().write("hello world!".as_bytes(), 0).unwrap();
 
     let mut buf = [0u8; 20];
     let len = file.lock().read(&mut buf, 0).unwrap();
     let memfile_hello = core::str::from_utf8(&buf[0..len]).unwrap();
-
-    info!("heap: {}", &heap_hello);
     info!("memfile: {}", &memfile_hello);
 
     captain::init()
