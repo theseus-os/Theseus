@@ -18,10 +18,16 @@ In general, the interfaces exposed by the task management subsystem in Theseus f
 In this way, tasks in Theseus are effectively a combination of the concept of language-level green threads and OS-level native threads.
 
 
-## The Task struct
+## The `Task` struct
 
-Task management in Theseus is centered around the [`Task`] struct, which represents an *execution context*. 
-The execution context within the Task struct includes several key items:
+There is one instance of the `Task` struct for each task that currently exists in the system.
+A task is often thought of as an *execution context*, and the task struct includes key information about the execution of a given program's code.
+Compare to that of other OSes, the [`Task`] struct in Theseus is quite minimal in size and scope,
+because our state management philosophy strives to keep only states relevant to a given subsystem in that subsystem. 
+For example, scheduler-related states are not present in Theseus's task struct; rather, they are found in the relevant scheduler crate in which they are used.
+In other words, Theseus's task struct is not monolithic and all-encompassing.
+
+Theseus's task struct includes several key items:
 * The actual [`Context`] of the task's on-CPU execution.
     * This holds the values of CPU registers (e.g., the stack pointer and other registers) that are saved and restored when context switching between this task and others.
 * The name and unique ID of that task.
@@ -49,7 +55,7 @@ Note that certain mutable states, primarily runstate information, have been move
 We are also careful to correctly specify the public visibility of state items within the `Task` and `TaskInner` structures to ensure that they cannot be modified maliciously or accidentally by other crates.
 
 
-### The TaskRef type
+### The `TaskRef` type
 
 Tasks frequently need to be shared across many entities and subsystems throughout Theseus. 
 To accommodate this, Theseus offers the [`TaskRef`] type, which is effectively a shared reference to a `Task`, i.e., an `Arc<Task>`. 
