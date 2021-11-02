@@ -13,8 +13,8 @@ The trait bounds on these three type parameters `<F, A, R>` are a key aspect of 
 
 Rust already ensures this for multiple concurrent userspace threads, as long as they were created using its standard library thread type.
 Instead of using the standard library, Theseus provides its own task abstraction, overcoming the standard library’s need 
-to extralingually accommodate unsafe, platform-specific thread interfaces, e.g. fork(). 
-Theseus does not offer fork because it is known to be unsafe and unsuitable for SAS systems [7], 
+to extralingually accommodate unsafe, platform-specific thread interfaces, e.g. `fork()`. 
+Theseus does not offer fork because it is known to be unsafe and unsuitable for SAS systems[^2], 
 as it extralingually duplicates task context, states, and underlying memory regions without reflecting that aliasing at the language level.
 
 Theseus’s task abstraction preserves safety similarly to and as an extension of Rust threads. 
@@ -59,3 +59,7 @@ to outlive that task itself.
 This avoids the unsavory solution of littering lifetime constraints across all program variables, allowing Rust code to be written normally with the standard assumption that the
 stack, heap, data, and text sections will always exist.
 
+[^2]: Andrew Baumann, Jonathan Appavoo, Orran Krieger,
+and Timothy Roscoe. *"A fork() in the road"*. In Proceedings of HotOS, 2019.
+
+[spawn]: https://theseus-os.github.io/Theseus/doc/spawn/index.html
