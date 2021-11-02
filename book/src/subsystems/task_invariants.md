@@ -63,3 +63,5 @@ stack, heap, data, and text sections will always exist.
 and Timothy Roscoe. *"A fork() in the road"*. In Proceedings of HotOS, 2019.
 
 [spawn]: https://theseus-os.github.io/Theseus/doc/spawn/index.html
+
+<!-- cspell:ignore Baumann, Appavoo, Orran, Krieger  -->
