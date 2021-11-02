@@ -45,7 +45,7 @@ which is crucial for realizing restartable tasks because the failure handler for
 ## Invariant 3: All memory transitively reachable from a task’s entry function must outlive that task.
 Although all memory regions in Theseus are represented by `MappedPages`, which prevents use-after-free via lifetime invariants,
 it is difficult to use Rust lifetimes to sufficiently express the relationship between a task and arbitrary memory regions it accesses.
-The Rust language does not and cannot specify a task-based lifetime, e.g., `&'task`, to indicate that the lifeimte of a given reference is tied to the lifetime of the current task.
+The Rust language does not and cannot specify a task-based lifetime, e.g., `&'task`, to indicate that the lifetime of a given reference is tied to the lifetime of the current task.
 
 Furthermore, a Rust program running as a task cannot specify in its code that its variables bound to objects in memory are tied to the lifetime of an underlying `MappedPages` instance, as they are hidden beneath abstractions like stacks, heaps, or static program sections (.text, .rodata, etc).
 Even if possible, this would be highly unergonomic, inconvenient, and render ownership useless.

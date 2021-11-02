@@ -207,3 +207,6 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [`task_cleanup_success()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L547
 [`task_cleanup_failure()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L587
 [`task_cleanup_final()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L631
+
+
+<!-- cspell:ignore runnability, TASKLIST, newtype, lapic  -->
