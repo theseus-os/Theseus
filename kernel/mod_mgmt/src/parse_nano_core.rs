@@ -99,8 +99,8 @@ pub fn parse_nano_core(
     // We don't need to actually load the nano_core as a new crate, since we're already running it.
     // We just need to parse it to discover the symbols. 
     let parse_result = match nano_core_file_path.extension() {
-        Some("sym") => parse_nano_core_symbol_file(&nano_core_crate_ref, &text_pages, &rodata_pages, &data_pages),
-        Some("bin") => parse_nano_core_binary(&nano_core_crate_ref, &text_pages, &rodata_pages, &data_pages),
+        Some("sym") => parse_nano_core_symbol_file(real_namespace, &nano_core_crate_ref, &text_pages, &rodata_pages, &data_pages),
+        Some("bin") => parse_nano_core_binary(real_namespace, &nano_core_crate_ref, &text_pages, &rodata_pages, &data_pages),
         _ => Err("nano_core object file had unexpected file extension. Expected \".bin\" or \".sym\""),
     };
     let parsed_crate_items = try_mp!(parse_result, text_pages, rodata_pages, data_pages);
@@ -126,6 +126,8 @@ pub fn parse_nano_core(
     // Add the newly-parsed nano_core crate to the kernel namespace.
     real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
     info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
+    trace!("TlsInitializer after parse_nano_core(): {:?}", &*real_namespace.tls_initializer.lock());
+    trace!("TlsInitializer data after parse_nano_core(): {:?}", real_namespace.tls_initializer.lock().get_data());
     Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }
 
@@ -135,6 +137,7 @@ pub fn parse_nano_core(
 /// Basically, just searches the section list for offsets, size, and flag data,
 /// and parses the symbol table to populate the list of sections.
 fn parse_nano_core_symbol_file(
+    namespace:     &Arc<CrateNamespace>,
     new_crate_ref: &StrongCrateRef,
     text_pages:    &Arc<Mutex<MappedPages>>,
     rodata_pages:  &Arc<Mutex<MappedPages>>,
@@ -365,6 +368,7 @@ fn parse_nano_core_symbol_file(
             // debug!("parse_nano_core_symbol_file(): name: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", name, sec_vaddr, sec_size, sec_ndx);
 
             add_new_section(
+                namespace,
                 &shndxs, 
                 &mut crate_items, 
                 text_pages, 
@@ -397,6 +401,7 @@ fn parse_nano_core_symbol_file(
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
 fn parse_nano_core_binary(
+    namespace:     &Arc<CrateNamespace>,
     new_crate_ref: &StrongCrateRef,
     text_pages:    &Arc<Mutex<MappedPages>>,
     rodata_pages:  &Arc<Mutex<MappedPages>>,
@@ -558,6 +563,7 @@ fn parse_nano_core_binary(
                     // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_value, sec_size);
 
                     add_new_section(
+                        namespace,
                         &shndxs, 
                         &mut crate_items, 
                         text_pages, 
@@ -621,6 +627,7 @@ struct MainShndx {
 /// of actually creating and adding a new LoadedSection instance
 /// after it has been parsed. 
 fn add_new_section(
+    namespace:           &Arc<CrateNamespace>,
     shndxs:              &MainShndx,
     crate_items:         &mut ParsedCrateItems,
     text_pages:          &Arc<Mutex<MappedPages>>,
@@ -641,7 +648,7 @@ fn add_new_section(
     let new_section = if sec_ndx == shndxs.text_shndx {
         let sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or("new text section had invalid virtual address")?;
-        Some(LoadedSection::new(
+        Some(Arc::new(LoadedSection::new(
             SectionType::Text,
             sec_name,
             Arc::clone(&text_pages),
@@ -650,12 +657,12 @@ fn add_new_section(
             sec_size,
             global,
             new_crate_weak_ref.clone(), 
-        ))
+        )))
     }
     else if sec_ndx == shndxs.rodata_shndx {
         let sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or("new rodata section had invalid virtual address")?;
-        Some(LoadedSection::new(
+        Some(Arc::new(LoadedSection::new(
             SectionType::Rodata,
             sec_name,
             Arc::clone(&rodata_pages),
@@ -664,12 +671,12 @@ fn add_new_section(
             sec_size,
             global,
             new_crate_weak_ref.clone(),
-        ))
+        )))
     }
     else if sec_ndx == shndxs.data_shndx {
         let sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or("new data section had invalid virtual address")?;
-        Some(LoadedSection::new(
+        Some(Arc::new(LoadedSection::new(
             SectionType::Data,
             sec_name,
             Arc::clone(&data_pages),
@@ -678,12 +685,12 @@ fn add_new_section(
             sec_size,
             global,
             new_crate_weak_ref.clone(),
-        ))
+        )))
     }
     else if sec_ndx == shndxs.bss_shndx {
         let sec_vaddr = VirtualAddress::new(sec_vaddr)
             .ok_or("new bss section had invalid virtual address")?;
-        Some(LoadedSection::new(
+        Some(Arc::new(LoadedSection::new(
             SectionType::Bss,
             sec_name,
             Arc::clone(&data_pages),
@@ -692,14 +699,14 @@ fn add_new_section(
             sec_size,
             global,
             new_crate_weak_ref.clone(),
-        ))
+        )))
     }
     else if shndxs.tls_data_shndx.map_or(false, |(shndx, _)| sec_ndx == shndx) {
         // TLS sections encode their TLS offset in the virtual address field,
         // so we can use that to calculate the real virtual address where it's loaded.
         let tls_offset = sec_vaddr;
         let tls_sec_vaddr = shndxs.tls_data_shndx.unwrap().1 + tls_offset; 
-        Some(LoadedSection::new(
+        let tls_section = Arc::new(LoadedSection::new(
             SectionType::Tls,
             sec_name,
             Arc::clone(&rodata_pages),
@@ -709,7 +716,10 @@ fn add_new_section(
             sec_size,
             global,
             new_crate_weak_ref.clone(),
-        ))
+        ));
+        // Add this new TLS section to this namespace's TLS area image.
+        namespace.tls_initializer.lock().add_existing_tls_section(tls_offset, Arc::clone(&tls_section)).unwrap();
+        Some(tls_section)
     }
     else if shndxs.tls_bss_shndx.map_or(false, |(shndx, _)| sec_ndx == shndx) {
         todo!("parse_nano_core(): found unsupported TLS .bss section");
@@ -721,17 +731,13 @@ fn add_new_section(
 
     if let Some(sec) = new_section {
         // debug!("parse_nano_core: new section: {:?}", sec);
-        let sec_ref = Arc::new(sec);
-        if sec_ref.global {
+        if sec.global {
             crate_items.global_sections.insert(*section_counter);
         }
-        if sec_ref.typ.is_data_or_bss() {
+        if sec.typ.is_data_or_bss() {
             crate_items.data_sections.insert(*section_counter);
         }
-        if sec_ref.typ == SectionType::Tls {
-            crate_items.data_sections.insert(*section_counter);
-        }
-        crate_items.sections.insert(*section_counter, sec_ref);
+        crate_items.sections.insert(*section_counter, sec);
         *section_counter += 1;
     }
 

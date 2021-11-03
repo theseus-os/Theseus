@@ -11,6 +11,7 @@ xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.gi
 rustc-demangle = "0.1.19"
 qp-trie = "0.7.3"
 cstr_core = "0.2.3"
+rangemap = "0.1.13"
 
 
 [dependencies.util]

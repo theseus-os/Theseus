@@ -654,6 +654,9 @@ pub struct LoadedSection {
     /// This can be used to calculate size, but is primarily a performance optimization
     /// so we can avoid locking this section's `MappedPages` and avoid recalculating 
     /// its bounds based on its offset and size. 
+    /// 
+    /// For TLS sections, this `address_range.start` holds the offset (from the TLS base)
+    /// into the TLS area where this section's data exists.
     pub address_range: Range<VirtualAddress>, 
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,

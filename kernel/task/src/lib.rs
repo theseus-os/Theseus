@@ -257,6 +257,8 @@ pub struct TaskInner {
     /// The `TaskLocalData` refers back to this `Task` struct, thus it must be initialized later
     /// after the task has been fully created, which currently occurs in `TaskRef::new()`.
     task_local_data: Option<Box<TaskLocalData>>,
+    /// The Thread-Local Storage (TLS) area for this task.
+    // tls_area: Box<[u8]>,
     /// Data that should be dropped after a task switch; for example, the previous Task's [`TaskLocalData`].
     drop_after_task_switch: Option<Box<dyn Any + Send>>,
     /// The kernel stack, which all `Task`s must have in order to execute.

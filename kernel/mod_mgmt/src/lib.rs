@@ -21,12 +21,10 @@ extern crate path;
 extern crate memfs;
 extern crate cstr_core;
 extern crate hashbrown;
+extern crate rangemap;
 
-use core::{
-    fmt,
-    ops::{Deref, Range},
-};
-use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
+use core::{fmt, ops::{Deref, Range}};
+use alloc::{collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
@@ -40,6 +38,7 @@ use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
 use hashbrown::HashMap;
+use rangemap::RangeMap;
 pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
 pub use crate_metadata::*;
 
@@ -387,7 +386,7 @@ pub struct CrateNamespace {
     /// that is spawned and runs within this `CrateNamespace`.
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
-    tls_initializer: TlsInitializer,
+    tls_initializer: Mutex<TlsInitializer>,
 
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
     /// For example, if `true`, the symbol `my_crate::foo::h123` will be used to satisfy a dependency 
@@ -414,7 +413,7 @@ impl CrateNamespace {
             name,
             dir,
             recursive_namespace,
-            tls_initializer: TlsInitializer::empty(),
+            tls_initializer: Mutex::new(TlsInitializer::empty()),
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: false,
@@ -834,7 +833,7 @@ impl CrateNamespace {
         CrateNamespace {
             name: self.name.clone(),
             dir: self.dir.clone(),
-            tls_initializer: self.tls_initializer.clone(),
+            tls_initializer: Mutex::new(self.tls_initializer.lock().clone()),
             recursive_namespace: self.recursive_namespace.clone(),
             crate_tree: Mutex::new(self.crate_tree.lock().clone()),
             symbol_map: Mutex::new(self.symbol_map.lock().clone()),
@@ -1112,10 +1111,10 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
-
             let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
             let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
             let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
+
 
             // First, check for executable sections, which can only be .text sections.
             if is_exec && !is_write {
@@ -1185,8 +1184,8 @@ impl CrateNamespace {
                             return Err("couldn't get section data in TLS section");
                         }
                     }
-                    
-                    let new_tls_section = Arc::new(LoadedSection::new(
+
+                    let new_tls_section = LoadedSection::new(
                         SectionType::Tls,
                         demangled,
                         Arc::clone(rp_ref),
@@ -1195,8 +1194,17 @@ impl CrateNamespace {
                         sec_size,
                         global_sections.contains(&shndx),
                         new_crate_weak_ref.clone(),
-                    ));
+                    );
                     trace!("New TLS section: {:?}", new_tls_section);
+                    
+                    // Add the new TLS section to this namespace's initial TLS area,
+                    // which will reserve/obtain a new offset into that TLS area which holds this section's data.
+                    // This will also update the section's virtual address field to hold that offset value,
+                    // which is used for relocation entries that ask for a section's offset from the TLS base.
+                    let (_tls_offset, new_tls_section) = self.tls_initializer.lock().add_new_tls_section(new_tls_section)
+                        .map_err(|_| "Failed to add new TLS section")?;
+
+                    trace!("\t Updated new TLS section: {:?}", new_tls_section);
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
 
@@ -2335,32 +2343,139 @@ pub fn find_symbol_table<'e>(elf_file: &'e ElfFile)
 }
 
 
+/// A Thread-Local Storage (TLS) area data "image" that is used
+/// to initialize a new `Task`'s TLS area.
 #[derive(Debug, Clone)]
-struct TlsInitializer {
-    data: Vec<u8>,
-    needs_generating: bool,
-    offsets_of_sections: BTreeMap<usize, (WeakSectionRef, u8)>,
-    next_free_offset: usize,
-}
+pub(crate) struct TlsInitializer {
+    data_cache: Vec<u8>,
+    cache_status: CacheStatus,
+    offsets_of_sections: RangeMap<usize, StrongSectionRefWrapper>,
+} 
+
 impl TlsInitializer {
     fn empty() -> TlsInitializer {
         TlsInitializer {
-            data: Vec::new(),
-            needs_generating: false,
-            offsets_of_sections: BTreeMap::new(),
-            next_free_offset: 0,
+            // The data image will be generated lazily on the next request to use it.
+            data_cache: Vec::new(),
+            cache_status: CacheStatus::Invalidated,
+            offsets_of_sections: RangeMap::new(),
         }
     }
 
-    fn add_new_tls_section(&mut self, section: StrongSectionRef) -> (VirtualAddress, usize) {
-        todo!("add_new_tls_section")
-    }
-
-    fn get_data(&mut self) -> &[u8] {
-        if self.needs_generating {
-            todo!("generate TLS initializer data");
+    /// Add a TLS section that has pre-determined offset, e.g.,
+    /// one that was specified in the statically-linked nano_core kernel image.
+    pub(crate) fn add_existing_tls_section(
+        &mut self,
+        offset: usize,
+        tls_section: StrongSectionRef,
+    ) -> Result<(), ()> {
+        let range = offset .. (offset + tls_section.size());
+        if self.offsets_of_sections.contains_key(&range.start) || 
+            self.offsets_of_sections.contains_key(&(range.end - 1))
+        {
+            return Err(());
         }
 
-        &self.data
+        self.offsets_of_sections.insert(range, StrongSectionRefWrapper(tls_section));
+        self.cache_status = CacheStatus::Invalidated;
+        Ok(())
     }
+
+    /// Inserts the given `section` into this TLS area at the next index
+    /// (i.e., offset into the TLS area) where the section will fit.
+    /// 
+    /// This also modifies the virtual address field of the given `section`
+    /// to hold the value of that offset, which is necessary for relocation entries
+    /// that depend on this section.
+    /// 
+    /// Returns a tuple of:
+    /// 1. The index at which the new section was inserted, 
+    ///    which is the offset from the beginning of the TLS area where the section data starts.
+    /// 2. The modified section as a `StrongSectionRef`.
+    /// 
+    /// Returns an empty error if there is no remaining space that can fit the section.
+    pub(crate) fn add_new_tls_section(
+        &mut self,
+        mut section: LoadedSection,
+    ) -> Result<(usize, StrongSectionRef), ()> {
+        let sec_size = section.size();
+        let mut start_index = None;
+        // Find the next "gap" big enough to fit the new tls_section.
+        let unbounded_range = usize::MIN .. usize::MAX;
+        for gap in self.offsets_of_sections.gaps(&unbounded_range) {
+            if sec_size <= gap.len() {
+                start_index = Some(gap.start);
+                break;
+            }
+        }
+
+        if let Some(start) = start_index {
+            section.address_range = 
+                VirtualAddress::new_canonical(start) .. VirtualAddress::new_canonical(start + sec_size);
+            let section_ref = Arc::new(section);
+            self.offsets_of_sections.insert(
+                start .. (start + sec_size),
+                StrongSectionRefWrapper(Arc::clone(&section_ref)),
+            );
+            // Now that we've added a new section, the cached data is invalid.
+            self.cache_status = CacheStatus::Invalidated;
+            Ok((start, section_ref))
+        } else {
+            Err(())
+        }
+    }
+
+    /// Gets a reference to the TLS data image,
+    /// auto-generating it if needed.
+    pub(crate) fn get_data(&mut self) -> &[u8] {
+        if self.cache_status == CacheStatus::Fresh {
+            return &self.data_cache;
+        }
+
+        let mut new_data: Vec<u8> = Vec::new();
+        let mut end_of_previous_range: usize = 0;
+        for (range, sec) in self.offsets_of_sections.iter() {
+            // Insert padding into the data vec to ensure the section data is inserted at the correct index.
+            for _i in 0 .. end_of_previous_range.saturating_sub(range.start) {
+                new_data.push(0);
+            }
+            // Insert the section data into the new data vec.
+            let sec_mp = sec.mapped_pages.lock();
+            let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
+            new_data.extend_from_slice(sec_data);
+            assert_eq!(range.len(), sec.size());
+            end_of_previous_range = range.end;
+        }
+
+        self.data_cache = new_data;
+        self.cache_status = CacheStatus::Fresh;
+        &self.data_cache
+    }
+}
+
+
+/// A wrapper around a `StrongSectionRef` that implements `PartialEq` and `Eq` 
+/// so we can use it in a `RangeMap`.
+#[derive(Debug, Clone)]
+struct StrongSectionRefWrapper(StrongSectionRef);
+impl Deref for StrongSectionRefWrapper {
+    type Target = StrongSectionRef;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl PartialEq for StrongSectionRefWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for StrongSectionRefWrapper { }
+
+/// The status of a cached TLS area data image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CacheStatus {
+    /// The cached data image is up to date and can be used immediately.
+    Fresh,
+    /// The cached data image is out of date and needs to be regenerated.
+    Invalidated,
 }
