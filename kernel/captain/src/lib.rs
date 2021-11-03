@@ -43,6 +43,8 @@ pub use x86_64::*;
 extern crate alloc;
 extern crate cortex_m;
 extern crate memory_structs;
+extern crate task;
+extern crate interrupts;
 
 mod armv7em;
 pub use armv7em::*;

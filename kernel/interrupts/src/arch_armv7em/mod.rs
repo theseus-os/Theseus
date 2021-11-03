@@ -1,6 +1,7 @@
 use core::fmt;
 use scheduler;
 use zerocopy::FromBytes;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// Registers stacked (pushed into the stack) during an exception
 #[derive(Clone, Copy, FromBytes)]
@@ -67,8 +68,23 @@ impl fmt::Debug for ExceptionFrame {
     }
 }
 
+/// This variable will track the number of ticks elapsed on the system to keep track of time
+static SYSTICK_TICKS : AtomicUsize = AtomicUsize::new(0);
+
+/// Returns the current time in ticks
+pub fn get_current_time_in_ticks() -> usize {
+    SYSTICK_TICKS.load(Ordering::SeqCst)
+}
+
 #[export_name = "SysTick"]
 pub unsafe extern "C" fn systick_handler() {
+    let ticks = SYSTICK_TICKS.fetch_add(1, Ordering::SeqCst) + 1;
+
+    // remove all tasks that have been delayed but are able to be unblocked now
+    while(ticks > scheduler::NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst)) {
+        scheduler::remove_next_task_from_delayed_tasklist();
+    }
+
     scheduler::schedule();
 }
 

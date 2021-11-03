@@ -60,6 +60,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
+name = "ahash"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
+dependencies = [
+ "getrandom",
+ "once_cell",
+ "version_check",
+]
+
+[[package]]
 name = "aligned"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -278,7 +289,7 @@ dependencies = [
 name = "block_cache"
 version = "0.1.0"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.9.1",
  "lazy_static",
  "log",
  "storage_device",
@@ -556,7 +567,7 @@ dependencies = [
  "cow_arc",
  "fs_node",
  "goblin",
- "hashbrown",
+ "hashbrown 0.9.1",
  "log",
  "memory",
  "spin 0.9.0",
@@ -578,7 +589,7 @@ version = "0.1.0"
 dependencies = [
  "by_address",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "lazy_static",
  "log",
@@ -622,7 +633,7 @@ dependencies = [
  "fs_node",
  "gimli",
  "goblin",
- "hashbrown",
+ "hashbrown 0.9.1",
  "log",
  "memory",
  "mod_mgmt",
@@ -980,7 +991,7 @@ version = "0.1.0"
 dependencies = [
  "compositor",
  "framebuffer",
- "hashbrown",
+ "hashbrown 0.9.1",
  "lazy_static",
  "shapes",
  "spin 0.9.0",
@@ -1065,6 +1076,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "getrandom"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
+dependencies = [
+ "cfg-if 1.0.0",
+ "libc",
+ "wasi",
+]
+
+[[package]]
 name = "gimli"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1092,7 +1114,16 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 dependencies = [
- "ahash",
+ "ahash 0.4.7",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
+dependencies = [
+ "ahash 0.7.6",
 ]
 
 [[package]]
@@ -1169,6 +1200,16 @@ dependencies = [
  "bare-io",
  "log",
  "stdio",
+]
+
+[[package]]
+name = "indexmap"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
+dependencies = [
+ "autocfg",
+ "hashbrown 0.11.2",
 ]
 
 [[package]]
@@ -1282,7 +1323,7 @@ dependencies = [
  "acpi",
  "apic",
  "bit_field 0.7.0",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "intel_ethernet",
  "interrupts",
@@ -1433,7 +1474,7 @@ dependencies = [
  "apic",
  "atomic",
  "bit_field 0.10.0",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "libm",
  "log",
@@ -1712,7 +1753,7 @@ dependencies = [
  "crate_name_utils",
  "cstr_core",
  "fs_node",
- "hashbrown",
+ "hashbrown 0.9.1",
  "kernel_config",
  "log",
  "memfs",
@@ -1794,7 +1835,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cfg-if 0.1.10",
- "hashbrown",
+ "hashbrown 0.9.1",
  "heap",
  "intrusive-collections",
  "irq_safety",
@@ -1975,6 +2016,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "once_cell"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
+
+[[package]]
 name = "opaque-debug"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2128,7 +2175,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "getopts",
- "hashbrown",
+ "hashbrown 0.9.1",
  "hpet",
  "log",
  "network_manager",
@@ -2213,6 +2260,16 @@ name = "print_fault_log"
 version = "0.1.0"
 dependencies = [
  "fault_log",
+]
+
+[[package]]
+name = "priority-queue"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf40e51ccefb72d42720609e1d3c518de8b5800d723a09358d4a6d6245e1f8ca"
+dependencies = [
+ "autocfg",
+ "indexmap",
 ]
 
 [[package]]
@@ -2500,7 +2557,10 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cfg-if 1.0.0",
+ "hashbrown 0.11.2",
  "irq_safety",
+ "lazy_static",
+ "priority-queue",
  "runqueue",
  "scheduler_priority",
  "scheduler_round_robin",
@@ -3261,6 +3321,12 @@ dependencies = [
  "scheduler",
  "task",
 ]
+
+[[package]]
+name = "wasi"
+version = "0.10.2+wasi-snapshot-preview1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
 
 [[package]]
 name = "window"

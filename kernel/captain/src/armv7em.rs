@@ -1,4 +1,5 @@
 use core::cell::RefCell;
+use core::sync::atomic::AtomicUsize;
 use cortex_m::interrupt::Mutex as ExcpCell;
 use cortex_m::{self, interrupt, peripheral::syst::SystClkSource, Peripherals};
 use memory::{allocate_pages_by_bytes_at, get_kernel_mmi_ref, EntryFlags};
@@ -46,6 +47,8 @@ pub fn init() -> ! {
     tb1.spawn().unwrap();
     let tb2 = new_task_builder(task_world, 466);
     tb2.spawn().unwrap();
+    let tb3 = new_task_builder(task_delay_ten_seconds, 1);
+    tb3.spawn().unwrap();
 
     interrupt::free(move |cs| {
         let mut p = PERIPHERALS.borrow(cs).borrow_mut();
@@ -92,5 +95,25 @@ fn task_world(arg: usize) {
             asm::nop();
         }
         info!("world! arg: {}", arg);
+    }
+}
+
+fn task_delay_ten_seconds(arg: usize) {
+    let start_time : AtomicUsize = AtomicUsize::new(interrupts::get_current_time_in_ticks());
+    loop {
+        info!("I run every ten seconds!");
+
+        // Since we trigger a Tick every 10ms, 10 seconds will be 1000 ticks
+        scheduler::delay_task_until(&start_time, 1000);
+    }
+}
+
+fn task_delay_two_seconds(arg: usize) {
+    let start_time : AtomicUsize = AtomicUsize::new(interrupts::get_current_time_in_ticks());
+    loop {
+        info!("I run every two seconds!");
+
+        // Since we trigger a Tick every 10ms, 2 seconds will be 200 ticks
+        scheduler::delay_task_until(&start_time, 200);
     }
 }
