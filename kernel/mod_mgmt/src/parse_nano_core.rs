@@ -126,8 +126,8 @@ pub fn parse_nano_core(
     // Add the newly-parsed nano_core crate to the kernel namespace.
     real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
     info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
-    trace!("TlsInitializer after parse_nano_core(): {:?}", &*real_namespace.tls_initializer.lock());
-    trace!("TlsInitializer data after parse_nano_core(): {:?}", real_namespace.tls_initializer.lock().get_data());
+    trace!("TlsInitializer after parse_nano_core(): {:#?}", &*real_namespace.tls_initializer.lock());
+    trace!("TlsInitializer data after parse_nano_core(): {:X?}", real_namespace.tls_initializer.lock().get_data());
     Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }
 
@@ -703,16 +703,20 @@ fn add_new_section(
     }
     else if shndxs.tls_data_shndx.map_or(false, |(shndx, _)| sec_ndx == shndx) {
         // TLS sections encode their TLS offset in the virtual address field,
-        // so we can use that to calculate the real virtual address where it's loaded.
+        // which is necessary to properly calculate relocation entries that depend upon them.
         let tls_offset = sec_vaddr;
-        let tls_sec_vaddr = shndxs.tls_data_shndx.unwrap().1 + tls_offset; 
+        // We do need to calculate the real virtual address so we can use that 
+        // to calculate the real mapped_pages_offset where its data exists.
+        // so we can use that to calculate the real virtual address where it's loaded.
+        let tls_sec_data_vaddr = shndxs.tls_data_shndx.unwrap().1 + tls_offset; 
+
         let tls_section = Arc::new(LoadedSection::new(
             SectionType::Tls,
             sec_name,
             Arc::clone(&rodata_pages),
             // TLS sections are lumped into the ".rodata" MappedPages with the read-only data sections.
-            rodata_pages_locked.offset_of_address(tls_sec_vaddr).ok_or("nano_core TLS .tdata section wasn't covered by the .rodata mapped pages!")?,
-            tls_sec_vaddr,
+            rodata_pages_locked.offset_of_address(tls_sec_data_vaddr).ok_or("nano_core TLS .tdata section wasn't covered by the .rodata mapped pages!")?,
+            VirtualAddress::new(tls_offset).ok_or("new TLS .tdata section had invalid virtual address (TLS offset)")?,
             sec_size,
             global,
             new_crate_weak_ref.clone(),

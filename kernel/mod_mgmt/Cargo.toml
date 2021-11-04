@@ -13,6 +13,9 @@ qp-trie = "0.7.3"
 cstr_core = "0.2.3"
 rangemap = "0.1.13"
 
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.util]
 path = "../../libs/util"

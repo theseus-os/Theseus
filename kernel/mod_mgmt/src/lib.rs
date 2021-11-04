@@ -3,6 +3,7 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
@@ -63,6 +64,24 @@ pub fn get_initial_kernel_namespace() -> Option<&'static Arc<CrateNamespace>> {
 /// Returns the top-level directory that contains all of the namespaces. 
 pub fn get_namespaces_directory() -> Option<DirRef> {
     root::get_root().lock().get_dir(NAMESPACES_DIRECTORY_NAME)
+}
+
+lazy_static! {
+    /// The thread-local storage (TLS) area "image" that is used as the initial data for each `Task`.
+    /// When spawning a new task, the new task will create its own local TLS area
+    /// with this `TlsInitializer` as the initial data values.
+    /// 
+    /// # Implementation Notes/Shortcomings
+    /// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.
+    /// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.
+    /// 
+    /// However, this is quite complex because each namespace must be aware of the TLS sections
+    /// in BOTH its underlying recursive namespace AND its (multiple) "parent" namespace(s)
+    /// that recursively depend on it, since no two TLS sections can conflict (have the same offset).
+    /// 
+    /// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense 
+    /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
+    static ref TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
 }
 
 
@@ -386,7 +405,9 @@ pub struct CrateNamespace {
     /// that is spawned and runs within this `CrateNamespace`.
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
-    tls_initializer: Mutex<TlsInitializer>,
+    /// 
+    /// NOTE: this is currently a global system-wide singleton. See the static `TLS_INITIALIZER` for more.
+    tls_initializer: &'static Mutex<TlsInitializer>,
 
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
     /// For example, if `true`, the symbol `my_crate::foo::h123` will be used to satisfy a dependency 
@@ -413,7 +434,7 @@ impl CrateNamespace {
             name,
             dir,
             recursive_namespace,
-            tls_initializer: Mutex::new(TlsInitializer::empty()),
+            tls_initializer: &TLS_INITIALIZER,
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: false,
@@ -760,6 +781,7 @@ impl CrateNamespace {
     ) -> Result<StrongCrateRef, &'static str> {
         let cf = crate_object_file.lock();
         let (new_crate_ref, elf_file) = self.load_crate_sections(cf.deref(), kernel_mmi_ref, verbose_log)?;
+        warn!("After load_crate_sections, TlsInitializer data: {:X?}", self.tls_initializer.lock().get_data());
         self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         Ok(new_crate_ref)
     }
@@ -833,7 +855,7 @@ impl CrateNamespace {
         CrateNamespace {
             name: self.name.clone(),
             dir: self.dir.clone(),
-            tls_initializer: Mutex::new(self.tls_initializer.lock().clone()),
+            tls_initializer: &TLS_INITIALIZER,
             recursive_namespace: self.recursive_namespace.clone(),
             crate_tree: Mutex::new(self.crate_tree.lock().clone()),
             symbol_map: Mutex::new(self.symbol_map.lock().clone()),
@@ -1111,9 +1133,9 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
-            let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
 
 
             // First, check for executable sections, which can only be .text sections.
@@ -1201,7 +1223,8 @@ impl CrateNamespace {
                     // which will reserve/obtain a new offset into that TLS area which holds this section's data.
                     // This will also update the section's virtual address field to hold that offset value,
                     // which is used for relocation entries that ask for a section's offset from the TLS base.
-                    let (_tls_offset, new_tls_section) = self.tls_initializer.lock().add_new_tls_section(new_tls_section)
+                    let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
+                        .add_new_tls_section(new_tls_section, sec_align)
                         .map_err(|_| "Failed to add new TLS section")?;
 
                     trace!("\t Updated new TLS section: {:?}", new_tls_section);
@@ -2397,14 +2420,17 @@ impl TlsInitializer {
     pub(crate) fn add_new_tls_section(
         &mut self,
         mut section: LoadedSection,
+        alignment: usize,
     ) -> Result<(usize, StrongSectionRef), ()> {
         let sec_size = section.size();
         let mut start_index = None;
         // Find the next "gap" big enough to fit the new tls_section.
         let unbounded_range = usize::MIN .. usize::MAX;
         for gap in self.offsets_of_sections.gaps(&unbounded_range) {
-            if sec_size <= gap.len() {
-                start_index = Some(gap.start);
+            let aligned_start = util::round_up(gap.start, alignment);
+            if aligned_start + sec_size <= gap.end {
+                warn!("aligned gap.start {} (align {}) up to {}", gap.start, alignment, aligned_start);
+                start_index = Some(aligned_start);
                 break;
             }
         }
@@ -2425,6 +2451,15 @@ impl TlsInitializer {
         }
     }
 
+    /// Invalidates the cached data image in this `TlsInitializer` area.
+    /// 
+    /// This is useful for when a TLS section's data has been modified,
+    /// e.g., while performing relocations, 
+    /// and thus the data image needs to be re-created by re-reading the section data.
+    pub fn invalidate(&mut self) {
+        self.cache_status = CacheStatus::Invalidated;
+    }
+
     /// Gets a reference to the TLS data image,
     /// auto-generating it if needed.
     pub(crate) fn get_data(&mut self) -> &[u8] {
@@ -2432,13 +2467,19 @@ impl TlsInitializer {
             return &self.data_cache;
         }
 
+        debug!("{:#X?}", self);
+
         let mut new_data: Vec<u8> = Vec::new();
         let mut end_of_previous_range: usize = 0;
         for (range, sec) in self.offsets_of_sections.iter() {
-            // Insert padding into the data vec to ensure the section data is inserted at the correct index.
-            for _i in 0 .. end_of_previous_range.saturating_sub(range.start) {
-                new_data.push(0);
+            // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
+            let num_padding_bytes = range.start.saturating_sub(end_of_previous_range);
+            warn!("Inserting {} padding bytes", num_padding_bytes);
+            for _i in 0..num_padding_bytes {
+                // surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.
+                new_data.push(0); 
             }
+
             // Insert the section data into the new data vec.
             let sec_mp = sec.mapped_pages.lock();
             let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
