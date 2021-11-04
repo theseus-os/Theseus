@@ -104,7 +104,7 @@ fn task_delay_ten_seconds(arg: usize) {
         info!("I run every ten seconds!");
 
         // Since we trigger a Tick every 10ms, 10 seconds will be 1000 ticks
-        scheduler::delay_task_until(&start_time, 1000);
+        scheduler::delay::delay_task_until(&start_time, 1000);
     }
 }
 
@@ -114,6 +114,6 @@ fn task_delay_two_seconds(arg: usize) {
         info!("I run every two seconds!");
 
         // Since we trigger a Tick every 10ms, 2 seconds will be 200 ticks
-        scheduler::delay_task_until(&start_time, 200);
+        scheduler::delay::delay_task_until(&start_time, 200);
     }
 }

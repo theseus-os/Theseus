@@ -81,8 +81,8 @@ pub unsafe extern "C" fn systick_handler() {
     let ticks = SYSTICK_TICKS.fetch_add(1, Ordering::SeqCst) + 1;
 
     // remove all tasks that have been delayed but are able to be unblocked now
-    while(ticks > scheduler::NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst)) {
-        scheduler::remove_next_task_from_delayed_tasklist();
+    while(ticks > scheduler::delay::NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst)) {
+        scheduler::delay::remove_next_task_from_delayed_tasklist();
     }
 
     scheduler::schedule();
