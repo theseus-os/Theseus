@@ -51,6 +51,7 @@ extern crate fs_node;
 extern crate xmas_elf;
 extern crate goblin;
 
+use core::convert::TryFrom;
 use core::fmt;
 use core::ops::Range;
 use spin::{Mutex, RwLock};
@@ -1016,6 +1017,13 @@ pub fn write_relocation(
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
+        }
+        R_X86_64_TPOFF32 => {
+            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = u32::try_from(source_sec_vaddr.value())
+                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`")?;
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            *target_ref = source_val;
         }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table

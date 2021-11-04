@@ -1506,6 +1506,8 @@ impl CrateNamespace {
                 error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
                 "target section was not loaded for Rela section"
             })?; 
+
+            let mut target_sec_data_was_modified = false;
             
             let mut target_sec_dependencies: Vec<StrongDependency> = Vec::new();
             #[cfg(internal_deps)]
@@ -1578,6 +1580,7 @@ impl CrateNamespace {
                         source_sec.start_address(),
                         verbose_log
                     )?;
+                    target_sec_data_was_modified = true;
 
                     if source_and_target_in_same_crate {
                         // We keep track of relocation information so that we can be aware of and faithfully reconstruct 
@@ -1603,6 +1606,14 @@ impl CrateNamespace {
                         target_sec_dependencies.push(strong_dep);          
                     }
                 }
+            }
+
+            // If the target section of the relocation was a TLS section, 
+            // that TLS section's initializer data has now changed.
+            // Thus, we need to invalidate the TLS initializer area's cached data.
+            if target_sec_data_was_modified && target_sec.typ == SectionType::Tls {
+                warn!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
+                self.tls_initializer.lock().invalidate();
             }
 
             // add the target section's dependencies and relocation details all at once
