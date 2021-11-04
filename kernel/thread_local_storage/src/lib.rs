@@ -27,7 +27,7 @@ pub static LOCAL_U8_1: u8 = 9;
 pub static LOCAL_U16: u16 = 7;
 
 #[thread_local]
-pub static LOCAL_USIZE: usize = 4;
+pub static LOCAL_USIZE: Cell<usize> = Cell::new(4);
 
 #[thread_local]
 pub static LOCAL_U8_2: u8 = 9;
@@ -36,17 +36,19 @@ pub static LOCAL_U8_2: u8 = 9;
 pub static MY_STRUCT: Cell<MyStruct> = Cell::new(MyStruct(0x12345678DEADBEEF));
 
 #[thread_local]
-pub static COMPLEX: Cell<Complex> = Cell::new(Complex::new());
+pub static COMPLEX: Complex = Complex::new();
+// pub static COMPLEX: Cell<Complex> = Cell::new(Complex::new());
 
+
+#[derive(Debug, Clone, Copy)]
+pub struct MyStruct(usize);
+// impl Drop for MyStruct {
+//     fn drop(&mut self) {
+//         warn!("DROPPING MyStruct({})", self.0);
+//     }
+// }
 
 #[derive(Debug)]
-pub struct MyStruct(usize);
-impl Drop for MyStruct {
-    fn drop(&mut self) {
-        warn!("DROPPING MyStruct({})", self.0);
-    }
-}
-
 pub struct Complex {
     pub s: &'static str,
     pub m: u8,
@@ -60,12 +62,30 @@ impl Complex {
     }
 }
 
-pub fn test_tls() {
-    debug!("Task {:?}: LOCAL_USIZE: {:?}", task::get_my_current_task(), &LOCAL_USIZE);
+pub fn test_tls(x: usize) {
+    debug!("Task {:?}", task::get_my_current_task());
+    let local_zero = LOCAL_ZERO + x as u16;
+    debug!("LOCAL_ZERO + x: {:?}", local_zero);
+
+    let local_u8_1 = LOCAL_U8_1 + x as u8;
+    debug!("LOCAL_U8_1 + x: {:?}", local_u8_1);
+
+    let local_u16 = LOCAL_U16 + x as u16;
+    debug!("LOCAL_U16 + x: {:?}", local_u16);
+
+    let local_usize = LOCAL_USIZE.get() + x;
+    debug!("LOCAL_USIZE + x: {:?}", local_usize);
+
+    let local_u8_2 = LOCAL_U8_2 + x as u8;
+    debug!("LOCAL_U8_2 + x: {:?}", local_u8_2);
+
+    debug!("COMPLEX: {:?}", COMPLEX);
+
+    debug!("MY_STRUCT: {:?}", MY_STRUCT);
     debug!("Task {:?}: MY_STRUCT: {:?}", task::get_my_current_task(), MY_STRUCT.replace(MyStruct(0x99999999)));
 }
 
 pub fn main(_args: Vec<String>) -> isize {
-    test_tls();
+    test_tls(5);
     0
 }

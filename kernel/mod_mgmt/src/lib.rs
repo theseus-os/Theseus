@@ -25,7 +25,7 @@ extern crate hashbrown;
 extern crate rangemap;
 
 use core::{fmt, ops::{Deref, Range}};
-use alloc::{collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
+use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
@@ -455,6 +455,12 @@ impl CrateNamespace {
     /// if one exists.
     pub fn recursive_namespace(&self) -> Option<&Arc<CrateNamespace>> {
         self.recursive_namespace.as_ref()
+    }
+
+    /// Returns a new copy of this namespace's initial TLS area,
+    /// which can be used as the initial TLS area data for a new task.
+    pub fn get_tls_initializer_data(&self) -> Box<[u8]> {
+        self.tls_initializer.lock().get_data()
     }
 
     #[doc(hidden)]
@@ -1084,7 +1090,7 @@ impl CrateNamespace {
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
         //
         // Also, skip the first two sections, which correspond to the `NULL` and `.text` empty sections.
-        for (shndx, sec) in elf_file.section_iter().enumerate().skip(2) {
+        for (shndx, sec) in elf_file.section_iter().enumerate() {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
@@ -1100,6 +1106,11 @@ impl CrateNamespace {
                     return Err("couldn't get section name");
                 }
             };
+
+            // ignore the empty .text section at the start
+            if sec_name == ".text" {
+                continue;    
+            }
 
             // This handles the rare case of a zero-sized section. 
             // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations;
@@ -2471,14 +2482,13 @@ impl TlsInitializer {
         self.cache_status = CacheStatus::Invalidated;
     }
 
-    /// Gets a reference to the TLS data image,
-    /// auto-generating it if needed.
-    pub(crate) fn get_data(&mut self) -> &[u8] {
+    /// Returns a new copy of the TLS data image, auto-generating it if needed.
+    pub(crate) fn get_data(&mut self) -> Box<[u8]> {
         if self.cache_status == CacheStatus::Fresh {
-            return &self.data_cache;
+            return self.data_cache.as_slice().into();
         }
 
-        debug!("{:#X?}", self);
+        debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
 
         let mut new_data: Vec<u8> = Vec::new();
         let mut end_of_previous_range: usize = 0;
@@ -2501,7 +2511,7 @@ impl TlsInitializer {
 
         self.data_cache = new_data;
         self.cache_status = CacheStatus::Fresh;
-        &self.data_cache
+        self.data_cache.as_slice().into()
     }
 }
 

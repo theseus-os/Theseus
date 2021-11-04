@@ -60,7 +60,7 @@ path = "../vga_buffer"
 path = "../memory_initialization"
 
 [dependencies.thread_local_storage]
-path = "../../applications/thread_local_storage"
+path = "../thread_local_storage"
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
