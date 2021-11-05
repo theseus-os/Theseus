@@ -1,57 +1,84 @@
+//! The Send Queue (SQ) object holds the descriptor ring used to send outgoing messages and packets.
+//! The descriptor ring is referred to as a Work Queue Buffer.
+//! This module defines the layout of an SQ, the context used to initialize a SQ,
+//! the Transport Interface Send object attached to the queue and related functions.
+//! 
+//! (PRM Section 8.15: Send Queue)
+
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
-use alloc::{
-    vec::Vec,
-    boxed::Box
-};
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
-use kernel_config::memory::PAGE_SIZE;
+use alloc::boxed::Box;
+use memory::{PhysicalAddress, MappedPages};
 use owning_ref:: BoxRefMut;
 use core::fmt;
+use num_enum::TryFromPrimitive;
+use core::convert::TryFrom;
 
-use crate::{
-    work_queue::WorkQueueEntry,
+use crate::{ *,
+    work_queue::{WorkQueueEntrySend, DoorbellRecord},
     uar::UserAccessRegion
 };
 
-
+/// The Transport Interface Send (TIS) object is responsible for performing all transport
+/// related operations of the transmit side. Each SQ is associated with a TIS.
 #[derive(FromBytes, Default)]
 #[repr(C)]
 pub(crate) struct TransportInterfaceSendContext {
+    /// A multi-part field:
+    /// * `tls_en`: if set, TLS offload is supported, occupies bit 30
+    /// * `prio_or_sl`: for Ethernet, Ethernet Priority in bits [19:17], occupies bits [19:16]
     prio_or_sl:         Volatile<U32<BigEndian>>,
     _padding1:          [u8; 32],
+    /// transport domain ID
     transport_domain:   Volatile<U32<BigEndian>>,
     _padding2:          u32,
+    /// protection domain ID
     pd:                 Volatile<U32<BigEndian>>,
-    _padding3:          [u8; 32],
-    _padding4:          [u8; 32],
-    _padding5:          [u8; 32],
-    _padding6:          [u8; 16],
+    _padding3:          [u32; 28]
 }
 
 const_assert_eq!(core::mem::size_of::<TransportInterfaceSendContext>(), 160);
 
 impl TransportInterfaceSendContext {
+    /// Initialize the TIS object
+    /// 
+    /// # Arguments
+    /// * `td`: transport domain ID 
     pub fn init(&mut self, td: u32) {
         *self = TransportInterfaceSendContext::default();
         self.transport_domain.write(U32::new(td));
     }
 }
 
+/// The bitmask for the state in the [`SendQueueContext`]
+const STATE_MASK:   u32 = 0xF0_0000;
+/// The bit shift for the state in the [`SendQueueContext`]
+const STATE_SHIFT:  u32 = 20;
 
+/// The data structure containing SQ initialization parameters.
+/// It is passed to the HCA at the time of SQ creation.
 #[derive(FromBytes, Default)]
 #[repr(C, packed)]
 pub(crate) struct SendQueueContext {
+    /// A multi-part field:
+    /// * `rlky`: when set the reserved LKey can be used on the SQ, occupies bit 31
+    /// * `fre`: when set the SQ supports Fast Register WQEs, occupies bit 29
+    /// * `flush_in_error_en`: if set, and when SQ transitions into error state, the hardware will flush in error WQEs that were posted, occupies bit 28
+    /// * `min_wqe_inline_mode`: sets the inline mode for the SQ, occupies bits [26:24] 
     rlky_state:                         Volatile<U32<BigEndian>>,
+    /// an opaque identifier which software sets, which will be reported to the CQ
     user_index:                         Volatile<U32<BigEndian>>,
+    /// number of the CQ associated with this SQ
     cqn:                                Volatile<U32<BigEndian>>,
     hairpin_peer_rq:                    Volatile<U32<BigEndian>>,
     hairpin_peer_vhca:                  Volatile<U32<BigEndian>>,
     _padding1:                          u64,
     packet_pacing_rate_limit_index:     Volatile<U32<BigEndian>>,
+    /// the number of entries in the list of TISes
     tis_lst_sz:                         Volatile<U32<BigEndian>>,
     _padding2:                          u64,
+    /// list of TIS numbers
     tis_num_0:                          Volatile<U32<BigEndian>>,
 }
 
@@ -71,6 +98,10 @@ impl fmt::Debug for SendQueueContext {
             .finish()
     }
 }
+
+/// The possible states the SQ can be in.
+#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
 pub enum SendQueueState {
     Reset = 0x0,
     Ready = 0x1,
@@ -78,99 +109,147 @@ pub enum SendQueueState {
 }
 
 impl SendQueueContext {
+    /// Initialize the fields of the SQ context.
+    /// The SQ context is then passed to the HCA when creating the SQ.
+    /// 
+    /// # Arguments
+    /// * `cqn`: number of CQ associated with this SQ 
+    /// * `tisn`: number of the TIS context associated with this SQ
     pub fn init(&mut self, cqn: u32, tisn: u32) {
+        // We are always using 1 TIS per SQ
+        const TIS_LST_SZ:               u32 = 1 << 16;
+        const TISN_MASK:                u32 = 0xFF_FFFF;
+        const ENABLE_RLKEY:             u32 = 1 << 31;
+        const FAST_REGISTER_ENABLE:     u32 = 1 << 29;
+        const FLUSH_IN_ERROR_ENABLE:    u32 = 1 << 28;
+        const ONE_INLINE_HEADER:        u32 = 1 << 24;
+
+        // set all fields to zero
         *self = SendQueueContext::default();
-        self.rlky_state.write(U32::new((1 << 31) | (1 << 29) | (1 << 28) | (1 << 24))); // enable reserved lkey | fast register enable |  flush in error WQEs | min_wqe_inline_mode
-        self.cqn.write(U32::new(cqn & 0xFF_FFFF));
-        self.tis_lst_sz.write(U32::new(1 << 16));
-        self.tis_num_0.write(U32::new(tisn & 0xFF_FFFF));
+
+        self.rlky_state.write(U32::new(ENABLE_RLKEY | FAST_REGISTER_ENABLE | FLUSH_IN_ERROR_ENABLE | ONE_INLINE_HEADER));
+        self.cqn.write(U32::new(cqn & CQN_MASK));
+        self.tis_lst_sz.write(U32::new(TIS_LST_SZ));
+        self.tis_num_0.write(U32::new(tisn & TISN_MASK));
     }
 
+    /// set state of the SQ in the SQ context to `next_state`
     pub fn set_state(&mut self, next_state: SendQueueState) {
-        let state = self.rlky_state.read().get() & !0xF0_0000;
-        self.rlky_state.write(U32::new(state | ((next_state as u32) << 20))); 
+        let state = self.rlky_state.read().get() & !STATE_MASK;
+        self.rlky_state.write(U32::new(state | ((next_state as u32) << STATE_SHIFT))); 
     }
 
-    pub fn get_state(&self) -> u8 {
-        let state = (self.rlky_state.read().get() & 0xF0_0000) >> 20;
-        state as u8
+    /// Find the state of the SQ from the SQ context 
+    pub fn get_state(&self) -> Result<SendQueueState, &'static str> {
+        let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
+        Ok( SendQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the SQ state")? )
     }
 }
 
-#[derive(FromBytes, Default)]
-#[repr(C)]
-struct DoorbellRecord {
-    /// wqe_counter
-    rcv_counter:    Volatile<U32<BigEndian>>,
-    /// sq_wqebb_counter
-    send_counter:   Volatile<U32<BigEndian>>,
+/// There are two doorbell registers we use to send packets.
+/// We alternate between them for each packet.
+pub(crate) enum CurrentDoorbell {
+    Even,
+    Odd
 }
 
-const_assert_eq!(core::mem::size_of::<DoorbellRecord>(), 8);
+impl CurrentDoorbell {
+    fn alternate(&self) -> CurrentDoorbell {
+        match self {
+            Self::Even => Self::Odd,
+            Self::Odd => Self::Even,
+        }
+    }
+}
 
+/// A data structure that contains the SQ ring of descriptors 
+/// and is used to interact with the SQ once initialized.
 pub struct SendQueue {
-    /// Physically-contiguous queue entries
-    entries: BoxRefMut<MappedPages, [WorkQueueEntry]>, 
+    /// physically-contiguous SQ descriptors
+    entries: BoxRefMut<MappedPages, [WorkQueueEntrySend]>, 
+    /// the doorbell for the SQ
     doorbell: BoxRefMut<MappedPages, DoorbellRecord>,
+    /// the UAR page associated with the SQ
     uar: BoxRefMut<MappedPages, UserAccessRegion>,
+    /// the index of the next descriptor to use
     wqe_index: u32,
-    sqn: u32
+    /// SQ number that is returned by the [`CommandOpcode::CreateSq`] command
+    sqn: u32,
+    /// number of the TIS context associated with this SQ
+    tisn: u32,
+    /// the lkey used by the SQ
+    lkey: u32,
+    /// the uar doorbell to be used by the next packet
+    uar_db: CurrentDoorbell
 }
 
 impl SendQueue {
-    pub fn create(entries_mp: MappedPages, doorbell_mp: MappedPages, uar_mp: MappedPages, num_entries: usize, sqn: u32) -> Result<SendQueue, &'static str> {
-        let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<DoorbellRecord>(0))?;
-        doorbell.send_counter.write(U32::new(0));
-        doorbell.rcv_counter.write(U32::new(0));
-
-        let mut uar = BoxRefMut::new(Box::new(uar_mp)).try_map_mut(|mp| mp.as_type_mut::<UserAccessRegion>(0))?;
-        uar.db_blueflame_buffer0_even.write([U32::new(0); 64]);
-        uar.db_blueflame_buffer0_odd.write([U32::new(0); 64]);
-
-        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntry>(0, num_entries))?;
+    /// Creates a SQ by mapping the buffer as a slice of [`WorkQueueEntrySend`]s.
+    /// Each WQE is set to an initial state.
+    /// 
+    /// # Arguments
+    /// * `entries_mp`: memory that is to be transformed into a slice of WQEs. 
+    /// The starting physical address should have been passed to the HCA when creating the SQ.
+    /// * `num_entries`: number of entries in the SQ
+    /// * `doorbell_mp`: memory that is to be transformed into a doorbell record. 
+    /// The starting physical address should have been passed to the HCA when creating the SQ.   
+    /// * `uar_mp`: The UAR page that is associate with this SQ. 
+    /// * `sqn`: SQ number returned by the HCA
+    /// * `tisn`: number of the TIS context associated with this SQ
+    /// * `lkey`: the lkey used by the SQ
+    pub fn create(
+        entries_mp: MappedPages, 
+        num_entries: usize, 
+        doorbell_mp: MappedPages, 
+        uar_mp: MappedPages, 
+        sqn: u32,
+        tisn: u32,
+        lkey: u32
+    ) -> Result<SendQueue, &'static str> {
+        // map the descriptor ring and initialize
+        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntrySend>(0, num_entries))?;
         for entry in entries.iter_mut() {
             entry.init()
         }
+        // map the doorbell and initialize
+        let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<DoorbellRecord>(0))?;
+        *doorbell = DoorbellRecord::default();
+        // map the uar and initialize
+        let mut uar = BoxRefMut::new(Box::new(uar_mp)).try_map_mut(|mp| mp.as_type_mut::<UserAccessRegion>(0))?;
+        *uar = UserAccessRegion::default();
 
-        Ok( SendQueue{entries: entries, doorbell, uar, wqe_index: 0, sqn} )
+        Ok( SendQueue{entries, doorbell, uar, wqe_index: 0, sqn, tisn, lkey, uar_db: CurrentDoorbell::Even} )
     }
 
-    pub fn send(&mut self, sqn: u32, tisn: u32, lkey: u32, packet_address: PhysicalAddress, packet: &mut [u8]) -> Result<(), &'static str> {
-        let mut wqe = &mut self.entries[0];
-        wqe.init_send(self.wqe_index, sqn, tisn, lkey, packet_address, packet);
+    /// The steps required to post a WQE after the WQE fields have been initialized.
+    /// The doorbell record is updated and the UAR register wis written to.
+    fn finish_wqe_operation(&mut self) {
+        let wqe = &mut self.entries[self.wqe_index as usize];
         self.wqe_index += 1; // need to wrap around 0xFFFF
         self.doorbell.send_counter.write(U32::new(self.wqe_index));
-        let mut doorbell = [U32::new(0);64];
-        doorbell[0] = wqe.control.opcode.read(); 
-        doorbell[1] = wqe.control.ds.read();
-        self.uar.db_blueflame_buffer0_even.write(doorbell);
-
-        Ok(())
-    }
-
-    pub fn nop(&mut self, sqn: u32, tisn: u32, lkey: u32) -> Result<(), &'static str> {
-        let mut wqe = &mut self.entries[0];
-        wqe.nop(self.wqe_index, sqn, tisn, lkey);
-
-        self.wqe_index += 1; // need to wrap around 0xFFFF
-
         
         let mut doorbell = [U32::new(0);64];
         doorbell[0] = wqe.control.opcode.read(); 
         doorbell[1] = wqe.control.ds.read();
-        self.doorbell.send_counter.write(U32::new(self.wqe_index));
+        self.uar.write_wqe_to_doorbell(&self.uar_db, doorbell);
+        self.uar_db = self.uar_db.alternate();
 
-
-        self.uar.db_blueflame_buffer0_even.write(doorbell);
-
-        debug!("{:#X}", self.uar.db_blueflame_buffer0_even.read()[0].get());
-        debug!("{:#X}", self.uar.db_blueflame_buffer0_even.read()[1].get());
-
-        wqe.dump(0);
-
-        Ok(())
+    }
+    /// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar page
+    pub fn send(&mut self, packet_address: PhysicalAddress, packet: &[u8]) {
+        let wqe = &mut self.entries[self.wqe_index as usize];
+        wqe.send(self.wqe_index, self.sqn, self.lkey, packet_address, packet);
+        self.finish_wqe_operation();
     }
 
+    /// Perform all the steps to complete a NOP: initialize the WQE, update the doorbell record and the uar page
+    pub fn nop(&mut self) {
+        let wqe = &mut self.entries[self.wqe_index as usize];
+        wqe.nop(self.wqe_index, self.sqn);
+        self.finish_wqe_operation();       
+    }
+
+    /// Prints out all entries in the SQ
     pub fn dump(&self) {
         for (i, entry) in self.entries.iter().enumerate() {
             entry.dump(i)

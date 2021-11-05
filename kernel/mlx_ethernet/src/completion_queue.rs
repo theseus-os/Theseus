@@ -1,89 +1,99 @@
+//! Completion Queues (CQ) are circular buffers used by the HCA to post completion reports upon
+//! completion of a work request.
+//! This module defines the layout of an CQ, the context used to initialize an CQ and related functions.
+//! 
+//! (PRM Section 8.18: Completion Queues)
+
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
-use alloc::{
-    vec::Vec,
-    boxed::Box
-};
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
-use kernel_config::memory::PAGE_SIZE;
-use owning_ref:: BoxRefMut;
+use alloc::boxed::Box;
+use memory::{PhysicalAddress, MappedPages};
+use owning_ref::BoxRefMut;
+use crate::*;
 
+const CQE_OPCODE_SHIFT:         u32 = 4;
 
+/// The data structure containing CQ initialization parameters.
+/// It is passed to the HCA at the time of CQ creation.
+/// 
+/// (PRM Section 8.18.10: Completion Queue Context)
 #[derive(FromBytes, Default)]
 #[repr(C)]
 pub(crate) struct CompletionQueueContext {
+    /// A multi-part field:
+    /// * `status`: occupies bits [31:28]
+    /// * `cc`: if set all the CQE's are collapsed to the first, occupies bit 20
+    /// * `oi`: overrun ignore, allows CQE to be overwritten rather than generating an error, occupies bit 17
+    /// * `st`: event delivery state machine, occupies bits [11:8] 
     status:                 Volatile<U32<BigEndian>>,
     _padding1:              u32,
+    /// This field must be set to zero
     page_offset:            Volatile<U32<BigEndian>>,
+    /// A multi-part field:
+    /// * `log_cq_size`: Log (base 2) of the CQ size (in entries), occupies bits [28:24]
+    /// * `uar_page`: UAR page this CQ can be accessed through, occupies bits [23:0]
     uar_log_cq_size:        Volatile<U32<BigEndian>>,
     cq_max_count_period:    Volatile<U32<BigEndian>>,
+    /// EQ this CQ reports completion events to.
     c_eqn:                  Volatile<U32<BigEndian>>,
+    /// Log (base 2) of page size in units of 4KiB
     log_page_size:          Volatile<U32<BigEndian>>,
     _padding2:              u32,
     last_notified_index:    Volatile<U32<BigEndian>>,
     last_solicit_index:     Volatile<U32<BigEndian>>,
+    /// Consumer counter. The counter is incremented for each CQE polled from the CQ.
     consumer_counter:       Volatile<U32<BigEndian>>,
+    /// Producer Counter. The counter is incremented for each CQE that is written by the HW to the CQ.
     producer_counter:       Volatile<U32<BigEndian>>,
     _padding3:              u64,
+    /// Upper 4 bytes of the physical address of the [`CompletionQueueDoorbellRecord`]
     dbr_addr_h:             Volatile<U32<BigEndian>>,
+    /// Lower 4 bytes of the physical address of the [`CompletionQueueDoorbellRecord`]
     dbr_addr_l:             Volatile<U32<BigEndian>>,
 }
 
 const_assert_eq!(core::mem::size_of::<CompletionQueueContext>(), 64);
 
 impl CompletionQueueContext {
-    pub fn init(&mut self, uar_page: u32, log_cq_size: u8, c_eqn: u8, db_addr: PhysicalAddress, collapsed: bool) {
+    /// Initialize the fields of the CQ context.
+    /// The CQ context is then passed to the HCA when creating the CQ.
+    /// 
+    /// # Arguments
+    /// * `uar_page`: UAR page the CQ can be accessed through. 
+    /// * `cq_size`: number of entries in the CQ.
+    /// * `c_eqn`: number of the EQ this CQ reports completion events to.
+    /// * `db_addr`: physical address of the [`CompletionQueueDoorbellRecord`].
+    /// * `collapsed`: set to true if all CQE's are collapsed to the first.
+    pub fn init(&mut self, uar_page: u32, cq_size: u32, c_eqn: u8, db_addr: PhysicalAddress, collapsed: bool) {
+        const COLLAPSE_CQE:     u32 = 1 << 20;
+        const OVERRUN_IGNORE:   u32 = 1 << 17;
+
+        // set all fields to zero
         *self = CompletionQueueContext::default();
-        let status = if collapsed {
-            1 << 20 | 1 << 17 // collapse all CQE to first | overrun ignore 
-        } else {
-            1 << 17
-        };
+        let mut status = OVERRUN_IGNORE; 
+        if collapsed {
+            status |= COLLAPSE_CQE; 
+        }
         self.status.write(U32::new(status)); 
 
-        let uar = uar_page & 0xFF_FFFF;
-        let size = ((log_cq_size & 0x1F) as u32) << 24;
+        let uar = uar_page & UAR_MASK;
+        let size = (libm::log2(cq_size as f64) as u32 & LOG_QUEUE_SIZE_MASK) << LOG_QUEUE_SIZE_SHIFT;
         self.uar_log_cq_size.write(U32::new(uar | size));
 
         self.c_eqn.write(U32::new(c_eqn as u32));
 
-        let x = libm::ceil((2_usize.pow(log_cq_size as u32) * 64) as f64/ PAGE_SIZE as f64);
-        let log_page_size = libm::log2(x) as u32;
-        self.log_page_size.write(U32::new(log_page_size << 24));
+        let log_page_size = log_page_size(cq_size * core::mem::size_of::<CompletionQueueEntry>() as u32); 
+        self.log_page_size.write(U32::new(log_page_size << LOG_PAGE_SIZE_SHIFT));
         
         self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
         self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
-
-        trace!("cq context: size: {} {} pg size: {}", x, log_cq_size, log_page_size);
     }
 }
 
-#[derive(FromBytes, Debug)]
-#[repr(C)]
-struct CompletionQueueEntry {
-    eth_wqe_id:             Volatile<U32<BigEndian>>,
-    lro_tcp_win:            Volatile<U32<BigEndian>>,
-    lro_ack_seq_num:        Volatile<U32<BigEndian>>,
-    rx_hash_result:         Volatile<U32<BigEndian>>,
-    ml_path:                Volatile<U32<BigEndian>>,
-    slid_smac:              Volatile<U32<BigEndian>>,
-    rqpn:                   Volatile<U32<BigEndian>>,
-    vid:                    Volatile<U32<BigEndian>>,
-    srqn_user_index:        Volatile<U32<BigEndian>>,
-    flow_table_metadata:    Volatile<U32<BigEndian>>,
-    _padding1:              Volatile<U32<BigEndian>>,
-    mini_cqe_num:           Volatile<U32<BigEndian>>,
-    timestamp_h:            Volatile<U32<BigEndian>>,
-    timestamp_l:            Volatile<U32<BigEndian>>,
-    flow_tag:               Volatile<U32<BigEndian>>,
-    owner:                  Volatile<U32<BigEndian>>,
-}
-
-const_assert_eq!(core::mem::size_of::<CompletionQueueEntry>(), 64);
-
+#[allow(dead_code)]
 #[repr(u8)]
-enum CompletionQueueEntryOpcode {
+enum CQEOpcode {
     Requester = 0x0,
     ResponderRDMAWriteWithImmediate = 0x1,
     ResponderSend = 0x2,
@@ -96,14 +106,60 @@ enum CompletionQueueEntryOpcode {
     InvalidCQE = 0xF
 }
 
+#[allow(dead_code)]
+#[repr(u8)]
+enum CQEFormat {
+    NoInlineData = 0x0,
+    InlineData32 = 0x1,
+    InlineData64 = 0x2,
+    CompressedCQE = 0x3,
+}
+
+/// The layout of an entry in the CQ buffer.
+/// 
+/// (PRM Section 8.18.1.1: CQE Format)
+#[derive(FromBytes, Debug, Default)]
+#[repr(C)]
+pub struct CompletionQueueEntry {
+    eth_wqe_id:             Volatile<U32<BigEndian>>,
+    lro_tcp_win:            Volatile<U32<BigEndian>>,
+    lro_ack_seq_num:        Volatile<U32<BigEndian>>,
+    rx_hash_result:         Volatile<U32<BigEndian>>,
+    ml_path:                Volatile<U32<BigEndian>>,
+    slid_smac:              Volatile<U32<BigEndian>>,
+    rqpn:                   Volatile<U32<BigEndian>>,
+    vid:                    Volatile<U32<BigEndian>>,
+    srqn_user_index:        Volatile<U32<BigEndian>>,
+    flow_table_metadata:    Volatile<U32<BigEndian>>,
+    _padding1:              u32,
+    mini_cqe_num:           Volatile<U32<BigEndian>>,
+    timestamp_h:            Volatile<U32<BigEndian>>,
+    timestamp_l:            Volatile<U32<BigEndian>>,
+    flow_tag:               Volatile<U32<BigEndian>>,
+    /// A multi-part field:
+    /// * `wqe_counter`: wqe_counter of the WQE completed, occupies bits [31:16]
+    /// * `signature`: byte-wise XOR of CQE, occupies bits [15:8]
+    /// * `opcode`: a [`CQEOpcode`] value, occupies bits [7:4]
+    /// * `cqe_format`: a [`CQEFormat`] value, occupies bits [3:2]
+    /// * `se`: solicited event. This CQE cause EQE generation for solicited event, occupies bit 1
+    /// * `owner`: owner of the entry, occupies bit 0
+    owner:                  Volatile<U32<BigEndian>>,
+}
+
+const_assert_eq!(core::mem::size_of::<CompletionQueueEntry>(), 64);
+
 impl CompletionQueueEntry {
     pub fn init(&mut self) {
+        // Snabb initializes the CQE but setting all the bits. I do not think that is correct.
+        // In section 23.9.1: CREATE_CQ it stated that only the opcode and owner bit need to be set
+        
+        // set all fields to zero
         *self = CompletionQueueEntry::default();
-        // let invalid_cqe = (CompletionQueueEntryOpcode::InvalidCQE as u32) << 4;
-        // let hw_ownership = 0x1;
-        // self.owner.write(U32::new(invalid_cqe | hw_ownership));
+        let invalid_cqe = (CQEOpcode::InvalidCQE as u32) << CQE_OPCODE_SHIFT;
+        self.owner.write(U32::new(invalid_cqe | HW_OWNERSHIP));
     }
 
+    /// Prints out the fields of a CQE in the format used by other drivers (e.g. Linux, Snabb)
     pub fn dump(&self, i: usize) {
         debug!("CQE {}", i);
         unsafe {
@@ -116,60 +172,62 @@ impl CompletionQueueEntry {
     }
 }
 
-impl Default for CompletionQueueEntry {
-    fn default() -> Self {
-        CompletionQueueEntry{
-            eth_wqe_id:             Volatile::new(U32::new(0xFFFF_FFFF)),
-            lro_tcp_win:            Volatile::new(U32::new(0xFFFF_FFFF)),
-            lro_ack_seq_num:        Volatile::new(U32::new(0xFFFF_FFFF)),
-            rx_hash_result:         Volatile::new(U32::new(0xFFFF_FFFF)),
-            ml_path:                Volatile::new(U32::new(0xFFFF_FFFF)),
-            slid_smac:              Volatile::new(U32::new(0xFFFF_FFFF)),
-            rqpn:                   Volatile::new(U32::new(0xFFFF_FFFF)),
-            vid:                    Volatile::new(U32::new(0xFFFF_FFFF)),
-            srqn_user_index:        Volatile::new(U32::new(0xFFFF_FFFF)),
-            flow_table_metadata:    Volatile::new(U32::new(0xFFFF_FFFF)),
-            _padding1:              Volatile::new(U32::new(0xFFFF_FFFF)),
-            mini_cqe_num:           Volatile::new(U32::new(0xFFFF_FFFF)),
-            timestamp_h:            Volatile::new(U32::new(0xFFFF_FFFF)),
-            timestamp_l:            Volatile::new(U32::new(0xFFFF_FFFF)),
-            flow_tag:               Volatile::new(U32::new(0xFFFF_FFFF)),
-            owner:                  Volatile::new(U32::new(0xFFFF_FFFF)),
-        }
-    }
-}
-
+/// A structure containing information of recently-posted CQ commands
+/// and consumer index and is accessible by user-level software.
 #[derive(FromBytes, Default)]
 #[repr(C)]
-struct CompletionQueueDoorbellRecord {
+pub struct CompletionQueueDoorbellRecord {
+    /// Consumer counter of the last polled CQE.
+    /// It points to the next CQE to be polled.
     update_ci:          Volatile<U32<BigEndian>>,
+    /// Consumer Counter for arming CQ
     arm_ci:             Volatile<U32<BigEndian>>,
 }
 
 const_assert_eq!(core::mem::size_of::<CompletionQueueDoorbellRecord>(), 8);
 
+/// A data structure that contains the CQ buffer 
+/// and is used to interact with the CQ once initialized.
+#[allow(dead_code)]
 pub struct CompletionQueue {
     /// Physically-contiguous completion queue entries
     entries: BoxRefMut<MappedPages, [CompletionQueueEntry]>,
-    doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>
+    /// Doorbell record for this CQ
+    doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>,
+    /// CQ number that is returned by the [`CommandOpcode::CreateCq`] command
+    cqn: u32
 }
 
 impl CompletionQueue {
-    pub fn create(entries_mp: MappedPages, num_entries: usize, doorbell_mp: MappedPages) -> Result<CompletionQueue, &'static str> {
-        let entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<CompletionQueueEntry>(0, num_entries))?;
-
-        let doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<CompletionQueueDoorbellRecord>(0))?;
-        Ok( CompletionQueue{entries, doorbell} )
-    }
-
-    pub fn init(&mut self) {
-        for entry in self.entries.iter_mut() {
+    /// Creates a completion queue by mapping the buffer as a slice of [`CompletionQueueEntry`]s.
+    /// Each CQE is set to an initial state.
+    /// 
+    /// # Arguments
+    /// * `entries_mp`: memory that is to be transformed into a slice of CQEs. 
+    ///    The starting physical address should have been passed to the HCA when creating the CQ.
+    /// * `num_entries`: number of entries in the CQ
+    /// * `doorbell_mp`: memory that is to be transformed into a [`CompletionQueueDoorbellRecord`]. 
+    ///    The starting physical address should have been passed to the HCA when creating the CQ.
+    /// * `cqn`: CQ number returned by the HCA
+    pub fn init(
+        entries_mp: MappedPages, 
+        num_entries: usize, 
+        doorbell_mp: MappedPages,
+        cqn: u32
+    ) -> Result<CompletionQueue, &'static str> {
+        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<CompletionQueueEntry>(0, num_entries))?;
+        let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<CompletionQueueDoorbellRecord>(0))?;
+        
+        for entry in entries.iter_mut() {
             entry.init()
         }
-        self.doorbell.update_ci.write(U32::new(0));
-        self.doorbell.arm_ci.write(U32::new(0));
+        *doorbell = CompletionQueueDoorbellRecord::default();
+
+        Ok( CompletionQueue{entries, doorbell, cqn} )
     }
 
+    /// Returns true if the CQE is currently HW-owned
+    /// TODO: HW ownership changes as given in 8.18.3.1
     pub fn hw_owned(&self, entry_num: usize) -> bool {
         // self.entries[entry_num].dump(0);
         self.entries[entry_num].owner.read().get() & 0x1 == 0x1
@@ -180,6 +238,7 @@ impl CompletionQueue {
         debug!("CQ flow_tag: {:#X}", self.entries[entry_num].flow_tag.read().get());
     }
 
+    /// Prints out all entries in the CQ
     pub fn dump(&self) {
         for (i, entry) in self.entries.iter().enumerate() {
             entry.dump(i)

@@ -1586,10 +1586,13 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "kernel_config",
+ "libm",
  "log",
  "memory",
  "memory_structs",
  "mlx_ethernet",
+ "network_interface_card",
+ "nic_buffers",
  "nic_initialization",
  "owning_ref",
  "pci",
@@ -2913,6 +2916,17 @@ dependencies = [
  "terminal_print",
  "unified_channel",
  "window",
+]
+
+[[package]]
+name = "test_mlx5"
+version = "0.1.0"
+dependencies = [
+ "ixgbe",
+ "log",
+ "mlx5",
+ "spawn",
+ "terminal_print",
 ]
 
 [[package]]

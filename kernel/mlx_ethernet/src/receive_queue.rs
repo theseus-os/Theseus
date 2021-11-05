@@ -11,7 +11,7 @@ use owning_ref:: BoxRefMut;
 use core::fmt;
 
 use crate::{
-    work_queue::WorkQueueEntry,
+    work_queue::WorkQueueEntrySend,
     uar::UserAccessRegion
 };
 
