@@ -43,12 +43,14 @@ pub fn init() -> ! {
     spawn::create_idle_task(Some(0)).unwrap();
 
     // Build and spawn two tasks.
-    let tb1 = new_task_builder(task_hello, 233);
-    tb1.spawn().unwrap();
-    let tb2 = new_task_builder(task_world, 466);
-    tb2.spawn().unwrap();
+    //let tb1 = new_task_builder(task_hello, 233);
+    //tb1.spawn().unwrap();
+    //let tb2 = new_task_builder(task_world, 466);
+    //tb2.spawn().unwrap();
     let tb3 = new_task_builder(task_delay_ten_seconds, 1);
     tb3.spawn().unwrap();
+    let tb4 = new_task_builder(task_delay_two_seconds, 2);
+    tb4.spawn().unwrap();
 
     interrupt::free(move |cs| {
         let mut p = PERIPHERALS.borrow(cs).borrow_mut();
