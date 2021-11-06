@@ -51,6 +51,7 @@ extern crate fs_node;
 extern crate xmas_elf;
 extern crate goblin;
 
+use core::convert::TryFrom;
 use core::fmt;
 use core::ops::Range;
 use spin::{Mutex, RwLock};
@@ -222,6 +223,10 @@ pub struct LoadedCrate {
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
     pub global_sections: BTreeSet<Shndx>,
+    /// The set of thread-local storage (TLS) symbols in this crate.
+    /// The `Shndx` values in this set are the section index (shndx) numbers, 
+    /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
+    pub tls_sections: BTreeSet<Shndx>,
     /// The set of `.data` and `.bss` sections in this crate.
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
@@ -415,6 +420,7 @@ impl LoadedCrate {
             rodata_pages:            new_rodata_pages_range,
             data_pages:              new_data_pages_range,
             global_sections:         self.global_sections.clone(),
+            tls_sections:            self.tss_sections.clone(),
             data_sections:           self.data_sections.clone(),
             reexported_symbols:      self.reexported_symbols.clone(),
         });
@@ -569,6 +575,8 @@ pub enum SectionType {
     Data,
     /// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.
     Bss,
+    /// A read-only section that holds the initial data for a thread-local storage (TLS) area.
+    Tls,
     /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process
@@ -647,6 +655,9 @@ pub struct LoadedSection {
     /// This can be used to calculate size, but is primarily a performance optimization
     /// so we can avoid locking this section's `MappedPages` and avoid recalculating 
     /// its bounds based on its offset and size. 
+    /// 
+    /// For TLS sections, this `address_range.start` holds the offset (from the TLS base)
+    /// into the TLS area where this section's data exists.
     pub address_range: Range<VirtualAddress>, 
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
@@ -1006,6 +1017,13 @@ pub fn write_relocation(
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
+        }
+        R_X86_64_TPOFF32 => {
+            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = u32::try_from(source_sec_vaddr.value())
+                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`")?;
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            *target_ref = source_val;
         }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table

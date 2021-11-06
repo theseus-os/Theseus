@@ -141,6 +141,16 @@ start_high_ap:
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
+
+	; clear out the FS/GS base MSRs
+	xor eax, eax          ; set to 0
+	xor edx, edx          ; set to 0
+	mov ecx, 0xc0000100   ; FS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000101   ; GS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
+	wrmsr
 	
 	; each character is reversed in the dword cuz of little endianness
 	mov dword [0xb8048 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."

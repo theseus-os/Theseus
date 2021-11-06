@@ -192,7 +192,7 @@ else ifeq ($(debug),base)
 		$(CROSS)strip  --strip-debug      $${f} ; \
 	done
 else
-$(error Error: unsupported option "debug=$(debug)")
+$(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
 
 #############################

@@ -62,13 +62,10 @@ use irq_safety::{MutexIrqSafe, interrupts_enabled};
 use memory::MmiRef;
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use mod_mgmt::{
-    CrateNamespace,
-    AppCrateRef,
-};
+use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
-use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
+use x86_64::registers::msr::{IA32_FS_BASE, IA32_GS_BASE, rdmsr, wrmsr};
 
 
 /// The function signature of the callback that will be invoked
@@ -278,7 +275,9 @@ pub struct TaskInner {
 
 /// A structure that contains contextual information for a thread of execution. 
 ///
-/// Only fields that do not permit interior mutability are public and can be accessed directly.
+/// # Implementation note
+/// Only fields that do not permit interior mutability can safely be exposed as public
+/// because we allow foreign crates to directly access task struct fields.
 pub struct Task {
     /// The mutable parts of a `Task` struct that can be modified after task creation,
     /// excluding private items that can be modified atomically.
@@ -320,6 +319,11 @@ pub struct Task {
     /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
     /// which has generic type parameters that describe its function signature, argument type, and return type.
     pub failure_cleanup_function: FailureCleanupFunction,
+    /// The Thread-Local Storage (TLS) area for this task.
+    /// 
+    /// Upon each task switch, we must set the value of the TLS base register 
+    /// (e.g., FS_BASE on x86_64) to the value of this TLS area's self pointer.
+    tls_area: TlsDataImage,
     
     #[cfg(runqueue_spillful)]
     /// The runqueue that this Task is on.
@@ -388,7 +392,8 @@ impl Task {
     /// should inherit any states from it.
     fn new_internal(
         kstack: Stack, 
-        mmi: MmiRef, namespace: Arc<CrateNamespace>,
+        mmi: MmiRef,
+        namespace: Arc<CrateNamespace>,
         env: Arc<Mutex<Environment>>,
         app_crate: Option<Arc<AppCrateRef>>,
         failure_cleanup_function: FailureCleanupFunction,
@@ -399,6 +404,9 @@ impl Task {
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
+
+        // Obtain a new copied instance of the TLS data image for this task.
+        let tls_area = namespace.get_tls_initializer_data();
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
@@ -421,6 +429,7 @@ impl Task {
             app_crate,
             namespace,
             failure_cleanup_function,
+            tls_area,
 
             #[cfg(runqueue_spillful)]
             on_runqueue: AtomicCell::new(None.into()),
@@ -621,14 +630,21 @@ impl Task {
     /// Sets this `Task` as this core's current task.
     /// 
     /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
-    /// into the FS segment register base MSR.
+    /// into the `GS_BASE` register.
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to access it. 
     fn set_as_current_task(&self) {
+        unsafe {
+            wrmsr(IA32_FS_BASE, self.tls_area.pointer_value() as u64);
+        }
+
+        // TODO: now that proper ELF TLS areas are supported, 
+        //       use that TLS area for the `TaskLocalData` instead of `GS_BASE`. 
+
         if let Some(ref tld) = self.inner.lock().task_local_data {
             unsafe {
-                wrmsr(IA32_FS_BASE, tld.deref() as *const _ as u64);
+                wrmsr(IA32_GS_BASE, tld.deref() as *const _ as u64);
             }
         } else {
             error!("BUG: failed to set current task, it had no TaskLocalData. {:?}", self);
@@ -1084,8 +1100,10 @@ fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason
 
 /// The structure that holds information local to each Task,
 /// effectively a form of thread-local storage (TLS).
-/// A pointer to this structure is stored in the `FS` segment register,
+/// A pointer to this structure is stored in the `GS_BASE` MSR (model-specific register),
 /// such that any task can easily and quickly access their local data.
+/// 
+/// TODO: combine this into the standard TLS area, which uses FS_BASE plus the FS segment register.
 // #[repr(C)]
 #[derive(Debug)]
 struct TaskLocalData {
@@ -1094,10 +1112,10 @@ struct TaskLocalData {
 }
 
 /// Returns a reference to the current task's `TaskLocalData` 
-/// by using the `TaskLocalData` pointer stored in the FS base MSR register.
+/// by using the `TaskLocalData` pointer stored in the `GS_BASE` register.
 fn get_task_local_data() -> Option<&'static TaskLocalData> {
     let tld: &'static TaskLocalData = {
-        let tld_ptr = rdmsr(IA32_FS_BASE) as *const TaskLocalData;
+        let tld_ptr = rdmsr(IA32_GS_BASE) as *const TaskLocalData;
         if tld_ptr.is_null() {
             return None;
         }
@@ -1108,14 +1126,12 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
     Some(tld)
 }
 
-/// Returns a reference to the current task by using the `TaskLocalData` pointer
-/// stored in the thread-local storage (FS base model-specific register).
+/// Returns a reference to the current task.
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.current_taskref)
 }
 
-/// Returns the current Task's id by using the `TaskLocalData` pointer
-/// stored in the thread-local storage (FS base model-specific register).
+/// Returns the current task's ID.
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
 }
