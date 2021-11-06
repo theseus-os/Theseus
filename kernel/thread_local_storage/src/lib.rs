@@ -58,31 +58,32 @@ pub struct Complex {
 }
 impl Complex {
     const fn new() -> Complex {
-        Complex { s: "hello there how", m: 8, x: 32, l: 0xDEAD, v: Vec::new() }
+        Complex { s: "hello there now", m: 0x8, x: 0x20, l: 0xDEAD, v: Vec::new() }
     }
 }
 
 pub fn test_tls(x: usize) {
-    debug!("Task {:?}", task::get_my_current_task());
+    let curr_task = task::get_my_current_task().unwrap();
     let local_zero = LOCAL_ZERO + x as u16;
-    debug!("LOCAL_ZERO + x: {:?}", local_zero);
+    debug!("Task {:?}, LOCAL_ZERO + x: {:?}", curr_task, local_zero);
 
     let local_u8_1 = LOCAL_U8_1 + x as u8;
-    debug!("LOCAL_U8_1 + x: {:?}", local_u8_1);
+    debug!("Task {:?}, LOCAL_U8_1 + x: {:?}", curr_task, local_u8_1);
 
     let local_u16 = LOCAL_U16 + x as u16;
-    debug!("LOCAL_U16 + x: {:?}", local_u16);
+    debug!("Task {:?}, LOCAL_U16 + x: {:?}", curr_task, local_u16);
 
     let local_usize = LOCAL_USIZE.get() + x;
-    debug!("LOCAL_USIZE + x: {:?}", local_usize);
+    debug!("Task {:?}, LOCAL_USIZE + x: {:?}", curr_task, local_usize);
 
     let local_u8_2 = LOCAL_U8_2 + x as u8;
-    debug!("LOCAL_U8_2 + x: {:?}", local_u8_2);
+    debug!("Task {:?}, LOCAL_U8_2 + x: {:?}", curr_task, local_u8_2);
 
-    debug!("COMPLEX: {:X?}", COMPLEX);
+    debug!("Task {:?}, COMPLEX: {:X?}", curr_task, COMPLEX);
 
-    debug!("MY_STRUCT: {:?}", MY_STRUCT);
-    debug!("Task {:?}: MY_STRUCT: {:X?}", task::get_my_current_task(), MY_STRUCT.replace(MyStruct(0x99999999)));
+    debug!("Task {:?}, MY_STRUCT: {:?}", curr_task, MY_STRUCT);
+    debug!("Task {:?}: MY_STRUCT: {:X?}", curr_task, MY_STRUCT.replace(MyStruct(0x99999999)));
+    debug!("Task {:?}: after setting MY_STRUCT to 0x99999999, its new value is {:X?}", curr_task, MY_STRUCT.get());
 }
 
 pub fn main(_args: Vec<String>) -> isize {

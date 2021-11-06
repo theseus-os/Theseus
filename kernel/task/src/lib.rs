@@ -323,7 +323,6 @@ pub struct Task {
     /// 
     /// Upon each task switch, we must set the value of the TLS base register 
     /// (e.g., FS_BASE on x86_64) to the value of this TLS area's self pointer.
-    /// to this area; for example, FSBASE on x86. 
     tls_area: TlsDataImage,
     
     #[cfg(runqueue_spillful)]
@@ -406,8 +405,8 @@ impl Task {
         // TODO FIXME: or use random values to avoid state spill
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
 
+        // Obtain a new copied instance of the TLS data image for this task.
         let tls_area = namespace.get_tls_initializer_data();
-        warn!("Task::new_internal(): {:02X?}", tls_area);
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
@@ -636,11 +635,12 @@ impl Task {
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to access it. 
     fn set_as_current_task(&self) {
-        let tls_ptr = self.tls_area.pointer_value();
-        warn!("Setting FS_BASE MSR to TLS pointer: {:#X}", tls_ptr);
         unsafe {
-            wrmsr(IA32_FS_BASE, tls_ptr as u64);
+            wrmsr(IA32_FS_BASE, self.tls_area.pointer_value() as u64);
         }
+
+        // TODO: now that proper ELF TLS areas are supported, 
+        //       use that TLS area for the `TaskLocalData` instead of `GS_BASE`. 
 
         if let Some(ref tld) = self.inner.lock().task_local_data {
             unsafe {

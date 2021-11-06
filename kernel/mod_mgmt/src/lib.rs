@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(rustc_private)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -406,7 +405,7 @@ pub struct CrateNamespace {
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
     /// 
-    /// NOTE: this is currently a global system-wide singleton. See the static `TLS_INITIALIZER` for more.
+    /// NOTE: this is currently a global system-wide singleton. See the static [`TLS_INITIALIZER`] for more.
     tls_initializer: &'static Mutex<TlsInitializer>,
 
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
@@ -787,7 +786,6 @@ impl CrateNamespace {
     ) -> Result<StrongCrateRef, &'static str> {
         let cf = crate_object_file.lock();
         let (new_crate_ref, elf_file) = self.load_crate_sections(cf.deref(), kernel_mmi_ref, verbose_log)?;
-        warn!("After load_crate_sections, TlsInitializer data: {:02X?}", self.tls_initializer.lock().get_data());
         self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         Ok(new_crate_ref)
     }
@@ -2398,6 +2396,7 @@ pub(crate) struct TlsInitializer {
 } 
 
 impl TlsInitializer {
+    /// Creates an empty TLS initializer with no TLS data sections.
     fn empty() -> TlsInitializer {
         TlsInitializer {
             // The data image will be generated lazily on the next request to use it.
@@ -2482,13 +2481,15 @@ impl TlsInitializer {
         self.cache_status = CacheStatus::Invalidated;
     }
 
-    /// Returns a new copy of the TLS data image, auto-generating it if needed.
+    /// Returns a new copy of the TLS data image.
+    /// 
+    /// This function lazily generates the TLS image data on demand, if needed.
     pub(crate) fn get_data(&mut self) -> TlsDataImage {
         const POINTER_SIZE:      usize = core::mem::size_of::<usize>();
         const POINTER_ALIGNMENT: usize = core::mem::align_of::<usize>();
 
         if self.cache_status == CacheStatus::Invalidated {
-            debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+            // debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
 
             // On some architectures, such as x86_64, the ABI convention REQUIRES that
             // the TLS area data starts with a pointer to itself (the TLS self pointer).
@@ -2505,7 +2506,6 @@ impl TlsInitializer {
             for (range, sec) in self.offsets_of_sections.iter() {
                 // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
                 let num_padding_bytes = range.start.saturating_sub(end_of_previous_range);
-                warn!("Inserting {} padding bytes", num_padding_bytes);
                 for _i in 0..num_padding_bytes {
                     // surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.
                     new_data.push(0); 
@@ -2515,16 +2515,14 @@ impl TlsInitializer {
                 let sec_mp = sec.mapped_pages.lock();
                 let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
                 new_data.extend_from_slice(sec_data);
-                assert_eq!(range.len(), sec.size());
                 end_of_previous_range = range.end;
             }
 
             // Append space for the TLS self pointer (with enough padding for proper alignment);
             // it's actual value will be filled in later once a new copy of the TLS data image is made.
-            {
+            if !new_data.is_empty() {
                 let aligned_start = util::round_up(end_of_previous_range, POINTER_ALIGNMENT);
                 let num_bytes = aligned_start - end_of_previous_range + POINTER_SIZE;
-                warn!("Inserting {} bytes for TLS self pointer", num_bytes);
                 for _i in 0..num_bytes {
                     new_data.push(0); 
                 }
@@ -2534,21 +2532,25 @@ impl TlsInitializer {
             self.cache_status = CacheStatus::Fresh;
         }
 
-        // Here, the `data_cache` is guaranteed to be fresh and ready to use,
-        // so we can simply create (allocate) a new copy of it.
-        let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
-
-        // Every time we create a new copy of the TLS data image, we have to re-calculate
-        // and re-assign the TLS self pointer value at the end of the data image,
-        // because the virtual address of that new TLS data image copy will be unique.
-        let offset_of_tls_self_ptr = data_copy.len() - POINTER_SIZE;
-        let dest_slice = &mut data_copy[offset_of_tls_self_ptr .. (offset_of_tls_self_ptr + POINTER_SIZE)];
-        let tls_self_ptr_value = dest_slice.as_ptr() as usize;
-        dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
-        TlsDataImage { 
-            _data: data_copy,
-            ptr:   tls_self_ptr_value,
+        // Here, the `data_cache` is guaranteed to be fresh and ready to use.
+        if !self.data_cache.is_empty() {
+            let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
+            // Every time we create a new copy of the TLS data image, we have to re-calculate
+            // and re-assign the TLS self pointer value at the end of the data image,
+            // because the virtual address of that new TLS data image copy will be unique.
+            // Note that we only do this if the data_copy actually contains any TLS data.
+            let offset_of_tls_self_ptr = data_copy.len().saturating_sub(POINTER_SIZE);
+            if let Some(dest_slice) = data_copy.get_mut(offset_of_tls_self_ptr .. (offset_of_tls_self_ptr + POINTER_SIZE)) {
+                let tls_self_ptr_value = dest_slice.as_ptr() as usize;
+                dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
+                return TlsDataImage { 
+                    _data: Some(data_copy),
+                    ptr:   tls_self_ptr_value,
+                };
+            }
         }
+
+        TlsDataImage { _data: None, ptr: 0 }
     }
 }
 
@@ -2566,14 +2568,28 @@ impl TlsInitializer {
 /// that executes "in" this task, e.g., instructions that access the current TLS area.
 #[derive(Debug)]
 pub struct TlsDataImage {
-    _data: Box<[u8]>,
+    // The data is wrapped in an Option to avoid allocating an empty boxed slice
+    // when there are no TLS data sections.
+    _data: Option<Box<[u8]>>,
     ptr:   usize,
 }
 impl TlsDataImage {
+    /// Returns the value of the TLS selft pointer for this TLS data image.
+    /// If it has no TLS data sections, the returned value will be zero.
     #[inline(always)]
     pub fn pointer_value(&self) -> usize {
         self.ptr
     }
+}
+
+
+/// The status of a cached TLS area data image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CacheStatus {
+    /// The cached data image is up to date and can be used immediately.
+    Fresh,
+    /// The cached data image is out of date and needs to be regenerated.
+    Invalidated,
 }
 
 
@@ -2593,12 +2609,3 @@ impl PartialEq for StrongSectionRefWrapper {
     }
 }
 impl Eq for StrongSectionRefWrapper { }
-
-/// The status of a cached TLS area data image.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum CacheStatus {
-    /// The cached data image is up to date and can be used immediately.
-    Fresh,
-    /// The cached data image is out of date and needs to be regenerated.
-    Invalidated,
-}
