@@ -679,6 +679,77 @@
 <span id="676">676</span>
 <span id="677">677</span>
 <span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
+<span id="685">685</span>
+<span id="686">686</span>
+<span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
+<span id="696">696</span>
+<span id="697">697</span>
+<span id="698">698</span>
+<span id="699">699</span>
+<span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
+<span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
+<span id="707">707</span>
+<span id="708">708</span>
+<span id="709">709</span>
+<span id="710">710</span>
+<span id="711">711</span>
+<span id="712">712</span>
+<span id="713">713</span>
+<span id="714">714</span>
+<span id="715">715</span>
+<span id="716">716</span>
+<span id="717">717</span>
+<span id="718">718</span>
+<span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,</span>
 <span class="doccomment">//! in other words, the code that is currently executing.</span>
@@ -693,11 +764,7 @@
 };
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">cow_arc</span>::{<span class="ident">CowArc</span>, <span class="ident">CowWeak</span>};
-<span class="kw">use</span> <span class="ident">xmas_elf</span>::{
-    <span class="self">self</span>,
-    <span class="ident">ElfFile</span>,
-    <span class="ident">sections</span>::{<span class="ident">ShType</span>, <span class="ident">SectionData</span>, <span class="ident">SHF_WRITE</span>, <span class="ident">SHF_ALLOC</span>, <span class="ident">SHF_EXECINSTR</span>},
-};
+<span class="kw">use</span> <span class="ident">xmas_elf</span>::{<span class="self">self</span>, <span class="ident">ElfFile</span>, <span class="ident">sections</span>::{<span class="ident">SHF_ALLOC</span>, <span class="ident">SHF_EXECINSTR</span>, <span class="ident">SHF_TLS</span>, <span class="ident">SHF_WRITE</span>, <span class="ident">SectionData</span>, <span class="ident">ShType</span>}};
 <span class="kw">use</span> <span class="ident">rustc_demangle::demangle</span>;
 <span class="kw">use</span> <span class="ident">cstr_core::CStr</span>;
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">MappedPages</span>};
@@ -777,6 +844,7 @@
         <span class="ident">rodata_pages</span>:        <span class="prelude-val">Some</span>((<span class="ident">rodata_pages</span>.<span class="ident">clone</span>(), <span class="ident">mp_range</span>(<span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>))),
         <span class="ident">data_pages</span>:          <span class="prelude-val">Some</span>((<span class="ident">data_pages</span>.<span class="ident">clone</span>(),   <span class="ident">mp_range</span>(<span class="kw-2">&amp;</span><span class="ident">data_pages</span>))),
         <span class="ident">global_sections</span>:     <span class="ident">BTreeSet::new</span>(),
+        <span class="ident">tls_sections</span>:        <span class="ident">BTreeSet::new</span>(),
         <span class="ident">data_sections</span>:       <span class="ident">BTreeSet::new</span>(),
         <span class="ident">reexported_symbols</span>:  <span class="ident">BTreeSet::new</span>(),
     });
@@ -784,8 +852,8 @@
     <span class="comment">// We don&#39;t need to actually load the nano_core as a new crate, since we&#39;re already running it.</span>
     <span class="comment">// We just need to parse it to discover the symbols. </span>
     <span class="kw">let</span> <span class="ident">parse_result</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">nano_core_file_path</span>.<span class="ident">extension</span>() {
-        <span class="prelude-val">Some</span>(<span class="string">&quot;sym&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">parse_nano_core_symbol_file</span>(<span class="kw-2">&amp;</span><span class="ident">nano_core_crate_ref</span>, <span class="kw-2">&amp;</span><span class="ident">text_pages</span>, <span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>, <span class="kw-2">&amp;</span><span class="ident">data_pages</span>),
-        <span class="prelude-val">Some</span>(<span class="string">&quot;bin&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">parse_nano_core_binary</span>(<span class="kw-2">&amp;</span><span class="ident">nano_core_crate_ref</span>, <span class="kw-2">&amp;</span><span class="ident">text_pages</span>, <span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>, <span class="kw-2">&amp;</span><span class="ident">data_pages</span>),
+        <span class="prelude-val">Some</span>(<span class="string">&quot;sym&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">parse_nano_core_symbol_file</span>(<span class="ident">real_namespace</span>, <span class="kw-2">&amp;</span><span class="ident">nano_core_crate_ref</span>, <span class="kw-2">&amp;</span><span class="ident">text_pages</span>, <span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>, <span class="kw-2">&amp;</span><span class="ident">data_pages</span>),
+        <span class="prelude-val">Some</span>(<span class="string">&quot;bin&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">parse_nano_core_binary</span>(<span class="ident">real_namespace</span>, <span class="kw-2">&amp;</span><span class="ident">nano_core_crate_ref</span>, <span class="kw-2">&amp;</span><span class="ident">text_pages</span>, <span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>, <span class="kw-2">&amp;</span><span class="ident">data_pages</span>),
         <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="string">&quot;nano_core object file had unexpected file extension. Expected \&quot;.bin\&quot; or \&quot;.sym\&quot;&quot;</span>),
     };
     <span class="kw">let</span> <span class="ident">parsed_crate_items</span> <span class="op">=</span> <span class="macro">try_mp!</span>(<span class="ident">parse_result</span>, <span class="ident">text_pages</span>, <span class="ident">rodata_pages</span>, <span class="ident">data_pages</span>);
@@ -811,6 +879,8 @@
     <span class="comment">// Add the newly-parsed nano_core crate to the kernel namespace.</span>
     <span class="ident">real_namespace</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">crate_name</span>.<span class="ident">into</span>(), <span class="ident">nano_core_crate_ref</span>.<span class="ident">clone_shallow</span>());
     <span class="macro">info!</span>(<span class="string">&quot;Finished parsing nano_core crate, {} new symbols.&quot;</span>, <span class="ident">new_syms</span>);
+    <span class="comment">// trace!(&quot;TlsInitializer after parse_nano_core(): {:#?}&quot;, &amp;*real_namespace.tls_initializer.lock());</span>
+    <span class="comment">// trace!(&quot;TlsInitializer data after parse_nano_core(): {:02X?}&quot;, real_namespace.tls_initializer.lock().get_data());</span>
     <span class="prelude-val">Ok</span>((<span class="ident">nano_core_crate_ref</span>, <span class="ident">parsed_crate_items</span>.<span class="ident">init_symbols</span>, <span class="ident">new_syms</span>))
 }
 
@@ -820,6 +890,7 @@
 <span class="doccomment">/// Basically, just searches the section list for offsets, size, and flag data,</span>
 <span class="doccomment">/// and parses the symbol table to populate the list of sections.</span>
 <span class="kw">fn</span> <span class="ident">parse_nano_core_symbol_file</span>(
+    <span class="ident">namespace</span>:     <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
     <span class="ident">new_crate_ref</span>: <span class="kw-2">&amp;</span><span class="ident">StrongCrateRef</span>,
     <span class="ident">text_pages</span>:    <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">rodata_pages</span>:  <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -844,21 +915,28 @@
         <span class="string">&quot;Utf8Error occurred when parsing nano_core symbols CStr&quot;</span>
     })<span class="question-mark">?</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_shndx</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_shndx</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_shndx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bss_shndx</span>:    <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_shndx</span>:     <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_shndx</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_shndx</span>:     <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bss_shndx</span>:      <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tls_data_shndx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Shndx</span>, <span class="ident">VirtualAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tls_bss_shndx</span>:  <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Shndx</span>, <span class="ident">VirtualAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
 
-    <span class="comment">// a closure that parses a section header&#39;s index (e.g., &quot;[7]&quot;) out of the given str</span>
-    <span class="kw">let</span> <span class="ident">parse_section_ndx</span> <span class="op">=</span> <span class="op">|</span><span class="ident">str_ref</span>: <span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">|</span> {
+    <span class="doccomment">/// An internal function that parses a section header&#39;s index (e.g., &quot;[7]&quot;) out of the given str.</span>
+    <span class="doccomment">/// Returns a tuple of the parsed `Shndx` and the rest of the unparsed str after the shndx.</span>
+    <span class="kw">fn</span> <span class="ident">parse_section_ndx</span>(<span class="ident">str_ref</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Shndx</span>, <span class="kw-2">&amp;</span><span class="ident">str</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">open</span>  <span class="op">=</span> <span class="ident">str_ref</span>.<span class="ident">find</span>(<span class="string">&quot;[&quot;</span>);
         <span class="kw">let</span> <span class="ident">close</span> <span class="op">=</span> <span class="ident">str_ref</span>.<span class="ident">find</span>(<span class="string">&quot;]&quot;</span>);
-        <span class="ident">open</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">start</span><span class="op">|</span> <span class="ident">close</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">end</span><span class="op">|</span> <span class="ident">str_ref</span>.<span class="ident">get</span>((<span class="ident">start</span> <span class="op">+</span> <span class="number">1</span>) .. <span class="ident">end</span>)))
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">trim</span>().<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
-    };
+        <span class="ident">open</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">start</span><span class="op">|</span> <span class="ident">close</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">end</span><span class="op">|</span>
+            <span class="ident">str_ref</span>.<span class="ident">get</span>(<span class="ident">start</span> <span class="op">+</span> <span class="number">1</span> .. <span class="ident">end</span>)
+                .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">trim</span>().<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>().<span class="ident">ok</span>())
+                .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">shndx</span><span class="op">|</span> <span class="ident">str_ref</span>.<span class="ident">get</span>(<span class="ident">end</span> <span class="op">+</span> <span class="number">1</span> ..).<span class="ident">map</span>(<span class="op">|</span><span class="ident">the_rest</span><span class="op">|</span> (<span class="ident">shndx</span>, <span class="ident">the_rest</span>)))
+        ))
+    }
 
-    <span class="comment">// a closure that parses a section header&#39;s address and size</span>
-    <span class="kw">let</span> <span class="ident">parse_section_vaddr_size</span> <span class="op">=</span> <span class="op">|</span><span class="ident">sec_hdr_line_starting_at_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">|</span> {
+    <span class="doccomment">/// An internal function that parses a section header&#39;s address and size</span>
+    <span class="doccomment">/// from a string that starts at the `Name` field of a line.</span>
+    <span class="kw">fn</span> <span class="ident">parse_section_vaddr_size</span>(<span class="ident">sec_hdr_line_starting_at_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tokens</span> <span class="op">=</span> <span class="ident">sec_hdr_line_starting_at_name</span>.<span class="ident">split_whitespace</span>();
         <span class="ident">tokens</span>.<span class="ident">next</span>(); <span class="comment">// skip Name </span>
         <span class="ident">tokens</span>.<span class="ident">next</span>(); <span class="comment">// skip Type</span>
@@ -868,11 +946,11 @@
         <span class="comment">// parse both the Address and Size fields as hex strings</span>
         <span class="ident">addr_hex_str</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">usize::from_str_radix</span>(<span class="ident">a</span>, <span class="number">16</span>).<span class="ident">ok</span>())
             .<span class="ident">and_then</span>(<span class="ident">VirtualAddress::new</span>)
-            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">vaddr</span><span class="op">|</span> {
-                <span class="ident">size_hex_str</span>.<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">usize::from_str_radix</span>(<span class="ident">s</span>, <span class="number">16</span>).<span class="ident">ok</span>())
-                    .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">size</span><span class="op">|</span> <span class="prelude-val">Some</span>((<span class="ident">vaddr</span>, <span class="ident">size</span>)))
-            })
-    };
+            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">vaddr</span><span class="op">|</span> <span class="ident">size_hex_str</span>
+                .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">usize::from_str_radix</span>(<span class="ident">s</span>, <span class="number">16</span>).<span class="ident">ok</span>())
+                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">size</span><span class="op">|</span> (<span class="ident">vaddr</span>, <span class="ident">size</span>))
+            )
+    }
 
     <span class="comment">// We will fill in these crate items while parsing the symbol file.</span>
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crate_items</span> <span class="op">=</span> <span class="ident">ParsedCrateItems::empty</span>();
@@ -893,16 +971,26 @@
         <span class="comment">// debug!(&quot;Looking at line: {:?}&quot;, line);</span>
 
         <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.text &quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;PROGBITS&quot;</span>) {
-            <span class="ident">text_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>);
-        }
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.data &quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;PROGBITS&quot;</span>) {
-            <span class="ident">data_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>);
+            <span class="ident">text_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">shndx</span>);
         }
         <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.rodata &quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;PROGBITS&quot;</span>) {
-            <span class="ident">rodata_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>);
+            <span class="ident">rodata_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">shndx</span>);
+        }
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.tdata &quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;PROGBITS&quot;</span>) {
+            <span class="ident">tls_data_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>).<span class="ident">and_then</span>(<span class="op">|</span>(<span class="ident">shndx</span>, <span class="ident">rest_of_line</span>)<span class="op">|</span> 
+                <span class="ident">parse_section_vaddr_size</span>(<span class="ident">rest_of_line</span>).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">vaddr</span>, <span class="kw">_</span>)<span class="op">|</span> (<span class="ident">shndx</span>, <span class="ident">vaddr</span>))
+            );
+        }
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.tbss &quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;NOBITS&quot;</span>) {
+            <span class="ident">tls_bss_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>).<span class="ident">and_then</span>(<span class="op">|</span>(<span class="ident">shndx</span>, <span class="ident">rest_of_line</span>)<span class="op">|</span> 
+                <span class="ident">parse_section_vaddr_size</span>(<span class="ident">rest_of_line</span>).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">vaddr</span>, <span class="kw">_</span>)<span class="op">|</span> (<span class="ident">shndx</span>, <span class="ident">vaddr</span>))
+            );
+        }
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.data &quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;PROGBITS&quot;</span>) {
+            <span class="ident">data_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">shndx</span>);
         }
         <span class="kw">else</span> <span class="kw">if</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.bss &quot;</span>) <span class="op">&amp;&amp;</span> <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;NOBITS&quot;</span>) {
-            <span class="ident">bss_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>);
+            <span class="ident">bss_shndx</span> <span class="op">=</span> <span class="ident">parse_section_ndx</span>(<span class="ident">line</span>).<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">shndx</span>);
         }
         <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">start</span>) <span class="op">=</span> <span class="ident">line</span>.<span class="ident">find</span>(<span class="string">&quot;.eh_frame &quot;</span>) {
             <span class="kw">let</span> (<span class="ident">sec_vaddr</span>, <span class="ident">sec_size</span>) <span class="op">=</span> <span class="ident">parse_section_vaddr_size</span>(<span class="kw-2">&amp;</span><span class="ident">line</span>[<span class="ident">start</span>..])
@@ -950,7 +1038,7 @@
     <span class="kw">let</span> <span class="ident">rodata_shndx</span> <span class="op">=</span> <span class="ident">rodata_shndx</span>.<span class="ident">ok_or</span>(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .rodata section index&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">data_shndx</span>   <span class="op">=</span> <span class="ident">data_shndx</span>  .<span class="ident">ok_or</span>(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .data section index&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">bss_shndx</span>    <span class="op">=</span> <span class="ident">bss_shndx</span>   .<span class="ident">ok_or</span>(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .bss section index&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">shndxs</span> <span class="op">=</span> <span class="ident">MainShndx</span> { <span class="ident">text_shndx</span>, <span class="ident">rodata_shndx</span>, <span class="ident">data_shndx</span>, <span class="ident">bss_shndx</span> };
+    <span class="kw">let</span> <span class="ident">shndxs</span> <span class="op">=</span> <span class="ident">MainShndx</span> { <span class="ident">text_shndx</span>, <span class="ident">rodata_shndx</span>, <span class="ident">data_shndx</span>, <span class="ident">bss_shndx</span>, <span class="ident">tls_data_shndx</span>, <span class="ident">tls_bss_shndx</span> };
 
     <span class="comment">// second, skip ahead to the start of the symbol table: a line which contains &quot;.symtab&quot; but does NOT contain &quot;SYMTAB&quot;</span>
     <span class="kw">let</span> <span class="ident">is_start_of_symbol_table</span> <span class="op">=</span> <span class="op">|</span><span class="ident">line</span>: <span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">|</span> { <span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;.symtab&quot;</span>) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">line</span>.<span class="ident">contains</span>(<span class="string">&quot;SYMTAB&quot;</span>) };
@@ -1033,6 +1121,7 @@
             <span class="comment">// debug!(&quot;parse_nano_core_symbol_file(): name: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {}&quot;, name, sec_vaddr, sec_size, sec_ndx);</span>
 
             <span class="ident">add_new_section</span>(
+                <span class="ident">namespace</span>,
                 <span class="kw-2">&amp;</span><span class="ident">shndxs</span>, 
                 <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">crate_items</span>, 
                 <span class="ident">text_pages</span>, 
@@ -1065,6 +1154,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// Drops the given `mapped_pages` that hold the nano_core binary file itself.</span>
 <span class="kw">fn</span> <span class="ident">parse_nano_core_binary</span>(
+    <span class="ident">namespace</span>:     <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
     <span class="ident">new_crate_ref</span>: <span class="kw-2">&amp;</span><span class="ident">StrongCrateRef</span>,
     <span class="ident">text_pages</span>:    <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">rodata_pages</span>:  <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -1094,10 +1184,13 @@
     };
     
     <span class="comment">// find the .text, .data, and .rodata sections</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_shndx</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_shndx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_shndx</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bss_shndx</span>:    <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_shndx</span>:     <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_shndx</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_shndx</span>:     <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">bss_shndx</span>:      <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tls_data_shndx</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Shndx</span>, <span class="ident">VirtualAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tls_bss_shndx</span>:  <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Shndx</span>, <span class="ident">VirtualAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+
 
     <span class="comment">// We will fill in these crate items while parsing the symbol file.</span>
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crate_items</span> <span class="op">=</span> <span class="ident">ParsedCrateItems::empty</span>();
@@ -1135,9 +1228,25 @@
                 }
                 <span class="ident">bss_shndx</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">shndx</span>);
             }
+            <span class="prelude-val">Ok</span>(<span class="string">&quot;.tdata&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="op">!</span>(<span class="ident">sec</span>.<span class="ident">flags</span>() <span class="op">&amp;</span> (<span class="ident">SHF_ALLOC</span> <span class="op">|</span> <span class="ident">SHF_WRITE</span> <span class="op">|</span> <span class="ident">SHF_EXECINSTR</span> <span class="op">|</span> <span class="ident">SHF_TLS</span>) <span class="op">=</span><span class="op">=</span> (<span class="ident">SHF_ALLOC</span> <span class="op">|</span> <span class="ident">SHF_WRITE</span> <span class="op">|</span> <span class="ident">SHF_TLS</span>)) {
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;.tdata section had wrong flags!&quot;</span>);
+                }
+                <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .tdata section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
+                <span class="ident">tls_data_shndx</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">shndx</span>, <span class="ident">sec_vaddr</span>));
+            }
+            <span class="prelude-val">Ok</span>(<span class="string">&quot;.tbss&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">if</span> <span class="op">!</span>(<span class="ident">sec</span>.<span class="ident">flags</span>() <span class="op">&amp;</span> (<span class="ident">SHF_ALLOC</span> <span class="op">|</span> <span class="ident">SHF_WRITE</span> <span class="op">|</span> <span class="ident">SHF_EXECINSTR</span> <span class="op">|</span> <span class="ident">SHF_TLS</span>) <span class="op">=</span><span class="op">=</span> (<span class="ident">SHF_ALLOC</span> <span class="op">|</span> <span class="ident">SHF_WRITE</span> <span class="op">|</span> <span class="ident">SHF_TLS</span>)) {
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;.tbss section had wrong flags!&quot;</span>);
+                }
+                <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .tbss section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
+                <span class="ident">tls_bss_shndx</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">shndx</span>, <span class="ident">sec_vaddr</span>));
+            }
             <span class="prelude-val">Ok</span>(<span class="string">&quot;.gcc_except_table&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section had an invalid physical address&quot;</span>)<span class="question-mark">?</span>;
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
                 <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
@@ -1149,7 +1258,7 @@
                         <span class="ident">mapped_pages_offset</span>,
                         <span class="ident">sec_vaddr</span>,
                         <span class="ident">sec_size</span>,
-                        <span class="bool-val">false</span>, <span class="comment">// .eh_frame is not global</span>
+                        <span class="bool-val">false</span>, <span class="comment">// .gcc_except_table is not global</span>
                         <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
                     ))
                 );
@@ -1157,7 +1266,7 @@
             }
             <span class="prelude-val">Ok</span>(<span class="string">&quot;.eh_frame&quot;</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec</span>.<span class="ident">address</span>() <span class="kw">as</span> <span class="ident">usize</span>)
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section had an invalid physical address&quot;</span>)<span class="question-mark">?</span>;
+                    .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
                 <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
@@ -1185,7 +1294,7 @@
     <span class="kw">let</span> <span class="ident">rodata_shndx</span> <span class="op">=</span> <span class="ident">rodata_shndx</span>.<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t find .rodata section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">data_shndx</span>   <span class="op">=</span> <span class="ident">data_shndx</span>.<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t find .data section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">bss_shndx</span>    <span class="op">=</span> <span class="ident">bss_shndx</span>.<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t find .bss section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">shndxs</span> <span class="op">=</span> <span class="ident">MainShndx</span> { <span class="ident">text_shndx</span>, <span class="ident">rodata_shndx</span>, <span class="ident">data_shndx</span>, <span class="ident">bss_shndx</span> };
+    <span class="kw">let</span> <span class="ident">shndxs</span> <span class="op">=</span> <span class="ident">MainShndx</span> { <span class="ident">text_shndx</span>, <span class="ident">rodata_shndx</span>, <span class="ident">data_shndx</span>, <span class="ident">bss_shndx</span>, <span class="ident">tls_data_shndx</span>, <span class="ident">tls_bss_shndx</span> };
     
     {
         <span class="kw">let</span> <span class="ident">text_pages_locked</span> <span class="op">=</span> <span class="ident">text_pages</span>.<span class="ident">lock</span>();
@@ -1207,6 +1316,7 @@
                     <span class="comment">// debug!(&quot;parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}&quot;, name, demangled, sec_value, sec_size);</span>
 
                     <span class="ident">add_new_section</span>(
+                        <span class="ident">namespace</span>,
                         <span class="kw-2">&amp;</span><span class="ident">shndxs</span>, 
                         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">crate_items</span>, 
                         <span class="ident">text_pages</span>, 
@@ -1254,17 +1364,23 @@
 
 <span class="doccomment">/// The section header indices (shndx) for the main sections:</span>
 <span class="doccomment">/// .text, .rodata, .data, and .bss.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// If TLS sections are present, e.g., .tdata or .tbss, </span>
+<span class="doccomment">/// their `shndx`s and starting virtul addresses are also included here.</span>
 <span class="kw">struct</span> <span class="ident">MainShndx</span> {
-    <span class="ident">text_shndx</span>:   <span class="ident">Shndx</span>,
-    <span class="ident">rodata_shndx</span>: <span class="ident">Shndx</span>,
-    <span class="ident">data_shndx</span>:   <span class="ident">Shndx</span>,
-    <span class="ident">bss_shndx</span>:    <span class="ident">Shndx</span>,
+    <span class="ident">text_shndx</span>:      <span class="ident">Shndx</span>,
+    <span class="ident">rodata_shndx</span>:    <span class="ident">Shndx</span>,
+    <span class="ident">data_shndx</span>:      <span class="ident">Shndx</span>,
+    <span class="ident">bss_shndx</span>:       <span class="ident">Shndx</span>,
+    <span class="ident">tls_data_shndx</span>:  <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Shndx</span>, <span class="ident">VirtualAddress</span>)<span class="op">&gt;</span>,
+    <span class="ident">tls_bss_shndx</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Shndx</span>, <span class="ident">VirtualAddress</span>)<span class="op">&gt;</span>,
 }
 
 <span class="doccomment">/// A convenience function that separates out the logic </span>
 <span class="doccomment">/// of actually creating and adding a new LoadedSection instance</span>
 <span class="doccomment">/// after it has been parsed. </span>
 <span class="kw">fn</span> <span class="ident">add_new_section</span>(
+    <span class="ident">namespace</span>:           <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
     <span class="ident">shndxs</span>:              <span class="kw-2">&amp;</span><span class="ident">MainShndx</span>,
     <span class="ident">crate_items</span>:         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ParsedCrateItems</span>,
     <span class="ident">text_pages</span>:          <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MappedPages</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -1285,7 +1401,7 @@
     <span class="kw">let</span> <span class="ident">new_section</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">text_shndx</span> {
         <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
             .<span class="ident">ok_or</span>(<span class="string">&quot;new text section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
+        <span class="prelude-val">Some</span>(<span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Text</span>,
             <span class="ident">sec_name</span>,
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">text_pages</span>),
@@ -1294,12 +1410,12 @@
             <span class="ident">sec_size</span>,
             <span class="ident">global</span>,
             <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(), 
-        ))
+        )))
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">rodata_shndx</span> {
         <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
             .<span class="ident">ok_or</span>(<span class="string">&quot;new rodata section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
+        <span class="prelude-val">Some</span>(<span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Rodata</span>,
             <span class="ident">sec_name</span>,
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>),
@@ -1308,12 +1424,12 @@
             <span class="ident">sec_size</span>,
             <span class="ident">global</span>,
             <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
-        ))
+        )))
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">data_shndx</span> {
         <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
             .<span class="ident">ok_or</span>(<span class="string">&quot;new data section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
+        <span class="prelude-val">Some</span>(<span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Data</span>,
             <span class="ident">sec_name</span>,
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">data_pages</span>),
@@ -1322,12 +1438,12 @@
             <span class="ident">sec_size</span>,
             <span class="ident">global</span>,
             <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
-        ))
+        )))
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">bss_shndx</span> {
         <span class="kw">let</span> <span class="ident">sec_vaddr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">sec_vaddr</span>)
             .<span class="ident">ok_or</span>(<span class="string">&quot;new bss section had invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Some</span>(<span class="ident">LoadedSection::new</span>(
+        <span class="prelude-val">Some</span>(<span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
             <span class="ident">SectionType::Bss</span>,
             <span class="ident">sec_name</span>,
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">data_pages</span>),
@@ -1336,7 +1452,34 @@
             <span class="ident">sec_size</span>,
             <span class="ident">global</span>,
             <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
-        ))
+        )))
+    }
+    <span class="kw">else</span> <span class="kw">if</span> <span class="ident">shndxs</span>.<span class="ident">tls_data_shndx</span>.<span class="ident">map_or</span>(<span class="bool-val">false</span>, <span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndx</span>) {
+        <span class="comment">// TLS sections encode their TLS offset in the virtual address field,</span>
+        <span class="comment">// which is necessary to properly calculate relocation entries that depend upon them.</span>
+        <span class="kw">let</span> <span class="ident">tls_offset</span> <span class="op">=</span> <span class="ident">sec_vaddr</span>;
+        <span class="comment">// We do need to calculate the real virtual address so we can use that </span>
+        <span class="comment">// to calculate the real mapped_pages_offset where its data exists.</span>
+        <span class="comment">// so we can use that to calculate the real virtual address where it&#39;s loaded.</span>
+        <span class="kw">let</span> <span class="ident">tls_sec_data_vaddr</span> <span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">tls_data_shndx</span>.<span class="ident">unwrap</span>().<span class="number">1</span> <span class="op">+</span> <span class="ident">tls_offset</span>; 
+
+        <span class="kw">let</span> <span class="ident">tls_section</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
+            <span class="ident">SectionType::Tls</span>,
+            <span class="ident">sec_name</span>,
+            <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>),
+            <span class="comment">// TLS sections are lumped into the &quot;.rodata&quot; MappedPages with the read-only data sections.</span>
+            <span class="ident">rodata_pages_locked</span>.<span class="ident">offset_of_address</span>(<span class="ident">tls_sec_data_vaddr</span>).<span class="ident">ok_or</span>(<span class="string">&quot;nano_core TLS .tdata section wasn&#39;t covered by the .rodata mapped pages!&quot;</span>)<span class="question-mark">?</span>,
+            <span class="ident">VirtualAddress::new</span>(<span class="ident">tls_offset</span>).<span class="ident">ok_or</span>(<span class="string">&quot;new TLS .tdata section had invalid virtual address (TLS offset)&quot;</span>)<span class="question-mark">?</span>,
+            <span class="ident">sec_size</span>,
+            <span class="ident">global</span>,
+            <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
+        ));
+        <span class="comment">// Add this new TLS section to this namespace&#39;s TLS area image.</span>
+        <span class="ident">namespace</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>().<span class="ident">add_existing_tls_section</span>(<span class="ident">tls_offset</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">tls_section</span>)).<span class="ident">unwrap</span>();
+        <span class="prelude-val">Some</span>(<span class="ident">tls_section</span>)
+    }
+    <span class="kw">else</span> <span class="kw">if</span> <span class="ident">shndxs</span>.<span class="ident">tls_bss_shndx</span>.<span class="ident">map_or</span>(<span class="bool-val">false</span>, <span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndx</span>) {
+        <span class="macro">todo!</span>(<span class="string">&quot;parse_nano_core(): found unsupported TLS .bss section&quot;</span>);
     }
     <span class="kw">else</span> {
         <span class="ident">crate_items</span>.<span class="ident">init_symbols</span>.<span class="ident">insert</span>(<span class="ident">sec_name</span>, <span class="ident">sec_vaddr</span>);
@@ -1345,18 +1488,18 @@
 
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sec</span>) <span class="op">=</span> <span class="ident">new_section</span> {
         <span class="comment">// debug!(&quot;parse_nano_core: new section: {:?}&quot;, sec);</span>
-        <span class="kw">let</span> <span class="ident">sec_ref</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">sec</span>);
-        <span class="kw">if</span> <span class="ident">sec_ref</span>.<span class="ident">global</span> {
+        <span class="kw">if</span> <span class="ident">sec</span>.<span class="ident">global</span> {
             <span class="ident">crate_items</span>.<span class="ident">global_sections</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">section_counter</span>);
         }
-        <span class="kw">if</span> <span class="ident">sec_ref</span>.<span class="ident">typ</span>.<span class="ident">is_data_or_bss</span>() {
+        <span class="kw">if</span> <span class="ident">sec</span>.<span class="ident">typ</span>.<span class="ident">is_data_or_bss</span>() {
             <span class="ident">crate_items</span>.<span class="ident">data_sections</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">section_counter</span>);
         }
-        <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">section_counter</span>, <span class="ident">sec_ref</span>);
+        <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(<span class="kw-2">*</span><span class="ident">section_counter</span>, <span class="ident">sec</span>);
         <span class="kw-2">*</span><span class="ident">section_counter</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
     }
 
     <span class="prelude-val">Ok</span>(())
-}</pre></div>
+}
+</pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mod_mgmt" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
     <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>

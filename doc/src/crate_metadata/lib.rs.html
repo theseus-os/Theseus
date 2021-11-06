@@ -1021,6 +1021,24 @@
 <span id="1018">1018</span>
 <span id="1019">1019</span>
 <span id="1020">1020</span>
+<span id="1021">1021</span>
+<span id="1022">1022</span>
+<span id="1023">1023</span>
+<span id="1024">1024</span>
+<span id="1025">1025</span>
+<span id="1026">1026</span>
+<span id="1027">1027</span>
+<span id="1028">1028</span>
+<span id="1029">1029</span>
+<span id="1030">1030</span>
+<span id="1031">1031</span>
+<span id="1032">1032</span>
+<span id="1033">1033</span>
+<span id="1034">1034</span>
+<span id="1035">1035</span>
+<span id="1036">1036</span>
+<span id="1037">1037</span>
+<span id="1038">1038</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.</span>
 <span class="doccomment">//! </span>
@@ -1075,6 +1093,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">xmas_elf</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">goblin</span>;
 
+<span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::ops::Range</span>;
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">RwLock</span>};
@@ -1246,6 +1265,10 @@
     <span class="doccomment">/// The `Shndx` values in this set are the section index (shndx) numbers, </span>
     <span class="doccomment">/// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.</span>
     <span class="kw">pub</span> <span class="ident">global_sections</span>: <span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The set of thread-local storage (TLS) symbols in this crate.</span>
+    <span class="doccomment">/// The `Shndx` values in this set are the section index (shndx) numbers, </span>
+    <span class="doccomment">/// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.</span>
+    <span class="kw">pub</span> <span class="ident">tls_sections</span>: <span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">Shndx</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The set of `.data` and `.bss` sections in this crate.</span>
     <span class="doccomment">/// The `Shndx` values in this set are the section index (shndx) numbers, </span>
     <span class="doccomment">/// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.</span>
@@ -1439,6 +1462,7 @@
             <span class="ident">rodata_pages</span>:            <span class="ident">new_rodata_pages_range</span>,
             <span class="ident">data_pages</span>:              <span class="ident">new_data_pages_range</span>,
             <span class="ident">global_sections</span>:         <span class="self">self</span>.<span class="ident">global_sections</span>.<span class="ident">clone</span>(),
+            <span class="ident">tls_sections</span>:            <span class="self">self</span>.<span class="ident">tss_sections</span>.<span class="ident">clone</span>(),
             <span class="ident">data_sections</span>:           <span class="self">self</span>.<span class="ident">data_sections</span>.<span class="ident">clone</span>(),
             <span class="ident">reexported_symbols</span>:      <span class="self">self</span>.<span class="ident">reexported_symbols</span>.<span class="ident">clone</span>(),
         });
@@ -1593,6 +1617,8 @@
     <span class="ident">Data</span>,
     <span class="doccomment">/// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.</span>
     <span class="ident">Bss</span>,
+    <span class="doccomment">/// A read-only section that holds the initial data for a thread-local storage (TLS) area.</span>
+    <span class="ident">Tls</span>,
     <span class="doccomment">/// A `.gcc_except_table` section contains landing pads for exception handling,</span>
     <span class="doccomment">/// comprising the LSDA (Language Specific Data Area),</span>
     <span class="doccomment">/// which is effectively used to determine when we should stop the stack unwinding process</span>
@@ -1671,6 +1697,9 @@
     <span class="doccomment">/// This can be used to calculate size, but is primarily a performance optimization</span>
     <span class="doccomment">/// so we can avoid locking this section&#39;s `MappedPages` and avoid recalculating </span>
     <span class="doccomment">/// its bounds based on its offset and size. </span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// For TLS sections, this `address_range.start` holds the offset (from the TLS base)</span>
+    <span class="doccomment">/// into the TLS area where this section&#39;s data exists.</span>
     <span class="kw">pub</span> <span class="ident">address_range</span>: <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>, 
     <span class="doccomment">/// The `LoadedCrate` object that contains/owns this section</span>
     <span class="kw">pub</span> <span class="ident">parent_crate</span>: <span class="ident">WeakCrateRef</span>,
@@ -2030,6 +2059,13 @@
             <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>().<span class="ident">wrapping_add</span>(<span class="ident">relocation_entry</span>.<span class="ident">addend</span>).<span class="ident">wrapping_sub</span>(<span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>);
             <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
             <span class="kw-2">*</span><span class="ident">target_ref</span> <span class="op">=</span> <span class="ident">source_val</span> <span class="kw">as</span> <span class="ident">u64</span>;
+        }
+        <span class="ident">R_X86_64_TPOFF32</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="kw">let</span> <span class="ident">target_ref</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">u32</span> <span class="op">=</span> <span class="ident">target_sec_mapped_pages</span>.<span class="ident">as_type_mut</span>(<span class="ident">target_offset</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">source_val</span> <span class="op">=</span> <span class="ident">u32::try_from</span>(<span class="ident">source_sec_vaddr</span>.<span class="ident">value</span>())
+                .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">if</span> <span class="ident">verbose_log</span> { <span class="macro">trace!</span>(<span class="string">&quot;                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})&quot;</span>, <span class="ident">target_ref</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">source_val</span>, <span class="ident">source_sec_vaddr</span>); }
+            <span class="kw-2">*</span><span class="ident">target_ref</span> <span class="op">=</span> <span class="ident">source_val</span>;
         }
         <span class="comment">// R_X86_64_GOTPCREL =&gt; { </span>
         <span class="comment">//     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table</span>

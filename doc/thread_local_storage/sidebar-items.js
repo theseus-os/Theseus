@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main",""],["test_tls",""]],"static":[["COMPLEX",""],["LOCAL_U16",""],["LOCAL_U8_1",""],["LOCAL_U8_2",""],["LOCAL_USIZE",""],["LOCAL_ZERO",""],["MY_STRUCT",""]],"struct":[["Complex",""],["MyStruct",""]]});

@@ -1122,6 +1122,22 @@
 <span id="1119">1119</span>
 <span id="1120">1120</span>
 <span id="1121">1121</span>
+<span id="1122">1122</span>
+<span id="1123">1123</span>
+<span id="1124">1124</span>
+<span id="1125">1125</span>
+<span id="1126">1126</span>
+<span id="1127">1127</span>
+<span id="1128">1128</span>
+<span id="1129">1129</span>
+<span id="1130">1130</span>
+<span id="1131">1131</span>
+<span id="1132">1132</span>
+<span id="1133">1133</span>
+<span id="1134">1134</span>
+<span id="1135">1135</span>
+<span id="1136">1136</span>
+<span id="1137">1137</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
@@ -1187,13 +1203,10 @@
 <span class="kw">use</span> <span class="ident">memory::MmiRef</span>;
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
 <span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES</span>;
-<span class="kw">use</span> <span class="ident">mod_mgmt</span>::{
-    <span class="ident">CrateNamespace</span>,
-    <span class="ident">AppCrateRef</span>,
-};
+<span class="kw">use</span> <span class="ident">mod_mgmt</span>::{<span class="ident">AppCrateRef</span>, <span class="ident">CrateNamespace</span>, <span class="ident">TlsDataImage</span>};
 <span class="kw">use</span> <span class="ident">environment::Environment</span>;
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">x86_64::registers::msr</span>::{<span class="ident">rdmsr</span>, <span class="ident">wrmsr</span>, <span class="ident">IA32_FS_BASE</span>};
+<span class="kw">use</span> <span class="ident">x86_64::registers::msr</span>::{<span class="ident">IA32_FS_BASE</span>, <span class="ident">IA32_GS_BASE</span>, <span class="ident">rdmsr</span>, <span class="ident">wrmsr</span>};
 
 
 <span class="doccomment">/// The function signature of the callback that will be invoked</span>
@@ -1403,7 +1416,9 @@
 
 <span class="doccomment">/// A structure that contains contextual information for a thread of execution. </span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// Only fields that do not permit interior mutability are public and can be accessed directly.</span>
+<span class="doccomment">/// # Implementation note</span>
+<span class="doccomment">/// Only fields that do not permit interior mutability can safely be exposed as public</span>
+<span class="doccomment">/// because we allow foreign crates to directly access task struct fields.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Task</span> {
     <span class="doccomment">/// The mutable parts of a `Task` struct that can be modified after task creation,</span>
     <span class="doccomment">/// excluding private items that can be modified atomically.</span>
@@ -1445,6 +1460,11 @@
     <span class="doccomment">/// Typically, it will point to this Task&#39;s specific instance of `spawn::task_cleanup_failure()`,</span>
     <span class="doccomment">/// which has generic type parameters that describe its function signature, argument type, and return type.</span>
     <span class="kw">pub</span> <span class="ident">failure_cleanup_function</span>: <span class="ident">FailureCleanupFunction</span>,
+    <span class="doccomment">/// The Thread-Local Storage (TLS) area for this task.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Upon each task switch, we must set the value of the TLS base register </span>
+    <span class="doccomment">/// (e.g., FS_BASE on x86_64) to the value of this TLS area&#39;s self pointer.</span>
+    <span class="ident">tls_area</span>: <span class="ident">TlsDataImage</span>,
     
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
     <span class="doccomment">/// The runqueue that this Task is on.</span>
@@ -1513,7 +1533,8 @@
     <span class="doccomment">/// should inherit any states from it.</span>
     <span class="kw">fn</span> <span class="ident">new_internal</span>(
         <span class="ident">kstack</span>: <span class="ident">Stack</span>, 
-        <span class="ident">mmi</span>: <span class="ident">MmiRef</span>, <span class="ident">namespace</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
+        <span class="ident">mmi</span>: <span class="ident">MmiRef</span>,
+        <span class="ident">namespace</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
         <span class="ident">env</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Environment</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">app_crate</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">AppCrateRef</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">failure_cleanup_function</span>: <span class="ident">FailureCleanupFunction</span>,
@@ -1524,6 +1545,9 @@
         <span class="comment">// we should re-use old task IDs again, instead of simply blindly counting up</span>
         <span class="comment">// TODO FIXME: or use random values to avoid state spill</span>
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">TASKID_COUNTER</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Acquire</span>);
+
+        <span class="comment">// Obtain a new copied instance of the TLS data image for this task.</span>
+        <span class="kw">let</span> <span class="ident">tls_area</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">get_tls_initializer_data</span>();
 
         <span class="ident">Task</span> {
             <span class="ident">inner</span>: <span class="ident">MutexIrqSafe::new</span>(<span class="ident">TaskInner</span> {
@@ -1546,6 +1570,7 @@
             <span class="ident">app_crate</span>,
             <span class="ident">namespace</span>,
             <span class="ident">failure_cleanup_function</span>,
+            <span class="ident">tls_area</span>,
 
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">runqueue_spillful</span>)]</span>
             <span class="ident">on_runqueue</span>: <span class="ident">AtomicCell::new</span>(<span class="prelude-val">None</span>.<span class="ident">into</span>()),
@@ -1746,14 +1771,21 @@
     <span class="doccomment">/// Sets this `Task` as this core&#39;s current task.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Currently this is achieved by writing a pointer to the `TaskLocalData` </span>
-    <span class="doccomment">/// into the FS segment register base MSR.</span>
+    <span class="doccomment">/// into the `GS_BASE` register.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Locking / Deadlock</span>
     <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to access it. </span>
     <span class="kw">fn</span> <span class="ident">set_as_current_task</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">unsafe</span> {
+            <span class="ident">wrmsr</span>(<span class="ident">IA32_FS_BASE</span>, <span class="self">self</span>.<span class="ident">tls_area</span>.<span class="ident">pointer_value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
+        }
+
+        <span class="comment">// TODO: now that proper ELF TLS areas are supported, </span>
+        <span class="comment">//       use that TLS area for the `TaskLocalData` instead of `GS_BASE`. </span>
+
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">tld</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span> {
             <span class="kw">unsafe</span> {
-                <span class="ident">wrmsr</span>(<span class="ident">IA32_FS_BASE</span>, <span class="ident">tld</span>.<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">u64</span>);
+                <span class="ident">wrmsr</span>(<span class="ident">IA32_GS_BASE</span>, <span class="ident">tld</span>.<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">u64</span>);
             }
         } <span class="kw">else</span> {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: failed to set current task, it had no TaskLocalData. {:?}&quot;</span>, <span class="self">self</span>);
@@ -2209,8 +2241,10 @@
 
 <span class="doccomment">/// The structure that holds information local to each Task,</span>
 <span class="doccomment">/// effectively a form of thread-local storage (TLS).</span>
-<span class="doccomment">/// A pointer to this structure is stored in the `FS` segment register,</span>
+<span class="doccomment">/// A pointer to this structure is stored in the `GS_BASE` MSR (model-specific register),</span>
 <span class="doccomment">/// such that any task can easily and quickly access their local data.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// TODO: combine this into the standard TLS area, which uses FS_BASE plus the FS segment register.</span>
 <span class="comment">// #[repr(C)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">struct</span> <span class="ident">TaskLocalData</span> {
@@ -2219,10 +2253,10 @@
 }
 
 <span class="doccomment">/// Returns a reference to the current task&#39;s `TaskLocalData` </span>
-<span class="doccomment">/// by using the `TaskLocalData` pointer stored in the FS base MSR register.</span>
+<span class="doccomment">/// by using the `TaskLocalData` pointer stored in the `GS_BASE` register.</span>
 <span class="kw">fn</span> <span class="ident">get_task_local_data</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">TaskLocalData</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">tld</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">TaskLocalData</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">tld_ptr</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_FS_BASE</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">TaskLocalData</span>;
+        <span class="kw">let</span> <span class="ident">tld_ptr</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_GS_BASE</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="ident">TaskLocalData</span>;
         <span class="kw">if</span> <span class="ident">tld_ptr</span>.<span class="ident">is_null</span>() {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -2233,14 +2267,12 @@
     <span class="prelude-val">Some</span>(<span class="ident">tld</span>)
 }
 
-<span class="doccomment">/// Returns a reference to the current task by using the `TaskLocalData` pointer</span>
-<span class="doccomment">/// stored in the thread-local storage (FS base model-specific register).</span>
+<span class="doccomment">/// Returns a reference to the current task.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_my_current_task</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">TaskRef</span><span class="op">&gt;</span> {
     <span class="ident">get_task_local_data</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">tld</span><span class="op">|</span> <span class="kw-2">&amp;</span><span class="ident">tld</span>.<span class="ident">current_taskref</span>)
 }
 
-<span class="doccomment">/// Returns the current Task&#39;s id by using the `TaskLocalData` pointer</span>
-<span class="doccomment">/// stored in the thread-local storage (FS base model-specific register).</span>
+<span class="doccomment">/// Returns the current task&#39;s ID.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_my_current_task_id</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
     <span class="ident">get_task_local_data</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">tld</span><span class="op">|</span> <span class="ident">tld</span>.<span class="ident">current_task_id</span>)
 }

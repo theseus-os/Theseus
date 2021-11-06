@@ -462,6 +462,12 @@
 <span id="459">459</span>
 <span id="460">460</span>
 <span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate contains common types used for memory mapping. </span>
 
@@ -909,13 +915,19 @@
 
 <span class="doccomment">/// The address bounds and flags of the initial kernel sections that need mapping. </span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// It contains three main items, in which each item includes all sections that have identical flags:</span>
-<span class="doccomment">/// * The `.text` section bounds cover all sections that are executable.</span>
-<span class="doccomment">/// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).</span>
-<span class="doccomment">/// * The `.data` section bounds cover those that are writable (.data, .bss).</span>
+<span class="doccomment">/// Individual sections in the kernel&#39;s ELF image are combined here according to their flags,</span>
+<span class="doccomment">/// as described below, but some are kept separate for the sake of correctness or ease of use.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// It also contains the bounds of the initial page table (root p4 frame) and </span>
-<span class="doccomment">/// the initial stack, which are maintained separately.</span>
+<span class="doccomment">/// It contains three main items, in which each item includes all sections that have identical flags:</span>
+<span class="doccomment">/// * The `text` section bounds cover all sections that are executable.</span>
+<span class="doccomment">/// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).</span>
+<span class="doccomment">///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,</span>
+<span class="doccomment">///     because they can be mapped using the same page table flags.</span>
+<span class="doccomment">/// * The `data` section bounds cover those that are writable (.data, .bss).</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// It also contains:</span>
+<span class="doccomment">/// * The `page_table` section bounds cover the initial page table&#39;s top-level (root) P4 frame. </span>
+<span class="doccomment">/// * The `stack` section bounds cover the initial stack, which are maintained separately.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AggregatedSectionMemoryBounds</span> {
    <span class="kw">pub</span> <span class="ident">text</span>:        <span class="ident">SectionMemoryBounds</span>,

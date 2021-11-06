@@ -324,6 +324,25 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.</span>
 <span class="doccomment">//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  </span>
@@ -423,10 +442,10 @@
 <span class="doccomment">/// Finds the addresses in memory of the main kernel sections, as specified by the given boot information. </span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// Returns the following tuple, if successful:</span>
-<span class="doccomment">///  * The combined size and address bounds of specifically .text, .rodata, .data, and the stack.</span>
-<span class="doccomment">///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections that share the same flags,</span>
-<span class="doccomment">///    except for the stack which is kept separate.</span>
-<span class="doccomment">///  * The list of individual sections found. </span>
+<span class="doccomment">///  * The combined size and address bounds of key sections, e.g., .text, .rodata, .data.</span>
+<span class="doccomment">///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections </span>
+<span class="doccomment">///    that share the same page table mapping flags and can thus be logically combined.</span>
+<span class="doccomment">///  * The list of all individual sections found. </span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_section_memory_bounds</span>(<span class="ident">boot_info</span>: <span class="kw-2">&amp;</span><span class="ident">BootInformation</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AggregatedSectionMemoryBounds</span>, [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SectionMemoryBounds</span><span class="op">&gt;</span>; <span class="number">32</span>]), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">elf_sections_tag</span> <span class="op">=</span> <span class="ident">boot_info</span>.<span class="ident">elf_sections_tag</span>().<span class="ident">ok_or</span>(<span class="string">&quot;no Elf sections tag present!&quot;</span>)<span class="question-mark">?</span>;
 
@@ -442,9 +461,9 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page_table_start</span>:  <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page_table_end</span>:    <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
 
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_flags</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_flags</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_flags</span>:   <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">text_flags</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rodata_flags</span>:      <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_flags</span>:        <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">EntryFlags</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sections_memory_bounds</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SectionMemoryBounds</span><span class="op">&gt;</span>; <span class="number">32</span>] <span class="op">=</span> <span class="ident">Default::default</span>();
 
@@ -490,20 +509,25 @@
         }
 
         <span class="comment">// The linker script (linker_higher_half.ld) defines the following order of sections:</span>
-        <span class="comment">// |-----|-------------------|------------------------------|</span>
-        <span class="comment">// | Sec |    Sec Name       |    Description / purpose     |</span>
-        <span class="comment">// | Num |                   |                              |</span>
-        <span class="comment">// |-----|--------------------------------------------------|</span>
-        <span class="comment">// | (1) | .init             | start of executable pages    |</span>
-        <span class="comment">// | (2) | .text             | end of executable pages      |</span>
-        <span class="comment">// | (3) | .rodata           | start of read-only pages     |</span>
-        <span class="comment">// | (4) | .eh_frame         | part of read-only pages      |</span>
-        <span class="comment">// | (5) | .gcc_except_table | end of read-only pages       |</span>
-        <span class="comment">// | (6) | .data             | start of read-write pages    | </span>
-        <span class="comment">// | (7) | .bss              | end of read-write pages      |</span>
-        <span class="comment">// | (8) | .page_table       | separate .data-like section  |</span>
-        <span class="comment">// | (9) | .stack            | separate .data-like section  |</span>
-        <span class="comment">// |-----|-------------------|------------------------------|</span>
+        <span class="comment">// |------|-------------------|-------------------------------|</span>
+        <span class="comment">// | Sec  |    Sec Name       |    Description / purpose      |</span>
+        <span class="comment">// | Num  |                   |                               |</span>
+        <span class="comment">// |------|---------------------------------------------------|</span>
+        <span class="comment">// | (1)  | .init             | start of executable pages     |</span>
+        <span class="comment">// | (2)  | .text             | end of executable pages       |</span>
+        <span class="comment">// | (3)  | .rodata           | start of read-only pages      |</span>
+        <span class="comment">// | (4)  | .eh_frame         | part of read-only pages       |</span>
+        <span class="comment">// | (5)  | .gcc_except_table | part/end of read-only pages   |</span>
+        <span class="comment">// | (6)  | .tdata            | part/end of read-only pages   |</span>
+        <span class="comment">// | (7)  | .tbss             | part/end of read-only pages   |</span>
+        <span class="comment">// | (8)  | .data             | start of read-write pages     | </span>
+        <span class="comment">// | (9)  | .bss              | end of read-write pages       |</span>
+        <span class="comment">// | (10) | .page_table       | separate .data-like section   |</span>
+        <span class="comment">// | (11) | .stack            | separate .data-like section   |</span>
+        <span class="comment">// |------|-------------------|-------------------------------|</span>
+        <span class="comment">//</span>
+        <span class="comment">// Note that because the TLS data areas (.tdata and .tbss) are nothing more than</span>
+        <span class="comment">// read-only initializer data, we combine their pages into the end of the read-only pages.</span>
         <span class="comment">//</span>
         <span class="comment">// Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).</span>
         <span class="kw">let</span> <span class="ident">static_str_name</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">section</span>.<span class="ident">name</span>() {
@@ -528,13 +552,27 @@
                 <span class="ident">rodata_flags</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">flags</span>);
                 <span class="string">&quot;nano_core .gcc_except_table&quot;</span>
             }
+            <span class="comment">// The following four sections are optional: .tdata, .tbss, .data, .bss.</span>
+            <span class="comment">//</span>
+            <span class="comment">// If .tdata or .tbss exist, we place them at the end of the rodata pages.</span>
+            <span class="string">&quot;.tdata&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">rodata_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
+                <span class="string">&quot;nano_core .tdata&quot;</span>
+            }
+            <span class="string">&quot;.tbss&quot;</span> <span class="op">=</span><span class="op">&gt;</span>{
+                <span class="ident">rodata_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
+                <span class="string">&quot;nano_core .tbss&quot;</span>
+            }
             <span class="string">&quot;.data&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="ident">data_start</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
+                <span class="ident">data_start</span>.<span class="ident">get_or_insert</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
+                <span class="ident">data_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
                 <span class="ident">data_flags</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">flags</span>);
                 <span class="string">&quot;nano_core .data&quot;</span>
             }
             <span class="string">&quot;.bss&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">data_start</span>.<span class="ident">get_or_insert</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));
                 <span class="ident">data_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
+                <span class="ident">data_flags</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">flags</span>);
                 <span class="string">&quot;nano_core .bss&quot;</span>
             }
             <span class="string">&quot;.page_table&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
@@ -558,7 +596,7 @@
         <span class="ident">sections_memory_bounds</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">SectionMemoryBounds</span> {
             <span class="ident">start</span>: (<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>),
             <span class="ident">end</span>: (<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>),
-            <span class="ident">flags</span>: <span class="ident">flags</span>,
+            <span class="ident">flags</span>,
         });
 
         <span class="ident">index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;

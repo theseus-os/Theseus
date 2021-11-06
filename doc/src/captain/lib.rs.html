@@ -179,6 +179,7 @@
 <span id="176">176</span>
 <span id="177">177</span>
 <span id="178">178</span>
+<span id="179">179</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The main initialization routine and setup logic of the OS. </span>
 <span class="doccomment">//! </span>
@@ -294,6 +295,7 @@
 
     <span class="comment">// create the initial `Task`, which is bootstrapped from this execution context.</span>
     <span class="kw">let</span> <span class="ident">bootstrap_task</span> <span class="op">=</span> <span class="ident">spawn::init</span>(<span class="ident">kernel_mmi_ref</span>.<span class="ident">clone</span>(), <span class="ident">bsp_apic_id</span>, <span class="ident">bsp_initial_stack</span>)<span class="question-mark">?</span>;
+    <span class="macro">info!</span>(<span class="string">&quot;Created initial bootstrap task: {:?}&quot;</span>, <span class="ident">bootstrap_task</span>);
 
     <span class="comment">// after we&#39;ve initialized the task subsystem, we can use better exception handlers</span>
     <span class="ident">exceptions_full::init</span>(<span class="ident">idt</span>);
