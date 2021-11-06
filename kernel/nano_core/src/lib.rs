@@ -227,7 +227,7 @@ pub extern "C" fn nano_core_start(
 
     // TODO: REMOVE: just a hack to force the thread_local_storage crate's code/data sections to be included.
     //               this won't actually be invoked because the captain shouldn't return.
-    thread_local_storage::test_tls(3);
+    // thread_local_storage::test_tls(3);
 
     // the captain shouldn't return ...
     try_exit!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));

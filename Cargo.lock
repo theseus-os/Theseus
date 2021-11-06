@@ -1763,7 +1763,6 @@ dependencies = [
  "spin 0.9.0",
  "stack",
  "state_store",
- "thread_local_storage",
  "vga_buffer",
 ]
 
@@ -3003,15 +3002,6 @@ dependencies = [
  "memory",
  "pause",
  "x86_64",
-]
-
-[[package]]
-name = "tls_test"
-version = "0.1.0"
-dependencies = [
- "log",
- "terminal_print",
- "thread_local_storage",
 ]
 
 [[package]]
