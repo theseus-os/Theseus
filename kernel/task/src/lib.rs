@@ -62,10 +62,7 @@ use irq_safety::{MutexIrqSafe, interrupts_enabled};
 use memory::MmiRef;
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use mod_mgmt::{
-    CrateNamespace,
-    AppCrateRef,
-};
+use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{IA32_FS_BASE, IA32_GS_BASE, rdmsr, wrmsr};
@@ -323,16 +320,11 @@ pub struct Task {
     /// which has generic type parameters that describe its function signature, argument type, and return type.
     pub failure_cleanup_function: FailureCleanupFunction,
     /// The Thread-Local Storage (TLS) area for this task.
-    /// This is a boxed slice instead of a vector because it is instantiated once upon task creation
-    /// and should never be expanded or shrunk; it is "immutable" with respect to
-    /// Theseus task management functions at the language level.
     /// 
-    /// However, the data within this TLS area will be modified directly by code
-    /// that executes "in" this task, e.g., instructions that access the current TLS area.
-    /// 
-    /// Upon each task switch, we must set the value of the TLS base register to point
+    /// Upon each task switch, we must set the value of the TLS base register 
+    /// (e.g., FS_BASE on x86_64) to the value of this TLS area's self pointer.
     /// to this area; for example, FSBASE on x86. 
-    tls_area: Box<[u8]>,
+    tls_area: TlsDataImage,
     
     #[cfg(runqueue_spillful)]
     /// The runqueue that this Task is on.
@@ -415,7 +407,7 @@ impl Task {
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
 
         let tls_area = namespace.get_tls_initializer_data();
-        warn!("Task::new_internal(): tls_area: {:X?}", tls_area);
+        warn!("Task::new_internal(): {:02X?}", tls_area);
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
@@ -644,8 +636,8 @@ impl Task {
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to access it. 
     fn set_as_current_task(&self) {
-        let tls_ptr = self.tls_area.as_ptr();
-        warn!("Setting FS_BASE MSR to TLS pointer: {:#X}", tls_ptr as u64);
+        let tls_ptr = self.tls_area.pointer_value();
+        warn!("Setting FS_BASE MSR to TLS pointer: {:#X}", tls_ptr);
         unsafe {
             wrmsr(IA32_FS_BASE, tls_ptr as u64);
         }

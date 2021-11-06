@@ -79,10 +79,10 @@ pub fn test_tls(x: usize) {
     let local_u8_2 = LOCAL_U8_2 + x as u8;
     debug!("LOCAL_U8_2 + x: {:?}", local_u8_2);
 
-    debug!("COMPLEX: {:?}", COMPLEX);
+    debug!("COMPLEX: {:X?}", COMPLEX);
 
     debug!("MY_STRUCT: {:?}", MY_STRUCT);
-    debug!("Task {:?}: MY_STRUCT: {:?}", task::get_my_current_task(), MY_STRUCT.replace(MyStruct(0x99999999)));
+    debug!("Task {:?}: MY_STRUCT: {:X?}", task::get_my_current_task(), MY_STRUCT.replace(MyStruct(0x99999999)));
 }
 
 pub fn main(_args: Vec<String>) -> isize {

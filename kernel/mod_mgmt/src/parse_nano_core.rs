@@ -127,7 +127,7 @@ pub fn parse_nano_core(
     real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
     info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
     trace!("TlsInitializer after parse_nano_core(): {:#?}", &*real_namespace.tls_initializer.lock());
-    trace!("TlsInitializer data after parse_nano_core(): {:X?}", real_namespace.tls_initializer.lock().get_data());
+    trace!("TlsInitializer data after parse_nano_core(): {:02X?}", real_namespace.tls_initializer.lock().get_data());
     Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }
 

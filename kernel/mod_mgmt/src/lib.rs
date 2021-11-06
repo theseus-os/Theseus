@@ -459,7 +459,7 @@ impl CrateNamespace {
 
     /// Returns a new copy of this namespace's initial TLS area,
     /// which can be used as the initial TLS area data for a new task.
-    pub fn get_tls_initializer_data(&self) -> Box<[u8]> {
+    pub fn get_tls_initializer_data(&self) -> TlsDataImage {
         self.tls_initializer.lock().get_data()
     }
 
@@ -787,7 +787,7 @@ impl CrateNamespace {
     ) -> Result<StrongCrateRef, &'static str> {
         let cf = crate_object_file.lock();
         let (new_crate_ref, elf_file) = self.load_crate_sections(cf.deref(), kernel_mmi_ref, verbose_log)?;
-        warn!("After load_crate_sections, TlsInitializer data: {:X?}", self.tls_initializer.lock().get_data());
+        warn!("After load_crate_sections, TlsInitializer data: {:02X?}", self.tls_initializer.lock().get_data());
         self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         Ok(new_crate_ref)
     }
@@ -2483,35 +2483,96 @@ impl TlsInitializer {
     }
 
     /// Returns a new copy of the TLS data image, auto-generating it if needed.
-    pub(crate) fn get_data(&mut self) -> Box<[u8]> {
-        if self.cache_status == CacheStatus::Fresh {
-            return self.data_cache.as_slice().into();
-        }
+    pub(crate) fn get_data(&mut self) -> TlsDataImage {
+        const POINTER_SIZE:      usize = core::mem::size_of::<usize>();
+        const POINTER_ALIGNMENT: usize = core::mem::align_of::<usize>();
 
-        debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+        if self.cache_status == CacheStatus::Invalidated {
+            debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
 
-        let mut new_data: Vec<u8> = Vec::new();
-        let mut end_of_previous_range: usize = 0;
-        for (range, sec) in self.offsets_of_sections.iter() {
-            // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
-            let num_padding_bytes = range.start.saturating_sub(end_of_previous_range);
-            warn!("Inserting {} padding bytes", num_padding_bytes);
-            for _i in 0..num_padding_bytes {
-                // surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.
-                new_data.push(0); 
+            // On some architectures, such as x86_64, the ABI convention REQUIRES that
+            // the TLS area data starts with a pointer to itself (the TLS self pointer).
+            // Also, all TLS section data comes *before* the TLS self pointer, i.e.,
+            // at negative offsets from the TLS area's self pointer.
+            // Thus, we handle that here by appending space for a pointer (one `usize`)
+            // to the `new_data` vector after we insert the rest of the TLS data sections.
+            // The pointer value is aligned to the architecture's pointer size, e.g., 8 bytes for x86_64.
+            // The location of the new pointer value is the conceptual "start" of the TLS image,
+            // and that's what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).
+            let mut new_data: Vec<u8> = Vec::new();
+            
+            let mut end_of_previous_range: usize = 0;
+            for (range, sec) in self.offsets_of_sections.iter() {
+                // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
+                let num_padding_bytes = range.start.saturating_sub(end_of_previous_range);
+                warn!("Inserting {} padding bytes", num_padding_bytes);
+                for _i in 0..num_padding_bytes {
+                    // surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.
+                    new_data.push(0); 
+                }
+
+                // Insert the section data into the new data vec.
+                let sec_mp = sec.mapped_pages.lock();
+                let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
+                new_data.extend_from_slice(sec_data);
+                assert_eq!(range.len(), sec.size());
+                end_of_previous_range = range.end;
             }
 
-            // Insert the section data into the new data vec.
-            let sec_mp = sec.mapped_pages.lock();
-            let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
-            new_data.extend_from_slice(sec_data);
-            assert_eq!(range.len(), sec.size());
-            end_of_previous_range = range.end;
+            // Append space for the TLS self pointer (with enough padding for proper alignment);
+            // it's actual value will be filled in later once a new copy of the TLS data image is made.
+            {
+                let aligned_start = util::round_up(end_of_previous_range, POINTER_ALIGNMENT);
+                let num_bytes = aligned_start - end_of_previous_range + POINTER_SIZE;
+                warn!("Inserting {} bytes for TLS self pointer", num_bytes);
+                for _i in 0..num_bytes {
+                    new_data.push(0); 
+                }
+            }
+
+            self.data_cache = new_data;
+            self.cache_status = CacheStatus::Fresh;
         }
 
-        self.data_cache = new_data;
-        self.cache_status = CacheStatus::Fresh;
-        self.data_cache.as_slice().into()
+        // Here, the `data_cache` is guaranteed to be fresh and ready to use,
+        // so we can simply create (allocate) a new copy of it.
+        let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
+
+        // Every time we create a new copy of the TLS data image, we have to re-calculate
+        // and re-assign the TLS self pointer value at the end of the data image,
+        // because the virtual address of that new TLS data image copy will be unique.
+        let offset_of_tls_self_ptr = data_copy.len() - POINTER_SIZE;
+        let dest_slice = &mut data_copy[offset_of_tls_self_ptr .. (offset_of_tls_self_ptr + POINTER_SIZE)];
+        let tls_self_ptr_value = dest_slice.as_ptr() as usize;
+        dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
+        TlsDataImage { 
+            _data: data_copy,
+            ptr:   tls_self_ptr_value,
+        }
+    }
+}
+
+/// An initialized TLS area data image ready to be used by a new task.
+/// 
+/// The data is opaque, but one can obtain a pointer to the TLS area.
+/// 
+/// The enclosed opaque data is stored as a boxed slice (`Box<[u8]>`)
+/// instead of a vector (`Vec<u8>`) because it is instantiated once upon task creation
+/// and should never be expanded or shrunk.
+/// 
+/// The data is "immutable" with respect to Theseus task management functions
+/// at the language level.
+/// However, the data within this TLS area will be modified directly by code
+/// that executes "in" this task, e.g., instructions that access the current TLS area.
+#[derive(Debug)]
+pub struct TlsDataImage {
+    _data: Box<[u8]>,
+    ptr:   usize,
+}
+impl TlsDataImage {
+    #[inline(always)]
+    pub fn pointer_value(&self) -> usize {
+        self.ptr
     }
 }
 
