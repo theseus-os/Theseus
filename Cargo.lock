@@ -1648,12 +1648,14 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
+ "lazy_static",
  "log",
  "memfs",
  "memory",
  "memory_initialization",
  "path",
  "qp-trie",
+ "rangemap",
  "root",
  "rustc-demangle",
  "spin 0.9.0",
@@ -2229,6 +2231,12 @@ checksum = "effa3fcaa47e18db002bdde6060944b6d2f9cfd8db471c30e873448ad9187be3"
 dependencies = [
  "rand_core",
 ]
+
+[[package]]
+name = "rangemap"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6cb84161aa5e5eaa263fadf53172fee10b72fa7aad3a37e0a7aa1aefec2423e"
 
 [[package]]
 name = "raw-cpuid"
@@ -2988,6 +2996,15 @@ dependencies = [
  "unicode-width",
  "util",
  "vte",
+]
+
+[[package]]
+name = "thread_local_storage"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "spawn",
+ "task",
 ]
 
 [[package]]

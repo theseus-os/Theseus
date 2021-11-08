@@ -1,0 +1,18 @@
+[package]
+name = "tls_test"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.thread_local_storage]
+path = "../../kernel/thread_local_storage"

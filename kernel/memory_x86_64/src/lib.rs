@@ -96,10 +96,10 @@ pub fn get_boot_info_mem_area(
 /// Finds the addresses in memory of the main kernel sections, as specified by the given boot information. 
 /// 
 /// Returns the following tuple, if successful:
-///  * The combined size and address bounds of specifically .text, .rodata, .data, and the stack.
-///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections that share the same flags,
-///    except for the stack which is kept separate.
-///  * The list of individual sections found. 
+///  * The combined size and address bounds of key sections, e.g., .text, .rodata, .data.
+///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections 
+///    that share the same page table mapping flags and can thus be logically combined.
+///  * The list of all individual sections found. 
 pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str> {
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
@@ -115,9 +115,9 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
     let mut page_table_start:  Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut page_table_end:    Option<(VirtualAddress, PhysicalAddress)> = None;
 
-    let mut text_flags:   Option<EntryFlags> = None;
-    let mut rodata_flags: Option<EntryFlags> = None;
-    let mut data_flags:   Option<EntryFlags> = None;
+    let mut text_flags:        Option<EntryFlags> = None;
+    let mut rodata_flags:      Option<EntryFlags> = None;
+    let mut data_flags:        Option<EntryFlags> = None;
 
     let mut sections_memory_bounds: [Option<SectionMemoryBounds>; 32] = Default::default();
 
@@ -163,20 +163,25 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         }
 
         // The linker script (linker_higher_half.ld) defines the following order of sections:
-        // |-----|-------------------|------------------------------|
-        // | Sec |    Sec Name       |    Description / purpose     |
-        // | Num |                   |                              |
-        // |-----|--------------------------------------------------|
-        // | (1) | .init             | start of executable pages    |
-        // | (2) | .text             | end of executable pages      |
-        // | (3) | .rodata           | start of read-only pages     |
-        // | (4) | .eh_frame         | part of read-only pages      |
-        // | (5) | .gcc_except_table | end of read-only pages       |
-        // | (6) | .data             | start of read-write pages    | 
-        // | (7) | .bss              | end of read-write pages      |
-        // | (8) | .page_table       | separate .data-like section  |
-        // | (9) | .stack            | separate .data-like section  |
-        // |-----|-------------------|------------------------------|
+        // |------|-------------------|-------------------------------|
+        // | Sec  |    Sec Name       |    Description / purpose      |
+        // | Num  |                   |                               |
+        // |------|---------------------------------------------------|
+        // | (1)  | .init             | start of executable pages     |
+        // | (2)  | .text             | end of executable pages       |
+        // | (3)  | .rodata           | start of read-only pages      |
+        // | (4)  | .eh_frame         | part of read-only pages       |
+        // | (5)  | .gcc_except_table | part/end of read-only pages   |
+        // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .tbss             | part/end of read-only pages   |
+        // | (8)  | .data             | start of read-write pages     | 
+        // | (9)  | .bss              | end of read-write pages       |
+        // | (10) | .page_table       | separate .data-like section   |
+        // | (11) | .stack            | separate .data-like section   |
+        // |------|-------------------|-------------------------------|
+        //
+        // Note that because the TLS data areas (.tdata and .tbss) are nothing more than
+        // read-only initializer data, we combine their pages into the end of the read-only pages.
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
@@ -201,13 +206,27 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 rodata_flags = Some(flags);
                 "nano_core .gcc_except_table"
             }
+            // The following four sections are optional: .tdata, .tbss, .data, .bss.
+            //
+            // If .tdata or .tbss exist, we place them at the end of the rodata pages.
+            ".tdata" => {
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+                "nano_core .tdata"
+            }
+            ".tbss" =>{
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+                "nano_core .tbss"
+            }
             ".data" => {
-                data_start = Some((start_virt_addr, start_phys_addr));
+                data_start.get_or_insert((start_virt_addr, start_phys_addr));
+                data_end = Some((end_virt_addr, end_phys_addr));
                 data_flags = Some(flags);
                 "nano_core .data"
             }
             ".bss" => {
+                data_start.get_or_insert((start_virt_addr, start_phys_addr));
                 data_end = Some((end_virt_addr, end_phys_addr));
+                data_flags = Some(flags);
                 "nano_core .bss"
             }
             ".page_table" => {
@@ -231,7 +250,7 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         sections_memory_bounds[index] = Some(SectionMemoryBounds {
             start: (start_virt_addr, start_phys_addr),
             end: (end_virt_addr, end_phys_addr),
-            flags: flags,
+            flags,
         });
 
         index += 1;

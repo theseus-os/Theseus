@@ -185,9 +185,9 @@ pub fn get_current_p4() -> Frame {
 /// Returns the following tuple, if successful:
 /// 
 ///  1. The kernel's new PageTable, which is now currently active,
-///  2. the kernels' text section MappedPages,
-///  3. the kernels' rodata section MappedPages,
-///  4. the kernels' data section MappedPages,
+///  2. the kernel's text section MappedPages,
+///  3. the kernel's rodata section MappedPages,
+///  4. the kernel's data section MappedPages,
 ///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
 ///  6. the `MappedPages` holding the bootloader info,
 ///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
