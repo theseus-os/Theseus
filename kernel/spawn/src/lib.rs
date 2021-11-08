@@ -78,6 +78,7 @@ pub fn init(
 /// 
 /// This exists such that a bootstrapped task can be marked as exited and removed
 /// when being dropped.
+#[derive(Debug)]
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,

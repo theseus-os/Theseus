@@ -59,7 +59,6 @@ path = "../vga_buffer"
 [dependencies.memory_initialization]
 path = "../memory_initialization"
 
-
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
 # that we can jump to from the bootloader.

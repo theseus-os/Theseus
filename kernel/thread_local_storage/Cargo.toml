@@ -1,0 +1,18 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "thread_local_storage"
+description = "Support for thread-local storage (TLS)"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[lib]
+crate-type = ["rlib"]

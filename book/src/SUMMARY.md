@@ -34,7 +34,8 @@
     - [Memory Management](subsystems/memory.md)
         - [Mapping Virtual to Physical Memory](subsystems/memory_mapping.md)
         - [Heap Allocators](subsystems/heap.md)
-    - [Task Management]() <!-- TODO: task.md -->
+    - [Task Management](subsystems/task.md)
+        - [Task Management Invariants](subsystems/task_invariants.md)
     - [Display and Window Management](subsystems/display/display.md)
         - [The Window Manager](subsystems/display/window_manager.md)
         - [Creating and Displaying Windows](subsystems/display/window_tutorial.md)
