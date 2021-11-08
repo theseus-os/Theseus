@@ -811,52 +811,6 @@ fn add_reserved_region(
 }
 
 
-/// Removes the given `frames_to_remove` from the given list of free (general purpose) frames.
-///
-/// This is primarily useful to remove a range of newly-reserved frames from 
-/// the list of free frames to ensure there's no overlap between the reserved and free lists.
-fn remove_free_frames(
-    free_list: &mut StaticArrayRBTree<Chunk>,
-    frames_to_remove: FrameRange,
-) -> Result<(), &'static str> {
-    match &mut free_list.0 {
-        Inner::Array(ref mut _arr) => {
-            todo!("remove_frames() is not supported for early array-based frame allocation");
-        }
-        Inner::RBTree(ref mut tree) => {
-            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(frames_to_remove.start()));
-            while let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
-                if chunk.start() > frames_to_remove.end() {
-                    // We're iterating in ascending order over a sorted tree,
-                    // so we can stop looking for overlapping regions once we pass the end of frames_to_remove.
-                    break;  
-                }
-                if let Some(overlap) = chunk.overlap(&frames_to_remove) {
-                    let (_removed, before, after) = split_chosen_chunk(*overlap.start(), overlap.size_in_frames(), chunk);
-                    // Add the `before` and `after` chunks back to the `free_list`, if they exist.
-                    match (before, after) {
-                        (Some(b), Some(a)) => {
-                            cursor_mut.replace_with(Wrapper::new_link(b)).unwrap();
-                            cursor_mut.insert_after(Wrapper::new_link(a));
-                        }
-                        (Some(x), None) | (None, Some(x)) => {
-                            cursor_mut.replace_with(Wrapper::new_link(x)).unwrap();
-                        }
-                        (None, None) => {
-                            cursor_mut.remove();
-                        }
-                    }
-                }
-                cursor_mut.move_next();
-            }
-        }
-    }
-
-    Ok(())
-}
-
-
-
 /// The core frame allocation routine that allocates the given number of physical frames,
 /// optionally at the requested starting `PhysicalAddress`.
 /// 
@@ -915,12 +869,6 @@ pub fn allocate_frames_deferred(
                 // then add those frames to the actual list of *available* reserved regions.
                 let _new_free_reserved_frames = add_reserved_region(&mut free_reserved_frames_list, new_reserved_frames.clone())?;
                 assert_eq!(new_reserved_frames, _new_free_reserved_frames);
-                // Now that we added new frames to the reserved lists, we need to ensure those frames don't also exist
-                // in the list of free general-use frames.
-                // This prevents the logical error of allocating the same frame multiple times, 
-                // once from the reserved list and once from the free list.
-                remove_free_frames(&mut FREE_FRAMES_LIST.lock(), frames.clone())?;
-                trace!("Removed now-reserved frames from the free frames list: {:X?}", frames);
                 find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames)
             } 
             else {
