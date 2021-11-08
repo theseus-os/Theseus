@@ -107,15 +107,17 @@ impl ConnectX5Nic {
     /// (steps taken from the PRM, Section 7.2: HCA Driver Start-up)
     /// 
     /// # Arguments
-    /// * `mlx5_pci_dev`: 
-    /// * `num_tx_descs`:
-    /// * `num_rx_descs`: 
-    /// * `mtu`: 
+    /// * `mlx5_pci_dev`: Contains the pci device information for this NIC.
+    /// * `num_tx_descs`: The number of descriptors in each transmit queue.
+    /// * `num_rx_descs`: The number of descriptors in each receive queue.
+    /// * `mtu`: Maximum Transmission Unit
     pub fn init(mlx5_pci_dev: &PciDevice, num_tx_descs: usize, num_rx_descs: usize, mtu: u16) -> Result<&'static MutexIrqSafe<ConnectX5Nic> , &'static str> {
         let sq_size_in_bytes = num_tx_descs * core::mem::size_of::<WorkQueueEntrySend>();
         let rq_size_in_bytes = num_rx_descs * core::mem::size_of::<WorkQueueEntrySend>();
-        if (sq_size_in_bytes % PAGE_SIZE != 0) || (rq_size_in_bytes % PAGE_SIZE != 0) {
-            return Err("SQ and RQ size in bytes must be a multiple of the page size");
+        // because the RX and TX queues have to be contiguous and we are using MappedPages to split ownership of the queues
+        // the RX queue must end on a page boundary
+        if rq_size_in_bytes % PAGE_SIZE != 0 {
+            return Err("RQ size in bytes must be a multiple of the page size");
         }
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
@@ -446,7 +448,7 @@ impl ConnectX5Nic {
         // Allocate pages for RQ and SQ, they have to be contiguous      
         let (q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, NIC_MAPPING_FLAGS)?;
         let vaddr = q_mp.start_address();
-        let (rq_mp, sq_mp) = q_mp.split(memory_structs::Page::containing_address(vaddr + sq_size_in_bytes))
+        let (rq_mp, sq_mp) = q_mp.split(memory_structs::Page::containing_address(vaddr + rq_size_in_bytes))
             .map_err(|_e| "Could not split MappedPages")?;
         let sq_pa = q_pa + rq_size_in_bytes;
         debug!("RQ paddr: {:?}, SQ paddr: {:?}, RQ vaddr: {:?}, SQ vaddr: {:?}", q_pa, sq_pa, rq_mp.start_address(), sq_mp.start_address());
@@ -583,8 +585,9 @@ impl ConnectX5Nic {
 
     pub fn send(&mut self, buffer: TransmitBuffer) -> Result<(), &'static str> {
         let packet_length = buffer.length;
-        self.send_queue.send(buffer.phys_addr, buffer.as_slice(0, packet_length as usize)?);
-        // while self.send_completion_queue.hw_owned(0) {}
+        let wqe_counter = self.send_queue.send(buffer.phys_addr, buffer.as_slice(0, packet_length as usize)?);
+        // self.send_completion_queue.wqe_posted(wqe_counter);
+        self.send_completion_queue.check_packet_transmission(0);
         self.send_completion_queue.dump();
         Ok(())
     }

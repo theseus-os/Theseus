@@ -4,13 +4,19 @@
 //! 
 //! (PRM Section 8.18: Completion Queues)
 
+use core::convert::TryFrom;
+
+use bit_field::BitField;
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, MappedPages};
 use owning_ref::BoxRefMut;
-use crate::*;
+use crate::{
+    *,
+    work_queue::WQEOpcode
+};
 
 const CQE_OPCODE_SHIFT:         u32 = 4;
 
@@ -135,6 +141,9 @@ pub struct CompletionQueueEntry {
     mini_cqe_num:           Volatile<U32<BigEndian>>,
     timestamp_h:            Volatile<U32<BigEndian>>,
     timestamp_l:            Volatile<U32<BigEndian>>,
+    /// A multi-part field:
+    /// * `send_wqe_opcode/rx_drop_counter`: the send WQE opcode or the number of dropped packets
+    /// because of no RCV WQE since the last CQE, occupies bits [31:24]
     flow_tag:               Volatile<U32<BigEndian>>,
     /// A multi-part field:
     /// * `wqe_counter`: wqe_counter of the WQE completed, occupies bits [31:16]
@@ -142,7 +151,8 @@ pub struct CompletionQueueEntry {
     /// * `opcode`: a [`CQEOpcode`] value, occupies bits [7:4]
     /// * `cqe_format`: a [`CQEFormat`] value, occupies bits [3:2]
     /// * `se`: solicited event. This CQE cause EQE generation for solicited event, occupies bit 1
-    /// * `owner`: owner of the entry, occupies bit 0
+    /// * `owner`: owner of the entry, occupies bit 0.
+    /// The value indicating SW ownership is flipped every time CQ wraps around, starting with 0.
     owner:                  Volatile<U32<BigEndian>>,
 }
 
@@ -157,6 +167,29 @@ impl CompletionQueueEntry {
         *self = CompletionQueueEntry::default();
         let invalid_cqe = (CQEOpcode::InvalidCQE as u32) << CQE_OPCODE_SHIFT;
         self.owner.write(U32::new(invalid_cqe | HW_OWNERSHIP));
+    }
+
+    /// Return the WQE opcode value of the  of the WQE completed
+    pub(crate) fn get_send_wqe_opcode(&self) -> Result<WQEOpcode, &'static str> {
+        const WQE_OPCODE_SHIFT: u32 = 24;
+        WQEOpcode::try_from((self.flow_tag.read().get() >> WQE_OPCODE_SHIFT) as u8)
+            .map_err(|_e| "Invalid WQE opcode in the CQE")
+    }
+
+    /// Return the WQE counter value for the WQE completed
+    pub(crate) fn get_wqe_counter(&self) -> u16 {
+        const WQE_COUNTER_SHIFT: u32 = 16;
+        (self.owner.read().get() >> WQE_COUNTER_SHIFT) as u16
+    }
+
+    /// Returns true if the ownership bit is set
+    pub(crate) fn get_owner(&self) -> bool {
+        self.owner.read().get().get_bit(0)
+    }
+
+    /// Returns if the CQE is HW-owned for the given HW ownership value
+    pub(crate) fn hw_owned(&self, hw_own_value: bool) -> bool {
+        self.get_owner() == hw_own_value
     }
 
     /// Prints out the fields of a CQE in the format used by other drivers (e.g. Linux, Snabb)
@@ -195,7 +228,10 @@ pub struct CompletionQueue {
     /// Doorbell record for this CQ
     doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>,
     /// CQ number that is returned by the [`CommandOpcode::CreateCq`] command
-    cqn: u32
+    cqn: u32,
+    /// The value the ownership bit of a CQE must be in to indicate hardware ownership.
+    /// It alternates everytime the CQ wraps around
+    hw_ownership: bool
 }
 
 impl CompletionQueue {
@@ -223,19 +259,30 @@ impl CompletionQueue {
         }
         *doorbell = CompletionQueueDoorbellRecord::default();
 
-        Ok( CompletionQueue{entries, doorbell, cqn} )
+        Ok( CompletionQueue{entries, doorbell, cqn, hw_ownership: false} )
     }
+    
+    // /// Called every time a WQE is posted for completion so that we can update the HW ownership value
+    // /// TODO: find a better way to do this
+    // pub fn wqe_posted(&mut self, wqe_counter: u16) {
+    //     if (wqe_counter as usize % self.entries.len()) == 0 {
+    //         self.hw_ownership = if self.hw_ownership == false {
+    //             true
+    //         } else {
+    //             false
+    //         };
+    //     }
+    // }
 
-    /// Returns true if the CQE is currently HW-owned
-    /// TODO: HW ownership changes as given in 8.18.3.1
-    pub fn hw_owned(&self, entry_num: usize) -> bool {
-        // self.entries[entry_num].dump(0);
-        self.entries[entry_num].owner.read().get() & 0x1 == 0x1
-    }
 
+    /// Checks if a packet is tranmsitted.
+    /// If it is, then prints out the WQE opcode and counter.
     pub fn check_packet_transmission(&mut self, entry_num: usize) {
-        debug!("CQ owner: {:#X}", self.entries[entry_num].owner.read().get());
-        debug!("CQ flow_tag: {:#X}", self.entries[entry_num].flow_tag.read().get());
+        let entry = &self.entries[entry_num];
+        // debug!("hw ownership = {}", self.hw_ownership);
+        // if !entry.hw_owned(self.hw_ownership) {
+            trace!("opcode: {:?}, wqe_counter: {}", entry.get_send_wqe_opcode(), entry.get_wqe_counter());
+        // }
     }
 
     /// Prints out all entries in the CQ

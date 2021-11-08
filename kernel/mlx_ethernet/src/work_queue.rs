@@ -1,7 +1,7 @@
 //! The Work Queue (WQ) contains a contiguous memory buffer used by SW to post I/O requests (WQEs) for HCA execution.
 //! A Work Request is posted to the HCA by writing a list of one or more Work Queue Elements (WQE) to the WQ and
 //! ringing the DoorBell, notifying the HCA that request has been posted. A WQ is created for every SQ and RQ and
-//! is comprised of WQE Basic Blocks (WQEBBs).
+//! is comprised of WQE Basic Blocks (WQEBBs) which are 64 byte units.
 //! 
 //! This module defines the context used to initialize a WQ, layout of WQ Doorbell Records, the layout of WQEBBs and related functions.
 //! 
@@ -128,7 +128,7 @@ impl WorkQueue {
 /// The possible values of the opcode field in the control segment of a WQE
 #[derive(Debug, TryFromPrimitive)]
 #[repr(u8)]
-enum WQEOpcode {
+pub(crate) enum WQEOpcode {
     /// WQE with this opcode creates a completion, but does nothing else
     Nop = 0x0,
     SndInv = 0x1,
@@ -176,7 +176,7 @@ impl WorkQueueEntrySend {
     /// Fill the control, ethernet and data segments of the WQE to send packets.
     /// 
     /// # Arguments    
-    /// * `wqe_index`: WQEBB number of the first block of this WQE
+    /// * `wqe_index`: WQEBB number of the first block of this WQE // TODO? seems to be wqe_counter
     /// * `sqn`: number of the SQ this WQE is posted to
     /// * `lkey`: the lkey used by the SQ
     /// * `local_address`: physical address of the packet buffer

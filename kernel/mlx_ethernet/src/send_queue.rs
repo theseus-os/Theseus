@@ -148,13 +148,13 @@ impl SendQueueContext {
 
 /// There are two doorbell registers we use to send packets.
 /// We alternate between them for each packet.
-pub(crate) enum CurrentDoorbell {
+pub(crate) enum CurrentUARDoorbell {
     Even,
     Odd
 }
 
-impl CurrentDoorbell {
-    fn alternate(&self) -> CurrentDoorbell {
+impl CurrentUARDoorbell {
+    fn alternate(&self) -> CurrentUARDoorbell {
         match self {
             Self::Even => Self::Odd,
             Self::Odd => Self::Even,
@@ -171,8 +171,9 @@ pub struct SendQueue {
     doorbell: BoxRefMut<MappedPages, DoorbellRecord>,
     /// the UAR page associated with the SQ
     uar: BoxRefMut<MappedPages, UserAccessRegion>,
-    /// the index of the next descriptor to use
-    wqe_index: u32,
+    /// The number of WQEs that have been completed.
+    /// From this we also calculate the next descriptor to use
+    wqe_counter: u16,
     /// SQ number that is returned by the [`CommandOpcode::CreateSq`] command
     sqn: u32,
     /// number of the TIS context associated with this SQ
@@ -180,7 +181,7 @@ pub struct SendQueue {
     /// the lkey used by the SQ
     lkey: u32,
     /// the uar doorbell to be used by the next packet
-    uar_db: CurrentDoorbell
+    uar_db: CurrentUARDoorbell
 }
 
 impl SendQueue {
@@ -218,15 +219,21 @@ impl SendQueue {
         let mut uar = BoxRefMut::new(Box::new(uar_mp)).try_map_mut(|mp| mp.as_type_mut::<UserAccessRegion>(0))?;
         *uar = UserAccessRegion::default();
 
-        Ok( SendQueue{entries, doorbell, uar, wqe_index: 0, sqn, tisn, lkey, uar_db: CurrentDoorbell::Even} )
+        Ok( SendQueue{entries, doorbell, uar, wqe_counter: 0, sqn, tisn, lkey, uar_db: CurrentUARDoorbell::Even} )
+    }
+
+    fn desc_id(&self) -> usize {
+        self.wqe_counter as usize  % self.entries.len()
     }
 
     /// The steps required to post a WQE after the WQE fields have been initialized.
-    /// The doorbell record is updated and the UAR register wis written to.
+    /// The doorbell record is updated and the UAR register is written to.
     fn finish_wqe_operation(&mut self) {
-        let wqe = &mut self.entries[self.wqe_index as usize];
-        self.wqe_index += 1; // need to wrap around 0xFFFF
-        self.doorbell.send_counter.write(U32::new(self.wqe_index));
+        let desc_id = self.desc_id();
+        let wqe = &mut self.entries[desc_id];
+        self.wqe_counter += 1; // need to wrap around 0xFFFF, this should happen automatically with a u16
+        // we're writing the wqe counter, not the next wqe to be used (8.8.2 is confusing about what should actually be posted)
+        self.doorbell.send_counter.write(U32::new(self.wqe_counter as u32)); 
         
         let mut doorbell = [U32::new(0);64];
         doorbell[0] = wqe.control.opcode.read(); 
@@ -234,19 +241,27 @@ impl SendQueue {
         self.uar.write_wqe_to_doorbell(&self.uar_db, doorbell);
         self.uar_db = self.uar_db.alternate();
 
-    }
-    /// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar page
-    pub fn send(&mut self, packet_address: PhysicalAddress, packet: &[u8]) {
-        let wqe = &mut self.entries[self.wqe_index as usize];
-        wqe.send(self.wqe_index, self.sqn, self.lkey, packet_address, packet);
-        self.finish_wqe_operation();
+        wqe.dump(desc_id);
     }
 
-    /// Perform all the steps to complete a NOP: initialize the WQE, update the doorbell record and the uar page
-    pub fn nop(&mut self) {
-        let wqe = &mut self.entries[self.wqe_index as usize];
-        wqe.nop(self.wqe_index, self.sqn);
-        self.finish_wqe_operation();       
+    /// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar page.
+    /// Returns the current value of the WQE counter.
+    pub fn send(&mut self, packet_address: PhysicalAddress, packet: &[u8]) -> u16 {
+        let desc_id = self.desc_id();
+        let wqe = &mut self.entries[desc_id];
+        wqe.send(self.wqe_counter as u32, self.sqn, self.lkey, packet_address, packet);
+        self.finish_wqe_operation();
+        self.wqe_counter
+    }
+
+    /// Perform all the steps to complete a NOP: initialize the WQE, update the doorbell record and the uar page.
+    /// Returns the current value of the WQE counter.
+    pub fn nop(&mut self) -> u16 {
+        let desc_id = self.desc_id();
+        let wqe = &mut self.entries[desc_id];
+        wqe.nop(self.wqe_counter as u32, self.sqn);
+        self.finish_wqe_operation();  
+        self.wqe_counter
     }
 
     /// Prints out all entries in the SQ

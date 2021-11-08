@@ -7,7 +7,7 @@
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
-use crate::send_queue::CurrentDoorbell;
+use crate::send_queue::CurrentUARDoorbell;
 
 /// The layout of registers within one UAR page.
 /// Send DoorBells are rung in blue flame registers by writing the first 8 bytes of the WQE to blueflame register 0
@@ -49,10 +49,10 @@ pub(crate) struct UserAccessRegion {
 const_assert_eq!(core::mem::size_of::<UserAccessRegion>(), 4096);
 
 impl UserAccessRegion {
-    pub(crate) fn write_wqe_to_doorbell(&mut self, current_doorbell: &CurrentDoorbell, wqe_value: [U32<BigEndian>; 64]) {
+    pub(crate) fn write_wqe_to_doorbell(&mut self, current_doorbell: &CurrentUARDoorbell, wqe_value: [U32<BigEndian>; 64]) {
         match current_doorbell {
-            CurrentDoorbell::Even => self.db_blueflame_buffer0_even.write(wqe_value),
-            CurrentDoorbell::Odd => self.db_blueflame_buffer0_odd.write(wqe_value),
+            CurrentUARDoorbell::Even => self.db_blueflame_buffer0_even.write(wqe_value),
+            CurrentUARDoorbell::Odd => self.db_blueflame_buffer0_odd.write(wqe_value),
         }
     }
 }
