@@ -2486,7 +2486,6 @@ impl TlsInitializer {
     /// This function lazily generates the TLS image data on demand, if needed.
     pub(crate) fn get_data(&mut self) -> TlsDataImage {
         const POINTER_SIZE:      usize = core::mem::size_of::<usize>();
-        const POINTER_ALIGNMENT: usize = core::mem::align_of::<usize>();
 
         if self.cache_status == CacheStatus::Invalidated {
             // debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
@@ -2518,11 +2517,10 @@ impl TlsInitializer {
                 end_of_previous_range = range.end;
             }
 
-            // Append space for the TLS self pointer (with enough padding for proper alignment);
+            // Append space for the TLS self pointer immediately after the end of the last TLS data section;
             // it's actual value will be filled in later once a new copy of the TLS data image is made.
             if !new_data.is_empty() {
-                let aligned_start = util::round_up(end_of_previous_range, POINTER_ALIGNMENT);
-                let num_bytes = aligned_start - end_of_previous_range + POINTER_SIZE;
+                let num_bytes = POINTER_SIZE;
                 for _i in 0..num_bytes {
                     new_data.push(0); 
                 }

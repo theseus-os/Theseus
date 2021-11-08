@@ -18,13 +18,13 @@ use core::cell::Cell;
 use alloc::{string::String, vec::Vec};
 
 #[thread_local]
-pub static LOCAL_ZERO: u16 = 7;
+pub static LOCAL_ZERO: Cell<u16> = Cell::new(7);
 
 #[thread_local]
-pub static LOCAL_U8_1: u8 = 9;
+pub static LOCAL_U8_1: Cell<u8> = Cell::new(91);
 
 #[thread_local]
-pub static LOCAL_U16: u16 = 7;
+pub static LOCAL_U16: Cell<u16> = Cell::new(71);
 
 #[thread_local]
 pub static LOCAL_USIZE: Cell<usize> = Cell::new(4);
@@ -64,13 +64,13 @@ impl Complex {
 
 pub fn test_tls(x: usize) {
     let curr_task = task::get_my_current_task().unwrap();
-    let local_zero = LOCAL_ZERO + x as u16;
+    let local_zero = LOCAL_ZERO.get() + x as u16;
     debug!("Task {:?}, LOCAL_ZERO + x: {:?}", curr_task, local_zero);
 
-    let local_u8_1 = LOCAL_U8_1 + x as u8;
+    let local_u8_1 = LOCAL_U8_1.get() + x as u8;
     debug!("Task {:?}, LOCAL_U8_1 + x: {:?}", curr_task, local_u8_1);
 
-    let local_u16 = LOCAL_U16 + x as u16;
+    let local_u16 = LOCAL_U16.get() + x as u16;
     debug!("Task {:?}, LOCAL_U16 + x: {:?}", curr_task, local_u16);
 
     let local_usize = LOCAL_USIZE.get() + x;
