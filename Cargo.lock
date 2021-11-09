@@ -3005,6 +3005,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tls_test"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "terminal_print",
+ "thread_local_storage",
+]
+
+[[package]]
 name = "tsc"
 version = "0.1.0"
 dependencies = [
