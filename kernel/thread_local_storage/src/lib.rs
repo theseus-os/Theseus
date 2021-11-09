@@ -76,7 +76,7 @@ pub fn test_tls(_x: usize) {
     debug!("Task {:?}, LOCAL_USIZE: {:#X?}", curr_task, local_usize);
 
     let local_u8_2 = LOCAL_U8_2.get();
-    debug!("Task {:?}, LOCAL_U8_2: {:X?}", curr_task, local_u8_2);
+    debug!("Task {:?}, LOCAL_U8_2: {:#X?}", curr_task, local_u8_2);
 
     debug!("Task {:?}, COMPLEX: {:X?}", curr_task, COMPLEX);
     debug!("Task {:?}, COMPLEX: {:X?}", curr_task, COMPLEX.replace(Complex {

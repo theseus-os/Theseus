@@ -1763,7 +1763,6 @@ dependencies = [
  "spin 0.9.0",
  "stack",
  "state_store",
- "thread_local_storage",
  "vga_buffer",
 ]
 
