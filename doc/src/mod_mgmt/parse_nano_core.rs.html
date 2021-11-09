@@ -1475,7 +1475,7 @@
             <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
         ));
         <span class="comment">// Add this new TLS section to this namespace&#39;s TLS area image.</span>
-        <span class="ident">namespace</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>().<span class="ident">add_existing_tls_section</span>(<span class="ident">tls_offset</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">tls_section</span>)).<span class="ident">unwrap</span>();
+        <span class="ident">namespace</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>().<span class="ident">add_existing_static_tls_section</span>(<span class="ident">tls_offset</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">tls_section</span>)).<span class="ident">unwrap</span>();
         <span class="prelude-val">Some</span>(<span class="ident">tls_section</span>)
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">shndxs</span>.<span class="ident">tls_bss_shndx</span>.<span class="ident">map_or</span>(<span class="bool-val">false</span>, <span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">sec_ndx</span> <span class="op">=</span><span class="op">=</span> <span class="ident">shndx</span>) {

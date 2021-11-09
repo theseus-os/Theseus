@@ -254,10 +254,6 @@
 <span id="251">251</span>
 <span id="252">252</span>
 <span id="253">253</span>
-<span id="254">254</span>
-<span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.</span>
 <span class="doccomment">//! </span>
@@ -485,10 +481,6 @@
             <span class="ident">func</span>(<span class="ident">kernel_mmi_ref</span>, <span class="ident">identity_mapped_pages</span>, <span class="ident">stack</span>, <span class="ident">ap_realmode_begin</span>, <span class="ident">ap_realmode_end</span>)
         );
     }
-
-    <span class="comment">// TODO: REMOVE: just a hack to force the thread_local_storage crate&#39;s code/data sections to be included.</span>
-    <span class="comment">//               this won&#39;t actually be invoked because the captain shouldn&#39;t return.</span>
-    <span class="comment">// thread_local_storage::test_tls(3);</span>
 
     <span class="comment">// the captain shouldn&#39;t return ...</span>
     <span class="macro">try_exit!</span>(<span class="prelude-val">Err</span>(<span class="string">&quot;captain::init returned unexpectedly... it should be an infinite loop (diverging function)&quot;</span>));

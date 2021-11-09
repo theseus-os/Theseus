@@ -2612,6 +2612,54 @@
 <span id="2609">2609</span>
 <span id="2610">2610</span>
 <span id="2611">2611</span>
+<span id="2612">2612</span>
+<span id="2613">2613</span>
+<span id="2614">2614</span>
+<span id="2615">2615</span>
+<span id="2616">2616</span>
+<span id="2617">2617</span>
+<span id="2618">2618</span>
+<span id="2619">2619</span>
+<span id="2620">2620</span>
+<span id="2621">2621</span>
+<span id="2622">2622</span>
+<span id="2623">2623</span>
+<span id="2624">2624</span>
+<span id="2625">2625</span>
+<span id="2626">2626</span>
+<span id="2627">2627</span>
+<span id="2628">2628</span>
+<span id="2629">2629</span>
+<span id="2630">2630</span>
+<span id="2631">2631</span>
+<span id="2632">2632</span>
+<span id="2633">2633</span>
+<span id="2634">2634</span>
+<span id="2635">2635</span>
+<span id="2636">2636</span>
+<span id="2637">2637</span>
+<span id="2638">2638</span>
+<span id="2639">2639</span>
+<span id="2640">2640</span>
+<span id="2641">2641</span>
+<span id="2642">2642</span>
+<span id="2643">2643</span>
+<span id="2644">2644</span>
+<span id="2645">2645</span>
+<span id="2646">2646</span>
+<span id="2647">2647</span>
+<span id="2648">2648</span>
+<span id="2649">2649</span>
+<span id="2650">2650</span>
+<span id="2651">2651</span>
+<span id="2652">2652</span>
+<span id="2653">2653</span>
+<span id="2654">2654</span>
+<span id="2655">2655</span>
+<span id="2656">2656</span>
+<span id="2657">2657</span>
+<span id="2658">2658</span>
+<span id="2659">2659</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -2638,7 +2686,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">hashbrown</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">rangemap</span>;
 
-<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">fmt</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">Range</span>}};
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">cmp::max</span>, <span class="ident">fmt</span>, <span class="ident">mem::size_of</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">Range</span>}};
 <span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">boxed::Box</span>, <span class="ident">collections</span>::{<span class="ident">BTreeMap</span>, <span class="ident">btree_map</span>, <span class="ident">BTreeSet</span>}, <span class="ident">string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>}, <span class="ident">sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>}, <span class="ident">vec::Vec</span>};
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">Once</span>};
 <span class="kw">use</span> <span class="ident">xmas_elf</span>::{<span class="ident">ElfFile</span>, <span class="ident">sections</span>::{<span class="ident">SHF_ALLOC</span>, <span class="ident">SHF_EXECINSTR</span>, <span class="ident">SHF_TLS</span>, <span class="ident">SHF_WRITE</span>, <span class="ident">SectionData</span>, <span class="ident">ShType</span>}};
@@ -3841,17 +3889,17 @@
                         <span class="ident">global_sections</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>),
                         <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
                     );
-                    <span class="macro">trace!</span>(<span class="string">&quot;New TLS section: {:?}&quot;</span>, <span class="ident">new_tls_section</span>);
+                    <span class="macro">trace!</span>(<span class="string">&quot;Loaded new TLS section: {:?}&quot;</span>, <span class="ident">new_tls_section</span>);
                     
                     <span class="comment">// Add the new TLS section to this namespace&#39;s initial TLS area,</span>
                     <span class="comment">// which will reserve/obtain a new offset into that TLS area which holds this section&#39;s data.</span>
                     <span class="comment">// This will also update the section&#39;s virtual address field to hold that offset value,</span>
                     <span class="comment">// which is used for relocation entries that ask for a section&#39;s offset from the TLS base.</span>
                     <span class="kw">let</span> (<span class="ident">_tls_offset</span>, <span class="ident">new_tls_section</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>()
-                        .<span class="ident">add_new_tls_section</span>(<span class="ident">new_tls_section</span>, <span class="ident">sec_align</span>)
+                        .<span class="ident">add_new_dynamic_tls_section</span>(<span class="ident">new_tls_section</span>, <span class="ident">sec_align</span>)
                         .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;Failed to add new TLS section&quot;</span>)<span class="question-mark">?</span>;
 
-                    <span class="macro">trace!</span>(<span class="string">&quot;\t Updated new TLS section: {:?}&quot;</span>, <span class="ident">new_tls_section</span>);
+                    <span class="macro">trace!</span>(<span class="string">&quot;\t --&gt; updated new TLS section: {:?}&quot;</span>, <span class="ident">new_tls_section</span>);
                     <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(<span class="ident">shndx</span>, <span class="ident">new_tls_section</span>);
                     <span class="ident">tls_sections</span>.<span class="ident">insert</span>(<span class="ident">shndx</span>);
 
@@ -4236,7 +4284,7 @@
             <span class="comment">// that TLS section&#39;s initializer data has now changed.</span>
             <span class="comment">// Thus, we need to invalidate the TLS initializer area&#39;s cached data.</span>
             <span class="kw">if</span> <span class="ident">target_sec_data_was_modified</span> <span class="op">&amp;&amp;</span> <span class="ident">target_sec</span>.<span class="ident">typ</span> <span class="op">=</span><span class="op">=</span> <span class="ident">SectionType::Tls</span> {
-                <span class="macro">warn!</span>(<span class="string">&quot;Invalidating TlsInitializer due to relocation written to section {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">target_sec</span>);
+                <span class="macro">debug!</span>(<span class="string">&quot;Invalidating TlsInitializer due to relocation written to section {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">target_sec</span>);
                 <span class="self">self</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>().<span class="ident">invalidate</span>();
             }
 
@@ -5005,10 +5053,37 @@
 <span class="doccomment">/// to initialize a new `Task`&#39;s TLS area.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct</span> <span class="ident">TlsInitializer</span> {
+    <span class="doccomment">/// The cached data image (with blank space for the TLS self pointer).</span>
+    <span class="doccomment">/// This is used to avoid unnecessarily re-generating the TLS data image</span>
+    <span class="doccomment">/// every time a new task is spawned if no TLS data sections have been added.</span>
     <span class="ident">data_cache</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The status of the above `data_cache`: whether it is ready to be used</span>
+    <span class="doccomment">/// immediately or needs to be regenerated.</span>
     <span class="ident">cache_status</span>: <span class="ident">CacheStatus</span>,
-    <span class="ident">offsets_of_sections</span>: <span class="ident">RangeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">StrongSectionRefWrapper</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The set of TLS data sections that are defined at link time</span>
+    <span class="doccomment">/// and come from the statically-linked base kernel image (the nano_core).</span>
+    <span class="doccomment">/// According to the x86_64 TLS ABI, these exist at **negative** offsets</span>
+    <span class="doccomment">/// from the TLS self pointer, i.e., they exist **before** the TLS self pointer in memory.</span>
+    <span class="doccomment">/// Thus, their actual location in memory depends on the size of **all** static TLS data sections.</span>
+    <span class="doccomment">/// For example, the last section in this set (with the highest offset) will be placed</span>
+    <span class="doccomment">/// right before the TLS self pointer in memory. </span>
+    <span class="ident">static_section_offsets</span>:  <span class="ident">RangeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">StrongSectionRefWrapper</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The ending offset (an exclusive range end bound) of the last TLS section</span>
+    <span class="doccomment">/// in the above set of `static_section_offsets`.</span>
+    <span class="doccomment">/// This is the offset where the TLS self pointer exists.</span>
+    <span class="ident">end_of_static_sections</span>: <span class="ident">usize</span>,
+    <span class="doccomment">/// The set of TLS data sections that come from dynamically-loaded crate object files.</span>
+    <span class="doccomment">/// We can control and arbitrarily assign their offsets, and thus,</span>
+    <span class="doccomment">/// we place all of these sections **after** the TLS self pointer in memory.</span>
+    <span class="doccomment">/// For example, the first section in this set (with an offset of `0`) will be place</span>
+    <span class="doccomment">/// right after the TLS self pointer in memory.</span>
+    <span class="ident">dynamic_section_offsets</span>: <span class="ident">RangeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">StrongSectionRefWrapper</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// The ending offset (an exclusive range end bound) of the last TLS section</span>
+    <span class="doccomment">/// in the above set of `dynamic_section_offsets`.</span>
+    <span class="ident">end_of_dynamic_sections</span>: <span class="ident">usize</span>,
 } 
+
+<span class="kw">const</span> <span class="ident">POINTER_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>();
 
 <span class="kw">impl</span> <span class="ident">TlsInitializer</span> {
     <span class="doccomment">/// Creates an empty TLS initializer with no TLS data sections.</span>
@@ -5017,25 +5092,34 @@
             <span class="comment">// The data image will be generated lazily on the next request to use it.</span>
             <span class="ident">data_cache</span>: <span class="ident">Vec::new</span>(),
             <span class="ident">cache_status</span>: <span class="ident">CacheStatus::Invalidated</span>,
-            <span class="ident">offsets_of_sections</span>: <span class="ident">RangeMap::new</span>(),
+            <span class="ident">static_section_offsets</span>: <span class="ident">RangeMap::new</span>(),
+            <span class="ident">end_of_static_sections</span>: <span class="number">0</span>,
+            <span class="ident">dynamic_section_offsets</span>: <span class="ident">RangeMap::new</span>(),
+            <span class="ident">end_of_dynamic_sections</span>: <span class="number">0</span>,
         }
     }
 
     <span class="doccomment">/// Add a TLS section that has pre-determined offset, e.g.,</span>
     <span class="doccomment">/// one that was specified in the statically-linked nano_core kernel image.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">add_existing_tls_section</span>(
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Returns an Error if inserting the given `tls_section` at the given `offset`</span>
+    <span class="doccomment">/// would overlap with an existing section.</span>
+    <span class="doccomment">/// Note: an error occurring here would indicate a link-time bug </span>
+    <span class="doccomment">/// or a bug in the symbol parsing code that invokes this function.</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">add_existing_static_tls_section</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">offset</span>: <span class="ident">usize</span>,
         <span class="ident">tls_section</span>: <span class="ident">StrongSectionRef</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">range</span> <span class="op">=</span> <span class="ident">offset</span> .. (<span class="ident">offset</span> <span class="op">+</span> <span class="ident">tls_section</span>.<span class="ident">size</span>());
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">offsets_of_sections</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">range</span>.<span class="ident">start</span>) <span class="op">|</span><span class="op">|</span> 
-            <span class="self">self</span>.<span class="ident">offsets_of_sections</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span>(<span class="ident">range</span>.<span class="ident">end</span> <span class="op">-</span> <span class="number">1</span>))
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">static_section_offsets</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">range</span>.<span class="ident">start</span>) <span class="op">|</span><span class="op">|</span> 
+            <span class="self">self</span>.<span class="ident">static_section_offsets</span>.<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span>(<span class="ident">range</span>.<span class="ident">end</span> <span class="op">-</span> <span class="number">1</span>))
         {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(());
         }
 
-        <span class="self">self</span>.<span class="ident">offsets_of_sections</span>.<span class="ident">insert</span>(<span class="ident">range</span>, <span class="ident">StrongSectionRefWrapper</span>(<span class="ident">tls_section</span>));
+        <span class="self">self</span>.<span class="ident">end_of_static_sections</span> <span class="op">=</span> <span class="ident">max</span>(<span class="self">self</span>.<span class="ident">end_of_static_sections</span>, <span class="ident">range</span>.<span class="ident">end</span>);
+        <span class="self">self</span>.<span class="ident">static_section_offsets</span>.<span class="ident">insert</span>(<span class="ident">range</span>, <span class="ident">StrongSectionRefWrapper</span>(<span class="ident">tls_section</span>));
         <span class="self">self</span>.<span class="ident">cache_status</span> <span class="op">=</span> <span class="ident">CacheStatus::Invalidated</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -5047,38 +5131,40 @@
     <span class="doccomment">/// to hold the value of that offset, which is necessary for relocation entries</span>
     <span class="doccomment">/// that depend on this section.</span>
     <span class="doccomment">/// </span>
+    <span class="doccomment">/// Note: this will never return an index/offset value less than `size_of::&lt;usize&gt;()`,</span>
+    <span class="doccomment">/// (`8` on a 64-bit machine), as the first slot is reserved for the TLS self pointer.</span>
+    <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns a tuple of:</span>
     <span class="doccomment">/// 1. The index at which the new section was inserted, </span>
     <span class="doccomment">///    which is the offset from the beginning of the TLS area where the section data starts.</span>
     <span class="doccomment">/// 2. The modified section as a `StrongSectionRef`.</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// Returns an empty error if there is no remaining space that can fit the section.</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">add_new_tls_section</span>(
+    <span class="doccomment">/// Returns an Error if there is no remaining space that can fit the section.</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">add_new_dynamic_tls_section</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="kw-2">mut</span> <span class="ident">section</span>: <span class="ident">LoadedSection</span>,
         <span class="ident">alignment</span>: <span class="ident">usize</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">usize</span>, <span class="ident">StrongSectionRef</span>), ()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">sec_size</span> <span class="op">=</span> <span class="ident">section</span>.<span class="ident">size</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">start_index</span> <span class="op">=</span> <span class="prelude-val">None</span>;
-        <span class="comment">// Find the next &quot;gap&quot; big enough to fit the new tls_section.</span>
-        <span class="kw">let</span> <span class="ident">unbounded_range</span> <span class="op">=</span> <span class="ident">usize::MIN</span> .. <span class="ident">usize::MAX</span>;
-        <span class="kw">for</span> <span class="ident">gap</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">offsets_of_sections</span>.<span class="ident">gaps</span>(<span class="kw-2">&amp;</span><span class="ident">unbounded_range</span>) {
+        <span class="comment">// Find the next &quot;gap&quot; big enough to fit the new TLS section, </span>
+        <span class="comment">// skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.</span>
+        <span class="kw">let</span> <span class="ident">range_after_tls_self_pointer</span> <span class="op">=</span> <span class="ident">POINTER_SIZE</span> .. <span class="ident">usize::MAX</span>;
+        <span class="kw">for</span> <span class="ident">gap</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">dynamic_section_offsets</span>.<span class="ident">gaps</span>(<span class="kw-2">&amp;</span><span class="ident">range_after_tls_self_pointer</span>) {
             <span class="kw">let</span> <span class="ident">aligned_start</span> <span class="op">=</span> <span class="ident">util::round_up</span>(<span class="ident">gap</span>.<span class="ident">start</span>, <span class="ident">alignment</span>);
             <span class="kw">if</span> <span class="ident">aligned_start</span> <span class="op">+</span> <span class="ident">sec_size</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">gap</span>.<span class="ident">end</span> {
-                <span class="macro">warn!</span>(<span class="string">&quot;aligned gap.start {} (align {}) up to {}&quot;</span>, <span class="ident">gap</span>.<span class="ident">start</span>, <span class="ident">alignment</span>, <span class="ident">aligned_start</span>);
                 <span class="ident">start_index</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">aligned_start</span>);
                 <span class="kw">break</span>;
             }
         }
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">start</span>) <span class="op">=</span> <span class="ident">start_index</span> {
+            <span class="kw">let</span> <span class="ident">range</span> <span class="op">=</span> <span class="ident">start</span> .. (<span class="ident">start</span> <span class="op">+</span> <span class="ident">sec_size</span>);
             <span class="ident">section</span>.<span class="ident">address_range</span> <span class="op">=</span> 
-                <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">start</span>) .. <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">sec_size</span>);
+                <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">range</span>.<span class="ident">start</span>) .. <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">range</span>.<span class="ident">end</span>);
             <span class="kw">let</span> <span class="ident">section_ref</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">section</span>);
-            <span class="self">self</span>.<span class="ident">offsets_of_sections</span>.<span class="ident">insert</span>(
-                <span class="ident">start</span> .. (<span class="ident">start</span> <span class="op">+</span> <span class="ident">sec_size</span>),
-                <span class="ident">StrongSectionRefWrapper</span>(<span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">section_ref</span>)),
-            );
+            <span class="self">self</span>.<span class="ident">end_of_dynamic_sections</span> <span class="op">=</span> <span class="ident">max</span>(<span class="self">self</span>.<span class="ident">end_of_dynamic_sections</span>, <span class="ident">range</span>.<span class="ident">end</span>);
+            <span class="self">self</span>.<span class="ident">dynamic_section_offsets</span>.<span class="ident">insert</span>(<span class="ident">range</span>, <span class="ident">StrongSectionRefWrapper</span>(<span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">section_ref</span>)));
             <span class="comment">// Now that we&#39;ve added a new section, the cached data is invalid.</span>
             <span class="self">self</span>.<span class="ident">cache_status</span> <span class="op">=</span> <span class="ident">CacheStatus::Invalidated</span>;
             <span class="prelude-val">Ok</span>((<span class="ident">start</span>, <span class="ident">section_ref</span>))
@@ -5100,27 +5186,21 @@
     <span class="doccomment">/// </span>
     <span class="doccomment">/// This function lazily generates the TLS image data on demand, if needed.</span>
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">TlsDataImage</span> {
-        <span class="kw">const</span> <span class="ident">POINTER_SIZE</span>:      <span class="ident">usize</span> <span class="op">=</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>();
-        <span class="kw">const</span> <span class="ident">POINTER_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">core::mem::align_of</span>::<span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>();
+        <span class="kw">let</span> <span class="ident">total_section_size</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end_of_static_sections</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">end_of_dynamic_sections</span>;
+        <span class="kw">let</span> <span class="ident">required_capacity</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">total_section_size</span> <span class="op">&gt;</span> <span class="number">0</span> { <span class="ident">total_section_size</span> <span class="op">+</span> <span class="ident">POINTER_SIZE</span> } <span class="kw">else</span> { <span class="number">0</span> };
+        <span class="kw">if</span> <span class="ident">required_capacity</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="kw">return</span> <span class="ident">TlsDataImage</span> { <span class="ident">_data</span>: <span class="prelude-val">None</span>, <span class="ident">ptr</span>: <span class="number">0</span> };
+        }
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cache_status</span> <span class="op">=</span><span class="op">=</span> <span class="ident">CacheStatus::Invalidated</span> {
-            <span class="comment">// debug!(&quot;TlsInitializer was invalidated, re-generating data.\n{:#X?}&quot;, self);</span>
-
-            <span class="comment">// On some architectures, such as x86_64, the ABI convention REQUIRES that</span>
-            <span class="comment">// the TLS area data starts with a pointer to itself (the TLS self pointer).</span>
-            <span class="comment">// Also, all TLS section data comes *before* the TLS self pointer, i.e.,</span>
-            <span class="comment">// at negative offsets from the TLS area&#39;s self pointer.</span>
-            <span class="comment">// Thus, we handle that here by appending space for a pointer (one `usize`)</span>
-            <span class="comment">// to the `new_data` vector after we insert the rest of the TLS data sections.</span>
-            <span class="comment">// The pointer value is aligned to the architecture&#39;s pointer size, e.g., 8 bytes for x86_64.</span>
-            <span class="comment">// The location of the new pointer value is the conceptual &quot;start&quot; of the TLS image,</span>
-            <span class="comment">// and that&#39;s what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-            
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_of_previous_range</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="kw">for</span> (<span class="ident">range</span>, <span class="ident">sec</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">offsets_of_sections</span>.<span class="ident">iter</span>() {
+        <span class="comment">// An internal function that iterates over all TLS sections and copies their data into the new data image.</span>
+        <span class="kw">fn</span> <span class="ident">copy_tls_section_data</span>(
+            <span class="ident">new_data</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
+            <span class="ident">section_offsets</span>: <span class="kw-2">&amp;</span><span class="ident">RangeMap</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">StrongSectionRefWrapper</span><span class="op">&gt;</span>,
+            <span class="ident">end_of_previous_range</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">usize</span>,
+        ) {
+            <span class="kw">for</span> (<span class="ident">range</span>, <span class="ident">sec</span>) <span class="kw">in</span> <span class="ident">section_offsets</span>.<span class="ident">iter</span>() {
                 <span class="comment">// Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.</span>
-                <span class="kw">let</span> <span class="ident">num_padding_bytes</span> <span class="op">=</span> <span class="ident">range</span>.<span class="ident">start</span>.<span class="ident">saturating_sub</span>(<span class="ident">end_of_previous_range</span>);
+                <span class="kw">let</span> <span class="ident">num_padding_bytes</span> <span class="op">=</span> <span class="ident">range</span>.<span class="ident">start</span>.<span class="ident">saturating_sub</span>(<span class="kw-2">*</span><span class="ident">end_of_previous_range</span>);
                 <span class="kw">for</span> <span class="ident">_i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">num_padding_bytes</span> {
                     <span class="comment">// surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.</span>
                     <span class="ident">new_data</span>.<span class="ident">push</span>(<span class="number">0</span>); 
@@ -5130,42 +5210,58 @@
                 <span class="kw">let</span> <span class="ident">sec_mp</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
                 <span class="kw">let</span> <span class="ident">sec_data</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">sec_mp</span>.<span class="ident">as_slice</span>(<span class="ident">sec</span>.<span class="ident">mapped_pages_offset</span>, <span class="ident">sec</span>.<span class="ident">size</span>()).<span class="ident">unwrap</span>();
                 <span class="ident">new_data</span>.<span class="ident">extend_from_slice</span>(<span class="ident">sec_data</span>);
-                <span class="ident">end_of_previous_range</span> <span class="op">=</span> <span class="ident">range</span>.<span class="ident">end</span>;
+                <span class="kw-2">*</span><span class="ident">end_of_previous_range</span> <span class="op">=</span> <span class="ident">range</span>.<span class="ident">end</span>;
             }
+        }
 
-            <span class="comment">// Append space for the TLS self pointer (with enough padding for proper alignment);</span>
-            <span class="comment">// it&#39;s actual value will be filled in later once a new copy of the TLS data image is made.</span>
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">new_data</span>.<span class="ident">is_empty</span>() {
-                <span class="kw">let</span> <span class="ident">aligned_start</span> <span class="op">=</span> <span class="ident">util::round_up</span>(<span class="ident">end_of_previous_range</span>, <span class="ident">POINTER_ALIGNMENT</span>);
-                <span class="kw">let</span> <span class="ident">num_bytes</span> <span class="op">=</span> <span class="ident">aligned_start</span> <span class="op">-</span> <span class="ident">end_of_previous_range</span> <span class="op">+</span> <span class="ident">POINTER_SIZE</span>;
-                <span class="kw">for</span> <span class="ident">_i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">num_bytes</span> {
-                    <span class="ident">new_data</span>.<span class="ident">push</span>(<span class="number">0</span>); 
-                }
-            }
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cache_status</span> <span class="op">=</span><span class="op">=</span> <span class="ident">CacheStatus::Invalidated</span> {
+            <span class="comment">// debug!(&quot;TlsInitializer was invalidated, re-generating data.\n{:#X?}&quot;, self);</span>
+
+            <span class="comment">// On some architectures, such as x86_64, the ABI convention REQUIRES that</span>
+            <span class="comment">// the TLS area data starts with a pointer to itself (the TLS self pointer).</span>
+            <span class="comment">// Also, all data for &quot;existing&quot; (statically-linked) TLS sections must</span>
+            <span class="comment">// come  *before* the TLS self pointer, i.e., at negative offsets from the TLS self pointer.</span>
+            <span class="comment">// Thus, we handle that here by appending space for a pointer (one `usize`)</span>
+            <span class="comment">// to the `new_data` vector after we insert the static TLS data sections.</span>
+            <span class="comment">// The location of the new pointer value is the conceptual &quot;start&quot; of the TLS image,</span>
+            <span class="comment">// and that&#39;s what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_data</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">required_capacity</span>);
+            
+            <span class="comment">// Iterate through all static TLS sections and copy their data into the new data image.</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_of_previous_range</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="ident">copy_tls_section_data</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_data</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">static_section_offsets</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">end_of_previous_range</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">end_of_previous_range</span>, <span class="self">self</span>.<span class="ident">end_of_static_sections</span>);
+
+            <span class="comment">// Append space for the TLS self pointer immediately after the end of the last static TLS data section;</span>
+            <span class="comment">// its actual value will be filled in later (in `get_data()`) after a new copy of the TLS data image is made.</span>
+            <span class="ident">new_data</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span>[<span class="number">0u8</span>; <span class="ident">POINTER_SIZE</span>]);
+
+            <span class="comment">// Iterate through all dynamic TLS sections and copy their data into the new data image.</span>
+            <span class="ident">end_of_previous_range</span> <span class="op">=</span> <span class="ident">POINTER_SIZE</span>; <span class="comment">// we already pushed room for the TLS self pointer above.</span>
+            <span class="ident">copy_tls_section_data</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_data</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">dynamic_section_offsets</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">end_of_previous_range</span>);
+            <span class="macro">assert_eq!</span>(<span class="ident">end_of_previous_range</span>, <span class="self">self</span>.<span class="ident">end_of_dynamic_sections</span>);
 
             <span class="self">self</span>.<span class="ident">data_cache</span> <span class="op">=</span> <span class="ident">new_data</span>;
             <span class="self">self</span>.<span class="ident">cache_status</span> <span class="op">=</span> <span class="ident">CacheStatus::Fresh</span>;
         }
 
         <span class="comment">// Here, the `data_cache` is guaranteed to be fresh and ready to use.</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">data_cache</span>.<span class="ident">is_empty</span>() {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_copy</span>: <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data_cache</span>.<span class="ident">as_slice</span>().<span class="ident">into</span>();
-            <span class="comment">// Every time we create a new copy of the TLS data image, we have to re-calculate</span>
-            <span class="comment">// and re-assign the TLS self pointer value at the end of the data image,</span>
-            <span class="comment">// because the virtual address of that new TLS data image copy will be unique.</span>
-            <span class="comment">// Note that we only do this if the data_copy actually contains any TLS data.</span>
-            <span class="kw">let</span> <span class="ident">offset_of_tls_self_ptr</span> <span class="op">=</span> <span class="ident">data_copy</span>.<span class="ident">len</span>().<span class="ident">saturating_sub</span>(<span class="ident">POINTER_SIZE</span>);
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">dest_slice</span>) <span class="op">=</span> <span class="ident">data_copy</span>.<span class="ident">get_mut</span>(<span class="ident">offset_of_tls_self_ptr</span> .. (<span class="ident">offset_of_tls_self_ptr</span> <span class="op">+</span> <span class="ident">POINTER_SIZE</span>)) {
-                <span class="kw">let</span> <span class="ident">tls_self_ptr_value</span> <span class="op">=</span> <span class="ident">dest_slice</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">usize</span>;
-                <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">tls_self_ptr_value</span>.<span class="ident">to_ne_bytes</span>());
-                <span class="kw">return</span> <span class="ident">TlsDataImage</span> { 
-                    <span class="ident">_data</span>: <span class="prelude-val">Some</span>(<span class="ident">data_copy</span>),
-                    <span class="ident">ptr</span>:   <span class="ident">tls_self_ptr_value</span>,
-                };
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data_copy</span>: <span class="ident">Box</span><span class="op">&lt;</span>[<span class="ident">u8</span>]<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data_cache</span>.<span class="ident">as_slice</span>().<span class="ident">into</span>();
+        <span class="comment">// Every time we create a new copy of the TLS data image, we have to re-calculate</span>
+        <span class="comment">// and re-assign the TLS self pointer value (located after the static TLS section data),</span>
+        <span class="comment">// because the virtual address of that new TLS data image copy will be unique.</span>
+        <span class="comment">// Note that we only do this if the data_copy actually contains any TLS data.</span>
+        <span class="kw">let</span> <span class="ident">self_ptr_offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">end_of_static_sections</span>;
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">dest_slice</span>) <span class="op">=</span> <span class="ident">data_copy</span>.<span class="ident">get_mut</span>(<span class="ident">self_ptr_offset</span> .. (<span class="ident">self_ptr_offset</span> <span class="op">+</span> <span class="ident">POINTER_SIZE</span>)) {
+            <span class="kw">let</span> <span class="ident">tls_self_ptr_value</span> <span class="op">=</span> <span class="ident">dest_slice</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+            <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">tls_self_ptr_value</span>.<span class="ident">to_ne_bytes</span>());
+            <span class="ident">TlsDataImage</span> {
+                <span class="ident">_data</span>: <span class="prelude-val">Some</span>(<span class="ident">data_copy</span>),
+                <span class="ident">ptr</span>:   <span class="ident">tls_self_ptr_value</span>,
             }
+        } <span class="kw">else</span> {
+            <span class="macro">panic!</span>(<span class="string">&quot;BUG: offset of TLS self pointer was out of bounds in the TLS data image:\n{:02X?}&quot;</span>, <span class="ident">data_copy</span>);
         }
-
-        <span class="ident">TlsDataImage</span> { <span class="ident">_data</span>: <span class="prelude-val">None</span>, <span class="ident">ptr</span>: <span class="number">0</span> }
     }
 }
 

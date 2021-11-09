@@ -93,6 +93,12 @@
 <span id="90">90</span>
 <span id="91">91</span>
 <span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Offers thread-local storage (TLS) in Theseus, or rather, task-local storage.</span>
 <span class="doccomment">//! </span>
@@ -114,26 +120,26 @@
 <span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">string::String</span>, <span class="ident">vec::Vec</span>};
 
 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_ZERO</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">7</span>;
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_ZERO</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="number">0</span>);
 
 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_U8_1</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">9</span>;
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_U8_1</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="number">91</span>);
 
 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_U16</span>: <span class="ident">u16</span> <span class="op">=</span> <span class="number">7</span>;
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_U16</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="number">71</span>);
 
 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_USIZE</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="number">4</span>);
 
 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_U8_2</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">9</span>;
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">LOCAL_U8_2</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="number">9</span>);
 
 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
 <span class="kw">pub</span> <span class="kw">static</span> <span class="ident">MY_STRUCT</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">MyStruct</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="ident">MyStruct</span>(<span class="number">0x12345678DEADBEEF</span>));
 
 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">COMPLEX</span>: <span class="ident">Complex</span> <span class="op">=</span> <span class="ident">Complex::new</span>();
-<span class="comment">// pub static COMPLEX: Cell&lt;Complex&gt; = Cell::new(Complex::new());</span>
+<span class="comment">// pub static COMPLEX: Complex = Complex::new();</span>
+<span class="kw">pub</span> <span class="kw">static</span> <span class="ident">COMPLEX</span>: <span class="ident">Cell</span><span class="op">&lt;</span><span class="ident">Complex</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Cell::new</span>(<span class="ident">Complex::new</span>());
 
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
@@ -144,40 +150,46 @@
 <span class="comment">//     }</span>
 <span class="comment">// }</span>
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Complex</span> {
     <span class="kw">pub</span> <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
     <span class="kw">pub</span> <span class="ident">m</span>: <span class="ident">u8</span>,
     <span class="kw">pub</span> <span class="ident">x</span>: <span class="ident">u32</span>,
     <span class="kw">pub</span> <span class="ident">l</span>: <span class="ident">usize</span>,
-    <span class="kw">pub</span> <span class="ident">v</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
 }
 <span class="kw">impl</span> <span class="ident">Complex</span> {
     <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Complex</span> {
-        <span class="ident">Complex</span> { <span class="ident">s</span>: <span class="string">&quot;hello there now&quot;</span>, <span class="ident">m</span>: <span class="number">0x8</span>, <span class="ident">x</span>: <span class="number">0x20</span>, <span class="ident">l</span>: <span class="number">0xDEAD</span>, <span class="ident">v</span>: <span class="ident">Vec::new</span>() }
+        <span class="ident">Complex</span> { <span class="ident">s</span>: <span class="string">&quot;hello there now&quot;</span>, <span class="ident">m</span>: <span class="number">0x8</span>, <span class="ident">x</span>: <span class="number">0x20</span>, <span class="ident">l</span>: <span class="number">0xDEAD</span> }
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_tls</span>(<span class="ident">x</span>: <span class="ident">usize</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_tls</span>(<span class="ident">_x</span>: <span class="ident">usize</span>) {
     <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">unwrap</span>();
-    <span class="kw">let</span> <span class="ident">local_zero</span> <span class="op">=</span> <span class="ident">LOCAL_ZERO</span> <span class="op">+</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">u16</span>;
-    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_ZERO + x: {:?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_zero</span>);
+    <span class="kw">let</span> <span class="ident">local_zero</span> <span class="op">=</span> <span class="ident">LOCAL_ZERO</span>.<span class="ident">get</span>();
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_ZERO: {:#X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_zero</span>);
 
-    <span class="kw">let</span> <span class="ident">local_u8_1</span> <span class="op">=</span> <span class="ident">LOCAL_U8_1</span> <span class="op">+</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">u8</span>;
-    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_U8_1 + x: {:?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_u8_1</span>);
+    <span class="kw">let</span> <span class="ident">local_u8_1</span> <span class="op">=</span> <span class="ident">LOCAL_U8_1</span>.<span class="ident">get</span>();
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_U8_1: {:#X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_u8_1</span>);
 
-    <span class="kw">let</span> <span class="ident">local_u16</span> <span class="op">=</span> <span class="ident">LOCAL_U16</span> <span class="op">+</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">u16</span>;
-    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_U16 + x: {:?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_u16</span>);
+    <span class="kw">let</span> <span class="ident">local_u16</span> <span class="op">=</span> <span class="ident">LOCAL_U16</span>.<span class="ident">get</span>();
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_U16: {:#X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_u16</span>);
 
-    <span class="kw">let</span> <span class="ident">local_usize</span> <span class="op">=</span> <span class="ident">LOCAL_USIZE</span>.<span class="ident">get</span>() <span class="op">+</span> <span class="ident">x</span>;
-    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_USIZE + x: {:?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_usize</span>);
+    <span class="kw">let</span> <span class="ident">local_usize</span> <span class="op">=</span> <span class="ident">LOCAL_USIZE</span>.<span class="ident">get</span>();
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_USIZE: {:#X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_usize</span>);
 
-    <span class="kw">let</span> <span class="ident">local_u8_2</span> <span class="op">=</span> <span class="ident">LOCAL_U8_2</span> <span class="op">+</span> <span class="ident">x</span> <span class="kw">as</span> <span class="ident">u8</span>;
-    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_U8_2 + x: {:?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_u8_2</span>);
+    <span class="kw">let</span> <span class="ident">local_u8_2</span> <span class="op">=</span> <span class="ident">LOCAL_U8_2</span>.<span class="ident">get</span>();
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, LOCAL_U8_2: {:#X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">local_u8_2</span>);
 
     <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, COMPLEX: {:X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">COMPLEX</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, COMPLEX: {:X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">COMPLEX</span>.<span class="ident">replace</span>(<span class="ident">Complex</span> {
+        <span class="ident">s</span>: <span class="string">&quot;this is the new string value&quot;</span>,
+        <span class="ident">m</span>: <span class="number">0x5D</span>,
+        <span class="ident">x</span>: <span class="number">0xEB</span>,
+        <span class="ident">l</span>: <span class="number">0xBEEF</span>,
+    }));
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, after replacing COMPLEX, its new value is: {:X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">COMPLEX</span>.<span class="ident">get</span>());
 
-    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, MY_STRUCT: {:?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">MY_STRUCT</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}, MY_STRUCT: {:X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">MY_STRUCT</span>);
     <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}: MY_STRUCT: {:X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">MY_STRUCT</span>.<span class="ident">replace</span>(<span class="ident">MyStruct</span>(<span class="number">0x99999999</span>)));
     <span class="macro">debug!</span>(<span class="string">&quot;Task {:?}: after setting MY_STRUCT to 0x99999999, its new value is {:X?}&quot;</span>, <span class="ident">curr_task</span>, <span class="ident">MY_STRUCT</span>.<span class="ident">get</span>());
 }
