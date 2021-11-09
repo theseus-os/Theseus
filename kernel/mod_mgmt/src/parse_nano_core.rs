@@ -722,7 +722,7 @@ fn add_new_section(
             new_crate_weak_ref.clone(),
         ));
         // Add this new TLS section to this namespace's TLS area image.
-        namespace.tls_initializer.lock().add_existing_tls_section(tls_offset, Arc::clone(&tls_section)).unwrap();
+        namespace.tls_initializer.lock().add_existing_static_tls_section(tls_offset, Arc::clone(&tls_section)).unwrap();
         Some(tls_section)
     }
     else if shndxs.tls_bss_shndx.map_or(false, |(shndx, _)| sec_ndx == shndx) {

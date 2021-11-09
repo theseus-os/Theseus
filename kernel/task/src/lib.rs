@@ -407,7 +407,6 @@ impl Task {
 
         // Obtain a new copied instance of the TLS data image for this task.
         let tls_area = namespace.get_tls_initializer_data();
-        warn!("Task::new_internal(): {:02X?}", tls_area);
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
