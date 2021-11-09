@@ -30,6 +30,8 @@ extern crate page_table_entry;
 #[macro_use] extern crate static_assertions;
 extern crate intrusive_collections;
 
+#[cfg(test)]
+mod test;
 
 mod static_array_rb_tree;
 // mod static_array_linked_list;
@@ -376,24 +378,40 @@ impl AllocatedFrames {
     /// * `[beginning : at_frame - 1]`
     /// * `[at_frame : end]`
     /// 
-    /// Depending on the size of this `AllocatedFrames`, either one of the 
-    /// returned `AllocatedFrames` objects may be empty. 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `AllocatedFrames` objects may be empty. 
+    /// * If `at_frame == self.start`, the first returned `AllocatedFrames` object will be empty.
+    /// * If `at_frame == self.end + 1`, the second returned `AllocatedFrames` object will be empty.
     /// 
-    /// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is not within its bounds.
+    /// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is otherwise out of bounds.
     pub fn split(self, at_frame: Frame) -> Result<(AllocatedFrames, AllocatedFrames), AllocatedFrames> {
         let end_of_first = at_frame - 1;
-        if at_frame > *self.start() && end_of_first <= *self.end() {
+
+        let (first, second) = if at_frame == *self.start() && at_frame <= *self.end() {
+            let first  = FrameRange::empty();
+            let second = FrameRange::new(at_frame, *self.end());
+            (first, second)
+        } 
+        else if at_frame == (*self.end() + 1) && end_of_first >= *self.start() {
+            let first  = FrameRange::new(*self.start(), *self.end()); 
+            let second = FrameRange::empty();
+            (first, second)
+        }
+        else if at_frame > *self.start() && end_of_first <= *self.end() {
             let first  = FrameRange::new(*self.start(), end_of_first);
             let second = FrameRange::new(at_frame, *self.end());
-            // ensure the original AllocatedFrames doesn't run its drop handler and free its frames.
-            core::mem::forget(self); 
-            Ok((
-                AllocatedFrames { frames: first }, 
-                AllocatedFrames { frames: second },
-            ))
-        } else {
-            Err(self)
+            (first, second)
         }
+        else {
+            return Err(self);
+        };
+
+        // ensure the original AllocatedFrames doesn't run its drop handler and free its frames.
+        core::mem::forget(self);   
+        Ok((
+            AllocatedFrames { frames: first }, 
+            AllocatedFrames { frames: second },
+        ))
     }
 }
 
