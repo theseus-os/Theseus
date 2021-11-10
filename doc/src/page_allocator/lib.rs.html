@@ -688,6 +688,22 @@
 <span id="685">685</span>
 <span id="686">686</span>
 <span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
+<span id="696">696</span>
+<span id="697">697</span>
+<span id="698">698</span>
+<span id="699">699</span>
+<span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Provides an allocator for virtual memory pages.</span>
 <span class="doccomment">//! The minimum unit of allocation is a single page. </span>
@@ -923,28 +939,44 @@
 	}
 
 	<span class="doccomment">/// Splits this `AllocatedPages` into two separate `AllocatedPages` objects:</span>
-	<span class="doccomment">/// * `[beginning : at_page - 1]`</span>
-	<span class="doccomment">/// * `[at_page : end]`</span>
-	<span class="doccomment">/// </span>
-	<span class="doccomment">/// Depending on the size of this `AllocatedPages`, either one of the </span>
-	<span class="doccomment">/// returned `AllocatedPages` objects may be empty. </span>
-	<span class="doccomment">/// </span>
-	<span class="doccomment">/// Returns an `Err` containing this `AllocatedPages` if `at_page` is not within its bounds.</span>
-	<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="self">self</span>, <span class="ident">at_page</span>: <span class="ident">Page</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">AllocatedPages</span>), <span class="ident">AllocatedPages</span><span class="op">&gt;</span> {
-		<span class="kw">let</span> <span class="ident">end_of_first</span> <span class="op">=</span> <span class="ident">at_page</span> <span class="op">-</span> <span class="number">1</span>;
-		<span class="kw">if</span> <span class="ident">at_page</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">end</span>() {
-			<span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">start</span>(), <span class="ident">end_of_first</span>);
-			<span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="ident">at_page</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">pages</span>.<span class="ident">end</span>());
-			<span class="comment">// ensure the original AllocatedPages doesn&#39;t run its drop handler and free its pages.</span>
-			<span class="ident">core::mem::forget</span>(<span class="self">self</span>); 
-			<span class="prelude-val">Ok</span>((
-				<span class="ident">AllocatedPages</span> { <span class="ident">pages</span>: <span class="ident">first</span> }, 
-				<span class="ident">AllocatedPages</span> { <span class="ident">pages</span>: <span class="ident">second</span> },
-			))
-		} <span class="kw">else</span> {
-			<span class="prelude-val">Err</span>(<span class="self">self</span>)
-		}
-	}
+    <span class="doccomment">/// * `[beginning : at_page - 1]`</span>
+    <span class="doccomment">/// * `[at_page : end]`</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This function follows the behavior of [`core::slice::split_at()`],</span>
+    <span class="doccomment">/// thus, either one of the returned `AllocatedPages` objects may be empty. </span>
+    <span class="doccomment">/// * If `at_page == self.start`, the first returned `AllocatedPages` object will be empty.</span>
+    <span class="doccomment">/// * If `at_page == self.end + 1`, the second returned `AllocatedPages` object will be empty.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Returns an `Err` containing this `AllocatedPages` if `at_page` is otherwise out of bounds.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="self">self</span>, <span class="ident">at_page</span>: <span class="ident">Page</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedPages</span>, <span class="ident">AllocatedPages</span>), <span class="ident">AllocatedPages</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">end_of_first</span> <span class="op">=</span> <span class="ident">at_page</span> <span class="op">-</span> <span class="number">1</span>;
+
+        <span class="kw">let</span> (<span class="ident">first</span>, <span class="ident">second</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">at_page</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">at_page</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
+            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">PageRange::empty</span>();
+            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="ident">at_page</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
+            (<span class="ident">first</span>, <span class="ident">second</span>)
+        } 
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_page</span> <span class="op">=</span><span class="op">=</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>) <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() {
+            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>()); 
+            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">PageRange::empty</span>();
+            (<span class="ident">first</span>, <span class="ident">second</span>)
+        }
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_page</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
+            <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">end_of_first</span>);
+            <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">PageRange::new</span>(<span class="ident">at_page</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
+            (<span class="ident">first</span>, <span class="ident">second</span>)
+        }
+        <span class="kw">else</span> {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="self">self</span>);
+        };
+
+        <span class="comment">// ensure the original AllocatedPages doesn&#39;t run its drop handler and free its pages.</span>
+        <span class="ident">core::mem::forget</span>(<span class="self">self</span>);   
+        <span class="prelude-val">Ok</span>((
+            <span class="ident">AllocatedPages</span> { <span class="ident">pages</span>: <span class="ident">first</span> }, 
+            <span class="ident">AllocatedPages</span> { <span class="ident">pages</span>: <span class="ident">second</span> },
+        ))
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">AllocatedPages</span> {
