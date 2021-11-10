@@ -232,28 +232,44 @@ impl AllocatedPages {
 	}
 
 	/// Splits this `AllocatedPages` into two separate `AllocatedPages` objects:
-	/// * `[beginning : at_page - 1]`
-	/// * `[at_page : end]`
-	/// 
-	/// Depending on the size of this `AllocatedPages`, either one of the 
-	/// returned `AllocatedPages` objects may be empty. 
-	/// 
-	/// Returns an `Err` containing this `AllocatedPages` if `at_page` is not within its bounds.
-	pub fn split(self, at_page: Page) -> Result<(AllocatedPages, AllocatedPages), AllocatedPages> {
-		let end_of_first = at_page - 1;
-		if at_page > *self.pages.start() && end_of_first <= *self.pages.end() {
-			let first  = PageRange::new(*self.pages.start(), end_of_first);
-			let second = PageRange::new(at_page, *self.pages.end());
-			// ensure the original AllocatedPages doesn't run its drop handler and free its pages.
-			core::mem::forget(self); 
-			Ok((
-				AllocatedPages { pages: first }, 
-				AllocatedPages { pages: second },
-			))
-		} else {
-			Err(self)
-		}
-	}
+    /// * `[beginning : at_page - 1]`
+    /// * `[at_page : end]`
+    /// 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `AllocatedPages` objects may be empty. 
+    /// * If `at_page == self.start`, the first returned `AllocatedPages` object will be empty.
+    /// * If `at_page == self.end + 1`, the second returned `AllocatedPages` object will be empty.
+    /// 
+    /// Returns an `Err` containing this `AllocatedPages` if `at_page` is otherwise out of bounds.
+    pub fn split(self, at_page: Page) -> Result<(AllocatedPages, AllocatedPages), AllocatedPages> {
+        let end_of_first = at_page - 1;
+
+        let (first, second) = if at_page == *self.start() && at_page <= *self.end() {
+            let first  = PageRange::empty();
+            let second = PageRange::new(at_page, *self.end());
+            (first, second)
+        } 
+        else if at_page == (*self.end() + 1) && end_of_first >= *self.start() {
+            let first  = PageRange::new(*self.start(), *self.end()); 
+            let second = PageRange::empty();
+            (first, second)
+        }
+        else if at_page > *self.start() && end_of_first <= *self.end() {
+            let first  = PageRange::new(*self.start(), end_of_first);
+            let second = PageRange::new(at_page, *self.end());
+            (first, second)
+        }
+        else {
+            return Err(self);
+        };
+
+        // ensure the original AllocatedPages doesn't run its drop handler and free its pages.
+        core::mem::forget(self);   
+        Ok((
+            AllocatedPages { pages: first }, 
+            AllocatedPages { pages: second },
+        ))
+    }
 }
 
 impl Drop for AllocatedPages {
