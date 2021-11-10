@@ -2507,6 +2507,7 @@ dependencies = [
  "lazy_static",
  "log",
  "runqueue_priority",
+ "runqueue_realtime",
  "runqueue_round_robin",
  "single_simd_task_optimization",
  "task",
@@ -2521,6 +2522,14 @@ dependencies = [
  "lazy_static",
  "log",
  "single_simd_task_optimization",
+ "task",
+]
+
+[[package]]
+name = "runqueue_realtime"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
  "task",
 ]
 
@@ -2563,6 +2572,7 @@ dependencies = [
  "priority-queue",
  "runqueue",
  "scheduler_priority",
+ "scheduler_realtime",
  "scheduler_round_robin",
  "spin 0.9.0",
  "task",
@@ -2587,6 +2597,16 @@ dependencies = [
  "runqueue",
  "runqueue_priority",
  "spin 0.9.0",
+ "task",
+]
+
+[[package]]
+name = "scheduler_realtime"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "runqueue",
+ "runqueue_realtime",
  "task",
 ]
 

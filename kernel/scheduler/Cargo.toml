@@ -22,6 +22,9 @@ path = "../scheduler_round_robin"
 [dependencies.scheduler_priority]
 path = "../scheduler_priority"
 
+[dependencies.scheduler_realtime]
+path = "../scheduler_realtime"
+
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 

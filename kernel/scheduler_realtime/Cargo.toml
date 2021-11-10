@@ -3,4 +3,17 @@ name = "scheduler_realtime"
 version = "0.1.0"
 edition = "2018"
 
-[dependencies]
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.runqueue]
+path = "../runqueue"
+
+[dependencies.runqueue_realtime]
+path = "../runqueue_realtime"
+
+[lib]
+crate-type = ["rlib"]

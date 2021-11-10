@@ -5,15 +5,17 @@ extern crate alloc;
 extern crate irq_safety;
 extern crate task;
 extern crate runqueue;
+#[cfg(realtime_scheduler)] extern crate scheduler_realtime;
 #[cfg(priority_scheduler)] extern crate scheduler_priority;
-#[cfg(not(priority_scheduler))] extern crate scheduler_round_robin;
+#[cfg(all(not(priority_scheduler), not(realtime_scheduler)))] extern crate scheduler_round_robin;
 
 
 use core::ops::Deref;
 use irq_safety::hold_interrupts;
 use task::{Task, get_my_current_task, TaskRef};
+#[cfg(realtime_scheduler)] use scheduler_realtime::select_next_task;
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
-#[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
+#[cfg(all(not(priority_scheduler), not(realtime_scheduler)))] use scheduler_round_robin::select_next_task;
 
 cfg_if!{
     if #[cfg(target_arch="x86_64")] {

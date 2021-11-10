@@ -3,4 +3,8 @@ name = "runqueue_realtime"
 version = "0.1.0"
 edition = "2018"
 
-[dependencies]
+[dependencies.task]
+path = "../task"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
