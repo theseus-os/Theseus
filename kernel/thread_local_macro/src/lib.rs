@@ -22,6 +22,8 @@
 #![no_std]
 #![feature(thread_local)]
 #![feature(const_fn_fn_ptr_basics)]
+#![feature(allow_internal_unstable)]
+
 // The code from Rust libstd uses unsafe blocks within unsafe functions,
 // so we preserve that here (for now).
 #![allow(unused_unsafe)]
@@ -162,6 +164,10 @@ macro_rules! thread_local {
 
 #[doc(hidden)]
 #[macro_export]
+// This allows the `thread_local!()` macro to be used in a foreign crate
+// without that crate having to specify the `#![feature(thread_local)]`.
+// This is also done in the Rust standard library, so it's completely fine to do.
+#[allow_internal_unstable(thread_local)]
 macro_rules! __thread_local_inner {
     // used to generate the `LocalKey` value for const-initialized thread locals
     (@key $t:ty, const $init:expr) => {{
