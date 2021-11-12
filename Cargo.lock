@@ -2654,6 +2654,7 @@ dependencies = [
  "scheduler",
  "stack",
  "task",
+ "thread_local_macro",
 ]
 
 [[package]]
@@ -2996,9 +2997,7 @@ dependencies = [
 name = "thread_local_macro"
 version = "0.1.0"
 dependencies = [
- "log",
- "spawn",
- "task",
+ "static_assertions",
 ]
 
 [[package]]

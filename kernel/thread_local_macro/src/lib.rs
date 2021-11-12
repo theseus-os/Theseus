@@ -9,13 +9,21 @@
 //! However, static items defined in a `thread_local!()` macro block will be
 //! destructed (e.g., dropped, destroyed) when that task exits.
 //! 
-//! # Implementation Notes
+//! # Rust std-based implementation notes
 //! The code in this crate is adapted from [this version of the `thread_local!()` macro]
 //! from the Rust standard library.
 //! The main design has been left unchanged, but we have removed most of the configuration blocks
 //! for complex platform-specific or OS-specific behavior.
 //! Because Theseus supports the `#[thread_local]` attribute, we can directly use the 
 //! TLS "fast path", which the Rust standard library refers to as the "FastLocalInnerKey".
+//! 
+//! ## Unsafety
+//! We could probably could remove most of the unsafe code from this implementation,
+//! because we don't have to account for the various raw platform-specific interfaces 
+//! or using raw libc types like the original Rust std implementation does.
+//! However, I have chosen to leave the code as close as possible to the original 
+//! Rust std implementation in order to make updates as easy as possible,
+//! for if and when the Rust std version changes and we wish to track/merge in those changes.
 //! 
 //! [this version of the `thread_local!()` macro]: https://github.com/rust-lang/rust/blob/3f14f4b3cec811017079564e16a92a1dc9870f41/library/std/src/thread/local.rs
 
@@ -24,22 +32,82 @@
 #![feature(const_fn_fn_ptr_basics)]
 #![feature(allow_internal_unstable)]
 
-// The code from Rust libstd uses unsafe blocks within unsafe functions,
+// The code from Rust std uses unsafe blocks within unsafe functions,
 // so we preserve that here (for now).
 #![allow(unused_unsafe)]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate spawn;
-extern crate task; 
+#[macro_use] extern crate static_assertions;
 
+use core::cell::RefCell;
+
+/// The set of TLS objects that have been initialized by a task
+/// and need a destructor to be run after that task exits.
+///
+/// We store these TLS destructors in a raw TLS object itself
+/// which is okay as long as this object itself doesn't require a destructor.
+/// We achieve this condition in two parts:
+/// 1. We statically assert that the `TlsObjectDestructor` doesn't implement [`Drop`],
+///    which makes sense because it only holds raw pointer values and function pointers.
+/// 2. The actual `Vec` is drained upon task exit by the task cleanup functions
+///    in the `spawn` crate`, ensuring that there is no `Vec` memory itself
+///    to actually be deallocated, as the contents of this `Vec` have been cleared.
+/// 
+/// Note that this will always be safe even if the two conditions **aren't** met, 
+/// because the only thing that will happen there is a memory leak.
+#[thread_local]
+static TLS_DESTRUCTORS: RefCell<Vec<TlsObjectDestructor>> = RefCell::new(Vec::new());
+
+/// A TLS data object that has been initialized and requires a destructor to be run.
+/// The destructor should be invoked when the task containing this `TlsObjectDestructor` exits.
+#[doc(hidden)]
+pub struct TlsObjectDestructor {
+    /// The raw pointer to the object that needs to be dropped.
+    pub object_ptr: *mut u8,
+    /// The destructor function that should be invoked with `object_ptr` as its only parameter.
+    /// The function itself must be an unsafe one, as it dereferences raw pointers.
+    pub dtor: unsafe extern "C" fn(*mut u8),
+}
+// See the above [`TLS_DESTRUCTORS`] docs for why this is necessary.
+const_assert!(!core::mem::needs_drop::<TlsObjectDestructor>());
+
+/// Takes ownership of the list of [`TlsObjectDestructor`]s
+/// for TLS objects that have been initialized in this current task's TLS area.
+/// 
+/// This is only intended to be used by the task cleanup functions
+/// after the current task has exited.
+#[doc(hidden)]
+pub fn take_current_tls_destructors() -> Vec<TlsObjectDestructor> {
+    TLS_DESTRUCTORS.take()
+}
+
+/// Adds the given destructor callback to the current task's list of
+/// TLS destructors that should be run when that task exits.
+/// 
+/// # Arguments
+/// * `a`: the pointer to the object that will be destructed.
+/// * `dtor`: the function that should be invoked to destruct the object pointed to by `a`.
+///   When the current task exits, this function will be invoked with `a`
+///   as its only argument, at which point the `dtor` function should drop `a`.
+/// 
+/// Currently the only value of `dtor` that is used is a type-specific monomorphized
+/// version of the above [`fast::destroy_value()`] function.
+fn register_dtor(object_ptr: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
+    TLS_DESTRUCTORS.borrow_mut().push(TlsObjectDestructor { object_ptr, dtor });
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////
+//// Everything below here is a modified version of thread_local!() from Rust std ////
+//////////////////////////////////////////////////////////////////////////////////////
 
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
+#[doc(hidden)]
 pub use core::option;
 use core::mem;
 use core::hint;
-
+use alloc::vec::Vec;
 
 /// A thread-local storage key which owns its contents.
 ///
@@ -52,8 +120,8 @@ use core::hint;
 /// # Initialization and Destruction
 ///
 /// Initialization is lazily performed dynamically on the first call to [`with`]
-/// within a thread (a [`Task`]), and values that implement [`Drop`] get destructed
-/// when a thread exits (when a [`Task. 
+/// within a thread ([`task::Task`]), and values that implement [`Drop`] get destructed
+/// when a thread exits.
 ///
 /// A `LocalKey`'s initializer cannot recursively depend on itself, and using
 /// a `LocalKey` in this way will cause the initializer to infinitely recurse
@@ -61,9 +129,9 @@ use core::hint;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use core::cell::RefCell;
-/// use std::thread;
+/// use spawn::new_task_builder;
 ///
 /// thread_local!(static FOO: RefCell<u32> = RefCell::new(1));
 ///
@@ -73,15 +141,18 @@ use core::hint;
 /// });
 ///
 /// // each thread starts out with the initial value of 1
-/// let t = thread::spawn(move|| {
-///     FOO.with(|f| {
-///         assert_eq!(*f.borrow(), 1);
-///         *f.borrow_mut() = 3;
-///     });
-/// });
+/// let t = new_task_builder(
+///     move |_: ()| {
+///         FOO.with(|f| {
+///             assert_eq!(*f.borrow(), 1);
+///             *f.borrow_mut() = 3;
+///         });
+///     },
+///     (), // empty arg
+/// ).spawn().unwrap();
 ///
-/// // wait for the thread to complete and bail out on panic
-/// t.join().unwrap();
+/// // wait for the new task to exit
+/// t.join();
 ///
 /// // we retain our original value of 2 despite the child thread
 /// FOO.with(|f| {
@@ -114,7 +185,7 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
     }
 }
 
-/// Declare a new thread local storage key of type [`std::thread::LocalKey`].
+/// Declare a new thread local storage key of type [`LocalKey`].
 ///
 /// # Syntax
 ///
@@ -122,7 +193,7 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
 /// Publicity and attributes for each static are allowed. Example:
 ///
 /// ```
-/// use std::cell::RefCell;
+/// use core::cell::RefCell;
 /// thread_local! {
 ///     pub static FOO: RefCell<u32> = RefCell::new(1);
 ///
@@ -132,10 +203,7 @@ impl<T: 'static> fmt::Debug for LocalKey<T> {
 /// # fn main() {}
 /// ```
 ///
-/// See [`LocalKey` documentation][`std::thread::LocalKey`] for more
-/// information.
-///
-/// [`std::thread::LocalKey`]: crate::thread::LocalKey
+/// See [`LocalKey`] documentation for more information.
 #[macro_export]
 macro_rules! thread_local {
     // empty (base case for the recursion)
@@ -545,22 +613,4 @@ pub mod fast {
             drop(value);
         }
     }
-}
-
-/// A Theseus-specific function that adds the given destructor callback
-/// to the current task's list of destructors that should be run
-/// when that task exits.
-/// 
-/// # Arguments
-/// * `a`: the pointer to the object that will be destructed.
-/// * `dtor`: the function that should be invoked to destruct the object pointed to by `a`.
-///   When the current task exits, this function will be invoked with `a`
-///   as its only argument, at which point the `dtor` function should drop `a`.
-/// 
-/// Currently the only value of `dtor` that is used is a type-specific monomorphized
-/// version of the above [`fast::destroy_value()`] function.
-/// 
-unsafe fn register_dtor(a: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
-    debug!("register_dtor(): a: {:X?}, dtor: {:X?}", a as usize, dtor); 
-    task::register_tls_destructor(a, dtor);
 }

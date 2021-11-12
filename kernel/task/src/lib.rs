@@ -54,7 +54,6 @@ use core::ops::Deref;
 use alloc::{
     boxed::Box,
     collections::BTreeMap,
-    vec::Vec,
     string::String,
     sync::Arc,
 };
@@ -231,33 +230,6 @@ impl fmt::Debug for OptionU8 {
     }
 }
 
-
-/// A TLS data object that has been initialized and requires a destructor to be run
-/// upon being dropped. of TLS data objects that have been initialized and their destructors.
-#[derive(Debug, Clone, Copy)]
-pub struct TlsObjectDestructor {
-    /// The raw pointer to the object that needs to be dropped.
-    /// We store it as a `usize` to get around the Send/Safe restriction, but that's completely harmless
-    /// because the `dtor` function will cast the pointer to whatever specific type it is.
-    pub object_ptr: usize,
-    /// The destructor function that should be invoked with `object_ptr` as its only parameter.
-    pub dtor: unsafe extern "C" fn(*mut u8),
-}
-
-pub unsafe fn register_tls_destructor(object_ptr: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
-    get_my_current_task().unwrap().inner.lock().tls_destructors.push(
-        TlsObjectDestructor {
-            object_ptr: object_ptr as usize,
-            dtor,
-        }
-    );
-}
-
-pub fn get_tls_destructors() -> Box<[TlsObjectDestructor]> {
-    get_my_current_task().unwrap().inner.lock().tls_destructors.as_slice().into()
-}
-
-
 /// The parts of a `Task` that may be modified after its creation.
 ///
 /// This includes only the parts that cannot be modified atomically.
@@ -297,15 +269,6 @@ pub struct TaskInner {
     /// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
-    /// A list of TLS data objects that have been initialized and their destructors.
-    /// Their types `T` need destructors to be called; they implement `Drop`, i.e.,
-    /// `core::mem::needs_drop::<T>()` is `true`.
-    /// 
-    /// These destructors are typically registered by the `thread_local!()` macro.
-    /// 
-    /// Theseus destructors will be invoked at the end of task cleanup
-    /// after this task has exited.
-    tls_destructors: Vec<TlsObjectDestructor>,
 }
 
 
@@ -455,7 +418,6 @@ impl Task {
                 kill_handler: None,
                 env,
                 restart_info: None,
-                tls_destructors: Vec::new(),
             }),
             id: task_id,
             name: format!("task_{}", task_id),

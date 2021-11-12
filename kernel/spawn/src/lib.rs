@@ -29,6 +29,7 @@ extern crate fs_node;
 extern crate catch_unwind;
 extern crate fault_crate_swap;
 extern crate pause;
+extern crate thread_local_macro;
 
 
 use core::{marker::PhantomData, mem, ops::Deref};
@@ -581,7 +582,7 @@ fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: 
 
 
 
-/// Internal function that clean up the task not exited properly.
+/// Internal function that cleans up a task that did not exit properly.
 #[inline(always)]
 fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillReason) -> (irq_safety::HeldInterrupts, TaskRef) {
     // Disable preemption (currently just disabling interrupts altogether)
@@ -624,6 +625,21 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
 }
 
 
+/// Internal function that performs final cleanup actions for an exited task.
+#[inline(always)]
+fn task_cleanup_final_internal(current_task: &TaskRef) {
+    // First, remove the task from its runqueue(s).
+    remove_current_task_from_runqueue(current_task);
+
+    // Second, run TLS object destructors, which will drop any TLS objects
+    // that were lazily initialized during this execution of this task.
+    for tls_dtor in thread_local_macro::take_current_tls_destructors().into_iter() {
+        unsafe {
+            (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
+        }
+    }
+}
+
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
@@ -632,13 +648,7 @@ fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, curr
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    remove_current_task_from_runqueue(&current_task);
-    // Run TLS object destructors
-    for tls_dtor in task::get_tls_destructors().iter() {
-        unsafe {
-            (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
-        }
-    }
+    task_cleanup_final_internal(&current_task);
     drop(current_task);
     drop(held_interrupts);
     // ****************************************************
@@ -658,8 +668,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
          R: Send + 'static,
          F: FnOnce(A) -> R + Send + Clone + 'static, 
 {
-    // remove the task from runqueue
-    remove_current_task_from_runqueue(&current_task);
+    task_cleanup_final_internal(&current_task);
 
     {
         #[cfg(use_crate_replacement)]
