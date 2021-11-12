@@ -2957,6 +2957,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_thread_local"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "text_display"
 version = "0.1.0"
 dependencies = [
@@ -2984,7 +2993,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "thread_local_storage"
+name = "thread_local_macro"
 version = "0.1.0"
 dependencies = [
  "log",
@@ -3010,7 +3019,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "terminal_print",
- "thread_local_storage",
+ "test_thread_local",
 ]
 
 [[package]]

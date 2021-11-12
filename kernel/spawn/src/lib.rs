@@ -31,11 +31,7 @@ extern crate fault_crate_swap;
 extern crate pause;
 
 
-use core::{
-    mem,
-    marker::PhantomData,
-    ops::Deref,
-};
+use core::{marker::PhantomData, mem, ops::Deref, slice::SlicePattern};
 use alloc::{
     vec::Vec,
     string::String,
@@ -637,6 +633,12 @@ fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, curr
           F: FnOnce(A) -> R, 
 {
     remove_current_task_from_runqueue(&current_task);
+    // Run TLS object destructors
+    for tls_dtor in task::get_tls_destructors().iter() {
+        unsafe {
+            (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
+        }
+    }
     drop(current_task);
     drop(held_interrupts);
     // ****************************************************

@@ -405,7 +405,7 @@ pub struct CrateNamespace {
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
     /// 
-    /// NOTE: this is currently a global system-wide singleton. See the static [`TLS_INITIALIZER`] for more.
+    /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
     tls_initializer: &'static Mutex<TlsInitializer>,
 
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
