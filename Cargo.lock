@@ -3020,6 +3020,7 @@ dependencies = [
  "log",
  "terminal_print",
  "test_thread_local",
+ "thread_local_macro",
 ]
 
 [[package]]

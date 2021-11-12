@@ -16,3 +16,6 @@ path = "../../kernel/terminal_print"
 
 [dependencies.test_thread_local]
 path = "../../kernel/test_thread_local"
+
+[dependencies.thread_local_macro]
+path = "../../kernel/thread_local_macro"

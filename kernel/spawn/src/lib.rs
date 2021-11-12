@@ -31,7 +31,7 @@ extern crate fault_crate_swap;
 extern crate pause;
 
 
-use core::{marker::PhantomData, mem, ops::Deref, slice::SlicePattern};
+use core::{marker::PhantomData, mem, ops::Deref};
 use alloc::{
     vec::Vec,
     string::String,

@@ -34,7 +34,7 @@ extern crate task;
 
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
-use core::option::Option;
+pub use core::option;
 use core::mem;
 use core::hint;
 
@@ -203,7 +203,7 @@ macro_rules! __thread_local_inner {
                         // 0 == we haven't registered a destructor, so do
                         //   so now.
                         0 => {
-                            $crate::fast::LocalKeyInner::<$t>::register_dtor(
+                            $crate::fast::Key::<$t>::register_dtor(
                                 $crate::ptr::addr_of_mut!(VAL) as *mut u8,
                                 destroy,
                             );
@@ -235,8 +235,8 @@ macro_rules! __thread_local_inner {
             #[inline]
             unsafe fn __getit() -> $crate::option::Option<&'static $t> {
                 #[thread_local]
-                static __KEY: $crate::fast::LocalKeyInner<$t> =
-                    $crate::fast::LocalKeyInner::new();
+                static __KEY: $crate::fast::Key<$t> =
+                    $crate::fast::Key::new();
 
                 // FIXME: remove the #[allow(...)] marker when macros don't
                 // raise warning for missing/extraneous unsafe blocks anymore.
@@ -246,12 +246,12 @@ macro_rules! __thread_local_inner {
             }
 
             unsafe {
-                $crate::thread::LocalKey::new(__getit)
+                $crate::LocalKey::new(__getit)
             }
         }
     };
     ($(#[$attr:meta])* $vis:vis $name:ident, $t:ty, $($init:tt)*) => {
-        $(#[$attr])* $vis const $name: $crate::thread::LocalKey<$t> =
+        $(#[$attr])* $vis const $name: $crate::LocalKey<$t> =
             $crate::__thread_local_inner!(@key $t, $($init)*);
     }
 }
