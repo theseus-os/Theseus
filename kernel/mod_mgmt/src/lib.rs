@@ -405,7 +405,7 @@ pub struct CrateNamespace {
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
     /// 
-    /// NOTE: this is currently a global system-wide singleton. See the static [`TLS_INITIALIZER`] for more.
+    /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
     tls_initializer: &'static Mutex<TlsInitializer>,
 
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
@@ -1226,7 +1226,7 @@ impl CrateNamespace {
                         global_sections.contains(&shndx),
                         new_crate_weak_ref.clone(),
                     );
-                    trace!("Loaded new TLS section: {:?}", new_tls_section);
+                    // trace!("Loaded new TLS section: {:?}", new_tls_section);
                     
                     // Add the new TLS section to this namespace's initial TLS area,
                     // which will reserve/obtain a new offset into that TLS area which holds this section's data.
@@ -1236,7 +1236,7 @@ impl CrateNamespace {
                         .add_new_dynamic_tls_section(new_tls_section, sec_align)
                         .map_err(|_| "Failed to add new TLS section")?;
 
-                    trace!("\t --> updated new TLS section: {:?}", new_tls_section);
+                    // trace!("\t --> updated new TLS section: {:?}", new_tls_section);
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
 
@@ -2557,7 +2557,7 @@ impl TlsInitializer {
             // On some architectures, such as x86_64, the ABI convention REQUIRES that
             // the TLS area data starts with a pointer to itself (the TLS self pointer).
             // Also, all data for "existing" (statically-linked) TLS sections must
-            // come  *before* the TLS self pointer, i.e., at negative offsets from the TLS self pointer.
+            // come *before* the TLS self pointer, i.e., at negative offsets from the TLS self pointer.
             // Thus, we handle that here by appending space for a pointer (one `usize`)
             // to the `new_data` vector after we insert the static TLS data sections.
             // The location of the new pointer value is the conceptual "start" of the TLS image,
@@ -2576,7 +2576,10 @@ impl TlsInitializer {
             // Iterate through all dynamic TLS sections and copy their data into the new data image.
             end_of_previous_range = POINTER_SIZE; // we already pushed room for the TLS self pointer above.
             copy_tls_section_data(&mut new_data, &self.dynamic_section_offsets, &mut end_of_previous_range);
-            assert_eq!(end_of_previous_range, self.end_of_dynamic_sections);
+            if self.end_of_dynamic_sections != 0 {
+                // this assertion only makes sense if there are any dynamic sections
+                assert_eq!(end_of_previous_range, self.end_of_dynamic_sections);
+            }
 
             self.data_cache = new_data;
             self.cache_status = CacheStatus::Fresh;

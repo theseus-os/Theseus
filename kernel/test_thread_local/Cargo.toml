@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "thread_local_storage"
-description = "Support for thread-local storage (TLS)"
+name = "test_thread_local"
+description = "Test cases for thread-local storage (TLS) directly using the #[thread_local] attribute" 
 version = "0.1.0"
 build = "../../build.rs"
 

@@ -61,5 +61,8 @@ path = "../fault_log"
 [dependencies.pause]
 path = "../pause"
 
+[dependencies.thread_local_macro]
+path = "../thread_local_macro"
+
 [lib]
 crate-type = ["rlib"]

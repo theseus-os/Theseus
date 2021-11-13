@@ -230,7 +230,6 @@ impl fmt::Debug for OptionU8 {
     }
 }
 
-
 /// The parts of a `Task` that may be modified after its creation.
 ///
 /// This includes only the parts that cannot be modified atomically.
