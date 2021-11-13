@@ -2577,7 +2577,7 @@ impl TlsInitializer {
             end_of_previous_range = POINTER_SIZE; // we already pushed room for the TLS self pointer above.
             copy_tls_section_data(&mut new_data, &self.dynamic_section_offsets, &mut end_of_previous_range);
             if self.end_of_dynamic_sections != 0 {
-                // this assertion only makes sense if some dynamic sections exist
+                // this assertion only makes sense if there are any dynamic sections
                 assert_eq!(end_of_previous_range, self.end_of_dynamic_sections);
             }
 

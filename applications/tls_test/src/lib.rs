@@ -1,3 +1,5 @@
+//! Basic tests for thread-local storage (TLS) atop Theseus.
+
 #![no_std]
 // #![feature(plugin)]
 // #![plugin(application_main_fn)]
@@ -7,8 +9,6 @@ extern crate alloc;
 #[macro_use] extern crate terminal_print;
 extern crate test_thread_local;
 #[macro_use] extern crate thread_local_macro;
-
-// use core::cell::RefCell;
 
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -24,11 +24,8 @@ pub fn main(args: Vec<String>) -> isize {
         _ => { }
     }
 
-
     println!("Invoking test_thread_local::test_tls()...");
-
     test_thread_local::test_tls(10);
-
     println!("Finished invoking test_thread_local::test_tls().");
 
     0
@@ -37,20 +34,19 @@ pub fn main(args: Vec<String>) -> isize {
 
 /// Tests the `thread_local!()` macro and its destructors at task exit.
 fn test_macro() {
-
     thread_local! {
         static CONST_USIZE: usize = 0x1234;
         static MY_STRUCT: MyStruct = MyStruct::new(0x6565);
     }
 
-    warn!("Accessing CONST_USIZE...");
+    debug!("Accessing CONST_USIZE...");
     CONST_USIZE.with(|val| {
-        warn!("CONST_USIZE has val {:X?}", val);
+        debug!("CONST_USIZE has val {:X?}", val);
     });
 
-    warn!("Accessing MY_STRUCT...");
+    debug!("Accessing MY_STRUCT...");
     MY_STRUCT.with(|val| {
-        warn!("MY_STRUCT has val {:X?}", val);
+        debug!("MY_STRUCT has val {:X?}", val);
     });
 }
 
@@ -58,12 +54,12 @@ fn test_macro() {
 pub struct MyStruct(usize);
 impl MyStruct {
     fn new(a: usize) -> MyStruct {
-        warn!("MyStruct::new({:X?})", a);
+        debug!("MyStruct::new({:X?})", a);
         MyStruct(a)
     }
 }
 impl Drop for MyStruct {
     fn drop(&mut self) {
-        warn!("DROPPING MyStruct({:X?})", self.0);
+        debug!("DROPPING MyStruct({:X?})", self.0);
     }
 }
