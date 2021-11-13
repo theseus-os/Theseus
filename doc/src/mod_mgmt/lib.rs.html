@@ -2660,6 +2660,9 @@
 <span id="2657">2657</span>
 <span id="2658">2658</span>
 <span id="2659">2659</span>
+<span id="2660">2660</span>
+<span id="2661">2661</span>
+<span id="2662">2662</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -3068,7 +3071,7 @@
     <span class="doccomment">/// When spawning a new task, the new task will create its own local TLS area</span>
     <span class="doccomment">/// with this `tls_initializer` as the local data.</span>
     <span class="doccomment">/// </span>
-    <span class="doccomment">/// NOTE: this is currently a global system-wide singleton. See the static [`TLS_INITIALIZER`] for more.</span>
+    <span class="doccomment">/// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.</span>
     <span class="ident">tls_initializer</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TlsInitializer</span><span class="op">&gt;</span>,
 
     <span class="doccomment">/// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. </span>
@@ -3889,7 +3892,7 @@
                         <span class="ident">global_sections</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>),
                         <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
                     );
-                    <span class="macro">trace!</span>(<span class="string">&quot;Loaded new TLS section: {:?}&quot;</span>, <span class="ident">new_tls_section</span>);
+                    <span class="comment">// trace!(&quot;Loaded new TLS section: {:?}&quot;, new_tls_section);</span>
                     
                     <span class="comment">// Add the new TLS section to this namespace&#39;s initial TLS area,</span>
                     <span class="comment">// which will reserve/obtain a new offset into that TLS area which holds this section&#39;s data.</span>
@@ -3899,7 +3902,7 @@
                         .<span class="ident">add_new_dynamic_tls_section</span>(<span class="ident">new_tls_section</span>, <span class="ident">sec_align</span>)
                         .<span class="ident">map_err</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="string">&quot;Failed to add new TLS section&quot;</span>)<span class="question-mark">?</span>;
 
-                    <span class="macro">trace!</span>(<span class="string">&quot;\t --&gt; updated new TLS section: {:?}&quot;</span>, <span class="ident">new_tls_section</span>);
+                    <span class="comment">// trace!(&quot;\t --&gt; updated new TLS section: {:?}&quot;, new_tls_section);</span>
                     <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(<span class="ident">shndx</span>, <span class="ident">new_tls_section</span>);
                     <span class="ident">tls_sections</span>.<span class="ident">insert</span>(<span class="ident">shndx</span>);
 
@@ -5220,7 +5223,7 @@
             <span class="comment">// On some architectures, such as x86_64, the ABI convention REQUIRES that</span>
             <span class="comment">// the TLS area data starts with a pointer to itself (the TLS self pointer).</span>
             <span class="comment">// Also, all data for &quot;existing&quot; (statically-linked) TLS sections must</span>
-            <span class="comment">// come  *before* the TLS self pointer, i.e., at negative offsets from the TLS self pointer.</span>
+            <span class="comment">// come *before* the TLS self pointer, i.e., at negative offsets from the TLS self pointer.</span>
             <span class="comment">// Thus, we handle that here by appending space for a pointer (one `usize`)</span>
             <span class="comment">// to the `new_data` vector after we insert the static TLS data sections.</span>
             <span class="comment">// The location of the new pointer value is the conceptual &quot;start&quot; of the TLS image,</span>
@@ -5239,7 +5242,10 @@
             <span class="comment">// Iterate through all dynamic TLS sections and copy their data into the new data image.</span>
             <span class="ident">end_of_previous_range</span> <span class="op">=</span> <span class="ident">POINTER_SIZE</span>; <span class="comment">// we already pushed room for the TLS self pointer above.</span>
             <span class="ident">copy_tls_section_data</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_data</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">dynamic_section_offsets</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">end_of_previous_range</span>);
-            <span class="macro">assert_eq!</span>(<span class="ident">end_of_previous_range</span>, <span class="self">self</span>.<span class="ident">end_of_dynamic_sections</span>);
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">end_of_dynamic_sections</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
+                <span class="comment">// this assertion only makes sense if there are any dynamic sections</span>
+                <span class="macro">assert_eq!</span>(<span class="ident">end_of_previous_range</span>, <span class="self">self</span>.<span class="ident">end_of_dynamic_sections</span>);
+            }
 
             <span class="self">self</span>.<span class="ident">data_cache</span> <span class="op">=</span> <span class="ident">new_data</span>;
             <span class="self">self</span>.<span class="ident">cache_status</span> <span class="op">=</span> <span class="ident">CacheStatus::Fresh</span>;
