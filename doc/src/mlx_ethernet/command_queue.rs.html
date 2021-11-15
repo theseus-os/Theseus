@@ -1016,7 +1016,7 @@
 
     <span class="doccomment">/// Create a command queue object.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `entries`: physically contiguous memory that is mapped as a slice of command queue entries.</span>
     <span class="doccomment">/// * `num_cmdq_entries`: number of entries in the queue.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create</span>(<span class="ident">entries</span>: <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">CommandQueueEntry</span>]<span class="op">&gt;</span>, <span class="ident">num_cmdq_entries</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">CommandQueue</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
@@ -1050,7 +1050,7 @@
     <span class="doccomment">/// At the end of the function, the command is ready to be posted using the doorbell in the initialization segment. </span>
     <span class="doccomment">/// Returns an error if no entry is available to use.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `opcode`: [`CommandOpcode`] for the command that the driver wants to execute</span>
     <span class="doccomment">/// * `opmod`: opcode modifer, only applicable for certain commands</span>
     <span class="doccomment">/// * `allocated_pages`: physical address of pages that need to be passed to the NIC. Only used in the [`CommandOpcode::ManagePages`] command.</span>
@@ -1433,7 +1433,7 @@
     <span class="doccomment">/// Sets the first 16 bytes of input data that are written inline in the command.</span>
     <span class="doccomment">/// The valid values for each field are different for every command, and can be taken from Chapter 23 of the PRM.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `opcode`: value identifying which command has to be carried out</span>
     <span class="doccomment">/// * `opmod`: opcode modifier. If None, field will be set to zero.</span>
     <span class="doccomment">/// * `command0`: the first 4 bytes of actual command data. If None, field will be set to zero.</span>

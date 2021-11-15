@@ -5,7 +5,7 @@
 <p>This ideally <em>should</em> be realized via automatic trait implementations, 
 in which all types that implement <code>BlockReader</code> also implement <code>ByteReader</code>, 
 but we can’t do that because Rust currently does not support specialization.</p>
-<h2 id="example" class="section-header"><a href="#example">Example</a></h2>
+<h1 id="example" class="section-header"><a href="#example">Example</a></h1>
 <p>Use the <code>From</code> implementation around a <code>BlockReader</code> instance, such as:</p>
 
 <div class='information'><div class='tooltip ignore'>ⓘ</div></div><div class="example-wrap"><pre class="rust rust-example-rendered ignore">

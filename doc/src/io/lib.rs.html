@@ -1059,12 +1059,12 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// The number of blocks read is dictated by the length of the given `buffer`.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `buffer`: the buffer into which data will be read. </span>
     <span class="doccomment">///    The length of this buffer must be a multiple of the block size.</span>
     <span class="doccomment">/// * `block_offset`: the offset in number of blocks from the beginning of this reader.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Return</span>
+    <span class="doccomment">/// # Return</span>
     <span class="doccomment">/// If successful, returns the number of blocks read into the given `buffer`. </span>
     <span class="doccomment">/// Otherwise, returns an error.</span>
     <span class="kw">fn</span> <span class="ident">read_blocks</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>], <span class="ident">block_offset</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span>;
@@ -1093,12 +1093,12 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// The number of blocks written is dictated by the length of the given `buffer`.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `buffer`: the buffer from which data will be written. </span>
     <span class="doccomment">///    The length of this buffer must be a multiple of the block size.</span>
     <span class="doccomment">/// * `block_offset`: the offset in number of blocks from the beginning of this writer.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Return</span>
+    <span class="doccomment">/// # Return</span>
     <span class="doccomment">/// If successful, returns the number of blocks written to this writer. </span>
     <span class="doccomment">/// Otherwise, returns an error.</span>
     <span class="kw">fn</span> <span class="ident">write_blocks</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">block_offset</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span>;
@@ -1125,7 +1125,7 @@
 <span class="doccomment">/// A trait that represents an I/O stream that can be read from at the granularity of individual bytes,</span>
 <span class="doccomment">/// but which does not track the current offset into the stream.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// ## `ByteReader` implementation atop `BlockReader`</span>
+<span class="doccomment">/// # `ByteReader` implementation atop `BlockReader`</span>
 <span class="doccomment">/// The [`ByteReader`] trait ideally _should be_ auto-implemented for any type</span>
 <span class="doccomment">/// that implements the [`BlockReader`] trait,</span>
 <span class="doccomment">/// to allow easy byte-wise access to a block-based I/O stream.</span>
@@ -1136,12 +1136,12 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// The number of bytes read is dictated by the length of the given `buffer`.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `buffer`: the buffer into which data will be copied.</span>
     <span class="doccomment">/// * `offset`: the offset in bytes from the beginning of this reader </span>
     <span class="doccomment">///    where the read operation will begin.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Return</span>
+    <span class="doccomment">/// # Return</span>
     <span class="doccomment">/// If successful, returns the number of bytes read into the given `buffer`. </span>
     <span class="doccomment">/// Otherwise, returns an error.</span>
     <span class="kw">fn</span> <span class="ident">read_at</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span>; 
@@ -1162,7 +1162,7 @@
 <span class="doccomment">/// A trait that represents an I/O stream that can be written to,</span>
 <span class="doccomment">/// but which does not track the current offset into the stream.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// ## `ByteWriter` implementation atop `BlockWriter`</span>
+<span class="doccomment">/// # `ByteWriter` implementation atop `BlockWriter`</span>
 <span class="doccomment">/// The [`ByteWriter`] trait ideally _should be_ auto-implemented for any type </span>
 <span class="doccomment">/// that implements both the [`BlockWriter`] **and** [`BlockReader`] traits</span>
 <span class="doccomment">/// to allow easy byte-wise access to a block-based I/O stream.</span>
@@ -1181,12 +1181,12 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// The number of bytes written is dictated by the length of the given `buffer`.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Arguments</span>
+    <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `buffer`: the buffer from which data will be copied. </span>
     <span class="doccomment">/// * `offset`: the offset in number of bytes from the beginning of this writer</span>
     <span class="doccomment">///    where the write operation will begin.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// ## Return</span>
+    <span class="doccomment">/// # Return</span>
     <span class="doccomment">/// If successful, returns the number of bytes written to this writer. </span>
     <span class="doccomment">/// Otherwise, returns an error.</span>
     <span class="kw">fn</span> <span class="ident">write_at</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span>;
@@ -1216,7 +1216,7 @@
 <span class="doccomment">/// in which all types that implement `BlockReader` also implement `ByteReader`, </span>
 <span class="doccomment">/// but we can&#39;t do that because Rust currently does not support specialization.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// ## Example</span>
+<span class="doccomment">/// # Example</span>
 <span class="doccomment">/// Use the `From` implementation around a `BlockReader` instance, such as:</span>
 <span class="doccomment">/// ```ignore</span>
 <span class="doccomment">/// // Assume `storage_dev` implements `BlockReader`</span>
@@ -1274,7 +1274,7 @@
 <span class="doccomment">/// also implement `ByteReader + ByteWriter`, </span>
 <span class="doccomment">/// but we cannot do that because Rust currently does not support specialization.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// ## Example</span>
+<span class="doccomment">/// # Example</span>
 <span class="doccomment">/// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:</span>
 <span class="doccomment">/// ```ignore</span>
 <span class="doccomment">/// // Assume `storage_dev` implements `BlockReader + BlockWriter`</span>
@@ -1354,7 +1354,7 @@
 <span class="doccomment">/// See the [`ByteWriter`] trait docs for an explanation of why both </span>
 <span class="doccomment">/// `BlockReader + BlockWriter` are required.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// ## Example</span>
+<span class="doccomment">/// # Example</span>
 <span class="doccomment">/// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:</span>
 <span class="doccomment">/// ```ignore</span>
 <span class="doccomment">/// // Assume `storage_dev` implements `BlockReader + BlockWriter`</span>
@@ -1719,7 +1719,7 @@
 <span class="doccomment">/// 3. A partial single-block transfer of some bytes in the last block,</span>
 <span class="doccomment">///    only if the end of `byte_range` is not aligned to `block_size`.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// ## Example</span>
+<span class="doccomment">/// # Example</span>
 <span class="doccomment">/// Given a read request for a `byte_range` of `1500..3950` and a `block_size` of `512` bytes,</span>
 <span class="doccomment">/// this function will return the following three transfer operations:</span>
 <span class="doccomment">/// 1. Read 1 block (block `2`) and transfer the last 36 bytes of that block (`476..512`)</span>
@@ -1729,12 +1729,12 @@
 <span class="doccomment">/// 3. Read 1 block (block `7`) and transfer the first 366 bytes of that block (`0..366`)</span>
 <span class="doccomment">///    into the byte range `3584..3950`.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// ## Arguments</span>
+<span class="doccomment">/// # Arguments</span>
 <span class="doccomment">/// * `byte_range`: the absolute range of bytes where the I/O transfer starts and ends,</span>
 <span class="doccomment">///    specified as absolute offsets from the beginning of the block-wise I/O stream.</span>
 <span class="doccomment">/// * `block_size`: the size in bytes of each block in the block-wise I/O stream.</span>
 <span class="doccomment">/// </span>
-<span class="doccomment">/// ## Return</span>
+<span class="doccomment">/// # Return</span>
 <span class="doccomment">/// Returns a list of the three above transfer operations, </span>
 <span class="doccomment">/// enclosed in `Option`s to convey that not all operations may be necessary.</span>
 <span class="doccomment">/// </span>

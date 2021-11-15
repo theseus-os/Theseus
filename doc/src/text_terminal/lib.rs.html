@@ -3621,7 +3621,7 @@
 <span class="doccomment">/// but this is different from the concept of a `cell` because it may contain </span>
 <span class="doccomment">/// more than just a single displayable character, in order to support complex Unicode/emoji.</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// ## 1-to-1 Relationship between Units and Columns</span>
+<span class="doccomment">/// # 1-to-1 Relationship between Units and Columns</span>
 <span class="doccomment">/// It is guaranteed that one `Unit` in the scrollback buffer corresponds to exactly one screen column,</span>
 <span class="doccomment">/// which makes it easy to calculate the conversions between screen cursor coordinate points</span>
 <span class="doccomment">/// and scrollback buffer coordinate points.</span>
@@ -3645,7 +3645,7 @@
 <span class="doccomment">/// multiple `Unit`s.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// ## What Units are Not</span>
+<span class="doccomment">/// # What Units are Not</span>
 <span class="doccomment">/// Displayable control/escape sequences, i.e., those that affect text style,</span>
 <span class="doccomment">/// **do not** exist as individual `Unit`s,</span>
 <span class="doccomment">/// though their effects on text style are represented by a `Unit`&#39;s `FormatFlags`.</span>

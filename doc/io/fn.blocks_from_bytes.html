@@ -19,7 +19,7 @@ only if <code>byte_range</code> spans more than 2 blocks.</li>
 <li>A partial single-block transfer of some bytes in the last block,
 only if the end of <code>byte_range</code> is not aligned to <code>block_size</code>.</li>
 </ol>
-<h2 id="example" class="section-header"><a href="#example">Example</a></h2>
+<h1 id="example" class="section-header"><a href="#example">Example</a></h1>
 <p>Given a read request for a <code>byte_range</code> of <code>1500..3950</code> and a <code>block_size</code> of <code>512</code> bytes,
 this function will return the following three transfer operations:</p>
 <ol>
@@ -30,13 +30,13 @@ into the byte range <code>1536..3584</code>.</li>
 <li>Read 1 block (block <code>7</code>) and transfer the first 366 bytes of that block (<code>0..366</code>)
 into the byte range <code>3584..3950</code>.</li>
 </ol>
-<h2 id="arguments" class="section-header"><a href="#arguments">Arguments</a></h2>
+<h1 id="arguments" class="section-header"><a href="#arguments">Arguments</a></h1>
 <ul>
 <li><code>byte_range</code>: the absolute range of bytes where the I/O transfer starts and ends,
 specified as absolute offsets from the beginning of the block-wise I/O stream.</li>
 <li><code>block_size</code>: the size in bytes of each block in the block-wise I/O stream.</li>
 </ul>
-<h2 id="return" class="section-header"><a href="#return">Return</a></h2>
+<h1 id="return" class="section-header"><a href="#return">Return</a></h1>
 <p>Returns a list of the three above transfer operations, 
 enclosed in <code>Option</code>s to convey that not all operations may be necessary.</p>
 </div></details></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../" data-current-crate="io" data-search-index-js="../search-index.js" data-search-js="../search.js"></div>

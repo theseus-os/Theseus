@@ -5,7 +5,7 @@
 <p>Some terminal emulators call this structure a <code>cell</code>, 
 but this is different from the concept of a <code>cell</code> because it may contain 
 more than just a single displayable character, in order to support complex Unicode/emoji.</p>
-<h2 id="1-to-1-relationship-between-units-and-columns" class="section-header"><a href="#1-to-1-relationship-between-units-and-columns">1-to-1 Relationship between Units and Columns</a></h2>
+<h1 id="1-to-1-relationship-between-units-and-columns" class="section-header"><a href="#1-to-1-relationship-between-units-and-columns">1-to-1 Relationship between Units and Columns</a></h1>
 <p>It is guaranteed that one <code>Unit</code> in the scrollback buffer corresponds to exactly one screen column,
 which makes it easy to calculate the conversions between screen cursor coordinate points
 and scrollback buffer coordinate points.
@@ -25,7 +25,7 @@ This conveniently allows the screen cursor to store a single <code>Unit</code> o
 that represents the entirety of that displayable Unit,
 instead of more complex storage strategy that splits up wide character sequences into
 multiple <code>Unit</code>s.</p>
-<h2 id="what-units-are-not" class="section-header"><a href="#what-units-are-not">What Units are Not</a></h2>
+<h1 id="what-units-are-not" class="section-header"><a href="#what-units-are-not">What Units are Not</a></h1>
 <p>Displayable control/escape sequences, i.e., those that affect text style,
 <strong>do not</strong> exist as individual <code>Unit</code>s,
 though their effects on text style are represented by a <code>Unit</code>’s <code>FormatFlags</code>.</p>

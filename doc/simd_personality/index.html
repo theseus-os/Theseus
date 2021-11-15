@@ -8,7 +8,7 @@ This crate itself is part of the regular non-SIMD world, not the SIMD world. </p
 <p>There are two considerations here to ensure correctness by saving/restoring SIMD registers: 
 how to deal with it for context switching, and also for interrupt handling.
 Both of these policies are determined per-core as follows:</p>
-<h3 id="context-switching" class="section-header"><a href="#context-switching">Context Switching</a></h3>
+<h1 id="context-switching" class="section-header"><a href="#context-switching">Context Switching</a></h1>
 <ul>
 <li>If there is one or zero SIMD-enabled <code>Task</code>s running on a given core, 
 then all <code>Task</code>s running on that core can use the standard, 
@@ -26,7 +26,7 @@ and that can be determined statically and independently for each task, without c
 We don’t really need personalities for that, since the <code>context_switch</code> routines are self-contained.<br />
 However, that static policy misses out on the performance optimization of 
 not having to save/restore SIMD registers when only a single SIMD Task is running on a given core.</p>
-<h3 id="interrupt-handling" class="section-header"><a href="#interrupt-handling">Interrupt Handling</a></h3>
+<h1 id="interrupt-handling" class="section-header"><a href="#interrupt-handling">Interrupt Handling</a></h1>
 <ul>
 <li>
 <p>If interrupt handlers are only ever compiled for the regular world, i.e., 

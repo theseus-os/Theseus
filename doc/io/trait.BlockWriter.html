@@ -12,13 +12,13 @@ thus, each write operation requires a starting offset:
 the number of blocks from the beginning of the I/O stream at which the write should start.</p>
 </div></details><h2 id="required-methods" class="small-section-header">Required methods<a href="#required-methods" class="anchor"></a></h2><div class="methods"><details class="rustdoc-toggle" open><summary><h3 id="tymethod.write_blocks" class="method"><code>fn <a href="#tymethod.write_blocks" class="fnname">write_blocks</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;mut self, <br>&nbsp;&nbsp;&nbsp;&nbsp;buffer: &amp;[u8], <br>&nbsp;&nbsp;&nbsp;&nbsp;block_offset: usize<br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;usize, <a class="enum" href="enum.IoError.html" title="enum io::IoError">IoError</a>&gt;</code><a class="srclink" href="../src/io/lib.rs.html#184" title="goto source code">[src]</a></h3></summary><div class="docblock"><p>Writes blocks of data from the given <code>buffer</code> to this writer.</p>
 <p>The number of blocks written is dictated by the length of the given <code>buffer</code>.</p>
-<h2 id="arguments" class="section-header"><a href="#arguments">Arguments</a></h2>
+<h1 id="arguments" class="section-header"><a href="#arguments">Arguments</a></h1>
 <ul>
 <li><code>buffer</code>: the buffer from which data will be written. 
 The length of this buffer must be a multiple of the block size.</li>
 <li><code>block_offset</code>: the offset in number of blocks from the beginning of this writer.</li>
 </ul>
-<h2 id="return" class="section-header"><a href="#return">Return</a></h2>
+<h1 id="return" class="section-header"><a href="#return">Return</a></h1>
 <p>If successful, returns the number of blocks written to this writer. 
 Otherwise, returns an error.</p>
 </div><details class="rustdoc-toggle" open><summary><h3 id="tymethod.flush" class="method"><code>fn <a href="#tymethod.flush" class="fnname">flush</a>(&amp;mut self) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;(), <a class="enum" href="enum.IoError.html" title="enum io::IoError">IoError</a>&gt;</code><a class="srclink" href="../src/io/lib.rs.html#188" title="goto source code">[src]</a></h3></summary><div class="docblock"><p>Flushes this entire writer’s output stream, 
