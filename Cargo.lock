@@ -1799,12 +1799,14 @@ dependencies = [
  "fs_node",
  "hashbrown 0.9.1",
  "kernel_config",
+ "lazy_static",
  "log",
  "memfs",
  "memory",
  "memory_initialization",
  "path",
  "qp-trie",
+ "rangemap",
  "root",
  "rustc-demangle",
  "spin 0.9.0",
@@ -2459,6 +2461,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rangemap"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6cb84161aa5e5eaa263fadf53172fee10b72fa7aad3a37e0a7aa1aefec2423e"
+
+[[package]]
 name = "raw-cpuid"
 version = "7.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2942,6 +2950,7 @@ dependencies = [
  "scheduler",
  "stack",
  "task",
+ "thread_local_macro",
 ]
 
 [[package]]
@@ -3251,6 +3260,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_thread_local"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
@@ -3310,6 +3328,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "thread_local_macro"
+version = "0.1.0"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
 name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
@@ -3319,6 +3344,16 @@ dependencies = [
  "memory",
  "pause",
  "x86_64",
+]
+
+[[package]]
+name = "tls_test"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "terminal_print",
+ "test_thread_local",
+ "thread_local_macro",
 ]
 
 [[package]]

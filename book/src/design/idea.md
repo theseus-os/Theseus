@@ -12,7 +12,7 @@ For more details about Theseus's research merit and novel design principles, see
 
 ## P.I.E. Principle
 The P.I.E. principle is one of the guiding lights in the design of Theseus and much of our other systems software research.
-The main idea is that there are three pillars of computing goals, of which only 2 of 3 can be achieved simultaneously:
+The main idea is that there are three pillars of computing goals, of which the hardware should be responsible for only two:
 <!-- cspell:disable -->
 1. **P**erformance
 2. **I**solation
@@ -20,20 +20,14 @@ The main idea is that there are three pillars of computing goals, of which only 
 <!-- cspell:enable -->
 
 Traditionally, systems software designers have looked to hardware to provide all three -- high performance, strong isolation, and efficiency (low overhead). 
-We believe that hardware cannot fully realize all three:
-* Hardware can realize high performance with high efficiency, but only in the absence of hardware-provided isolation (protection).
-* Hardware can realize high performance with strong isolation, but is inefficient, e.g., due to switching between privilege modes and address spaces.
-* Hardware can realize strong isolation at the cost of lower efficiency, which reduces performance.
-
-
-We assert that hardware should *only* be responsible for increasing performance, i.e., via various accelerators and dedicated improvements, but should have *no role* (or a minimal role) in providing isolation, safety, and security.
-Isolation and efficiency should be the responsibility of software alone.
+We believe that hardware cannot fully realize all three. The P.I.E. principle asserts that hardware should *only* be responsible for performance and efficiency, but should have *no role* (or a minimal role) in providing isolation, safety, and security.
+Isolation should be the responsibility of software alone.
 
 We sometimes refer to this as the **PHIS** principle: **Performance** in **Hardware**, **Isolation** in **Software**.
 
 *But why?*
 
-For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted user space applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where we have the ability to verify the OS, compiler, language libraries, and more. 
+For one, speculative execution exploits like Meltdown and Spectre have shown that hardware-ensured isolation does not protect kernel data from untrusted user space applications to the extent we once thought. It is difficult if not impossible to verify the true behavior of closed-source hardware (CPU architectures), so we turn to open-source software instead, where the OS, compiler, language libraries, and more are subject to scrutiny and even formal verification. 
 
 In addition, modern languages like Rust are able to ensure type safety and memory safety at compile time, without the overhead of traditional safe/managed languages that rely upon inefficient garbage collection and transparent heap-based object management.
 Thus, we can leverage these safety guarantees to ensure that compiled code does not violation isolation between tasks (threads of execution) and software modules without the need for significant runtime checks.

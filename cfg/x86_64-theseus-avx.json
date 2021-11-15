@@ -9,6 +9,7 @@
   "target-endian": "little",
   "target-pointer-width": "64",
   "target-c-int-width": "32",
+  "has-elf-tls": true,
   "arch": "x86_64",
   "os": "redox",
   "features": "+avx",

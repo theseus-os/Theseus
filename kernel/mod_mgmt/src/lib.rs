@@ -1,8 +1,8 @@
 #![no_std]
-#![feature(rustc_private)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate lazy_static;
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
@@ -21,22 +21,12 @@ extern crate path;
 extern crate memfs;
 extern crate cstr_core;
 extern crate hashbrown;
+extern crate rangemap;
 
-use core::{
-    fmt,
-    ops::{Deref, Range},
-};
-use alloc::{
-    vec::Vec,
-    collections::{BTreeMap, btree_map, BTreeSet},
-    string::{String, ToString},
-    sync::{Arc, Weak},
-};
+use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
+use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
 use spin::{Mutex, Once};
-use xmas_elf::{
-    ElfFile,
-    sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
-};
+use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use memory_initialization::BootloaderModule;
@@ -48,6 +38,7 @@ use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
 use hashbrown::HashMap;
+use rangemap::RangeMap;
 pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
 pub use crate_metadata::*;
 
@@ -72,6 +63,24 @@ pub fn get_initial_kernel_namespace() -> Option<&'static Arc<CrateNamespace>> {
 /// Returns the top-level directory that contains all of the namespaces. 
 pub fn get_namespaces_directory() -> Option<DirRef> {
     root::get_root().lock().get_dir(NAMESPACES_DIRECTORY_NAME)
+}
+
+lazy_static! {
+    /// The thread-local storage (TLS) area "image" that is used as the initial data for each `Task`.
+    /// When spawning a new task, the new task will create its own local TLS area
+    /// with this `TlsInitializer` as the initial data values.
+    /// 
+    /// # Implementation Notes/Shortcomings
+    /// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.
+    /// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.
+    /// 
+    /// However, this is quite complex because each namespace must be aware of the TLS sections
+    /// in BOTH its underlying recursive namespace AND its (multiple) "parent" namespace(s)
+    /// that recursively depend on it, since no two TLS sections can conflict (have the same offset).
+    /// 
+    /// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense 
+    /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
+    static ref TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
 }
 
 
@@ -391,6 +400,14 @@ pub struct CrateNamespace {
     /// its `recursive_namespace` could contain the set of kernel crates that these application crates rely on.
     recursive_namespace: Option<Arc<CrateNamespace>>,
 
+    /// The thread-local storage (TLS) area "image" that is used as the initial data for each `Task`
+    /// that is spawned and runs within this `CrateNamespace`.
+    /// When spawning a new task, the new task will create its own local TLS area
+    /// with this `tls_initializer` as the local data.
+    /// 
+    /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
+    tls_initializer: &'static Mutex<TlsInitializer>,
+
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
     /// For example, if `true`, the symbol `my_crate::foo::h123` will be used to satisfy a dependency 
     /// on any other `my_crate::foo::*` regardless of hash value. 
@@ -416,6 +433,7 @@ impl CrateNamespace {
             name,
             dir,
             recursive_namespace,
+            tls_initializer: &TLS_INITIALIZER,
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: false,
@@ -436,6 +454,12 @@ impl CrateNamespace {
     /// if one exists.
     pub fn recursive_namespace(&self) -> Option<&Arc<CrateNamespace>> {
         self.recursive_namespace.as_ref()
+    }
+
+    /// Returns a new copy of this namespace's initial TLS area,
+    /// which can be used as the initial TLS area data for a new task.
+    pub fn get_tls_initializer_data(&self) -> TlsDataImage {
+        self.tls_initializer.lock().get_data()
     }
 
     #[doc(hidden)]
@@ -835,6 +859,7 @@ impl CrateNamespace {
         CrateNamespace {
             name: self.name.clone(),
             dir: self.dir.clone(),
+            tls_initializer: &TLS_INITIALIZER,
             recursive_namespace: self.recursive_namespace.clone(),
             crate_tree: Mutex::new(self.crate_tree.lock().clone()),
             symbol_map: Mutex::new(self.symbol_map.lock().clone()),
@@ -986,10 +1011,13 @@ impl CrateNamespace {
             for entry in symtab.iter() {
                 // Include all symbols with "GLOBAL" binding, regardless of visibility.  
                 if entry.get_binding() == Ok(xmas_elf::symbol_table::Binding::Global) {
-                    if let Ok(typ) = entry.get_type() {
-                        if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
+                    match entry.get_type() {
+                        Ok(xmas_elf::symbol_table::Type::Func 
+                            | xmas_elf::symbol_table::Type::Object
+                            | xmas_elf::symbol_table::Type::Tls) => {
                             globals.insert(entry.shndx() as Shndx);
                         }
+                        _ => continue,
                     }
                 }
             }
@@ -1024,7 +1052,9 @@ impl CrateNamespace {
         const RODATA_PREFIX:           &'static str = ".rodata.";
         const DATA_PREFIX:             &'static str = ".data.";
         const BSS_PREFIX:              &'static str = ".bss.";
-        const RELRO_PREFIX:            &'static str = "rel.ro.";
+        const TLS_DATA_PREFIX:         &'static str = ".tdata.";
+        const TLS_BSS_PREFIX:          &'static str = ".tbss.";
+        // const RELRO_PREFIX:            &'static str = "rel.ro.";
         const GCC_EXCEPT_TABLE_PREFIX: &'static str = ".gcc_except_table.";
         const EH_FRAME_NAME:           &'static str = ".eh_frame";
 
@@ -1037,6 +1067,7 @@ impl CrateNamespace {
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
             global_sections:         BTreeSet::new(),
+            tls_sections:            BTreeSet::new(),
             data_sections:           BTreeSet::new(),
             reexported_symbols:      BTreeSet::new(),
         });
@@ -1046,6 +1077,8 @@ impl CrateNamespace {
         let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
         // the set of Shndxes for .data and .bss sections
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
+        // the set of Shndxes for TLS sections (.tdata, .tbss)
+        let mut tls_sections: BTreeSet<Shndx> = BTreeSet::new();
 
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
@@ -1055,7 +1088,7 @@ impl CrateNamespace {
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
         //
         // Also, skip the first two sections, which correspond to the `NULL` and `.text` empty sections.
-        for (shndx, sec) in elf_file.section_iter().enumerate().skip(2) {
+        for (shndx, sec) in elf_file.section_iter().enumerate() {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
@@ -1071,6 +1104,11 @@ impl CrateNamespace {
                     return Err("couldn't get section name");
                 }
             };
+
+            // ignore the empty .text section at the start
+            if sec_name == ".text" {
+                continue;    
+            }
 
             // This handles the rare case of a zero-sized section. 
             // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations;
@@ -1104,12 +1142,13 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
+            let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
 
-            let write: bool = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let exec:  bool = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
 
             // First, check for executable sections, which can only be .text sections.
-            if exec && !write {
+            if is_exec && !is_write {
                 if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
 
@@ -1143,33 +1182,94 @@ impl CrateNamespace {
                 }
             }
 
-            // Second, if not executable, handle writable .data/.bss sections
-            else if write {
-                // check if this section is .bss or .data
-                let (name, is_bss) = if sec_name.starts_with(BSS_PREFIX) {
-                    if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
-                        (name, true) // true means it is .bss
-                    } else {
-                        error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
-                        return Err("Failed to get the .bss section's name after \".bss.\"!");
-                    }
-                } else if sec_name.starts_with(DATA_PREFIX) {
-                    if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
-                        let name = if name.starts_with(RELRO_PREFIX) {
-                            let relro_name = name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?;
-                            relro_name
-                        } else {
-                            name
-                        };
-                        (name, false) // false means it's not .bss
-                    }
-                    else {
-                        error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
-                        return Err("Failed to get the .data section's name after \".data.\"!");
-                    }
+            // Second, if not executable, handle TLS sections.
+            // Although TLS sections have "WAT" flags (write, alloc, TLS),
+            // we load TLS sections into the same read-only pages as other read-only sections (e.g., .rodata)
+            // because they contain thread-local storage initializer data that is only read from.
+            else if is_tls {
+                // check if this TLS section is .bss or .data
+                let is_bss = sec.get_type() == Ok(ShType::NoBits);
+                let name = if is_bss {
+                    sec_name.get(TLS_BSS_PREFIX.len() ..).ok_or_else(|| {
+                        error!("Failed to get the .tbss section's name: {:?}", sec_name);
+                        "Failed to get the .tbss section's name"
+                    })?
                 } else {
-                    error!("Unsupported: found writable section that wasn't .data or .bss: [{}] {:?}", shndx, sec_name);
-                    return Err("Unsupported: found writable section that wasn't .data or .bss");
+                    sec_name.get(TLS_DATA_PREFIX.len() ..).ok_or_else(|| {
+                        error!("Failed to get the .tdata section's name: {:?}", sec_name);
+                        "Failed to get the .tdata section's name"
+                    })?
+                };
+                let demangled = demangle(name).to_string();
+
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    // here: we're ready to copy the TLS section to the proper address in the read-only pages
+                    let dest_vaddr = rp.address_at_offset(rodata_offset)
+                        .ok_or_else(|| "BUG: for TLS section, rodata_offset wasn't within rodata_mapped_pages")?;
+                    let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
+                    match sec.get_data(&elf_file) {
+                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for TLS section [{}] {}: {:?}", shndx, sec_name, _other);
+                            return Err("couldn't get section data in TLS section");
+                        }
+                    }
+
+                    let new_tls_section = LoadedSection::new(
+                        SectionType::Tls,
+                        demangled,
+                        Arc::clone(rp_ref),
+                        rodata_offset,
+                        dest_vaddr,
+                        sec_size,
+                        global_sections.contains(&shndx),
+                        new_crate_weak_ref.clone(),
+                    );
+                    // trace!("Loaded new TLS section: {:?}", new_tls_section);
+                    
+                    // Add the new TLS section to this namespace's initial TLS area,
+                    // which will reserve/obtain a new offset into that TLS area which holds this section's data.
+                    // This will also update the section's virtual address field to hold that offset value,
+                    // which is used for relocation entries that ask for a section's offset from the TLS base.
+                    let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
+                        .add_new_dynamic_tls_section(new_tls_section, sec_align)
+                        .map_err(|_| "Failed to add new TLS section")?;
+
+                    // trace!("\t --> updated new TLS section: {:?}", new_tls_section);
+                    loaded_sections.insert(shndx, new_tls_section);
+                    tls_sections.insert(shndx);
+
+                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                }
+                else {
+                    return Err("no rodata_pages were allocated when handling .rodata section");
+                }
+            }
+
+            // Third, if not executable nor TLS, handle writable .data/.bss sections.
+            else if is_write {
+                // check if this section is .bss or .data
+                let is_bss = sec.get_type() == Ok(ShType::NoBits);
+                let name = if is_bss {
+                    sec_name.get(BSS_PREFIX.len() ..).ok_or_else(|| {
+                        error!("Failed to get the .bss section's name: {:?}", sec_name);
+                        "Failed to get the .bss section's name"
+                    })?
+                } else {
+                    sec_name.get(DATA_PREFIX.len() ..)
+                        // Currently, .rel.ro sections no longer exist in object files compiled for Theseus.
+                        // .and_then(|name| {
+                        //     if name.starts_with(RELRO_PREFIX) {
+                        //         name.get(RELRO_PREFIX.len() ..)
+                        //     } else {
+                        //         Some(name)
+                        //     }
+                        // })
+                        .ok_or_else(|| {
+                            error!("Failed to get the .data section's name: {:?}", sec_name);
+                            "Failed to get the .data section's name"
+                        })?
                 };
                 let demangled = demangle(name).to_string();
                 
@@ -1180,13 +1280,9 @@ impl CrateNamespace {
                     let dest_slice: &mut [u8] = dp.as_slice_mut(data_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                        Ok(SectionData::Empty) => {
-                            for b in dest_slice {
-                                *b = 0;
-                            }
-                        },
-                        _ => {
-                            error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, _other);
                             return Err("couldn't get section data in .data section");
                         }
                     }
@@ -1213,7 +1309,7 @@ impl CrateNamespace {
                 }
             }
 
-            // Third, if neither executable nor writable, handle .rodata sections
+            // Fourth, if neither executable nor TLS nor writable, handle .rodata sections.
             else if sec_name.starts_with(RODATA_PREFIX) {
                 if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
@@ -1222,16 +1318,12 @@ impl CrateNamespace {
                         // here: we're ready to copy the rodata section to the proper address
                         let dest_vaddr = rp.address_at_offset(rodata_offset)
                             .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
                         match sec.get_data(&elf_file) {
                             Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => {
-                                for b in dest_slice {
-                                    *b = 0;
-                                }
-                            },
-                            _ => {
-                                error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                            Ok(SectionData::Empty) => dest_slice.fill(0),
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, _other);
                                 return Err("couldn't get section data in .rodata section");
                             }
                         }
@@ -1262,7 +1354,7 @@ impl CrateNamespace {
                 }
             }
 
-            // Fourth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` sections
+            // Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections
             else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
                 if let Some(name) = sec_name.get(GCC_EXCEPT_TABLE_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
@@ -1275,13 +1367,9 @@ impl CrateNamespace {
                         let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
                         match sec.get_data(&elf_file) {
                             Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => {
-                                for b in dest_slice {
-                                    *b = 0;
-                                }
-                            },
-                            _ => {
-                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                            Ok(SectionData::Empty) => dest_slice.fill(0),
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, _other);
                                 return Err("couldn't get section data in .gcc_except_table section");
                             }
                         }
@@ -1312,7 +1400,7 @@ impl CrateNamespace {
                 }
             }
 
-            // Fifth, if neither executable nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
+            // Fifth, if neither executable nor TLS nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
             else if sec_name == EH_FRAME_NAME {
                 // The eh_frame section is read-only, so we put it in the .rodata pages
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -1322,13 +1410,9 @@ impl CrateNamespace {
                     let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                        Ok(SectionData::Empty) => {
-                            for b in dest_slice {
-                                *b = 0;
-                            }
-                        },
-                        _ => {
-                            error!("load_crate_sections(): Couldn't get section data for .eh_frame section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for .eh_frame section [{}] {}: {:?}", shndx, sec_name, _other);
                             return Err("couldn't get section data in .eh_frame section");
                         }
                     }
@@ -1369,9 +1453,10 @@ impl CrateNamespace {
         {
             let mut new_crate_mut = new_crate.lock_as_mut()
                 .ok_or_else(|| "BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
-            new_crate_mut.sections = loaded_sections;
+            new_crate_mut.sections        = loaded_sections;
             new_crate_mut.global_sections = global_sections;
-            new_crate_mut.data_sections = data_sections;
+            new_crate_mut.tls_sections    = tls_sections;
+            new_crate_mut.data_sections   = data_sections;
         }
 
         Ok((new_crate, elf_file))
@@ -1430,6 +1515,8 @@ impl CrateNamespace {
                 error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
                 "target section was not loaded for Rela section"
             })?; 
+
+            let mut target_sec_data_was_modified = false;
             
             let mut target_sec_dependencies: Vec<StrongDependency> = Vec::new();
             #[cfg(internal_deps)]
@@ -1502,6 +1589,7 @@ impl CrateNamespace {
                         source_sec.start_address(),
                         verbose_log
                     )?;
+                    target_sec_data_was_modified = true;
 
                     if source_and_target_in_same_crate {
                         // We keep track of relocation information so that we can be aware of and faithfully reconstruct 
@@ -1527,6 +1615,14 @@ impl CrateNamespace {
                         target_sec_dependencies.push(strong_dep);          
                     }
                 }
+            }
+
+            // If the target section of the relocation was a TLS section, 
+            // that TLS section's initializer data has now changed.
+            // Thus, we need to invalidate the TLS initializer area's cached data.
+            if target_sec_data_was_modified && target_sec.typ == SectionType::Tls {
+                debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
+                self.tls_initializer.lock().invalidate();
             }
 
             // add the target section's dependencies and relocation details all at once
@@ -2183,14 +2279,19 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             let addend = round_up_power_of_two(size, align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-            let write: bool = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let exec:  bool = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
             // trace!("  Looking at sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
-            if exec {
+            if is_exec {
                 // this includes only .text sections
                 text_max_offset = core::cmp::max(text_max_offset, (sec.offset() as usize) + addend);
             }
-            else if write {
+            else if is_tls {
+                // TLS sections are included as part of read-only pages
+                ro_bytes += addend;
+            }
+            else if is_write {
                 // this includes both .bss and .data sections
                 rw_bytes += addend;
             }
@@ -2283,3 +2384,279 @@ pub fn find_symbol_table<'e>(elf_file: &'e ElfFile)
         }
     }
 }
+
+
+/// A Thread-Local Storage (TLS) area data "image" that is used
+/// to initialize a new `Task`'s TLS area.
+#[derive(Debug, Clone)]
+pub(crate) struct TlsInitializer {
+    /// The cached data image (with blank space for the TLS self pointer).
+    /// This is used to avoid unnecessarily re-generating the TLS data image
+    /// every time a new task is spawned if no TLS data sections have been added.
+    data_cache: Vec<u8>,
+    /// The status of the above `data_cache`: whether it is ready to be used
+    /// immediately or needs to be regenerated.
+    cache_status: CacheStatus,
+    /// The set of TLS data sections that are defined at link time
+    /// and come from the statically-linked base kernel image (the nano_core).
+    /// According to the x86_64 TLS ABI, these exist at **negative** offsets
+    /// from the TLS self pointer, i.e., they exist **before** the TLS self pointer in memory.
+    /// Thus, their actual location in memory depends on the size of **all** static TLS data sections.
+    /// For example, the last section in this set (with the highest offset) will be placed
+    /// right before the TLS self pointer in memory. 
+    static_section_offsets:  RangeMap<usize, StrongSectionRefWrapper>,
+    /// The ending offset (an exclusive range end bound) of the last TLS section
+    /// in the above set of `static_section_offsets`.
+    /// This is the offset where the TLS self pointer exists.
+    end_of_static_sections: usize,
+    /// The set of TLS data sections that come from dynamically-loaded crate object files.
+    /// We can control and arbitrarily assign their offsets, and thus,
+    /// we place all of these sections **after** the TLS self pointer in memory.
+    /// For example, the first section in this set (with an offset of `0`) will be place
+    /// right after the TLS self pointer in memory.
+    dynamic_section_offsets: RangeMap<usize, StrongSectionRefWrapper>,
+    /// The ending offset (an exclusive range end bound) of the last TLS section
+    /// in the above set of `dynamic_section_offsets`.
+    end_of_dynamic_sections: usize,
+} 
+
+const POINTER_SIZE: usize = size_of::<usize>();
+
+impl TlsInitializer {
+    /// Creates an empty TLS initializer with no TLS data sections.
+    fn empty() -> TlsInitializer {
+        TlsInitializer {
+            // The data image will be generated lazily on the next request to use it.
+            data_cache: Vec::new(),
+            cache_status: CacheStatus::Invalidated,
+            static_section_offsets: RangeMap::new(),
+            end_of_static_sections: 0,
+            dynamic_section_offsets: RangeMap::new(),
+            end_of_dynamic_sections: 0,
+        }
+    }
+
+    /// Add a TLS section that has pre-determined offset, e.g.,
+    /// one that was specified in the statically-linked nano_core kernel image.
+    /// 
+    /// Returns an Error if inserting the given `tls_section` at the given `offset`
+    /// would overlap with an existing section.
+    /// Note: an error occurring here would indicate a link-time bug 
+    /// or a bug in the symbol parsing code that invokes this function.
+    pub(crate) fn add_existing_static_tls_section(
+        &mut self,
+        offset: usize,
+        tls_section: StrongSectionRef,
+    ) -> Result<(), ()> {
+        let range = offset .. (offset + tls_section.size());
+        if self.static_section_offsets.contains_key(&range.start) || 
+            self.static_section_offsets.contains_key(&(range.end - 1))
+        {
+            return Err(());
+        }
+
+        self.end_of_static_sections = max(self.end_of_static_sections, range.end);
+        self.static_section_offsets.insert(range, StrongSectionRefWrapper(tls_section));
+        self.cache_status = CacheStatus::Invalidated;
+        Ok(())
+    }
+
+    /// Inserts the given `section` into this TLS area at the next index
+    /// (i.e., offset into the TLS area) where the section will fit.
+    /// 
+    /// This also modifies the virtual address field of the given `section`
+    /// to hold the value of that offset, which is necessary for relocation entries
+    /// that depend on this section.
+    /// 
+    /// Note: this will never return an index/offset value less than `size_of::<usize>()`,
+    /// (`8` on a 64-bit machine), as the first slot is reserved for the TLS self pointer.
+    /// 
+    /// Returns a tuple of:
+    /// 1. The index at which the new section was inserted, 
+    ///    which is the offset from the beginning of the TLS area where the section data starts.
+    /// 2. The modified section as a `StrongSectionRef`.
+    /// 
+    /// Returns an Error if there is no remaining space that can fit the section.
+    pub(crate) fn add_new_dynamic_tls_section(
+        &mut self,
+        mut section: LoadedSection,
+        alignment: usize,
+    ) -> Result<(usize, StrongSectionRef), ()> {
+        let sec_size = section.size();
+        let mut start_index = None;
+        // Find the next "gap" big enough to fit the new TLS section, 
+        // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
+        let range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
+        for gap in self.dynamic_section_offsets.gaps(&range_after_tls_self_pointer) {
+            let aligned_start = util::round_up(gap.start, alignment);
+            if aligned_start + sec_size <= gap.end {
+                start_index = Some(aligned_start);
+                break;
+            }
+        }
+
+        if let Some(start) = start_index {
+            let range = start .. (start + sec_size);
+            section.address_range = 
+                VirtualAddress::new_canonical(range.start) .. VirtualAddress::new_canonical(range.end);
+            let section_ref = Arc::new(section);
+            self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
+            self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(Arc::clone(&section_ref)));
+            // Now that we've added a new section, the cached data is invalid.
+            self.cache_status = CacheStatus::Invalidated;
+            Ok((start, section_ref))
+        } else {
+            Err(())
+        }
+    }
+
+    /// Invalidates the cached data image in this `TlsInitializer` area.
+    /// 
+    /// This is useful for when a TLS section's data has been modified,
+    /// e.g., while performing relocations, 
+    /// and thus the data image needs to be re-created by re-reading the section data.
+    pub fn invalidate(&mut self) {
+        self.cache_status = CacheStatus::Invalidated;
+    }
+
+    /// Returns a new copy of the TLS data image.
+    /// 
+    /// This function lazily generates the TLS image data on demand, if needed.
+    pub(crate) fn get_data(&mut self) -> TlsDataImage {
+        let total_section_size = self.end_of_static_sections + self.end_of_dynamic_sections;
+        let required_capacity = if total_section_size > 0 { total_section_size + POINTER_SIZE } else { 0 };
+        if required_capacity == 0 {
+            return TlsDataImage { _data: None, ptr: 0 };
+        }
+
+        // An internal function that iterates over all TLS sections and copies their data into the new data image.
+        fn copy_tls_section_data(
+            new_data: &mut Vec<u8>,
+            section_offsets: &RangeMap<usize, StrongSectionRefWrapper>,
+            end_of_previous_range: &mut usize,
+        ) {
+            for (range, sec) in section_offsets.iter() {
+                // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
+                let num_padding_bytes = range.start.saturating_sub(*end_of_previous_range);
+                for _i in 0..num_padding_bytes {
+                    // surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.
+                    new_data.push(0); 
+                }
+
+                // Insert the section data into the new data vec.
+                let sec_mp = sec.mapped_pages.lock();
+                let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
+                new_data.extend_from_slice(sec_data);
+                *end_of_previous_range = range.end;
+            }
+        }
+
+        if self.cache_status == CacheStatus::Invalidated {
+            // debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+
+            // On some architectures, such as x86_64, the ABI convention REQUIRES that
+            // the TLS area data starts with a pointer to itself (the TLS self pointer).
+            // Also, all data for "existing" (statically-linked) TLS sections must
+            // come *before* the TLS self pointer, i.e., at negative offsets from the TLS self pointer.
+            // Thus, we handle that here by appending space for a pointer (one `usize`)
+            // to the `new_data` vector after we insert the static TLS data sections.
+            // The location of the new pointer value is the conceptual "start" of the TLS image,
+            // and that's what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).
+            let mut new_data: Vec<u8> = Vec::with_capacity(required_capacity);
+            
+            // Iterate through all static TLS sections and copy their data into the new data image.
+            let mut end_of_previous_range: usize = 0;
+            copy_tls_section_data(&mut new_data, &self.static_section_offsets, &mut end_of_previous_range);
+            assert_eq!(end_of_previous_range, self.end_of_static_sections);
+
+            // Append space for the TLS self pointer immediately after the end of the last static TLS data section;
+            // its actual value will be filled in later (in `get_data()`) after a new copy of the TLS data image is made.
+            new_data.extend_from_slice(&[0u8; POINTER_SIZE]);
+
+            // Iterate through all dynamic TLS sections and copy their data into the new data image.
+            end_of_previous_range = POINTER_SIZE; // we already pushed room for the TLS self pointer above.
+            copy_tls_section_data(&mut new_data, &self.dynamic_section_offsets, &mut end_of_previous_range);
+            if self.end_of_dynamic_sections != 0 {
+                // this assertion only makes sense if there are any dynamic sections
+                assert_eq!(end_of_previous_range, self.end_of_dynamic_sections);
+            }
+
+            self.data_cache = new_data;
+            self.cache_status = CacheStatus::Fresh;
+        }
+
+        // Here, the `data_cache` is guaranteed to be fresh and ready to use.
+        let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
+        // Every time we create a new copy of the TLS data image, we have to re-calculate
+        // and re-assign the TLS self pointer value (located after the static TLS section data),
+        // because the virtual address of that new TLS data image copy will be unique.
+        // Note that we only do this if the data_copy actually contains any TLS data.
+        let self_ptr_offset = self.end_of_static_sections;
+        if let Some(dest_slice) = data_copy.get_mut(self_ptr_offset .. (self_ptr_offset + POINTER_SIZE)) {
+            let tls_self_ptr_value = dest_slice.as_ptr() as usize;
+            dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
+            TlsDataImage {
+                _data: Some(data_copy),
+                ptr:   tls_self_ptr_value,
+            }
+        } else {
+            panic!("BUG: offset of TLS self pointer was out of bounds in the TLS data image:\n{:02X?}", data_copy);
+        }
+    }
+}
+
+/// An initialized TLS area data image ready to be used by a new task.
+/// 
+/// The data is opaque, but one can obtain a pointer to the TLS area.
+/// 
+/// The enclosed opaque data is stored as a boxed slice (`Box<[u8]>`)
+/// instead of a vector (`Vec<u8>`) because it is instantiated once upon task creation
+/// and should never be expanded or shrunk.
+/// 
+/// The data is "immutable" with respect to Theseus task management functions
+/// at the language level.
+/// However, the data within this TLS area will be modified directly by code
+/// that executes "in" this task, e.g., instructions that access the current TLS area.
+#[derive(Debug)]
+pub struct TlsDataImage {
+    // The data is wrapped in an Option to avoid allocating an empty boxed slice
+    // when there are no TLS data sections.
+    _data: Option<Box<[u8]>>,
+    ptr:   usize,
+}
+impl TlsDataImage {
+    /// Returns the value of the TLS selft pointer for this TLS data image.
+    /// If it has no TLS data sections, the returned value will be zero.
+    #[inline(always)]
+    pub fn pointer_value(&self) -> usize {
+        self.ptr
+    }
+}
+
+
+/// The status of a cached TLS area data image.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CacheStatus {
+    /// The cached data image is up to date and can be used immediately.
+    Fresh,
+    /// The cached data image is out of date and needs to be regenerated.
+    Invalidated,
+}
+
+
+/// A wrapper around a `StrongSectionRef` that implements `PartialEq` and `Eq` 
+/// so we can use it in a `RangeMap`.
+#[derive(Debug, Clone)]
+struct StrongSectionRefWrapper(StrongSectionRef);
+impl Deref for StrongSectionRefWrapper {
+    type Target = StrongSectionRef;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl PartialEq for StrongSectionRefWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for StrongSectionRefWrapper { }

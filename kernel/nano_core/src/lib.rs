@@ -225,7 +225,6 @@ pub extern "C" fn nano_core_start(
         );
     }
 
-
     // the captain shouldn't return ...
     try_exit!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
 }
