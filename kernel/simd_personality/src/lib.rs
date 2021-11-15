@@ -8,7 +8,7 @@
 //! how to deal with it for context switching, and also for interrupt handling.
 //! Both of these policies are determined per-core as follows:
 //! 
-//! ### Context Switching 
+//! # Context Switching 
 //! * If there is one or zero SIMD-enabled `Task`s running on a given core, 
 //!   then all `Task`s running on that core can use the standard, 
 //!   non-SIMD-enabled context switching routine. 
@@ -26,7 +26,7 @@
 //! However, that static policy misses out on the performance optimization of 
 //! not having to save/restore SIMD registers when only a single SIMD Task is running on a given core.
 //! 
-//! ### Interrupt Handling
+//! # Interrupt Handling
 //! * If interrupt handlers are only ever compiled for the regular world, i.e., 
 //!   no interrupt handlers exist that are compiled to use SIMD instructions,
 //!   then we do not have to save/restore SIMD registers on an interrupt because

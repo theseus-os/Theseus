@@ -1286,7 +1286,7 @@ impl Default for Character {
 /// but this is different from the concept of a `cell` because it may contain 
 /// more than just a single displayable character, in order to support complex Unicode/emoji.
 ///
-/// ## 1-to-1 Relationship between Units and Columns
+/// # 1-to-1 Relationship between Units and Columns
 /// It is guaranteed that one `Unit` in the scrollback buffer corresponds to exactly one screen column,
 /// which makes it easy to calculate the conversions between screen cursor coordinate points
 /// and scrollback buffer coordinate points.
@@ -1310,7 +1310,7 @@ impl Default for Character {
 /// multiple `Unit`s.
 ///
 ///
-/// ## What Units are Not
+/// # What Units are Not
 /// Displayable control/escape sequences, i.e., those that affect text style,
 /// **do not** exist as individual `Unit`s,
 /// though their effects on text style are represented by a `Unit`'s `FormatFlags`.
