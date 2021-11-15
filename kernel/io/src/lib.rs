@@ -139,12 +139,12 @@ pub trait BlockReader: BlockIo {
     ///
     /// The number of blocks read is dictated by the length of the given `buffer`.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `buffer`: the buffer into which data will be read. 
     ///    The length of this buffer must be a multiple of the block size.
     /// * `block_offset`: the offset in number of blocks from the beginning of this reader.
     ///
-    /// ## Return
+    /// # Return
     /// If successful, returns the number of blocks read into the given `buffer`. 
     /// Otherwise, returns an error.
     fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>;
@@ -173,12 +173,12 @@ pub trait BlockWriter: BlockIo {
     ///
     /// The number of blocks written is dictated by the length of the given `buffer`.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `buffer`: the buffer from which data will be written. 
     ///    The length of this buffer must be a multiple of the block size.
     /// * `block_offset`: the offset in number of blocks from the beginning of this writer.
     ///
-    /// ## Return
+    /// # Return
     /// If successful, returns the number of blocks written to this writer. 
     /// Otherwise, returns an error.
     fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>;
@@ -205,7 +205,7 @@ impl<W> BlockWriter for &mut W where W: BlockWriter + ?Sized {
 /// A trait that represents an I/O stream that can be read from at the granularity of individual bytes,
 /// but which does not track the current offset into the stream.
 ///
-/// ## `ByteReader` implementation atop `BlockReader`
+/// # `ByteReader` implementation atop `BlockReader`
 /// The [`ByteReader`] trait ideally _should be_ auto-implemented for any type
 /// that implements the [`BlockReader`] trait,
 /// to allow easy byte-wise access to a block-based I/O stream.
@@ -216,12 +216,12 @@ pub trait ByteReader {
     ///
     /// The number of bytes read is dictated by the length of the given `buffer`.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `buffer`: the buffer into which data will be copied.
     /// * `offset`: the offset in bytes from the beginning of this reader 
     ///    where the read operation will begin.
     ///
-    /// ## Return
+    /// # Return
     /// If successful, returns the number of bytes read into the given `buffer`. 
     /// Otherwise, returns an error.
     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; 
@@ -242,7 +242,7 @@ impl<R> ByteReader for &mut R where R: ByteReader + ?Sized {
 /// A trait that represents an I/O stream that can be written to,
 /// but which does not track the current offset into the stream.
 ///
-/// ## `ByteWriter` implementation atop `BlockWriter`
+/// # `ByteWriter` implementation atop `BlockWriter`
 /// The [`ByteWriter`] trait ideally _should be_ auto-implemented for any type 
 /// that implements both the [`BlockWriter`] **and** [`BlockReader`] traits
 /// to allow easy byte-wise access to a block-based I/O stream.
@@ -261,12 +261,12 @@ pub trait ByteWriter {
     ///
     /// The number of bytes written is dictated by the length of the given `buffer`.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `buffer`: the buffer from which data will be copied. 
     /// * `offset`: the offset in number of bytes from the beginning of this writer
     ///    where the write operation will begin.
     ///
-    /// ## Return
+    /// # Return
     /// If successful, returns the number of bytes written to this writer. 
     /// Otherwise, returns an error.
     fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>;
@@ -296,7 +296,7 @@ impl<R> ByteWriter for &mut R where R: ByteWriter + ?Sized {
 /// in which all types that implement `BlockReader` also implement `ByteReader`, 
 /// but we can't do that because Rust currently does not support specialization.
 /// 
-/// ## Example
+/// # Example
 /// Use the `From` implementation around a `BlockReader` instance, such as:
 /// ```ignore
 /// // Assume `storage_dev` implements `BlockReader`
@@ -354,7 +354,7 @@ impl<R> BlockReader for ByteReaderWrapper<R> where R: BlockReader {
 /// also implement `ByteReader + ByteWriter`, 
 /// but we cannot do that because Rust currently does not support specialization.
 /// 
-/// ## Example
+/// # Example
 /// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
 /// ```ignore
 /// // Assume `storage_dev` implements `BlockReader + BlockWriter`
@@ -434,7 +434,7 @@ impl<RW> BlockWriter for ByteReaderWriterWrapper<RW> where RW: BlockReader + Blo
 /// See the [`ByteWriter`] trait docs for an explanation of why both 
 /// `BlockReader + BlockWriter` are required.
 ///
-/// ## Example
+/// # Example
 /// Use the `From` implementation around a `BlockReader + BlockWriter` instance, such as:
 /// ```ignore
 /// // Assume `storage_dev` implements `BlockReader + BlockWriter`
@@ -799,7 +799,7 @@ impl<'io, IO, L, B> core::fmt::Write for LockableIo<'io, IO, L, B>
 /// 3. A partial single-block transfer of some bytes in the last block,
 ///    only if the end of `byte_range` is not aligned to `block_size`.
 /// 
-/// ## Example
+/// # Example
 /// Given a read request for a `byte_range` of `1500..3950` and a `block_size` of `512` bytes,
 /// this function will return the following three transfer operations:
 /// 1. Read 1 block (block `2`) and transfer the last 36 bytes of that block (`476..512`)
@@ -809,12 +809,12 @@ impl<'io, IO, L, B> core::fmt::Write for LockableIo<'io, IO, L, B>
 /// 3. Read 1 block (block `7`) and transfer the first 366 bytes of that block (`0..366`)
 ///    into the byte range `3584..3950`.
 ///
-/// ## Arguments
+/// # Arguments
 /// * `byte_range`: the absolute range of bytes where the I/O transfer starts and ends,
 ///    specified as absolute offsets from the beginning of the block-wise I/O stream.
 /// * `block_size`: the size in bytes of each block in the block-wise I/O stream.
 /// 
-/// ## Return
+/// # Return
 /// Returns a list of the three above transfer operations, 
 /// enclosed in `Option`s to convey that not all operations may be necessary.
 /// 
