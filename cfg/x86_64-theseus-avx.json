@@ -1,17 +1,13 @@
 {
-  "__NOTE": [ "Despite not being Unix-like or Redox-like, we use the `unix` family and `redox` OS type in order to",
-              "enable the `libc` crate to build correctly, such that we can use its various c_* type definitions" ],
-
   "llvm-target": "x86_64-unknown-none-gnu",
   "data-layout": "e-m:e-i64:64-f80:128-n8:16:32:64-S128",
   "linker-flavor": "gcc",
-  "target-family": "unix",
   "target-endian": "little",
   "target-pointer-width": "64",
   "target-c-int-width": "32",
   "has-elf-tls": true,
   "arch": "x86_64",
-  "os": "redox",
+  "os": "theseus",
   "features": "+avx",
   "disable-redzone": true,
   "panic": "unwind"

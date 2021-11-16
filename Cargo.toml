@@ -58,6 +58,9 @@ qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 
+### Patch `libc` so we can use libc-specific types when using `cfg(target-os = "theseus")`.
+libc = { git = "https://github.com/theseus-os/libc", branch = "theseus" }
+
 ### Patch `crc32fast` because it fails to build for target specs 
 ### that don't support `target_feature`s: "sse2", "sse4.2", "pclmulqdq".
 ### Currently, this is only used by the `object` crate, which is a dependency of `wasmtime`.

@@ -8,7 +8,7 @@ build = "../build.rs"
 [dependencies]
 spin = "0.9.0"
 log = "0.4.8"
-libc = { version = "0.2", default-features = false }
+libc = { version = "0.2.107", default-features = false }
 cstr_core = "0.2.3"
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
 memchr = { version = "2.2.0", default-features = false }

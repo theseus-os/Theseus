@@ -22,3 +22,6 @@
 [submodule "libs/crc32fast"]
 	path = libs/crc32fast
 	url = git@github.com:theseus-os/rust-crc32fast.git
+[submodule "libs/libc"]
+	path = libs/libc
+	url = git@github.com:theseus-os/libc.git
