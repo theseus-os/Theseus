@@ -465,6 +465,10 @@ run-arm: arm
 		-semihosting-config enable=on,target=native \
 		-kernel target/thumbv7em-none-eabi/theseus.bin
 
+### Compile Theseus for realtime scheduling algorithm
+arm-realtime: export override THESEUS_CONFIG += realtime_scheduler
+arm-realtime: arm
+
 ### Configure Theseus to run realtime scheduling algorithm
 run-arm-realtime: export override THESEUS_CONFIG += realtime_scheduler
 run-arm-realtime: run-arm

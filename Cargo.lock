@@ -2530,6 +2530,8 @@ name = "runqueue_realtime"
 version = "0.1.0"
 dependencies = [
  "irq_safety",
+ "lazy_static",
+ "log",
  "task",
 ]
 
