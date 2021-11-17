@@ -2529,6 +2529,7 @@ dependencies = [
 name = "runqueue_realtime"
 version = "0.1.0"
 dependencies = [
+ "atomic_linked_list",
  "irq_safety",
  "lazy_static",
  "log",

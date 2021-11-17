@@ -15,3 +15,6 @@ version = "0.4.8"
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
+
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
