@@ -34,6 +34,11 @@ pub fn init(
     runqueue::init(apic_id)?;
     
     let task_ref = task::bootstrap_task(apic_id, stack)?;
+
+    // if we are using a realtime scheduler, we would like to initialize the bootstrap task as an aperiodic task
+    #[cfg(realtime_scheduler)]
+    runqueue::add_task_to_specific_runqueue_realtime(apic_id, task_ref.clone(), None)?;
+    #[cfg(not(realtime_scheduler))]
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(BootstrapTaskRef {
         apic_id, 
@@ -74,7 +79,8 @@ impl Drop for BootstrapTaskRef {
 /// # Note 
 /// The new task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked. 
 /// See the `TaskBuilder` documentation for more details. 
-/// 
+///
+#[cfg(not(realtime_scheduler))] 
 pub fn new_task_builder<F, A, R>(
     func: F,
     argument: A
@@ -84,6 +90,27 @@ pub fn new_task_builder<F, A, R>(
           F: FnOnce(A) -> R,
 {
     TaskBuilder::new(func, argument)
+}
+
+/// Creates a builder for a new `Task` that starts at the given entry point function `func`
+/// and will be passed the given `argument`.
+/// 
+/// # Note 
+/// The new task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked. 
+/// See the `TaskBuilder` documentation for more details. 
+/// 
+/// In the case of realtime scheduling, the period of the task must also be declared
+#[cfg(realtime_scheduler)]
+pub fn new_task_builder<F, A, R>(
+    func: F,
+    argument: A,
+    period: Option<usize>
+) -> TaskBuilder<F, A, R>
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R,
+{
+    TaskBuilder::new(func, argument, period)
 }
 
 /// A struct that offers a builder pattern to create and customize new `Task`s.
@@ -106,6 +133,9 @@ pub struct TaskBuilder<F, A, R> {
     blocked: bool,
     idle: bool,
     post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
+    /// In the case of realtime scheduling, we must include the period of the task we would like to create
+    #[cfg(realtime_scheduler)]
+    period: Option<usize>,
 }
 
 impl<F, A, R> TaskBuilder<F, A, R> 
@@ -115,6 +145,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
 {
     /// Creates a new `Task` from the given function `func`
     /// that will be passed the argument `arg` when spawned. 
+    #[cfg(not(realtime_scheduler))]
     fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
         TaskBuilder {
             argument: argument,
@@ -127,6 +158,25 @@ impl<F, A, R> TaskBuilder<F, A, R>
             post_build_function: None,
         }
     }
+
+    /// Creates a new `Task` from the given function `func`
+    /// that will be passed the argument `arg` when spawned. 
+    /// Used in the case of realtime scheduling, where the period of the task must be specified as well
+    #[cfg(realtime_scheduler)]
+    fn new(func: F, argument: A, period: Option<usize>) -> TaskBuilder<F, A, R> {
+        TaskBuilder {
+            argument: argument,
+            func: func,
+            _return_type: PhantomData,
+            name: None,
+            pin_on_core: None,
+            blocked: false,
+            idle: false,
+            post_build_function: None,
+            period: period,
+        }
+    }
+    
 
     /// Set the String name for the new Task.
     pub fn name(mut self, name: String) -> TaskBuilder<F, A, R> {
@@ -214,10 +264,16 @@ impl<F, A, R> TaskBuilder<F, A, R>
         }
         
         if let Some(core) = self.pin_on_core {
+            #[cfg(not(realtime_scheduler))]
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
+            #[cfg(realtime_scheduler)]
+            runqueue::add_task_to_specific_runqueue_realtime(core, task_ref.clone(), self.period)?;
         }
         else {
+            #[cfg(not(realtime_scheduler))]
             runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            #[cfg(realtime_scheduler)]
+            runqueue::add_task_to_any_runqueue_realtime(task_ref.clone(), self.period)?;
         }
 
         Ok(task_ref)
@@ -481,10 +537,18 @@ pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
     let apic_id = core.unwrap_or_else(|| APIC_ID);
     debug!("Spawning a new idle task on core {}", apic_id);
 
-    new_task_builder(dummy_idle_task, apic_id)
+    #[cfg(not(realtime_scheduler))]
+    return new_task_builder(dummy_idle_task, apic_id)
         .name(format!("idle_task_core_{}", apic_id))
         .idle(apic_id)
-        .spawn()
+        .spawn();
+
+    // In the case of realtime scheduling, we would like to initialize the idle task as an aperiodic task
+    #[cfg(realtime_scheduler)]
+    return new_task_builder(dummy_idle_task, apic_id, None)
+        .name(format!("idle_task_core_{}", apic_id))
+        .idle(apic_id)
+        .spawn();
 }
 
 /// Dummy `idle_task` to be used if original `idle_task` crashes.

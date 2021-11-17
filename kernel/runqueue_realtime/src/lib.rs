@@ -173,20 +173,20 @@ impl RunQueue {
     }
 
 	/// TODO!!!
-	pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
+	pub fn add_task_to_any_runqueue_realtime(task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
             .ok_or("couldn't find any runqueues to add the task to!")?;
 
-        rq.write().add_task(task, None)
+        rq.write().add_task(task, period)
 	}
 
 	/// TODO!!!
-	pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
+	pub fn add_task_to_specific_runqueue_realtime(which_core: u8, task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
         RunQueue::get_runqueue(which_core)
             .ok_or("Couldn't get RunQueue for the given core")?
             .write()
-            .add_task(task, None)
+            .add_task(task, period)
 	}
 
 	/// Inserts a `RealtimeTaskRef` at its proper position in the queue
