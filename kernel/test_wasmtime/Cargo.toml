@@ -15,27 +15,28 @@ default-features = false
 
 ## working!
 [dependencies.cranelift-entity]
-path = "../../libs/wasmtime/cranelift/entity"
+path = "../../ports/wasmtime/cranelift/entity"
 features = ['enable-serde']
 
 ## working!
 [dependencies.wasmtime-types]
-path = "../../libs/wasmtime/crates/types"
+path = "../../ports/wasmtime/crates/types"
 default-features = false
 
 ## working!
 [dependencies.wasmtime-environ]
-path = "../../libs/wasmtime/crates/environ"
+path = "../../ports/wasmtime/crates/environ"
 default-features = false
 
-## working!
-[dependencies.wasmtime-runtime]
-path = "../../libs/wasmtime/crates/runtime"
-default-features = false
+# # not yet working
+# [dependencies.wasmtime-runtime]
+# path = "../../ports/wasmtime/crates/runtime"
+# default-features = false
+
 
 
 # [dependencies.wasmtime]
-# path = "../../libs/wasmtime/crates/wasmtime"
+# path = "../../ports/wasmtime/crates/wasmtime"
 # default-features = false
 
 
