@@ -37,6 +37,9 @@ path = "../memory_structs"
 [target.'cfg(target_arch = "arm")'.dependencies.task]
 path = "../task"
 
+[target.'cfg(target_arch = "arm")'.dependencies.task_delay]
+path = "../task_delay"
+
 [target.'cfg(target_arch = "arm")'.dependencies.interrupts]
 path = "../interrupts"
 

@@ -23,11 +23,6 @@ cfg_if!{
         use apic::get_my_apic_id;
     } else if #[cfg(target_arch="arm")] {
         fn get_my_apic_id() -> u8 { 0 }
-
-        extern crate priority_queue;
-        extern crate hashbrown;
-        #[macro_use] extern crate lazy_static;
-        pub mod delay;
     }
 }
 

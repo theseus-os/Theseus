@@ -371,6 +371,7 @@ dependencies = [
  "spawn",
  "stack",
  "task",
+ "task_delay",
  "task_fs",
  "tsc",
  "window_manager",
@@ -1255,6 +1256,7 @@ dependencies = [
  "serial_port",
  "spin 0.9.0",
  "task",
+ "task_delay",
  "tlb_shootdown",
  "tss",
  "vga_buffer",
@@ -2569,10 +2571,8 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cfg-if 1.0.0",
- "hashbrown 0.11.2",
  "irq_safety",
  "lazy_static",
- "priority-queue",
  "runqueue",
  "scheduler_priority",
  "scheduler_realtime",
@@ -3012,6 +3012,18 @@ dependencies = [
  "stack",
  "tss",
  "x86_64",
+]
+
+[[package]]
+name = "task_delay"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.11.2",
+ "irq_safety",
+ "lazy_static",
+ "priority-queue",
+ "scheduler",
+ "task",
 ]
 
 [[package]]

@@ -1,0 +1,26 @@
+[package]
+name = "task_delay"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+[dependencies.priority-queue]
+version = "1.2.0"
+
+[dependencies.hashbrown]
+version = "0.11.2"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety" 
+
+[dependencies.scheduler]
+path = "../scheduler"
