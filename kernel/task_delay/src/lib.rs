@@ -1,3 +1,7 @@
+//! This crate provides an API that can be used to delay tasks for specified periods of time.
+//! The `delay_task_until` function allows for tasks to be delayed for periodic intervals of time and can be used to implement a period task.
+//!
+
 #![no_std]
 extern crate task;
 extern crate irq_safety;

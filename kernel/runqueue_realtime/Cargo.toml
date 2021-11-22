@@ -1,7 +1,9 @@
 [package]
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
 name = "runqueue_realtime"
+description = "Functions and types for handling runqueues in a realtime scheduling context"
 version = "0.1.0"
-edition = "2018"
+build = "../../build.rs"
 
 [dependencies.task]
 path = "../task"
@@ -18,3 +20,6 @@ version = "1.2.0"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
+
+[lib]
+crate-type = ["rlib"]

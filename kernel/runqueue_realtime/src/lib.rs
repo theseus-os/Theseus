@@ -1,3 +1,8 @@
+//! This crate contains the `RunQueue` structure, for a realtime scheduler using rate monotonic scheduling.
+//! `RunQueue` structure is essentially a list of `Task`s
+//! that is used for scheduling purposes.
+//!
+
 #![no_std]
 
 extern crate task;
@@ -71,6 +76,8 @@ impl RealtimeTaskRef {
 	}
 
 	/// Checks whether the period of this `RealtimeTaskRef` is shorter than the period of another `RealtimeTaskRef`
+	/// If the `RealtimeTaskRef` is aperiodic, i.e. if `period` is `None`, we will always return false
+	/// Additionally, a periodic task will always return `true` if `other_taskref` is aperiodic
 	pub fn has_smaller_period(&self, other_taskref: &RealtimeTaskRef) -> bool{
 		match self.period {
 			Some(period_val) => if let Some(other_period_val) = other_taskref.period {
@@ -89,6 +96,11 @@ lazy_static! {
 	static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 }
 
+/// A list of references to `Task`s (`RealtimeTaskRef`s). 
+/// This is used to store the `Task`s (and associated scheduler related data) 
+/// that are runnable on a given core.
+/// A queue is used for the round robin scheduler.
+/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.
 #[derive(Debug)]
 pub struct RunQueue {
 	core: u8,
@@ -110,6 +122,14 @@ impl DerefMut for RunQueue {
 
 
 impl RunQueue {
+	/// Moves the `RealtimeTaskRef` at the given index in this `RunQueue` to the appropriate location in this `RunQueue`,
+	/// and returns a cloned reference to the underlying `TaskRef`.
+	/// Under the Rate Monotonic scheduling algorithm, periodic tasks are assigned priorities in order from the smallest period.
+	/// Thus, the `RealtimeTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
+	/// `RealtimeTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
+	/// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.
+	/// Afterwards, the number of context switches is incremented by one.
+	/// This function is used when the task is selected by the scheduler.
 	pub fn update_and_reinsert(&mut self, index: usize) -> Option<TaskRef> {
 		if let Some(mut realtime_taskref) = self.remove(index) {
 			realtime_taskref.increment_context_switches();
@@ -122,7 +142,7 @@ impl RunQueue {
 		}
 	}
 
-	/// TODO!!!
+    /// Creates a new `RunQueue` for the given core, which is an `apic_id`
 	pub fn init(which_core: u8) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
         trace!("Created runqueue (realtime) for core {}", which_core);
@@ -141,12 +161,12 @@ impl RunQueue {
         }
 	}
 
-	/// TODO!!!
+    /// Returns `RunQueue` for the given core, which is an `apic_id`.
 	pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockIrqSafe<RunQueue>> {
 		RUNQUEUES.get(&which_core)
 	} 
 
-	/// TODO!!!
+    /// Returns the "least busy" core, which is currently very simple, based on runqueue size.
 	pub fn get_least_busy_core() -> Option<u8> {
 		Self::get_least_busy_runqueue().map(|rq| rq.read().core)
 	}
@@ -172,7 +192,8 @@ impl RunQueue {
         min_rq.map(|m| m.0)
     }
 
-	/// TODO!!!
+    /// Chooses the "least busy" core's runqueue (based on simple runqueue-size-based load balancing)
+    /// and adds the given `Task` reference to that core's runqueue.
 	pub fn add_task_to_any_runqueue_realtime(task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
@@ -181,7 +202,7 @@ impl RunQueue {
         rq.write().add_task(task, period)
 	}
 
-	/// TODO!!!
+    /// Convenience method that adds the given `Task` reference to given core's runqueue.
 	pub fn add_task_to_specific_runqueue_realtime(which_core: u8, task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
         RunQueue::get_runqueue(which_core)
             .ok_or("Couldn't get RunQueue for the given core")?
@@ -219,7 +240,6 @@ impl RunQueue {
 		}
 	}
 
-	/// TODO!!!
 	/// Adds a `TaskRef` to this runqueue with the given periodicity value
 	fn add_task(&mut self, task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
 		debug!("Adding task to runqueue_realtime {}, {:?}", self.core, task);
@@ -237,13 +257,14 @@ impl RunQueue {
         Ok(())
     }
 
-
-	/// TODO!!!
+    /// Removes a `TaskRef` from this RunQueue.
 	pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
 		self.remove_internal(task)
 	}
 
-	/// TODO!!!
+    /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
+    /// 
+    /// This is a brute force approach that iterates over all runqueues. 
 	pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;

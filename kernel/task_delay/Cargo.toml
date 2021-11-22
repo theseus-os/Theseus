@@ -1,11 +1,12 @@
 [package]
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
 name = "task_delay"
+description = "Provides APIs that allow tasks to be delayed for specified intervals of time"
 version = "0.1.0"
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+build = "../../build.rs"
 
 [dependencies]
+
 [dependencies.priority-queue]
 version = "1.2.0"
 
@@ -24,3 +25,6 @@ git = "https://github.com/theseus-os/irq_safety"
 
 [dependencies.scheduler]
 path = "../scheduler"
+
+[lib]
+crate-type = ["rlib"]

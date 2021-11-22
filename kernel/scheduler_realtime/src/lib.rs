@@ -1,3 +1,9 @@
+//! This crate picks the next task in accordance with the Rate Monotonic Scheduling algorithm,
+//! a realtime scheduling algorithm that selects the task with the shortest period that is ready for execution.
+//! We achieve this here by having the `RunQueue` structure internally sort the tasks in order of increasing periodicity.
+//! Whenever a task is selected, it will be reinserted into the `RunQueue` at the same location if it is a periodic
+//! task, or at the end if it is an aperiodic task.
+
 #![no_std]
 
 extern crate alloc;
@@ -9,6 +15,8 @@ extern crate runqueue_realtime;
 use task::TaskRef;
 use runqueue_realtime::RunQueue;
 
+/// This defines the realtime scheduler policy.
+/// Returns None if there is no schedule-able task
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
 	let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
 		Some(rq) => rq.write(),

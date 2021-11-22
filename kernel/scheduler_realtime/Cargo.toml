@@ -1,7 +1,9 @@
 [package]
+authors = ["Jacob Earle <jacob.earle@yale.edu>"]
 name = "scheduler_realtime"
+description = "Provides realtime scheduling functionality and picks the next task according to the Rate Monotonic scheduling algorithm"
 version = "0.1.0"
-edition = "2018"
+build = "../../build.rs"
 
 [dependencies.log]
 version = "0.4.8"
