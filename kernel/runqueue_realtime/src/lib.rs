@@ -201,13 +201,12 @@ impl RunQueue {
 				} else {
 					let mut index_to_insert: usize = 0;
 					let mut found_index_to_insert = false;
-					for inserted_taskref in self.iter() {
+					for (index, inserted_taskref) in self.iter().enumerate() {
 						if taskref.has_smaller_period(inserted_taskref) {
+							index_to_insert = index;
 							found_index_to_insert = true;
 							break;
 						}
-
-						index_to_insert += 1;
 					}
 
 					if found_index_to_insert {
