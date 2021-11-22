@@ -80,7 +80,6 @@ impl Drop for BootstrapTaskRef {
 /// The new task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked. 
 /// See the `TaskBuilder` documentation for more details. 
 ///
-#[cfg(not(realtime_scheduler))] 
 pub fn new_task_builder<F, A, R>(
     func: F,
     argument: A
@@ -101,16 +100,16 @@ pub fn new_task_builder<F, A, R>(
 /// 
 /// In the case of realtime scheduling, the period of the task must also be declared
 #[cfg(realtime_scheduler)]
-pub fn new_task_builder<F, A, R>(
+pub fn new_task_builder_periodic<F, A, R>(
     func: F,
     argument: A,
-    period: Option<usize>
+    period: usize
 ) -> TaskBuilder<F, A, R>
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R,
 {
-    TaskBuilder::new(func, argument, period)
+    TaskBuilder::new_periodic_taskbuilder(func, argument, period)
 }
 
 /// A struct that offers a builder pattern to create and customize new `Task`s.
@@ -145,7 +144,6 @@ impl<F, A, R> TaskBuilder<F, A, R>
 {
     /// Creates a new `Task` from the given function `func`
     /// that will be passed the argument `arg` when spawned. 
-    #[cfg(not(realtime_scheduler))]
     fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
         TaskBuilder {
             argument: argument,
@@ -156,6 +154,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             blocked: false,
             idle: false,
             post_build_function: None,
+            #[cfg(realtime_scheduler)] period: None,
         }
     }
 
@@ -163,7 +162,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// that will be passed the argument `arg` when spawned. 
     /// Used in the case of realtime scheduling, where the period of the task must be specified as well
     #[cfg(realtime_scheduler)]
-    fn new(func: F, argument: A, period: Option<usize>) -> TaskBuilder<F, A, R> {
+    fn new_periodic_taskbuilder(func: F, argument: A, period: usize) -> TaskBuilder<F, A, R> {
         TaskBuilder {
             argument: argument,
             func: func,
@@ -173,7 +172,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             blocked: false,
             idle: false,
             post_build_function: None,
-            period: period,
+            period: Some(period),
         }
     }
     
@@ -537,18 +536,10 @@ pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
     let apic_id = core.unwrap_or_else(|| APIC_ID);
     debug!("Spawning a new idle task on core {}", apic_id);
 
-    #[cfg(not(realtime_scheduler))]
-    return new_task_builder(dummy_idle_task, apic_id)
+    new_task_builder(dummy_idle_task, apic_id)
         .name(format!("idle_task_core_{}", apic_id))
         .idle(apic_id)
-        .spawn();
-
-    // In the case of realtime scheduling, we would like to initialize the idle task as an aperiodic task
-    #[cfg(realtime_scheduler)]
-    return new_task_builder(dummy_idle_task, apic_id, None)
-        .name(format!("idle_task_core_{}", apic_id))
-        .idle(apic_id)
-        .spawn();
+        .spawn()
 }
 
 /// Dummy `idle_task` to be used if original `idle_task` crashes.

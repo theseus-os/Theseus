@@ -45,9 +45,9 @@ pub fn init() -> ! {
     cfg_if! {
         if #[cfg(realtime_scheduler)] {
             // build and spawn two real time tasks
-            let tb3 = new_task_builder(task_delay_ten_seconds, 1, Some(1000));
+            let tb3 = spawn::new_task_builder_periodic(task_delay_ten_seconds, 1, 1000);
             tb3.spawn().unwrap();
-            let tb4 = new_task_builder(task_delay_two_seconds, 2, Some(200));
+            let tb4 = spawn::new_task_builder_periodic(task_delay_two_seconds, 2, 200);
             tb4.spawn().unwrap();
         }
         else {
