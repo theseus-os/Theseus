@@ -70,13 +70,6 @@ libc = { path = "ports/libc" }
 ##############################################################################################
 wasmparser = { path = "libs/wasm-tools/crates/wasmparser" }
 object = { path = "libs/object" }
-### Patch `crc32fast` because it fails to build for target specs 
-### that don't support `target_feature`s: "sse2", "sse4.2", "pclmulqdq".
-### Currently, this is only used by the `object` crate, which is a dependency of `wasmtime`.
-### See relevant issues:
-### * https://github.com/rust-lang/rust/issues/61721
-### * https://github.com/BurntSushi/memchr/pull/77 
-crc32fast = { path = "libs/crc32fast"}
 
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 

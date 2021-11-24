@@ -9,8 +9,8 @@
   "has-elf-tls": true,
   "arch": "x86_64",
   "os": "theseus",
-  "__features": "-mmx,-sse,+soft-float",
-  "features": "-pclmulqdq,-mmx,-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-3dnow,-3dnowa,-avx,-avx2,+soft-float",
+  "features": "-mmx,-sse,+soft-float",
+  "__features": "-pclmulqdq,-mmx,-sse,-sse2,-sse3,-ssse3,-sse4.1,-sse4.2,-3dnow,-3dnowa,-avx,-avx2,+soft-float",
   "disable-redzone": true,
   "panic": "unwind"
 }

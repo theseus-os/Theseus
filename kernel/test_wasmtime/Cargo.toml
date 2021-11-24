@@ -28,6 +28,10 @@ default-features = false
 path = "../../ports/wasmtime/crates/environ"
 default-features = false
 
+## working!
+[dependencies.region]
+path = "../../ports/region"
+
 # # not yet working
 # [dependencies.wasmtime-runtime]
 # path = "../../ports/wasmtime/crates/runtime"
