@@ -70,7 +70,7 @@ sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qe
 
 If you're on WSL, also do the following steps:
   * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/) or [VcXsvr](https://sourceforge.net/projects/vcxsrv/).
-    * You'll likely need to invoke those X servers withan `-ac` argument (or use the GUI to disable access control). 
+    * You'll likely need to invoke those X servers with the `-ac` argument (or use the GUI to disable access control). 
   * Setup an X display as follows:
     * on original WSL (version 1), run:
       ```sh
