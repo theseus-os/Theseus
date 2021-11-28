@@ -40,32 +40,14 @@ pub fn get_least_busy_core() -> Option<u8>{
 
 /// Chooses the "least busy" core's runqueue
 /// and adds the given `Task` reference to that core's runqueue.
-#[cfg(not(realtime_scheduler))]
 pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str>{
     RunQueue::add_task_to_any_runqueue(task)
 }
 
 /// Adds the given `Task` reference to given core's runqueue.
-#[cfg(not(realtime_scheduler))]
 pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str>{
     RunQueue::add_task_to_specific_runqueue(which_core, task)
 }
-
-/// Chooses the "least busy" core's runqueue
-/// and adds the given `Task` reference to that core's runqueue.
-/// In this case `period` describes the period of the task or whether it is aperiodic
-#[cfg(realtime_scheduler)]
-pub fn add_task_to_any_runqueue_realtime(task: TaskRef, period: Option<usize>) -> Result<(), &'static str>{
-    RunQueue::add_task_to_any_runqueue_realtime(task, period)
-}
-
-/// Adds the given `Task` reference to given core's runqueue.
-/// In this case `period` describes the period of the task or whether it is aperiodic
-#[cfg(realtime_scheduler)]
-pub fn add_task_to_specific_runqueue_realtime(which_core: u8, task: TaskRef, period: Option<usize>) -> Result<(), &'static str>{
-    RunQueue::add_task_to_specific_runqueue_realtime(which_core, task, period)
-}
-
 
 /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
 pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str>{

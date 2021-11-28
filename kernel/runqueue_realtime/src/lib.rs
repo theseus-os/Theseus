@@ -195,20 +195,20 @@ impl RunQueue {
 
     /// Chooses the "least busy" core's runqueue (based on simple runqueue-size-based load balancing)
     /// and adds the given `Task` reference to that core's runqueue.
-	pub fn add_task_to_any_runqueue_realtime(task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
+	pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
             .ok_or("couldn't find any runqueues to add the task to!")?;
 
-        rq.write().add_task(task, period)
+        rq.write().add_task(task, None)
 	}
 
     /// Convenience method that adds the given `Task` reference to given core's runqueue.
-	pub fn add_task_to_specific_runqueue_realtime(which_core: u8, task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
+	pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
         RunQueue::get_runqueue(which_core)
             .ok_or("Couldn't get RunQueue for the given core")?
             .write()
-            .add_task(task, period)
+            .add_task(task, None)
 	}
 
 	/// Inserts a `RealtimeTaskRef` at its proper position in the queue
@@ -272,4 +272,27 @@ impl RunQueue {
         }
         Ok(())
 	}
+
+	/// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`
+	/// then reinserts the `RealtimeTaskRef` at the proper location
+	fn set_periodicity_internal(&mut self, task: &TaskRef, period: usize) -> Result<(), &'static str> {
+		match self.iter().position(|rt| rt.taskref == *task ) {
+			Some(i) => {
+				if let Some(mut realtime_taskref) = self.remove(i) {
+					realtime_taskref.period = Some(period);
+					self.insert_realtime_taskref_at_proper_location(realtime_taskref);
+				}
+			},
+			None => {},
+		};
+		Ok(())
+	}
+}
+
+/// Set the periodicity of a given `Task` in all the `RunQueue` structures
+pub fn set_periodicity(task: &TaskRef, period: usize) -> Result<(), &'static str> {
+	for (_core, rq) in RUNQUEUES.iter() {
+		rq.write().set_periodicity_internal(task, period)?;
+	}
+	Ok(())
 }

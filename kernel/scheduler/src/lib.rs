@@ -89,6 +89,15 @@ pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> 
     }
 }
 
+pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static str> {
+    #[cfg(realtime_scheduler)] {
+        scheduler_realtime::set_periodicity(_task, _period)
+    }
+    #[cfg(not(realtime_scheduler))] {
+        Err("no scheduler that supports periodic tasks is currently loaded")
+    }
+}
+
 /// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
 pub fn get_priority(_task: &TaskRef) -> Option<u8> {

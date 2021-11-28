@@ -2,7 +2,6 @@ use core::fmt;
 use scheduler;
 use sleep;
 use zerocopy::FromBytes;
-use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// Registers stacked (pushed into the stack) during an exception
 #[derive(Clone, Copy, FromBytes)]

@@ -44,11 +44,20 @@ pub fn init() -> ! {
 
     cfg_if! {
         if #[cfg(realtime_scheduler)] {
-            // build and spawn two real time tasks
-            let tb3 = spawn::new_task_builder_periodic(task_delay_ten_seconds, 1, 1000);
-            tb3.spawn().unwrap();
-            let tb4 = spawn::new_task_builder_periodic(task_delay_two_seconds, 2, 200);
-            tb4.spawn().unwrap();
+            // build and spawn two real time periodic tasks
+            // we will start them as blocked in order to set the periods before they run
+            let periodic_tb1 = new_task_builder(task_delay_ten_seconds, 1).block();
+            let periodic_tb2 = new_task_builder(task_delay_two_seconds, 2).block();
+            let periodic_task_1 = periodic_tb1.spawn().unwrap();
+            let periodic_task_2 = periodic_tb2.spawn().unwrap();
+
+            // setting the periods of the tasks
+            scheduler::set_periodicity(&periodic_task_1, 1000).unwrap();
+            scheduler::set_periodicity(&periodic_task_2, 200).unwrap();
+
+            // starting the tasks
+            periodic_task_1.unblock();
+            periodic_task_2.unblock();
         }
         else {
             // Build and spawn two tasks.
