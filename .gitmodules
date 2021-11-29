@@ -10,12 +10,6 @@
 [submodule "libs/mpmc"]
 	path = libs/mpmc
 	url = https://github.com/theseus-os/mpmc
-[submodule "libs/wasmtime"]
-	path = ports/wasmtime
-	url = git@github.com:theseus-os/wasmtime.git
-[submodule "libs/wasm-tools"]
-	path = libs/wasm-tools
-	url = git@github.com:theseus-os/wasm-tools.git
 [submodule "libs/object"]
 	path = libs/object
 	url = git@github.com:theseus-os/object.git
