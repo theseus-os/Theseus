@@ -9,7 +9,7 @@ extern crate alloc;
 // #[macro_use] extern crate terminal_print;
 extern crate task;
 extern crate io;
-extern crate bare_io;
+extern crate core2;
 extern crate storage_manager;
 extern crate ata;
 
@@ -78,7 +78,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 
     // Test the Reader, Writer, ReaderWriter stuff (with offsets)
-    use bare_io::{Read, Write, Seek, SeekFrom};
+    use core2::io::{Read, Write, Seek, SeekFrom};
     let mut locked_sd = dev.lock();
     // let dev_mut = locked_sd.deref_mut();
     {

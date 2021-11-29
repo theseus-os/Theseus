@@ -1,9 +1,9 @@
-pub use bare_io::*;
+pub use core2::io::*;
 use core::fmt;
 
-pub fn last_os_error() -> bare_io::Error {
+pub fn last_os_error() -> core2::io::Error {
     // If we switch back to core_io, this should invoke `Error::from_raw_os_error()`
-    bare_io::Error::new(ErrorKind::Other, crate::errno_str())
+    core2::io::Error::new(ErrorKind::Other, crate::errno_str())
 }
 
 
@@ -32,23 +32,23 @@ impl<T: WriteByte> WriteByte for CountingWriter<T> {
     }
 }
 impl<T: Write> Write for CountingWriter<T> {
-    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
         let res = self.inner.write(buf);
         if let Ok(written) = res {
             self.written += written;
         }
         res
     }
-    fn write_all(&mut self, buf: &[u8]) -> bare_io::Result<()> {
+    fn write_all(&mut self, buf: &[u8]) -> core2::io::Result<()> {
         match self.inner.write_all(&buf) {
             Ok(()) => (),
-            Err(ref err) if err.kind() == bare_io::ErrorKind::WriteZero => (),
+            Err(ref err) if err.kind() == core2::io::ErrorKind::WriteZero => (),
             Err(err) => return Err(err),
         }
         self.written += buf.len();
         Ok(())
     }
-    fn flush(&mut self) -> bare_io::Result<()> {
+    fn flush(&mut self) -> core2::io::Result<()> {
         self.inner.flush()
     }
 }
@@ -57,7 +57,7 @@ impl<T: Write> Write for CountingWriter<T> {
 
 pub struct StringWriter(pub *mut u8, pub usize);
 impl Write for StringWriter {
-    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
         if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
             unsafe {
@@ -76,7 +76,7 @@ impl Write for StringWriter {
         // `cmp::min(written, maxlen)`.
         Ok(buf.len())
     }
-    fn flush(&mut self) -> bare_io::Result<()> {
+    fn flush(&mut self) -> core2::io::Result<()> {
         Ok(())
     }
 }

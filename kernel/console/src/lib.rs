@@ -6,7 +6,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate spin;
 extern crate irq_safety;
-extern crate bare_io;
+extern crate core2;
 extern crate mpmc;
 
 extern crate task;
@@ -41,8 +41,8 @@ pub fn start_connection_detection() -> Result<TaskRef, &'static str> {
 }
 
 pub struct Console<I, O, Backend> 
-	where I: bare_io::Read,
-	      O: bare_io::Write,
+	where I: core2::io::Read,
+	      O: core2::io::Write,
 		  Backend: TerminalBackend,
 {
 	name: String,
@@ -64,8 +64,8 @@ pub fn new_serial_console<S, I, O>(
 	output_stream: O,
 ) -> Console<I, O, TtyBackend<O>> 
 	where S: Into<String>,
-		  I: bare_io::Read,
-	      O: bare_io::Write + Send + 'static,
+		  I: core2::io::Read,
+	      O: core2::io::Write + Send + 'static,
 {
 	Console {
 		name: name.into(),
@@ -114,8 +114,8 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 fn console_entry<I, O, Backend>(
 	(mut console, input_receiver): (Console<I, O, Backend>, Receiver<DataChunk>),
 ) -> Result<(), &'static str> 
-	where I: bare_io::Read,
-	      O: bare_io::Write,
+	where I: core2::io::Read,
+	      O: core2::io::Write,
 		  Backend: TerminalBackend,
 {
 	loop {
