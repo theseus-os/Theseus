@@ -43,7 +43,7 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate delegate;
 extern crate spin;
-extern crate bare_io;
+extern crate core2;
 extern crate lockable;
 
 #[cfg(test)]
@@ -52,7 +52,7 @@ mod test;
 use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, Range}};
 use alloc::{boxed::Box, vec::Vec};
 use lockable::Lockable;
-use bare_io::{Seek, SeekFrom};
+use core2::io::{Seek, SeekFrom};
 
 
 /// Errors that can be returned from I/O operations.
@@ -66,9 +66,9 @@ pub enum IoError {
     TimedOut,
 }
 
-impl From<IoError> for bare_io::Error {
+impl From<IoError> for core2::io::Error {
     fn from(io_error: IoError) -> Self {
-        use bare_io::{ErrorKind, Error};
+        use core2::io::{ErrorKind, Error};
         match io_error {
             IoError::InvalidInput => ErrorKind::InvalidInput.into(),
             IoError::OutOfBounds  => Error::new(ErrorKind::Other, "out of bounds"),
@@ -465,8 +465,8 @@ impl<RW> BlockWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWrit
 /// A readable and writable "stateful" I/O stream that keeps track 
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// This implements the [`bare_io::Read`] and [`bare_io::Write`] traits for read and write access,
-/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// This implements the [`core2::io::Read`] and [`core2::io::Write`] traits for read and write access,
+/// as well as the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 /// It also forwards all other I/O-related traits implemented by the underlying I/O stream.
 pub struct ReaderWriter<IO> {
     io: IO,
@@ -478,28 +478,28 @@ impl<IO> ReaderWriter<IO> where IO: ByteReader + ByteWriter {
         ReaderWriter { io, offset: 0 }
     }
 }
-impl<IO> bare_io::Read for ReaderWriter<IO> where IO: ByteReader {
-    fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize> {
+impl<IO> core2::io::Read for ReaderWriter<IO> where IO: ByteReader {
+    fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
         let bytes_read = self.io.read_at(buf, self.offset as usize)
-            .map_err(Into::<bare_io::Error>::into)?;
+            .map_err(Into::<core2::io::Error>::into)?;
         self.offset += bytes_read as u64;
         Ok(bytes_read)
     }
 }
-impl<IO> bare_io::Write for ReaderWriter<IO> where IO: ByteWriter {
-    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+impl<IO> core2::io::Write for ReaderWriter<IO> where IO: ByteWriter {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
         let bytes_written = self.io.write_at(buf, self.offset as usize)
-            .map_err(Into::<bare_io::Error>::into)?;
+            .map_err(Into::<core2::io::Error>::into)?;
         self.offset += bytes_written as u64;
         Ok(bytes_written)
     }
 
-    fn flush(&mut self) -> bare_io::Result<()> {
+    fn flush(&mut self) -> core2::io::Result<()> {
         self.io.flush().map_err(Into::into)
     }    
 }
 impl<IO> Seek for ReaderWriter<IO> where IO: KnownLength {
-    fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64> {
+    fn seek(&mut self, position: SeekFrom) -> core2::io::Result<u64> {
         let (base_pos, offset) = match position {
             SeekFrom::Start(n) => {
                 self.offset = n;
@@ -517,8 +517,8 @@ impl<IO> Seek for ReaderWriter<IO> where IO: KnownLength {
             self.offset = n;
             Ok(self.offset)
         } else {
-            Err(bare_io::Error::new(
-                bare_io::ErrorKind::InvalidInput,
+            Err(core2::io::Error::new(
+                core2::io::ErrorKind::InvalidInput,
                 "invalid seek to a negative or overflowing position",
             ))
         }
@@ -554,8 +554,8 @@ impl<IO> ByteWriter for ReaderWriter<IO> where IO: ByteWriter {
 /// A stateful reader that keeps track of its current offset
 /// within the internal stateless [`ByteReader`] I/O stream.
 ///
-/// This implements the [`bare_io::Read`] trait for read-only access,
-/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// This implements the [`core2::io::Read`] trait for read-only access,
+/// as well as the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 /// It also forwards all other read-only I/O-related traits implemented by the underlying I/O stream.
 ///
 /// Note: this is implemented as a thin wrapper around [`ReaderWriter`].
@@ -579,19 +579,19 @@ impl<IO> BlockReader for Reader<IO> where IO: BlockReader {
 impl<IO> ByteReader for Reader<IO> where IO: ByteReader {
     delegate!{ to self.0 { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
 }
-impl<IO> bare_io::Read for Reader<IO> where IO: ByteReader {
-    delegate!{ to self.0 { fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize>; } }
+impl<IO> core2::io::Read for Reader<IO> where IO: ByteReader {
+    delegate!{ to self.0 { fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize>; } }
 }
 impl<IO> Seek for Reader<IO> where IO: KnownLength {
-    delegate!{ to self.0 { fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64>; } }
+    delegate!{ to self.0 { fn seek(&mut self, position: SeekFrom) -> core2::io::Result<u64>; } }
 }
 
 
 /// A stateful writer that keeps track of its current offset
 /// within the internal stateless [`ByteWriter`] I/O stream.
 ///
-/// This implements the [`bare_io::Write`] trait for write-only access,
-/// as well as the [`bare_io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// This implements the [`core2::io::Write`] trait for write-only access,
+/// as well as the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
 /// It also forwards all other write-only I/O-related traits implemented by the underlying I/O stream.
 ///
 /// Note: this is implemented as a thin wrapper around [`ReaderWriter`].
@@ -621,12 +621,12 @@ impl<IO> ByteWriter for Writer<IO> where IO: ByteWriter {
         fn flush(&mut self) -> Result<(), IoError>;
     } }
 }
-impl<IO> bare_io::Write for Writer<IO> where IO: ByteWriter {
-    delegate!{ to self.0 { fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize>; } }
-    fn flush(&mut self) -> bare_io::Result<()> { bare_io::Write::flush(&mut self.0) }
+impl<IO> core2::io::Write for Writer<IO> where IO: ByteWriter {
+    delegate!{ to self.0 { fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize>; } }
+    fn flush(&mut self) -> core2::io::Result<()> { core2::io::Write::flush(&mut self.0) }
 }
 impl<IO> Seek for Writer<IO> where IO: KnownLength {
-    delegate!{ to self.0 { fn seek(&mut self, position: SeekFrom) -> bare_io::Result<u64>; } }
+    delegate!{ to self.0 { fn seek(&mut self, position: SeekFrom) -> core2::io::Result<u64>; } }
 }
 
 
@@ -642,7 +642,7 @@ impl<IO> Seek for Writer<IO> where IO: KnownLength {
 /// * [`KnownLength`]
 /// * [`BlockReader`] and [`BlockWriter`]
 /// * [`ByteReader`] and [`ByteWriter`]
-/// * [`bare_io::Read`], [`bare_io::Write`], and [`bare_io::Seek`]
+/// * [`core2::io::Read`], [`core2::io::Write`], and [`core2::io::Seek`]
 /// * [`core::fmt::Write`]
 ///
 /// # Usage and Examples
@@ -753,23 +753,23 @@ impl<'io, IO, L, B> ByteWriter for LockableIo<'io, IO, L, B>
         fn flush(&mut self) -> Result<(), IoError>;
     } }
 }
-impl<'io, IO, L, B> bare_io::Read for LockableIo<'io, IO, L, B>
-    where IO: bare_io::Read + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+impl<'io, IO, L, B> core2::io::Read for LockableIo<'io, IO, L, B>
+    where IO: core2::io::Read + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
 {
-    delegate!{ to self.lock_mut() { fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize>; } }
+    delegate!{ to self.lock_mut() { fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize>; } }
 }
-impl<'io, IO, L, B> bare_io::Write for LockableIo<'io, IO, L, B>
-    where IO: bare_io::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+impl<'io, IO, L, B> core2::io::Write for LockableIo<'io, IO, L, B>
+    where IO: core2::io::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
 {
     delegate!{ to self.lock_mut() {
-        fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize>;
-        fn flush(&mut self) -> bare_io::Result<()>;
+        fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize>;
+        fn flush(&mut self) -> core2::io::Result<()>;
     } }
 }
-impl<'io, IO, L, B> bare_io::Seek for LockableIo<'io, IO, L, B>
-    where IO: bare_io::Seek + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+impl<'io, IO, L, B> core2::io::Seek for LockableIo<'io, IO, L, B>
+    where IO: core2::io::Seek + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
 {
-    delegate!{ to self.lock_mut() { fn seek(&mut self, position: bare_io::SeekFrom) -> bare_io::Result<u64>; } }
+    delegate!{ to self.lock_mut() { fn seek(&mut self, position: core2::io::SeekFrom) -> core2::io::Result<u64>; } }
 }
 impl<'io, IO, L, B> core::fmt::Write for LockableIo<'io, IO, L, B>
     where IO: core::fmt::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,

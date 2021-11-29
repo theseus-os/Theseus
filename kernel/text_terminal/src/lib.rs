@@ -33,7 +33,7 @@
 #[macro_use] extern crate bitflags;
 extern crate event_types;
 extern crate unicode_width;
-extern crate bare_io;
+extern crate core2;
 extern crate vte;
 extern crate util;
 #[macro_use] extern crate derive_more;
@@ -55,7 +55,7 @@ use core::num::NonZeroUsize;
 use core::ops::{Bound, Deref, DerefMut, Index, IndexMut};
 use alloc::string::String;
 use alloc::vec::Vec;
-use bare_io::{Read, Write};
+use core2::io::{Read, Write};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use vte::{Parser, Perform};
 
@@ -500,7 +500,7 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
     /// and handles that stream of bytes as input into this terminal.
     ///
     /// Returns the number of bytes read from the given reader.
-    pub fn handle_input<R: Read>(&mut self, reader: &mut R) -> bare_io::Result<usize> {
+    pub fn handle_input<R: Read>(&mut self, reader: &mut R) -> core2::io::Result<usize> {
         const READ_BATCH_SIZE: usize = 128;
         let mut total_bytes_read = 0;
         let mut buf = [0; READ_BATCH_SIZE];
@@ -533,7 +533,7 @@ impl<Backend: TerminalBackend> TextTerminal<Backend> {
     /// to the backend output stream.
     ///
     /// No caching or performance optimizations are used. 
-    pub fn flush(&mut self) -> bare_io::Result<usize> {
+    pub fn flush(&mut self) -> core2::io::Result<usize> {
         unimplemented!()
     }
 
@@ -1820,7 +1820,7 @@ pub trait TerminalBackend {
 ///
 /// A TTY backend doesn't support any form of random access or direct text rendering, 
 /// so we can only issue regular ANSI/xterm control and escape sequences to it.
-pub struct TtyBackend<Output: bare_io::Write> {
+pub struct TtyBackend<Output: core2::io::Write> {
     /// The width and height of this terminal's screen.
     screen_size: ScreenSize,
 
@@ -1833,7 +1833,7 @@ pub struct TtyBackend<Output: bare_io::Write> {
 
     insert_mode: InsertMode,
 }
-impl<Output: bare_io::Write> TtyBackend<Output> {
+impl<Output: core2::io::Write> TtyBackend<Output> {
     // const FORWARDS_DELETE: &'static [u8] = &[
     //     AsciiControlCodes::Escape,
     //     b'[',
@@ -1921,8 +1921,8 @@ impl<Output: bare_io::Write> TtyBackend<Output> {
         self.real_screen_cursor = cursor;
     }
 }
-impl<Output: bare_io::Write> TerminalBackend for TtyBackend<Output> {
-    type DisplayError = bare_io::Error;
+impl<Output: core2::io::Write> TerminalBackend for TtyBackend<Output> {
+    type DisplayError = core2::io::Error;
 
     #[inline(always)]
     fn screen_size(&self) -> ScreenSize {
