@@ -10,3 +10,15 @@
 [submodule "libs/mpmc"]
 	path = libs/mpmc
 	url = https://github.com/theseus-os/mpmc
+[submodule "libs/object"]
+	path = libs/object
+	url = git@github.com:theseus-os/object.git
+[submodule "libs/libc"]
+	path = ports/libc
+	url = git@github.com:theseus-os/libc.git
+[submodule "libs/indexmap"]
+	path = libs/indexmap
+	url = https://github.com/theseus-os/indexmap
+[submodule "region"]
+	path = ports/region
+	url = https://github.com/theseus-os/region-rs
