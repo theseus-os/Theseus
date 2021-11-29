@@ -146,7 +146,7 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bare_io</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">core2</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mpmc</span>;
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
@@ -181,8 +181,8 @@
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Console</span><span class="op">&lt;</span><span class="ident">I</span>, <span class="ident">O</span>, <span class="ident">Backend</span><span class="op">&gt;</span> 
-	<span class="kw">where</span> <span class="ident">I</span>: <span class="ident">bare_io::Read</span>,
-	      <span class="ident">O</span>: <span class="ident">bare_io::Write</span>,
+	<span class="kw">where</span> <span class="ident">I</span>: <span class="ident">core2::io::Read</span>,
+	      <span class="ident">O</span>: <span class="ident">core2::io::Write</span>,
 		  <span class="ident">Backend</span>: <span class="ident">TerminalBackend</span>,
 {
 	<span class="ident">name</span>: <span class="ident">String</span>,
@@ -204,8 +204,8 @@
 	<span class="ident">output_stream</span>: <span class="ident">O</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Console</span><span class="op">&lt;</span><span class="ident">I</span>, <span class="ident">O</span>, <span class="ident">TtyBackend</span><span class="op">&lt;</span><span class="ident">O</span><span class="op">&gt;</span><span class="op">&gt;</span> 
 	<span class="kw">where</span> <span class="ident">S</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
-		  <span class="ident">I</span>: <span class="ident">bare_io::Read</span>,
-	      <span class="ident">O</span>: <span class="ident">bare_io::Write</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
+		  <span class="ident">I</span>: <span class="ident">core2::io::Read</span>,
+	      <span class="ident">O</span>: <span class="ident">core2::io::Write</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
 	<span class="ident">Console</span> {
 		<span class="ident">name</span>: <span class="ident">name</span>.<span class="ident">into</span>(),
@@ -254,8 +254,8 @@
 <span class="kw">fn</span> <span class="ident">console_entry</span><span class="op">&lt;</span><span class="ident">I</span>, <span class="ident">O</span>, <span class="ident">Backend</span><span class="op">&gt;</span>(
 	(<span class="kw-2">mut</span> <span class="ident">console</span>, <span class="ident">input_receiver</span>): (<span class="ident">Console</span><span class="op">&lt;</span><span class="ident">I</span>, <span class="ident">O</span>, <span class="ident">Backend</span><span class="op">&gt;</span>, <span class="ident">Receiver</span><span class="op">&lt;</span><span class="ident">DataChunk</span><span class="op">&gt;</span>),
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
-	<span class="kw">where</span> <span class="ident">I</span>: <span class="ident">bare_io::Read</span>,
-	      <span class="ident">O</span>: <span class="ident">bare_io::Write</span>,
+	<span class="kw">where</span> <span class="ident">I</span>: <span class="ident">core2::io::Read</span>,
+	      <span class="ident">O</span>: <span class="ident">core2::io::Write</span>,
 		  <span class="ident">Backend</span>: <span class="ident">TerminalBackend</span>,
 {
 	<span class="kw">loop</span> {

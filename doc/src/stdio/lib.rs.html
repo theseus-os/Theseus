@@ -418,7 +418,7 @@
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bare_io</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">core2</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keycodes_ascii</span>;
 
 <span class="kw">use</span> <span class="ident">alloc::collections::VecDeque</span>;
@@ -427,7 +427,7 @@
 <span class="kw">use</span> <span class="ident">alloc::string::String</span>;
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
-<span class="kw">use</span> <span class="ident">bare_io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
+<span class="kw">use</span> <span class="ident">core2::io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
 <span class="kw">use</span> <span class="ident">keycodes_ascii::KeyEvent</span>;
 <span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
 
@@ -551,7 +551,7 @@
     <span class="doccomment">/// buffer. Do NOT use this function alternatively with `read()` method defined in</span>
     <span class="doccomment">/// `StdioReadGuard`. This function returns the number of bytes read. It will return</span>
     <span class="doccomment">/// zero only upon EOF.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_line</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">bare_io::Error</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_line</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">String</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_cnt</span> <span class="op">=</span> <span class="number">0usize</span>;    <span class="comment">// total number of bytes read this time</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_cnt</span>;               <span class="comment">// number of bytes returned from a `read()` invocation</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp_buf</span> <span class="op">=</span> <span class="ident">Vec::new</span>();  <span class="comment">// temporary buffer</span>
@@ -617,7 +617,7 @@
     <span class="doccomment">/// It will only return zero under one of two scenarios:</span>
     <span class="doccomment">/// 1. The EOF flag has been set.</span>
     <span class="doccomment">/// 2. The buffer specified was 0 bytes in length.</span>
-    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">bare_io::Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
 
         <span class="comment">// Deal with the edge case that the buffer specified was 0 bytes in length.</span>
         <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0</span> { <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="number">0</span>); }
@@ -654,7 +654,7 @@
     <span class="doccomment">/// Same as `read()`, but is non-blocking.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns `Ok(0)` when the underlying buffer is empty.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">bare_io::Error</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_read</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
 
         <span class="comment">// Deal with the edge case that the buffer specified was 0 bytes in length.</span>
         <span class="kw">if</span> <span class="ident">buf</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0</span> { <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="number">0</span>); }
@@ -688,9 +688,9 @@
     <span class="doccomment">/// Also note that this method does *not* guarantee to write all given bytes, although it currently</span>
     <span class="doccomment">/// does so. Always check the return value when using this method. Otherwise, use `write_all` to</span>
     <span class="doccomment">/// ensure that all given bytes are written.</span>
-    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">bare_io::Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">buf</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>().<span class="ident">end</span> {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">bare_io::Error::new</span>(<span class="ident">bare_io::ErrorKind::UnexpectedEof</span>,
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">core2::io::Error::new</span>(<span class="ident">core2::io::ErrorKind::UnexpectedEof</span>,
                                            <span class="string">&quot;cannot write to a stream with EOF set&quot;</span>));
         }
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_ring_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>();
@@ -701,7 +701,7 @@
     }
     <span class="doccomment">/// The function required by `Write` trait. Currently it performs nothing,</span>
     <span class="doccomment">/// since everything is write directly to the ring buffer in `write` method.</span>
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">bare_io::Error</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">core2::io::Error</span><span class="op">&gt;</span> {
         <span class="prelude-val">Ok</span>(())
     }
 }

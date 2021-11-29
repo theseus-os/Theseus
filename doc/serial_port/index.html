@@ -7,7 +7,7 @@ and functions that enable simple interactions with serial ports.
 This crate extends that functionality to provide interrupt handlers for receiving data
 and handling data access in a deferred, asynchronous manner.
 It also implements additional higher-level I/O traits for serial ports,
-namely [<code>bare_io::Read</code>] and [<code>bare_io::Write</code>].</p>
+namely [<code>core2::io::Read</code>] and [<code>core2::io::Write</code>].</p>
 <h1 id="notes" class="section-header"><a href="#notes">Notes</a></h1>
 <p>Typically, drivers do not need to be designed in this split manner. 
 However, the serial port is the very earliest device to be initialized and used

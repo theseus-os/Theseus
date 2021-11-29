@@ -2368,7 +2368,7 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bitflags</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">event_types</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">unicode_width</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bare_io</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">core2</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">vte</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">util</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">derive_more</span>;
@@ -2390,7 +2390,7 @@
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Bound</span>, <span class="ident">Deref</span>, <span class="ident">DerefMut</span>, <span class="ident">Index</span>, <span class="ident">IndexMut</span>};
 <span class="kw">use</span> <span class="ident">alloc::string::String</span>;
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
-<span class="kw">use</span> <span class="ident">bare_io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
+<span class="kw">use</span> <span class="ident">core2::io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
 <span class="kw">use</span> <span class="ident">unicode_width</span>::{<span class="ident">UnicodeWidthChar</span>, <span class="ident">UnicodeWidthStr</span>};
 <span class="kw">use</span> <span class="ident">vte</span>::{<span class="ident">Parser</span>, <span class="ident">Perform</span>};
 
@@ -2835,7 +2835,7 @@
     <span class="doccomment">/// and handles that stream of bytes as input into this terminal.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Returns the number of bytes read from the given reader.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_input</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">reader</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bare_io::Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_input</span><span class="op">&lt;</span><span class="ident">R</span>: <span class="ident">Read</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">reader</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">R</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">core2::io::Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="kw">const</span> <span class="ident">READ_BATCH_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_bytes_read</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> [<span class="number">0</span>; <span class="ident">READ_BATCH_SIZE</span>];
@@ -2868,7 +2868,7 @@
     <span class="doccomment">/// to the backend output stream.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// No caching or performance optimizations are used. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bare_io::Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">core2::io::Result</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="macro">unimplemented!</span>()
     }
 
@@ -4155,7 +4155,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// A TTY backend doesn&#39;t support any form of random access or direct text rendering, </span>
 <span class="doccomment">/// so we can only issue regular ANSI/xterm control and escape sequences to it.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TtyBackend</span><span class="op">&lt;</span><span class="ident">Output</span>: <span class="ident">bare_io::Write</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TtyBackend</span><span class="op">&lt;</span><span class="ident">Output</span>: <span class="ident">core2::io::Write</span><span class="op">&gt;</span> {
     <span class="doccomment">/// The width and height of this terminal&#39;s screen.</span>
     <span class="ident">screen_size</span>: <span class="ident">ScreenSize</span>,
 
@@ -4168,7 +4168,7 @@
 
     <span class="ident">insert_mode</span>: <span class="ident">InsertMode</span>,
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Output</span>: <span class="ident">bare_io::Write</span><span class="op">&gt;</span> <span class="ident">TtyBackend</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Output</span>: <span class="ident">core2::io::Write</span><span class="op">&gt;</span> <span class="ident">TtyBackend</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">&gt;</span> {
     <span class="comment">// const FORWARDS_DELETE: &amp;&#39;static [u8] = &amp;[</span>
     <span class="comment">//     AsciiControlCodes::Escape,</span>
     <span class="comment">//     b&#39;[&#39;,</span>
@@ -4256,8 +4256,8 @@
         <span class="self">self</span>.<span class="ident">real_screen_cursor</span> <span class="op">=</span> <span class="ident">cursor</span>;
     }
 }
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Output</span>: <span class="ident">bare_io::Write</span><span class="op">&gt;</span> <span class="ident">TerminalBackend</span> <span class="kw">for</span> <span class="ident">TtyBackend</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">DisplayError</span> <span class="op">=</span> <span class="ident">bare_io::Error</span>;
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">Output</span>: <span class="ident">core2::io::Write</span><span class="op">&gt;</span> <span class="ident">TerminalBackend</span> <span class="kw">for</span> <span class="ident">TtyBackend</span><span class="op">&lt;</span><span class="ident">Output</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">DisplayError</span> <span class="op">=</span> <span class="ident">core2::io::Error</span>;
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">screen_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ScreenSize</span> {

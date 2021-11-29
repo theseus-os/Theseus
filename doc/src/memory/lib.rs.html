@@ -271,6 +271,7 @@
 <span id="268">268</span>
 <span id="269">269</span>
 <span id="270">270</span>
+<span id="271">271</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate implements the virtual memory subsystem for Theseus,</span>
 <span class="doccomment">//! which is fairly robust and provides a unification between </span>
@@ -324,6 +325,7 @@
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
 <span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_OFFSET</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SIZE</span>;
 
 <span class="doccomment">/// The memory management info and address space of the kernel</span>
 <span class="kw">static</span> <span class="ident">KERNEL_MMI</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">MmiRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
