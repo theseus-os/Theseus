@@ -65,12 +65,6 @@ smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 ### Patch `libc` so we can use libc-specific types when using `cfg(target-os = "theseus")`.
 libc = { path = "ports/libc" }
 
-##############################################################################################
-#################### Below are patches for wasmtime-related crates. ##########################
-##############################################################################################
-wasmparser = { path = "libs/wasm-tools/crates/wasmparser" }
-object = { path = "libs/object" }
-
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!
