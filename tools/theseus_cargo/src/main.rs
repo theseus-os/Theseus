@@ -677,8 +677,13 @@ impl BuildConfig {
         pathbuf.push("TheseusBuild.toml");
         let theseus_build_toml = fs::read_to_string(&pathbuf)
             .map_err(|e| format!("Error reading {}: {}", pathbuf.display(), e))?;
-        let build_config: BuildConfig = toml::from_str(&theseus_build_toml)
+        let mut build_config: BuildConfig = toml::from_str(&theseus_build_toml)
             .map_err(|e| format!("Error parsing TheseusBuild.toml: {}", e))?;
+        
+        // Trim errant whitespace from the various parsed items.
+        build_config.target     = build_config.target    .trim().into();
+        build_config.rustflags  = build_config.rustflags .trim().into();
+        build_config.cargoflags = build_config.cargoflags.trim().into();
         Ok(build_config)
     }
 }
