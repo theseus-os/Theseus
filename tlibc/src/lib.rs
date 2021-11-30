@@ -32,6 +32,7 @@ mod globals;
 mod printf;
 mod stdlib;
 mod string;
+mod mm;
 
 
 use alloc::vec::Vec;
