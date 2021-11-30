@@ -45,7 +45,7 @@ extern crate cortex_m;
 extern crate memory_structs;
 extern crate task;
 extern crate interrupts;
-extern crate task_delay;
+extern crate sleep;
 
 mod armv7em;
 pub use armv7em::*;

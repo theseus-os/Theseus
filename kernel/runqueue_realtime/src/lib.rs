@@ -10,6 +10,7 @@ extern crate irq_safety;
 extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
+extern crate atomic_linked_list;
 
 use task::TaskRef;
 use irq_safety::RwLockIrqSafe;

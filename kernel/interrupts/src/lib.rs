@@ -33,7 +33,7 @@ pub use arch_x86_64::*;
 } else if #[cfg(target_arch="arm")] {
 
 extern crate zerocopy;
-extern crate task_delay;
+extern crate sleep;
 
 mod arch_armv7em;
 pub use arch_armv7em::*;

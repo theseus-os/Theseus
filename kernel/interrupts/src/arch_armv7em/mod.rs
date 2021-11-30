@@ -1,6 +1,6 @@
 use core::fmt;
 use scheduler;
-use task_delay;
+use sleep;
 use zerocopy::FromBytes;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -69,22 +69,12 @@ impl fmt::Debug for ExceptionFrame {
     }
 }
 
-/// This variable will track the number of ticks elapsed on the system to keep track of time
-static SYSTICK_TICKS : AtomicUsize = AtomicUsize::new(0);
-
-/// Returns the current time in ticks
-pub fn get_current_time_in_ticks() -> usize {
-    SYSTICK_TICKS.load(Ordering::SeqCst)
-}
-
 #[export_name = "SysTick"]
 pub unsafe extern "C" fn systick_handler() {
-    let ticks = SYSTICK_TICKS.fetch_add(1, Ordering::SeqCst) + 1;
-
-    // remove all tasks that have been delayed but are able to be unblocked now
-    while ticks > task_delay::NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst) {
-        task_delay::remove_next_task_from_delayed_tasklist();
-    }
+    // Callback to the sleep API to unblock tasks whose waiting time is over
+    // and alert to update the number of ticks elapsed
+    sleep::increment_tick_count();
+    sleep::unblock_delayed_tasks();
 
     scheduler::schedule();
 }

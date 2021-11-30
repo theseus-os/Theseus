@@ -1,6 +1,6 @@
 [package]
 authors = ["Jacob Earle <jacob.earle@yale.edu>"]
-name = "task_delay"
+name = "sleep"
 description = "Provides APIs that allow tasks to be delayed for specified intervals of time"
 version = "0.1.0"
 build = "../../build.rs"

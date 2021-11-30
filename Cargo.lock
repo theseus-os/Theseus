@@ -368,10 +368,10 @@ dependencies = [
  "print",
  "scheduler",
  "simd_personality",
+ "sleep",
  "spawn",
  "stack",
  "task",
- "task_delay",
  "task_fs",
  "tsc",
  "window_manager",
@@ -1254,9 +1254,9 @@ dependencies = [
  "ps2",
  "scheduler",
  "serial_port",
+ "sleep",
  "spin 0.9.0",
  "task",
- "task_delay",
  "tlb_shootdown",
  "tss",
  "vga_buffer",
@@ -2783,6 +2783,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sleep"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.11.2",
+ "irq_safety",
+ "lazy_static",
+ "priority-queue",
+ "scheduler",
+ "task",
+]
+
+[[package]]
 name = "smoltcp"
 version = "0.5.0"
 source = "git+https://github.com/m-labs/smoltcp#0fedb1db9aa26712830822dd61f065deaa34d611"
@@ -3012,18 +3024,6 @@ dependencies = [
  "stack",
  "tss",
  "x86_64",
-]
-
-[[package]]
-name = "task_delay"
-version = "0.1.0"
-dependencies = [
- "hashbrown 0.11.2",
- "irq_safety",
- "lazy_static",
- "priority-queue",
- "scheduler",
- "task",
 ]
 
 [[package]]
