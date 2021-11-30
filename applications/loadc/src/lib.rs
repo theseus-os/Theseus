@@ -172,7 +172,7 @@ impl Offset {
 
 /// Parses an elf executable file from the given slice of bytes and load it into memory.
 ///
-/// ## Important note about memory mappings
+/// # Important note about memory mappings
 /// This function will allocate new memory regions to store each program segment
 /// and copy each segment's data into them.
 /// When this function returns, those segments will be mapped as writable in order to allow them 
@@ -180,7 +180,7 @@ impl Offset {
 /// Before running this executable, each segment's `MappedPages` should be remapped
 /// to the proper `flags` specified in its `LoadedSegment.flags` field. 
 ///
-/// ## Return
+/// # Return
 /// Returns a tuple of:
 /// 1. A list of program segments mapped into memory. 
 /// 2. The virtual address of the executable's entry point, e.g., the `_start` function.

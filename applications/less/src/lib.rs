@@ -12,7 +12,7 @@ extern crate libterm;
 extern crate spin;
 extern crate app_io;
 extern crate stdio;
-extern crate bare_io;
+extern crate core2;
 #[macro_use] extern crate log;
 
 use keycodes_ascii::{Keycode, KeyAction};
@@ -29,7 +29,7 @@ use alloc::collections::BTreeMap;
 use libterm::Terminal;
 use spin::Mutex;
 use stdio::{StdioWriter, KeyEventQueueReader};
-use bare_io::Write;
+use core2::io::Write;
 
 /// The metadata for each line in the file.
 struct LineSlice {

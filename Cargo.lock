@@ -121,7 +121,7 @@ dependencies = [
 name = "app_io"
 version = "0.1.0"
 dependencies = [
- "bare-io",
+ "core2",
  "event_types",
  "keycodes_ascii",
  "lazy_static",
@@ -188,15 +188,6 @@ name = "autocfg"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
-
-[[package]]
-name = "bare-io"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dec6ec4815d7aacd0be4ec053ef9e2883b22f79b29f9bd2ef3f79003e3ee7c9d"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "bit_field"
@@ -336,7 +327,7 @@ name = "cat"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "bare-io",
+ "core2",
  "fs_node",
  "getopts",
  "log",
@@ -414,7 +405,7 @@ name = "console"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "bare-io",
+ "core2",
  "io",
  "irq_safety",
  "log",
@@ -678,7 +669,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
- "bare-io",
+ "core2",
  "derive_more",
  "e1000",
  "ethernet_smoltcp_device",
@@ -1154,7 +1145,7 @@ name = "immediate_input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "bare-io",
+ "core2",
  "log",
  "stdio",
 ]
@@ -1175,7 +1166,7 @@ name = "input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "bare-io",
+ "core2",
  "log",
 ]
 
@@ -1230,7 +1221,7 @@ dependencies = [
 name = "io"
 version = "0.1.0"
 dependencies = [
- "bare-io",
+ "core2",
  "delegate",
  "lazy_static",
  "lockable",
@@ -1349,7 +1340,7 @@ name = "keyboard_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "bare-io",
+ "core2",
  "keycodes_ascii",
  "log",
  "scheduler",
@@ -1387,7 +1378,7 @@ name = "less"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "bare-io",
+ "core2",
  "fs_node",
  "getopts",
  "keycodes_ascii",
@@ -2621,7 +2612,7 @@ name = "serial_port"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "bare-io",
+ "core2",
  "deferred_interrupt_tasks",
  "interrupts",
  "irq_safety",
@@ -2663,7 +2654,7 @@ name = "shell"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "bare-io",
+ "core2",
  "dfqueue",
  "environment",
  "event_types",
@@ -2892,7 +2883,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "stdio"
 version = "0.1.0"
 dependencies = [
- "bare-io",
+ "core2",
  "keycodes_ascii",
  "spin 0.9.0",
 ]
@@ -3020,7 +3011,7 @@ name = "test_block_io"
 version = "0.1.0"
 dependencies = [
  "ata",
- "bare-io",
+ "core2",
  "io",
  "log",
  "storage_manager",
@@ -3094,7 +3085,7 @@ dependencies = [
 name = "test_serial_echo"
 version = "0.1.0"
 dependencies = [
- "bare-io",
+ "core2",
  "io",
  "irq_safety",
  "log",
@@ -3141,8 +3132,8 @@ dependencies = [
 name = "text_terminal"
 version = "0.1.0"
 dependencies = [
- "bare-io",
  "bitflags",
+ "core2",
  "derive_more",
  "event_types",
  "log",

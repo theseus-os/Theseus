@@ -5,7 +5,7 @@
 
 extern crate alloc;
 extern crate spin;
-extern crate bare_io;
+extern crate core2;
 extern crate keycodes_ascii;
 
 use alloc::collections::VecDeque;
@@ -14,7 +14,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
-use bare_io::{Read, Write};
+use core2::io::{Read, Write};
 use keycodes_ascii::KeyEvent;
 use core::ops::Deref;
 
@@ -138,7 +138,7 @@ impl StdioReader {
     /// buffer. Do NOT use this function alternatively with `read()` method defined in
     /// `StdioReadGuard`. This function returns the number of bytes read. It will return
     /// zero only upon EOF.
-    pub fn read_line(&mut self, buf: &mut String) -> Result<usize, bare_io::Error> {
+    pub fn read_line(&mut self, buf: &mut String) -> Result<usize, core2::io::Error> {
         let mut total_cnt = 0usize;    // total number of bytes read this time
         let mut new_cnt;               // number of bytes returned from a `read()` invocation
         let mut tmp_buf = Vec::new();  // temporary buffer
@@ -204,7 +204,7 @@ impl<'a> Read for StdioReadGuard<'a> {
     /// It will only return zero under one of two scenarios:
     /// 1. The EOF flag has been set.
     /// 2. The buffer specified was 0 bytes in length.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, bare_io::Error> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, core2::io::Error> {
 
         // Deal with the edge case that the buffer specified was 0 bytes in length.
         if buf.len() == 0 { return Ok(0); }
@@ -241,7 +241,7 @@ impl<'a> StdioReadGuard<'a> {
     /// Same as `read()`, but is non-blocking.
     /// 
     /// Returns `Ok(0)` when the underlying buffer is empty.
-    pub fn try_read(&mut self, buf: &mut [u8]) -> Result<usize, bare_io::Error> {
+    pub fn try_read(&mut self, buf: &mut [u8]) -> Result<usize, core2::io::Error> {
 
         // Deal with the edge case that the buffer specified was 0 bytes in length.
         if buf.len() == 0 { return Ok(0); }
@@ -275,9 +275,9 @@ impl<'a> Write for StdioWriteGuard<'a> {
     /// Also note that this method does *not* guarantee to write all given bytes, although it currently
     /// does so. Always check the return value when using this method. Otherwise, use `write_all` to
     /// ensure that all given bytes are written.
-    fn write(&mut self, buf: &[u8]) -> Result<usize, bare_io::Error> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, core2::io::Error> {
         if self.guard.lock().end {
-            return Err(bare_io::Error::new(bare_io::ErrorKind::UnexpectedEof,
+            return Err(core2::io::Error::new(core2::io::ErrorKind::UnexpectedEof,
                                            "cannot write to a stream with EOF set"));
         }
         let mut locked_ring_buf = self.guard.lock();
@@ -288,7 +288,7 @@ impl<'a> Write for StdioWriteGuard<'a> {
     }
     /// The function required by `Write` trait. Currently it performs nothing,
     /// since everything is write directly to the ring buffer in `write` method.
-    fn flush(&mut self) -> Result<(), bare_io::Error> {
+    fn flush(&mut self) -> Result<(), core2::io::Error> {
         Ok(())
     }
 }

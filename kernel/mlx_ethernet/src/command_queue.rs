@@ -239,7 +239,7 @@ impl CommandQueue {
 
     /// Create a command queue object.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `entries`: physically contiguous memory that is mapped as a slice of command queue entries.
     /// * `num_cmdq_entries`: number of entries in the queue.
     pub fn create(entries: BoxRefMut<MappedPages, [CommandQueueEntry]>, num_cmdq_entries: usize) -> Result<CommandQueue, &'static str> {
@@ -273,7 +273,7 @@ impl CommandQueue {
     /// At the end of the function, the command is ready to be posted using the doorbell in the initialization segment. 
     /// Returns an error if no entry is available to use.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `opcode`: [`CommandOpcode`] for the command that the driver wants to execute
     /// * `opmod`: opcode modifer, only applicable for certain commands
     /// * `allocated_pages`: physical address of pages that need to be passed to the NIC. Only used in the [`CommandOpcode::ManagePages`] command.
@@ -656,7 +656,7 @@ impl CommandQueueEntry {
     /// Sets the first 16 bytes of input data that are written inline in the command.
     /// The valid values for each field are different for every command, and can be taken from Chapter 23 of the PRM.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `opcode`: value identifying which command has to be carried out
     /// * `opmod`: opcode modifier. If None, field will be set to zero.
     /// * `command0`: the first 4 bytes of actual command data. If None, field will be set to zero.

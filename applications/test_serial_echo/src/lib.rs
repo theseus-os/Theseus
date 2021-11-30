@@ -7,7 +7,7 @@ extern crate alloc;
 // #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
 extern crate task;
-extern crate bare_io;
+extern crate core2;
 extern crate io;
 extern crate irq_safety;
 extern crate serial_port;
@@ -18,7 +18,7 @@ use alloc::{
     string::String,
     vec::Vec,
 };
-use bare_io::Read;
+use core2::io::Read;
 use io::LockableIo;
 use irq_safety::MutexIrqSafe;
 use serial_port::{SerialPort, SerialPortAddress, get_serial_port};
@@ -45,7 +45,7 @@ pub fn main(args: Vec<String>) -> isize {
             let res = serial_port_io2.read(&mut buf);
             if let Ok(bytes_read) = res {
                 if let Ok(s) = core::str::from_utf8(&buf[..bytes_read]) {
-                    use bare_io::Write;
+                    use core2::io::Write;
                     serial_port_io.write(s.as_bytes()).expect("serial port write failed");
                 }
             }

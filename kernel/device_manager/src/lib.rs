@@ -21,7 +21,7 @@ extern crate ixgbe;
 extern crate alloc;
 extern crate fatfs;
 extern crate io;
-extern crate bare_io;
+extern crate core2;
 #[macro_use] extern crate derive_more;
 extern crate mlx5;
 
@@ -233,8 +233,8 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
 ///
 /// To meet [`fatfs`]'s requirements, the underlying I/O stream must be able to 
 /// read, write, and seek while tracking its current offset. 
-/// We use traits from the [`bare_io`] crate to meet these requirements, 
-/// thus, the given `IO` parameter must implement those [`bare_io`] traits.
+/// We use traits from the [`core2`] crate to meet these requirements, 
+/// thus, the given `IO` parameter must implement those [`core2`] traits.
 ///
 /// For example, this allows one to access a FAT filesystem 
 /// by reading from or writing to a storage device.
@@ -244,16 +244,16 @@ impl<IO> FatFsAdapter<IO> {
 }
 /// This tells the `fatfs` crate that our read/write/seek functions
 /// may return errors of the type [`FatFsIoErrorAdapter`],
-/// which is a simple wrapper around [`bare_io::Error`].
+/// which is a simple wrapper around [`core2::io::Error`].
 impl<IO> fatfs::IoBase for FatFsAdapter<IO> {
     type Error = FatFsIoErrorAdapter;
 }
-impl<IO> fatfs::Read for FatFsAdapter<IO> where IO: bare_io::Read {
+impl<IO> fatfs::Read for FatFsAdapter<IO> where IO: core2::io::Read {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.0.read(buf).map_err(Into::into)
     }
 }
-impl<IO> fatfs::Write for FatFsAdapter<IO> where IO: bare_io::Write {
+impl<IO> fatfs::Write for FatFsAdapter<IO> where IO: core2::io::Write {
     fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.0.write(buf).map_err(Into::into)
     }
@@ -261,31 +261,31 @@ impl<IO> fatfs::Write for FatFsAdapter<IO> where IO: bare_io::Write {
         self.0.flush().map_err(Into::into)
     }
 }
-impl<IO> fatfs::Seek for FatFsAdapter<IO> where IO: bare_io::Seek {
+impl<IO> fatfs::Seek for FatFsAdapter<IO> where IO: core2::io::Seek {
     fn seek(&mut self, pos: fatfs::SeekFrom) -> Result<u64, Self::Error> {
-        let bare_io_pos = match pos {
-            fatfs::SeekFrom::Start(s)   => bare_io::SeekFrom::Start(s),
-            fatfs::SeekFrom::Current(c) => bare_io::SeekFrom::Current(c),
-            fatfs::SeekFrom::End(e)     => bare_io::SeekFrom::End(e),
+        let core2_pos = match pos {
+            fatfs::SeekFrom::Start(s)   => core2::io::SeekFrom::Start(s),
+            fatfs::SeekFrom::Current(c) => core2::io::SeekFrom::Current(c),
+            fatfs::SeekFrom::End(e)     => core2::io::SeekFrom::End(e),
         };
-        self.0.seek(bare_io_pos).map_err(Into::into)
+        self.0.seek(core2_pos).map_err(Into::into)
     }
 }
 
 /// This struct exists to enable us to implement the [`fatfs::IoError`] trait
-/// for the [`bare_io::Error`] trait.
+/// for the [`core2::io::Error`] trait.
 /// 
 /// This is required because Rust prevents implementing foreign traits for foreign types.
 #[derive(Debug, From, Into)]
-pub struct FatFsIoErrorAdapter(bare_io::Error);
+pub struct FatFsIoErrorAdapter(core2::io::Error);
 impl fatfs::IoError for FatFsIoErrorAdapter {
     fn is_interrupted(&self) -> bool {
-        self.0.kind() == bare_io::ErrorKind::Interrupted
+        self.0.kind() == core2::io::ErrorKind::Interrupted
     }
     fn new_unexpected_eof_error() -> Self {
-        FatFsIoErrorAdapter(bare_io::ErrorKind::UnexpectedEof.into())
+        FatFsIoErrorAdapter(core2::io::ErrorKind::UnexpectedEof.into())
     }
     fn new_write_zero_error() -> Self {
-        FatFsIoErrorAdapter(bare_io::ErrorKind::WriteZero.into())
+        FatFsIoErrorAdapter(core2::io::ErrorKind::WriteZero.into())
     }
 }

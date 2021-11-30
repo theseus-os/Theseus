@@ -17,7 +17,7 @@ extern crate path;
 extern crate root;
 extern crate scheduler;
 extern crate stdio;
-extern crate bare_io;
+extern crate core2;
 extern crate app_io;
 extern crate fs_node;
 extern crate terminal_print;
@@ -43,7 +43,7 @@ use core::mem;
 use alloc::collections::BTreeMap;
 use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter,
             StdioReader, StdioWriter};
-use bare_io::Write;
+use core2::io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
