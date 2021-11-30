@@ -5,15 +5,15 @@ set -x
 # capture all output to a file
 # script -e .script_output
 
-THIS_DIR="$(dirname "$(readlink -f "$0")")"
-THESEUS_BASE_DIR=$THIS_DIR/..
+TLIBC_DIR="$(dirname "$(readlink -f "$0")")"
+THESEUS_BASE_DIR=$TLIBC_DIR/..
 THESEUS_CARGO_PATH="$THESEUS_BASE_DIR/tools/theseus_cargo"
 THESEUS_DEPS_DIR="$THESEUS_BASE_DIR/build/deps"
 
 export RUST_BACKTRACE=1
 
 ### Note: the "theseus_cargo" tool must be installed locally instead of invoked via `cargo run` 
-cargo install --force --path=$THESEUS_CARGO_PATH --root=$THESEUS_CARGO_PATH
+cargo install --force --locked --path=$THESEUS_CARGO_PATH --root=$THESEUS_CARGO_PATH
 
 ### Do a full clean build every time at this point
 cargo clean

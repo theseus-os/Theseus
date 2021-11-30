@@ -328,18 +328,17 @@ c_test:
 
 
 ### Demo/test target for building libtheseus
-libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
+libtheseus: theseus_cargo $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
 	@( \
 		cd $(ROOT_DIR)/libtheseus && \
 		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
 	)
 
 
-
 ### This target builds the `theseus_cargo` tool as a dedicated binary.
-$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
+theseus_cargo: $(wildcard $(THESEUS_CARGO)/Cargo.*)  $(wildcard$(THESEUS_CARGO)/src/*)
 	@echo -e "\n=================== Building the theseus_cargo tool ==================="
-	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+	cargo install --locked --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
 
 
 
