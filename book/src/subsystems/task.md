@@ -59,7 +59,7 @@ We are also careful to correctly specify the public visibility of state items wi
 
 Tasks frequently need to be shared across many entities and subsystems throughout Theseus. 
 To accommodate this, Theseus offers the [`TaskRef`] type, which is effectively a shared reference to a `Task`, i.e., an `Arc<Task>`. 
-There are several reasons that we introduce a dedicated [newtype] instead of using an `Arc<Task>` directly:
+There are several reasons that we introduce a dedicated [`newtype`] instead of using an `Arc<Task>` directly:
 * To clarify all code related to task management.
 * To control the visibility (public vs. private) of items in the Task struct.
 * To guarantee that the task-local data area (per-task data) is properly set up when a new Task is created.
@@ -207,6 +207,3 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [`task_cleanup_success()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L547
 [`task_cleanup_failure()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L587
 [`task_cleanup_final()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L631
-
-
-<!-- cspell:ignore runnability, TASKLIST, newtype, lapic  -->
