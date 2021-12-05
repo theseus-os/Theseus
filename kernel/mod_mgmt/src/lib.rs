@@ -6,7 +6,7 @@
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
-extern crate memory_initialization;
+extern crate bootloader_modules;
 extern crate kernel_config;
 extern crate util;
 extern crate crate_name_utils;
@@ -29,7 +29,7 @@ use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
-use memory_initialization::BootloaderModule;
+use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, wrapper::BString};
@@ -151,11 +151,11 @@ fn parse_bootloader_modules_into_files(
     };
 
     for m in bootloader_modules {
-        let (crate_type, prefix, file_name) = CrateType::from_module_name(&m.name)?;
+        let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name().as_str())?;
         let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
         let name = String::from(file_name);
 
-        let frames = allocate_frames_by_bytes_at(m.start, m.size_in_bytes())
+        let frames = allocate_frames_by_bytes_at(m.start_address(), m.size_in_bytes())
             .map_err(|_e| "Failed to allocate frames for bootloader module")?;
         let pages = allocate_pages_by_bytes(m.size_in_bytes())
             .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
@@ -165,7 +165,7 @@ fn parse_bootloader_modules_into_files(
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", m.name, m.size_in_bytes(), mp);
+        // debug!("Module: {:?}, size {}, mp: {:?}", m.name(), m.size_in_bytes(), mp);
 
         let create_file = |dir: &DirRef| {
             MemFile::from_mapped_pages(mp, name, m.size_in_bytes(), dir)
