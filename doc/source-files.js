@@ -10,6 +10,7 @@ sourcesIndex["ata"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["atomic_linked_list"] = {"name":"","files":["atomic_linked_list.rs","atomic_map.rs","lib.rs"]};
 sourcesIndex["block_allocator"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["block_cache"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["bootloader_modules"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["captain"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["catch_unwind"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["color"] = {"name":"","files":["lib.rs"]};

@@ -142,23 +142,6 @@
 <span id="139">139</span>
 <span id="140">140</span>
 <span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
-<span id="144">144</span>
-<span id="145">145</span>
-<span id="146">146</span>
-<span id="147">147</span>
-<span id="148">148</span>
-<span id="149">149</span>
-<span id="150">150</span>
-<span id="151">151</span>
-<span id="152">152</span>
-<span id="153">153</span>
-<span id="154">154</span>
-<span id="155">155</span>
-<span id="156">156</span>
-<span id="157">157</span>
-<span id="158">158</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -169,6 +152,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">multiboot2</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bootloader_modules</span>;
 
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">MmiRef</span>, <span class="ident">MappedPages</span>, <span class="ident">VirtualAddress</span>, <span class="ident">PhysicalAddress</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::memory</span>::{<span class="ident">KERNEL_HEAP_START</span>, <span class="ident">KERNEL_HEAP_INITIAL_SIZE</span>};
@@ -179,6 +163,7 @@
 };
 <span class="kw">use</span> <span class="ident">heap::HEAP_FLAGS</span>;
 <span class="kw">use</span> <span class="ident">stack::Stack</span>;
+<span class="kw">use</span> <span class="ident">bootloader_modules::BootloaderModule</span>;
 
 <span class="doccomment">/// Just like Rust&#39;s `try!()` macro, </span>
 <span class="doccomment">/// but forgets the given `obj`s to prevent them from being dropped,</span>
@@ -278,13 +263,12 @@
     <span class="comment">// Because bootloader modules may overlap with the actual boot information, </span>
     <span class="comment">// we need to preserve those records here in a separate list,</span>
     <span class="comment">// such that we can unmap the boot info pages &amp; frames here but still access that info in the future .</span>
-    <span class="kw">let</span> <span class="ident">bootloader_modules</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BootloaderModule</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">boot_info</span>.<span class="ident">module_tags</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> {
-        <span class="ident">BootloaderModule</span> {
-            <span class="ident">start</span>: <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">m</span>.<span class="ident">start_address</span>() <span class="kw">as</span> <span class="ident">usize</span>),
-            <span class="ident">end</span>:   <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">m</span>.<span class="ident">end_address</span>()   <span class="kw">as</span> <span class="ident">usize</span>),
-            <span class="ident">name</span>:  <span class="ident">String::from</span>(<span class="ident">m</span>.<span class="ident">name</span>()),
-        }
-    }).<span class="ident">collect</span>();
+    <span class="kw">let</span> <span class="ident">bootloader_modules</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">BootloaderModule</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">boot_info</span>.<span class="ident">module_tags</span>()
+        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">BootloaderModule::new</span>(
+            <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">m</span>.<span class="ident">start_address</span>() <span class="kw">as</span> <span class="ident">usize</span>),
+            <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">m</span>.<span class="ident">end_address</span>()   <span class="kw">as</span> <span class="ident">usize</span>),
+            <span class="ident">String::from</span>(<span class="ident">m</span>.<span class="ident">name</span>()),
+        )).<span class="ident">collect</span>();
 
     <span class="comment">// Now that we&#39;ve recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.</span>
     <span class="comment">// This frees up those frames such that future code can exclusively map and access those pages/frames.</span>
@@ -299,24 +283,6 @@
         <span class="ident">bootloader_modules</span>,
         <span class="ident">identity_mapped_pages</span>
     ))
-}
-
-
-<span class="doccomment">/// A record of a bootloader module&#39;s name and location in physical memory.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BootloaderModule</span> {
-    <span class="doccomment">/// The starting address of this module, inclusive.</span>
-    <span class="kw">pub</span> <span class="ident">start</span>: <span class="ident">PhysicalAddress</span>,
-    <span class="doccomment">/// The ending address of this module, exclusive.</span>
-    <span class="kw">pub</span> <span class="ident">end</span>: <span class="ident">PhysicalAddress</span>,
-    <span class="doccomment">/// The name of this module, i.e.,</span>
-    <span class="doccomment">/// the filename it was given in the bootloader&#39;s cfg file.</span>
-    <span class="kw">pub</span> <span class="ident">name</span>: <span class="ident">String</span>,
-}
-<span class="kw">impl</span> <span class="ident">BootloaderModule</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">size_in_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">start</span>.<span class="ident">value</span>()
-    }
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_initialization" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
