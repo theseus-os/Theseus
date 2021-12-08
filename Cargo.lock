@@ -968,6 +968,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "gen_test_files"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memfs",
+ "memory",
+ "root",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3271,6 +3281,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasi"
+version = "0.10.0+wasi-snapshot-preview1"
+source = "git+https://github.com/bytecodealliance/wasi?rev=45536ac956a6211e3cff047f36cf19d6da82fd95#45536ac956a6211e3cff047f36cf19d6da82fd95"
+
+[[package]]
+name = "wasi_interpreter"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "bare-io",
+ "fs_node",
+ "hashbrown",
+ "memfs",
+ "path",
+ "root",
+ "smallvec",
+ "task",
+ "wasi",
+ "wasmi",
+]
+
+[[package]]
 name = "wasmi"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3295,20 +3327,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasmi_interpreter"
-version = "0.1.0"
-dependencies = [
- "smallvec",
- "terminal_print",
- "wasmi",
-]
-
-[[package]]
 name = "wasmi_simple_test"
 version = "0.1.0"
 dependencies = [
  "terminal_print",
  "wasmi",
+]
+
+[[package]]
+name = "wgrep"
+version = "0.1.0"
+dependencies = [
+ "wasi_interpreter",
 ]
 
 [[package]]
@@ -3364,6 +3394,15 @@ dependencies = [
  "spawn",
  "spin 0.9.0",
  "window_inner",
+]
+
+[[package]]
+name = "wzork"
+version = "0.1.0"
+dependencies = [
+ "memfs",
+ "root",
+ "wasi_interpreter",
 ]
 
 [[package]]

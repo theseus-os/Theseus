@@ -27,6 +27,7 @@ github_pages/doc/
 *.idea/
 *.vscode/
 *.code-workspace
+*.swp
 
 # log files
 *.pcap
