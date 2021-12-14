@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
-use bare_io::{Read, Write};
 use core::{cmp, convert::TryFrom as _};
+use core2::io::{Read, Write};
 use fs_node::DirRef;
 use fs_node::{FileOrDir, FileRef};
 use hashbrown::HashMap;

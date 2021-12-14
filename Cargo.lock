@@ -3290,7 +3290,7 @@ name = "wasi_interpreter"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "bare-io",
+ "core2",
  "fs_node",
  "hashbrown",
  "memfs",
