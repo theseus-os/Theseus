@@ -95,11 +95,20 @@ impl PosixNode {
         self.fd_flags
     }
 
-    pub fn set_fd_flags(&mut self, new_flags: wasi::Fdflags) {
+    pub fn set_fd_flags(&mut self, new_flags: wasi::Fdflags) -> Result<(), wasi::Errno> {
+        if self.fs_rights_base() & wasi::RIGHTS_FD_FDSTAT_SET_FLAGS == 0 {
+            return Err(wasi::ERRNO_ACCES);
+        }
+
         self.fd_flags = new_flags;
+        Ok(())
     }
 
     pub fn write(&mut self, buffer: &[u8]) -> Result<usize, wasi::Errno> {
+        if self.fs_rights_base() & wasi::RIGHTS_FD_WRITE == 0 {
+            return Err(wasi::ERRNO_ACCES);
+        }
+
         match self.theseus_file_or_dir.clone() {
             FileOrDir::File(file_ref) => {
                 let is_append_mode: bool = (self.fd_flags() & wasi::FDFLAGS_APPEND) != 0;
@@ -126,6 +135,10 @@ impl PosixNode {
         }
     }
     pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, wasi::Errno> {
+        if self.fs_rights_base() & wasi::RIGHTS_FD_READ == 0 {
+            return Err(wasi::ERRNO_ACCES);
+        }
+
         match self.theseus_file_or_dir().clone() {
             FileOrDir::File(file_ref) => {
                 let offset = self.offset;
@@ -146,6 +159,10 @@ impl PosixNode {
         delta: wasi::Filedelta,
         whence: wasi::Whence,
     ) -> Result<usize, wasi::Errno> {
+        if self.fs_rights_base() & wasi::RIGHTS_FD_SEEK == 0 {
+            return Err(wasi::ERRNO_ACCES);
+        }
+
         match self.theseus_file_or_dir.clone() {
             FileOrDir::File(file_ref) => {
                 let max_offset: usize = file_ref.lock().size();

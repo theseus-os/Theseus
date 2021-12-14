@@ -341,6 +341,10 @@ pub fn execute_system_call(
                 }
             };
 
+            if posix_node.fs_rights_base() & wasi::RIGHTS_PATH_OPEN == 0 {
+                return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_ACCES))));
+            }
+
             let parent_dir: DirRef = match posix_node.theseus_file_or_dir().clone() {
                 FileOrDir::File { .. } => {
                     return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
@@ -396,7 +400,12 @@ pub fn execute_system_call(
             };
 
             let flags: wasi::Fdflags = wasmi_args.nth_checked(1).unwrap();
-            posix_node.set_fd_flags(flags);
+            match posix_node.set_fd_flags(flags) {
+                Ok(_) => {}
+                Err(wasi_error) => {
+                    return Ok(Some(RuntimeValue::I32(From::from(wasi_error))));
+                }
+            };
 
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
