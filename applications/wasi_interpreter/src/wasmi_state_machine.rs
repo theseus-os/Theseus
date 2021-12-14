@@ -3,16 +3,12 @@ use core::{cell::RefCell, convert::TryFrom as _};
 
 use wasmi::{Module, Signature};
 
-/// Module for parsing wasm binary module (ripped from Redshirt)
+/// Module for parsing wasm binary module (from Redshirt)
 
 #[derive(Debug)]
 pub enum NewErr {
     /// Error in the interpreter.
     Interpreter(wasmi::Error),
-    /// The "start" symbol doesn't exist.
-    StartNotFound,
-    /// The "start" symbol must be a function.
-    StartIsntAFunction,
     /// If a "memory" symbol is provided, it must be a memory.
     MemoryIsntMemory,
     /// A memory object has both been imported and exported.

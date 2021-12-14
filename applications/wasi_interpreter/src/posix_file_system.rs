@@ -1,7 +1,8 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use bare_io::{Read, Write};
-use fs_node::{DirRef, File, FsNode, WeakDirRef};
+use core::{cmp, convert::TryFrom as _, fmt};
+use fs_node::DirRef;
 use fs_node::{FileOrDir, FileRef};
 use hashbrown::HashMap;
 use memfs::MemFile;
@@ -94,6 +95,10 @@ impl PosixNode {
         self.fd_flags
     }
 
+    pub fn set_fd_flags(&mut self, new_flags: wasi::Fdflags) {
+        self.fd_flags = new_flags;
+    }
+
     pub fn write(&mut self, buffer: &[u8]) -> Result<usize, wasi::Errno> {
         match self.theseus_file_or_dir.clone() {
             FileOrDir::File(file_ref) => {
@@ -136,29 +141,34 @@ impl PosixNode {
         }
     }
 
-    pub fn seek(&mut self, delta: i64, whence: wasi::Whence) -> Result<usize, wasi::Errno> {
+    pub fn seek(
+        &mut self,
+        delta: wasi::Filedelta,
+        whence: wasi::Whence,
+    ) -> Result<usize, wasi::Errno> {
         match self.theseus_file_or_dir.clone() {
             FileOrDir::File(file_ref) => {
                 let max_offset: usize = file_ref.lock().size();
 
-                // TODO: Do this way better
-                let mut new_offset_signed: i64 = match whence {
-                    wasi::WHENCE_CUR => ((self.offset as i64) + delta),
-                    wasi::WHENCE_END => ((max_offset as i64) + delta),
-                    wasi::WHENCE_SET => ((0 as i64) + delta),
+                let signed_to_file_offset = |x: i64| -> usize {
+                    cmp::min(usize::try_from(cmp::max(0, x)).unwrap(), max_offset)
+                };
+
+                let new_offset: usize = match whence {
+                    wasi::WHENCE_CUR => {
+                        signed_to_file_offset(i64::try_from(self.offset).unwrap() + delta)
+                    }
+                    wasi::WHENCE_END => {
+                        signed_to_file_offset(i64::try_from(max_offset).unwrap() + delta)
+                    }
+                    wasi::WHENCE_SET => signed_to_file_offset(delta),
                     _ => {
                         return Err(wasi::ERRNO_SPIPE);
                     }
                 };
 
-                if new_offset_signed < 0 {
-                    new_offset_signed = 0;
-                }
-                if new_offset_signed > max_offset as i64 {
-                    new_offset_signed = max_offset as i64;
-                }
-                self.offset = new_offset_signed as usize;
-                Ok(new_offset_signed as usize)
+                self.offset = new_offset;
+                Ok(new_offset)
             }
             FileOrDir::Dir { .. } => Err(wasi::ERRNO_ISDIR),
         }

@@ -7,7 +7,6 @@ description = "Interpreter for executing WASI-compliant WASM binaries"
 build = "../../build.rs"
 
 [dependencies]
-smallvec = "1.7.0"
 wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
 bare-io = { version = "0.2.1", features = [ "alloc" ] }
 
@@ -37,6 +36,3 @@ features = ["core"]
 [dependencies.hashbrown]
 version = "0.9.1"
 features = ["nightly"]
-
-[lib]
-crate-type = ["rlib"]

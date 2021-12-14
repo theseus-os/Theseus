@@ -4,7 +4,7 @@ use crate::HostExternals;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryFrom as _;
-use fs_node::{DirRef, File, FileOrDir, FileRef, FsNode, WeakDirRef};
+use fs_node::{DirRef, FileOrDir, FsNode};
 use wasmi::{MemoryRef, RuntimeArgs, RuntimeValue, Trap};
 
 fn args_or_env_sizes_get(
@@ -78,7 +78,7 @@ pub fn execute_system_call(
         SystemCall::ProcExit => {
             let exit_code: wasi::Exitcode = wasmi_args.nth_checked(0)?;
             h_ext.exit_code = exit_code;
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Err(Trap::new(wasmi::TrapKind::Unreachable))
         }
         SystemCall::FdClose => {
             let fd: wasi::Fd = wasmi_args.nth_checked(0).unwrap();
@@ -140,7 +140,7 @@ pub fn execute_system_call(
                 }
             };
 
-            let offset: i64 = wasmi_args.nth_checked(1).unwrap();
+            let offset: wasi::Filedelta = wasmi_args.nth_checked(1).unwrap();
             let whence: wasi::Whence = wasmi_args.nth_checked(2).unwrap();
 
             let new_offset: usize = match posix_node_or_stdio.seek(offset, whence) {
@@ -371,7 +371,19 @@ pub fn execute_system_call(
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
         SystemCall::FdFdstatSetFlags => {
-            panic!("unimplemented {:?}", system_call);
+            let posix_node: &mut PosixNode = {
+                let fd: wasi::Fd = wasmi_args.nth_checked(0).unwrap();
+                match fd_table.get_posix_node(fd) {
+                    Some(pn) => pn,
+                    None => {
+                        return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_BADF))));
+                    }
+                }
+            };
+
+            let flags: wasi::Fdflags = wasmi_args.nth_checked(1).unwrap();
+            posix_node.set_fd_flags(flags);
+
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
         SystemCall::ArgsSizesGet => {
@@ -385,7 +397,22 @@ pub fn execute_system_call(
             args_or_env_get(theseus_args, argv, argv_buf, memory)
         }
         SystemCall::ClockTimeGet => {
-            // TODO Actually implement
+            let clock_id: wasi::Clockid = wasmi_args.nth_checked(0).unwrap();
+            let _precision: wasi::Timestamp = wasmi_args.nth_checked(1).unwrap();
+
+            // TODO: Use rtc value converted to unix timestamp
+            let timestamp: wasi::Timestamp = match clock_id {
+                wasi::CLOCKID_MONOTONIC => unimplemented!(),
+                wasi::CLOCKID_PROCESS_CPUTIME_ID => unimplemented!(),
+                wasi::CLOCKID_REALTIME => 0,
+                wasi::CLOCKID_THREAD_CPUTIME_ID => unimplemented!(),
+                _ => {
+                    return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTSUP))));
+                }
+            };
+
+            let time_ptr: u32 = wasmi_args.nth_checked(2).unwrap();
+            memory.set(time_ptr, &timestamp.to_le_bytes()).unwrap();
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
     }

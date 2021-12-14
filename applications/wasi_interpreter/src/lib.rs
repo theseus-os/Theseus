@@ -75,12 +75,8 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>) -> isize {
         &module,
         |wasm_interface: &str, fn_name: &str, fn_signature: &Signature| {
             if wasm_interface.eq("wasi_snapshot_preview1") {
-                let system_call: SystemCall = match SystemCall::from_fn_name(fn_name) {
-                    Ok(v) => v,
-                    Err(_) => {
-                        return Err(());
-                    }
-                };
+                let system_call: SystemCall = SystemCall::from_fn_name(fn_name)
+                    .expect(&format!("Missing function {}", fn_name));
                 if fn_signature.eq(&system_call.signature()) {
                     return Ok(system_call.to_usize());
                 }
@@ -114,7 +110,7 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>) -> isize {
         theseus_args: theseus_args,
     };
 
-    // TODO: Possibly need to open a FD with name of '.' in order to give access to PWD?
+    // NOTE: Currently preopens root directory
     let root_fd: wasi::Fd = ext
         .fd_table
         .open_path(
@@ -128,10 +124,10 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>) -> isize {
         )
         .unwrap();
 
-    match state_machine.module.invoke_export("_start", &[], &mut ext) {
-        Ok(_) => {}
-        Err(_) => {}
-    };
+    state_machine
+        .module
+        .invoke_export("_start", &[], &mut ext)
+        .ok();
 
     ext.fd_table.close_fd(root_fd).unwrap();
 

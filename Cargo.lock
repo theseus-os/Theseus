@@ -2664,12 +2664,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smallvec"
-version = "1.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
-
-[[package]]
 name = "smoltcp"
 version = "0.5.0"
 source = "git+https://github.com/m-labs/smoltcp#0fedb1db9aa26712830822dd61f065deaa34d611"
@@ -3296,7 +3290,6 @@ dependencies = [
  "memfs",
  "path",
  "root",
- "smallvec",
  "task",
  "wasi",
  "wasmi",
@@ -3394,6 +3387,13 @@ dependencies = [
  "spawn",
  "spin 0.9.0",
  "window_inner",
+]
+
+[[package]]
+name = "wpee"
+version = "0.1.0"
+dependencies = [
+ "wasi_interpreter",
 ]
 
 [[package]]

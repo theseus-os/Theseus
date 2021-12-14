@@ -1,21 +1,13 @@
 use alloc::vec::Vec;
-use smallvec::SmallVec;
 use wasmi::{Signature, ValueType};
 
 pub fn get_signature(
     params: impl Iterator<Item = ValueType>,
     ret_ty: impl Into<Option<ValueType>>,
 ) -> Signature {
-    let params: SmallVec<[ValueType; 2]> = params.collect();
-    let ret_ty: Option<ValueType> = ret_ty.into();
-
     wasmi::Signature::new(
-        params
-            .iter()
-            .cloned()
-            .map(wasmi::ValueType::from)
-            .collect::<Vec<_>>(),
-        ret_ty.map(wasmi::ValueType::from),
+        params.map(wasmi::ValueType::from).collect::<Vec<_>>(),
+        ret_ty.into().map(wasmi::ValueType::from),
     )
 }
 
@@ -33,8 +25,7 @@ macro_rules! sig {
     }};
 }
 
-// TODO find macros to cut down on duplicated logic
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub enum SystemCall {
     ProcExit,
     FdClose,
