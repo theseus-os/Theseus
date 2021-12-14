@@ -13,10 +13,10 @@ fn args_or_env_sizes_get(
     argv_buf_size_out: u32,
     memory: &MemoryRef,
 ) -> Result<Option<RuntimeValue>, Trap> {
-    let argc: u32 = list.len() as u32;
-    let argv_buf_size: u32 = list.iter().fold(0u32, |s, a| {
-        s.saturating_add(a.len() as u32).saturating_add(1)
-    });
+    let argc: wasi::Size = list.len();
+    let argv_buf_size: wasi::Size = list
+        .iter()
+        .fold(0, |s, a| s.saturating_add(a.len()).saturating_add(1));
 
     memory.set(argc_out, &argc.to_le_bytes()).unwrap();
     memory
@@ -32,8 +32,8 @@ fn args_or_env_get(
     argv_buf: u32,
     memory: &MemoryRef,
 ) -> Result<Option<RuntimeValue>, Trap> {
-    let mut argv_pos = 0;
-    let mut argv_buf_pos = 0;
+    let mut argv_pos: u32 = 0;
+    let mut argv_buf_pos: u32 = 0;
 
     for arg in list.iter() {
         let arg = arg.as_bytes();
@@ -47,7 +47,9 @@ fn args_or_env_get(
         memory
             .set(argv_buf.checked_add(argv_buf_pos).unwrap(), &arg)
             .unwrap();
-        argv_buf_pos = argv_buf_pos.checked_add(arg.len() as u32).unwrap();
+        argv_buf_pos = argv_buf_pos
+            .checked_add(u32::try_from(arg.len()).unwrap())
+            .unwrap();
         memory
             .set(argv_buf.checked_add(argv_buf_pos).unwrap(), &[0])
             .unwrap();
@@ -65,20 +67,18 @@ pub fn execute_system_call(
     let ref mut memory = match h_ext.memory {
         Some(ref mut mem) => mem,
         None => {
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_IO))));
+            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOMEM))));
         }
     };
     let ref mut fd_table = h_ext.fd_table;
     let ref theseus_env_vars = h_ext.theseus_env_vars;
     let ref theseus_args = h_ext.theseus_args;
 
-    //    println!("Called {:?} with args: {:?}", system_call, wasmi_args);
-
     match system_call {
         SystemCall::ProcExit => {
             let exit_code: wasi::Exitcode = wasmi_args.nth_checked(0)?;
             h_ext.exit_code = exit_code;
-            Err(Trap::new(wasmi::TrapKind::Unreachable))
+            Ok(None)
         }
         SystemCall::FdClose => {
             let fd: wasi::Fd = wasmi_args.nth_checked(0).unwrap();
@@ -98,11 +98,14 @@ pub fn execute_system_call(
                 }
             };
 
-            let addr: u32 = wasmi_args.nth_checked(1).unwrap();
-            let num: u32 = wasmi_args.nth_checked(2).unwrap();
+            let iovs: u32 = wasmi_args.nth_checked(1).unwrap();
+            let iovs_len: wasi::Size = {
+                let len: u32 = wasmi_args.nth_checked(2).unwrap();
+                wasi::Size::try_from(len).unwrap()
+            };
 
-            let data_to_write = memory.get(addr as u32, 4 * num as usize * 2);
-            let mut data_out = Vec::with_capacity(num as usize);
+            let data_to_write = memory.get(iovs, 4 * iovs_len * 2);
+            let mut data_out = Vec::with_capacity(iovs_len);
 
             for elt in data_to_write.unwrap().chunks(4) {
                 data_out.push(u32::from_le_bytes(<[u8; 4]>::try_from(elt).unwrap()));
@@ -112,11 +115,11 @@ pub fn execute_system_call(
 
             for ptr_and_len in data_out.chunks(2) {
                 let ptr: u32 = ptr_and_len[0];
-                let len: usize = ptr_and_len[1] as usize;
+                let len: wasi::Size = wasi::Size::try_from(ptr_and_len[1]).unwrap();
 
                 let char_arr = memory.get(ptr, len).unwrap();
 
-                let bytes_written: usize = match posix_node_or_stdio.write(&char_arr) {
+                let bytes_written: wasi::Size = match posix_node_or_stdio.write(&char_arr) {
                     Ok(bytes_written) => bytes_written,
                     Err(wasi_errno) => {
                         return Ok(Some(RuntimeValue::I32(From::from(wasi_errno))));
@@ -143,8 +146,8 @@ pub fn execute_system_call(
             let offset: wasi::Filedelta = wasmi_args.nth_checked(1).unwrap();
             let whence: wasi::Whence = wasmi_args.nth_checked(2).unwrap();
 
-            let new_offset: usize = match posix_node_or_stdio.seek(offset, whence) {
-                Ok(new_offset) => new_offset,
+            let new_offset: wasi::Filesize = match posix_node_or_stdio.seek(offset, whence) {
+                Ok(new_offset) => wasi::Filesize::try_from(new_offset).unwrap(),
                 Err(wasi_errno) => {
                     return Ok(Some(RuntimeValue::I32(From::from(wasi_errno))));
                 }
@@ -165,32 +168,34 @@ pub fn execute_system_call(
                 }
             };
 
-            let addr: u32 = wasmi_args.nth_checked(1).unwrap();
-            let num: u32 = wasmi_args.nth_checked(2).unwrap();
+            let iovs: u32 = wasmi_args.nth_checked(1).unwrap();
+            let iovs_len: wasi::Size = {
+                let len: u32 = wasmi_args.nth_checked(2).unwrap();
+                wasi::Size::try_from(len).unwrap()
+            };
 
-            let list_buf = memory.get(addr as u32, 8 * num as usize);
-            let mut out_buffers_list = Vec::with_capacity(num as usize);
+            let list_buf = memory.get(iovs, 4 * iovs_len * 2);
+            let mut out_buffers_list = Vec::with_capacity(iovs_len);
 
             for elt in list_buf.unwrap().chunks(4) {
                 out_buffers_list.push(u32::from_le_bytes(<[u8; 4]>::try_from(elt).unwrap()));
             }
 
-            let mut total_read: usize = 0;
+            let mut total_read: wasi::Size = 0;
 
             for ptr_and_len in out_buffers_list.chunks(2) {
                 let ptr: u32 = ptr_and_len[0];
-                let len: usize = ptr_and_len[1] as usize;
+                let len: wasi::Size = wasi::Size::try_from(ptr_and_len[1]).unwrap();
 
                 let ref mut read_buf = vec![0; len];
 
-                let bytes_read: usize = match posix_node_or_stdio.read(read_buf) {
+                let bytes_read: wasi::Size = match posix_node_or_stdio.read(read_buf) {
                     Ok(bytes_written) => bytes_written,
                     Err(wasi_errno) => {
                         return Ok(Some(RuntimeValue::I32(From::from(wasi_errno))));
                     }
                 };
 
-                //println!("{}", String::from_utf8_lossy(&read_buf[0..bytes_read]));
                 memory.set(ptr, &read_buf[0..bytes_read]).unwrap();
                 total_read = total_read.checked_add(bytes_read).unwrap();
             }
@@ -210,7 +215,7 @@ pub fn execute_system_call(
                 }
             };
 
-            let stat = match posix_node.theseus_file_or_dir() {
+            let stat: wasi::Fdstat = match posix_node.theseus_file_or_dir() {
                 FileOrDir::Dir { .. } => wasi::Fdstat {
                     fs_filetype: wasi::FILETYPE_DIRECTORY,
                     fs_flags: posix_node.fd_flags(),
@@ -251,14 +256,14 @@ pub fn execute_system_call(
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
         SystemCall::EnvironSizesGet => {
-            let envc_out: u32 = wasmi_args.nth_checked(0).unwrap();
-            let envv_buf_size_out: u32 = wasmi_args.nth_checked(1).unwrap();
-            args_or_env_sizes_get(theseus_env_vars, envc_out, envv_buf_size_out, memory)
+            let argc_ptr: u32 = wasmi_args.nth_checked(0).unwrap();
+            let argv_buf_size_ptr: u32 = wasmi_args.nth_checked(1).unwrap();
+            args_or_env_sizes_get(theseus_env_vars, argc_ptr, argv_buf_size_ptr, memory)
         }
         SystemCall::EnvironGet => {
-            let envv: u32 = wasmi_args.nth_checked(0).unwrap();
-            let envv_buf: u32 = wasmi_args.nth_checked(1).unwrap();
-            args_or_env_get(theseus_env_vars, envv, envv_buf, memory)
+            let environ_ptr: u32 = wasmi_args.nth_checked(0).unwrap();
+            let environ_buf_ptr: u32 = wasmi_args.nth_checked(1).unwrap();
+            args_or_env_get(theseus_env_vars, environ_ptr, environ_buf_ptr, memory)
         }
         SystemCall::FdPrestatGet => {
             let posix_node: &mut PosixNode = {
@@ -273,19 +278,22 @@ pub fn execute_system_call(
 
             let pr_name_len: u32 = match posix_node.theseus_file_or_dir() {
                 FileOrDir::File { .. } => {
-                    return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTSUP))));
+                    return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
                 FileOrDir::Dir { .. } => {
-                    posix_node.theseus_file_or_dir().get_name().chars().count() as u32
+                    u32::try_from(posix_node.theseus_file_or_dir().get_name().chars().count())
+                        .unwrap()
                 }
             };
 
-            let prestat_buf: u32 = wasmi_args.nth_checked(1).unwrap();
-            memory.set(prestat_buf, &[0; 8]).unwrap();
-            memory.set(prestat_buf, &[wasi::PREOPENTYPE_DIR]).unwrap();
+            let prestat_buf_ptr: u32 = wasmi_args.nth_checked(1).unwrap();
+            memory.set(prestat_buf_ptr, &[0; 8]).unwrap();
+            memory
+                .set(prestat_buf_ptr, &[wasi::PREOPENTYPE_DIR])
+                .unwrap();
             memory
                 .set(
-                    prestat_buf.checked_add(4).unwrap(),
+                    prestat_buf_ptr.checked_add(4).unwrap(),
                     &pr_name_len.to_le_bytes(),
                 )
                 .unwrap();
@@ -305,16 +313,19 @@ pub fn execute_system_call(
 
             let name = match posix_node.theseus_file_or_dir() {
                 FileOrDir::File { .. } => {
-                    return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTSUP))));
+                    return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
                 FileOrDir::Dir { .. } => posix_node.theseus_file_or_dir().get_name(),
             };
 
             let path_out_buf: u32 = wasmi_args.nth_checked(1).unwrap();
-            let path_out_len: u32 = wasmi_args.nth_checked(2).unwrap();
+            let path_out_len: wasi::Size = {
+                let len: u32 = wasmi_args.nth_checked(2).unwrap();
+                wasi::Size::try_from(len).unwrap()
+            };
 
             memory
-                .set(path_out_buf, &name.as_bytes()[..path_out_len as usize])
+                .set(path_out_buf, &name.as_bytes()[..path_out_len])
                 .unwrap();
 
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
@@ -340,9 +351,12 @@ pub fn execute_system_call(
             let lookup_flags: wasi::Lookupflags = wasmi_args.nth_checked(1).unwrap();
 
             let path = {
-                let path_buf: u32 = wasmi_args.nth_checked(2).unwrap();
-                let path_buf_len: u32 = wasmi_args.nth_checked(3).unwrap();
-                let path_utf8 = memory.get(path_buf, path_buf_len as usize).unwrap();
+                let path_buf_ptr: u32 = wasmi_args.nth_checked(2).unwrap();
+                let path_buf_len: wasi::Size = {
+                    let len: u32 = wasmi_args.nth_checked(3).unwrap();
+                    wasi::Size::try_from(len).unwrap()
+                };
+                let path_utf8 = memory.get(path_buf_ptr, path_buf_len).unwrap();
                 String::from_utf8(path_utf8).unwrap()
             };
 
@@ -387,14 +401,14 @@ pub fn execute_system_call(
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
         }
         SystemCall::ArgsSizesGet => {
-            let argc_out: u32 = wasmi_args.nth_checked(0).unwrap();
-            let argv_buf_size_out: u32 = wasmi_args.nth_checked(1).unwrap();
-            args_or_env_sizes_get(theseus_args, argc_out, argv_buf_size_out, memory)
+            let argc_ptr: u32 = wasmi_args.nth_checked(0).unwrap();
+            let argv_buf_size_ptr: u32 = wasmi_args.nth_checked(1).unwrap();
+            args_or_env_sizes_get(theseus_args, argc_ptr, argv_buf_size_ptr, memory)
         }
         SystemCall::ArgsGet => {
-            let argv: u32 = wasmi_args.nth_checked(0).unwrap();
-            let argv_buf: u32 = wasmi_args.nth_checked(1).unwrap();
-            args_or_env_get(theseus_args, argv, argv_buf, memory)
+            let argv_ptr: u32 = wasmi_args.nth_checked(0).unwrap();
+            let argv_buf_ptr: u32 = wasmi_args.nth_checked(1).unwrap();
+            args_or_env_get(theseus_args, argv_ptr, argv_buf_ptr, memory)
         }
         SystemCall::ClockTimeGet => {
             let clock_id: wasi::Clockid = wasmi_args.nth_checked(0).unwrap();

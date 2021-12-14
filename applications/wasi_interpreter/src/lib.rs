@@ -8,7 +8,6 @@ mod wasmi_state_machine;
 
 #[macro_use]
 extern crate alloc;
-#[macro_use]
 extern crate app_io;
 extern crate root;
 extern crate task;
@@ -16,6 +15,7 @@ extern crate wasmi;
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::convert::TryFrom as _;
 use posix_file_system::FileDescriptorTable;
 use wasi_definitions::SystemCall;
 use wasmi::{
@@ -110,7 +110,7 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>) -> isize {
         theseus_args: theseus_args,
     };
 
-    // NOTE: Currently preopens root directory
+    // NOTE: Currently preopens root directory by default
     let root_fd: wasi::Fd = ext
         .fd_table
         .open_path(
@@ -131,5 +131,5 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>) -> isize {
 
     ext.fd_table.close_fd(root_fd).unwrap();
 
-    ext.exit_code as isize
+    isize::try_from(ext.exit_code).unwrap()
 }

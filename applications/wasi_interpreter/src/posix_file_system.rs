@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use bare_io::{Read, Write};
-use core::{cmp, convert::TryFrom as _, fmt};
+use core::{cmp, convert::TryFrom as _};
 use fs_node::DirRef;
 use fs_node::{FileOrDir, FileRef};
 use hashbrown::HashMap;
@@ -23,11 +23,11 @@ impl PosixNodeOrStdio {
             PosixNodeOrStdio::Stdin => Err(wasi::ERRNO_NOTSUP),
             PosixNodeOrStdio::Stdout => match app_io::stdout().unwrap().lock().write_all(buffer) {
                 Ok(_) => Ok(buffer.len()),
-                Err(_) => Err(wasi::ERRNO_NOBUFS),
+                Err(_) => Err(wasi::ERRNO_IO),
             },
             PosixNodeOrStdio::Stderr => match app_io::stderr().unwrap().lock().write_all(buffer) {
                 Ok(_) => Ok(buffer.len()),
-                Err(_) => Err(wasi::ERRNO_NOBUFS),
+                Err(_) => Err(wasi::ERRNO_IO),
             },
             PosixNodeOrStdio::Inode(posix_node) => posix_node.write(buffer),
         }
@@ -37,7 +37,7 @@ impl PosixNodeOrStdio {
         match self {
             PosixNodeOrStdio::Stdin => match app_io::stdin().unwrap().lock().read(buffer) {
                 Ok(bytes_read) => Ok(bytes_read),
-                Err(_) => Err(wasi::ERRNO_NOBUFS),
+                Err(_) => Err(wasi::ERRNO_IO),
             },
             PosixNodeOrStdio::Stdout => Err(wasi::ERRNO_NOTSUP),
             PosixNodeOrStdio::Stderr => Err(wasi::ERRNO_NOTSUP),

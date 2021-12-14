@@ -3,7 +3,7 @@ use core::{cell::RefCell, convert::TryFrom as _};
 
 use wasmi::{Module, Signature};
 
-/// Module for parsing wasm binary module (from Redshirt)
+/// Module for parsing wasm binary into wasmi state machine (from Redshirt)
 
 #[derive(Debug)]
 pub enum NewErr {
