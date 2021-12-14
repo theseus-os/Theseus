@@ -8,7 +8,7 @@ build = "../../build.rs"
 [dependencies]
 log = "0.4.8"
 spin = "0.9.0"
-bare-io = { version = "0.2.1", features = [ "alloc" ] }
+core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
 x86_64 = { path = "../../libs/x86_64" }
 static_assertions = "1.1.0"
 

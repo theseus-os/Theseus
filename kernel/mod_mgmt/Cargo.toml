@@ -38,8 +38,8 @@ path = "../crate_metadata"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.memory_initialization]
-path = "../memory_initialization"
+[dependencies.bootloader_modules]
+path = "../bootloader_modules"
 
 [dependencies.root]
 path = "../root"

@@ -69,7 +69,8 @@ sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qe
     ```
 
 If you're on WSL, also do the following steps:
-  * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
+  * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/) or [VcXsvr](https://sourceforge.net/projects/vcxsrv/).
+    * You'll likely need to invoke those X servers with the `-ac` argument (or use the GUI to disable access control). 
   * Setup an X display as follows:
     * on original WSL (version 1), run:
       ```sh
@@ -81,7 +82,7 @@ If you're on WSL, also do the following steps:
       ```
 
     You'll need to do this each time you open up a new WSL terminal, so it's best to add it to the end of your `.bashrc` or `.profile` file in your `$HOME` directory.
-  * If you get an error like `Could not initialize SDL (No available video device) ...`, then make sure that your X Server is running and that you have set the `DISPLAY` environment variable above.
+  * If you get an error like `Could not initialize SDL (No available video device) ...` or any type of GTK or video device error, then make sure that your X Server is running and that you have set the `DISPLAY` environment variable above.
   * **NOTE**: WSL and WSL2 do not currently support using KVM.
 
 ### Building on MacOS

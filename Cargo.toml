@@ -22,6 +22,10 @@ exclude = [
 	"tools",
 	"userspace",
 
+	## Exclude *all* ports for now, as only the ones requested by core Theseus crates
+	## should be included in the workspace build by default.
+	"ports",
+
 	## exclude tlibc, since we currently build it separately.
 	"tlibc",
 
@@ -57,6 +61,10 @@ getopts = { git = "https://github.com/theseus-os/getopts" }
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
+
+### Patch `libc` so we can use libc-specific types when using `cfg(target-os = "theseus")`.
+libc = { path = "ports/libc" }
+
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!

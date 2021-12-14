@@ -22,7 +22,7 @@ extern crate cbitset;
 extern crate memory;
 extern crate task;
 extern crate cstr_core;
-extern crate bare_io;
+extern crate core2;
 
 
 mod errno;

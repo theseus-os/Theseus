@@ -6,7 +6,7 @@ description = "a simple app for testing serial port I/O using higher-level I/O t
 build = "../../build.rs"
 
 [dependencies]
-bare-io = { version = "0.2.1", features = [ "alloc" ] }
+core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
 log = "0.4.8"
 
 [dependencies.irq_safety]
