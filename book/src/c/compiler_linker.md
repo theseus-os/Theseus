@@ -49,5 +49,3 @@ This only applies for sections that already exist in Theseus; references to new 
 The relocation information is encoded into the ELF file itself as standard `.rela.*` sections via the `--emit-relocs` linker argument shown above.
 
 This procedure is currently performed by the `loadc` application; it also handles loading the ELF executable segments (program headers) and managing their metadata. 
-
-<!-- cspell:ignore crtbegin, crtend, fdata, ffunction, mcmodel, nostartfiles, nostdlib   -->

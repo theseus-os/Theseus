@@ -4,16 +4,16 @@ Heaps are used to dynamically allocate chunks of memory smaller than the granula
 > Note: One can request a large allocation from the heap, but in Theseus it will be backed by an individually-created `MappedPages` object of newly-allocated pages and frames that are mapped to one another, so it's generally less efficient to use the heap for large allocations.
 
 In Theseus, the primary purpose of the heap is to enable the usage of Rust's [`alloc`] types, e.g., `Box`, `Arc`, `Vec`, and other dynamically-allocated collections types.
-Heap allocators must implement Rust's [`GlobalAlloc`] trait in order to be used as the backing allocator behind these alloc types.
+Heap allocators must implement Rust's [`GlobalAlloc`] trait in order to be used as the backing allocator behind these `alloc` types.
  how we integrate that with Rust's (old) requirement of a single global allocator.
 
 ## Overview of Relevant Crates
 * [`heap`]: the default heap implementation that offers a static singleton fixed-size block allocator.
     * This is the first heap initialized and created during early OS boot.
     * [`block_allocator`]: the underlying allocator implementation that optimizes allocations of common power-of-two sizes, e.g., 8 bytes, 32 bytes, etc.
-        * Uses the [linked_list_allocator] crate as a fallback for uncommon allocation sizes.
+        * Uses the [`linked_list_allocator`] crate as a fallback for uncommon allocation sizes.
 * [`multiple_heaps`]: a more complex allocator that implements multiple heaps of arbitrary sizes and usage patterns.
-    * Each internal heap instance is based on a zone allocator, which are modified versions of slab allocators from the [slabmalloc] crate. 
+    * Each internal heap instance is based on a zone allocator, which are modified versions of slab allocators from the [`slabmalloc`] crate. 
     * Unused heap space can easily be transferred among different internal heap instances for rapid, efficient heap growth.
     * Currently, one internal heap is created for each CPU core, with the core ID being used to identify and select which heap should be used for allocation.
     * It is trivially easy to use `multiple_heaps` in a different way, such as per-task heaps or per-namespace heaps.
@@ -40,8 +40,8 @@ Another unique aspect of heaps in Theseus is that all entities across the system
 [`GlobalAlloc`]: https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html
 [`heap`]: https://theseus-os.github.io/Theseus/doc/heap/index.html
 [`block_allocator`]: https://theseus-os.github.io/Theseus/doc/block_allocator/struct.FixedSizeBlockAllocator.html
-[linked_list_allocator]: https://crates.io/crates/linked_list_allocator
-[slabmalloc]: https://crates.io/crates/slabmalloc
+[`linked_list_allocator`]: https://crates.io/crates/linked_list_allocator
+[`slabmalloc`]: https://crates.io/crates/slabmalloc
 [exchange heaps]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/EuroSys2007_SealedProcesses.pdf
 [`multiple_heaps`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/index.html
 [`switch_to_multiple_heaps()`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/fn.switch_to_multiple_heaps.html

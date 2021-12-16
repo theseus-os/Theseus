@@ -49,5 +49,3 @@ To change `minicom`'s default behavior, you can do the following:
 
 Either of these serial ports can be changed in QEMU using the environment variables `SERIAL1` and `SERIAL2` respectively, though again, we recommend only using `SERIAL2` in virtual environments.
 In real hardware, where there is only one serial port and therefore COM1 must be used, you can disable the log or initialize it with a different serial port, e.g., COM2, to avoid polluting the terminal emulator connected to COM1 with system log printouts.
-
-<!-- cspell:ignore microcontrollers, picocom, minicom -->
