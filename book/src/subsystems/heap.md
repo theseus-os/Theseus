@@ -11,7 +11,7 @@ Heap allocators must implement Rust's [`GlobalAlloc`] trait in order to be used 
 * [`heap`]: the default heap implementation that offers a static singleton fixed-size block allocator.
     * This is the first heap initialized and created during early OS boot.
     * [`block_allocator`]: the underlying allocator implementation that optimizes allocations of common power-of-two sizes, e.g., 8 bytes, 32 bytes, etc.
-        * Uses the [linked_list_allocator] crate as a fallback for uncommon allocation sizes.
+        * Uses the [`linked_list_allocator`] crate as a fallback for uncommon allocation sizes.
 * [`multiple_heaps`]: a more complex allocator that implements multiple heaps of arbitrary sizes and usage patterns.
     * Each internal heap instance is based on a zone allocator, which are modified versions of slab allocators from the [`slabmalloc`] crate. 
     * Unused heap space can easily be transferred among different internal heap instances for rapid, efficient heap growth.
@@ -40,8 +40,8 @@ Another unique aspect of heaps in Theseus is that all entities across the system
 [`GlobalAlloc`]: https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html
 [`heap`]: https://theseus-os.github.io/Theseus/doc/heap/index.html
 [`block_allocator`]: https://theseus-os.github.io/Theseus/doc/block_allocator/struct.FixedSizeBlockAllocator.html
-[linked_list_allocator]: https://crates.io/crates/linked_list_allocator
-[slabmalloc]: https://crates.io/crates/slabmalloc
+[`linked_list_allocator`]: https://crates.io/crates/linked_list_allocator
+[`slabmalloc`]: https://crates.io/crates/slabmalloc
 [exchange heaps]: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/EuroSys2007_SealedProcesses.pdf
 [`multiple_heaps`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/index.html
 [`switch_to_multiple_heaps()`]: https://theseus-os.github.io/Theseus/doc/multiple_heaps/fn.switch_to_multiple_heaps.html

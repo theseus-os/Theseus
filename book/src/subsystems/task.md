@@ -197,7 +197,7 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [exit value]: https://theseus-os.github.io/Theseus/doc/task/enum.ExitValue.html
 [`spawn`]: https://theseus-os.github.io/Theseus/doc/spawn/index.html
 [stack]: https://theseus-os.github.io/Theseus/doc/stack/struct.Stack.html
-[newtype]: https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction
+[`newtype`]: https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction
 [`TaskLocalData`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/task/src/lib.rs#L1085
 [`context_switch`]: https://theseus-os.github.io/Theseus/doc/context_switch/index.html
 [`context_switch()`]: https://theseus-os.github.io/Theseus/doc/context_switch_regular/fn.context_switch_regular.html
