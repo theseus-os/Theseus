@@ -211,7 +211,7 @@ We are also careful to correctly specify the public visibility of state items wi
 <h3 id="the-taskref-type"><a class="header" href="#the-taskref-type">The <code>TaskRef</code> type</a></h3>
 <p>Tasks frequently need to be shared across many entities and subsystems throughout Theseus. 
 To accommodate this, Theseus offers the <a href="https://theseus-os.github.io/Theseus/doc/task/struct.TaskRef.html"><code>TaskRef</code></a> type, which is effectively a shared reference to a <code>Task</code>, i.e., an <code>Arc&lt;Task&gt;</code>. 
-There are several reasons that we introduce a dedicated <a href="https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction">newtype</a> instead of using an <code>Arc&lt;Task&gt;</code> directly:</p>
+There are several reasons that we introduce a dedicated <a href="https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction"><code>newtype</code></a> instead of using an <code>Arc&lt;Task&gt;</code> directly:</p>
 <ul>
 <li>To clarify all code related to task management.</li>
 <li>To control the visibility (public vs. private) of items in the Task struct.</li>
@@ -333,7 +333,6 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 True concurrency can be achieved on a multiprocessor machine, in which different tasks execute simultaneously on different cores.</p>
 </div>
 <!-- Links below -->
-<!-- cspell:ignore runnability, TASKLIST, newtype, lapic  -->
 
                     </main>
 

@@ -734,7 +734,7 @@ Add the following lines to that new file and save it:</p>
 MULTILIB_DIRNAMES += no-red-zone
 </code></pre>
 <p>Yes, even though we're building for <code>x86_64</code>, we put it in the original x86 architecture config folder called <code>i386</code>.</p>
-<p>Then, instruct gcc's build process to use that new multilib configuration. Open the file <code>$SRC/gcc-10.2.0/gcc/config</code> and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):</p>
+<p>Then, instruct gcc's build process to use that new <code>multilib</code> configuration. Open the file <code>$SRC/gcc-10.2.0/gcc/config</code> and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):</p>
 <pre><code>x86_64-*-elf*)
 	tm_file=&quot;${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h&quot;
 	;;
@@ -747,7 +747,7 @@ MULTILIB_DIRNAMES += no-red-zone
 </code></pre>
 <p><strong>Note</strong>: the indentation before <code>tmake_file</code> must be a TAB, not spaces. </p>
 <h3 id="building-gcc-again-with-no-red-zone"><a class="header" href="#building-gcc-again-with-no-red-zone">Building GCC again with no red zone</a></h3>
-<p>Go back to the build directory and reconfigure and re-make libgcc:</p>
+<p>Go back to the build directory and reconfigure and re-make <code>libgcc</code>:</p>
 <pre><code class="language-sh">cd $SRC/cross-build-gcc
 ../gcc-10.2.0/configure --target=$TARGET --prefix=&quot;$PREFIX&quot; --disable-nls --enable-languages=c,c++ --without-headers
 make all-gcc -j$(nproc)
@@ -771,7 +771,6 @@ $DEST/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone/libgcc.a
 <li>use the <code>x86_64-elf-gcc</code> executable that now resides in <code>$DEST/cross</code> </li>
 <li>specify the <code>-mno-red-zone</code> flag, either on the command line or as part of <code>LDFLAGS</code></li>
 </ol>
-<!-- cspell:ignore dbxelf, elfos, ldflags, libgcc, libgmp, libmpc, libmpfr, multilib, newlib, nproc, stdint, texinfo, tmake, werror -->
 <div style="break-before: page; page-break-before: always;"></div><h1 id="tlibc-compiling-and-linking-theseuss-libc"><a class="header" href="#tlibc-compiling-and-linking-theseuss-libc"><code>tlibc</code>: Compiling and Linking Theseus's libc</a></h1>
 <blockquote>
 <p><em>Warning:</em> Support for building C programs atop Theseus is experimental and liable to change at any moment.</p>
@@ -839,7 +838,6 @@ Using those sections would result in multiple copies of data that's supposed to 
 This only applies for sections that already exist in Theseus; references to new sections that are unique to the executable are kept intact, of course.
 The relocation information is encoded into the ELF file itself as standard <code>.rela.*</code> sections via the <code>--emit-relocs</code> linker argument shown above.</p>
 <p>This procedure is currently performed by the <code>loadc</code> application; it also handles loading the ELF executable segments (program headers) and managing their metadata. </p>
-<!-- cspell:ignore crtbegin, crtend, fdata, ffunction, mcmodel, nostartfiles, nostdlib   -->
 <div style="break-before: page; page-break-before: always;"></div><h1 id="overview-of-key-subsystems"><a class="header" href="#overview-of-key-subsystems">Overview of Key Subsystems</a></h1>
 <p>Like every OS, Theseus's functionality can be categorized into multiple <em>subsystems</em>, which each implement a different core OS feature. 
 This section covers the design and implementation of key subsystems in Theseus, such as memory management, multitasking support, graphical displays, etc.</p>
@@ -1064,7 +1062,7 @@ We refer to this as exclusive mappings, and they are realized via a combination 
 <p>Note: One can request a large allocation from the heap, but in Theseus it will be backed by an individually-created <code>MappedPages</code> object of newly-allocated pages and frames that are mapped to one another, so it's generally less efficient to use the heap for large allocations.</p>
 </blockquote>
 <p>In Theseus, the primary purpose of the heap is to enable the usage of Rust's <a href="https://doc.rust-lang.org/alloc/"><code>alloc</code></a> types, e.g., <code>Box</code>, <code>Arc</code>, <code>Vec</code>, and other dynamically-allocated collections types.
-Heap allocators must implement Rust's <a href="https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html"><code>GlobalAlloc</code></a> trait in order to be used as the backing allocator behind these alloc types.
+Heap allocators must implement Rust's <a href="https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html"><code>GlobalAlloc</code></a> trait in order to be used as the backing allocator behind these <code>alloc</code> types.
 how we integrate that with Rust's (old) requirement of a single global allocator.</p>
 <h2 id="overview-of-relevant-crates"><a class="header" href="#overview-of-relevant-crates">Overview of Relevant Crates</a></h2>
 <ul>
@@ -1073,14 +1071,14 @@ how we integrate that with Rust's (old) requirement of a single global allocator
 <li>This is the first heap initialized and created during early OS boot.</li>
 <li><a href="https://theseus-os.github.io/Theseus/doc/block_allocator/struct.FixedSizeBlockAllocator.html"><code>block_allocator</code></a>: the underlying allocator implementation that optimizes allocations of common power-of-two sizes, e.g., 8 bytes, 32 bytes, etc.
 <ul>
-<li>Uses the <a href="https://crates.io/crates/linked_list_allocator">linked_list_allocator</a> crate as a fallback for uncommon allocation sizes.</li>
+<li>Uses the <a href="https://crates.io/crates/linked_list_allocator"><code>linked_list_allocator</code></a> crate as a fallback for uncommon allocation sizes.</li>
 </ul>
 </li>
 </ul>
 </li>
 <li><a href="https://theseus-os.github.io/Theseus/doc/multiple_heaps/index.html"><code>multiple_heaps</code></a>: a more complex allocator that implements multiple heaps of arbitrary sizes and usage patterns.
 <ul>
-<li>Each internal heap instance is based on a zone allocator, which are modified versions of slab allocators from the <a href="https://crates.io/crates/slabmalloc">slabmalloc</a> crate. </li>
+<li>Each internal heap instance is based on a zone allocator, which are modified versions of slab allocators from the <a href="https://crates.io/crates/slabmalloc"><code>slabmalloc</code></a> crate. </li>
 <li>Unused heap space can easily be transferred among different internal heap instances for rapid, efficient heap growth.</li>
 <li>Currently, one internal heap is created for each CPU core, with the core ID being used to identify and select which heap should be used for allocation.</li>
 <li>It is trivially easy to use <code>multiple_heaps</code> in a different way, such as per-task heaps or per-namespace heaps.</li>
@@ -1164,7 +1162,7 @@ We are also careful to correctly specify the public visibility of state items wi
 <h3 id="the-taskref-type"><a class="header" href="#the-taskref-type">The <code>TaskRef</code> type</a></h3>
 <p>Tasks frequently need to be shared across many entities and subsystems throughout Theseus. 
 To accommodate this, Theseus offers the <a href="https://theseus-os.github.io/Theseus/doc/task/struct.TaskRef.html"><code>TaskRef</code></a> type, which is effectively a shared reference to a <code>Task</code>, i.e., an <code>Arc&lt;Task&gt;</code>. 
-There are several reasons that we introduce a dedicated <a href="https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction">newtype</a> instead of using an <code>Arc&lt;Task&gt;</code> directly:</p>
+There are several reasons that we introduce a dedicated <a href="https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction"><code>newtype</code></a> instead of using an <code>Arc&lt;Task&gt;</code> directly:</p>
 <ul>
 <li>To clarify all code related to task management.</li>
 <li>To control the visibility (public vs. private) of items in the Task struct.</li>
@@ -1286,7 +1284,6 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 True concurrency can be achieved on a multiprocessor machine, in which different tasks execute simultaneously on different cores.</p>
 </div>
 <!-- Links below -->
-<!-- cspell:ignore runnability, TASKLIST, newtype, lapic  -->
 <div style="break-before: page; page-break-before: always;"></div><h1 id="invariants-upheld-in-task-management"><a class="header" href="#invariants-upheld-in-task-management">Invariants Upheld in Task Management</a></h1>
 <p>Theseus enforces several key invariants related to task management in order to empower the compiler to uphold memory safety and prevent resource leaks throughout the task lifecycle.</p>
 <p>All task lifecycle functions leverage the same set of generic type parameters. 
@@ -1349,7 +1346,7 @@ and Timothy Roscoe. <em>&quot;A fork() in the road&quot;</em>. In Proceedings of
 <h2 id="design"><a class="header" href="#design">Design</a></h2>
 <p>Typically, both the application that owns/creates a window and the window manager that controls that window need to access it jointly. The application needs to display its content into the main part of the window, and the window manager needs information about the location and depth ordering of all windows to render them. </p>
 <p>To share a window between an application and the window manager, the application holds a strong reference (<code>Arc</code>) to the window, while the window manager holds a weak reference (<code>Weak</code>) to that same window. This allows the window manager to control an manage a window without conceptually owning it.</p>
-<p>We use a <code>Mutex</code> to wrap each window to allow the application task and window manager task to safely access it jointly. However, <code>Mutex</code> introduces the possibility of deadlock: when an application wants to access its window, it must acquire the Mutex lock, operate on the window, and then release the lock. If the application doesn't release the lock on its window, the window manager will be forced to block until the lock is released, preventing it from performing typical operations like switching between windows, delivering events, or deleting windows.</p>
+<p>We use a <code>Mutex</code> to wrap each window to allow the application task and window manager task to safely access it jointly. However, <code>Mutex</code> introduces the possibility of deadlock: when an application wants to access its window, it must acquire the <code>Mutex</code> lock, operate on the window, and then release the lock. If the application doesn't release the lock on its window, the window manager will be forced to block until the lock is released, preventing it from performing typical operations like switching between windows, delivering events, or deleting windows.</p>
 <p>To solve this problem, we define two structures: <code>Window</code> and <code>WindowInner</code>. <code>WindowInner</code> only contains the information required by the window manager. The window manager holds a list of references to <code>WindowInner</code> objects, while only the application owns the outer <code>Window</code> object (which itself does contain a reference to the underlying WM-owned <code>WindowInner</code> object. The <code>Window</code> struct also contains other application-relevant states that describe the window.</p>
 <h2 id="the-windowinner-structure"><a class="header" href="#the-windowinner-structure">The <code>WindowInner</code> structure</a></h2>
 <p>The <code>window_inner</code> crate defines a <code>WindowInner</code> structure. It has states and methods of displaying the window on the screen.</p>
@@ -1519,7 +1516,7 @@ echo 1 &gt; /sys/bus/pci/rescan
 <p>Finally, give access to the current user via this command:</p>
 <pre><code class="language-sh">chown $USER /dev/vfio/$group_number
 </code></pre>
-<!-- cspell:ignore devsel, iommu, lspci, Mellanox, NUMA, VFIO -->
+<!-- cspell:ignore iommu, Mellanox, VFIO -->
 <div style="break-before: page; page-break-before: always;"></div><h1 id="running-theseus-on-headless-systems-interactively"><a class="header" href="#running-theseus-on-headless-systems-interactively">Running Theseus on Headless Systems Interactively</a></h1>
 <p>By default, Theseus expects to run in a standard desktop environment with a basic graphical display (monitor) and a real keyboard (and optionally, a mouse). 
 For interacting with the system, Theseus uses the keyboard as its primary input and the graphical display as its primary output.</p>
@@ -1570,7 +1567,6 @@ To change <code>minicom</code>'s default behavior, you can do the following:</p>
 </ul>
 <p>Either of these serial ports can be changed in QEMU using the environment variables <code>SERIAL1</code> and <code>SERIAL2</code> respectively, though again, we recommend only using <code>SERIAL2</code> in virtual environments.
 In real hardware, where there is only one serial port and therefore COM1 must be used, you can disable the log or initialize it with a different serial port, e.g., COM2, to avoid polluting the terminal emulator connected to COM1 with system log printouts.</p>
-<!-- cspell:ignore microcontrollers, picocom, minicom -->
 <div style="break-before: page; page-break-before: always;"></div><h1 id="booting-theseus-from-a-usb-drive"><a class="header" href="#booting-theseus-from-a-usb-drive">Booting Theseus from a USB drive</a></h1>
 <p>To boot over USB, simply run</p>
 <pre><code class="language-sh">make boot usb=sdc
@@ -1594,7 +1590,7 @@ Add the following lines:</p>
 <pre><code>RUN_DAEMON=&quot;yes&quot;
 OPTIONS=&quot;-l -s /var/lib/tftpboot&quot;
 </code></pre>
-<p>Then, edit the inetd configuration file by opening the editor:
+<p>Then, edit the <code>inetd</code> configuration file by opening the editor:
 <code>sudo nano /etc/inetd.conf</code>
 And adding:
 <code>tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot</code></p>
@@ -1656,7 +1652,6 @@ And add Theseus as a menu option by adding the following:</p>
 <h2 id="subsequent-pxe-uses"><a class="header" href="#subsequent-pxe-uses">Subsequent PXE Uses</a></h2>
 <p>After setting up PXE the first time, you can run <code>make pxe</code> to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier:
 <code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code></p>
-<!-- cspell:ignore bootp, dgram, dhcpd, inetd, inetutils, initrd, memdisk, netmask, pxelinux, tftpboot, tftpd, xzvf -->
 <div style="break-before: page; page-break-before: always;"></div><h1 id="the-golden-rule-of-software-development"><a class="header" href="#the-golden-rule-of-software-development">The Golden Rule of Software Development</a></h1>
 <p><em>Code for others how you wish they would code for you.</em></p>
 <p>What does this mean? You should adhere to the following principles.</p>

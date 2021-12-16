@@ -242,7 +242,7 @@ Add the following lines to that new file and save it:</p>
 MULTILIB_DIRNAMES += no-red-zone
 </code></pre>
 <p>Yes, even though we're building for <code>x86_64</code>, we put it in the original x86 architecture config folder called <code>i386</code>.</p>
-<p>Then, instruct gcc's build process to use that new multilib configuration. Open the file <code>$SRC/gcc-10.2.0/gcc/config</code> and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):</p>
+<p>Then, instruct gcc's build process to use that new <code>multilib</code> configuration. Open the file <code>$SRC/gcc-10.2.0/gcc/config</code> and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):</p>
 <pre><code>x86_64-*-elf*)
 	tm_file=&quot;${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h&quot;
 	;;
@@ -255,7 +255,7 @@ MULTILIB_DIRNAMES += no-red-zone
 </code></pre>
 <p><strong>Note</strong>: the indentation before <code>tmake_file</code> must be a TAB, not spaces. </p>
 <h3 id="building-gcc-again-with-no-red-zone"><a class="header" href="#building-gcc-again-with-no-red-zone">Building GCC again with no red zone</a></h3>
-<p>Go back to the build directory and reconfigure and re-make libgcc:</p>
+<p>Go back to the build directory and reconfigure and re-make <code>libgcc</code>:</p>
 <pre><code class="language-sh">cd $SRC/cross-build-gcc
 ../gcc-10.2.0/configure --target=$TARGET --prefix=&quot;$PREFIX&quot; --disable-nls --enable-languages=c,c++ --without-headers
 make all-gcc -j$(nproc)
@@ -279,7 +279,6 @@ $DEST/cross/lib/gcc/x86_64-elf/10.2.0/no-red-zone/libgcc.a
 <li>use the <code>x86_64-elf-gcc</code> executable that now resides in <code>$DEST/cross</code> </li>
 <li>specify the <code>-mno-red-zone</code> flag, either on the command line or as part of <code>LDFLAGS</code></li>
 </ol>
-<!-- cspell:ignore dbxelf, elfos, ldflags, libgcc, libgmp, libmpc, libmpfr, multilib, newlib, nproc, stdint, texinfo, tmake, werror -->
 
                     </main>
 

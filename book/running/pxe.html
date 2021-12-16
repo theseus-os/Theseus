@@ -157,7 +157,7 @@ Add the following lines:</p>
 <pre><code>RUN_DAEMON=&quot;yes&quot;
 OPTIONS=&quot;-l -s /var/lib/tftpboot&quot;
 </code></pre>
-<p>Then, edit the inetd configuration file by opening the editor:
+<p>Then, edit the <code>inetd</code> configuration file by opening the editor:
 <code>sudo nano /etc/inetd.conf</code>
 And adding:
 <code>tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot</code></p>
@@ -219,7 +219,6 @@ And add Theseus as a menu option by adding the following:</p>
 <h2 id="subsequent-pxe-uses"><a class="header" href="#subsequent-pxe-uses">Subsequent PXE Uses</a></h2>
 <p>After setting up PXE the first time, you can run <code>make pxe</code> to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier:
 <code>sudo ifconfig &lt;network-device-name&gt; 192.168.1.105</code></p>
-<!-- cspell:ignore bootp, dgram, dhcpd, inetd, inetutils, initrd, memdisk, netmask, pxelinux, tftpboot, tftpd, xzvf -->
 
                     </main>
 

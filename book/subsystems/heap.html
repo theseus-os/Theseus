@@ -149,7 +149,7 @@
 <p>Note: One can request a large allocation from the heap, but in Theseus it will be backed by an individually-created <code>MappedPages</code> object of newly-allocated pages and frames that are mapped to one another, so it's generally less efficient to use the heap for large allocations.</p>
 </blockquote>
 <p>In Theseus, the primary purpose of the heap is to enable the usage of Rust's <a href="https://doc.rust-lang.org/alloc/"><code>alloc</code></a> types, e.g., <code>Box</code>, <code>Arc</code>, <code>Vec</code>, and other dynamically-allocated collections types.
-Heap allocators must implement Rust's <a href="https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html"><code>GlobalAlloc</code></a> trait in order to be used as the backing allocator behind these alloc types.
+Heap allocators must implement Rust's <a href="https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html"><code>GlobalAlloc</code></a> trait in order to be used as the backing allocator behind these <code>alloc</code> types.
 how we integrate that with Rust's (old) requirement of a single global allocator.</p>
 <h2 id="overview-of-relevant-crates"><a class="header" href="#overview-of-relevant-crates">Overview of Relevant Crates</a></h2>
 <ul>
@@ -158,14 +158,14 @@ how we integrate that with Rust's (old) requirement of a single global allocator
 <li>This is the first heap initialized and created during early OS boot.</li>
 <li><a href="https://theseus-os.github.io/Theseus/doc/block_allocator/struct.FixedSizeBlockAllocator.html"><code>block_allocator</code></a>: the underlying allocator implementation that optimizes allocations of common power-of-two sizes, e.g., 8 bytes, 32 bytes, etc.
 <ul>
-<li>Uses the <a href="https://crates.io/crates/linked_list_allocator">linked_list_allocator</a> crate as a fallback for uncommon allocation sizes.</li>
+<li>Uses the <a href="https://crates.io/crates/linked_list_allocator"><code>linked_list_allocator</code></a> crate as a fallback for uncommon allocation sizes.</li>
 </ul>
 </li>
 </ul>
 </li>
 <li><a href="https://theseus-os.github.io/Theseus/doc/multiple_heaps/index.html"><code>multiple_heaps</code></a>: a more complex allocator that implements multiple heaps of arbitrary sizes and usage patterns.
 <ul>
-<li>Each internal heap instance is based on a zone allocator, which are modified versions of slab allocators from the <a href="https://crates.io/crates/slabmalloc">slabmalloc</a> crate. </li>
+<li>Each internal heap instance is based on a zone allocator, which are modified versions of slab allocators from the <a href="https://crates.io/crates/slabmalloc"><code>slabmalloc</code></a> crate. </li>
 <li>Unused heap space can easily be transferred among different internal heap instances for rapid, efficient heap growth.</li>
 <li>Currently, one internal heap is created for each CPU core, with the core ID being used to identify and select which heap should be used for allocation.</li>
 <li>It is trivially easy to use <code>multiple_heaps</code> in a different way, such as per-task heaps or per-namespace heaps.</li>

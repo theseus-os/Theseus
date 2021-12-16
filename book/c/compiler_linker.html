@@ -186,7 +186,6 @@ Using those sections would result in multiple copies of data that's supposed to 
 This only applies for sections that already exist in Theseus; references to new sections that are unique to the executable are kept intact, of course.
 The relocation information is encoded into the ELF file itself as standard <code>.rela.*</code> sections via the <code>--emit-relocs</code> linker argument shown above.</p>
 <p>This procedure is currently performed by the <code>loadc</code> application; it also handles loading the ELF executable segments (program headers) and managing their metadata. </p>
-<!-- cspell:ignore crtbegin, crtend, fdata, ffunction, mcmodel, nostartfiles, nostdlib   -->
 
                     </main>
 
