@@ -410,6 +410,10 @@
 <span id="407">407</span>
 <span id="408">408</span>
 <span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate creates the abstraction of `stdio`. They are essentially ring buffer of bytes.</span>
 <span class="doccomment">//! It also creates the queue for `KeyEvent`, which allows applications to have direct access</span>
@@ -664,10 +668,14 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">locked_ring_buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">guard</span>.<span class="ident">lock</span>();
 
         <span class="comment">// Keep reading if we have empty space in the output buffer</span>
-        <span class="comment">// and available byte in the ring buffer.</span>
-        <span class="kw">while</span> <span class="kw">let</span> (<span class="prelude-val">Some</span>(<span class="ident">buf_elem</span>), <span class="prelude-val">Some</span>(<span class="ident">queue_elem</span>)) <span class="op">=</span> (<span class="ident">buf_iter</span>.<span class="ident">next</span>(), <span class="ident">locked_ring_buf</span>.<span class="ident">queue</span>.<span class="ident">pop_front</span>()) {
-            <span class="kw-2">*</span><span class="ident">buf_elem</span> <span class="op">=</span> <span class="ident">queue_elem</span>;
-            <span class="ident">cnt</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="comment">// and available byte(s) in the ring buffer.</span>
+        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">buf_entry</span>) <span class="op">=</span> <span class="ident">buf_iter</span>.<span class="ident">next</span>() {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">queue_elem</span>) <span class="op">=</span> <span class="ident">locked_ring_buf</span>.<span class="ident">queue</span>.<span class="ident">pop_front</span>() {
+                <span class="kw-2">*</span><span class="ident">buf_entry</span> <span class="op">=</span> <span class="ident">queue_elem</span>;
+                <span class="ident">cnt</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+            } <span class="kw">else</span> {
+                <span class="kw">break</span>;
+            }
         }
 
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">cnt</span>);
