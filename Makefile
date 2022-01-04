@@ -68,6 +68,7 @@ DEPS_SYSROOT_DIR := $(DEPS_DIR)/sysroot
 THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
 THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
+EXTRA_FILES := $(ROOT_DIR)/extra_files
 
 
 ## This is the default output path defined by cargo.
@@ -109,7 +110,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 .PHONY: all \
 		check-rustc check-usb \
 		clean clean-doc clean-old-build \
-		run run_pause iso build cargo grub \
+		run run_pause iso build cargo grub extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -276,6 +277,16 @@ grub:
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
+
+### This target copies all extra files into the `GRUB_ISOFILES` directory,
+### collapsing their directory structure into a single file name with `?` as the directory delimiter.
+### The contents of the EXTRA_FILES directory will be available at runtime within Theseus's root fs, too.
+### See the `README.md` in the `extra_files` directory for more info.
+extra_files:
+	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@for f in $(shell cd $(EXTRA_FILES) && find * -type f); do \
+		ln -v -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//?/g'` ; \
+	done
 
 
 ### Target for building tlibc, Theseus's libc.
