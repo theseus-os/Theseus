@@ -4,7 +4,7 @@ use core::{mem, ptr, slice, usize};
 
 use cbitset::BitSet256;
 
-use types::*;
+use libc::{c_void, c_int, size_t, c_char, c_uchar};
 use errno::*;
 
 

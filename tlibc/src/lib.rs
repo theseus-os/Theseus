@@ -6,6 +6,7 @@
 #![feature(untagged_unions)]
 #![feature(core_intrinsics)]
 #![feature(linkage)]
+#![feature(thread_local)]
 
 // Allowances for C-style syntax.
 #![allow(non_upper_case_globals)]
@@ -26,10 +27,9 @@ extern crate core2;
 
 
 mod errno;
-mod types;
 mod io;
 mod globals;
-mod printf;
+mod stdio;
 mod stdlib;
 mod string;
 mod mm;
@@ -40,8 +40,7 @@ use cstr_core::CString;
 
 
 pub use errno::*;
-pub use types::*;
-
+use libc::{c_int, c_char};
 
 
 /// The entry point that Theseus's task spawning logic will invoke (from its task wrapper).
