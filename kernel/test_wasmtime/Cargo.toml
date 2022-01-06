@@ -5,8 +5,9 @@ description = "A crate for testing the build of wasmtime ported to Theseus"
 version = "0.1.0"
 build = "../../build.rs"
 
-[dependencies.log]
-version = "0.4.8"
+[dependencies]
+log = "0.4.8"
+libc = { version = "0.2", default-features = false }
 
 ## working!
 [dependencies.wasmparser]

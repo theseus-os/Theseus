@@ -3061,6 +3061,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_libc"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "log",
+]
+
+[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
@@ -3108,6 +3116,7 @@ name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
  "cranelift-entity",
+ "libc",
  "log",
  "region",
  "wasmparser",
