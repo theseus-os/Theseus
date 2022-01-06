@@ -24,6 +24,13 @@ path = "../kernel/memory"
 [dependencies.task]
 path = "../kernel/task"
 
+[dependencies.app_io]
+path = "../applications/app_io"
+
+
+
+[build-dependencies]
+cc = "1.0.25"
 
 [lib]
 crate-type = ["lib"]

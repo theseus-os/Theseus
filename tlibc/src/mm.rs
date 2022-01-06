@@ -1,11 +1,9 @@
-use libc::*;
+use libc::{c_void, c_int, size_t, off_t};
+use libc::{MAP_FAILED, PROT_READ, PROT_WRITE};
 use memory::{MappedPages, EntryFlags};
-use types::*;
 use errno::*;
 
 use alloc::{
-    alloc::{alloc, dealloc, Layout},
-    collections::BTreeMap,
     vec::Vec,
 };
 use spin::Mutex;
@@ -61,6 +59,10 @@ pub unsafe extern "C" fn mmap(
         offset: off_t,
     ) -> Result<*mut c_void, &'static str> {
 
+        debug!("mmap::inner(): addr: {:X?}, len: {:X?}, prot: {:X?}, flags: {:X?}, fd: {:X?}, offset: {:X?}",
+            addr, len, prot, flags, fd, offset
+        );
+
         let pages = if !addr.is_null() {
             let vaddr = memory::VirtualAddress::new(addr as usize)
                 .ok_or("addr was an invalid virtual address")?;
@@ -74,6 +76,8 @@ pub unsafe extern "C" fn mmap(
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("Theseus memory subsystem not yet initialized.")?;
         let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, flags)?;
 
+        debug!("mmap::inner(): created {:X?}", mp);
+        
         let start_addr = mp.start_address().value();
         MAPPINGS.lock().push(mp);
         Ok(start_addr as *mut _)
