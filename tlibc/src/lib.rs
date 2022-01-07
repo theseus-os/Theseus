@@ -12,6 +12,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
+// Needed for "staticlib" crate-type only
+extern crate panic_entry;
 
 extern crate alloc;
 #[macro_use] extern crate log;

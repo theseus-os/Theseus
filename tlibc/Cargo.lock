@@ -1081,6 +1081,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "panic_entry"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "mod_mgmt",
+ "panic_wrapper",
+ "unwind",
+ "vga_buffer",
+]
+
+[[package]]
+name = "panic_wrapper"
+version = "0.1.0"
+dependencies = [
+ "fault_log",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "runqueue",
+ "stack_trace",
+ "stack_trace_frame_pointers",
+ "task",
+ "unwind",
+]
+
+[[package]]
 name = "paste"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1476,6 +1503,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "stack_trace"
+version = "0.1.0"
+dependencies = [
+ "fallible-iterator",
+ "log",
+ "mod_mgmt",
+ "task",
+ "unwind",
+]
+
+[[package]]
+name = "stack_trace_frame_pointers"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 0.1.10",
+ "memory",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1580,6 +1626,7 @@ dependencies = [
  "log",
  "memchr",
  "memory",
+ "panic_entry",
  "spin 0.9.0",
  "task",
 ]
