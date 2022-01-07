@@ -3,7 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "tlibc"
 description = "A libc implementation for Theseus."
 version = "0.1.0"
-build = "../build.rs"
+build = "build.rs"
 
 [dependencies]
 spin = "0.9.0"
@@ -28,12 +28,16 @@ path = "../kernel/task"
 path = "../applications/app_io"
 
 
+## Needed for "staticlib" crate-type only
+[dependencies.panic_entry]
+path = "../kernel/panic_entry"
+
 
 [build-dependencies]
 cc = "1.0.25"
 
 [lib]
-crate-type = ["lib"]
+crate-type = ["lib", "staticlib"]
 
 
 ### Patch section was copied from the top-level Theseus Cargo.toml
