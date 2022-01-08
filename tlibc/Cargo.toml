@@ -28,7 +28,10 @@ path = "../kernel/task"
 path = "../applications/app_io"
 
 
-## Needed for "staticlib" crate-type only
+## Needed for building tlibc as a "staticlib" crate-type,
+## and for avoiding having to link a C program to the nano_core.
+## Otherwise, it's not strictly requiredif we just want to build
+## tlibc into an .rlib file.
 [dependencies.panic_entry]
 path = "../kernel/panic_entry"
 

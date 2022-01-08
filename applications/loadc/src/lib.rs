@@ -52,6 +52,9 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
+    memory::dump_page_allocator_state();
+    memory::dump_frame_allocator_state();
+
     match rmain(matches) {
         Ok(retval) => retval as isize,
         Err(e) => {
