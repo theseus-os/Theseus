@@ -49,16 +49,17 @@ export override LDFLAGS += -nostdlib -nostartfiles
 
 
 ### This approach seems to be the closest to what I want.
-### To use the outputted `dummy_works` executable, we (Theseus's loader at runtime) just needs to go through all of the relocations
+### To use the outputted executable, we (Theseus's loader at runtime) just needs to go through all of the relocations
 ### that use OBJECT sections (.data, .rodata) as their source section and then re-write those entries to use the corresponding existing Theseus sections 
 ### as source sections instead.
 ###
 ### TODO: figure out a way to remove all irrelevant relocation entries, at a minimum the `R_X86_64_NONE` and local relocation sections, such as the `.rela.eh_frame` section. 
 ### 
-dummy_works:
+%: %.c
 	$(CROSS)gcc \
 		$(LDFLAGS) \
 		-O0 \
+		-I $(TLIBC_DIR)/include \
 		-static-libgcc \
 		-ffunction-sections \
 		-fdata-sections \
@@ -68,11 +69,11 @@ dummy_works:
 		-o $@ \
 		$(PARTIAL_LINK) \
 		$(STARTFILES) \
-		dummy.c \
+		$^ \
 		$(TLIBC_A) \
-		../target/x86_64-theseus/release/libnano_core.a \
 		$(ENDFILES)
 
+		# ../target/x86_64-theseus/release/libnano_core.a \
 
 		# -static \
 	

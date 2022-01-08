@@ -96,7 +96,7 @@ pub unsafe extern "C" fn mmap(
 #[no_mangle]
 pub unsafe extern "C" fn munmap(addr: *mut c_void, len: size_t) -> c_int {
 
-    fn inner(addr: *mut c_void, len: size_t) -> Option<c_int> {
+    fn inner(addr: *mut c_void, _len: size_t) -> Option<c_int> {
         if let Some(mp) = find_mapped_pages(addr as usize).map(|i| MAPPINGS.lock().remove(i)) {
             drop(mp); // unmaps this MappedPages
             Some(0)
