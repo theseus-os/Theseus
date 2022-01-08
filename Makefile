@@ -313,7 +313,8 @@ tlibc:
 ### Target for building a test C language executable.
 ### This should be run after `make iso` and then `make tlibc` have both completed.
 .PHONY: c_test
-C_TEST_TARGET := dummy_works
+# C_TEST_TARGET := dummy_works
+C_TEST_TARGET := print_test
 c_test:
 	$(MAKE) -C c_test $(C_TEST_TARGET)
 	@for f in c_test/$(C_TEST_TARGET); do \
