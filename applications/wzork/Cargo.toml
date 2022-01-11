@@ -11,4 +11,4 @@ path = "../../kernel/memfs"
 path = "../../kernel/root"
 
 [dependencies.wasi_interpreter]
-path = "../../applications/wasi_interpreter"
+path = "../../kernel/wasi_interpreter"

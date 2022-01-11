@@ -13,7 +13,7 @@ wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a621
 wasmi = { version = "0.9.0", default-features = false, features = ["core"] }
 
 [dependencies.app_io]
-path = "../../applications/app_io"
+path = "../../kernel/app_io"
 
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
