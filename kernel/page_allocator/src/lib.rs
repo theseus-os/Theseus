@@ -12,7 +12,7 @@
 //! # Notes and Missing Features
 //! This allocator currently does **not** merge freed chunks (de-fragmentation) upon deallocation. 
 //! It only merges free chunks lazily upon request, i.e., when we run out of address space
-//! o rwhen a requested address is in a chunk that needs to be merged with a nearby chunk.
+//! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
 
 #![no_std]
 #![feature(const_fn_trait_bound)]
