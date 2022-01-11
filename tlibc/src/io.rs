@@ -97,6 +97,53 @@ impl WriteByte for StringWriter {
 
 
 
+pub struct UnsafeStringWriter(pub *mut u8);
+impl Write for UnsafeStringWriter {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
+        unsafe {
+            core::ptr::copy_nonoverlapping(buf.as_ptr(), self.0, buf.len());
+            self.0 = self.0.add(buf.len());
+            *self.0 = b'\0';
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> core2::io::Result<()> {
+        Ok(())
+    }
+}
+impl fmt::Write for UnsafeStringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        // can't fail
+        self.write(s.as_bytes()).unwrap();
+        Ok(())
+    }
+}
+impl WriteByte for UnsafeStringWriter {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        // can't fail
+        self.write(&[byte]).unwrap();
+        Ok(())
+    }
+}
+
+pub struct UnsafeStringReader(pub *const u8);
+impl Read for UnsafeStringReader {
+    fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
+        unsafe {
+            for i in 0..buf.len() {
+                if *self.0 == 0 {
+                    return Ok(i);
+                }
+
+                buf[i] = *self.0;
+                self.0 = self.0.offset(1);
+            }
+            Ok(buf.len())
+        }
+    }
+}
+
+
 pub trait WriteByte: fmt::Write {
     fn write_u8(&mut self, byte: u8) -> fmt::Result;
 }

@@ -68,6 +68,7 @@ DEPS_SYSROOT_DIR := $(DEPS_DIR)/sysroot
 THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
 THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
+EXTRA_FILES := $(ROOT_DIR)/extra_files
 
 
 ## This is the default output path defined by cargo.
@@ -109,7 +110,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 .PHONY: all \
 		check-rustc check-usb \
 		clean clean-doc clean-old-build \
-		run run_pause iso build cargo grub \
+		run run_pause iso build cargo grub extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -277,6 +278,16 @@ grub:
 	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
+### This target copies all extra files into the `GRUB_ISOFILES` directory,
+### collapsing their directory structure into a single file name with `?` as the directory delimiter.
+### The contents of the EXTRA_FILES directory will be available at runtime within Theseus's root fs, too.
+### See the `README.md` in the `extra_files` directory for more info.
+extra_files:
+	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@for f in $(shell cd $(EXTRA_FILES) && find * -type f); do \
+		ln -v -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//?/g'` ; \
+	done
+
 
 ### Target for building tlibc, Theseus's libc.
 ### This should be run after `make iso` has completed.
@@ -302,7 +313,8 @@ tlibc:
 ### Target for building a test C language executable.
 ### This should be run after `make iso` and then `make tlibc` have both completed.
 .PHONY: c_test
-C_TEST_TARGET := dummy_works
+# C_TEST_TARGET := dummy_works
+C_TEST_TARGET := print_test
 c_test:
 	$(MAKE) -C c_test $(C_TEST_TARGET)
 	@for f in c_test/$(C_TEST_TARGET); do \
@@ -317,18 +329,17 @@ c_test:
 
 
 ### Demo/test target for building libtheseus
-libtheseus: $(THESEUS_CARGO_BIN) $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
+libtheseus: theseus_cargo $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
 	@( \
 		cd $(ROOT_DIR)/libtheseus && \
 		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
 	)
 
 
-
 ### This target builds the `theseus_cargo` tool as a dedicated binary.
-$(THESEUS_CARGO_BIN): $(THESEUS_CARGO)/Cargo.* $(THESEUS_CARGO)/src/*
+theseus_cargo: $(wildcard $(THESEUS_CARGO)/Cargo.*)  $(wildcard$(THESEUS_CARGO)/src/*)
 	@echo -e "\n=================== Building the theseus_cargo tool ==================="
-	cargo install --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
+	cargo install --locked --force --path=$(THESEUS_CARGO) --root=$(THESEUS_CARGO)
 
 
 

@@ -5,9 +5,11 @@ use alloc::{
     vec::Vec,
     format,
 };
+use libc::{c_char, c_short, c_int, c_long, c_longlong, intmax_t, ptrdiff_t, size_t, wchar_t, c_uchar, c_uint, c_ulong, c_ulonglong, c_ushort, uintmax_t, c_double, c_void, ssize_t};
 use core::{char, cmp, f64, ffi::VaList, fmt, num::FpCategory, ops::Range, slice};
-use crate::types::*;
 use crate::errno::*;
+
+pub type wint_t = u32;
 
 //  ____        _ _                 _       _
 // | __ )  ___ (_) | ___ _ __ _ __ | | __ _| |_ ___ _
