@@ -5,6 +5,7 @@ sourcesIndex["acpi_table"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["acpi_table_handler"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["ap_start"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["apic"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["app_io"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["async_channel"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["ata"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["atomic_linked_list"] = {"name":"","files":["atomic_linked_list.rs","atomic_map.rs","lib.rs"]};
