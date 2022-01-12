@@ -25,7 +25,7 @@ path = "../kernel/memory"
 path = "../kernel/task"
 
 [dependencies.app_io]
-path = "../applications/app_io"
+path = "../kernel/app_io"
 
 
 ## Needed for building tlibc as a "staticlib" crate-type,
