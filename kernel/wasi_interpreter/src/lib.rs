@@ -8,7 +8,6 @@ mod wasmi_state_machine;
 
 #[macro_use]
 extern crate alloc;
-#[macro_use]
 extern crate app_io;
 extern crate core2;
 extern crate fs_node;
