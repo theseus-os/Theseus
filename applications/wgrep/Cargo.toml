@@ -1,8 +1,0 @@
-[package]
-name = "wgrep"
-version = "0.1.0"
-authors = ["Vikram Mullick <vikram1.mullick@gmail.com>"]
-edition = "2018"
-
-[dependencies.wasi_interpreter]
-path = "../../kernel/wasi_interpreter"

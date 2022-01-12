@@ -3310,6 +3310,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm"
+version = "0.1.0"
+dependencies = [
+ "fs_node",
+ "getopts",
+ "path",
+ "task",
+ "terminal_print",
+ "wasi_interpreter",
+]
+
+[[package]]
 name = "wasmi"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3331,21 +3343,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "165343ecd6c018fc09ebcae280752702c9a2ef3e6f8d02f1cfcbdb53ef6d7937"
 dependencies = [
  "parity-wasm",
-]
-
-[[package]]
-name = "wasmi_simple_test"
-version = "0.1.0"
-dependencies = [
- "terminal_print",
- "wasmi",
-]
-
-[[package]]
-name = "wgrep"
-version = "0.1.0"
-dependencies = [
- "wasi_interpreter",
 ]
 
 [[package]]
@@ -3401,22 +3398,6 @@ dependencies = [
  "spawn",
  "spin 0.9.0",
  "window_inner",
-]
-
-[[package]]
-name = "wpee"
-version = "0.1.0"
-dependencies = [
- "wasi_interpreter",
-]
-
-[[package]]
-name = "wzork"
-version = "0.1.0"
-dependencies = [
- "memfs",
- "root",
- "wasi_interpreter",
 ]
 
 [[package]]

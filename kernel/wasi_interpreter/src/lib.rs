@@ -8,13 +8,16 @@ mod wasmi_state_machine;
 
 #[macro_use]
 extern crate alloc;
+#[macro_use]
 extern crate app_io;
 extern crate core2;
+extern crate fs_node;
 extern crate root;
 extern crate task;
 extern crate wasmi;
 
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::convert::TryFrom as _;
 use posix_file_system::FileDescriptorTable;
@@ -68,7 +71,7 @@ impl ModuleImportResolver for HostExternals {
     }
 }
 
-pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>) -> isize {
+pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec<String>) -> isize {
     // Load wasm binary and prepare it for instantiation.
     let module = Module::from_buffer(&wasm_binary).unwrap();
 
@@ -92,45 +95,44 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>) -> isize {
         .get_env()
         .lock()
         .get_wd_path();
-    let task_name: String = task::get_my_current_task().unwrap().name.clone();
 
     // Populate environment variables
     let mut theseus_env_vars: Vec<String> = Vec::new();
     theseus_env_vars.push(format!("PWD={}", pwd));
-
-    // Populate args (POSIX-style)
-    let mut theseus_args: Vec<String> = Vec::new();
-    theseus_args.push(task_name);
-    theseus_args.append(&mut args.clone());
 
     let mut ext: HostExternals = HostExternals {
         memory: state_machine.memory,
         exit_code: 0,
         fd_table: FileDescriptorTable::new(),
         theseus_env_vars: theseus_env_vars,
-        theseus_args: theseus_args,
+        theseus_args: args,
     };
 
-    // NOTE: Currently preopens root directory by default
-    let root_fd: wasi::Fd = ext
-        .fd_table
-        .open_path(
-            root::ROOT_DIRECTORY_NAME,
-            root::get_root().clone(),
-            wasi::LOOKUPFLAGS_SYMLINK_FOLLOW,
-            wasi::OFLAGS_DIRECTORY,
-            wasi_definitions::FULL_DIR_RIGHTS,
-            wasi_definitions::FULL_FILE_RIGHTS | wasi_definitions::FULL_DIR_RIGHTS,
-            0,
-        )
-        .unwrap();
+    for preopen_dir in preopen_dirs.iter() {
+        let _curr_fd: wasi::Fd = ext
+            .fd_table
+            .open_path(
+                &preopen_dir,
+                Arc::clone(
+                    &task::get_my_current_task()
+                        .unwrap()
+                        .get_env()
+                        .lock()
+                        .working_dir,
+                ),
+                wasi::LOOKUPFLAGS_SYMLINK_FOLLOW,
+                wasi::OFLAGS_DIRECTORY,
+                wasi_definitions::FULL_DIR_RIGHTS,
+                wasi_definitions::FULL_FILE_RIGHTS | wasi_definitions::FULL_DIR_RIGHTS,
+                0,
+            )
+            .unwrap();
+    }
 
     state_machine
         .module
         .invoke_export("_start", &[], &mut ext)
         .ok();
-
-    ext.fd_table.close_fd(root_fd).unwrap();
 
     isize::try_from(ext.exit_code).unwrap()
 }
