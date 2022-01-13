@@ -37,12 +37,6 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     let preopened_dirs: Vec<String> = matches.opt_strs("d");
-    let args: Vec<String> = matches.free;
-
-    if args.is_empty() {
-        print_usage(opts);
-        return -1;
-    }
 
     // get current working directory
     let curr_wr = Arc::clone(
@@ -72,6 +66,13 @@ pub fn main(args: Vec<String>) -> isize {
         };
     }
 
+    let args: Vec<String> = matches.free;
+
+    if args.is_empty() {
+        print_usage(opts);
+        return -1;
+    }
+
     let wasm_binary_path = Path::new(args[0].clone());
 
     // parse inputted wasm module into byte array
@@ -84,16 +85,16 @@ pub fn main(args: Vec<String>) -> isize {
             FileOrDir::File(file) => {
                 let file_locked = file.lock();
                 let file_size = file_locked.size();
-                let mut string_slice_as_bytes = vec![0; file_size];
+                let mut wasm_binary_as_bytes = vec![0; file_size];
 
-                let _num_bytes_read = match file_locked.read(&mut string_slice_as_bytes, 0) {
+                let _num_bytes_read = match file_locked.read(&mut wasm_binary_as_bytes, 0) {
                     Ok(num) => num,
                     Err(e) => {
                         println!("Failed to read {:?}, error {:?}", file_locked.get_name(), e);
                         return -1;
                     }
                 };
-                string_slice_as_bytes
+                wasm_binary_as_bytes
             }
         },
         _ => {

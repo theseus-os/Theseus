@@ -975,16 +975,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gen_test_files"
-version = "0.1.0"
-dependencies = [
- "log",
- "memfs",
- "memory",
- "root",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

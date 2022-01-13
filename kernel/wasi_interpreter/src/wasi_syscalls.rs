@@ -4,7 +4,7 @@ use crate::HostExternals;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryFrom as _;
-use fs_node::{DirRef, FileOrDir, FsNode};
+use fs_node::{DirRef, FileOrDir};
 use wasmi::{MemoryRef, RuntimeArgs, RuntimeValue, Trap};
 
 fn args_or_env_sizes_get(
@@ -281,8 +281,7 @@ pub fn execute_system_call(
                     return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
                 FileOrDir::Dir { .. } => {
-                    u32::try_from(posix_node.theseus_file_or_dir().get_name().chars().count())
-                        .unwrap()
+                    u32::try_from(posix_node.get_relative_path().chars().count()).unwrap()
                 }
             };
 
@@ -315,7 +314,7 @@ pub fn execute_system_call(
                 FileOrDir::File { .. } => {
                     return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
-                FileOrDir::Dir { .. } => posix_node.theseus_file_or_dir().get_name(),
+                FileOrDir::Dir { .. } => posix_node.get_relative_path(),
             };
 
             let path_out_buf: u32 = wasmi_args.nth_checked(1).unwrap();

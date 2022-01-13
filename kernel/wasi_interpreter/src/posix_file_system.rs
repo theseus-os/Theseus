@@ -2,7 +2,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::{cmp, convert::TryFrom as _};
 use core2::io::{Read, Write};
-use fs_node::{DirRef, FileOrDir, FileRef};
+use fs_node::{DirRef, FileOrDir, FileRef, FsNode};
 use hashbrown::HashMap;
 use memfs::MemFile;
 use path::Path;
@@ -80,6 +80,20 @@ impl PosixNode {
 
     pub fn theseus_file_or_dir(&self) -> &FileOrDir {
         &self.theseus_file_or_dir
+    }
+
+    pub fn get_relative_path(&self) -> String {
+        let absolute_path = Path::new(self.theseus_file_or_dir.get_absolute_path());
+        let wd_path = Path::new(
+            task::get_my_current_task()
+                .unwrap()
+                .get_env()
+                .lock()
+                .get_wd_path(),
+        );
+
+        let relative_path: Path = absolute_path.relative(&wd_path).unwrap();
+        String::from(relative_path)
     }
 
     pub fn fs_rights_base(&self) -> wasi::Rights {
