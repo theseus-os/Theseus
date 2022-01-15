@@ -1,3 +1,19 @@
+//! A library for executing WASI-compliant WebAssembly binaries.
+//!
+//! `wasi_interpreter` provides an interface between the `wasmi` crate (used to interpret
+//! WebAssembly) and Theseus under the assumption of a WASI interface.
+//!
+//! This library exposes a public method called `execute_binary` to allow for the execution of a
+//! WebAssembly binary given directory permissions (in accordance to the WASI capabilities model)
+//! and arguments.
+//!
+//! This library depends on the following modules:
+//! * wasi_definitions
+//! * wasi_syscalls
+//! * posix_file_system
+//! * wasmi_state_machine
+//!
+
 #![no_std]
 
 #[macro_use]
@@ -21,20 +37,27 @@ use alloc::vec::Vec;
 use core::convert::TryFrom as _;
 use posix_file_system::FileDescriptorTable;
 use wasi_definitions::SystemCall;
-use wasmi::{
-    Error, Externals, FuncInstance, FuncRef, MemoryRef, Module, ModuleImportResolver, RuntimeArgs,
-    RuntimeValue, Signature, Trap, ValueType,
-};
+use wasmi::{Externals, MemoryRef, Module, RuntimeArgs, RuntimeValue, Signature, Trap, ValueType};
 
+/// Theseus and wasmi I/O required to execute WASI system calls.
 pub struct HostExternals {
+    /// WebAssembly memory buffer provided by wasmi.
     memory: Option<MemoryRef>,
+    /// Exit code returned WebAssembly binary.
     exit_code: wasi::Exitcode,
+    /// POSIX-style file descriptor table abstraction for interacting with Theseus I/O.
     fd_table: FileDescriptorTable,
+    /// POSIX-formatted environment variables provided by Theseus.
+    /// (i.e. KEY=VALUE)
     theseus_env_vars: Vec<String>,
+    /// POSIX-formatted arguments.
+    /// (i.e. PROGRAM_NAME arg1 arg2 ...)
     theseus_args: Vec<String>,
 }
 
 impl Externals for HostExternals {
+    /// Function used by wasmi to invoke a system call given a specified system call number and
+    /// wasm arguments.
     fn invoke_index(
         &mut self,
         index: usize,
@@ -44,42 +67,31 @@ impl Externals for HostExternals {
     }
 }
 
-impl ModuleImportResolver for HostExternals {
-    fn resolve_func(&self, field_name: &str, signature: &Signature) -> Result<FuncRef, Error> {
-        let system_call: SystemCall = match SystemCall::from_fn_name(field_name) {
-            Ok(v) => v,
-            Err(_) => {
-                return Err(Error::Instantiation(format!(
-                    "Export {} not found",
-                    field_name
-                )))
-            }
-        };
-
-        if !signature.eq(&system_call.signature()) {
-            return Err(Error::Instantiation(format!(
-                "Export {} has a bad signature",
-                field_name
-            )));
-        }
-
-        Ok(FuncInstance::alloc_host(
-            sig!((I32)),
-            system_call.to_usize(),
-        ))
-    }
-}
-
+/// Executes a WASI-compliant WebAssembly binary.
+///
+/// This function constructs a wasmi state machine from a WebAssembly binary, constructs a
+/// HostExternals object consisting of any necessary Theseus or wasmi I/O, opens file descriptors
+/// for accessible directories, and executes.
+///
+/// # Arguments
+/// * `wasm_binary`: a WASI-compliant WebAssembly binary as a byte vector
+/// * `args`: a POSIX-formatted string vector of arguments to WebAssembly binary
+/// * `preopen_dirs`: a string vector of directory paths to grant WASI access to
+///
 pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec<String>) -> isize {
     // Load wasm binary and prepare it for instantiation.
     let module = Module::from_buffer(&wasm_binary).unwrap();
 
+    // Construct wasmi WebAssembly state machine.
     let state_machine = wasmi_state_machine::ProcessStateMachine::new(
         &module,
         |wasm_interface: &str, fn_name: &str, fn_signature: &Signature| {
+            // Match WebAssembly function import to corresponding system call number.
+            // Currently supports `wasi_snapshot_preview1`.
             if wasm_interface.eq("wasi_snapshot_preview1") {
                 let system_call: SystemCall = SystemCall::from_fn_name(fn_name)
                     .expect(&format!("Missing function {}", fn_name));
+                // Verify that signature of system call matches expected signature.
                 if fn_signature.eq(&system_call.signature()) {
                     return Ok(system_call.to_usize());
                 }
@@ -89,16 +101,17 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
     )
     .unwrap();
 
+    // Populate environment variables.
     let pwd: String = task::get_my_current_task()
         .unwrap()
         .get_env()
         .lock()
         .get_wd_path();
 
-    // Populate environment variables
     let mut theseus_env_vars: Vec<String> = Vec::new();
     theseus_env_vars.push(format!("PWD={}", pwd));
 
+    // Construct initial host externals.
     let mut ext: HostExternals = HostExternals {
         memory: state_machine.memory,
         exit_code: 0,
@@ -107,6 +120,10 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
         theseus_args: args,
     };
 
+    // Open permitted directories in file descriptor table prior to execution.
+    // NOTE: WASI relies on an assumption that all preopened directories occupy the first the lowest
+    // possible file descriptors (3, 4, ...). The `open_path` function below conforms to this
+    // standard.
     for preopen_dir in preopen_dirs.iter() {
         let _curr_fd: wasi::Fd = ext
             .fd_table
@@ -128,10 +145,12 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
             .unwrap();
     }
 
+    // Execute WebAssembly binary.
     state_machine
         .module
         .invoke_export("_start", &[], &mut ext)
         .ok();
 
+    // Return resulting WebAssembly exit code.
     isize::try_from(ext.exit_code).unwrap()
 }

@@ -7,8 +7,8 @@ edition = "2018"
 [dependencies]
 getopts = "0.2.21"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.task]
 path = "../../kernel/task"

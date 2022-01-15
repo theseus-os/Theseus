@@ -1,9 +1,13 @@
+//! Module for resolving memory and function imports from WebAssembly module into state machine.
+//!
+//! Subset of functionality borrowed from tomaka/redshirt:
+//! https://github.com/tomaka/redshirt/blob/main/kernel/core/src/scheduler/vm.rs
+//!
+
 use alloc::string::String;
 use core::{cell::RefCell, convert::TryFrom as _};
 
 use wasmi::{Module, Signature};
-
-/// Module for parsing wasm binary into wasmi state machine (from Redshirt)
 
 #[derive(Debug)]
 pub enum NewErr {

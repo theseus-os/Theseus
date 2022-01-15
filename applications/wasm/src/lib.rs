@@ -1,11 +1,28 @@
+//! Application for running WASI-compliant WebAssembly binaries from Theseus command line.
+//!
+//! USAGE:
+//!    wasm </path/to/wasm/binary.wasm> [args ...]
+//!
+//! EXAMPLES:
+//!
+//! Running a WebAssembly Module:
+//!     wasm example.wasm
+//!
+//! Preopening Multiple Directories:
+//!     wasm --dir DIR1 --dir DIR2 example.wasm
+//!
+//! Passing Arguments/Flags to WebAssembly Module
+//!     wasm --dir . example.wasm ARG1 ARG2 ARG3
+//!
+
 #![no_std]
 
 #[macro_use]
 extern crate alloc;
+#[macro_use]
+extern crate app_io;
 extern crate fs_node;
 extern crate getopts;
-#[macro_use]
-extern crate terminal_print;
 extern crate path;
 extern crate task;
 extern crate wasi_interpreter;
@@ -16,7 +33,10 @@ use getopts::{Options, ParsingStyle};
 use path::Path;
 
 pub fn main(args: Vec<String>) -> isize {
+    // Parse command line options.
     let mut opts = Options::new();
+
+    // StopAtFirstFree allows arguments to be passed to WebAssembly program.
     opts.parsing_style(ParsingStyle::StopAtFirstFree);
 
     opts.optmulti("d", "dir", "set preopened directories", "DIR");
@@ -38,7 +58,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     let preopened_dirs: Vec<String> = matches.opt_strs("d");
 
-    // get current working directory
+    // Get current working directory.
     let curr_wr = Arc::clone(
         &task::get_my_current_task()
             .unwrap()
@@ -47,7 +67,7 @@ pub fn main(args: Vec<String>) -> isize {
             .working_dir,
     );
 
-    // verify preopened directories are directories
+    // Verify passed preopened directories are real directories.
     for dir in preopened_dirs.iter() {
         let dir_path = Path::new(dir.clone());
 
@@ -68,14 +88,16 @@ pub fn main(args: Vec<String>) -> isize {
 
     let args: Vec<String> = matches.free;
 
+    // Verify that arguments is non-empty.
     if args.is_empty() {
+        println!("No WebAssembly path specified.");
         print_usage(opts);
         return -1;
     }
 
     let wasm_binary_path = Path::new(args[0].clone());
 
-    // parse inputted wasm module into byte array
+    // Parse inputted WebAssembly binary path into byte array.
     let wasm_binary: Vec<u8> = match wasm_binary_path.get(&curr_wr) {
         Some(file_dir_enum) => match file_dir_enum {
             FileOrDir::Dir(directory) => {
@@ -103,7 +125,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    // execute wasm binary
+    // Execute wasm binary.
     wasi_interpreter::execute_binary(wasm_binary, args, preopened_dirs);
 
     0

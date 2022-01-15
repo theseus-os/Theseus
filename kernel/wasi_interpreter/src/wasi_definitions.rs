@@ -1,6 +1,28 @@
+//! WASI system call, signature, and permission definitions as well as mappings.
+//!
+//! This module contains the following:
+//! * Macros for easily defining wasmi function signatures.
+//! * SystemCall enum type consisting of supported system calls.
+//! * Mapping from system call string to SystemCall type.
+//! * Mapping between system call number and SystemCall type.
+//! * Mapping from SystemCall type to wasmi signature.
+//! * Definitions of WASI rights for full file and directory permissions.
+//!
+//! Signature macro from tomaka/redshirt:
+//! https://github.com/tomaka/redshirt/blob/main/kernel/core/src/primitives.rs
+//!
+
 use alloc::vec::Vec;
 use wasmi::{Signature, ValueType};
 
+/// Generates wasmi function signature.
+///
+/// # Arguments
+/// * `params`: function signature argument types.
+/// * `ret_ty`: function signature return type.
+///
+/// # Return
+/// Returns requested wasmi signature.
 pub fn get_signature(
     params: impl Iterator<Item = ValueType>,
     ret_ty: impl Into<Option<ValueType>>,
@@ -11,6 +33,12 @@ pub fn get_signature(
     )
 }
 
+/// Macro to efficiently generate wasmi function signature.
+///
+/// Usage examples:
+///     sig!((I32))
+///     sig!((I32, I32)->I32)
+///
 #[macro_export]
 macro_rules! sig {
     (($($p:ident),*)) => {{
@@ -25,6 +53,7 @@ macro_rules! sig {
     }};
 }
 
+/// WASI system calls that are currently supported.
 #[derive(Debug)]
 pub enum SystemCall {
     ProcExit,
@@ -45,48 +74,66 @@ pub enum SystemCall {
 }
 
 impl SystemCall {
-    pub fn from_usize(syscall_index: usize) -> Result<SystemCall, ()> {
-        match syscall_index {
-            0 => Ok(SystemCall::ProcExit),
-            1 => Ok(SystemCall::FdClose),
-            2 => Ok(SystemCall::FdWrite),
-            3 => Ok(SystemCall::FdSeek),
-            4 => Ok(SystemCall::FdRead),
-            5 => Ok(SystemCall::FdFdstatGet),
-            6 => Ok(SystemCall::EnvironSizesGet),
-            7 => Ok(SystemCall::EnvironGet),
-            8 => Ok(SystemCall::FdPrestatGet),
-            9 => Ok(SystemCall::FdPrestatDirName),
-            10 => Ok(SystemCall::PathOpen),
-            11 => Ok(SystemCall::FdFdstatSetFlags),
-            12 => Ok(SystemCall::ArgsSizesGet),
-            13 => Ok(SystemCall::ArgsGet),
-            14 => Ok(SystemCall::ClockTimeGet),
-            _ => Err(()),
-        }
-    }
-
-    pub fn from_fn_name(fn_name: &str) -> Result<SystemCall, ()> {
+    /// Get SystemCall type from imported function name string.
+    ///
+    /// # Arguments:
+    /// * `fn_name`: system call string representation.
+    ///
+    /// # Return
+    /// Returns SystemCall enum corresponding to given system call string.
+    pub fn from_fn_name(fn_name: &str) -> Option<SystemCall> {
         match fn_name {
-            "proc_exit" => Ok(SystemCall::ProcExit),
-            "fd_close" => Ok(SystemCall::FdClose),
-            "fd_write" => Ok(SystemCall::FdWrite),
-            "fd_seek" => Ok(SystemCall::FdSeek),
-            "fd_read" => Ok(SystemCall::FdRead),
-            "fd_fdstat_get" => Ok(SystemCall::FdFdstatGet),
-            "environ_sizes_get" => Ok(SystemCall::EnvironSizesGet),
-            "environ_get" => Ok(SystemCall::EnvironGet),
-            "fd_prestat_get" => Ok(SystemCall::FdPrestatGet),
-            "fd_prestat_dir_name" => Ok(SystemCall::FdPrestatDirName),
-            "path_open" => Ok(SystemCall::PathOpen),
-            "fd_fdstat_set_flags" => Ok(SystemCall::FdFdstatSetFlags),
-            "args_sizes_get" => Ok(SystemCall::ArgsSizesGet),
-            "args_get" => Ok(SystemCall::ArgsGet),
-            "clock_time_get" => Ok(SystemCall::ClockTimeGet),
-            _ => Err(()),
+            "proc_exit" => Some(SystemCall::ProcExit),
+            "fd_close" => Some(SystemCall::FdClose),
+            "fd_write" => Some(SystemCall::FdWrite),
+            "fd_seek" => Some(SystemCall::FdSeek),
+            "fd_read" => Some(SystemCall::FdRead),
+            "fd_fdstat_get" => Some(SystemCall::FdFdstatGet),
+            "environ_sizes_get" => Some(SystemCall::EnvironSizesGet),
+            "environ_get" => Some(SystemCall::EnvironGet),
+            "fd_prestat_get" => Some(SystemCall::FdPrestatGet),
+            "fd_prestat_dir_name" => Some(SystemCall::FdPrestatDirName),
+            "path_open" => Some(SystemCall::PathOpen),
+            "fd_fdstat_set_flags" => Some(SystemCall::FdFdstatSetFlags),
+            "args_sizes_get" => Some(SystemCall::ArgsSizesGet),
+            "args_get" => Some(SystemCall::ArgsGet),
+            "clock_time_get" => Some(SystemCall::ClockTimeGet),
+            _ => None,
         }
     }
 
+    /// Get SystemCall type from system call number.
+    ///
+    /// # Arguments:
+    /// * `syscall_index`: system call number.
+    ///
+    /// # Return
+    /// Returns SystemCall enum corresponding to given system call number.
+    pub fn from_usize(syscall_index: usize) -> Option<SystemCall> {
+        match syscall_index {
+            0 => Some(SystemCall::ProcExit),
+            1 => Some(SystemCall::FdClose),
+            2 => Some(SystemCall::FdWrite),
+            3 => Some(SystemCall::FdSeek),
+            4 => Some(SystemCall::FdRead),
+            5 => Some(SystemCall::FdFdstatGet),
+            6 => Some(SystemCall::EnvironSizesGet),
+            7 => Some(SystemCall::EnvironGet),
+            8 => Some(SystemCall::FdPrestatGet),
+            9 => Some(SystemCall::FdPrestatDirName),
+            10 => Some(SystemCall::PathOpen),
+            11 => Some(SystemCall::FdFdstatSetFlags),
+            12 => Some(SystemCall::ArgsSizesGet),
+            13 => Some(SystemCall::ArgsGet),
+            14 => Some(SystemCall::ClockTimeGet),
+            _ => None,
+        }
+    }
+
+    /// Get system call number from this SystemCall enum.
+    ///
+    /// # Return
+    /// Returns system call number of this SystemCall enum.
     pub fn to_usize(&self) -> usize {
         match self {
             SystemCall::ProcExit => 0,
@@ -107,6 +154,10 @@ impl SystemCall {
         }
     }
 
+    /// Get wasmi function signature of SystemCall enum.
+    ///
+    /// # Return
+    /// Returns wasmi function signature of this SystemCall enum.
     pub fn signature(&self) -> Signature {
         match self {
             SystemCall::ProcExit => sig!((I32)),
@@ -128,6 +179,7 @@ impl SystemCall {
     }
 }
 
+/// WASI rights of a directory with full permissions.
 pub const FULL_DIR_RIGHTS: wasi::Rights = wasi::RIGHTS_FD_FDSTAT_SET_FLAGS
     | wasi::RIGHTS_FD_SYNC
     | wasi::RIGHTS_FD_ADVISE
@@ -151,6 +203,7 @@ pub const FULL_DIR_RIGHTS: wasi::Rights = wasi::RIGHTS_FD_FDSTAT_SET_FLAGS
     | wasi::RIGHTS_PATH_UNLINK_FILE
     | wasi::RIGHTS_POLL_FD_READWRITE;
 
+/// WASI rights of a file with full permissions.
 pub const FULL_FILE_RIGHTS: wasi::Rights = wasi::RIGHTS_FD_DATASYNC
     | wasi::RIGHTS_FD_READ
     | wasi::RIGHTS_FD_SEEK

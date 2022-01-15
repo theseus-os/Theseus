@@ -3303,11 +3303,11 @@ dependencies = [
 name = "wasm"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "path",
  "task",
- "terminal_print",
  "wasi_interpreter",
 ]
 
