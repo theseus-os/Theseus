@@ -90,10 +90,10 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
             // Match WebAssembly function import to corresponding system call number.
             // Currently supports `wasi_snapshot_preview1`.
             if wasm_interface.eq("wasi_snapshot_preview1") {
-                let system_call: SystemCall =
-                    SystemCall::from_str(fn_name).expect(&format!("Missing function {}", fn_name));
+                let system_call = SystemCall::from_str(fn_name)
+                    .expect(&format!("Unknown WASI function {}", fn_name));
                 // Verify that signature of system call matches expected signature.
-                if fn_signature.eq(&system_call.clone().into()) {
+                if fn_signature.eq(&system_call.into()) {
                     return Ok(system_call.into());
                 }
             }

@@ -1,7 +1,7 @@
 //! Application for running WASI-compliant WebAssembly binaries from Theseus command line.
 //!
 //! USAGE:
-//!     wasm [option] ... WASM_BINARY_PATH [arg] ...
+//!     wasm [option]... WASM_BINARY_PATH [arg]...
 //!
 //! EXAMPLES:
 //!
@@ -136,7 +136,7 @@ fn print_usage(opts: Options) {
 }
 
 const USAGE: &'static str = "USAGE:
-    wasm [option] ... WASM_BINARY_PATH [arg] ...
+    wasm [option]... WASM_BINARY_PATH [arg]...
 
 EXAMPLES:
 

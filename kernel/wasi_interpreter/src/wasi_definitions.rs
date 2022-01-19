@@ -9,7 +9,7 @@
 //! * Definitions of WASI rights for full file and directory permissions.
 //!
 //! Signature macro from tomaka/redshirt:
-//! https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/primitives.rs
+//! <https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/primitives.rs>
 //!
 
 use alloc::vec::Vec;
@@ -56,7 +56,7 @@ macro_rules! sig {
 }
 
 /// WASI system calls that are currently supported.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum SystemCall {
     ProcExit,
     FdClose,
@@ -102,7 +102,7 @@ impl FromStr for SystemCall {
             "args_sizes_get" => Ok(SystemCall::ArgsSizesGet),
             "args_get" => Ok(SystemCall::ArgsGet),
             "clock_time_get" => Ok(SystemCall::ClockTimeGet),
-            _ => Err("Missing system call."),
+            _ => Err("Unknown WASI system call."),
         }
     }
 }
@@ -134,7 +134,7 @@ impl TryFrom<usize> for SystemCall {
             12 => Ok(SystemCall::ArgsSizesGet),
             13 => Ok(SystemCall::ArgsGet),
             14 => Ok(SystemCall::ClockTimeGet),
-            _ => Err("Missing system call."),
+            _ => Err("Unknown WASI system call."),
         }
     }
 }

@@ -4,15 +4,15 @@
 //! memory and Theseus I/O (standard I/O, file system, arguments, environment variables, etc.).
 //!
 //! Documentation on system call behavior:
-//! https://docs.rs/wasi/0.10.2+wasi-snapshot-preview1/wasi/index.html
-//! https://github.com/WebAssembly/wasi-libc/blob/ad5133410f66b93a2381db5b542aad5e0964db96/libc-bottom-half/headers/public/wasi/api.h
+//! <https://docs.rs/wasi/0.10.2+wasi-snapshot-preview1/wasi/index.html>
+//! <https://github.com/WebAssembly/wasi-libc/blob/ad5133410f66b93a2381db5b542aad5e0964db96/libc-bottom-half/headers/public/wasi/api.h>
 //!
 //! The WASI crate documentation is useful for understanding WASI crate types and for a high-level
 //! understanding of WASI standards. The wasi-lib.c API header is far more useful, however, for
 //! understanding implementation details such as exact arguments passed into WASI system calls.
 //!
 //! Inspiration for some implementations is borrowed from tomaka/redshirt:
-//! https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/extrinsics/wasi.rs
+//! <https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/extrinsics/wasi.rs>
 //!
 
 use crate::posix_file_system::{PosixNode, PosixNodeOrStdio};
