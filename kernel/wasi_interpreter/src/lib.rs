@@ -122,9 +122,8 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
     };
 
     // Open permitted directories in file descriptor table prior to execution.
-    // NOTE: WASI relies on an assumption that all preopened directories occupy the first the lowest
-    // possible file descriptors (3, 4, ...). The `open_path` function below conforms to this
-    // standard.
+    // NOTE: WASI relies on an assumption that all preopened directories occupy the lowest possible
+    // file descriptors (3, 4, ...). The `open_path` function below conforms to this standard.
     for preopen_dir in preopen_dirs.iter() {
         let _curr_fd: wasi::Fd = ext
             .fd_table
