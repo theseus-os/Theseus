@@ -1,17 +1,17 @@
 //! Application for running WASI-compliant WebAssembly binaries from Theseus command line.
 //!
 //! USAGE:
-//!    wasm </path/to/wasm/binary.wasm> [args ...]
+//!     wasm [option] ... WASM_BINARY_PATH [arg] ...
 //!
 //! EXAMPLES:
 //!
-//! Running a WebAssembly Module:
+//! Running a WebAssembly Binary:
 //!     wasm example.wasm
 //!
 //! Preopening Multiple Directories:
 //!     wasm --dir DIR1 --dir DIR2 example.wasm
 //!
-//! Passing Arguments/Flags to WebAssembly Module
+//! Passing Arguments/Flags to WebAssembly Binary:
 //!     wasm --dir . example.wasm ARG1 ARG2 ARG3
 //!
 
@@ -39,7 +39,7 @@ pub fn main(args: Vec<String>) -> isize {
     // StopAtFirstFree allows arguments to be passed to WebAssembly program.
     opts.parsing_style(ParsingStyle::StopAtFirstFree);
 
-    opts.optmulti("d", "dir", "set preopened directories", "DIR");
+    opts.optmulti("d", "dir", "directories to grant file system access", "DIR");
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args) {
@@ -136,15 +136,15 @@ fn print_usage(opts: Options) {
 }
 
 const USAGE: &'static str = "USAGE:
-    wasm </path/to/wasm/binary.wasm> [args ...]
+    wasm [option] ... WASM_BINARY_PATH [arg] ...
 
 EXAMPLES:
 
-Running a WebAssembly Module:
+Running a WebAssembly Binary:
     wasm example.wasm
 
 Preopening Multiple Directories:
     wasm --dir DIR1 --dir DIR2 example.wasm
 
-Passing Arguments to WebAssembly Module
-    wasm example.wasm ARG1 ARG2 ARG3";
+Passing Arguments/Flags to WebAssembly Binary:
+    wasm --dir . example.wasm ARG1 ARG2 ARG3";

@@ -1,10 +1,10 @@
 //! Types for interacting with Theseus standard I/O and file system via POSIX-style abstraction.
 //!
 //! This module provides APIs to:
-//! * interact with a file descriptor table (open fd, close fd, get underlying handle).
+//! * interact with a file descriptor table (open path, close fd, get underlying Theseus handle).
 //! * read, write, or seek a file system node or standard I/O
 //!
-//! This abstraction is necessary as WASI assumed a POSIX-style file descriptor table interface.
+//! This abstraction is necessary as WASI assumes a POSIX-style file descriptor table interface.
 //!
 
 use alloc::string::String;

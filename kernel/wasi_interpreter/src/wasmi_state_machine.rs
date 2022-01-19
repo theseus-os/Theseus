@@ -1,7 +1,7 @@
 //! Module for resolving memory and function imports from WebAssembly module into state machine.
 //!
 //! Subset of functionality borrowed from tomaka/redshirt:
-//! https://github.com/tomaka/redshirt/blob/main/kernel/core/src/scheduler/vm.rs
+//! https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/scheduler/vm.rs
 //!
 
 use alloc::string::String;

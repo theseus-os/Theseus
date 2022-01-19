@@ -1,4 +1,4 @@
-//! A library for executing WASI-compliant WebAssembly binaries.
+//! Interpreter for executing WASI-compliant WASM binaries.
 //!
 //! `wasi_interpreter` provides an interface between the `wasmi` crate (used to interpret
 //! WebAssembly) and Theseus under the assumption of a WASI interface.
@@ -34,7 +34,8 @@ extern crate wasmi;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::convert::TryFrom as _;
+use core::convert::TryFrom;
+use core::str::FromStr;
 use posix_file_system::FileDescriptorTable;
 use wasi_definitions::SystemCall;
 use wasmi::{Externals, MemoryRef, Module, RuntimeArgs, RuntimeValue, Signature, Trap, ValueType};
@@ -63,7 +64,7 @@ impl Externals for HostExternals {
         index: usize,
         wasmi_args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
-        wasi_syscalls::execute_system_call(SystemCall::from_usize(index).unwrap(), self, wasmi_args)
+        wasi_syscalls::execute_system_call(SystemCall::try_from(index).unwrap(), self, wasmi_args)
     }
 }
 
@@ -85,15 +86,15 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
     // Construct wasmi WebAssembly state machine.
     let state_machine = wasmi_state_machine::ProcessStateMachine::new(
         &module,
-        |wasm_interface: &str, fn_name: &str, fn_signature: &Signature| {
+        |wasm_interface: &str, fn_name: &str, fn_signature: &Signature| -> Result<usize, ()> {
             // Match WebAssembly function import to corresponding system call number.
             // Currently supports `wasi_snapshot_preview1`.
             if wasm_interface.eq("wasi_snapshot_preview1") {
-                let system_call: SystemCall = SystemCall::from_fn_name(fn_name)
-                    .expect(&format!("Missing function {}", fn_name));
+                let system_call: SystemCall =
+                    SystemCall::from_str(fn_name).expect(&format!("Missing function {}", fn_name));
                 // Verify that signature of system call matches expected signature.
-                if fn_signature.eq(&system_call.signature()) {
-                    return Ok(system_call.to_usize());
+                if fn_signature.eq(&system_call.clone().into()) {
+                    return Ok(system_call.into());
                 }
             }
             Err(())

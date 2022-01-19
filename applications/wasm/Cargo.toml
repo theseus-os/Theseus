@@ -3,6 +3,7 @@ name = "wasm"
 version = "0.1.0"
 authors = ["Vikram Mullick <vikram1.mullick@gmail.com>"]
 edition = "2018"
+description = "Application for running WASI-compliant WebAssembly binaries from Theseus command line"
 
 [dependencies]
 getopts = "0.2.21"
