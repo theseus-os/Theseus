@@ -137,7 +137,10 @@ fn main() -> Result<(), String> {
                 }
             }
             _ => {
-                println!("Skipping potentially-redundant file with unexpected extension: {}", path.display());
+                println!("Removing potentially-redundant file with unexpected extension: {}", path.display());
+                fs::remove_file(&path).map_err(|e| 
+                    format!("Failed to remove potentially-redundant file with unexpected extension: {}. Error: {}", path.display(), e)
+                )?;
                 continue;
             }
         };
@@ -150,9 +153,39 @@ fn main() -> Result<(), String> {
                 format!("Failed to remove redundant crate file in out_dir: {}. Error: {}", path.display(), e)
             )?;
         } else {
-            // do nothing: keep the non-redundant file
+            // Here, do nothing. We must keep the non-redundant files,
+            // as they represent new dependencies that were not part of
+            // the original in-tree Theseus build.
         }
     }
+
+    // Here, remove the ".fingerprint/` directory, in order to force rustc
+    // to rebuild all artifacts for all of the modified rustc commands that we re-run below.
+    // Those fingerprint files are in the actual target directory, which is the parent directory of `out_dir`.
+    let target_dir = out_dir.parent().unwrap();
+    let mut fingerprint_dir_path = target_dir.to_path_buf();
+    fingerprint_dir_path.push(".fingerprint");
+    println!("--> Removing .fingerprint directory: {}", fingerprint_dir_path.display());
+    fs::remove_dir_all(&fingerprint_dir_path).map_err(|_e| 
+        format!("Failed to remove .fingerprint directory: {}. Error: {:?}", fingerprint_dir_path.display(), _e)
+    )?;
+
+        // if dir_entry.file_type().unwrap().is_file() {
+        //     match path.extension().and_then(|os_str| os_str.to_str()) {
+        //         Some("d") 
+        //         | Some("o")
+        //         | Some("a")
+        //         | Some(RMETA_FILE_EXTENSION)
+        //         | Some(RLIB_FILE_EXTENSION) => {
+        //             println!("Removing potentially-redundant target file: {}", path.display());
+        //             fs::remove_file(&path).map_err(|e| 
+        //                 format!("Failed to remove potentially-redundant target file: {}. Error: {}", path.display(), e)
+        //             )?;
+        //         }
+        //         _ => println!("Skipping existing file with unknown extension in target directory: {:?}", path.display()),
+        //     }
+        // }
+
 
     // Obtain the directory for the host system dependencies
     let mut host_deps_dir_path = PathBuf::from(&input_dir_path);

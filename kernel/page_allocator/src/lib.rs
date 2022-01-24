@@ -410,7 +410,6 @@ fn find_specific_chunk(
 							cursor_mut.move_prev(); // move the cursor back to the original chunk
 							let _removed_chunk = cursor_mut.replace_with(Wrapper::new_link(Chunk { pages: PageRange::new(*chunk.start(), new_end_page) }))
 								.expect("BUG: page_allocator failed to replace the current chunk while merging contiguous chunks.");
-							warn!("Untested: new_end_page: {:X?}, _removed_chunk: {:X?}", new_end_page, _removed_chunk);
 							return adjust_chosen_chunk(requested_page, num_pages, &chunk, ValueRefMut::RBTree(cursor_mut));
 						}
 					}
