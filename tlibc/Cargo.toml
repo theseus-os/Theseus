@@ -34,6 +34,8 @@ path = "../kernel/app_io"
 ## tlibc into an .rlib file.
 [dependencies.panic_entry]
 path = "../kernel/panic_entry"
+[dependencies.heap]
+path = "../kernel/heap"
 
 
 [build-dependencies]

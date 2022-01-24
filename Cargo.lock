@@ -1388,6 +1388,7 @@ checksum = "84565678e403453d1a27a0886882b3b271701e65146d972d9d7d9a4c4a0ff498"
 name = "loadc"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "libc",
@@ -1397,7 +1398,6 @@ dependencies = [
  "path",
  "rustc-demangle",
  "task",
- "terminal_print",
  "xmas-elf",
 ]
 

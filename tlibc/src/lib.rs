@@ -14,6 +14,8 @@
 
 // Needed for "staticlib" crate-type only
 extern crate panic_entry;
+extern crate heap;
+
 
 extern crate alloc;
 #[macro_use] extern crate log;
