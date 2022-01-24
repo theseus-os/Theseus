@@ -155,6 +155,7 @@ sourcesIndex["vga_buffer"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["virtual_nic"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["wait_condition"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["wait_queue"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["wasi_interpreter"] = {"name":"","files":["lib.rs","posix_file_system.rs","wasi_definitions.rs","wasi_syscalls.rs","wasmi_state_machine.rs"]};
 sourcesIndex["window"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["window_inner"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["window_manager"] = {"name":"","files":["lib.rs"]};
