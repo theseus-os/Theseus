@@ -720,7 +720,6 @@
 <span id="717">717</span>
 <span id="718">718</span>
 <span id="719">719</span>
-<span id="720">720</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Provides an allocator for virtual memory pages.</span>
 <span class="doccomment">//! The minimum unit of allocation is a single page. </span>
@@ -1134,7 +1133,6 @@
 							<span class="ident">cursor_mut</span>.<span class="ident">move_prev</span>(); <span class="comment">// move the cursor back to the original chunk</span>
 							<span class="kw">let</span> <span class="ident">_removed_chunk</span> <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">replace_with</span>(<span class="ident">Wrapper::new_link</span>(<span class="ident">Chunk</span> { <span class="ident">pages</span>: <span class="ident">PageRange::new</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">new_end_page</span>) }))
 								.<span class="ident">expect</span>(<span class="string">&quot;BUG: page_allocator failed to replace the current chunk while merging contiguous chunks.&quot;</span>);
-							<span class="macro">warn!</span>(<span class="string">&quot;Untested: new_end_page: {:X?}, _removed_chunk: {:X?}&quot;</span>, <span class="ident">new_end_page</span>, <span class="ident">_removed_chunk</span>);
 							<span class="kw">return</span> <span class="ident">adjust_chosen_chunk</span>(<span class="ident">requested_page</span>, <span class="ident">num_pages</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>, <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor_mut</span>));
 						}
 					}
