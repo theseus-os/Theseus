@@ -132,7 +132,7 @@ iso: $(iso)
 
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): clean-old-build build
+$(iso): clean-old-build build extra_files
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
