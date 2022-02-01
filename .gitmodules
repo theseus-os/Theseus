@@ -7,9 +7,6 @@
 	url = https://github.com/theseus-os/x86_64
 	branch = master
 	ignore = dirty
-[submodule "libs/mpmc"]
-	path = libs/mpmc
-	url = https://github.com/theseus-os/mpmc
 [submodule "libs/object"]
 	path = libs/object
 	url = https://github.com/theseus-os/object.git
