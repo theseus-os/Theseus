@@ -9,15 +9,13 @@ build = "../../build.rs"
 spin = "0.9.0"
 crossbeam-utils = { version = "0.8.5", default-features = false }
 static_assertions = "1.1.0"
+mpmc = "0.1.6"
 
 [dependencies.log]
 version = "0.4.8"
 
 [dependencies.debugit]
 path = "../../libs/debugit"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
 
 [dependencies.wait_queue]
 path = "../wait_queue"
