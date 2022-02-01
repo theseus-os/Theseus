@@ -7,9 +7,6 @@
 	url = https://github.com/theseus-os/x86_64
 	branch = master
 	ignore = dirty
-[submodule "libs/mpmc"]
-	path = libs/mpmc
-	url = https://github.com/theseus-os/mpmc
 [submodule "libs/wasmtime"]
 	path = ports/wasmtime
 	url = git@github.com:theseus-os/wasmtime.git
@@ -18,13 +15,13 @@
 	url = git@github.com:theseus-os/wasm-tools.git
 [submodule "libs/object"]
 	path = libs/object
-	url = git@github.com:theseus-os/object.git
+	url = https://github.com/theseus-os/object.git
 [submodule "libs/libc"]
 	path = ports/libc
-	url = git@github.com:theseus-os/libc.git
+	url = https://github.com/theseus-os/libc.git
 [submodule "libs/indexmap"]
 	path = libs/indexmap
 	url = https://github.com/theseus-os/indexmap
-[submodule "region"]
+[submodule "ports/region"]
 	path = ports/region
 	url = https://github.com/theseus-os/region-rs

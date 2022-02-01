@@ -7,7 +7,7 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate getopts;
 extern crate fs_node;
 extern crate path;
@@ -80,6 +80,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
     // Parse the file as an ELF executable
     let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
     let byte_slice: &[u8] = file_mp.as_slice(0, file.size())?;
+
     let (mut segments, entry_point, _vaddr_offset, elf_file) = parse_and_load_elf_executable(byte_slice)?;
     debug!("Parsed ELF executable, moving on to overwriting relocations.");
     
@@ -354,7 +355,8 @@ fn overwrite_relocations(
         use xmas_elf::sections::SectionData::Rela64;
         if verbose_log { 
             trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
-            sec.get_name(&elf_file), sec.get_type(), sec.info()); 
+                sec.get_name(&elf_file), sec.get_type(), sec.info()
+            ); 
         }
 
         let rela_sec_name = sec.get_name(&elf_file).unwrap();

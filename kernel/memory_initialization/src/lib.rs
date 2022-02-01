@@ -7,6 +7,7 @@ extern crate kernel_config;
 extern crate memory;
 extern crate stack;
 extern crate multiboot2;
+extern crate bootloader_modules;
 
 use memory::{MmiRef, MappedPages, VirtualAddress, PhysicalAddress};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
@@ -17,6 +18,7 @@ use alloc::{
 };
 use heap::HEAP_FLAGS;
 use stack::Stack;
+use bootloader_modules::BootloaderModule;
 
 /// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
@@ -116,13 +118,12 @@ pub fn init_memory_management(
     // Because bootloader modules may overlap with the actual boot information, 
     // we need to preserve those records here in a separate list,
     // such that we can unmap the boot info pages & frames here but still access that info in the future .
-    let bootloader_modules: Vec<BootloaderModule> = boot_info.module_tags().map(|m| {
-        BootloaderModule {
-            start: PhysicalAddress::new_canonical(m.start_address() as usize),
-            end:   PhysicalAddress::new_canonical(m.end_address()   as usize),
-            name:  String::from(m.name()),
-        }
-    }).collect();
+    let bootloader_modules: Vec<BootloaderModule> = boot_info.module_tags()
+        .map(|m| BootloaderModule::new(
+            PhysicalAddress::new_canonical(m.start_address() as usize),
+            PhysicalAddress::new_canonical(m.end_address()   as usize),
+            String::from(m.name()),
+        )).collect();
 
     // Now that we've recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
     // This frees up those frames such that future code can exclusively map and access those pages/frames.
@@ -137,22 +138,4 @@ pub fn init_memory_management(
         bootloader_modules,
         identity_mapped_pages
     ))
-}
-
-
-/// A record of a bootloader module's name and location in physical memory.
-#[derive(Debug)]
-pub struct BootloaderModule {
-    /// The starting address of this module, inclusive.
-    pub start: PhysicalAddress,
-    /// The ending address of this module, exclusive.
-    pub end: PhysicalAddress,
-    /// The name of this module, i.e.,
-    /// the filename it was given in the bootloader's cfg file.
-    pub name: String,
-}
-impl BootloaderModule {
-    pub fn size_in_bytes(&self) -> usize {
-        self.end.value() - self.start.value()
-    }
 }

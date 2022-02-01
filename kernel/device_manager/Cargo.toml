@@ -9,6 +9,7 @@ build = "../../build.rs"
 spin = "0.9.0"
 core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
 derive_more = "0.99.0"
+mpmc = "0.1.6"
 
 [dependencies.fatfs]
 git = "https://github.com/rafalh/rust-fatfs"
@@ -17,9 +18,6 @@ features = [ "alloc", "lfn", "unicode", "log_level_warn" ]
 
 [dependencies.log]
 version = "0.4.8"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
 
 [dependencies.event_types]
 path = "../event_types"

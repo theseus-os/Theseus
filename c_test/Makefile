@@ -55,7 +55,7 @@ export override LDFLAGS += -nostdlib -nostartfiles
 ###
 ### TODO: figure out a way to remove all irrelevant relocation entries, at a minimum the `R_X86_64_NONE` and local relocation sections, such as the `.rela.eh_frame` section. 
 ### 
-%: %.c
+%: %.c $(TLIBC_A)
 	$(CROSS)gcc \
 		$(LDFLAGS) \
 		-O0 \

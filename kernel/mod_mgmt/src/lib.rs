@@ -6,7 +6,7 @@
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
-extern crate memory_initialization;
+extern crate bootloader_modules;
 extern crate kernel_config;
 extern crate util;
 extern crate crate_name_utils;
@@ -29,7 +29,7 @@ use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
-use memory_initialization::BootloaderModule;
+use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, wrapper::BString};
@@ -49,6 +49,10 @@ pub mod replace_nano_core_crates;
 
 /// The name of the directory that contains all of the CrateNamespace files.
 pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
+
+/// The name of the directory that contains all other "extra_files" contents.
+pub const EXTRA_FILES_DIRECTORY_NAME: &'static str = "extra_files";
+const EXTRA_FILES_DIRECTORY_DELIMITER: char = '?';
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
 static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
@@ -131,6 +135,9 @@ pub fn init(
 /// This function does not create any namespaces, it just populates the files and directories
 /// such that namespaces can be created based on those files.
 /// 
+/// If a file does not have an expected crate prefix according to [`CrateType::from_module_name()`],
+/// then it is treated as part of "extra_files"; see [`parse_extra_file()`] for more.
+/// 
 /// Returns a tuple of: 
 /// * the top-level root "namespaces" directory that contains all other namespace directories,
 /// * the directory of the default kernel crate namespace.
@@ -141,6 +148,8 @@ fn parse_bootloader_modules_into_files(
 
     // create the top-level directory to hold all default namespaces
     let namespaces_dir = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())?;
+    // create the top-level directory to hold all extra files
+    let extra_files_dir = VFSDirectory::new(EXTRA_FILES_DIRECTORY_NAME.to_string(), root::get_root())?;
 
     // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
     let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
@@ -151,11 +160,7 @@ fn parse_bootloader_modules_into_files(
     };
 
     for m in bootloader_modules {
-        let (crate_type, prefix, file_name) = CrateType::from_module_name(&m.name)?;
-        let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
-        let name = String::from(file_name);
-
-        let frames = allocate_frames_by_bytes_at(m.start, m.size_in_bytes())
+        let frames = allocate_frames_by_bytes_at(m.start_address(), m.size_in_bytes())
             .map_err(|_e| "Failed to allocate frames for bootloader module")?;
         let pages = allocate_pages_by_bytes(m.size_in_bytes())
             .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
@@ -165,10 +170,18 @@ fn parse_bootloader_modules_into_files(
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", m.name, m.size_in_bytes(), mp);
+        let (crate_type, prefix, file_name) = if let Ok((c, p, f)) = CrateType::from_module_name(m.name().as_str()) {
+            (c, p, f)
+        } else {
+            parse_extra_file(&m, mp, Arc::clone(&extra_files_dir))?;
+            continue;
+        };
+
+        let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
+        // debug!("Module: {:?}, size {}, mp: {:?}", m.name(), m.size_in_bytes(), mp);
 
         let create_file = |dir: &DirRef| {
-            MemFile::from_mapped_pages(mp, name, m.size_in_bytes(), dir)
+            MemFile::from_mapped_pages(mp, file_name.to_string(), m.size_in_bytes(), dir)
         };
 
         // Get the existing (or create a new) namespace directory corresponding to the given directory name.
@@ -183,6 +196,50 @@ fn parse_bootloader_modules_into_files(
         namespaces_dir,
         prefix_map.remove(CrateType::Kernel.default_namespace_name()).ok_or("BUG: no default namespace found")?,
     ))
+}
+
+/// Adds the given extra file to the directory of extra files
+/// 
+/// See the top-level Makefile target "extra_files" for an explanation of how these work.
+/// Basically, they are arbitrary files that are included by the bootloader as modules
+/// (files that exist as areas of pre-loaded memory).
+/// 
+/// Their file paths are encoded by flattening directory hierarchies into a the file name,
+/// using `'?'` (question marks) to replace the directory delimiter `'/'`.
+/// 
+/// Thus, for example, a file named `"foo?bar?me?test.txt"` will be placed at the path
+/// `/extra_files/foo/bar/me/test.txt`.
+fn parse_extra_file(
+    extra_file: &BootloaderModule,
+    extra_file_mp: MappedPages,
+    extra_files_dir: DirRef
+) -> Result<FileRef, &'static str> {
+
+    let mut file_name = extra_file.name().as_str();
+    
+    let mut parent_dir = extra_files_dir;
+    let mut iter = extra_file.name().as_str().split(EXTRA_FILES_DIRECTORY_DELIMITER).peekable();
+    while let Some(path_component) = iter.next() {
+        if iter.peek().is_some() {
+            let existing_dir = parent_dir.lock().get_dir(path_component);
+            parent_dir = existing_dir
+                .or_else(|| VFSDirectory::new(path_component.to_string(), &parent_dir).ok())
+                .ok_or_else(|| {
+                    error!("Failed to get or create directory {:?} for extra file {:?}", path_component, extra_file);
+                    "Failed to get or create directory for extra file"
+                })?;
+        } else {
+            file_name = path_component;
+            break;
+        }
+    }
+
+    MemFile::from_mapped_pages(
+        extra_file_mp,
+        file_name.to_string(),
+        extra_file.size_in_bytes(),
+        &parent_dir
+    )
 }
 
 

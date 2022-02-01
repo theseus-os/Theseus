@@ -173,6 +173,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bootloader_modules"
+version = "0.1.0"
+dependencies = [
+ "memory_structs",
+]
+
+[[package]]
 name = "by_address"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -898,19 +905,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memory_initialization"
-version = "0.1.0"
-dependencies = [
- "heap",
- "irq_safety",
- "kernel_config",
- "log",
- "memory",
- "multiboot2",
- "stack",
-]
-
-[[package]]
 name = "memory_structs"
 version = "0.1.0"
 dependencies = [
@@ -940,6 +934,7 @@ dependencies = [
 name = "mod_mgmt"
 version = "0.1.0"
 dependencies = [
+ "bootloader_modules",
  "cow_arc",
  "crate_metadata",
  "crate_name_utils",
@@ -951,7 +946,6 @@ dependencies = [
  "log",
  "memfs",
  "memory",
- "memory_initialization",
  "path",
  "qp-trie",
  "rangemap",
@@ -1621,6 +1615,7 @@ dependencies = [
  "cc",
  "core2",
  "cstr_core",
+ "heap",
  "lazy_static",
  "libc",
  "log",

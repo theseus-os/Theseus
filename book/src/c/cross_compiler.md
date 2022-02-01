@@ -121,7 +121,7 @@ MULTILIB_DIRNAMES += no-red-zone
 ```
 Yes, even though we're building for `x86_64`, we put it in the original x86 architecture config folder called `i386`.
 
-Then, instruct gcc's build process to use that new multilib configuration. Open the file `$SRC/gcc-10.2.0/gcc/config` and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):    
+Then, instruct gcc's build process to use that new `multilib` configuration. Open the file `$SRC/gcc-10.2.0/gcc/config` and search for the following configuration lines, which starts on Line 1867 (for gcc-10.2.0):    
 ```
 x86_64-*-elf*)
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
@@ -137,7 +137,7 @@ x86_64-*-elf*)
 **Note**: the indentation before `tmake_file` must be a TAB, not spaces. 
 
 ### Building GCC again with no red zone
-Go back to the build directory and reconfigure and re-make libgcc:
+Go back to the build directory and reconfigure and re-make `libgcc`:
 ```sh
 cd $SRC/cross-build-gcc
 ../gcc-10.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
@@ -163,5 +163,3 @@ The first one should output a path to `libgcc.a`, and the second should output a
 To properly use this new version of GCC that cross-compiles to the Theseus target and disables the red zone, make sure you:
  1. use the `x86_64-elf-gcc` executable that now resides in `$DEST/cross` 
  2. specify the `-mno-red-zone` flag, either on the command line or as part of `LDFLAGS`
-
-<!-- cspell:ignore dbxelf, elfos, ldflags, libgcc, libgmp, libmpc, libmpfr, multilib, newlib, nproc, stdint, texinfo, tmake, werror -->

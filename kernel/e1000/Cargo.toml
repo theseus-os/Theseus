@@ -12,6 +12,7 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 zerocopy = "0.5.0"
 static_assertions = "1.1.0"
+mpmc = "0.1.6"
 
 
 [dependencies.log]
@@ -35,9 +36,6 @@ path = "../pci"
 
 [dependencies.interrupts]
 path = "../interrupts"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
 
 [dependencies.network_interface_card]
 path = "../network_interface_card"
