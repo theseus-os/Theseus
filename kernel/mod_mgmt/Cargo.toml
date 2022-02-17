@@ -48,7 +48,7 @@ path = "../root"
 path = "../fs_node"
 
 [dependencies.hashbrown]
-version = "0.9.1"
+version = "0.11.2"
 features = ["nightly"]
 
 [dependencies.vfs_node]
