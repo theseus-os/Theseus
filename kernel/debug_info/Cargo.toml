@@ -26,7 +26,7 @@ default-features = false
 features = ["elf64"]
 
 [dependencies.hashbrown]
-version = "0.9.1"
+version = "0.11.2"
 features = ["nightly"]
 
 [dependencies.util]

@@ -56,12 +56,6 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
-
-[[package]]
-name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcb51a0695d8f838b1ee009b3fbf66bda078cd64590202a864a8f3e8c4315c47"
@@ -239,7 +233,7 @@ dependencies = [
 name = "block_cache"
 version = "0.1.0"
 dependencies = [
- "hashbrown 0.9.1",
+ "hashbrown",
  "lazy_static",
  "log",
  "storage_device",
@@ -510,7 +504,7 @@ dependencies = [
  "cow_arc",
  "fs_node",
  "goblin",
- "hashbrown 0.9.1",
+ "hashbrown",
  "log",
  "memory",
  "spin 0.9.0",
@@ -532,7 +526,7 @@ version = "0.1.0"
 dependencies = [
  "by_address",
  "fs_node",
- "hashbrown 0.9.1",
+ "hashbrown",
  "hpet",
  "lazy_static",
  "log",
@@ -594,7 +588,7 @@ dependencies = [
  "fs_node",
  "gimli 0.19.0",
  "goblin",
- "hashbrown 0.9.1",
+ "hashbrown",
  "log",
  "memory",
  "mod_mgmt",
@@ -958,7 +952,7 @@ version = "0.1.0"
 dependencies = [
  "compositor",
  "framebuffer",
- "hashbrown 0.9.1",
+ "hashbrown",
  "lazy_static",
  "shapes",
  "spin 0.9.0",
@@ -1026,9 +1020,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
+checksum = "418d37c8b1d42553c93648be529cb70f920d3baf8ef469b74b9638df426e0b4c"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
@@ -1065,20 +1059,11 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
-dependencies = [
- "ahash 0.4.7",
-]
-
-[[package]]
-name = "hashbrown"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 dependencies = [
- "ahash 0.7.6",
+ "ahash",
 ]
 
 [[package]]
@@ -1164,7 +1149,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
 dependencies = [
  "autocfg",
- "hashbrown 0.11.2",
+ "hashbrown",
  "serde",
 ]
 
@@ -1291,7 +1276,7 @@ dependencies = [
  "acpi",
  "apic",
  "bit_field 0.7.0",
- "hashbrown 0.9.1",
+ "hashbrown",
  "hpet",
  "intel_ethernet",
  "interrupts",
@@ -1436,7 +1421,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.0",
- "hashbrown 0.9.1",
+ "hashbrown",
  "hpet",
  "libm",
  "log",
@@ -1734,7 +1719,7 @@ dependencies = [
  "crate_name_utils",
  "cstr_core",
  "fs_node",
- "hashbrown 0.9.1",
+ "hashbrown",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1815,7 +1800,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cfg-if 0.1.10",
- "hashbrown 0.9.1",
+ "hashbrown",
  "heap",
  "intrusive-collections",
  "irq_safety",
@@ -2005,16 +1990,16 @@ name = "object"
 version = "0.27.1"
 dependencies = [
  "crc32fast",
- "hashbrown 0.11.2",
+ "hashbrown",
  "indexmap",
  "memchr",
 ]
 
 [[package]]
 name = "once_cell"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
+checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
 name = "opaque-debug"
@@ -2170,7 +2155,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "getopts",
- "hashbrown 0.9.1",
+ "hashbrown",
  "hpet",
  "log",
  "network_manager",
@@ -3348,9 +3333,9 @@ version = "0.1.0"
 
 [[package]]
 name = "version_check"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
+checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
 name = "vfs_node"
@@ -3456,7 +3441,7 @@ dependencies = [
  "app_io",
  "core2",
  "fs_node",
- "hashbrown 0.9.1",
+ "hashbrown",
  "memfs",
  "path",
  "root",
@@ -3505,7 +3490,7 @@ dependencies = [
 name = "wasmparser"
 version = "0.81.0"
 dependencies = [
- "hashbrown 0.9.1",
+ "hashbrown",
 ]
 
 [[package]]
@@ -3516,7 +3501,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "cranelift-entity",
  "gimli 0.25.0",
- "hashbrown 0.9.1",
+ "hashbrown",
  "indexmap",
  "log",
  "more-asserts",
