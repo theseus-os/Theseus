@@ -8,7 +8,7 @@ build = "../../build.rs"
 
 [dependencies]
 core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
-hashbrown = { version = "0.9.1", features = ["nightly"] }
+hashbrown = { version = "0.11.2", features = ["nightly"] }
 wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
 wasmi = { version = "0.9.0", default-features = false, features = ["core"] }
 
