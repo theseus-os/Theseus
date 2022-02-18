@@ -38,8 +38,8 @@ path = "../crate_metadata"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.memory_initialization]
-path = "../memory_initialization"
+[dependencies.bootloader_modules]
+path = "../bootloader_modules"
 
 [dependencies.root]
 path = "../root"
@@ -48,7 +48,7 @@ path = "../root"
 path = "../fs_node"
 
 [dependencies.hashbrown]
-version = "0.9.1"
+version = "0.11.2"
 features = ["nightly"]
 
 [dependencies.vfs_node]

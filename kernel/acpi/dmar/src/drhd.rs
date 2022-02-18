@@ -66,7 +66,7 @@ impl<'t> DmarDrhd<'t> {
     /// Returns the value of the `INCLUDE_PCI_ALL` flag,
     /// the only bit flag in this DRHD table.
     ///
-    /// ## Description from Intel Spec
+    /// # Description from Intel Spec
     /// If `false`, this remapping hardware unit has under its scope only
     /// devices in the specified segment that are explicitly identified through
     /// the Device Scope field. The device can be of any type as described by

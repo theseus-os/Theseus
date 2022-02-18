@@ -5,13 +5,13 @@ authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
 
 [dependencies]
-bare-io = { version = "0.2.1", features = [ "alloc" ] }
+core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
 [dependencies.app_io]
-path = "../app_io"
+path = "../../kernel/app_io"
 
 [dependencies.log]
 version = "0.4.8"

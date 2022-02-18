@@ -1,9 +1,9 @@
-pub use bare_io::*;
+pub use core2::io::*;
 use core::fmt;
 
-pub fn last_os_error() -> bare_io::Error {
+pub fn last_os_error() -> core2::io::Error {
     // If we switch back to core_io, this should invoke `Error::from_raw_os_error()`
-    bare_io::Error::new(ErrorKind::Other, crate::errno_str())
+    core2::io::Error::new(ErrorKind::Other, crate::errno_str())
 }
 
 
@@ -32,23 +32,23 @@ impl<T: WriteByte> WriteByte for CountingWriter<T> {
     }
 }
 impl<T: Write> Write for CountingWriter<T> {
-    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
         let res = self.inner.write(buf);
         if let Ok(written) = res {
             self.written += written;
         }
         res
     }
-    fn write_all(&mut self, buf: &[u8]) -> bare_io::Result<()> {
+    fn write_all(&mut self, buf: &[u8]) -> core2::io::Result<()> {
         match self.inner.write_all(&buf) {
             Ok(()) => (),
-            Err(ref err) if err.kind() == bare_io::ErrorKind::WriteZero => (),
+            Err(ref err) if err.kind() == core2::io::ErrorKind::WriteZero => (),
             Err(err) => return Err(err),
         }
         self.written += buf.len();
         Ok(())
     }
-    fn flush(&mut self) -> bare_io::Result<()> {
+    fn flush(&mut self) -> core2::io::Result<()> {
         self.inner.flush()
     }
 }
@@ -57,7 +57,7 @@ impl<T: Write> Write for CountingWriter<T> {
 
 pub struct StringWriter(pub *mut u8, pub usize);
 impl Write for StringWriter {
-    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
         if self.1 > 1 {
             let copy_size = buf.len().min(self.1 - 1);
             unsafe {
@@ -76,7 +76,7 @@ impl Write for StringWriter {
         // `cmp::min(written, maxlen)`.
         Ok(buf.len())
     }
-    fn flush(&mut self) -> bare_io::Result<()> {
+    fn flush(&mut self) -> core2::io::Result<()> {
         Ok(())
     }
 }
@@ -95,6 +95,53 @@ impl WriteByte for StringWriter {
     }
 }
 
+
+
+pub struct UnsafeStringWriter(pub *mut u8);
+impl Write for UnsafeStringWriter {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
+        unsafe {
+            core::ptr::copy_nonoverlapping(buf.as_ptr(), self.0, buf.len());
+            self.0 = self.0.add(buf.len());
+            *self.0 = b'\0';
+        }
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> core2::io::Result<()> {
+        Ok(())
+    }
+}
+impl fmt::Write for UnsafeStringWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        // can't fail
+        self.write(s.as_bytes()).unwrap();
+        Ok(())
+    }
+}
+impl WriteByte for UnsafeStringWriter {
+    fn write_u8(&mut self, byte: u8) -> fmt::Result {
+        // can't fail
+        self.write(&[byte]).unwrap();
+        Ok(())
+    }
+}
+
+pub struct UnsafeStringReader(pub *const u8);
+impl Read for UnsafeStringReader {
+    fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
+        unsafe {
+            for i in 0..buf.len() {
+                if *self.0 == 0 {
+                    return Ok(i);
+                }
+
+                buf[i] = *self.0;
+                self.0 = self.0.offset(1);
+            }
+            Ok(buf.len())
+        }
+    }
+}
 
 
 pub trait WriteByte: fmt::Write {

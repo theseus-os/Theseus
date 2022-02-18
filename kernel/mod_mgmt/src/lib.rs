@@ -6,7 +6,7 @@
 extern crate spin;
 extern crate xmas_elf;
 extern crate memory;
-extern crate memory_initialization;
+extern crate bootloader_modules;
 extern crate kernel_config;
 extern crate util;
 extern crate crate_name_utils;
@@ -23,13 +23,13 @@ extern crate cstr_core;
 extern crate hashbrown;
 extern crate rangemap;
 
-use core::{fmt, ops::{Deref, Range}};
+use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
 use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
-use memory_initialization::BootloaderModule;
+use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
 use qp_trie::{Trie, wrapper::BString};
@@ -49,6 +49,10 @@ pub mod replace_nano_core_crates;
 
 /// The name of the directory that contains all of the CrateNamespace files.
 pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
+
+/// The name of the directory that contains all other "extra_files" contents.
+pub const EXTRA_FILES_DIRECTORY_NAME: &'static str = "extra_files";
+const EXTRA_FILES_DIRECTORY_DELIMITER: char = '?';
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
 static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
@@ -131,6 +135,9 @@ pub fn init(
 /// This function does not create any namespaces, it just populates the files and directories
 /// such that namespaces can be created based on those files.
 /// 
+/// If a file does not have an expected crate prefix according to [`CrateType::from_module_name()`],
+/// then it is treated as part of "extra_files"; see [`parse_extra_file()`] for more.
+/// 
 /// Returns a tuple of: 
 /// * the top-level root "namespaces" directory that contains all other namespace directories,
 /// * the directory of the default kernel crate namespace.
@@ -141,6 +148,8 @@ fn parse_bootloader_modules_into_files(
 
     // create the top-level directory to hold all default namespaces
     let namespaces_dir = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())?;
+    // create the top-level directory to hold all extra files
+    let extra_files_dir = VFSDirectory::new(EXTRA_FILES_DIRECTORY_NAME.to_string(), root::get_root())?;
 
     // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
     let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
@@ -151,11 +160,7 @@ fn parse_bootloader_modules_into_files(
     };
 
     for m in bootloader_modules {
-        let (crate_type, prefix, file_name) = CrateType::from_module_name(&m.name)?;
-        let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
-        let name = String::from(file_name);
-
-        let frames = allocate_frames_by_bytes_at(m.start, m.size_in_bytes())
+        let frames = allocate_frames_by_bytes_at(m.start_address(), m.size_in_bytes())
             .map_err(|_e| "Failed to allocate frames for bootloader module")?;
         let pages = allocate_pages_by_bytes(m.size_in_bytes())
             .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
@@ -165,10 +170,18 @@ fn parse_bootloader_modules_into_files(
             EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", m.name, m.size_in_bytes(), mp);
+        let (crate_type, prefix, file_name) = if let Ok((c, p, f)) = CrateType::from_module_name(m.name().as_str()) {
+            (c, p, f)
+        } else {
+            parse_extra_file(&m, mp, Arc::clone(&extra_files_dir))?;
+            continue;
+        };
+
+        let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
+        // debug!("Module: {:?}, size {}, mp: {:?}", m.name(), m.size_in_bytes(), mp);
 
         let create_file = |dir: &DirRef| {
-            MemFile::from_mapped_pages(mp, name, m.size_in_bytes(), dir)
+            MemFile::from_mapped_pages(mp, file_name.to_string(), m.size_in_bytes(), dir)
         };
 
         // Get the existing (or create a new) namespace directory corresponding to the given directory name.
@@ -183,6 +196,50 @@ fn parse_bootloader_modules_into_files(
         namespaces_dir,
         prefix_map.remove(CrateType::Kernel.default_namespace_name()).ok_or("BUG: no default namespace found")?,
     ))
+}
+
+/// Adds the given extra file to the directory of extra files
+/// 
+/// See the top-level Makefile target "extra_files" for an explanation of how these work.
+/// Basically, they are arbitrary files that are included by the bootloader as modules
+/// (files that exist as areas of pre-loaded memory).
+/// 
+/// Their file paths are encoded by flattening directory hierarchies into a the file name,
+/// using `'?'` (question marks) to replace the directory delimiter `'/'`.
+/// 
+/// Thus, for example, a file named `"foo?bar?me?test.txt"` will be placed at the path
+/// `/extra_files/foo/bar/me/test.txt`.
+fn parse_extra_file(
+    extra_file: &BootloaderModule,
+    extra_file_mp: MappedPages,
+    extra_files_dir: DirRef
+) -> Result<FileRef, &'static str> {
+
+    let mut file_name = extra_file.name().as_str();
+    
+    let mut parent_dir = extra_files_dir;
+    let mut iter = extra_file.name().as_str().split(EXTRA_FILES_DIRECTORY_DELIMITER).peekable();
+    while let Some(path_component) = iter.next() {
+        if iter.peek().is_some() {
+            let existing_dir = parent_dir.lock().get_dir(path_component);
+            parent_dir = existing_dir
+                .or_else(|| VFSDirectory::new(path_component.to_string(), &parent_dir).ok())
+                .ok_or_else(|| {
+                    error!("Failed to get or create directory {:?} for extra file {:?}", path_component, extra_file);
+                    "Failed to get or create directory for extra file"
+                })?;
+        } else {
+            file_name = path_component;
+            break;
+        }
+    }
+
+    MemFile::from_mapped_pages(
+        extra_file_mp,
+        file_name.to_string(),
+        extra_file.size_in_bytes(),
+        &parent_dir
+    )
 }
 
 
@@ -405,7 +462,7 @@ pub struct CrateNamespace {
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
     /// 
-    /// NOTE: this is currently a global system-wide singleton. See the static [`TLS_INITIALIZER`] for more.
+    /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
     tls_initializer: &'static Mutex<TlsInitializer>,
 
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
@@ -1226,17 +1283,17 @@ impl CrateNamespace {
                         global_sections.contains(&shndx),
                         new_crate_weak_ref.clone(),
                     );
-                    trace!("New TLS section: {:?}", new_tls_section);
+                    // trace!("Loaded new TLS section: {:?}", new_tls_section);
                     
                     // Add the new TLS section to this namespace's initial TLS area,
                     // which will reserve/obtain a new offset into that TLS area which holds this section's data.
                     // This will also update the section's virtual address field to hold that offset value,
                     // which is used for relocation entries that ask for a section's offset from the TLS base.
                     let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                        .add_new_tls_section(new_tls_section, sec_align)
+                        .add_new_dynamic_tls_section(new_tls_section, sec_align)
                         .map_err(|_| "Failed to add new TLS section")?;
 
-                    trace!("\t Updated new TLS section: {:?}", new_tls_section);
+                    // trace!("\t --> updated new TLS section: {:?}", new_tls_section);
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
 
@@ -1621,7 +1678,7 @@ impl CrateNamespace {
             // that TLS section's initializer data has now changed.
             // Thus, we need to invalidate the TLS initializer area's cached data.
             if target_sec_data_was_modified && target_sec.typ == SectionType::Tls {
-                warn!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
+                debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
                 self.tls_initializer.lock().invalidate();
             }
 
@@ -2390,10 +2447,37 @@ pub fn find_symbol_table<'e>(elf_file: &'e ElfFile)
 /// to initialize a new `Task`'s TLS area.
 #[derive(Debug, Clone)]
 pub(crate) struct TlsInitializer {
+    /// The cached data image (with blank space for the TLS self pointer).
+    /// This is used to avoid unnecessarily re-generating the TLS data image
+    /// every time a new task is spawned if no TLS data sections have been added.
     data_cache: Vec<u8>,
+    /// The status of the above `data_cache`: whether it is ready to be used
+    /// immediately or needs to be regenerated.
     cache_status: CacheStatus,
-    offsets_of_sections: RangeMap<usize, StrongSectionRefWrapper>,
+    /// The set of TLS data sections that are defined at link time
+    /// and come from the statically-linked base kernel image (the nano_core).
+    /// According to the x86_64 TLS ABI, these exist at **negative** offsets
+    /// from the TLS self pointer, i.e., they exist **before** the TLS self pointer in memory.
+    /// Thus, their actual location in memory depends on the size of **all** static TLS data sections.
+    /// For example, the last section in this set (with the highest offset) will be placed
+    /// right before the TLS self pointer in memory. 
+    static_section_offsets:  RangeMap<usize, StrongSectionRefWrapper>,
+    /// The ending offset (an exclusive range end bound) of the last TLS section
+    /// in the above set of `static_section_offsets`.
+    /// This is the offset where the TLS self pointer exists.
+    end_of_static_sections: usize,
+    /// The set of TLS data sections that come from dynamically-loaded crate object files.
+    /// We can control and arbitrarily assign their offsets, and thus,
+    /// we place all of these sections **after** the TLS self pointer in memory.
+    /// For example, the first section in this set (with an offset of `0`) will be place
+    /// right after the TLS self pointer in memory.
+    dynamic_section_offsets: RangeMap<usize, StrongSectionRefWrapper>,
+    /// The ending offset (an exclusive range end bound) of the last TLS section
+    /// in the above set of `dynamic_section_offsets`.
+    end_of_dynamic_sections: usize,
 } 
+
+const POINTER_SIZE: usize = size_of::<usize>();
 
 impl TlsInitializer {
     /// Creates an empty TLS initializer with no TLS data sections.
@@ -2402,25 +2486,34 @@ impl TlsInitializer {
             // The data image will be generated lazily on the next request to use it.
             data_cache: Vec::new(),
             cache_status: CacheStatus::Invalidated,
-            offsets_of_sections: RangeMap::new(),
+            static_section_offsets: RangeMap::new(),
+            end_of_static_sections: 0,
+            dynamic_section_offsets: RangeMap::new(),
+            end_of_dynamic_sections: 0,
         }
     }
 
     /// Add a TLS section that has pre-determined offset, e.g.,
     /// one that was specified in the statically-linked nano_core kernel image.
-    pub(crate) fn add_existing_tls_section(
+    /// 
+    /// Returns an Error if inserting the given `tls_section` at the given `offset`
+    /// would overlap with an existing section.
+    /// Note: an error occurring here would indicate a link-time bug 
+    /// or a bug in the symbol parsing code that invokes this function.
+    pub(crate) fn add_existing_static_tls_section(
         &mut self,
         offset: usize,
         tls_section: StrongSectionRef,
     ) -> Result<(), ()> {
         let range = offset .. (offset + tls_section.size());
-        if self.offsets_of_sections.contains_key(&range.start) || 
-            self.offsets_of_sections.contains_key(&(range.end - 1))
+        if self.static_section_offsets.contains_key(&range.start) || 
+            self.static_section_offsets.contains_key(&(range.end - 1))
         {
             return Err(());
         }
 
-        self.offsets_of_sections.insert(range, StrongSectionRefWrapper(tls_section));
+        self.end_of_static_sections = max(self.end_of_static_sections, range.end);
+        self.static_section_offsets.insert(range, StrongSectionRefWrapper(tls_section));
         self.cache_status = CacheStatus::Invalidated;
         Ok(())
     }
@@ -2432,38 +2525,40 @@ impl TlsInitializer {
     /// to hold the value of that offset, which is necessary for relocation entries
     /// that depend on this section.
     /// 
+    /// Note: this will never return an index/offset value less than `size_of::<usize>()`,
+    /// (`8` on a 64-bit machine), as the first slot is reserved for the TLS self pointer.
+    /// 
     /// Returns a tuple of:
     /// 1. The index at which the new section was inserted, 
     ///    which is the offset from the beginning of the TLS area where the section data starts.
     /// 2. The modified section as a `StrongSectionRef`.
     /// 
-    /// Returns an empty error if there is no remaining space that can fit the section.
-    pub(crate) fn add_new_tls_section(
+    /// Returns an Error if there is no remaining space that can fit the section.
+    pub(crate) fn add_new_dynamic_tls_section(
         &mut self,
         mut section: LoadedSection,
         alignment: usize,
     ) -> Result<(usize, StrongSectionRef), ()> {
         let sec_size = section.size();
         let mut start_index = None;
-        // Find the next "gap" big enough to fit the new tls_section.
-        let unbounded_range = usize::MIN .. usize::MAX;
-        for gap in self.offsets_of_sections.gaps(&unbounded_range) {
+        // Find the next "gap" big enough to fit the new TLS section, 
+        // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
+        let range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
+        for gap in self.dynamic_section_offsets.gaps(&range_after_tls_self_pointer) {
             let aligned_start = util::round_up(gap.start, alignment);
             if aligned_start + sec_size <= gap.end {
-                warn!("aligned gap.start {} (align {}) up to {}", gap.start, alignment, aligned_start);
                 start_index = Some(aligned_start);
                 break;
             }
         }
 
         if let Some(start) = start_index {
+            let range = start .. (start + sec_size);
             section.address_range = 
-                VirtualAddress::new_canonical(start) .. VirtualAddress::new_canonical(start + sec_size);
+                VirtualAddress::new_canonical(range.start) .. VirtualAddress::new_canonical(range.end);
             let section_ref = Arc::new(section);
-            self.offsets_of_sections.insert(
-                start .. (start + sec_size),
-                StrongSectionRefWrapper(Arc::clone(&section_ref)),
-            );
+            self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
+            self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(Arc::clone(&section_ref)));
             // Now that we've added a new section, the cached data is invalid.
             self.cache_status = CacheStatus::Invalidated;
             Ok((start, section_ref))
@@ -2485,27 +2580,21 @@ impl TlsInitializer {
     /// 
     /// This function lazily generates the TLS image data on demand, if needed.
     pub(crate) fn get_data(&mut self) -> TlsDataImage {
-        const POINTER_SIZE:      usize = core::mem::size_of::<usize>();
-        const POINTER_ALIGNMENT: usize = core::mem::align_of::<usize>();
+        let total_section_size = self.end_of_static_sections + self.end_of_dynamic_sections;
+        let required_capacity = if total_section_size > 0 { total_section_size + POINTER_SIZE } else { 0 };
+        if required_capacity == 0 {
+            return TlsDataImage { _data: None, ptr: 0 };
+        }
 
-        if self.cache_status == CacheStatus::Invalidated {
-            // debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
-
-            // On some architectures, such as x86_64, the ABI convention REQUIRES that
-            // the TLS area data starts with a pointer to itself (the TLS self pointer).
-            // Also, all TLS section data comes *before* the TLS self pointer, i.e.,
-            // at negative offsets from the TLS area's self pointer.
-            // Thus, we handle that here by appending space for a pointer (one `usize`)
-            // to the `new_data` vector after we insert the rest of the TLS data sections.
-            // The pointer value is aligned to the architecture's pointer size, e.g., 8 bytes for x86_64.
-            // The location of the new pointer value is the conceptual "start" of the TLS image,
-            // and that's what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).
-            let mut new_data: Vec<u8> = Vec::new();
-            
-            let mut end_of_previous_range: usize = 0;
-            for (range, sec) in self.offsets_of_sections.iter() {
+        // An internal function that iterates over all TLS sections and copies their data into the new data image.
+        fn copy_tls_section_data(
+            new_data: &mut Vec<u8>,
+            section_offsets: &RangeMap<usize, StrongSectionRefWrapper>,
+            end_of_previous_range: &mut usize,
+        ) {
+            for (range, sec) in section_offsets.iter() {
                 // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
-                let num_padding_bytes = range.start.saturating_sub(end_of_previous_range);
+                let num_padding_bytes = range.start.saturating_sub(*end_of_previous_range);
                 for _i in 0..num_padding_bytes {
                     // surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.
                     new_data.push(0); 
@@ -2515,17 +2604,38 @@ impl TlsInitializer {
                 let sec_mp = sec.mapped_pages.lock();
                 let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
                 new_data.extend_from_slice(sec_data);
-                end_of_previous_range = range.end;
+                *end_of_previous_range = range.end;
             }
+        }
 
-            // Append space for the TLS self pointer (with enough padding for proper alignment);
-            // it's actual value will be filled in later once a new copy of the TLS data image is made.
-            if !new_data.is_empty() {
-                let aligned_start = util::round_up(end_of_previous_range, POINTER_ALIGNMENT);
-                let num_bytes = aligned_start - end_of_previous_range + POINTER_SIZE;
-                for _i in 0..num_bytes {
-                    new_data.push(0); 
-                }
+        if self.cache_status == CacheStatus::Invalidated {
+            // debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+
+            // On some architectures, such as x86_64, the ABI convention REQUIRES that
+            // the TLS area data starts with a pointer to itself (the TLS self pointer).
+            // Also, all data for "existing" (statically-linked) TLS sections must
+            // come *before* the TLS self pointer, i.e., at negative offsets from the TLS self pointer.
+            // Thus, we handle that here by appending space for a pointer (one `usize`)
+            // to the `new_data` vector after we insert the static TLS data sections.
+            // The location of the new pointer value is the conceptual "start" of the TLS image,
+            // and that's what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).
+            let mut new_data: Vec<u8> = Vec::with_capacity(required_capacity);
+            
+            // Iterate through all static TLS sections and copy their data into the new data image.
+            let mut end_of_previous_range: usize = 0;
+            copy_tls_section_data(&mut new_data, &self.static_section_offsets, &mut end_of_previous_range);
+            assert_eq!(end_of_previous_range, self.end_of_static_sections);
+
+            // Append space for the TLS self pointer immediately after the end of the last static TLS data section;
+            // its actual value will be filled in later (in `get_data()`) after a new copy of the TLS data image is made.
+            new_data.extend_from_slice(&[0u8; POINTER_SIZE]);
+
+            // Iterate through all dynamic TLS sections and copy their data into the new data image.
+            end_of_previous_range = POINTER_SIZE; // we already pushed room for the TLS self pointer above.
+            copy_tls_section_data(&mut new_data, &self.dynamic_section_offsets, &mut end_of_previous_range);
+            if self.end_of_dynamic_sections != 0 {
+                // this assertion only makes sense if there are any dynamic sections
+                assert_eq!(end_of_previous_range, self.end_of_dynamic_sections);
             }
 
             self.data_cache = new_data;
@@ -2533,24 +2643,22 @@ impl TlsInitializer {
         }
 
         // Here, the `data_cache` is guaranteed to be fresh and ready to use.
-        if !self.data_cache.is_empty() {
-            let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
-            // Every time we create a new copy of the TLS data image, we have to re-calculate
-            // and re-assign the TLS self pointer value at the end of the data image,
-            // because the virtual address of that new TLS data image copy will be unique.
-            // Note that we only do this if the data_copy actually contains any TLS data.
-            let offset_of_tls_self_ptr = data_copy.len().saturating_sub(POINTER_SIZE);
-            if let Some(dest_slice) = data_copy.get_mut(offset_of_tls_self_ptr .. (offset_of_tls_self_ptr + POINTER_SIZE)) {
-                let tls_self_ptr_value = dest_slice.as_ptr() as usize;
-                dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
-                return TlsDataImage { 
-                    _data: Some(data_copy),
-                    ptr:   tls_self_ptr_value,
-                };
+        let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
+        // Every time we create a new copy of the TLS data image, we have to re-calculate
+        // and re-assign the TLS self pointer value (located after the static TLS section data),
+        // because the virtual address of that new TLS data image copy will be unique.
+        // Note that we only do this if the data_copy actually contains any TLS data.
+        let self_ptr_offset = self.end_of_static_sections;
+        if let Some(dest_slice) = data_copy.get_mut(self_ptr_offset .. (self_ptr_offset + POINTER_SIZE)) {
+            let tls_self_ptr_value = dest_slice.as_ptr() as usize;
+            dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
+            TlsDataImage {
+                _data: Some(data_copy),
+                ptr:   tls_self_ptr_value,
             }
+        } else {
+            panic!("BUG: offset of TLS self pointer was out of bounds in the TLS data image:\n{:02X?}", data_copy);
         }
-
-        TlsDataImage { _data: None, ptr: 0 }
     }
 }
 
