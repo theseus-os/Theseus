@@ -31,22 +31,24 @@ use fallible_iterator::FallibleIterator;
 /// Get a stack trace using the default stack tracer based on DWARF debug info. 
 /// 
 /// # Arguments
-/// * `on_each_stack_frame`: the function that will be called for each stack frame in the call stack.
-///   The function is passed two arguments: 
-///   (1) a `StackFrame` instance that contains information about that frame, 
-///   (2) a reference to the current `StackFrameIter`, which can be used to obtain
+/// * `on_each_stack_frame`: (a mutable reference to) the function that will be called 
+///   for each stack frame in the call stack.
+/// 
+///   The function is called with two arguments: 
+///   1. a `StackFrame` instance that contains information about that frame, 
+///   2. a reference to the current `StackFrameIter`, which can be used to obtain
 ///   register values that existed at this frame in the call stack.
+/// 
 ///   The function should return `true` if it wants to continue iterating up the call stack,
 ///   or `false` if it wants the iteration to stop.
 /// * `max_recursion`: an optional maximum number of stack frames to recurse up the call stack.
-///   If not provided, the default maximum will be `64` call stack frames.
 /// 
 /// # Examples
 /// Typical usage would involve using the stack frame's call site address to print out 
 /// a standard backtrace of the call stack, as such:
 /// ```
 /// stack_trace(
-///     & |stack_frame, _stack_frame_iter| {
+///     &mut |stack_frame, _stack_frame_iter| {
 ///         println!("{:>#018X}", stack_frame.call_site_address());
 ///         true // keep iterating
 ///     },
@@ -55,12 +57,12 @@ use fallible_iterator::FallibleIterator;
 /// ```
 #[inline(never)]
 pub fn stack_trace(
-    on_each_stack_frame: &dyn Fn(StackFrame, &StackFrameIter) -> bool,
+    on_each_stack_frame: &mut dyn FnMut(StackFrame, &StackFrameIter) -> bool,
     max_recursion: Option<usize>,
 ) -> Result<(), &'static str> {
-    let max_recursion = max_recursion.unwrap_or(64);
+    let max_recursion = max_recursion.unwrap_or(usize::MAX);
 
-    unwind::invoke_with_current_registers(|registers| {
+    unwind::invoke_with_current_registers(&mut |registers| {
         let namespace = task::get_my_current_task()
             .map(|t| t.get_namespace())
             .or_else(|| mod_mgmt::get_initial_kernel_namespace())

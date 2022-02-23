@@ -133,7 +133,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame, print_
         if print_stack_trace {
             println_both!("------------------ Stack Trace (DWARF) ---------------------------");
             let stack_trace_result = stack_trace::stack_trace(
-                &|stack_frame, stack_frame_iter| {
+                &mut |stack_frame, stack_frame_iter| {
                     let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
                         VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
                         false
