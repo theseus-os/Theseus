@@ -448,10 +448,10 @@ type FuncWithRegistersRefMut<'a> = &'a mut dyn FuncWithRegisters;
 /// since we have to start from the current call frame and work backwards up the call stack 
 /// while applying the rules for register value changes in each call frame
 /// in order to arrive at the proper register values for a prior call frame.
-pub fn invoke_with_current_registers<F>(mut f: F) -> Result<(), &'static str> 
+pub fn invoke_with_current_registers<F>(f: &mut F) -> Result<(), &'static str> 
     where F: FuncWithRegisters 
 {
-    let mut f: FuncWithRegistersRefMut = &mut f;
+    let mut f: FuncWithRegistersRefMut = f; // cast to a &mut trait object
     let result = unsafe { 
         let res_ptr = unwind_trampoline(&mut f);
         let res_boxed = Box::from_raw(res_ptr);
@@ -717,7 +717,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 
 
     // We pass a pointer to the unwinding context to this closure. 
-    let res = invoke_with_current_registers(|registers| {
+    let res = invoke_with_current_registers(&mut |registers| {
         // set the proper register values before start the actual unwinding procedure.
         {  
             // SAFE: we just created this pointer above
