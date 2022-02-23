@@ -171,7 +171,7 @@
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">frame_pointers</span>))]</span> {
             <span class="macro">error!</span>(<span class="string">&quot;------------------ Stack Trace (DWARF) ---------------------------&quot;</span>);
             <span class="ident">stack_trace::stack_trace</span>(
-                <span class="kw-2">&amp;</span><span class="op">|</span><span class="ident">stack_frame</span>, <span class="ident">stack_frame_iter</span><span class="op">|</span> {
+                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="op">|</span><span class="ident">stack_frame</span>, <span class="ident">stack_frame_iter</span><span class="op">|</span> {
                     <span class="kw">let</span> <span class="ident">symbol_offset</span> <span class="op">=</span> <span class="ident">stack_frame_iter</span>.<span class="ident">namespace</span>().<span class="ident">get_section_containing_address</span>(
                         <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">stack_frame</span>.<span class="ident">call_site_address</span>() <span class="kw">as</span> <span class="ident">usize</span>),
                         <span class="bool-val">false</span>

@@ -86,6 +86,8 @@
 <span id="83">83</span>
 <span id="84">84</span>
 <span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Stack trace (backtrace) functionality using DWARF debugging information.</span>
 <span class="doccomment">//! </span>
@@ -120,22 +122,24 @@
 <span class="doccomment">/// Get a stack trace using the default stack tracer based on DWARF debug info. </span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// # Arguments</span>
-<span class="doccomment">/// * `on_each_stack_frame`: the function that will be called for each stack frame in the call stack.</span>
-<span class="doccomment">///   The function is passed two arguments: </span>
-<span class="doccomment">///   (1) a `StackFrame` instance that contains information about that frame, </span>
-<span class="doccomment">///   (2) a reference to the current `StackFrameIter`, which can be used to obtain</span>
+<span class="doccomment">/// * `on_each_stack_frame`: (a mutable reference to) the function that will be called </span>
+<span class="doccomment">///   for each stack frame in the call stack.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">///   The function is called with two arguments: </span>
+<span class="doccomment">///   1. a `StackFrame` instance that contains information about that frame, </span>
+<span class="doccomment">///   2. a reference to the current `StackFrameIter`, which can be used to obtain</span>
 <span class="doccomment">///   register values that existed at this frame in the call stack.</span>
+<span class="doccomment">/// </span>
 <span class="doccomment">///   The function should return `true` if it wants to continue iterating up the call stack,</span>
 <span class="doccomment">///   or `false` if it wants the iteration to stop.</span>
 <span class="doccomment">/// * `max_recursion`: an optional maximum number of stack frames to recurse up the call stack.</span>
-<span class="doccomment">///   If not provided, the default maximum will be `64` call stack frames.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// # Examples</span>
 <span class="doccomment">/// Typical usage would involve using the stack frame&#39;s call site address to print out </span>
 <span class="doccomment">/// a standard backtrace of the call stack, as such:</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">/// stack_trace(</span>
-<span class="doccomment">///     &amp; |stack_frame, _stack_frame_iter| {</span>
+<span class="doccomment">///     &amp;mut |stack_frame, _stack_frame_iter| {</span>
 <span class="doccomment">///         println!(&quot;{:&gt;#018X}&quot;, stack_frame.call_site_address());</span>
 <span class="doccomment">///         true // keep iterating</span>
 <span class="doccomment">///     },</span>
@@ -144,12 +148,12 @@
 <span class="doccomment">/// ```</span>
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stack_trace</span>(
-    <span class="ident">on_each_stack_frame</span>: <span class="kw-2">&amp;</span><span class="ident">dyn</span> <span class="ident">Fn</span>(<span class="ident">StackFrame</span>, <span class="kw-2">&amp;</span><span class="ident">StackFrameIter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>,
+    <span class="ident">on_each_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">dyn</span> <span class="ident">FnMut</span>(<span class="ident">StackFrame</span>, <span class="kw-2">&amp;</span><span class="ident">StackFrameIter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>,
     <span class="ident">max_recursion</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">max_recursion</span> <span class="op">=</span> <span class="ident">max_recursion</span>.<span class="ident">unwrap_or</span>(<span class="number">64</span>);
+    <span class="kw">let</span> <span class="ident">max_recursion</span> <span class="op">=</span> <span class="ident">max_recursion</span>.<span class="ident">unwrap_or</span>(<span class="ident">usize::MAX</span>);
 
-    <span class="ident">unwind::invoke_with_current_registers</span>(<span class="op">|</span><span class="ident">registers</span><span class="op">|</span> {
+    <span class="ident">unwind::invoke_with_current_registers</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="op">|</span><span class="ident">registers</span><span class="op">|</span> {
         <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">get_namespace</span>())
             .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>())
