@@ -41,6 +41,8 @@ exclude = [
 	# "applications/unwind_test",
 	"applications/test_ixgbe",
 	"libtheseus",
+
+	"applications/test_backtrace",
 ]
 
 [patch.'https://github.com/rafalh/rust-fatfs']

@@ -24,6 +24,9 @@ extern crate task;
 extern crate unwind;
 extern crate fallible_iterator;
 
+pub use mod_mgmt::{CrateNamespace, StrongSectionRef};
+pub use task::get_my_current_task;
+
 use unwind::{StackFrame, StackFrameIter};
 use fallible_iterator::FallibleIterator;
 

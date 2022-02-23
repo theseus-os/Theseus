@@ -19,3 +19,6 @@
 [submodule "ports/region"]
 	path = ports/region
 	url = https://github.com/theseus-os/region-rs
+[submodule "ports/backtrace"]
+	path = ports/backtrace
+	url = https://github.com/theseus-os/backtrace-rs.git
