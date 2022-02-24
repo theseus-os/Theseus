@@ -6,6 +6,7 @@
 members = [
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
+	"ports/path_std",
 ]
 
 
