@@ -103,10 +103,22 @@
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Struct definitions for various sets of register values that are useful in unwinding.</span>
 
-<span class="kw">use</span> <span class="ident">gimli</span>;
+<span class="kw">use</span> <span class="ident">gimli</span>::{<span class="self">self</span>, <span class="ident">X86_64</span>};
 <span class="kw">use</span> <span class="ident">core::fmt</span>::{<span class="ident">Debug</span>, <span class="ident">Formatter</span>, <span class="prelude-ty">Result</span> <span class="kw">as</span> <span class="ident">FmtResult</span>};
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Index</span>, <span class="ident">IndexMut</span>};
 
@@ -130,6 +142,18 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Registers</span> {
     <span class="ident">registers</span>: [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>; <span class="number">17</span>],
+}
+
+<span class="kw">impl</span> <span class="ident">Registers</span> {
+    <span class="doccomment">/// Returns the value of the stack pointer register.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stack_pointer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
+        <span class="self">self</span>[<span class="ident">X86_64::RSP</span>]
+    }
+
+    <span class="doccomment">/// Returns the value of the return address for this register set.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">return_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span> {
+        <span class="self">self</span>[<span class="ident">X86_64::RA</span>]
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">Debug</span> <span class="kw">for</span> <span class="ident">Registers</span> {
