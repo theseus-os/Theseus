@@ -30,19 +30,17 @@ exclude = [
 	"tlibc",
 
 	## exclude unused test applications by default
-	# "applications/test_channel",
 	"applications/test_exception",
 	"applications/test_exception2",
 	"applications/test_filerw",
 	"applications/heap_eval",
 	"applications/test_mutex_sleep",
 	"applications/test_wait_queue",
-	# "applications/test_panic",
-	# "applications/unwind_test",
 	"applications/test_ixgbe",
-	"libtheseus",
-
 	"applications/test_backtrace",
+
+	## libtheseus is currently built separately and not used
+	"libtheseus",
 ]
 
 [patch.'https://github.com/rafalh/rust-fatfs']

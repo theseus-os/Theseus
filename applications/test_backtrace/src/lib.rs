@@ -11,14 +11,21 @@ extern crate backtrace;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::boxed::Box;
 
 
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_backtrace::main(): at top");
 
+    println!("Testing simple backtrace:");
     backtrace::trace(|frame| {
         println!("Frame: {:X?}", frame);
+        true
+    });
+
+    println!("Testing resolved backtrace:");
+    backtrace::trace(|frame| {
+        println!("Frame: {:X?}", frame);
+        backtrace::resolve_frame(frame, |symbol| println!("    Symbol: {:X?}", symbol));
         true
     });
    
