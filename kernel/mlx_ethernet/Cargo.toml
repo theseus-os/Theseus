@@ -27,6 +27,9 @@ path = "../nic_initialization"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
 [dependencies.log]
 version = "0.4.8"
 

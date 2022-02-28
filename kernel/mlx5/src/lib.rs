@@ -24,6 +24,9 @@ extern crate kernel_config;
 extern crate memory_structs;
 extern crate network_interface_card;
 extern crate nic_buffers;
+extern crate mpmc;
+#[macro_use] extern crate lazy_static;
+
 
 use spin::Once; 
 use alloc::{
@@ -34,7 +37,7 @@ use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use pci::PciDevice;
 use owning_ref::BoxRefMut;
-use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory};
+use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
 use mlx_ethernet::{
     command_queue::{AccessRegisterOpMod, CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, HCACapabilities, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
     completion_queue::{CompletionQueue, CompletionQueueEntry, CompletionQueueDoorbellRecord}, 
@@ -42,11 +45,11 @@ use mlx_ethernet::{
     initialization_segment::InitializationSegment, 
     receive_queue::ReceiveQueue, 
     send_queue::SendQueue,
-    work_queue::{WorkQueueEntrySend, DoorbellRecord}
+    work_queue::{WorkQueueEntrySend, WorkQueueEntryReceive, DoorbellRecord}
 };
 use kernel_config::memory::PAGE_SIZE;
 use network_interface_card::NetworkInterfaceCard;
-use nic_buffers::TransmitBuffer;
+use nic_buffers::{TransmitBuffer, ReceiveBuffer};
 
 /// Vendor ID for Mellanox
 pub const MLX_VEND:             u16 = 0x15B3;
@@ -56,6 +59,14 @@ pub const CONNECTX5_EX_DEV:     u16 = 0x1019;
 pub const CONNECTX5_DEV:        u16 = 0x1017;
 /// For the send queue, we compress all the completion queue entries to the first entry.
 const NUM_CQ_ENTRIES_SEND:      usize = 1; 
+
+/// How many ReceiveBuffers are preallocated for this driver to use. 
+const RX_BUFFER_POOL_SIZE: usize = 256; 
+lazy_static! {
+    /// The pool of pre-allocated receive buffers that are used by the NIC
+    /// and temporarily given to higher layers in the networking stack.
+    static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
+}
 
 /// The singleton connectx-5 NIC.
 /// TODO: Allow for multiple NICs
@@ -94,10 +105,10 @@ pub struct ConnectX5Nic {
     send_queue: SendQueue,
     /// The completion queue where packet transmission is reported
     send_completion_queue: CompletionQueue,
-    // /// a buffer of receive descriptors
-    // receive_queue: ReceiveQueue,
-    // /// The completion queue where packet reception is reported
-    // receive_completion_queue: CompletionQueue,
+    /// a buffer of receive descriptors
+    receive_queue: ReceiveQueue,
+    /// The completion queue where packet reception is reported
+    receive_completion_queue: CompletionQueue,
 }
 
 /// Functions that setup the NIC struct.
@@ -113,12 +124,17 @@ impl ConnectX5Nic {
     /// * `mtu`: Maximum Transmission Unit
     pub fn init(mlx5_pci_dev: &PciDevice, num_tx_descs: usize, num_rx_descs: usize, mtu: u16) -> Result<&'static MutexIrqSafe<ConnectX5Nic> , &'static str> {
         let sq_size_in_bytes = num_tx_descs * core::mem::size_of::<WorkQueueEntrySend>();
-        let rq_size_in_bytes = num_rx_descs * core::mem::size_of::<WorkQueueEntrySend>();
+        let rq_size_in_bytes = num_rx_descs * core::mem::size_of::<WorkQueueEntryReceive>();
+        
         // because the RX and TX queues have to be contiguous and we are using MappedPages to split ownership of the queues
         // the RX queue must end on a page boundary
         if rq_size_in_bytes % PAGE_SIZE != 0 {
-            return Err("RQ size in bytes must be a multiple of the page size");
+            return Err("RQ size in bytes must be a multiple of the page size.");
         }
+
+        if !check_pow_2(num_tx_descs) || !check_pow_2(num_rx_descs) {
+            return Err("The number of descriptors must be a power of two.");
+        } 
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         mlx5_pci_dev.pci_set_command_bus_master_bit();
@@ -411,7 +427,7 @@ impl ConnectX5Nic {
 
         #[cfg(mlx_logger)]
         {
-            completion_queue.dump()
+            send_completion_queue.dump()
         }
 
         // execute CREATE_CQ for RQ
@@ -476,7 +492,7 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (sqn, status) = cmdq.get_send_queue_number(completed_cmd)?;
-        let mut send_queue = SendQueue::create(sq_mp, num_tx_descs, db_page, uar_page, sqn, tisn, rlkey)?;
+        let send_queue = SendQueue::create(sq_mp, num_tx_descs, db_page, uar_page, sqn, tisn, rlkey)?;
         trace!("Create SQ status: {:?}, number: {}", status, sqn);
         
         #[cfg(mlx_logger)]
@@ -484,47 +500,45 @@ impl ConnectX5Nic {
             send_queue.dump()
         }
 
-        // // Create the RQ
-        // let mut receive_queue = ReceiveQueue::create(rq_mp)?;
-
-        // let completed_cmd = cmdq.create_and_execute_command(
-        //     CommandBuilder::new(CommandOpcode::CreateRq) 
-        //         .allocated_pages(vec!(q_pa)) 
-        //         .queue_size(num_rx_descs as u32)
-        //         .db_page(db_pa)
-        //         .cqn(cqn_r) 
-        //         .pd(pd), 
-        //     &mut init_segment
-        // )?;
-        // let (rqn, status) = cmdq.get_receive_queue_number(completed_cmd)?;
-        // trace!("Create RQ status: {:?}, number: {}", status, rqn);
+        // Create the RQ
+        
+        let completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateRq) 
+            .allocated_pages(vec!(q_pa)) 
+            .queue_size(num_rx_descs as u32)
+            .db_page(db_pa)
+            .cqn(cqn_r) 
+            .pd(pd), 
+            &mut init_segment
+        )?;
+        let (rqn, status) = cmdq.get_receive_queue_number(completed_cmd)?;
+        let receive_queue = ReceiveQueue::create(rq_mp, num_rx_descs, rqn, rlkey)?;
+        trace!("Create RQ status: {:?}, number: {}", status, rqn);
 
         // MODIFY_SQ
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::ModifySq) 
-                .cqn(cqn_s) 
-                .tisn(tisn) 
                 .sqn(sqn), 
             &mut init_segment
         )?;
         trace!("Modify SQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
 
-        // // MODIFY_RQ
-        // let completed_cmd = cmdq.create_and_execute_command(
-        //     CommandBuilder::new(CommandOpcode::ModifyRq) 
-        //         .rqn(rqn), 
-        //     &mut init_segment
-        // )?;
-        // trace!("Modify RQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
-
-        // QUERY_SQ
+        // MODIFY_RQ
         let completed_cmd = cmdq.create_and_execute_command(
-            CommandBuilder::new(CommandOpcode::QuerySq)
-                .sqn(sqn), 
+            CommandBuilder::new(CommandOpcode::ModifyRq) 
+                .rqn(rqn), 
             &mut init_segment
         )?;
-        let (state, status) = cmdq.get_sq_state(completed_cmd)?;
-        trace!("Query SQ status: {:?}, state: {:?}", status, state);
+        trace!("Modify RQ status: {:?}", cmdq.get_command_status(completed_cmd)?);
+
+        // QUERY_SQ
+        // let completed_cmd = cmdq.create_and_execute_command(
+        //     CommandBuilder::new(CommandOpcode::QuerySq)
+        //         .sqn(sqn), 
+        //     &mut init_segment
+        // )?;
+        // let (state, status) = cmdq.get_sq_state(completed_cmd)?;
+        // trace!("Query SQ status: {:?}, state: {:?}", status, state);
 
         // execute QUERY_VPORT_STATE
         let completed_cmd = cmdq.create_and_execute_command(
@@ -534,9 +548,51 @@ impl ConnectX5Nic {
         let (tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)?;
         trace!("Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}", status, tx_speed, admin_state, state); 
 
-        // send_queue.nop();
-        // while send_completion_queue.hw_owned(0) {}
-        // send_completion_queue.dump();
+        // Create a flow table, currently just send all packets to the one receive queue
+        
+        // currently we only create 1 rule, the wildcard rule.
+        const NUM_RULES: u32 = 1;
+        let completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateFlowTable)
+                .queue_size(NUM_RULES), 
+            &mut init_segment
+        )?;
+        let (ft_id, status) = cmdq.get_flow_table_id(completed_cmd)?;
+        trace!("Create FT status: {:?}, id: {}", status, ft_id);
+
+        let completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateFlowGroup)
+                .flow_table_id(ft_id), 
+            &mut init_segment
+        )?;
+        let (fg_id, status) = cmdq.get_flow_group_id(completed_cmd)?;
+        trace!("Create FG status: {:?}, id: {}", status, fg_id);
+
+        let completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::CreateTir)
+                .rqn(rqn)
+                .td(td), 
+            &mut init_segment
+        )?;
+        let (tirn, status) = cmdq.get_tir_context_number(completed_cmd)?;
+        trace!("Create TIR status: {:?}, tirn: {}", status, tirn);
+
+        let completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::SetFlowTableEntry)
+                .flow_table_id(ft_id)
+                .flow_group_id(fg_id)
+                .tirn(tirn), 
+            &mut init_segment
+        )?;
+        trace!("Set FT entry status: {:?}", cmdq.get_command_status(completed_cmd)?);
+
+        let completed_cmd = cmdq.create_and_execute_command(
+            CommandBuilder::new(CommandOpcode::SetFlowTableRoot)
+                .flow_table_id(ft_id),
+            &mut init_segment
+        )?;
+        trace!("Set FT root status: {:?}", cmdq.get_command_status(completed_cmd)?);
+
 
         let mlx5_nic = ConnectX5Nic {
             mem_base,
@@ -551,8 +607,8 @@ impl ConnectX5Nic {
             event_queue,
             send_completion_queue: send_completion_queue,
             send_queue,
-            // receive_completion_queue: completion_queue_r,
-            // receive_queue
+            receive_completion_queue: completion_queue_r,
+            receive_queue
         };
         
         let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
@@ -587,8 +643,23 @@ impl ConnectX5Nic {
         let packet_length = buffer.length;
         let wqe_counter = self.send_queue.send(buffer.phys_addr, buffer.as_slice(0, packet_length as usize)?);
         // self.send_completion_queue.wqe_posted(wqe_counter);
-        self.send_completion_queue.check_packet_transmission(0);
+        self.send_completion_queue.check_packet_transmission(0, wqe_counter);
         self.send_completion_queue.dump();
         Ok(())
     }
+
+    pub fn send_fastpath(&mut self, buffer_addr: PhysicalAddress, buffer: &[u8]) {
+        self.send_queue.send(buffer_addr, buffer);
+    }
+
+    pub fn transmission_complete(&mut self) -> u16 {
+        self.send_completion_queue.wqe_counter(0)
+    }
+
+
+}
+
+/// Returns true if `num` is a power of 2.
+fn check_pow_2(num: usize) -> bool {
+    (num & (num - 1) == 0) && (num != 0)
 }

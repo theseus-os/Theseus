@@ -21,4 +21,8 @@ path = "../../kernel/mlx5"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
+[dependencies.libtest]
+path = "../../kernel/libtest"
 
+[dependencies.hpet]
+path = "../../kernel/acpi/hpet"

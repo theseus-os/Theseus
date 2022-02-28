@@ -222,6 +222,7 @@ impl SendQueue {
         Ok( SendQueue{entries, doorbell, uar, wqe_counter: 0, sqn, tisn, lkey, uar_db: CurrentUARDoorbell::Even} )
     }
 
+    /// Returns the index into the WQ given the total number of WQEs completed
     fn desc_id(&self) -> usize {
         self.wqe_counter as usize  % self.entries.len()
     }
@@ -231,7 +232,8 @@ impl SendQueue {
     fn finish_wqe_operation(&mut self) {
         let desc_id = self.desc_id();
         let wqe = &mut self.entries[desc_id];
-        self.wqe_counter += 1; // need to wrap around 0xFFFF, this should happen automatically with a u16
+        // need to wrap around 0xFFFF, this should happen automatically with a u16
+        self.wqe_counter += 1; 
         // we're writing the wqe counter, not the next wqe to be used (8.8.2 is confusing about what should actually be posted)
         self.doorbell.send_counter.write(U32::new(self.wqe_counter as u32)); 
         
@@ -241,10 +243,10 @@ impl SendQueue {
         self.uar.write_wqe_to_doorbell(&self.uar_db, doorbell);
         self.uar_db = self.uar_db.alternate();
 
-        wqe.dump(desc_id);
+        // wqe.dump(desc_id);
     }
 
-    /// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar page.
+    /// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar doorbell register.
     /// Returns the current value of the WQE counter.
     pub fn send(&mut self, packet_address: PhysicalAddress, packet: &[u8]) -> u16 {
         let desc_id = self.desc_id();
@@ -254,7 +256,7 @@ impl SendQueue {
         self.wqe_counter
     }
 
-    /// Perform all the steps to complete a NOP: initialize the WQE, update the doorbell record and the uar page.
+    /// Perform all the steps to complete a NOP: initialize the WQE, update the doorbell record and the uar doorbell register.
     /// Returns the current value of the WQE counter.
     pub fn nop(&mut self) -> u16 {
         let desc_id = self.desc_id();

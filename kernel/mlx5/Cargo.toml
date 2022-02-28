@@ -40,5 +40,12 @@ path = "../network_interface_card"
 [dependencies.nic_buffers]
 path = "../nic_buffers"
 
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
+
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
 [lib]
 crate-type = ["rlib"]

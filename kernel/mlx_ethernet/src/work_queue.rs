@@ -81,18 +81,17 @@ pub(crate) struct WorkQueue {
 const_assert_eq!(core::mem::size_of::<WorkQueue>(), 192);
 
 impl WorkQueue {
-    /// Initialize the fields of the WQ for a SQ context.
-    /// This is then passed to the HCA as part of the SQ Context when creating the SQ.
+    /// Initialize the fields of the WQ for a SQ or RQ context.
+    /// This is then passed to the HCA as part of the Context when creating the queue.
     /// 
     /// # Arguments
     /// * `pd`: protection domain number
-    /// * `uar_page`: UAR page number
     /// * `db_addr`: physical address of the doorbell record
     /// * `wq_size`: number of WQ entries
-    pub fn init_sq(&mut self, pd: u32, uar_page: u32, db_addr: PhysicalAddress, wq_size: u32) {
+    /// * `wqe_size_in_bytes`: size of the WQE
+    fn init(&mut self, pd: u32, db_addr: PhysicalAddress, wq_size: u32, wqe_size_in_bytes: u32) {
         const WQ_TYPE_SHIFT: u32 = 28;
         const PD_MASK: u32 = 0xFF_FFFF;
-        const UAR_PAGE_MASK: u32 = 0xFF_FFFF;
         const WQ_STRIDE_SHIFT: u32 = 16;
         const WQ_PAGE_SIZE_SHIFT: u32 = 8;
 
@@ -101,27 +100,33 @@ impl WorkQueue {
         
         self.wq_type_signature.write(U32::new((WQType::Cyclic as u32) << WQ_TYPE_SHIFT)); 
         self.pd.write(U32::new(pd & PD_MASK));
-        self.uar_page.write(U32::new(uar_page & UAR_PAGE_MASK));
         self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
         self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
+        
         // the stride of the WQE is equal to the size of the WQE
-        let log_wq_stride = libm::log2(core::mem::size_of::<WorkQueueEntrySend>() as f64) as u32; 
+        let log_wq_stride = libm::log2(wqe_size_in_bytes as f64) as u32; 
         let log_wq_size = libm::log2(wq_size as f64) as u32;
-        let log_wq_page_size = log_page_size(wq_size * core::mem::size_of::<WorkQueueEntrySend>() as u32);
+        let log_wq_page_size = log_page_size(wq_size * wqe_size_in_bytes);
         self.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride << WQ_STRIDE_SHIFT) | (log_wq_page_size << WQ_PAGE_SIZE_SHIFT) | log_wq_size));
     }
 
-    pub fn init_rq(&mut self, pd: u32, db_addr: PhysicalAddress, wq_size: u32) {
-        *self = WorkQueue::default();
-        self.wq_type_signature.write(U32::new(0x1 << 28)); //cyclic
-        self.pd.write(U32::new(pd & 0xFF_FFFF));
-        self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
-        self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
+    /// Initialize the fields of the WQ for a SQ context.
+    /// This is then passed to the HCA as part of the SQ Context when creating the SQ.
+    /// 
+    /// # Arguments
+    /// * `pd`: protection domain number
+    /// * `uar_page`: UAR page number (only provided for a SQ)
+    /// * `db_addr`: physical address of the doorbell record
+    /// * `wq_size`: number of WQ entries
+    pub fn init_sq(&mut self, pd: u32, uar_page: u32, db_addr: PhysicalAddress, wq_size: u32) {
+        const UAR_PAGE_MASK: u32 = 0xFF_FFFF;
 
-        let log_wq_stride = libm::log2(64.0) as u32; //=64 ?????
-        let log_wq_size = libm::log2(wq_size as f64) as u32;
-        let log_wq_page_size = log_page_size(wq_size * 64);
-        self.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride << 16) | (log_wq_page_size << 8) | (log_wq_size as u32 & 0x1F)));
+        self.init(pd, db_addr, wq_size, core::mem::size_of::<WorkQueueEntrySend>() as u32);
+        self.uar_page.write(U32::new(uar_page & UAR_PAGE_MASK));
+    }
+
+    pub fn init_rq(&mut self, pd: u32, db_addr: PhysicalAddress, wq_size: u32) {
+        self.init(pd, db_addr, wq_size, core::mem::size_of::<WorkQueueEntryReceive>() as u32);
     }
 }
 
@@ -160,8 +165,9 @@ pub(crate) enum WQEOpcode {
 pub struct WorkQueueEntrySend {
     /// This segment contains control information of the WQE
     pub(crate) control: ControlSegment,
-
+    /// This segment contains inlined Ethernet packet headers
     eth: EthSegment,
+    /// This segment contains the length and address of the packet buffer
     data: MemoryPointerDataSegment
 }
 
@@ -183,8 +189,8 @@ impl WorkQueueEntrySend {
     /// * `packet`: packet buffer
     pub fn send(&mut self, wqe_index: u32, sqn: u32, lkey: u32, local_address: PhysicalAddress, packet: &[u8]) {
         self.control.send(wqe_index, sqn);
-        self.eth.send(packet);
-        self.data.send(lkey, local_address, packet.len() as u32);
+        self.eth.init(packet);
+        self.data.init(lkey, local_address, packet.len() as u32);
     }
 
     /// Fill the control segment of the WQE to execute a NOP.
@@ -198,7 +204,7 @@ impl WorkQueueEntrySend {
 
     /// Prints out the fields of a WQE in the format used by other drivers (e.g. Linux, Snabb)
     pub fn dump(&self, i: usize) {
-        debug!("WQE {}", i);
+        debug!("Tx WQE {}", i);
         unsafe {
             let ptr = self as *const WorkQueueEntrySend as *const u32;
             debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr).to_be(), (*ptr.offset(1)).to_be(), (*ptr.offset(2)).to_be(), (*ptr.offset(3)).to_be());
@@ -208,6 +214,44 @@ impl WorkQueueEntrySend {
         }
     }
 }
+
+/// WQEs are built from multiple segments.
+/// In the case of Receive WQEs, there is only the memory pointer data segment
+#[derive(FromBytes, Default)]
+#[repr(C)]
+pub struct WorkQueueEntryReceive {
+    /// This segment contains the length and address of the packet buffer
+    data: MemoryPointerDataSegment
+}
+
+const_assert_eq!(core::mem::size_of::<WorkQueueEntryReceive>(), 16);
+
+impl WorkQueueEntryReceive {
+    /// set a WQE to an initial state
+    pub fn init(&mut self) {
+        *self = WorkQueueEntryReceive::default();
+    }
+
+    /// Fill the data segment of the WQE to receive packets.
+    /// 
+    /// # Arguments    
+    /// * `lkey`: the lkey used by the RQ
+    /// * `local_address`: physical address of the packet buffer
+    /// * `packet_len`: packet buffer length in bytes
+    pub fn receive(&mut self, lkey: u32, local_address: PhysicalAddress, packet_len: u32) {
+        self.data.init(lkey, local_address, packet_len);
+    }
+
+    /// Prints out the fields of a WQE in the format used by other drivers (e.g. Linux, Snabb)
+    pub fn dump(&self, i: usize) {
+        debug!("Rx WQE {}", i);
+        unsafe {
+            let ptr = self as *const WorkQueueEntryReceive as *const u32;
+            debug!("{:#010x} {:#010x} {:#010x} {:#010x}", (*ptr).to_be(), (*ptr.offset(1)).to_be(), (*ptr.offset(2)).to_be(), (*ptr.offset(3)).to_be());
+        }
+    }
+}
+
 
 /// Possible values of the CE subfield in the [`ControlSegment`] 
 #[derive(Debug, TryFromPrimitive)]
@@ -315,7 +359,7 @@ impl EthSegment {
     /// 
     /// # Arguments
     /// * `packet`: packet buffer
-    pub fn send(&mut self, packet: &[u8]) {
+    pub fn init(&mut self, packet: &[u8]) {
         const INLINE_HEADER_SIZE: u32 = 16;
         const INLINE_HEADER_SHIFT: u32 = 16;
 
@@ -333,7 +377,7 @@ impl EthSegment {
 pub(crate) struct MemoryPointerDataSegment {
     /// length of the packet in bytes
     byte_count:         Volatile<U32<BigEndian>>,
-    /// the lkey used by the SQ
+    /// the lkey used by the WQ
     l_key:              Volatile<U32<BigEndian>>,
     /// upper 4 bytes of the physical address of the packet buffer
     local_address_h:    Volatile<U32<BigEndian>>,
@@ -344,13 +388,13 @@ pub(crate) struct MemoryPointerDataSegment {
 const_assert_eq!(core::mem::size_of::<MemoryPointerDataSegment>(), 16);
 
 impl MemoryPointerDataSegment {
-    /// Initialize the fields of the data segment to send a packet.
+    /// Initialize the fields of the data segment to send or receive a packet.
     /// 
     /// # Arguments    
-    /// * `lkey`: the lkey used by the SQ
+    /// * `lkey`: the lkey used by the WQ
     /// * `local_address`: physical address of the packet buffer
     /// * `len`: length of the packet in bytes
-    pub fn send(&mut self, lkey: u32, local_address: PhysicalAddress, len: u32) {
+    pub fn init(&mut self, lkey: u32, local_address: PhysicalAddress, len: u32) {
         self.byte_count.write(U32::new(len));
         self.l_key.write(U32::new(lkey));
         self.local_address_h.write(U32::new((local_address.value() >> 32) as u32));

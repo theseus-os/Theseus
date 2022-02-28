@@ -1586,11 +1586,13 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "kernel_config",
+ "lazy_static",
  "libm",
  "log",
  "memory",
  "memory_structs",
  "mlx_ethernet",
+ "mpmc",
  "network_interface_card",
  "nic_buffers",
  "nic_initialization",
@@ -1609,6 +1611,7 @@ dependencies = [
  "libm",
  "log",
  "memory",
+ "nic_buffers",
  "nic_initialization",
  "num_enum",
  "owning_ref",
@@ -2930,7 +2933,9 @@ dependencies = [
 name = "test_mlx5"
 version = "0.1.0"
 dependencies = [
+ "hpet",
  "ixgbe",
+ "libtest",
  "log",
  "mlx5",
  "spawn",

@@ -229,9 +229,6 @@ pub struct CompletionQueue {
     doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>,
     /// CQ number that is returned by the [`CommandOpcode::CreateCq`] command
     cqn: u32,
-    /// The value the ownership bit of a CQE must be in to indicate hardware ownership.
-    /// It alternates everytime the CQ wraps around
-    hw_ownership: bool
 }
 
 impl CompletionQueue {
@@ -259,30 +256,21 @@ impl CompletionQueue {
         }
         *doorbell = CompletionQueueDoorbellRecord::default();
 
-        Ok( CompletionQueue{entries, doorbell, cqn, hw_ownership: false} )
+        Ok( CompletionQueue{entries, doorbell, cqn} )
     }
-    
-    // /// Called every time a WQE is posted for completion so that we can update the HW ownership value
-    // /// TODO: find a better way to do this
-    // pub fn wqe_posted(&mut self, wqe_counter: u16) {
-    //     if (wqe_counter as usize % self.entries.len()) == 0 {
-    //         self.hw_ownership = if self.hw_ownership == false {
-    //             true
-    //         } else {
-    //             false
-    //         };
-    //     }
-    // }
 
-
-    /// Checks if a packet is tranmsitted.
+    /// Checks if a packet is transmitted by comparing the `wqe_counter` with the value in the CQE.
     /// If it is, then prints out the WQE opcode and counter.
-    pub fn check_packet_transmission(&mut self, entry_num: usize) {
+    pub fn check_packet_transmission(&mut self, entry_num: usize, wqe_counter: u16) {
         let entry = &self.entries[entry_num];
-        // debug!("hw ownership = {}", self.hw_ownership);
-        // if !entry.hw_owned(self.hw_ownership) {
-            trace!("opcode: {:?}, wqe_counter: {}", entry.get_send_wqe_opcode(), entry.get_wqe_counter());
-        // }
+        let counter = entry.get_wqe_counter();
+        if wqe_counter == counter {
+            trace!("opcode: {:?}, wqe_counter: {}", entry.get_send_wqe_opcode(), counter);
+        }
+    }
+
+    pub fn wqe_counter(&self, entry_num: usize) -> u16 {
+        self.entries[entry_num].get_wqe_counter()
     }
 
     /// Prints out all entries in the CQ

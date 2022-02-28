@@ -69,7 +69,7 @@ impl InitializationSegment {
     
     /// Sets the physical address of the command queue within the initialization segment.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `cmdq_physical_addr`: the starting physical address of the command queue, the lower 12 bits of which must be zero. 
     pub fn set_physical_address_of_cmdq(&mut self, cmdq_physical_addr: PhysicalAddress) -> Result<(), &'static str> {
         if cmdq_physical_addr.value() & 0xFFF != 0 {
@@ -89,7 +89,7 @@ impl InitializationSegment {
 
     /// Sets a bit in the [`InitializationSegment::command_doorbell_vector`] to inform HW that the command needs to be executed.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
     pub(crate) fn post_command(&mut self, command: &InitializedCommand) {
         let val = self.command_doorbell_vector.read().get();

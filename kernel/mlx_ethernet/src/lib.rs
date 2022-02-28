@@ -24,6 +24,7 @@ extern crate nic_initialization;
 extern crate kernel_config;
 extern crate libm;
 extern crate num_enum;
+extern crate nic_buffers;
 
 use kernel_config::memory::PAGE_SIZE;
 
@@ -35,6 +36,7 @@ pub mod send_queue;
 pub mod receive_queue;
 pub mod work_queue;
 mod uar;
+mod flow_table;
 
 const UAR_MASK:                 u32 = 0xFF_FFFF;
 const LOG_QUEUE_SIZE_MASK:      u32 = 0x1F;

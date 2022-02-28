@@ -56,6 +56,7 @@ impl UserAccessRegion {
         }
     }
 }
+
 impl Default for UserAccessRegion {
     /// We have to define our own default function since only array sizes up to 32 are supported
     fn default() -> UserAccessRegion {

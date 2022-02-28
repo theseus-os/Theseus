@@ -19,6 +19,7 @@ use crate::completion_queue::*;
 use crate::send_queue::*;
 use crate::work_queue::*;
 use crate::receive_queue::*;
+use crate::flow_table::*;
 
 /// Size of mailboxes, including both control fields and data.
 #[allow(dead_code)]
@@ -144,6 +145,10 @@ pub enum CommandOpcode {
     ModifyRq                = 0x909,
     QueryRq                 = 0x90B,
     CreateTis               = 0x912,
+    SetFlowTableRoot        = 0x92f,
+    CreateFlowTable         = 0x930,
+    CreateFlowGroup         = 0x933,
+    SetFlowTableEntry       = 0x936
 }
 
 impl CommandOpcode {
@@ -193,6 +198,10 @@ impl CommandOpcode {
             Self::ModifyRq                  => 0x118, 
             Self::QueryRq                   => 12,
             Self::CreateTis                 => 0x20 + 0xA0,
+            Self::SetFlowTableRoot          => 0x40,
+            Self::CreateFlowTable           => 0x40,
+            Self::CreateFlowGroup           => 0x400,
+            Self::SetFlowTableEntry         => 0x40 + 0x300 + 8, //TODO: allow more than one entry?
             _ => return Err(CommandQueueError::NotImplemented)           
         };
         Ok(len)
@@ -225,6 +234,10 @@ impl CommandOpcode {
             Self::ModifyRq                  => 16,
             Self::QueryRq                   => 0x10 + MAILBOX_DATA_SIZE_IN_BYTES as u32,
             Self::CreateTis                 => 16,
+            Self::SetFlowTableRoot          => 0x10,
+            Self::CreateFlowTable           => 0x10,
+            Self::CreateFlowGroup           => 0x10,
+            Self::SetFlowTableEntry         => 0x10,
             _ => return Err(CommandQueueError::NotImplemented)         
         };
         Ok(len)
@@ -404,21 +417,24 @@ pub struct CommandCompletionStatus {
 }
 
 pub struct CommandBuilder {
-    opcode:                         CommandOpcode,
-    opmod:                          Option<u16>,
-    allocated_pages:                Option<Vec<PhysicalAddress>>,
-    user_access_region:             Option<u32>,
-    queue_size:                     Option<u32>,
-    event_queue_num:                Option<u8>, 
-    doorbell_page:                  Option<PhysicalAddress>,
-    transport_domain:               Option<u32>,
-    completion_queue_num:           Option<u32>,
-    transport_interface_send_num:   Option<u32>,
-    protection_domain:              Option<u32>,
-    send_queue_num:                 Option<u32>,
-    collapsed_cq:                   bool,
-    receive_queue_num:              Option<u32>,
-    mtu:                            Option<u16>
+    opcode:                             CommandOpcode,
+    opmod:                              Option<u16>,
+    allocated_pages:                    Option<Vec<PhysicalAddress>>,
+    user_access_region:                 Option<u32>,
+    queue_size:                         Option<u32>,
+    event_queue_num:                    Option<u8>, 
+    doorbell_page:                      Option<PhysicalAddress>,
+    transport_domain:                   Option<u32>,
+    completion_queue_num:               Option<u32>,
+    transport_interface_send_num:       Option<u32>,
+    protection_domain:                  Option<u32>,
+    send_queue_num:                     Option<u32>,
+    collapsed_cq:                       bool,
+    receive_queue_num:                  Option<u32>,
+    mtu:                                Option<u16>,
+    flow_table_id:                      Option<u32>,
+    flow_group_id:                      Option<u32>,
+    transport_interface_receive_num:    Option<u32>,
 }
 
 impl CommandBuilder {
@@ -438,7 +454,10 @@ impl CommandBuilder {
             send_queue_num: None, 
             collapsed_cq: false,
             receive_queue_num: None,
-            mtu: None
+            mtu: None,
+            flow_table_id: None,
+            flow_group_id: None,
+            transport_interface_receive_num: None, 
         }
     }
 
@@ -511,6 +530,21 @@ impl CommandBuilder {
         self.mtu = Some(mtu);
         self
     }
+
+    pub fn flow_table_id(mut self, id: u32) -> CommandBuilder {
+        self.flow_table_id = Some(id);
+        self
+    }
+
+    pub fn flow_group_id(mut self, id: u32) -> CommandBuilder {
+        self.flow_group_id = Some(id);
+        self
+    }
+
+    pub fn tirn(mut self, tirn: u32) -> CommandBuilder {
+        self.transport_interface_receive_num = Some(tirn);
+        self
+    }
 }
 
 /// A buffer of fixed-size entries that is used to pass commands to the HCA.
@@ -531,7 +565,7 @@ impl CommandQueue {
 
     /// Create a command queue object.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `entries`: physically contiguous memory that is mapped as a slice of command queue entries.
     /// * `num_cmdq_entries`: number of entries in the queue.
     pub fn create(entries: BoxRefMut<MappedPages, [CommandQueueEntry]>, num_cmdq_entries: usize) -> Result<CommandQueue, &'static str> {
@@ -568,7 +602,7 @@ impl CommandQueue {
     /// At the end of the function, the command is ready to be posted using the doorbell in the initialization segment. 
     /// Returns an error if no entry is available to use.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `parameters`:
     fn create_command(&mut self, parameters: CommandBuilder) -> Result<InitializedCommand, CommandQueueError> 
     {
@@ -740,8 +774,6 @@ impl CommandQueue {
                 const SQ_CONTEXT_MAILBOX_INDEX: usize = 0;
                 Self::modify_sq_state(
                     &mut input_mailbox_buffers[SQ_CONTEXT_MAILBOX_INDEX],
-                    parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?, 
-                    parameters.transport_interface_send_num.ok_or(CommandQueueError::MissingInput)?, 
                 )?;
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
 
@@ -789,6 +821,72 @@ impl CommandQueue {
             //     self.initialize_mailboxes(NUM_OUTPUT_MAILBOXES_QUERY_SQ, &mut output_mailbox_buffers)?;
             //     cmdq_entry.set_output_mailbox_pointer(output_mailbox_buffers[0].addr);
             // },
+            CommandOpcode::CreateFlowTable => {
+                const NUM_INPUT_MAILBOXES_CREATE_FLOW_TABLE: usize = 1;
+                self.initialize_mailboxes(NUM_INPUT_MAILBOXES_CREATE_FLOW_TABLE, &mut input_mailbox_buffers)?;
+
+                const FLOW_TABLE_CTXT_MAILBOX_INDEX: usize = 0;
+                Self::write_flow_table_context_to_mailbox(
+                    &mut input_mailbox_buffers[FLOW_TABLE_CTXT_MAILBOX_INDEX],
+                    parameters.queue_size.ok_or(CommandQueueError::MissingInput)? as u8
+                )?;
+
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+            },
+            CommandOpcode::CreateFlowGroup => {
+                const NUM_INPUT_MAILBOXES_CREATE_FLOW_GROUP: usize = 1;
+                self.initialize_mailboxes(NUM_INPUT_MAILBOXES_CREATE_FLOW_GROUP, &mut input_mailbox_buffers)?;
+
+                const FLOW_GROUP_MAILBOX_INDEX: usize = 0;
+                Self::write_flow_group_info_to_mailbox(
+                    &mut input_mailbox_buffers[FLOW_GROUP_MAILBOX_INDEX],
+                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?
+                )?;
+
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+            },
+            CommandOpcode::CreateTir => {
+                const NUM_INPUT_MAILBOXES_CREATE_TIR: usize = 1;
+                self.initialize_mailboxes(NUM_INPUT_MAILBOXES_CREATE_TIR,&mut input_mailbox_buffers)?;
+
+                const TIR_MAILBOX_INDEX: usize = 0;
+                Self::write_transport_interface_receive_context_to_mailbox(
+                    &mut input_mailbox_buffers[TIR_MAILBOX_INDEX],
+                    parameters.receive_queue_num.ok_or(CommandQueueError::MissingInput)?,
+                    parameters.transport_domain.ok_or(CommandQueueError::MissingInput)?
+                )?;
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);          
+            },
+            CommandOpcode::SetFlowTableEntry => {
+                const SIZE_DEST_ENTRY_IN_BYTES: usize = 8;
+                const NUM_DEST_ENTRIES: usize = 1;
+
+                let size_of_mailbox_data = 0x30 + 0x300 + (NUM_DEST_ENTRIES * SIZE_DEST_ENTRY_IN_BYTES);
+                let num_mailboxes = libm::ceilf(size_of_mailbox_data as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+
+                self.initialize_mailboxes(num_mailboxes, &mut input_mailbox_buffers)?;
+
+                Self::write_flow_entry_info_to_mailbox(
+                    &mut input_mailbox_buffers,
+                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?,
+                    parameters.flow_group_id.ok_or(CommandQueueError::MissingInput)?,
+                    parameters.transport_interface_receive_num.ok_or(CommandQueueError::MissingInput)?
+                )?;
+
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+            },
+            CommandOpcode::SetFlowTableRoot => {
+                const NUM_INPUT_MAILBOXES_SET_FT_ROOT: usize = 1;
+                self.initialize_mailboxes(NUM_INPUT_MAILBOXES_SET_FT_ROOT, &mut input_mailbox_buffers)?;
+
+                const FT_ROOT_MAILBOX_INDEX: usize = 0;
+                Self::write_flow_table_root_to_mailbox(
+                    &mut input_mailbox_buffers[FT_ROOT_MAILBOX_INDEX],
+                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?
+                )?;
+
+                cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
+            }
             _=> {
                 error!("unimplemented opcode");
                 return Err(CommandQueueError::UnimplementedOpcode);
@@ -1000,22 +1098,22 @@ impl CommandQueue {
         Ok(())
     }
 
-    fn modify_sq_state(input_mailbox_buffer: &mut MailboxBuffer, cqn: u32, tisn: u32) -> Result<(), CommandQueueError> {        
+    /// ToDo: only sets state to ready
+    fn modify_sq_state(input_mailbox_buffer: &mut MailboxBuffer) -> Result<(), CommandQueueError> {        
         const SEND_QUEUE_CONTEXT_OFFSET:usize = 0x10;
         // initialize the TIS context
         let sq_context = input_mailbox_buffer.mp.as_type_mut::<SendQueueContext>(SEND_QUEUE_CONTEXT_OFFSET)
             .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        // sq_context.init(cqn, tisn);
         sq_context.set_state(SendQueueState::Ready);
 
         Ok(())
     }
 
+    /// ToDo: only sets state to ready
     fn modify_rq_state(input_mailbox_buffer: &mut MailboxBuffer) -> Result<(), CommandQueueError> {        
         const RECEIVE_QUEUE_CONTEXT_OFFSET:usize = 0x10;
         let rq_context = input_mailbox_buffer.mp.as_type_mut::<ReceiveQueueContext>(RECEIVE_QUEUE_CONTEXT_OFFSET)
             .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
-        // sq_context.init(cqn, tisn);
         rq_context.set_state(ReceiveQueueState::Ready);
 
         Ok(())
@@ -1044,12 +1142,87 @@ impl CommandQueue {
         wq.init_rq(pd, db_addr, wq_size);
 
         // Now use the remainder of the mailbox for page entries
-        const SQ_PADDR_OFFSET: usize = 0x10 + 0x30 + 0xC0;
-        let data_buffer = mb_page.as_type_mut::<[u8;256]>(SQ_PADDR_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        const RQ_PADDR_OFFSET: usize = 0x10 + 0x30 + 0xC0;
+        let data_buffer = mb_page.as_type_mut::<[u8;256]>(RQ_PADDR_OFFSET).map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
         Self::write_page_addrs_to_data_buffer(data_buffer, &mut pages);
 
         // Write the remaining addresses to the next mailboxes
         Self::write_page_addrs_to_mailboxes(&mut input_mailbox_buffers[1..], pages)?;
+        Ok(())
+    }
+
+    fn write_flow_table_context_to_mailbox(input_mailbox_buffer: &mut MailboxBuffer, num_ft_entries: u8) -> Result<(), CommandQueueError> {        
+        const TABLE_TYPE_OFFSET:usize = 0x0;
+        let table_type = input_mailbox_buffer.mp.as_type_mut::<U32<BigEndian>>(TABLE_TYPE_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        *table_type = U32::new((FlowTableType::NicRx as u32) << 24);
+
+        const FLOW_TABLE_CONTEXT_OFFSET:usize = 0x8;
+        let ft_context = input_mailbox_buffer.mp.as_type_mut::<FlowTableContext>(FLOW_TABLE_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        ft_context.log_size.write(U32::new(num_ft_entries as u32));
+
+        Ok(())
+    }
+
+    /// # Warning
+    /// This function currently only creates a wildcard flow group for the first flow.
+    fn write_flow_group_info_to_mailbox(input_mailbox_buffer: &mut MailboxBuffer, ft_id: u32) -> Result<(), CommandQueueError> {        
+        const FLOW_GROUP_INPUT_OFFSET:usize = 0x0;
+        let flow_group_input = input_mailbox_buffer.mp.as_type_mut::<FlowGroupInput>(FLOW_GROUP_INPUT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        flow_group_input.init(
+            FlowTableType::NicRx,
+            ft_id,
+            0,
+            0,
+            MatchCriteriaEnable::None
+        );
+
+        Ok(())
+    }
+
+    /// # Warning
+    /// This function currently only creates a TIR in direct dispatching mode
+    fn write_transport_interface_receive_context_to_mailbox(input_mailbox_buffer: &mut MailboxBuffer, rqn: u32, td: u32) -> Result<(), CommandQueueError> {
+        const TIR_OFFSET: usize = 0x10;
+        // initialize the TIS context
+        let tir_context = input_mailbox_buffer.mp.as_type_mut::<TransportInterfaceReceiveContext>(TIR_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        tir_context.init(rqn, td);
+        Ok(())
+    }
+
+    /// # Warning
+    /// This function currently only adds one flow entry to the flow table.
+    /// We have not tested this with anything but the wildcard flow group which is flow 0.
+    fn write_flow_entry_info_to_mailbox(input_mailbox_buffers: &mut [MailboxBuffer], ft_id: u32, fg_id: u32, tirn: u32) -> Result<(), CommandQueueError> {        
+        const FLOW_ENTRY_INPUT_OFFSET:usize = 0x0;
+        let flow_entry_input = input_mailbox_buffers[0].mp.as_type_mut::<FlowEntryInput>(FLOW_ENTRY_INPUT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        flow_entry_input.init(FlowTableType::NicRx, ft_id, 0);
+
+        const FLOW_CONTEXT_OFFSET:usize = 0x30;
+        let flow_context = input_mailbox_buffers[0].mp.as_type_mut::<FlowContext>(FLOW_CONTEXT_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        flow_context.init(fg_id, FlowContextAction::FwdDest, 1); //TODO: magic number
+
+        let dest_list_mb: usize = libm::ceilf((0x30 + 0x300) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
+        const DEST_LIST_MB_OFFSET: usize = 304; 
+        let dest_list = input_mailbox_buffers[dest_list_mb - 1].mp.as_type_mut::<DestinationEntry>(DEST_LIST_MB_OFFSET)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+
+        dest_list.init(DestinationType::TIR, tirn);
+
+        Ok(())
+    }
+
+    fn write_flow_table_root_to_mailbox(input_mailbox_buffer: &mut MailboxBuffer, ft_id: u32) -> Result<(), CommandQueueError> {
+        let ft_root = input_mailbox_buffer.mp.as_type_mut::<[U32<BigEndian>; 2]>(0)
+            .map_err(|_e| CommandQueueError::InvalidMailboxOffset)?;
+        ft_root[0] = U32::new((FlowTableType::NicRx as u32) << 24);
+        ft_root[1] = U32::new(ft_id & 0xFF_FFFF);
+
         Ok(())
     }
 
@@ -1258,6 +1431,27 @@ impl CommandQueue {
         let state = sq_context.get_state().map_err(|_e| CommandQueueError::InvalidSQState)?;
         Ok((state, self.get_command_status(command)?))
     }
+
+    pub fn get_flow_table_id(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+        self.check_command_output_validity(command.entry_num, CommandOpcode::CreateFlowTable)?;
+
+        let ft_id = self.entries[command.entry_num].get_output_inline_data_0();
+        Ok((ft_id & 0xFF_FFFF, self.get_command_status(command)?))
+    }
+
+    pub fn get_flow_group_id(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+        self.check_command_output_validity(command.entry_num, CommandOpcode::CreateFlowGroup)?;
+
+        let fg_id = self.entries[command.entry_num].get_output_inline_data_0();
+        Ok((fg_id & 0xFF_FFFF, self.get_command_status(command)?))
+    }
+
+    pub fn get_tir_context_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+        self.check_command_output_validity(command.entry_num, CommandOpcode::CreateTir)?;
+        
+        let tirn = self.entries[command.entry_num].get_output_inline_data_0();
+        Ok((tirn & 0xFF_FFFF, self.get_command_status(command)?))
+    }
 }
 
 /// Layout of a command passed to the NIC.
@@ -1331,7 +1525,7 @@ impl fmt::Debug for CommandQueueEntry {
 
 impl CommandQueueEntry {
     /// Creates a command queue entry and initializes it for the given `opcode` and `opmod`.
-    /// ## Arguments
+    /// # Arguments
     /// * `opcode`: value identifying which command has to be carried out
     /// * `opmod`: opcode modifier. If None, field will be set to zero.
     /// * `token`: token of the command, a random value that should be the same in the command entry and all linked mailboxes.
@@ -1378,7 +1572,7 @@ impl CommandQueueEntry {
     /// Sets the first 4 bytes of actual command input data that are written inline in the command.
     /// The valid values for each field are different for every command, and can be taken from Chapter 23 of the PRM.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `command0`: the first 4 bytes of actual command data.
     fn set_input_inline_data_0(&mut self, command0: u32) {
         self.command_input_inline_data_0.write(U32::new(command0));
@@ -1387,7 +1581,7 @@ impl CommandQueueEntry {
     /// Sets the second 4 bytes of actual command input data that are written inline in the command.
     /// The valid values for each field are different for every command, and can be taken from Chapter 23 of the PRM.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `command1`: the second 4 bytes of actual command data.
     fn set_input_inline_data_1(&mut self, command1: u32) {
         self.command_input_inline_data_1.write(U32::new(command1));

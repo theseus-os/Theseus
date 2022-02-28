@@ -1,27 +1,90 @@
+//! The Receive Queue (RQ) object holds the descriptor ring used to hold incoming packets.
+//! The descriptor ring is referred to as a Work Queue Buffer.
+//! This module defines the layout of an RQ and the context used to initialize a RQ.
+//! 
+//! (PRM Section 8.13: Receive Queue)
+
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
+use memory::{PhysicalAddress, MappedPages};
+use owning_ref:: BoxRefMut;
+use core::fmt;
+use num_enum::TryFromPrimitive;
+use core::convert::TryFrom;
 use alloc::{
     vec::Vec,
     boxed::Box
 };
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
-use kernel_config::memory::PAGE_SIZE;
-use owning_ref:: BoxRefMut;
-use core::fmt;
+use nic_buffers::ReceiveBuffer;
 
-use crate::{
-    work_queue::WorkQueueEntrySend,
-    uar::UserAccessRegion
-};
+use crate::{CQN_MASK, work_queue::WorkQueueEntryReceive};
 
+
+/// The Transport Interface Receive (TIR) object is responsible for performing 
+/// all transport related operations on the receive side. TIR performs the
+/// packet processing and reassembly and is also responsible for demultiplexing
+/// packets into different RQs.
+#[derive(FromBytes, Default)]
+#[repr(C)]
+pub(crate) struct TransportInterfaceReceiveContext {
+    _padding1:              [u8; 28],
+    /// RQ number that packets will directly be delivered to
+    inline_rqn:             Volatile<U32<BigEndian>>,
+    _padding2:              u32,
+    /// transport domain ID
+    transport_domain:       Volatile<U32<BigEndian>>,
+    _padding3:              [u8; 32],
+    _padding4:              [u8; 20],
+}
+
+const_assert_eq!(core::mem::size_of::<TransportInterfaceReceiveContext>(), 92);
+
+impl TransportInterfaceReceiveContext {
+    /// Initialize the TIR object
+    /// 
+    /// # Arguments
+    /// * `rqn`: RQ number
+    /// * `td`: transport domain ID 
+    pub fn init(&mut self, rqn: u32, td: u32) {
+        *self = TransportInterfaceReceiveContext::default();
+        self.inline_rqn.write(U32::new(rqn));
+        self.transport_domain.write(U32::new(td));
+    }
+}
+
+/// The possible states the RQ can be in.
+#[derive(Debug, TryFromPrimitive)]
+#[repr(u8)]
+pub enum ReceiveQueueState {
+    Reset = 0x0,
+    Ready = 0x1,
+    Error = 0x3
+}
+
+/// The bitmask for the state in the [`ReceiveQueueContext`]
+const STATE_MASK:   u32 = 0xF0_0000;
+/// The bit shift for the state in the [`ReceiveQueueContext`]
+const STATE_SHIFT:  u32 = 20;
+
+/// The data structure containing RQ initialization parameters.
+/// It is passed to the HCA at the time of RQ creation.
 #[derive(FromBytes, Default)]
 #[repr(C, packed)]
 pub(crate) struct ReceiveQueueContext {
+    /// A multi-part field:
+    /// * `rlky`: when set the reserved LKey can be used on the RQ, occupies bit 31
+    /// * `vlan_strip_disable`: if set, VLAN is not stripped from incoming frames, occupies bit 28
+    /// * `state`: RQ state, occupies bits [23:20]
+    /// * `flush_in_error_en`: if set, and when RQ transitions into error state, the hardware will flush in error WQEs that were posted, occupies bit 18
     rlky_state:                         Volatile<U32<BigEndian>>,
+    /// an opaque identifier which software sets, which is reported to the Completion Queue
     user_index:                         Volatile<U32<BigEndian>>,
+    /// number of the CQ associated with this RQ
     cqn:                                Volatile<U32<BigEndian>>,
+    /// set of counters in which statistics on this RQ are collected
     counter_set_id:                     Volatile<U32<BigEndian>>,
+    /// remote memory pool number (only when enabled)
     rmpn:                               Volatile<U32<BigEndian>>,
     hairpin_peer_sq:                    Volatile<U32<BigEndian>>,
     hairpin_peer_vhca:                  Volatile<U32<BigEndian>>,
@@ -44,38 +107,80 @@ impl fmt::Debug for ReceiveQueueContext {
     }
 }
 
-pub enum ReceiveQueueState {
-    Reset = 0x0,
-    Ready = 0x1,
-    Error = 0x3
-}
 
 impl ReceiveQueueContext {
+    /// Initialize the fields of the RQ context.
+    /// The RQ context is then passed to the HCA when creating the RQ.
+    /// 
+    /// # Arguments
+    /// * `cqn`: number of CQ associated with this RQ 
     pub fn init(&mut self, cqn: u32) {
+        const ENABLE_RLKEY:             u32 = 1 << 31;
+        const VLAN_STRIP_DISABLE:       u32 = 1 << 28;
+        
+        // set all fields to zero
         *self = ReceiveQueueContext::default();
-        self.rlky_state.write(U32::new((1 << 31) | (1 << 28))); // enable reserved lkey | VLAN strip disable 
-        self.cqn.write(U32::new(cqn & 0xFF_FFFF));
+        self.rlky_state.write(U32::new(ENABLE_RLKEY | VLAN_STRIP_DISABLE)); 
+        self.cqn.write(U32::new(cqn & CQN_MASK));
     }
 
+    /// set state of the RQ in the RQ context to `next_state`
     pub fn set_state(&mut self, next_state: ReceiveQueueState) {
-        let state = self.rlky_state.read().get() & !0xF0_0000;
-        self.rlky_state.write(U32::new(state | ((next_state as u32) << 20))); 
+        let state = self.rlky_state.read().get() & !STATE_MASK;
+        self.rlky_state.write(U32::new(state | ((next_state as u32) << STATE_SHIFT))); 
     }
 
-    pub fn get_state(&self) -> u8 {
-        let state = (self.rlky_state.read().get() & 0xF0_0000) >> 20;
-        state as u8
+    /// Find the state of the RQ from the RQ context 
+    pub fn get_state(&self) -> Result<ReceiveQueueState, &'static str> {
+        let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
+        Ok( ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")? )
     }
 }
 
+/// A data structure that contains the RQ ring of descriptors 
+/// and is used to interact with the RQ once initialized.
 pub struct ReceiveQueue {
-    /// Physically-contiguous queue entries
-    entries: MappedPages,
-    wqe_index: u32
+    /// physically-contiguous RQ descriptors
+    entries: BoxRefMut<MappedPages, [WorkQueueEntryReceive]>, 
+    /// the packet buffers in use by the descriptors
+    packet_buffers: Vec<ReceiveBuffer>,
+    /// The number of WQEs that have been completed.
+    /// From this we also calculate the next descriptor to use
+    wqe_counter: u16,
+    /// RQ number that is returned by the [`CommandOpcode::CreateRq`] command
+    rqn: u32,
+    /// the lkey used by the SQ
+    lkey: u32,
 }
 
 impl ReceiveQueue {
-    pub fn create(entries_mp: MappedPages) -> Result<ReceiveQueue, &'static str> {
-        Ok( ReceiveQueue{entries: entries_mp, wqe_index: 0} )
+    /// Creates a RQ by mapping the buffer as a slice of [`WorkQueueEntryReceive`]s.
+    /// Each WQE is set to an initial state.
+    /// 
+    /// # Arguments
+    /// * `entries_mp`: memory that is to be transformed into a slice of WQEs. 
+    /// The starting physical address should have been passed to the HCA when creating the SQ.
+    /// * `num_entries`: number of entries in the RQ 
+    /// * `rqn`: SQ number returned by the HCA
+    /// * `lkey`: the lkey used by the RQ
+    pub fn create(entries_mp: MappedPages, num_entries: usize, rqn: u32, lkey: u32) -> Result<ReceiveQueue, &'static str> {
+        // map the descriptor ring and initialize
+        let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntryReceive>(0, num_entries))?;
+        for entry in entries.iter_mut() {
+            entry.init()
+        }
+        Ok( ReceiveQueue{entries, packet_buffers: Vec::new(), wqe_counter: 0, rqn, lkey} )
     }
+
+    /// Returns the index into the WQ given the total number of WQEs completed
+    fn desc_id(&self) -> usize {
+        self.wqe_counter as usize  % self.entries.len()
+    }
+
+    // /// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar doorbell register.
+    // /// Returns the current value of the WQE counter.
+    // pub fn refill(&mut self, desc_id: usize, buffer_address: PhysicalAddress) {
+    //     let wqe = &mut self.entries[desc_id];
+    //     wqe.receive(self.lkey, buffer_address, packet);
+    // }
 }
