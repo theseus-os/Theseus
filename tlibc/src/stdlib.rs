@@ -1,4 +1,4 @@
-use types::*;
+use libc::{size_t, c_void};
 use errno::*;
 
 use alloc::{

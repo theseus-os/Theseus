@@ -10,10 +10,10 @@ getopts = "0.2.21"
 log = "0.4.8"
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 rustc-demangle = "0.1.19"
-libc = { version = "0.2", default-features = false }
+libc = { version = "0.2.107", default-features = false }
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.path]
 path = "../../kernel/path"

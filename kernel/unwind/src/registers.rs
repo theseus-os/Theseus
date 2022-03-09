@@ -1,6 +1,6 @@
 //! Struct definitions for various sets of register values that are useful in unwinding.
 
-use gimli;
+use gimli::{self, X86_64};
 use core::fmt::{Debug, Formatter, Result as FmtResult};
 use core::ops::{Index, IndexMut};
 
@@ -24,6 +24,18 @@ use core::ops::{Index, IndexMut};
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Registers {
     registers: [Option<u64>; 17],
+}
+
+impl Registers {
+    /// Returns the value of the stack pointer register.
+    pub fn stack_pointer(&self) -> Option<u64> {
+        self[X86_64::RSP]
+    }
+
+    /// Returns the value of the return address for this register set.
+    pub fn return_address(&self) -> Option<u64> {
+        self[X86_64::RA]
+    }
 }
 
 impl Debug for Registers {

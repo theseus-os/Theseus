@@ -225,7 +225,6 @@ pub extern "C" fn nano_core_start(
         );
     }
 
-
     // the captain shouldn't return ...
     try_exit!(Err("captain::init returned unexpectedly... it should be an infinite loop (diverging function)"));
 }
@@ -248,3 +247,7 @@ extern {
 /// This module is a hack to get around the lack of the 
 /// `__truncdfsf2` function in the `compiler_builtins` crate.
 mod truncate;
+
+/// This module is a hack to get around the issue of no_mangle symbols
+/// not being exported properly from the `libm` crate in no_std environments.
+mod libm;

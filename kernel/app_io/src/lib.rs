@@ -1,16 +1,17 @@
-//! This crate is an application-level library that stores the IO queues and pointers to terminal instances for running applications.
-//! It provides some APIs similar to std::io for applications to access those queues.
+//! A simple library that handles stdio queues for applications running in terminal instances.
+//! 
+//! This provides some APIs similar to Rust's `std::io` for applications to access those queues.
 //! 
 //! Usage example:
-//! 1. shell spawns a new app, and creates queues of `stdin`, `stdout` and `stderr`
-//! 2. shell stores the reader of `stdin` and writer of `stdout` and `stderr` to `app_io`,
-//!    along with the reader of key event queue and the pointer to the running terminal instance.
-//! 3. app calls app_io::stdin to get the reader of `stdin`, and can perform reading just like
+//! 1. shell spawns a new app, and creates queues of `stdin`, `stdout`, and `stderr` for that app.
+//! 2. shell stores the reader for `stdin` and writers for `stdout` and `stderr` to `app_io`,
+//!    along with the reader of the key events queue and references to the running terminal instance.
+//! 3. app calls [`stdin()`] to get the reader of `stdin`, and can perform reading just like
 //!    using the standard library
-//! 4. app calls app_io::stdout to get the writer of `stdin`, and can perform output just like
+//! 4. app calls [`stdout()`] to get the writer of `stdin`, and can perform output just like
 //!    using the standard library
-//! 5. after app exits, shell would set EOF flags to its `stdin`, `stdout` and `stderr` queues.
-//! 6. if all apps in a job exit, app shell removes all the structure stored in `app_io` and
+//! 5. after app exits, shell would set `EOF` flags to its `stdin`, `stdout`, and `stderr` queues.
+//! 6. once all apps in a job exit, app shell removes all the structure stored in `app_io` and
 //!    destructs all stdio queues
 
 #![no_std]
@@ -23,7 +24,7 @@ extern crate spin;
 extern crate keycodes_ascii;
 extern crate libterm;
 extern crate logger;
-extern crate bare_io;
+extern crate core2;
 extern crate window_manager;
 
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
@@ -318,7 +319,7 @@ macro_rules! print {
 }
 
 use core::fmt;
-use bare_io::Write;
+use core2::io::Write;
 /// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct
 /// terminal print-producer
 pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {

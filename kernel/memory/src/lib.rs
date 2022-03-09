@@ -50,6 +50,7 @@ use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::KERNEL_OFFSET;
+pub use kernel_config::memory::PAGE_SIZE;
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<MmiRef> = Once::new();

@@ -10,10 +10,9 @@
 //! but there are several convenience functions that offer simpler interfaces for general usage. 
 //!
 //! # Notes and Missing Features
-//! This allocator currently does **not** merge freed chunks (de-fragmentation). 
-//! We don't need to do so until we actually run out of address space or until 
-//! a requested address is in a chunk that needs to be merged;
-//! that's where we should add those merging features in whenever we do so.
+//! This allocator currently does **not** merge freed chunks (de-fragmentation) upon deallocation. 
+//! It only merges free chunks lazily upon request, i.e., when we run out of address space
+//! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
 
 #![no_std]
 #![feature(const_fn_trait_bound)]
@@ -232,28 +231,44 @@ impl AllocatedPages {
 	}
 
 	/// Splits this `AllocatedPages` into two separate `AllocatedPages` objects:
-	/// * `[beginning : at_page - 1]`
-	/// * `[at_page : end]`
-	/// 
-	/// Depending on the size of this `AllocatedPages`, either one of the 
-	/// returned `AllocatedPages` objects may be empty. 
-	/// 
-	/// Returns an `Err` containing this `AllocatedPages` if `at_page` is not within its bounds.
-	pub fn split(self, at_page: Page) -> Result<(AllocatedPages, AllocatedPages), AllocatedPages> {
-		let end_of_first = at_page - 1;
-		if at_page > *self.pages.start() && end_of_first <= *self.pages.end() {
-			let first  = PageRange::new(*self.pages.start(), end_of_first);
-			let second = PageRange::new(at_page, *self.pages.end());
-			// ensure the original AllocatedPages doesn't run its drop handler and free its pages.
-			core::mem::forget(self); 
-			Ok((
-				AllocatedPages { pages: first }, 
-				AllocatedPages { pages: second },
-			))
-		} else {
-			Err(self)
-		}
-	}
+    /// * `[beginning : at_page - 1]`
+    /// * `[at_page : end]`
+    /// 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `AllocatedPages` objects may be empty. 
+    /// * If `at_page == self.start`, the first returned `AllocatedPages` object will be empty.
+    /// * If `at_page == self.end + 1`, the second returned `AllocatedPages` object will be empty.
+    /// 
+    /// Returns an `Err` containing this `AllocatedPages` if `at_page` is otherwise out of bounds.
+    pub fn split(self, at_page: Page) -> Result<(AllocatedPages, AllocatedPages), AllocatedPages> {
+        let end_of_first = at_page - 1;
+
+        let (first, second) = if at_page == *self.start() && at_page <= *self.end() {
+            let first  = PageRange::empty();
+            let second = PageRange::new(at_page, *self.end());
+            (first, second)
+        } 
+        else if at_page == (*self.end() + 1) && end_of_first >= *self.start() {
+            let first  = PageRange::new(*self.start(), *self.end()); 
+            let second = PageRange::empty();
+            (first, second)
+        }
+        else if at_page > *self.start() && end_of_first <= *self.end() {
+            let first  = PageRange::new(*self.start(), end_of_first);
+            let second = PageRange::new(at_page, *self.end());
+            (first, second)
+        }
+        else {
+            return Err(self);
+        };
+
+        // ensure the original AllocatedPages doesn't run its drop handler and free its pages.
+        core::mem::forget(self);   
+        Ok((
+            AllocatedPages { pages: first }, 
+            AllocatedPages { pages: second },
+        ))
+    }
 }
 
 impl Drop for AllocatedPages {
@@ -361,7 +376,7 @@ fn find_specific_chunk(
 		Inner::Array(ref mut arr) => {
 			for elem in arr.iter_mut() {
 				if let Some(chunk) = elem {
-					if requested_page >= *chunk.pages.start() && requested_end_page <= *chunk.pages.end() {
+					if requested_page >= *chunk.start() && requested_end_page <= *chunk.end() {
 						// Here: `chunk` was big enough and did contain the requested address.
 						return adjust_chosen_chunk(requested_page, num_pages, &chunk.clone(), ValueRefMut::Array(elem));
 					}
@@ -369,17 +384,34 @@ fn find_specific_chunk(
 			}
 		}
 		Inner::RBTree(ref mut tree) => {
-			let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_page));
+			let mut cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_page));
 			if let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
-				if requested_page >= *chunk.pages.start() {
-					if requested_end_page <= *chunk.pages.end() {
+				if requested_page >= *chunk.start() {
+					if requested_end_page <= *chunk.end() {
 						return adjust_chosen_chunk(requested_page, num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor_mut));
 					} else {
-						todo!("Page allocator: found chunk containing requested address, but it was too small. \
-							Merging multiple chunks during an allocation is currently unsupported, please contact the Theseus developers. \
-							Requested address: {:?}, num_pages: {}, chunk: {:?}",
-							requested_page, num_pages, chunk,
-						);
+						// Here, we've found a chunk that includes the requested start page, but it's too small
+						// to cover the number of requested pages. 
+						// Thus, we attempt to merge this chunk with the next contiguous chunk(s) to create one single larger chunk.
+						let chunk = chunk.clone(); // ends the above borrow on `cursor_mut`
+						let mut new_end_page = *chunk.end();
+						cursor_mut.move_next();
+						while let Some(next_chunk) = cursor_mut.get().map(|w| w.deref()) {
+							if *next_chunk.start() - 1 == new_end_page {
+								new_end_page = *next_chunk.end();
+								cursor_mut.remove().expect("BUG: page_allocator failed to merge contiguous chunks.");
+								// The above call to `cursor_mut.remove()` advances the cursor to the next chunk.
+							} else {
+								break; // the next chunk wasn't contiguous, so stop iterating.
+							}
+						}
+
+						if new_end_page > *chunk.end() {
+							cursor_mut.move_prev(); // move the cursor back to the original chunk
+							let _removed_chunk = cursor_mut.replace_with(Wrapper::new_link(Chunk { pages: PageRange::new(*chunk.start(), new_end_page) }))
+								.expect("BUG: page_allocator failed to replace the current chunk while merging contiguous chunks.");
+							return adjust_chosen_chunk(requested_page, num_pages, &chunk, ValueRefMut::RBTree(cursor_mut));
+						}
 					}
 				}
 			}
@@ -407,8 +439,8 @@ fn find_any_chunk<'list>(
 				if let Some(chunk) = elem {
 					// Skip chunks that are too-small or in the designated regions.
 					if  chunk.size_in_pages() < num_pages || 
-						chunk.pages.start() <= &designated_low_end || 
-						chunk.pages.end() >= &DESIGNATED_PAGES_HIGH_START
+						chunk.start() <= &designated_low_end || 
+						chunk.end() >= &DESIGNATED_PAGES_HIGH_START
 					{
 						continue;
 					} 
@@ -435,7 +467,7 @@ fn find_any_chunk<'list>(
 			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
 			let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_HIGH_START));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if chunk.pages.start() <= &designated_low_end {
+				if chunk.start() <= &designated_low_end {
 					break; // move on to searching through the designated regions
 				}
 				if num_pages < chunk.size_in_pages() {
@@ -486,7 +518,7 @@ fn find_any_chunk<'list>(
 			// The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
 			let mut cursor = tree.upper_bound_mut::<Chunk>(Bound::Unbounded);
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if chunk.pages.start() < &DESIGNATED_PAGES_HIGH_START {
+				if chunk.start() < &DESIGNATED_PAGES_HIGH_START {
 					// we already iterated over non-designated pages in the first match statement above, so we're out of memory. 
 					break; 
 				}
@@ -527,14 +559,14 @@ fn adjust_chosen_chunk(
 		None
 	} else {
 		Some(Chunk {
-			pages: PageRange::new(*chosen_chunk.pages.start(), *new_allocation.start() - 1),
+			pages: PageRange::new(*chosen_chunk.start(), *new_allocation.start() - 1),
 		})
 	};
 	let after = if new_allocation.end() == &MAX_PAGE { 
 		None
 	} else {
 		Some(Chunk {
-			pages: PageRange::new(*new_allocation.end() + 1, *chosen_chunk.pages.end()),
+			pages: PageRange::new(*new_allocation.end() + 1, *chosen_chunk.end()),
 		})
 	};
 

@@ -33,7 +33,7 @@ path = "../acpi/hpet"
 path = "../pmu_x86"
 
 [dependencies.hashbrown]
-version = "0.9.1"
+version = "0.11.2"
 features = ["nightly"]
 
 [lib]

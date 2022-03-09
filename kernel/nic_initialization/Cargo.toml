@@ -8,15 +8,13 @@ build = "../../build.rs"
 [dependencies]
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 volatile = "0.2.7"
+mpmc = "0.1.6"
 
 [dependencies.log]
 version = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
 
 [dependencies.pci]
 path = "../pci"

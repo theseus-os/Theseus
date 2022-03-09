@@ -112,6 +112,7 @@ pub fn init(
 
     // create the initial `Task`, which is bootstrapped from this execution context.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
+    info!("Created initial bootstrap task: {:?}", bootstrap_task);
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);

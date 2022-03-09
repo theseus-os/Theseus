@@ -3,19 +3,19 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "tlibc"
 description = "A libc implementation for Theseus."
 version = "0.1.0"
-build = "../build.rs"
+build = "build.rs"
 
 [dependencies]
 spin = "0.9.0"
 log = "0.4.8"
-libc = { version = "0.2", default-features = false }
+libc = { path = "../ports/libc", default-features = false }
 cstr_core = "0.2.3"
-bare-io = { version = "0.2.1", features = [ "alloc" ] }
+core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
 memchr = { version = "2.2.0", default-features = false }
 cbitset = "0.2.0"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
+features = ["spin_no_std"]
 version = "1.2.0"
 
 [dependencies.memory]
@@ -24,9 +24,25 @@ path = "../kernel/memory"
 [dependencies.task]
 path = "../kernel/task"
 
+[dependencies.app_io]
+path = "../kernel/app_io"
+
+
+## Needed for building tlibc as a "staticlib" crate-type,
+## and for avoiding having to link a C program to the nano_core.
+## Otherwise, it's not strictly requiredif we just want to build
+## tlibc into an .rlib file.
+[dependencies.panic_entry]
+path = "../kernel/panic_entry"
+[dependencies.heap]
+path = "../kernel/heap"
+
+
+[build-dependencies]
+cc = "1.0.25"
 
 [lib]
-crate-type = ["lib"]
+crate-type = ["lib", "staticlib"]
 
 
 ### Patch section was copied from the top-level Theseus Cargo.toml

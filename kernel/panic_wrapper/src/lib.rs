@@ -39,7 +39,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         #[cfg(not(frame_pointers))] {
             error!("------------------ Stack Trace (DWARF) ---------------------------");
             stack_trace::stack_trace(
-                &|stack_frame, stack_frame_iter| {
+                &mut |stack_frame, stack_frame_iter| {
                     let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
                         VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
                         false

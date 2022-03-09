@@ -8,7 +8,7 @@ The book is written in Markdown and uses [mdBook](https://rust-lang-nursery.gith
 
 ## Building the book
 
-First, install `mdbook`:
+First, install `mdbook`, version `0.4.13` or higher:
 ```sh
 cargo +stable install mdbook
 ```

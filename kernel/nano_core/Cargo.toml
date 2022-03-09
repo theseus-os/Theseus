@@ -9,6 +9,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.9.0"
 multiboot2 = "0.10.1"
+libm = "0.2.1"
 
 
 # [dependencies.compiler_builtins]
@@ -57,7 +58,6 @@ path = "../vga_buffer"
 
 [dependencies.memory_initialization]
 path = "../memory_initialization"
-
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
