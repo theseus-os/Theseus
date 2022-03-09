@@ -203,9 +203,8 @@ pub(crate) enum DestinationType {
 #[derive(FromBytes, Default)]
 #[repr(C, packed)]
 pub(crate) struct DestinationEntry {
-    /// Group handler returned by the [`CommandOpcode::CreateFlowGroup`] command
+    /// currently we only set the type to [DestinationType::TIR] and the id is the TIR number for the RQ
     pub(crate) id_and_type:                Volatile<U32<BigEndian>>,
-    /// bitmask indicating which actions to perform
     pub(crate) packet_reformat:                 Volatile<U32<BigEndian>>,
 
 }

@@ -7,9 +7,6 @@ extern crate alloc;
 #[macro_use] extern crate terminal_print;
 extern crate mlx5;
 extern crate ixgbe;
-extern crate spawn;
-extern crate libtest;
-extern crate hpet;
 
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -36,18 +33,15 @@ pub fn main(_args: Vec<String>) -> isize {
 fn rmain() -> Result<(), &'static str> {
     
     let mut nic = mlx5::get_mlx5_nic().ok_or("mlx5 nic isn't initialized")?.lock();
-
     let mac_address = nic.mac_address();
+    let num_packets = 8192;
     
     let buffer = create_raw_packet(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF], &mac_address, &[1;46])?;
     let buffer_slice = buffer.as_slice(0, 46)?;
 
-    for _ in 0..8192 {
+    for _ in 0..num_packets {
         nic.send_fastpath(buffer.phys_addr, buffer_slice);
     }
-
-    loop { nic.receive() }
-
     Ok(())
 }
 

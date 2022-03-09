@@ -1,4 +1,4 @@
-//! User Access Regions (UAR) are used to provide isolated and direct access to the HCA HW by multiple processes.
+//! User Access Regions (UAR) are used to provide isolated and direct access to the HCA HW to multiple processes.
 //! Each UAR is a page within the PCI address space and can be used by a process to post execution and control requests to the HCA.
 //! When creating a control object, a UAR page is associated with it. When executing a control operation, the HCA checks that the
 //! UAR page used to post the command matches the one specified in the object's context.
@@ -10,7 +10,7 @@ use byteorder::BigEndian;
 use crate::send_queue::CurrentUARDoorbell;
 
 /// The layout of registers within one UAR page.
-/// Send DoorBells are rung in blue flame registers by writing the first 8 bytes of the WQE to blueflame register 0
+/// Send DoorBells are rung by writing the first 8 bytes of the WQE to blueflame register 0
 /// 
 /// (PRM Section 8.2.2: UAR Page Format)
 #[derive(FromBytes)]

@@ -19,7 +19,7 @@ use alloc::{
 use nic_buffers::ReceiveBuffer;
 use nic_initialization::NIC_MAPPING_FLAGS;
 
-use crate::{CQN_MASK, work_queue::WorkQueueEntryReceive, completion_queue::{CompletionQueue, CQEOpcode}};
+use crate::{*, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
 
 
 /// The Transport Interface Receive (TIR) object is responsible for performing 
@@ -159,9 +159,9 @@ pub struct ReceiveQueue {
     /// CQE ownership value that indicates SW owned
     owner: u8,
     /// RQ number that is returned by the [`CommandOpcode::CreateRq`] command
-    rqn: u32,
+    rqn: Rqn,
     /// the lkey used by the SQ
-    lkey: u32,
+    lkey: Lkey,
     /// completion queue associated with this receive queue
     cq: CompletionQueue
 }
@@ -183,8 +183,8 @@ impl ReceiveQueue {
         num_entries: usize,
         mtu: u32,
         pool: &'static mpmc::Queue<ReceiveBuffer>, 
-        rqn: u32, 
-        lkey: u32,
+        rqn: Rqn, 
+        lkey: Lkey,
         cq: CompletionQueue
     ) -> Result<ReceiveQueue, &'static str> {
         // map the descriptor ring and initialize
@@ -231,37 +231,10 @@ impl ReceiveQueue {
             let paddr_buf = rx_buf.phys_addr;
             rx_bufs_in_use.push(rx_buf); 
 
-            wqe.update_buffer_info(self.lkey, paddr_buf, self.buffer_size_bytes); 
+            wqe.update_buffer_info(self.lkey.0, paddr_buf, self.buffer_size_bytes); 
         }
         self.packet_buffers = rx_bufs_in_use;
         Ok(())
     }
-
-    // /// Returns the index into the WQ given the total number of WQEs completed
-    // fn desc_id(&self) -> usize {
-    //     self.wqe_counter as usize  % self.entries.len()
-    // }
-
-
-    /// poll the receive completion queue for received packets 
-    pub fn poll(&mut self) {
-        let cqe = &self.cq.entries[self.cqe_counter as usize];
-        let old_counter = self.cqe_counter;
-        self.cqe_counter =  (self.cqe_counter + 1) %  self.entries.len() as u16;
-
-        if self.cqe_counter == 0 {
-            self.owner = (self.owner + 1) % 2;
-        }
-
-        let opcode = cqe.get_opcode();
-        if opcode == CQEOpcode::Requester || opcode == CQEOpcode::ResponderSend {
-            debug!("received packet for wqe: {} of length:{}", cqe.get_wqe_counter(), cqe.get_pkt_len())
-        }
-        else {
-            self.cqe_counter = old_counter
-            // debug!("{:?}", opcode)
-        }
-    }
-
 
 }

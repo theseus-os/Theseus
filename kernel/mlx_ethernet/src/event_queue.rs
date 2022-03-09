@@ -116,7 +116,7 @@ pub struct EventQueue {
     /// Physically-contiguous event queue entries
     entries: BoxRefMut<MappedPages, [EventQueueEntry]>,
     /// EQ number that is returned by the [`CommandOpcode::CreateEq`] command
-    eqn: u8
+    eqn: Eqn
 }
 
 impl EventQueue {
@@ -128,7 +128,7 @@ impl EventQueue {
     /// The starting physical address should have been passed to the HCA when creating the EQ.
     /// * `num_entries`: number of entries in the EQ
     /// * `eqn`: EQ number returned by the HCA
-    pub fn init(mp: MappedPages, num_entries: usize, eqn: u8) -> Result<EventQueue, &'static str> {
+    pub fn init(mp: MappedPages, num_entries: usize, eqn: Eqn) -> Result<EventQueue, &'static str> {
         let mut entries = BoxRefMut::new(Box::new(mp)).try_map_mut(|mp| mp.as_slice_mut::<EventQueueEntry>(0, num_entries))?;
         for eqe in entries.iter_mut() {
             eqe.init()

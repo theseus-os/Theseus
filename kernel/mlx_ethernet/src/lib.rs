@@ -46,10 +46,55 @@ const LOG_QUEUE_SIZE_MASK:      u32 = 0x1F;
 const CQN_MASK:                 u32 = 0xFF_FFFF;
 const LOG_QUEUE_SIZE_SHIFT:     u32 = 24;
 const LOG_PAGE_SIZE_SHIFT:      u32 = 24;
-
 const HW_OWNERSHIP:             u32 = 1;
 
 /// Find the page size of the given `num_bytes` in units of 4KiB pages.
 pub fn log_page_size(num_bytes: u32) -> u32 {
     libm::log2(libm::ceil(num_bytes as f64 / PAGE_SIZE as f64)) as u32
 }
+
+
+// Below are a set of types used to keep track of handlers which are returned by the device when creating objects.
+
+/// receive queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Rqn(pub(crate) u32);
+
+/// send queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Sqn(pub(crate) u32);
+
+/// completion queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Cqn(pub(crate) u32);
+
+/// protection domain
+#[derive(Debug, Copy, Clone)]
+pub struct Pd(pub(crate) u32);
+
+/// transport domain
+#[derive(Debug, Copy, Clone)]
+pub struct Td(pub(crate) u32);
+
+#[derive(Debug, Copy, Clone)]
+pub struct Lkey(pub(crate) u32);
+
+/// event queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Eqn(pub(crate) u8);
+
+/// transport interface receive number
+#[derive(Debug, Copy, Clone)]
+pub struct Tirn(pub(crate) u32);
+
+/// transport interface send number
+#[derive(Debug, Copy, Clone)]
+pub struct Tisn(pub(crate) u32);
+
+/// flow table id
+#[derive(Debug, Copy, Clone)]
+pub struct FtId(pub(crate) u32);
+
+/// flow group id
+#[derive(Debug, Copy, Clone)]
+pub struct FgId(pub(crate) u32);

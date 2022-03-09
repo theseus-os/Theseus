@@ -175,11 +175,11 @@ pub struct SendQueue {
     /// From this we also calculate the next descriptor to use
     wqe_counter: u16,
     /// SQ number that is returned by the [`CommandOpcode::CreateSq`] command
-    sqn: u32,
+    sqn: Sqn,
     /// number of the TIS context associated with this SQ
-    _tisn: u32,
+    _tisn: Tisn,
     /// the lkey used by the SQ
-    lkey: u32,
+    lkey: Lkey,
     /// the uar doorbell to be used by the next packet
     uar_db: CurrentUARDoorbell
 }
@@ -203,9 +203,9 @@ impl SendQueue {
         num_entries: usize, 
         doorbell_mp: MappedPages, 
         uar_mp: MappedPages, 
-        sqn: u32,
-        _tisn: u32,
-        lkey: u32
+        sqn: Sqn,
+        _tisn: Tisn,
+        lkey: Lkey
     ) -> Result<SendQueue, &'static str> {
         // map the descriptor ring and initialize
         let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntrySend>(0, num_entries))?;
@@ -251,7 +251,7 @@ impl SendQueue {
     pub fn send(&mut self, packet_address: PhysicalAddress, packet: &[u8]) -> u16 {
         let desc_id = self.desc_id();
         let wqe = &mut self.entries[desc_id];
-        wqe.send(self.wqe_counter as u32, self.sqn, self.lkey, packet_address, packet);
+        wqe.send(self.wqe_counter as u32, self.sqn.0, self.lkey.0, packet_address, packet);
         self.finish_wqe_operation();
         self.wqe_counter
     }
@@ -261,7 +261,7 @@ impl SendQueue {
     pub fn nop(&mut self) -> u16 {
         let desc_id = self.desc_id();
         let wqe = &mut self.entries[desc_id];
-        wqe.nop(self.wqe_counter as u32, self.sqn);
+        wqe.nop(self.wqe_counter as u32, self.sqn.0);
         self.finish_wqe_operation();  
         self.wqe_counter
     }

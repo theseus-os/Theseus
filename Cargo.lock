@@ -3014,12 +3014,9 @@ dependencies = [
 name = "test_mlx5"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "ixgbe",
- "libtest",
  "log",
  "mlx5",
- "spawn",
  "terminal_print",
 ]
 

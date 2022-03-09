@@ -1,11 +1,12 @@
 //! The Work Queue (WQ) contains a contiguous memory buffer used by SW to post I/O requests (WQEs) for HCA execution.
-//! A Work Request is posted to the HCA by writing a list of one or more Work Queue Elements (WQE) to the WQ and
-//! ringing the DoorBell, notifying the HCA that request has been posted. A WQ is created for every SQ and RQ and
-//! is comprised of WQE Basic Blocks (WQEBBs) which are 64 byte units.
+//! A Work Request is posted to the HCA by writing to one or more Work Queue Elements (WQE) of the WQ and
+//! ringing the DoorBell, notifying the HCA that request has been posted.
+//! A WQ is created for every SQ and RQ and is comprised of WQE Basic Blocks (WQEBBs) which are 64 byte units.
 //! 
 //! This module defines the context used to initialize a WQ, layout of WQ Doorbell Records, the layout of WQEBBs and related functions.
 //! 
 //! (PRM Section 8.8: Work Queues)
+//! 
 use zerocopy::*;
 use volatile::{ReadOnly, Volatile};
 use byteorder::BigEndian;
@@ -275,17 +276,17 @@ pub(crate) struct ControlSegment {
     /// * `opc_mod`: opcode modifier, occupies bits [31:24]
     /// * `wqe_index`: WQEBB number of the first block of this WQE, occupies bits [23:8]
     /// * `opcode`: a value of the type [`WQEOpcode`], occupies bits [7:0]
-    pub(crate) opcode:             Volatile<U32<BigEndian>>,
+    pub(crate) opcode:              Volatile<U32<BigEndian>>,
     /// A multi-part field:
     /// * `qp_or_sq`: QP/SQ number this WQE is posted to, occupies bits [31:8]
     /// * `ds`: WQE size in octowords (16-byte units), occupies bits [5:0]
-    pub(crate) ds:                 Volatile<U32<BigEndian>>,
+    pub(crate) ds:                  Volatile<U32<BigEndian>>,
     /// A multi-part field:
     /// * `ce`: A value of the type [`CompletionAndEventMode`], occupies bits [3:2]
     /// * `se`: true if a solicited event, occupies bit 1
-    ce_se:                 Volatile<U32<BigEndian>>,
+    ce_se:                          Volatile<U32<BigEndian>>,
     /// general identifier according to WQE opcode/opc_mod
-    ctrl_general_id:    Volatile<U32<BigEndian>>,
+    ctrl_general_id:                Volatile<U32<BigEndian>>,
 }
 
 const_assert_eq!(core::mem::size_of::<ControlSegment>(), 16);

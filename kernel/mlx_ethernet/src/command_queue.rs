@@ -13,13 +13,17 @@ use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
-use crate::initialization_segment::InitializationSegment;
-use crate::event_queue::*;
-use crate::completion_queue::*;
-use crate::send_queue::*;
-use crate::work_queue::*;
-use crate::receive_queue::*;
-use crate::flow_table::*;
+use crate::{
+    *,
+    initialization_segment::InitializationSegment,
+    event_queue::*,
+    completion_queue::*,
+    send_queue::*,
+    work_queue::*,
+    receive_queue::*,
+    flow_table::*
+};
+
 
 /// Size of mailboxes, including both control fields and data.
 #[allow(dead_code)]
@@ -354,20 +358,30 @@ enum NetworkPortRegisters {
     PMTU = 0x5003,
 }
 
+/// The possible states a command can be in as it is updated by the driver and then posted to the HCA
 #[derive(PartialEq, Eq)]
 pub enum State {
+    /// Command entries have been filled, but it is still owned by SW
     Initialized,
+    /// The command has been issued to the HW by ringing the doorbell in the [`InitializationSegment`]
     Posted,
+    /// The command has been processed by HW and output is ready to be retrieved.
     Completed
 }
 
+/// A struct representing a Command Queue Entry in the Command Queue buffer currently in use by the driver.
 pub struct Command<const S: State> {
+    /// the index of the entry in the command queue buffer this struct has a 1-to-1 mapping to
     pub(crate) entry_num: usize,
+    /// input mailboxes used by the command
     input_mailbox_buffers: Vec<MailboxBuffer>,
+    /// output mailboxes used by the command
     output_mailbox_buffers: Vec<MailboxBuffer>,
 }
 
 impl Command<{State::Initialized}> {
+    /// Updates the command queue entry at index `entry_num` with arguments for the command,
+    /// and returns an initialized command.
     fn new(
         entry_num: usize, 
         mut entry: CommandQueueEntry, 
@@ -383,6 +397,8 @@ impl Command<{State::Initialized}> {
         }
     }
 
+    /// Posts an initialized command by ringing the doorbell in the initialization segment,
+    /// and returns a posted command.
     pub fn post(self, init_segment: &mut InitializationSegment) -> Command<{State::Posted}> {
         init_segment.post_command(&self);
         Command { 
@@ -395,6 +411,8 @@ impl Command<{State::Initialized}> {
 
 
 impl Command<{State::Posted}> {
+    /// Polls a completion bit until the command has been processed by the HCA, 
+    /// then returns a completed command.
     pub fn complete(self, cmdq: &CommandQueue) -> Command<{State::Completed}> {
         cmdq.wait_for_command_completion(&self);
         Command { 
@@ -413,25 +431,26 @@ pub struct CommandCompletionStatus {
     return_status: CommandReturnStatus
 }
 
+/// Struct that makes it easier to pass the variety of arguments that are required for different commands
 pub struct CommandBuilder {
     opcode:                             CommandOpcode,
     opmod:                              Option<u16>,
     allocated_pages:                    Option<Vec<PhysicalAddress>>,
     user_access_region:                 Option<u32>,
     queue_size:                         Option<u32>,
-    event_queue_num:                    Option<u8>, 
+    event_queue_num:                    Option<Eqn>, 
     doorbell_page:                      Option<PhysicalAddress>,
-    transport_domain:                   Option<u32>,
-    completion_queue_num:               Option<u32>,
-    transport_interface_send_num:       Option<u32>,
-    protection_domain:                  Option<u32>,
-    send_queue_num:                     Option<u32>,
+    transport_domain:                   Option<Td>,
+    completion_queue_num:               Option<Cqn>,
+    transport_interface_send_num:       Option<Tisn>,
+    protection_domain:                  Option<Pd>,
+    send_queue_num:                     Option<Sqn>,
     collapsed_cq:                       bool,
-    receive_queue_num:                  Option<u32>,
+    receive_queue_num:                  Option<Rqn>,
     mtu:                                Option<u16>,
-    flow_table_id:                      Option<u32>,
-    flow_group_id:                      Option<u32>,
-    transport_interface_receive_num:    Option<u32>,
+    flow_table_id:                      Option<FtId>,
+    flow_group_id:                      Option<FgId>,
+    transport_interface_receive_num:    Option<Tirn>,
 }
 
 impl CommandBuilder {
@@ -478,7 +497,7 @@ impl CommandBuilder {
         self
     }
 
-    pub fn eqn(mut self, eqn: u8) -> CommandBuilder {
+    pub fn eqn(mut self, eqn: Eqn) -> CommandBuilder {
         self.event_queue_num = Some(eqn);
         self
     }
@@ -488,27 +507,27 @@ impl CommandBuilder {
         self
     }
 
-    pub fn td(mut self, td: u32) -> CommandBuilder {
+    pub fn td(mut self, td: Td) -> CommandBuilder {
         self.transport_domain = Some(td);
         self
     }
 
-    pub fn cqn(mut self, cqn: u32) -> CommandBuilder {
+    pub fn cqn(mut self, cqn: Cqn) -> CommandBuilder {
         self.completion_queue_num = Some(cqn);
         self
     }
 
-    pub fn tisn(mut self, tisn: u32) -> CommandBuilder {
+    pub fn tisn(mut self, tisn: Tisn) -> CommandBuilder {
         self.transport_interface_send_num = Some(tisn);
         self
     }
 
-    pub fn pd(mut self, pd: u32) -> CommandBuilder {
+    pub fn pd(mut self, pd: Pd) -> CommandBuilder {
         self.protection_domain = Some(pd);
         self
     }
 
-    pub fn sqn(mut self, sqn: u32) -> CommandBuilder {
+    pub fn sqn(mut self, sqn: Sqn) -> CommandBuilder {
         self.send_queue_num = Some(sqn);
         self
     }
@@ -518,7 +537,7 @@ impl CommandBuilder {
         self
     }
     
-    pub fn rqn(mut self, rqn: u32) -> CommandBuilder {
+    pub fn rqn(mut self, rqn: Rqn) -> CommandBuilder {
         self.receive_queue_num = Some(rqn);
         self
     }
@@ -528,17 +547,17 @@ impl CommandBuilder {
         self
     }
 
-    pub fn flow_table_id(mut self, id: u32) -> CommandBuilder {
+    pub fn flow_table_id(mut self, id: FtId) -> CommandBuilder {
         self.flow_table_id = Some(id);
         self
     }
 
-    pub fn flow_group_id(mut self, id: u32) -> CommandBuilder {
+    pub fn flow_group_id(mut self, id: FgId) -> CommandBuilder {
         self.flow_group_id = Some(id);
         self
     }
 
-    pub fn tirn(mut self, tirn: u32) -> CommandBuilder {
+    pub fn tirn(mut self, tirn: Tirn) -> CommandBuilder {
         self.transport_interface_receive_num = Some(tirn);
         self
     }
@@ -598,9 +617,6 @@ impl CommandQueue {
     /// Fill in the fields of a command queue entry.
     /// At the end of the function, the command is ready to be posted using the doorbell in the initialization segment. 
     /// Returns an error if no entry is available to use.
-    ///
-    /// # Arguments
-    /// * `parameters`:
     fn create_command(&mut self, parameters: CommandBuilder) -> Result<Command<{State::Initialized}>, CommandQueueError> 
     {
         let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
@@ -723,7 +739,7 @@ impl CommandQueue {
                     pages_pa,
                     parameters.user_access_region.ok_or(CommandQueueError::MissingInput)?,
                     parameters.queue_size.ok_or(CommandQueueError::MissingInput)?,
-                    parameters.event_queue_num.ok_or(CommandQueueError::MissingInput)?,
+                    parameters.event_queue_num.ok_or(CommandQueueError::MissingInput)?.0,
                     parameters.doorbell_page.ok_or(CommandQueueError::MissingInput)?,
                     parameters.collapsed_cq
                 )?;
@@ -737,7 +753,7 @@ impl CommandQueue {
                 const TIS_MAILBOX_INDEX: usize = 0;
                 Self::write_transport_interface_send_context_to_mailbox(
                     &mut input_mailbox_buffers[TIS_MAILBOX_INDEX],
-                    parameters.transport_domain.ok_or(CommandQueueError::MissingInput)?
+                    parameters.transport_domain.ok_or(CommandQueueError::MissingInput)?.0
                 )?;
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
             },
@@ -751,9 +767,9 @@ impl CommandQueue {
                 Self::write_send_queue_context_to_mailbox(
                     &mut input_mailbox_buffers,
                     pages_pa, 
-                    parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?, 
-                    parameters.transport_interface_send_num.ok_or(CommandQueueError::MissingInput)?, 
-                    parameters.protection_domain.ok_or(CommandQueueError::MissingInput)?, 
+                    parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?.0, 
+                    parameters.transport_interface_send_num.ok_or(CommandQueueError::MissingInput)?.0, 
+                    parameters.protection_domain.ok_or(CommandQueueError::MissingInput)?.0, 
                     parameters.user_access_region.ok_or(CommandQueueError::MissingInput)?, 
                     parameters.doorbell_page.ok_or(CommandQueueError::MissingInput)?, 
                     parameters.queue_size.ok_or(CommandQueueError::MissingInput)?
@@ -763,7 +779,7 @@ impl CommandQueue {
             },
             CommandOpcode::ModifySq => {
                 let sq_state = 0 << 28;
-                cmdq_entry.set_input_inline_data_0(sq_state | parameters.send_queue_num.ok_or(CommandQueueError::MissingInput)?);
+                cmdq_entry.set_input_inline_data_0(sq_state | parameters.send_queue_num.ok_or(CommandQueueError::MissingInput)?.0);
 
                 const NUM_INPUT_MAILBOXES_MODIFY_SQ: usize = 1;
                 self.initialize_mailboxes(NUM_INPUT_MAILBOXES_MODIFY_SQ, &mut input_mailbox_buffers)?;
@@ -776,7 +792,7 @@ impl CommandQueue {
 
             },
             CommandOpcode::QuerySq => {
-                cmdq_entry.set_input_inline_data_0(parameters.send_queue_num.ok_or(CommandQueueError::MissingInput)?);
+                cmdq_entry.set_input_inline_data_0(parameters.send_queue_num.ok_or(CommandQueueError::MissingInput)?.0);
                 const NUM_OUTPUT_MAILBOXES_QUERY_SQ: usize = 1;
                 self.initialize_mailboxes(NUM_OUTPUT_MAILBOXES_QUERY_SQ, &mut output_mailbox_buffers)?;
                 cmdq_entry.set_output_mailbox_pointer(output_mailbox_buffers[0].addr);
@@ -791,8 +807,8 @@ impl CommandQueue {
                 Self::write_receive_queue_context_to_mailbox(
                     &mut input_mailbox_buffers,
                     pages_pa, 
-                    parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?, 
-                    parameters.protection_domain.ok_or(CommandQueueError::MissingInput)?, 
+                    parameters.completion_queue_num.ok_or(CommandQueueError::MissingInput)?.0, 
+                    parameters.protection_domain.ok_or(CommandQueueError::MissingInput)?.0, 
                     parameters.doorbell_page.ok_or(CommandQueueError::MissingInput)?, 
                     parameters.queue_size.ok_or(CommandQueueError::MissingInput)?
                 )?;
@@ -800,7 +816,7 @@ impl CommandQueue {
             }
             CommandOpcode::ModifyRq => {
                 let rq_state = 0 << 28;
-                cmdq_entry.set_input_inline_data_0(rq_state | parameters.receive_queue_num.ok_or(CommandQueueError::MissingInput)?);
+                cmdq_entry.set_input_inline_data_0(rq_state | parameters.receive_queue_num.ok_or(CommandQueueError::MissingInput)?.0);
 
                 const NUM_INPUT_MAILBOXES_MODIFY_RQ: usize = 1;
                 self.initialize_mailboxes(NUM_INPUT_MAILBOXES_MODIFY_RQ, &mut input_mailbox_buffers)?;
@@ -837,7 +853,7 @@ impl CommandQueue {
                 const FLOW_GROUP_MAILBOX_INDEX: usize = 0;
                 Self::write_flow_group_info_to_mailbox(
                     &mut input_mailbox_buffers[FLOW_GROUP_MAILBOX_INDEX],
-                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?
+                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?.0
                 )?;
 
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
@@ -849,8 +865,8 @@ impl CommandQueue {
                 const TIR_MAILBOX_INDEX: usize = 0;
                 Self::write_transport_interface_receive_context_to_mailbox(
                     &mut input_mailbox_buffers[TIR_MAILBOX_INDEX],
-                    parameters.receive_queue_num.ok_or(CommandQueueError::MissingInput)?,
-                    parameters.transport_domain.ok_or(CommandQueueError::MissingInput)?
+                    parameters.receive_queue_num.ok_or(CommandQueueError::MissingInput)?.0,
+                    parameters.transport_domain.ok_or(CommandQueueError::MissingInput)?.0
                 )?;
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);          
             },
@@ -865,9 +881,9 @@ impl CommandQueue {
 
                 Self::write_flow_entry_info_to_mailbox(
                     &mut input_mailbox_buffers,
-                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?,
-                    parameters.flow_group_id.ok_or(CommandQueueError::MissingInput)?,
-                    parameters.transport_interface_receive_num.ok_or(CommandQueueError::MissingInput)?
+                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?.0,
+                    parameters.flow_group_id.ok_or(CommandQueueError::MissingInput)?.0,
+                    parameters.transport_interface_receive_num.ok_or(CommandQueueError::MissingInput)?.0
                 )?;
 
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
@@ -879,7 +895,7 @@ impl CommandQueue {
                 const FT_ROOT_MAILBOX_INDEX: usize = 0;
                 Self::write_flow_table_root_to_mailbox(
                     &mut input_mailbox_buffers[FT_ROOT_MAILBOX_INDEX],
-                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?
+                    parameters.flow_table_id.ok_or(CommandQueueError::MissingInput)?.0
                 )?;
 
                 cmdq_entry.set_input_mailbox_pointer(input_mailbox_buffers[0].addr);
@@ -1095,7 +1111,7 @@ impl CommandQueue {
         Ok(())
     }
 
-    /// ToDo: only sets state to ready
+    /// TODO: only sets state to ready
     fn modify_sq_state(input_mailbox_buffer: &mut MailboxBuffer) -> Result<(), CommandQueueError> {        
         const SEND_QUEUE_CONTEXT_OFFSET:usize = 0x10;
         // initialize the TIS context
@@ -1106,7 +1122,7 @@ impl CommandQueue {
         Ok(())
     }
 
-    /// ToDo: only sets state to ready
+    /// TODO: only sets state to ready
     fn modify_rq_state(input_mailbox_buffer: &mut MailboxBuffer) -> Result<(), CommandQueueError> {        
         const RECEIVE_QUEUE_CONTEXT_OFFSET:usize = 0x10;
         let rq_context = input_mailbox_buffer.mp.as_type_mut::<ReceiveQueueContext>(RECEIVE_QUEUE_CONTEXT_OFFSET)
@@ -1332,28 +1348,28 @@ impl CommandQueue {
     }
 
     /// Get the protection domain number, which is the output of the [`CommandOpcode::AllocPd`] command.  
-    pub fn get_protection_domain(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_protection_domain(&mut self, command: Command<{State::Completed}>) -> Result<(Pd, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocPd)?;
 
         let pd = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((pd & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((Pd(pd & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
     /// Get the transport domain number, which is the output of the [`CommandOpcode::AllocTransportDomain`] command.  
-    pub fn get_transport_domain(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_transport_domain(&mut self, command: Command<{State::Completed}>) -> Result<(Td, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocTransportDomain)?;
 
         let td = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((td & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((Td(td & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
     /// Get the value of the reserved Lkey for Base Memory Management Extension, which is used when we are using physical addresses.
     /// It is taken as the output of the [`CommandOpcode::QuerySpecialContexts`] command.
-    pub fn get_reserved_lkey(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_reserved_lkey(&mut self, command: Command<{State::Completed}>) -> Result<(Lkey, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QuerySpecialContexts)?;
 
         let resd_lkey = self.entries[command.entry_num].get_output_inline_data_1();
-        Ok((resd_lkey, self.get_command_status(command)?))
+        Ok((Lkey(resd_lkey), self.get_command_status(command)?))
     }
 
     /// Get the Vport state in the format (max_tx_speed, admin_state, state)
@@ -1385,39 +1401,39 @@ impl CommandQueue {
         ], self.get_command_status(command)?))
     }
 
-    pub fn get_eq_number(&mut self, command: Command<{State::Completed}>) -> Result<(u8, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_eq_number(&mut self, command: Command<{State::Completed}>) -> Result<(Eqn, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateEq)?;
 
         let eq_number = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((eq_number as u8, self.get_command_status(command)?))
+        Ok((Eqn(eq_number as u8), self.get_command_status(command)?))
     }
 
-    pub fn get_cq_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_cq_number(&mut self, command: Command<{State::Completed}>) -> Result<(Cqn, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateCq)?;
 
         let cq_number = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((cq_number & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((Cqn(cq_number & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
-    pub fn get_tis_context_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_tis_context_number(&mut self, command: Command<{State::Completed}>) -> Result<(Tisn, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateTis)?;
         
         let tisn = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((tisn & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((Tisn(tisn & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
-    pub fn get_send_queue_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_send_queue_number(&mut self, command: Command<{State::Completed}>) -> Result<(Sqn, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateSq)?;
 
         let sqn = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((sqn & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((Sqn(sqn & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
-    pub fn get_receive_queue_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_receive_queue_number(&mut self, command: Command<{State::Completed}>) -> Result<(Rqn, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateRq)?;
 
         let rqn = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((rqn & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((Rqn(rqn & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
     pub fn get_sq_state(&mut self, command: Command<{State::Completed}>) -> Result<(SendQueueState, CommandCompletionStatus), CommandQueueError> {
@@ -1429,25 +1445,25 @@ impl CommandQueue {
         Ok((state, self.get_command_status(command)?))
     }
 
-    pub fn get_flow_table_id(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_flow_table_id(&mut self, command: Command<{State::Completed}>) -> Result<(FtId, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateFlowTable)?;
 
         let ft_id = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((ft_id & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((FtId(ft_id & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
-    pub fn get_flow_group_id(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_flow_group_id(&mut self, command: Command<{State::Completed}>) -> Result<(FgId, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateFlowGroup)?;
 
         let fg_id = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((fg_id & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((FgId(fg_id & 0xFF_FFFF), self.get_command_status(command)?))
     }
 
-    pub fn get_tir_context_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_tir_context_number(&mut self, command: Command<{State::Completed}>) -> Result<(Tirn, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateTir)?;
         
         let tirn = self.entries[command.entry_num].get_output_inline_data_0();
-        Ok((tirn & 0xFF_FFFF, self.get_command_status(command)?))
+        Ok((Tirn(tirn & 0xFF_FFFF), self.get_command_status(command)?))
     }
 }
 

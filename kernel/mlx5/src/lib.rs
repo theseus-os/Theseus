@@ -4,6 +4,7 @@
 //! * reading the device PCI space and mapping the initialization segment
 //! * setting up a command queue to pass commands to the NIC
 //! * setting up a single send and receive queue
+//! * functions to send packets
 //! 
 //! All information is taken from the Mellanox Adapters Programmer’s Reference Manual (PRM) Rev 0.54,
 //! unless otherwise specified. 
@@ -58,7 +59,7 @@ pub const CONNECTX5_DEV:        u16 = 0x1017;
 /// For the send queue, we compress all the completion queue entries to the first entry.
 const NUM_CQ_ENTRIES_SEND:      usize = 1; 
 
-/// How many ReceiveBuffers are preallocated for this driver to use. 
+/// How many [`ReceiveBuffers`] are preallocated for this driver to use. 
 /// 
 /// # Warning
 /// Right now we manually make sure this matches the mlx5 init arguments.
@@ -90,7 +91,7 @@ pub fn get_mlx5_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
 pub struct ConnectX5Nic {
     /// Initialization segment base address
     mem_base: PhysicalAddress,
-    /// Initialization Segment
+    /// Initialization segment
     init_segment: BoxRefMut<MappedPages, InitializationSegment>,
     /// Command Queue
     command_queue: CommandQueue,
@@ -108,15 +109,15 @@ pub struct ConnectX5Nic {
     max_mtu: u16,
     /// Event queue which currently only reports page request events
     event_queue: EventQueue,
-    /// a buffer of transmit descriptors
+    /// Buffer of transmit descriptors
     send_queue: SendQueue,
     /// The completion queue where packet transmission is reported
     send_completion_queue: CompletionQueue,
-    /// a buffer of receive descriptors
+    /// Buffer of receive descriptors
     receive_queue: ReceiveQueue,
 }
 
-/// Functions that setup the NIC struct.
+/// Functions that setup the NIC struct and transmit packets.
 impl ConnectX5Nic {
 
     /// Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.
@@ -131,7 +132,7 @@ impl ConnectX5Nic {
         let sq_size_in_bytes = num_tx_descs * core::mem::size_of::<WorkQueueEntrySend>();
         let rq_size_in_bytes = num_rx_descs * core::mem::size_of::<WorkQueueEntryReceive>();
         
-        // because the RX and TX queues have to be contiguous and we are using MappedPages to split ownership of the queues
+        // because the RX and TX queues have to be contiguous and we are using MappedPages to split ownership of the queues,
         // the RX queue must end on a page boundary
         if rq_size_in_bytes % PAGE_SIZE != 0 {
             return Err("RQ size in bytes must be a multiple of the page size.");
@@ -376,7 +377,7 @@ impl ConnectX5Nic {
         let (eqn, status) = cmdq.get_eq_number(completed_cmd)?;
         // 2. Initialize the EQ
         let event_queue = EventQueue::init(eq_mp, num_eq_entries, eqn)?;
-        trace!("CreateEq: {:?}, eqn: {}", status, eqn); 
+        trace!("CreateEq: {:?}, eqn: {:?}", status, eqn); 
 
         #[cfg(mlx_logger)]
         {
@@ -389,7 +390,7 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (pd, status) = cmdq.get_protection_domain(completed_cmd)?;
-        trace!("AllocPd: {:?}, protection domain: {}", status, pd);
+        trace!("AllocPd: {:?}, protection domain: {:?}", status, pd);
 
         // execute ALLOC_TRANSPORT_DOMAIN
         let completed_cmd = cmdq.create_and_execute_command(
@@ -397,7 +398,7 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (td, status) = cmdq.get_transport_domain(completed_cmd)?;
-        trace!("AllocTransportDomain: {:?}, transport domain: {}", status, td);
+        trace!("AllocTransportDomain: {:?}, transport domain: {:?}", status, td);
 
         // execute QUERY_SPECIAL_CONTEXTS
         let completed_cmd = cmdq.create_and_execute_command(
@@ -405,7 +406,7 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (rlkey, status) = cmdq.get_reserved_lkey(completed_cmd)?;
-        trace!("QuerySpecialContexts: {:?}, rlkey: {}", status, rlkey);
+        trace!("QuerySpecialContexts: {:?}, rlkey: {:?}", status, rlkey);
         
         // execute CREATE_CQ for SQ 
 
@@ -428,7 +429,7 @@ impl ConnectX5Nic {
         let (cqn_s, status) = cmdq.get_cq_number(completed_cmd)?;
         // 3. Initialize the CQ
         let send_completion_queue = CompletionQueue::init(cq_mp, NUM_CQ_ENTRIES_SEND, db_page, cqn_s)?;
-        trace!("CreateCq: {:?}, cqn_s: {}", status, cqn_s);
+        trace!("CreateCq: {:?}, cqn_s: {:?}", status, cqn_s);
 
         #[cfg(mlx_logger)]
         {
@@ -455,7 +456,7 @@ impl ConnectX5Nic {
         let (cqn_r, status) = cmdq.get_cq_number(completed_cmd)?;
         // 3. Initialize the CQ
         let completion_queue_r = CompletionQueue::init(cq_mp, cq_entries_r, db_page, cqn_r)?;
-        trace!("CreateCq: {:?}, cqn_r: {}", status, cqn_r);
+        trace!("CreateCq: {:?}, cqn_r: {:?}", status, cqn_r);
         
         // execute CREATE_TIS
         let completed_cmd = cmdq.create_and_execute_command(
@@ -464,7 +465,7 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (tisn, status) = cmdq.get_tis_context_number(completed_cmd)?;
-        trace!("CreateTis: {:?}, tisn: {}", status, tisn);
+        trace!("CreateTis: {:?}, tisn: {:?}", status, tisn);
 
         // Allocate pages for RQ and SQ, they have to be contiguous      
         let (q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, NIC_MAPPING_FLAGS)?;
@@ -497,8 +498,16 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (sqn, status) = cmdq.get_send_queue_number(completed_cmd)?;
-        let send_queue = SendQueue::create(sq_mp, num_tx_descs, db_page, uar_page, sqn, tisn, rlkey)?;
-        trace!("Create SQ status: {:?}, number: {}", status, sqn);
+        let send_queue = SendQueue::create(
+            sq_mp, 
+            num_tx_descs, 
+            db_page, 
+            uar_page, 
+            sqn, 
+            tisn, 
+            rlkey
+        )?;
+        trace!("Create SQ status: {:?}, number: {:?}", status, sqn);
         
         #[cfg(mlx_logger)]
         {
@@ -519,9 +528,17 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (rqn, status) = cmdq.get_receive_queue_number(completed_cmd)?;
-        let mut receive_queue = ReceiveQueue::create(rq_mp, num_rx_descs, mtu as u32, &RX_BUFFER_POOL, rqn, rlkey, completion_queue_r)?;
+        let mut receive_queue = ReceiveQueue::create(
+            rq_mp, 
+            num_rx_descs, 
+            mtu as u32, 
+            &RX_BUFFER_POOL, 
+            rqn, 
+            rlkey, 
+            completion_queue_r
+        )?;
         receive_queue.refill()?;
-        trace!("Create RQ status: {:?}, number: {}", status, rqn);
+        trace!("Create RQ status: {:?}, number: {:?}", status, rqn);
 
         // MODIFY_SQ
         let completed_cmd = cmdq.create_and_execute_command(
@@ -556,8 +573,7 @@ impl ConnectX5Nic {
         let (tx_speed, admin_state, state, status) = cmdq.get_vport_state(completed_cmd)?;
         trace!("Query Vport State status: {:?}, tx_speed: {:#X}, admin_state:{:#X}, state: {:#X}", status, tx_speed, admin_state, state); 
 
-        // Create a flow table, currently just send all packets to the one receive queue
-        
+        // Create a flow table
         // currently we only create 1 rule, the wildcard rule.
         const NUM_RULES: u32 = 1;
         let completed_cmd = cmdq.create_and_execute_command(
@@ -566,16 +582,18 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (ft_id, status) = cmdq.get_flow_table_id(completed_cmd)?;
-        trace!("Create FT status: {:?}, id: {}", status, ft_id);
+        trace!("Create FT status: {:?}, id: {:?}", status, ft_id);
 
+        // create the wildcard flow group
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateFlowGroup)
                 .flow_table_id(ft_id), 
             &mut init_segment
         )?;
         let (fg_id, status) = cmdq.get_flow_group_id(completed_cmd)?;
-        trace!("Create FG status: {:?}, id: {}", status, fg_id);
+        trace!("Create FG status: {:?}, id: {:?}", status, fg_id);
 
+        // create a TIR object for the RQ
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateTir)
                 .rqn(rqn)
@@ -583,8 +601,9 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (tirn, status) = cmdq.get_tir_context_number(completed_cmd)?;
-        trace!("Create TIR status: {:?}, tirn: {}", status, tirn);
+        trace!("Create TIR status: {:?}, tirn: {:?}", status, tirn);
 
+        // add the wildcard entry to the flow table
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::SetFlowTableEntry)
                 .flow_table_id(ft_id)
@@ -646,6 +665,7 @@ impl ConnectX5Nic {
         self.mac_addr
     }
 
+    /// Adds a packet to be sent to the transmit queue and returns once it is sent.
     pub fn send(&mut self, buffer: TransmitBuffer) -> Result<(), &'static str> {
         let packet_length = buffer.length;
         let wqe_counter = self.send_queue.send(buffer.phys_addr, buffer.as_slice(0, packet_length as usize)?);
@@ -655,19 +675,10 @@ impl ConnectX5Nic {
         Ok(())
     }
 
+    /// Adds a packet to be sent to the transmit queue.
     pub fn send_fastpath(&mut self, buffer_addr: PhysicalAddress, buffer: &[u8]) {
         self.send_queue.send(buffer_addr, buffer);
     }
-
-    pub fn transmission_complete(&mut self) -> u16 {
-        self.send_completion_queue.wqe_counter(0)
-    }
-
-    pub fn receive(&mut self) {
-        self.receive_queue.poll()
-    }
-
-
 }
 
 /// Returns true if `num` is a power of 2.

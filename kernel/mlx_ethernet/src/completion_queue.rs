@@ -1,5 +1,4 @@
-//! Completion Queues (CQ) are circular buffers used by the HCA to post completion reports upon
-//! completion of a work request.
+//! Completion Queues (CQ) are circular buffers used by the HCA to post completion reports upon completion of a work request.
 //! This module defines the layout of an CQ, the context used to initialize an CQ and related functions.
 //! 
 //! (PRM Section 8.18: Completion Queues)
@@ -173,7 +172,7 @@ impl CompletionQueueEntry {
         self.owner.write(U32::new(invalid_cqe | HW_OWNERSHIP));
     }
 
-    /// Return the WQE opcode value of the  of the WQE completed
+    /// Return the WQE opcode value of the WQE completed
     pub(crate) fn get_send_wqe_opcode(&self) -> Result<WQEOpcode, &'static str> {
         const WQE_OPCODE_SHIFT: u32 = 24;
         WQEOpcode::try_from((self.flow_tag.read().get() >> WQE_OPCODE_SHIFT) as u8)
@@ -202,11 +201,6 @@ impl CompletionQueueEntry {
         self.byte_count.read().get()
     }
 
-    /// Returns if the CQE is HW-owned for the given HW ownership value
-    pub(crate) fn hw_owned(&self, hw_own_value: bool) -> bool {
-        self.get_owner() == hw_own_value
-    }
-
     /// Prints out the fields of a CQE in the format used by other drivers (e.g. Linux, Snabb)
     pub fn dump(&self, i: usize) {
         debug!("CQE {}", i);
@@ -221,7 +215,6 @@ impl CompletionQueueEntry {
 }
 
 /// A structure containing information of recently-posted CQ commands
-/// and consumer index and is accessible by user-level software.
 #[derive(FromBytes, Default)]
 #[repr(C)]
 pub struct CompletionQueueDoorbellRecord {
@@ -243,7 +236,7 @@ pub struct CompletionQueue {
     /// Doorbell record for this CQ
     doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>,
     /// CQ number that is returned by the [`CommandOpcode::CreateCq`] command
-    cqn: u32,
+    cqn: Cqn,
 }
 
 impl CompletionQueue {
@@ -261,7 +254,7 @@ impl CompletionQueue {
         entries_mp: MappedPages, 
         num_entries: usize, 
         doorbell_mp: MappedPages,
-        cqn: u32
+        cqn: Cqn
     ) -> Result<CompletionQueue, &'static str> {
         let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<CompletionQueueEntry>(0, num_entries))?;
         let mut doorbell = BoxRefMut::new(Box::new(doorbell_mp)).try_map_mut(|mp| mp.as_type_mut::<CompletionQueueDoorbellRecord>(0))?;
@@ -282,10 +275,6 @@ impl CompletionQueue {
         if wqe_counter == counter {
             trace!("opcode: {:?}, wqe_counter: {}", entry.get_send_wqe_opcode(), counter);
         }
-    }
-
-    pub fn wqe_counter(&self, entry_num: usize) -> u16 {
-        self.entries[entry_num].get_wqe_counter()
     }
 
     /// Prints out all entries in the CQ
