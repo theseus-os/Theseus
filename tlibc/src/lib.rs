@@ -6,10 +6,15 @@
 #![feature(untagged_unions)]
 #![feature(core_intrinsics)]
 #![feature(linkage)]
+#![feature(thread_local)]
 
 // Allowances for C-style syntax.
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+
+// Needed for "staticlib" crate-type only
+extern crate panic_entry;
+extern crate heap;
 
 
 extern crate alloc;
@@ -22,16 +27,16 @@ extern crate cbitset;
 extern crate memory;
 extern crate task;
 extern crate cstr_core;
-extern crate bare_io;
+extern crate core2;
 
 
 mod errno;
-mod types;
 mod io;
 mod globals;
-mod printf;
+mod stdio;
 mod stdlib;
 mod string;
+mod mm;
 
 
 use alloc::vec::Vec;
@@ -39,8 +44,7 @@ use cstr_core::CString;
 
 
 pub use errno::*;
-pub use types::*;
-
+use libc::{c_int, c_char};
 
 
 /// The entry point that Theseus's task spawning logic will invoke (from its task wrapper).

@@ -14,5 +14,8 @@ version = "0.4.8"
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
 
-[dependencies.thread_local_storage]
-path = "../../kernel/thread_local_storage"
+[dependencies.test_thread_local]
+path = "../../kernel/test_thread_local"
+
+[dependencies.thread_local_macro]
+path = "../../kernel/thread_local_macro"

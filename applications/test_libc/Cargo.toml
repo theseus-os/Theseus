@@ -1,0 +1,14 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "test_libc"
+description = "A crate for testing tlibc with the libc Rust crate ported to Theseus"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+log = "0.4.8"
+libc = { version = "0.2", default-features = false }
+
+
+[lib]
+crate-type = ["rlib"]

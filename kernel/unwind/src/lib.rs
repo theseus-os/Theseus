@@ -437,8 +437,8 @@ unsafe fn deref_ptr(ptr: Pointer) -> u64 {
 }
 
 
-pub trait FuncWithRegisters = Fn(Registers) -> Result<(), &'static str>;
-type RefFuncWithRegisters<'a> = &'a dyn FuncWithRegisters;
+pub trait FuncWithRegisters = FnMut(Registers) -> Result<(), &'static str>;
+type FuncWithRegistersRefMut<'a> = &'a mut dyn FuncWithRegisters;
 
 
 /// This function saves the current CPU register values onto the stack (to preserve them)
@@ -448,12 +448,12 @@ type RefFuncWithRegisters<'a> = &'a dyn FuncWithRegisters;
 /// since we have to start from the current call frame and work backwards up the call stack 
 /// while applying the rules for register value changes in each call frame
 /// in order to arrive at the proper register values for a prior call frame.
-pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str> 
+pub fn invoke_with_current_registers<F>(f: &mut F) -> Result<(), &'static str> 
     where F: FuncWithRegisters 
 {
-    let f: RefFuncWithRegisters = &f;
+    let mut f: FuncWithRegistersRefMut = f; // cast to a &mut trait object
     let result = unsafe { 
-        let res_ptr = unwind_trampoline(&f);
+        let res_ptr = unwind_trampoline(&mut f);
         let res_boxed = Box::from_raw(res_ptr);
         *res_boxed
     };
@@ -470,7 +470,7 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
     /// The argument is a pointer to a function reference, so effectively a pointer to a pointer. 
     #[naked]
     #[inline(never)]
-    unsafe extern "C" fn unwind_trampoline(_func: *const RefFuncWithRegisters) -> *mut Result<(), &'static str> {
+    unsafe extern "C" fn unwind_trampoline(_func: *mut FuncWithRegistersRefMut) -> *mut Result<(), &'static str> {
         // This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.
         // This is because we rely on the value of registers to stay the same as whatever the caller set them to.
         // DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.
@@ -515,11 +515,11 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
     ///   after we change the register values during unwinding,
     #[no_mangle]
     unsafe extern "C" fn unwind_recorder(
-        func: *const RefFuncWithRegisters,
+        func: *mut FuncWithRegistersRefMut,
         stack: u64,
         saved_regs: *mut SavedRegs,
     ) -> *mut Result<(), &'static str> {
-        let func = &*func;
+        let func = &mut *func;
         let saved_regs = &*saved_regs;
 
         let mut registers = Registers::default();
@@ -717,8 +717,8 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 
 
     // We pass a pointer to the unwinding context to this closure. 
-    let res = invoke_with_current_registers(|registers| {
-        // set the proper register values before we used the 
+    let res = invoke_with_current_registers(&mut |registers| {
+        // set the proper register values before start the actual unwinding procedure.
         {  
             // SAFE: we just created this pointer above
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };

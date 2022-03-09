@@ -79,4 +79,4 @@ Finally, give access to the current user via this command:
 chown $USER /dev/vfio/$group_number
 ```
 
-<!-- cspell:ignore devsel, iommu, lspci, Mellanox, NUMA, VFIO -->
+<!-- cspell:ignore iommu, Mellanox, VFIO -->

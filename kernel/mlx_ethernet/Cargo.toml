@@ -13,6 +13,7 @@ static_assertions = "1.1.0"
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }
 byteorder = { version = "1.4.3", default-features = false }
 libm = "0.2.1"
+mpmc = "0.1.6"
 
 [dependencies.num_enum]
 version = "0.5.2"
@@ -32,9 +33,6 @@ path = "../nic_buffers"
 
 [dependencies.log]
 version = "0.4.8"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
 
 [lib]
 crate-type = ["rlib"]

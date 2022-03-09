@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 bitflags = "1.1.0"
-bare-io = { version = "0.2.1", features = [ "alloc", "nightly" ] }
+core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
 unicode-width = "0.1.8"
 vte = "0.10.1"
 derive_more = "0.99.0"

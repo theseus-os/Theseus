@@ -7,7 +7,7 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate getopts;
 extern crate fs_node;
 extern crate path;
@@ -77,6 +77,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
     // Parse the file as an ELF executable
     let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
     let byte_slice: &[u8] = file_mp.as_slice(0, file.size())?;
+
     let (mut segments, entry_point, _vaddr_offset, elf_file) = parse_and_load_elf_executable(byte_slice)?;
     debug!("Parsed ELF executable, moving on to overwriting relocations.");
     
@@ -172,7 +173,7 @@ impl Offset {
 
 /// Parses an elf executable file from the given slice of bytes and load it into memory.
 ///
-/// ## Important note about memory mappings
+/// # Important note about memory mappings
 /// This function will allocate new memory regions to store each program segment
 /// and copy each segment's data into them.
 /// When this function returns, those segments will be mapped as writable in order to allow them 
@@ -180,7 +181,7 @@ impl Offset {
 /// Before running this executable, each segment's `MappedPages` should be remapped
 /// to the proper `flags` specified in its `LoadedSegment.flags` field. 
 ///
-/// ## Return
+/// # Return
 /// Returns a tuple of:
 /// 1. A list of program segments mapped into memory. 
 /// 2. The virtual address of the executable's entry point, e.g., the `_start` function.
@@ -351,7 +352,8 @@ fn overwrite_relocations(
         use xmas_elf::sections::SectionData::Rela64;
         if verbose_log { 
             trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
-            sec.get_name(&elf_file), sec.get_type(), sec.info()); 
+                sec.get_name(&elf_file), sec.get_type(), sec.info()
+            ); 
         }
 
         let rela_sec_name = sec.get_name(&elf_file).unwrap();

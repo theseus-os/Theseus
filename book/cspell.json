@@ -1,14 +1,23 @@
 {
-    "version": "0.1",
+    "version": "0.2",
     "language": "en",
     "languageSettings": [
         {
             "languageId": "markdown",
-            "ignoreRegExpList": ["CodeBlock"],
-            "patterns": [{
-                "name": "CodeBlock",
-                "pattern": "^```[\\w\\W]+?^```$"
-            }]
+            "ignoreRegExpList": [
+                "CodeBlock",
+                "CodeInline"
+            ],
+            "patterns": [
+                {
+                    "name": "CodeBlock",
+                    "pattern": "```[\\w\\W]+?```"
+                },
+                {
+                    "name": "CodeInline",
+                    "pattern": "`[\\w\\W]+?`"
+                }
+            ]
         }
     ],
     "ignorePaths": [
@@ -22,11 +31,11 @@
         "bootloader",
         "cacheable",
         "cytokernel",
-        "Deallocation",
         "deallocate",
         "deallocated",
         "deallocating",
         "deallocation",
+        "Deallocation",
         "displayables",
         "extralingual",
         "extralingually",
@@ -35,6 +44,8 @@
         "intralingual",
         "linker's",
         "Makefiles",
+        "memdisk",
+        "microcontrollers",
         "microkernel",
         "microkernels",
         "minimalistic",
@@ -42,11 +53,12 @@
         "multicore",
         "multikernel",
         "multikernels",
+        "POSIX",
         "prefetchable",
         "QEMU",
         "quickstart",
-        "runnable",
         "runnability",
+        "runnable",
         "runqueue",
         "runqueues",
         "submodule",
@@ -64,57 +76,22 @@
     ],
     "ignoreWords": [
         "ACPI",
-        "alloc",
         "APIC",
         "binutils",
         "Bochs",
-        "bochsrc",
-        "Boos",
-        "Boos's",
-        "cargoflags",
-        "cdylib",
-        "chmod",
-        "debuginfo",
-        "dlopen",
-        "dlsym",
-        "dpkg",
-        "getopts",
-        "isize",
-        "isofiles",
-        "ISOs",
         "libc",
-        "libtheseus",
-        "libtlibc",
         "linkcheck",
-        "loadc",
         "manycore",
-        "mdbook",
-        "mgmt",
-        "mkdir",
         "MMIO",
-        "mutex",
-        "nasm",
-        "orun",
-        "OSDI",
-        "POSIX",
         "Phalereus",
-        "println",
-        "Reinterpretive",
-        "readlink",
-        "rela",
-        "relocs",
-        "rlib",
-        "rmeta",
+        "reinterpretive",
         "rodata",
         "runstate",
         "rustc",
         "rustdoc",
         "rustflags",
         "rustup",
-        "sbin",
-        "simd",
-        "slabmalloc",
-        "staticlib",
+        "SIMD",
         "struct",
         "structs",
         "Supermicro",
@@ -124,7 +101,6 @@
         "Thinkpad",
         "tlibc",
         "userspace",
-        "usize",
         "Zhong"
     ]
 }
