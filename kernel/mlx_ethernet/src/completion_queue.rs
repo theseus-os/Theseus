@@ -146,13 +146,13 @@ pub struct CompletionQueueEntry {
     timestamp_l:            Volatile<U32<BigEndian>>,
     /// A multi-part field:
     /// * `send_wqe_opcode/rx_drop_counter`: the send WQE opcode or the number of dropped packets
-    /// because of no RCV WQE since the last CQE, occupies bits [31:24]
+    /// because of no RCV WQE since the last CQE, occupies bits \[31:24\]
     flow_tag:               Volatile<U32<BigEndian>>,
     /// A multi-part field:
-    /// * `wqe_counter`: wqe_counter of the WQE completed, occupies bits [31:16]
-    /// * `signature`: byte-wise XOR of CQE, occupies bits [15:8]
-    /// * `opcode`: a [`CQEOpcode`] value, occupies bits [7:4]
-    /// * `cqe_format`: a [`CQEFormat`] value, occupies bits [3:2]
+    /// * `wqe_counter`: wqe_counter of the WQE completed, occupies bits \[31:16\]
+    /// * `signature`: byte-wise XOR of CQE, occupies bits \[15:8\]
+    /// * `opcode`: a [`CQEOpcode`] value, occupies bits \[7:4\]
+    /// * `cqe_format`: a [`CQEFormat`] value, occupies bits \[3:2\]
     /// * `se`: solicited event. This CQE cause EQE generation for solicited event, occupies bit 1
     /// * `owner`: owner of the entry, occupies bit 0.
     /// The value indicating SW ownership is flipped every time CQ wraps around, starting with 0.

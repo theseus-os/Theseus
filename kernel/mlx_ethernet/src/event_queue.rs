@@ -78,7 +78,7 @@ pub struct EventQueueEntry {
     /// delivers auxiliary data to handle the event
     event_data: Volatile<[u8; 28]>,
     /// A multi-part field:
-    /// * `signature`: byte-wise XOR of EQE, occupies bits [15:8]
+    /// * `signature`: byte-wise XOR of EQE, occupies bits \[15:8\]
     /// * `owner`: owner of the entry, occupies bit 0
     signature_owner: Volatile<U32<BigEndian>>
 }
