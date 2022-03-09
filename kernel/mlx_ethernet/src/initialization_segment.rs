@@ -1,7 +1,7 @@
 //! This module defines the layout of the initialization segment as well as access functions.
 //! (PRM Section 5.4: Initialization Segment)
 
-use command_queue::InitializedCommand;
+use command_queue::{Command, State};
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
 use bit_field::BitField;
@@ -91,7 +91,7 @@ impl InitializationSegment {
     ///
     /// # Arguments
     /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
-    pub(crate) fn post_command(&mut self, command: &InitializedCommand) {
+    pub(crate) fn post_command(&mut self, command: &Command<{State::Initialized}>) {
         let val = self.command_doorbell_vector.read().get();
         self.command_doorbell_vector.write(U32::new(val | (1 << command.entry_num)));
     }

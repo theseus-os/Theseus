@@ -177,7 +177,7 @@ pub struct SendQueue {
     /// SQ number that is returned by the [`CommandOpcode::CreateSq`] command
     sqn: u32,
     /// number of the TIS context associated with this SQ
-    tisn: u32,
+    _tisn: u32,
     /// the lkey used by the SQ
     lkey: u32,
     /// the uar doorbell to be used by the next packet
@@ -204,7 +204,7 @@ impl SendQueue {
         doorbell_mp: MappedPages, 
         uar_mp: MappedPages, 
         sqn: u32,
-        tisn: u32,
+        _tisn: u32,
         lkey: u32
     ) -> Result<SendQueue, &'static str> {
         // map the descriptor ring and initialize
@@ -219,7 +219,7 @@ impl SendQueue {
         let mut uar = BoxRefMut::new(Box::new(uar_mp)).try_map_mut(|mp| mp.as_type_mut::<UserAccessRegion>(0))?;
         *uar = UserAccessRegion::default();
 
-        Ok( SendQueue{entries, doorbell, uar, wqe_counter: 0, sqn, tisn, lkey, uar_db: CurrentUARDoorbell::Even} )
+        Ok( SendQueue{entries, doorbell, uar, wqe_counter: 0, sqn, _tisn, lkey, uar_db: CurrentUARDoorbell::Even} )
     }
 
     /// Returns the index into the WQ given the total number of WQEs completed

@@ -238,7 +238,7 @@ impl WorkQueueEntryReceive {
     /// * `lkey`: the lkey used by the RQ
     /// * `local_address`: physical address of the packet buffer
     /// * `packet_len`: packet buffer length in bytes
-    pub fn receive(&mut self, lkey: u32, local_address: PhysicalAddress, packet_len: u32) {
+    pub fn update_buffer_info(&mut self, lkey: u32, local_address: PhysicalAddress, packet_len: u32) {
         self.data.init(lkey, local_address, packet_len);
     }
 

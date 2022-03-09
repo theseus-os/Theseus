@@ -22,7 +22,6 @@ extern crate nic_initialization;
 extern crate mlx_ethernet;
 extern crate kernel_config;
 extern crate memory_structs;
-extern crate network_interface_card;
 extern crate nic_buffers;
 extern crate mpmc;
 #[macro_use] extern crate lazy_static;
@@ -48,7 +47,6 @@ use mlx_ethernet::{
     work_queue::{WorkQueueEntrySend, WorkQueueEntryReceive, DoorbellRecord}
 };
 use kernel_config::memory::PAGE_SIZE;
-use network_interface_card::NetworkInterfaceCard;
 use nic_buffers::{TransmitBuffer, ReceiveBuffer};
 
 /// Vendor ID for Mellanox
@@ -61,11 +59,20 @@ pub const CONNECTX5_DEV:        u16 = 0x1017;
 const NUM_CQ_ENTRIES_SEND:      usize = 1; 
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
-const RX_BUFFER_POOL_SIZE: usize = 256; 
+/// 
+/// # Warning
+/// Right now we manually make sure this matches the mlx5 init arguments.
+/// We need to update the whole RX buffer pool design to be per queue.
+const RX_BUFFER_POOL_SIZE: usize = 512; 
+
 lazy_static! {
     /// The pool of pre-allocated receive buffers that are used by the NIC
     /// and temporarily given to higher layers in the networking stack.
-    static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
+    /// 
+    /// # Note
+    /// The capacity always has to be greater than the number of buffers in the queue, which is why we multiply by 2.
+    /// I'm not sure why that is, but if we try to add packets >= capacity, the addition does not make any progress.
+    static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE * 2);
 }
 
 /// The singleton connectx-5 NIC.
@@ -107,8 +114,6 @@ pub struct ConnectX5Nic {
     send_completion_queue: CompletionQueue,
     /// a buffer of receive descriptors
     receive_queue: ReceiveQueue,
-    /// The completion queue where packet reception is reported
-    receive_completion_queue: CompletionQueue,
 }
 
 /// Functions that setup the NIC struct.
@@ -121,7 +126,7 @@ impl ConnectX5Nic {
     /// * `mlx5_pci_dev`: Contains the pci device information for this NIC.
     /// * `num_tx_descs`: The number of descriptors in each transmit queue.
     /// * `num_rx_descs`: The number of descriptors in each receive queue.
-    /// * `mtu`: Maximum Transmission Unit
+    /// * `mtu`: Maximum Transmission Unit in bytes
     pub fn init(mlx5_pci_dev: &PciDevice, num_tx_descs: usize, num_rx_descs: usize, mtu: u16) -> Result<&'static MutexIrqSafe<ConnectX5Nic> , &'static str> {
         let sq_size_in_bytes = num_tx_descs * core::mem::size_of::<WorkQueueEntrySend>();
         let rq_size_in_bytes = num_rx_descs * core::mem::size_of::<WorkQueueEntryReceive>();
@@ -500,8 +505,10 @@ impl ConnectX5Nic {
             send_queue.dump()
         }
 
+        // initialize the rx buffer pool
+        init_rx_buf_pool(num_rx_descs, mtu, &RX_BUFFER_POOL)?;
+
         // Create the RQ
-        
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateRq) 
             .allocated_pages(vec!(q_pa)) 
@@ -512,7 +519,8 @@ impl ConnectX5Nic {
             &mut init_segment
         )?;
         let (rqn, status) = cmdq.get_receive_queue_number(completed_cmd)?;
-        let receive_queue = ReceiveQueue::create(rq_mp, num_rx_descs, rqn, rlkey)?;
+        let mut receive_queue = ReceiveQueue::create(rq_mp, num_rx_descs, mtu as u32, &RX_BUFFER_POOL, rqn, rlkey, completion_queue_r)?;
+        receive_queue.refill()?;
         trace!("Create RQ status: {:?}, number: {}", status, rqn);
 
         // MODIFY_SQ
@@ -607,7 +615,6 @@ impl ConnectX5Nic {
             event_queue,
             send_completion_queue: send_completion_queue,
             send_queue,
-            receive_completion_queue: completion_queue_r,
             receive_queue
         };
         
@@ -654,6 +661,10 @@ impl ConnectX5Nic {
 
     pub fn transmission_complete(&mut self) -> u16 {
         self.send_completion_queue.wqe_counter(0)
+    }
+
+    pub fn receive(&mut self) {
+        self.receive_queue.poll()
     }
 
 

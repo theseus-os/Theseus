@@ -7,7 +7,7 @@
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
-use memory::{PhysicalAddress, MappedPages};
+use memory::{MappedPages, create_contiguous_mapping};
 use owning_ref:: BoxRefMut;
 use core::fmt;
 use num_enum::TryFromPrimitive;
@@ -17,8 +17,9 @@ use alloc::{
     boxed::Box
 };
 use nic_buffers::ReceiveBuffer;
+use nic_initialization::NIC_MAPPING_FLAGS;
 
-use crate::{CQN_MASK, work_queue::WorkQueueEntryReceive};
+use crate::{CQN_MASK, work_queue::WorkQueueEntryReceive, completion_queue::{CompletionQueue, CQEOpcode}};
 
 
 /// The Transport Interface Receive (TIR) object is responsible for performing 
@@ -107,7 +108,7 @@ impl fmt::Debug for ReceiveQueueContext {
     }
 }
 
-
+#[allow(unused)]
 impl ReceiveQueueContext {
     /// Initialize the fields of the RQ context.
     /// The RQ context is then passed to the HCA when creating the RQ.
@@ -139,18 +140,30 @@ impl ReceiveQueueContext {
 
 /// A data structure that contains the RQ ring of descriptors 
 /// and is used to interact with the RQ once initialized.
+#[allow(dead_code)]
 pub struct ReceiveQueue {
     /// physically-contiguous RQ descriptors
     entries: BoxRefMut<MappedPages, [WorkQueueEntryReceive]>, 
     /// the packet buffers in use by the descriptors
     packet_buffers: Vec<ReceiveBuffer>,
+    /// The size of a receive buffers in bytes. 
+    /// It should be set to the MTU.
+    buffer_size_bytes: u32,
+    /// Rx buffer pool 
+    pool: &'static mpmc::Queue<ReceiveBuffer>,
     /// The number of WQEs that have been completed.
     /// From this we also calculate the next descriptor to use
     wqe_counter: u16,
+    /// completion queue index of the next completed packet
+    cqe_counter: u16,
+    /// CQE ownership value that indicates SW owned
+    owner: u8,
     /// RQ number that is returned by the [`CommandOpcode::CreateRq`] command
     rqn: u32,
     /// the lkey used by the SQ
     lkey: u32,
+    /// completion queue associated with this receive queue
+    cq: CompletionQueue
 }
 
 impl ReceiveQueue {
@@ -160,27 +173,95 @@ impl ReceiveQueue {
     /// # Arguments
     /// * `entries_mp`: memory that is to be transformed into a slice of WQEs. 
     /// The starting physical address should have been passed to the HCA when creating the SQ.
-    /// * `num_entries`: number of entries in the RQ 
+    /// * `num_entries`: number of entries in the RQ
+    /// * `mtu`: size of the receive buffers in bytes
+    /// * `buffer_pool`: receive buffer pool 
     /// * `rqn`: SQ number returned by the HCA
     /// * `lkey`: the lkey used by the RQ
-    pub fn create(entries_mp: MappedPages, num_entries: usize, rqn: u32, lkey: u32) -> Result<ReceiveQueue, &'static str> {
+    pub fn create(
+        entries_mp: MappedPages, 
+        num_entries: usize,
+        mtu: u32,
+        pool: &'static mpmc::Queue<ReceiveBuffer>, 
+        rqn: u32, 
+        lkey: u32,
+        cq: CompletionQueue
+    ) -> Result<ReceiveQueue, &'static str> {
         // map the descriptor ring and initialize
         let mut entries = BoxRefMut::new(Box::new(entries_mp)).try_map_mut(|mp| mp.as_slice_mut::<WorkQueueEntryReceive>(0, num_entries))?;
         for entry in entries.iter_mut() {
             entry.init()
         }
-        Ok( ReceiveQueue{entries, packet_buffers: Vec::new(), wqe_counter: 0, rqn, lkey} )
+        Ok( ReceiveQueue {
+                entries, 
+                packet_buffers: Vec::new(), 
+                buffer_size_bytes: mtu,
+                pool,
+                wqe_counter: 0,
+                cqe_counter: 0, 
+                owner: 0,
+                rqn, 
+                lkey,
+                cq
+        })
     }
 
-    /// Returns the index into the WQ given the total number of WQEs completed
-    fn desc_id(&self) -> usize {
-        self.wqe_counter as usize  % self.entries.len()
+    /// Refills the receive queue by updating WQEs with new packet buffers.
+    /// Right now we assume that this function is only called once at the point of initialization.
+    /// 
+    /// TODO:
+    /// this function can be shifted to nic_initialization if we remove intel specific actions from those functions
+    pub fn refill(&mut self) -> Result<(), &'static str> {
+        let buffer_size = self.buffer_size_bytes;
+        let mem_pool = self.pool;
+
+        // now that we've created the rx descriptors, we can fill them in with initial values
+        let mut rx_bufs_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(self.entries.len());
+        for wqe in self.entries.iter_mut()
+        {
+            // obtain or create a receive buffer for each rx_desc
+            let rx_buf = self.pool.pop()
+                .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
+                .or_else(|_e| {
+                    create_contiguous_mapping(buffer_size as usize, NIC_MAPPING_FLAGS)
+                        .map(|(buf_mapped, buf_paddr)| 
+                            ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, mem_pool)
+                        )
+                })?;
+            let paddr_buf = rx_buf.phys_addr;
+            rx_bufs_in_use.push(rx_buf); 
+
+            wqe.update_buffer_info(self.lkey, paddr_buf, self.buffer_size_bytes); 
+        }
+        self.packet_buffers = rx_bufs_in_use;
+        Ok(())
     }
 
-    // /// Perform all the steps to send a packet: initialize the WQE, update the doorbell record and the uar doorbell register.
-    // /// Returns the current value of the WQE counter.
-    // pub fn refill(&mut self, desc_id: usize, buffer_address: PhysicalAddress) {
-    //     let wqe = &mut self.entries[desc_id];
-    //     wqe.receive(self.lkey, buffer_address, packet);
+    // /// Returns the index into the WQ given the total number of WQEs completed
+    // fn desc_id(&self) -> usize {
+    //     self.wqe_counter as usize  % self.entries.len()
     // }
+
+
+    /// poll the receive completion queue for received packets 
+    pub fn poll(&mut self) {
+        let cqe = &self.cq.entries[self.cqe_counter as usize];
+        let old_counter = self.cqe_counter;
+        self.cqe_counter =  (self.cqe_counter + 1) %  self.entries.len() as u16;
+
+        if self.cqe_counter == 0 {
+            self.owner = (self.owner + 1) % 2;
+        }
+
+        let opcode = cqe.get_opcode();
+        if opcode == CQEOpcode::Requester || opcode == CQEOpcode::ResponderSend {
+            debug!("received packet for wqe: {} of length:{}", cqe.get_wqe_counter(), cqe.get_pkt_len())
+        }
+        else {
+            self.cqe_counter = old_counter
+            // debug!("{:?}", opcode)
+        }
+    }
+
+
 }

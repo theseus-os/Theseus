@@ -7,9 +7,11 @@
 //! While this version of the manual was acquired by directly contacting Nvidia through their support site (<https://support.mellanox.com/s/>),
 //! an older version of the manual can be found at <http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf>.
 
- #![no_std]
- #![feature(slice_pattern)]
- #![feature(core_intrinsics)]
+#![no_std]
+#![feature(slice_pattern)]
+#![feature(core_intrinsics)]
+#![allow(incomplete_features)]
+#![feature(const_generics)]
 
 #[macro_use]extern crate log;
 #[macro_use] extern crate alloc;
@@ -25,6 +27,7 @@ extern crate kernel_config;
 extern crate libm;
 extern crate num_enum;
 extern crate nic_buffers;
+extern crate mpmc;
 
 use kernel_config::memory::PAGE_SIZE;
 

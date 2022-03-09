@@ -354,31 +354,38 @@ enum NetworkPortRegisters {
     PMTU = 0x5003,
 }
 
-pub struct InitializedCommand {
+#[derive(PartialEq, Eq)]
+pub enum State {
+    Initialized,
+    Posted,
+    Completed
+}
+
+pub struct Command<const S: State> {
     pub(crate) entry_num: usize,
     input_mailbox_buffers: Vec<MailboxBuffer>,
     output_mailbox_buffers: Vec<MailboxBuffer>,
 }
 
-impl InitializedCommand {
+impl Command<{State::Initialized}> {
     fn new(
         entry_num: usize, 
         mut entry: CommandQueueEntry, 
         input_mailbox_buffers: Vec<MailboxBuffer>,
         output_mailbox_buffers: Vec<MailboxBuffer>,
         command_queue: &mut BoxRefMut<MappedPages, [CommandQueueEntry]>
-    ) -> Self {
+    ) -> Command<{State::Initialized}> {
         core::mem::swap(&mut entry, &mut command_queue[entry_num]);
-        InitializedCommand {
+        Command {
             entry_num,
             input_mailbox_buffers,
             output_mailbox_buffers
         }
     }
 
-    pub fn post(self, init_segment: &mut InitializationSegment) -> PostedCommand {
+    pub fn post(self, init_segment: &mut InitializationSegment) -> Command<{State::Posted}> {
         init_segment.post_command(&self);
-        PostedCommand { 
+        Command { 
             entry_num: self.entry_num,
             input_mailbox_buffers: self.input_mailbox_buffers, 
             output_mailbox_buffers: self.output_mailbox_buffers 
@@ -386,16 +393,11 @@ impl InitializedCommand {
     }
 }
 
-pub struct PostedCommand {
-    entry_num: usize,
-    input_mailbox_buffers: Vec<MailboxBuffer>,
-    output_mailbox_buffers: Vec<MailboxBuffer>,
-}
 
-impl PostedCommand {
-    pub fn complete(self, cmdq: &CommandQueue) -> CompletedCommand {
+impl Command<{State::Posted}> {
+    pub fn complete(self, cmdq: &CommandQueue) -> Command<{State::Completed}> {
         cmdq.wait_for_command_completion(&self);
-        CompletedCommand { 
+        Command { 
             entry_num: self.entry_num,
             input_mailbox_buffers: self.input_mailbox_buffers, 
             output_mailbox_buffers: self.output_mailbox_buffers 
@@ -403,12 +405,7 @@ impl PostedCommand {
     }
 }
 
-#[allow(dead_code)]
-pub struct CompletedCommand {
-    entry_num: usize,
-    input_mailbox_buffers: Vec<MailboxBuffer>,
-    output_mailbox_buffers: Vec<MailboxBuffer>,
-}
+
 
 #[derive(Debug)]
 pub struct CommandCompletionStatus {
@@ -592,7 +589,7 @@ impl CommandQueue {
     }
 
     /// Find an command queue entry that is not in use
-    pub fn create_and_execute_command(&mut self, parameters: CommandBuilder, init_segment: &mut InitializationSegment) -> Result<CompletedCommand, CommandQueueError> {
+    pub fn create_and_execute_command(&mut self, parameters: CommandBuilder, init_segment: &mut InitializationSegment) -> Result<Command<{State::Completed}>, CommandQueueError> {
         Ok( self.create_command(parameters)?
                 .post(init_segment)
                 .complete(&self) )
@@ -604,7 +601,7 @@ impl CommandQueue {
     ///
     /// # Arguments
     /// * `parameters`:
-    fn create_command(&mut self, parameters: CommandBuilder) -> Result<InitializedCommand, CommandQueueError> 
+    fn create_command(&mut self, parameters: CommandBuilder) -> Result<Command<{State::Initialized}>, CommandQueueError> 
     {
         let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
         let num_pages = parameters.allocated_pages.as_ref().and_then(|pages| Some(pages.len())); 
@@ -895,7 +892,7 @@ impl CommandQueue {
         
         // Write the command to the actual place in memory, 
         // and return the command object indicating an initialized command queue entry which is still in SW ownership
-        let initialized_entry = InitializedCommand::new(entry_num, cmdq_entry, input_mailbox_buffers, output_mailbox_buffers, &mut self.entries);
+        let initialized_entry = Command::new(entry_num, cmdq_entry, input_mailbox_buffers, output_mailbox_buffers, &mut self.entries);
         
         // update token to be used in the next command
         self.token = self.token.wrapping_add(1);
@@ -1229,11 +1226,11 @@ impl CommandQueue {
     /*** Functions to retrieve output values ***/
 
     /// Waits for ownership bit to be cleared, and then returns the command delivery status and the command return status.
-    pub fn wait_for_command_completion(&self, command: &PostedCommand) {
+    pub fn wait_for_command_completion(&self, command: &Command<{State::Posted}>) {
         while self.entries[command.entry_num].owned_by_hw() {}
     }
 
-    pub fn get_command_status(&mut self, command: CompletedCommand) -> Result<CommandCompletionStatus, CommandQueueError> {
+    pub fn get_command_status(&mut self, command: Command<{State::Completed}>) -> Result<CommandCompletionStatus, CommandQueueError> {
         #[cfg(mlx_logger)]
         {
             debug!("command OUTPUT");
@@ -1265,7 +1262,7 @@ impl CommandQueue {
     }
 
     /// Get the number of pages requested by the NIC, which is the output of the [`CommandOpcode::QueryHcaCap`] command.  
-    pub fn get_port_type(&mut self, command: CompletedCommand) -> Result<(HcaPortType, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_port_type(&mut self, command: Command<{State::Completed}>) -> Result<(HcaPortType, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryHcaCap)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0x34; 
@@ -1280,7 +1277,7 @@ impl CommandQueue {
     }
 
     /// Get the device capabilities, which is the output of the [`CommandOpcode::QueryHcaCap`] command.  
-    pub fn get_device_capabilities(&mut self, command: CompletedCommand) -> Result<(HCACapabilities, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_device_capabilities(&mut self, command: Command<{State::Completed}>) -> Result<(HCACapabilities, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryHcaCap)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0; 
@@ -1292,7 +1289,7 @@ impl CommandQueue {
     }
 
     /// Get the current ISSI version and the supported ISSI versions, which is the output of the [`CommandOpcode::QueryIssi`] command.  
-    pub fn get_query_issi_command_output(&mut self, command: CompletedCommand) -> Result<(u16, u8, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_query_issi_command_output(&mut self, command: Command<{State::Completed}>) -> Result<(u16, u8, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryIssi)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0x6C - 0x10; 
@@ -1307,7 +1304,7 @@ impl CommandQueue {
     }
 
     /// Get the number of pages requested by the NIC, which is the output of the [`CommandOpcode::QueryPages`] command.  
-    pub fn get_query_pages_command_output(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_query_pages_command_output(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryPages)?;
 
         let num_pages = self.entries[command.entry_num].get_output_inline_data_1();
@@ -1316,7 +1313,7 @@ impl CommandQueue {
 
     /// Get the maximum value the MTU can be set to, which is the output of the [`CommandOpcode::AccessRegister`] command 
     /// when accessing [`NetworkPortRegisters::PMTU`].  
-    pub fn get_max_mtu(&mut self, command: CompletedCommand) -> Result<(u16, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_max_mtu(&mut self, command: Command<{State::Completed}>) -> Result<(u16, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AccessRegister)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0x0;
@@ -1328,14 +1325,14 @@ impl CommandQueue {
     }
     
     /// Get the User Access Region (UAR) number, which is the output of the [`CommandOpcode::AllocUar`] command.  
-    pub fn get_uar(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_uar(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocUar)?;
         let uar = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((uar & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
     /// Get the protection domain number, which is the output of the [`CommandOpcode::AllocPd`] command.  
-    pub fn get_protection_domain(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_protection_domain(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocPd)?;
 
         let pd = self.entries[command.entry_num].get_output_inline_data_0();
@@ -1343,7 +1340,7 @@ impl CommandQueue {
     }
 
     /// Get the transport domain number, which is the output of the [`CommandOpcode::AllocTransportDomain`] command.  
-    pub fn get_transport_domain(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_transport_domain(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::AllocTransportDomain)?;
 
         let td = self.entries[command.entry_num].get_output_inline_data_0();
@@ -1352,7 +1349,7 @@ impl CommandQueue {
 
     /// Get the value of the reserved Lkey for Base Memory Management Extension, which is used when we are using physical addresses.
     /// It is taken as the output of the [`CommandOpcode::QuerySpecialContexts`] command.
-    pub fn get_reserved_lkey(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_reserved_lkey(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QuerySpecialContexts)?;
 
         let resd_lkey = self.entries[command.entry_num].get_output_inline_data_1();
@@ -1361,7 +1358,7 @@ impl CommandQueue {
 
     /// Get the Vport state in the format (max_tx_speed, admin_state, state)
     /// It is taken as the output of the [`CommandOpcode::QueryVportState`] command.
-    pub fn get_vport_state(&mut self, command: CompletedCommand) -> Result<(u16, u8, u8, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_vport_state(&mut self, command: Command<{State::Completed}>) -> Result<(u16, u8, u8, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryVportState)?;
 
         let state = self.entries[command.entry_num].get_output_inline_data_1();
@@ -1369,7 +1366,7 @@ impl CommandQueue {
     }
 
     /// Get the port mac address, which is the output of the [`CommandOpcode::QueryNicVportContext`] command.  
-    pub fn get_vport_mac_address(&mut self, command: CompletedCommand) -> Result<([u8; 6], CommandCompletionStatus), CommandQueueError> {
+    pub fn get_vport_mac_address(&mut self, command: Command<{State::Completed}>) -> Result<([u8; 6], CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QueryNicVportContext)?;
 
         const DATA_OFFSET_IN_MAILBOX: usize = 0x0;
@@ -1388,42 +1385,42 @@ impl CommandQueue {
         ], self.get_command_status(command)?))
     }
 
-    pub fn get_eq_number(&mut self, command: CompletedCommand) -> Result<(u8, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_eq_number(&mut self, command: Command<{State::Completed}>) -> Result<(u8, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateEq)?;
 
         let eq_number = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((eq_number as u8, self.get_command_status(command)?))
     }
 
-    pub fn get_cq_number(&mut self, command:CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_cq_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateCq)?;
 
         let cq_number = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((cq_number & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_tis_context_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_tis_context_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateTis)?;
         
         let tisn = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((tisn & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_send_queue_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_send_queue_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateSq)?;
 
         let sqn = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((sqn & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_receive_queue_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_receive_queue_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateRq)?;
 
         let rqn = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((rqn & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_sq_state(&mut self, command: CompletedCommand) -> Result<(SendQueueState, CommandCompletionStatus), CommandQueueError> {
+    pub fn get_sq_state(&mut self, command: Command<{State::Completed}>) -> Result<(SendQueueState, CommandCompletionStatus), CommandQueueError> {
         self.check_command_output_validity(command.entry_num, CommandOpcode::QuerySq)?;
 
         let mailbox = &command.output_mailbox_buffers[0];
@@ -1432,21 +1429,21 @@ impl CommandQueue {
         Ok((state, self.get_command_status(command)?))
     }
 
-    pub fn get_flow_table_id(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_flow_table_id(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateFlowTable)?;
 
         let ft_id = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((ft_id & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_flow_group_id(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_flow_group_id(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateFlowGroup)?;
 
         let fg_id = self.entries[command.entry_num].get_output_inline_data_0();
         Ok((fg_id & 0xFF_FFFF, self.get_command_status(command)?))
     }
 
-    pub fn get_tir_context_number(&mut self, command: CompletedCommand) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
+    pub fn get_tir_context_number(&mut self, command: Command<{State::Completed}>) -> Result<(u32, CommandCompletionStatus), CommandQueueError>  {
         self.check_command_output_validity(command.entry_num, CommandOpcode::CreateTir)?;
         
         let tirn = self.entries[command.entry_num].get_output_inline_data_0();

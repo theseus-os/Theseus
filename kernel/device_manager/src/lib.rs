@@ -161,7 +161,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             }
             if dev.vendor_id == mlx5::MLX_VEND && (dev.device_id == mlx5::CONNECTX5_DEV || dev.device_id == mlx5::CONNECTX5_EX_DEV) {
                 info!("mlx5 PCI device found at: {:?}", dev.location);
-                const RX_DESCS: usize = 1024;
+                const RX_DESCS: usize = 512;
                 const TX_DESCS: usize = 8192;
                 const MAX_MTU:  u16 = 9000;
 

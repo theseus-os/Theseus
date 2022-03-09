@@ -13,6 +13,7 @@ use byteorder::BigEndian;
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, MappedPages};
 use owning_ref::BoxRefMut;
+use num_enum::TryFromPrimitive;
 use crate::{
     *,
     work_queue::WQEOpcode
@@ -97,9 +98,9 @@ impl CompletionQueueContext {
     }
 }
 
-#[allow(dead_code)]
+#[derive(Debug, TryFromPrimitive, PartialEq)]
 #[repr(u8)]
-enum CQEOpcode {
+pub(crate) enum CQEOpcode {
     Requester = 0x0,
     ResponderRDMAWriteWithImmediate = 0x1,
     ResponderSend = 0x2,
@@ -109,7 +110,8 @@ enum CQEOpcode {
     SignatureError = 0xC, // PRM ERROR: says its 0x12 but thats not possible with 4 bits
     RequesterError = 0xD,
     ResponderError = 0xE,
-    InvalidCQE = 0xF
+    InvalidCQE = 0xF,
+    Unknown
 }
 
 #[allow(dead_code)]
@@ -138,7 +140,8 @@ pub struct CompletionQueueEntry {
     srqn_user_index:        Volatile<U32<BigEndian>>,
     flow_table_metadata:    Volatile<U32<BigEndian>>,
     _padding1:              u32,
-    mini_cqe_num:           Volatile<U32<BigEndian>>,
+    /// Byte count of data transferred. Can be used to find length of received packets.
+    byte_count:             Volatile<U32<BigEndian>>,
     timestamp_h:            Volatile<U32<BigEndian>>,
     timestamp_l:            Volatile<U32<BigEndian>>,
     /// A multi-part field:
@@ -158,6 +161,7 @@ pub struct CompletionQueueEntry {
 
 const_assert_eq!(core::mem::size_of::<CompletionQueueEntry>(), 64);
 
+#[allow(unused)]
 impl CompletionQueueEntry {
     pub fn init(&mut self) {
         // Snabb initializes the CQE but setting all the bits. I do not think that is correct.
@@ -185,6 +189,17 @@ impl CompletionQueueEntry {
     /// Returns true if the ownership bit is set
     pub(crate) fn get_owner(&self) -> bool {
         self.owner.read().get().get_bit(0)
+    }
+
+    /// Returns the WQE entry opcode
+    pub(crate) fn get_opcode(&self) -> CQEOpcode {
+        CQEOpcode::try_from((self.owner.read().get() >> 4 & 0xF) as u8)
+            .unwrap_or(CQEOpcode::Unknown)
+    }
+
+    /// Returns the length of the received packet
+    pub(crate) fn get_pkt_len(&self) -> u32 {
+        self.byte_count.read().get()
     }
 
     /// Returns if the CQE is HW-owned for the given HW ownership value
@@ -224,7 +239,7 @@ const_assert_eq!(core::mem::size_of::<CompletionQueueDoorbellRecord>(), 8);
 #[allow(dead_code)]
 pub struct CompletionQueue {
     /// Physically-contiguous completion queue entries
-    entries: BoxRefMut<MappedPages, [CompletionQueueEntry]>,
+    pub(crate) entries: BoxRefMut<MappedPages, [CompletionQueueEntry]>,
     /// Doorbell record for this CQ
     doorbell: BoxRefMut<MappedPages, CompletionQueueDoorbellRecord>,
     /// CQ number that is returned by the [`CommandOpcode::CreateCq`] command
