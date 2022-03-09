@@ -43,11 +43,6 @@ exclude = [
 	"libtheseus",
 ]
 
-[patch.'https://github.com/rafalh/rust-fatfs']
-### Temporary patch for fatfs which allows us to set the logging level.
-### Once the below PR lands, we can remove this.
-### <https://github.com/rafalh/rust-fatfs/pull/44>
-fatfs = { git = "https://github.com/theseus-os/rust-fatfs", branch = "config_log_features" }
 
 [patch.crates-io]
 ### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
