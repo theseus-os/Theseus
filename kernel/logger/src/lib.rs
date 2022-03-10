@@ -104,7 +104,6 @@ impl Log for DummyLogger {
         metadata.level() <= log::max_level()
     }
 
-    #[cfg(not(mlx_logger))]
     fn log(&self, record: &Record) {
         if !self.enabled(record.metadata()) {
             return;
@@ -139,39 +138,6 @@ impl Log for DummyLogger {
                 level_str,
                 file_loc,
                 line_loc,
-                record.args(),
-            ));
-        }
-    }
-
-    #[cfg(mlx_logger)]
-    fn log(&self, record: &Record) {
-        if !self.enabled(record.metadata()) {
-            return;
-        }
-
-        let (level_str, color) = match record.level() {
-            Level::Error => ("[E] ", LogColor::Red),
-            Level::Warn =>  ("[W] ", LogColor::Yellow),
-            Level::Info =>  ("[I] ", LogColor::Cyan),
-            Level::Debug => ("[D] ", LogColor::Green),
-            Level::Trace => ("[T] ", LogColor::Purple),
-        };
-
-        let _result = self.write_fmt(
-            format_args!("{} {} {}",
-                color.as_terminal_string(),
-                record.args(),
-                LogColor::Reset.as_terminal_string(),
-            )
-        );
-        // If there was an error above, there's literally nothing we can do but ignore it,
-        // because there is no other lower-level way to log errors than the serial port.
-        
-        if let Some(func) = MIRROR_VGA_FUNC.get() {
-            // Currently printing to the VGA terminal doesn't support ANSI color escape sequences,
-            // so we exclude the first and the last elements that set those colors.
-            func(format_args!("{}",
                 record.args(),
             ));
         }
