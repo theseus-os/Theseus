@@ -372,7 +372,48 @@ impl MappedPages {
         Ok(())
     }
 
+    /// Splits this `MappedPages` into two separate `MappedPages` objects:
+    /// * `[beginning : at_page - 1]`
+    /// * `[at_page : end]`
+    /// 
+    /// Depending on the size of this `MappedPages`, either one of the 
+    /// returned `MappedPages` objects may be empty. 
+    /// 
+    /// Returns an `Err` containing this `MappedPages` if `at_page` is not within its bounds.
+    /// 
+    /// # Note
+    /// No remapping actions or page reallocations will occur on either a failure or a success.
+    pub fn split(mut self, at_page: Page) -> Result<(MappedPages, MappedPages), (&'static str, MappedPages)> {
+        // First, take ownership of the AllocatedPages inside of the `MappedPages`.
+        let alloc_pages_owned = core::mem::replace(&mut self.pages, AllocatedPages::empty());
 
+        match alloc_pages_owned.split(at_page) {
+            Ok((alloc_pages_begin, alloc_pages_end)) => {
+                let mp1 = MappedPages{
+                    page_table_p4: self.page_table_p4,
+                    pages: alloc_pages_begin,
+                    flags: self.flags,
+                };
+                let mp2 = MappedPages {
+                    page_table_p4: self.page_table_p4,
+                    pages: alloc_pages_end,
+                    flags: self.flags,
+                };
+                mem::forget(self); 
+                Ok((mp1, mp2))
+            },
+            Err(orig) => {
+                // Upon error, restore the `self.pages` AllocatedPages that we took ownership of.
+                self.pages = orig;
+                error!("MappedPages::split(): Given page is not within the MappedPages: The Page address is {:?}, MappedPages span {:?} to {:?}",
+                    at_page.start_address(), self.pages.start(), self.pages.end()
+                );
+                return Err(("failed to split MappedPages", self));  
+            }
+        }
+    }
+
+    
     // Removing this function for now since it's unused and untested.
     // /// Creates a deep copy of this `MappedPages` memory region,
     // /// by duplicating not only the virtual memory mapping
