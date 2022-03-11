@@ -380,12 +380,13 @@ impl MappedPages {
     /// thus, either one of the returned `MappedPages` objects may be empty. 
     /// * If `at_page == self.pages.start`, the first returned `MappedPages` object will be empty.
     /// * If `at_page == self.pages.end + 1`, the second returned `MappedPages` object will be empty.
+    /// 
     /// Returns an `Err` containing this `MappedPages` (`self`) if `at_page` is not within its bounds.
     /// 
     /// # Note
     /// No remapping actions or page reallocations will occur on either a failure or a success.
     pub fn split(mut self, at_page: Page) -> Result<(MappedPages, MappedPages), MappedPages> {
-        // Take ownership of the AllocatedPages inside of the `MappedPages` so we can split it.
+        // Take ownership of the `AllocatedPages` inside of the `MappedPages` so we can split it.
         let alloc_pages_owned = core::mem::replace(&mut self.pages, AllocatedPages::empty());
 
         match alloc_pages_owned.split(at_page) {
