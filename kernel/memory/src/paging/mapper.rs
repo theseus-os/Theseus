@@ -376,9 +376,10 @@ impl MappedPages {
     /// * `[beginning : at_page - 1]`
     /// * `[at_page : end]`
     /// 
-    /// Depending on the size of this `MappedPages`, either one of the 
-    /// returned `MappedPages` objects may be empty. 
-    /// 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `MappedPages` objects may be empty. 
+    /// * If `at_page == self.pages.start`, the first returned `MappedPages` object will be empty.
+    /// * If `at_page == self.pages.end + 1`, the second returned `MappedPages` object will be empty.
     /// Returns an `Err` containing this `MappedPages` if `at_page` is not within its bounds.
     /// 
     /// # Note
@@ -399,6 +400,7 @@ impl MappedPages {
                     pages: alloc_pages_end,
                     flags: self.flags,
                 };
+
                 mem::forget(self); 
                 Ok((mp1, mp2))
             },
