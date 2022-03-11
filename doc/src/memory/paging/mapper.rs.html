@@ -784,6 +784,47 @@
 <span id="781">781</span>
 <span id="782">782</span>
 <span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
 </pre><pre class="rust">
 <span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
@@ -1159,7 +1200,48 @@
         <span class="prelude-val">Ok</span>(())
     }
 
+    <span class="doccomment">/// Splits this `MappedPages` into two separate `MappedPages` objects:</span>
+    <span class="doccomment">/// * `[beginning : at_page - 1]`</span>
+    <span class="doccomment">/// * `[at_page : end]`</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This function follows the behavior of [`core::slice::split_at()`],</span>
+    <span class="doccomment">/// thus, either one of the returned `MappedPages` objects may be empty. </span>
+    <span class="doccomment">/// * If `at_page == self.pages.start`, the first returned `MappedPages` object will be empty.</span>
+    <span class="doccomment">/// * If `at_page == self.pages.end + 1`, the second returned `MappedPages` object will be empty.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Returns an `Err` containing this `MappedPages` (`self`) if `at_page` is not within its bounds.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// # Note</span>
+    <span class="doccomment">/// No remapping actions or page reallocations will occur on either a failure or a success.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">at_page</span>: <span class="ident">Page</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">MappedPages</span>, <span class="ident">MappedPages</span>), <span class="ident">MappedPages</span><span class="op">&gt;</span> {
+        <span class="comment">// Take ownership of the `AllocatedPages` inside of the `MappedPages` so we can split it.</span>
+        <span class="kw">let</span> <span class="ident">alloc_pages_owned</span> <span class="op">=</span> <span class="ident">core::mem::replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">pages</span>, <span class="ident">AllocatedPages::empty</span>());
 
+        <span class="kw">match</span> <span class="ident">alloc_pages_owned</span>.<span class="ident">split</span>(<span class="ident">at_page</span>) {
+            <span class="prelude-val">Ok</span>((<span class="ident">first_ap</span>, <span class="ident">second_ap</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>((
+                <span class="ident">MappedPages</span>{
+                    <span class="ident">page_table_p4</span>: <span class="self">self</span>.<span class="ident">page_table_p4</span>,
+                    <span class="ident">pages</span>: <span class="ident">first_ap</span>,
+                    <span class="ident">flags</span>: <span class="self">self</span>.<span class="ident">flags</span>,
+                },
+                <span class="ident">MappedPages</span> {
+                    <span class="ident">page_table_p4</span>: <span class="self">self</span>.<span class="ident">page_table_p4</span>,
+                    <span class="ident">pages</span>: <span class="ident">second_ap</span>,
+                    <span class="ident">flags</span>: <span class="self">self</span>.<span class="ident">flags</span>,
+                }
+                <span class="comment">// When returning here, `self` will be dropped, but it&#39;s empty so it has no effect.</span>
+            )),
+            <span class="prelude-val">Err</span>(<span class="ident">orig_ap</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="comment">// Upon error, restore the `self.pages` (`AllocatedPages`) that we took ownership of.</span>
+                <span class="self">self</span>.<span class="ident">pages</span> <span class="op">=</span> <span class="ident">orig_ap</span>;
+                <span class="prelude-val">Err</span>(<span class="self">self</span>)
+            }
+        }
+    }
+
+    
     <span class="comment">// Removing this function for now since it&#39;s unused and untested.</span>
     <span class="comment">// /// Creates a deep copy of this `MappedPages` memory region,</span>
     <span class="comment">// /// by duplicating not only the virtual memory mapping</span>

@@ -989,6 +989,8 @@
 <span id="986">986</span>
 <span id="987">987</span>
 <span id="988">988</span>
+<span id="989">989</span>
+<span id="990">990</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Provides an allocator for physical memory frames.</span>
 <span class="doccomment">//! The minimum unit of allocation is a single frame. </span>
@@ -1376,6 +1378,8 @@
     <span class="doccomment">/// * If `at_frame == self.end + 1`, the second returned `AllocatedFrames` object will be empty.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is otherwise out of bounds.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="self">self</span>, <span class="ident">at_frame</span>: <span class="ident">Frame</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">AllocatedFrames</span>), <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">end_of_first</span> <span class="op">=</span> <span class="ident">at_frame</span> <span class="op">-</span> <span class="number">1</span>;
 
