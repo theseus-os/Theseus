@@ -385,6 +385,8 @@ impl MappedPages {
     /// 
     /// # Note
     /// No remapping actions or page reallocations will occur on either a failure or a success.
+    /// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
     pub fn split(mut self, at_page: Page) -> Result<(MappedPages, MappedPages), MappedPages> {
         // Take ownership of the `AllocatedPages` inside of the `MappedPages` so we can split it.
         let alloc_pages_owned = core::mem::replace(&mut self.pages, AllocatedPages::empty());

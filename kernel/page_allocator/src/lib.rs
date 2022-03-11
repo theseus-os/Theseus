@@ -240,6 +240,8 @@ impl AllocatedPages {
     /// * If `at_page == self.end + 1`, the second returned `AllocatedPages` object will be empty.
     /// 
     /// Returns an `Err` containing this `AllocatedPages` if `at_page` is otherwise out of bounds.
+	/// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
     pub fn split(self, at_page: Page) -> Result<(AllocatedPages, AllocatedPages), AllocatedPages> {
         let end_of_first = at_page - 1;
 
