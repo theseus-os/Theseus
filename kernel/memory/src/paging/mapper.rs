@@ -372,7 +372,48 @@ impl MappedPages {
         Ok(())
     }
 
+    /// Splits this `MappedPages` into two separate `MappedPages` objects:
+    /// * `[beginning : at_page - 1]`
+    /// * `[at_page : end]`
+    /// 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `MappedPages` objects may be empty. 
+    /// * If `at_page == self.pages.start`, the first returned `MappedPages` object will be empty.
+    /// * If `at_page == self.pages.end + 1`, the second returned `MappedPages` object will be empty.
+    /// 
+    /// Returns an `Err` containing this `MappedPages` (`self`) if `at_page` is not within its bounds.
+    /// 
+    /// # Note
+    /// No remapping actions or page reallocations will occur on either a failure or a success.
+    /// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
+    pub fn split(mut self, at_page: Page) -> Result<(MappedPages, MappedPages), MappedPages> {
+        // Take ownership of the `AllocatedPages` inside of the `MappedPages` so we can split it.
+        let alloc_pages_owned = core::mem::replace(&mut self.pages, AllocatedPages::empty());
 
+        match alloc_pages_owned.split(at_page) {
+            Ok((first_ap, second_ap)) => Ok((
+                MappedPages{
+                    page_table_p4: self.page_table_p4,
+                    pages: first_ap,
+                    flags: self.flags,
+                },
+                MappedPages {
+                    page_table_p4: self.page_table_p4,
+                    pages: second_ap,
+                    flags: self.flags,
+                }
+                // When returning here, `self` will be dropped, but it's empty so it has no effect.
+            )),
+            Err(orig_ap) => {
+                // Upon error, restore the `self.pages` (`AllocatedPages`) that we took ownership of.
+                self.pages = orig_ap;
+                Err(self)
+            }
+        }
+    }
+
+    
     // Removing this function for now since it's unused and untested.
     // /// Creates a deep copy of this `MappedPages` memory region,
     // /// by duplicating not only the virtual memory mapping
