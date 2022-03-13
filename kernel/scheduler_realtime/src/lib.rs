@@ -15,6 +15,10 @@ extern crate runqueue_realtime;
 use task::TaskRef;
 use runqueue_realtime::RunQueue;
 
+/// Set the periodicity of a given `Task` in all `RunQueue` structures.
+/// A reexport of the set_periodicity function from runqueue_realtime
+pub use runqueue_realtime::set_periodicity;
+
 /// This defines the realtime scheduler policy.
 /// Returns None if there is no schedule-able task
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {

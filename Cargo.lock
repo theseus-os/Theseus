@@ -3069,6 +3069,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_realtime"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "scheduler",
+ "sleep",
+ "spawn",
+]
+
+[[package]]
 name = "test_restartable"
 version = "0.1.0"
 dependencies = [
