@@ -1115,16 +1115,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "indexmap"
-version = "1.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "282a6247722caba404c065016bbfa522806e51714c34f5dfc3e4a3a46fcb4223"
-dependencies = [
- "autocfg",
- "hashbrown",
-]
-
-[[package]]
 name = "input_echo"
 version = "0.1.0"
 dependencies = [
@@ -2189,16 +2179,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "priority-queue"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00ba480ac08d3cfc40dea10fd466fd2c14dee3ea6fc7873bc4079eda2727caf0"
-dependencies = [
- "autocfg",
- "indexmap",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2731,10 +2711,8 @@ dependencies = [
 name = "sleep"
 version = "0.1.0"
 dependencies = [
- "hashbrown",
  "irq_safety",
  "lazy_static",
- "priority-queue",
  "scheduler",
  "task",
 ]

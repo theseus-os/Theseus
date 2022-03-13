@@ -7,22 +7,47 @@
 #![no_std]
 extern crate task;
 extern crate irq_safety;
-extern crate priority_queue;
-extern crate hashbrown;
+extern crate alloc;
 #[macro_use] extern crate lazy_static;
 extern crate scheduler;
 
 use core::sync::atomic::{Ordering, AtomicUsize};
-use core::cmp::Reverse;
-use priority_queue::priority_queue::PriorityQueue;
-use hashbrown::hash_map::DefaultHashBuilder;
+use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
 use task::get_my_current_task;
 
+/// This struct will be used as an entry that contains the task id and the associated wakeup time for an entry in DELAYED_TASKLIST
+/// Entries will be sorted in increasing order of resume_time
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct SleepingTaskNode {
+    resume_time: usize,
+    taskid: usize,
+}
+
+// The priority queue depends on `Ord`.
+// Explicitly implement the trait so the queue becomes a min-heap
+// instead of a max-heap.
+impl Ord for SleepingTaskNode {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        // Notice that the we flip the ordering on resume_time.
+        // In case of a tie we compare taskids - this step is necessary
+        // to make implementations of `PartialEq` and `Ord` consistent.
+        other.resume_time.cmp(&self.resume_time)
+            .then_with(|| self.taskid.cmp(&other.taskid))
+    }
+}
+
+// `PartialOrd` needs to be implemented as well.
+impl PartialOrd for SleepingTaskNode {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 lazy_static! {
     /// List of all delayed tasks in the system
-    /// Implemented as a priority queue where the key is the unblocking time and the value is the id of the task
-    static ref DELAYED_TASKLIST: MutexIrqSafe<PriorityQueue<usize, Reverse<usize>, DefaultHashBuilder>> = MutexIrqSafe::new(PriorityQueue::with_default_hasher());
+    /// Implemented as a min-heap of `SleepingTaskNode` sorted in increasing order of `resume_time`
+    static ref DELAYED_TASKLIST: MutexIrqSafe<BinaryHeap<SleepingTaskNode>> = MutexIrqSafe::new(BinaryHeap::new());
 }
 
 /// Keeps track of the next task that needs to unblock, by default, it is the maximum time
@@ -45,8 +70,9 @@ pub fn increment_tick_count() {
 
 /// Helper function adds the id associated with a TaskRef to the list of delayed tasks with priority equal to the time when the task must resume work
 /// If the resume time is less than the current earliest resume time, we will update it
-fn add_to_delayed_tasklist(taskid: usize, resume_time: usize) {
-    DELAYED_TASKLIST.lock().push(taskid, Reverse(resume_time));
+fn add_to_delayed_tasklist(new_node: SleepingTaskNode) {
+    let SleepingTaskNode { resume_time, taskid } = new_node;
+    DELAYED_TASKLIST.lock().push(new_node);
     
     let next_unblock_time = NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst);
     if resume_time < next_unblock_time {
@@ -57,15 +83,15 @@ fn add_to_delayed_tasklist(taskid: usize, resume_time: usize) {
 /// Remove the next task from the delayed task list and unblock that task
 fn remove_next_task_from_delayed_tasklist() {
     let mut delayed_tasklist = DELAYED_TASKLIST.lock();
-    if let Some((taskid, _resume_time)) = delayed_tasklist.pop() {
-    if let Some(task) = task::TASKLIST.lock().get(&taskid) {
-        task.unblock();
-    }
+    if let Some(SleepingTaskNode { resume_time, taskid }) = delayed_tasklist.pop() {
+        if let Some(task) = task::TASKLIST.lock().get(&taskid) {
+            task.unblock();
+        }
 
-    match delayed_tasklist.peek() {
-        Some((_new_taskid, Reverse(new_resume_time))) => NEXT_DELAYED_TASK_UNBLOCK_TIME.store(*new_resume_time, Ordering::SeqCst),
-        None => NEXT_DELAYED_TASK_UNBLOCK_TIME.store(usize::MAX, Ordering::SeqCst),
-    }
+        match delayed_tasklist.peek() {
+            Some(SleepingTaskNode { resume_time: new_resume_time, taskid: new_taskid}) => NEXT_DELAYED_TASK_UNBLOCK_TIME.store(*new_resume_time, Ordering::SeqCst),
+            None => NEXT_DELAYED_TASK_UNBLOCK_TIME.store(usize::MAX, Ordering::SeqCst),
+        }
     }
 }
 
@@ -86,7 +112,7 @@ pub fn sleep(duration: usize) {
         // block current task and add it to the delayed tasklist
         current_task.block();
         let taskid = current_task.id;
-        add_to_delayed_tasklist(taskid, resume_time);
+        add_to_delayed_tasklist(SleepingTaskNode{taskid, resume_time});
         scheduler::schedule();
     }
 }
