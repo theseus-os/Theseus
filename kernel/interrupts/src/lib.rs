@@ -23,6 +23,7 @@ extern crate scheduler;
 extern crate keyboard;
 extern crate mouse;
 extern crate ps2;
+extern crate sleep;
 extern crate tlb_shootdown;
 
 
@@ -383,6 +384,11 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     
     // we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn't return
     eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
+
+    // Callback to the sleep API to unblock tasks whose waiting time is over
+    // and alert to update the number of ticks elapsed
+    sleep::increment_tick_count();
+    sleep::unblock_delayed_tasks();
     
     scheduler::schedule();
 }

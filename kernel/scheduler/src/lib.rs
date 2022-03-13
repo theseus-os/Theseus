@@ -7,7 +7,8 @@ extern crate apic;
 extern crate task;
 extern crate runqueue;
 #[cfg(priority_scheduler)] extern crate scheduler_priority;
-#[cfg(not(priority_scheduler))] extern crate scheduler_round_robin;
+#[cfg(realtime_scheduler)] extern crate scheduler_realtime;
+#[cfg(all(not(priority_scheduler), not(realtime_scheduler)))] extern crate scheduler_round_robin;
 
 
 use core::ops::Deref;
@@ -15,7 +16,8 @@ use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
 use task::{get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
-#[cfg(not(priority_scheduler))] use scheduler_round_robin::select_next_task;
+#[cfg(realtime_scheduler)] use scheduler_realtime::select_next_task;
+#[cfg(all(not(priority_scheduler), not(realtime_scheduler)))] use scheduler_round_robin::select_next_task;
 
 /// Yields the current CPU by selecting a new `Task` to run 
 /// and then performs a task switch to that new `Task`.
@@ -72,6 +74,15 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
     }
     #[cfg(not(priority_scheduler))] {
         None
+    }
+}
+
+pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static str> {
+    #[cfg(realtime_scheduler)] {
+        scheduler_realtime::set_periodicity(_task, _period)
+    }
+    #[cfg(not(realtime_scheduler))] {
+        Err("no scheduler that supports periodic tasks is currently loaded")
     }
 }
 

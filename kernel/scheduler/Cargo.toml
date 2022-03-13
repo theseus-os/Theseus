@@ -30,5 +30,8 @@ path = "../scheduler_round_robin"
 [dependencies.scheduler_priority]
 path = "../scheduler_priority"
 
+[dependencies.scheduler_realtime]
+path = "../scheduler_realtime"
+
 [lib]
 crate-type = ["rlib"]

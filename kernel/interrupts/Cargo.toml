@@ -65,6 +65,9 @@ path = "../ps2"
 [dependencies.scheduler]
 path = "../scheduler"
 
+[dependencies.sleep]
+path = "../sleep"
+
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
