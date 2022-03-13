@@ -1,3 +1,5 @@
+//! This application demonstrates how to create a periodic task using the `sleep::sleep_periodic` API and add it to the realtime scheduler.
+
 #![no_std]
 
 #[macro_use] extern crate log;
