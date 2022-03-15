@@ -70,7 +70,9 @@ libc = { path = "ports/libc" }
 ##############################################################################################
 wasmparser = { path = "libs/wasm-tools/crates/wasmparser" }
 object = { path = "libs/object" }
-
+backtrace = { path = "ports/backtrace" }
+region = { path = "ports/region" }
+thiserror_core2 = { path = "libs/thiserror-core2" }
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!

@@ -4,10 +4,12 @@ name = "test_wasmtime"
 description = "A crate for testing the build of wasmtime ported to Theseus"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 log = "0.4.8"
 libc = { version = "0.2", default-features = false }
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 
 ## working!
 [dependencies.wasmparser]
@@ -33,10 +35,11 @@ default-features = false
 [dependencies.region]
 path = "../../ports/region"
 
-# # not yet working
-# [dependencies.wasmtime-runtime]
-# path = "../../ports/wasmtime/crates/runtime"
-# default-features = false
+
+# builds properly, but still has unfinishing stub functions for signal handling, etc.
+[dependencies.wasmtime-runtime]
+path = "../../ports/wasmtime/crates/runtime"
+default-features = false
 
 
 
