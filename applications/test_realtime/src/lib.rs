@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate spawn;
 extern crate sleep;
 extern crate scheduler;
+#[macro_use] extern crate terminal_print;
 
 use core::sync::atomic::AtomicUsize;
 use alloc::{
@@ -27,7 +28,8 @@ pub fn main(_args: Vec<String>) -> isize {
         periodic_task_1.unblock();
     }
     else {
-        info!("Realtime scheduler not enabled!");
+        println!("Realtime scheduler not enabled!");
+        return -1;
     }
     0
 }    

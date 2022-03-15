@@ -1,5 +1,5 @@
 [package]
-authors = ["Jacob Earle <jacob.earle@yale.edu>"]
+authors = ["Jacob Earle <earlejacobt@gmail.com>"]
 name = "sleep"
 description = "Provides APIs that allow tasks to be delayed for specified intervals of time"
 version = "0.1.0"

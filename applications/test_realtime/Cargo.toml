@@ -16,5 +16,9 @@ path = "../../kernel/spawn"
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+
 [dependencies.log]
 version = "0.4.8"

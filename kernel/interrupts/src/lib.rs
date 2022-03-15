@@ -381,14 +381,15 @@ pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
     // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id(), _ticks);
-    
-    // we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn't return
-    eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
 
     // Callback to the sleep API to unblock tasks whose waiting time is over
     // and alert to update the number of ticks elapsed
     sleep::increment_tick_count();
     sleep::unblock_delayed_tasks();
+    
+    // we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn't return
+    eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
+
     
     scheduler::schedule();
 }

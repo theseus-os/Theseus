@@ -7,6 +7,9 @@ build = "../../build.rs"
 
 [dependencies]
 
+[dependencies.cfg-if]
+version = "1.0.0"
+
 [dependencies.log]
 version = "0.4.8"
 
