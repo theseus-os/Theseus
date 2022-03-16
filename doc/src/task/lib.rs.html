@@ -1137,6 +1137,13 @@
 <span id="1134">1134</span>
 <span id="1135">1135</span>
 <span id="1136">1136</span>
+<span id="1137">1137</span>
+<span id="1138">1138</span>
+<span id="1139">1139</span>
+<span id="1140">1140</span>
+<span id="1141">1141</span>
+<span id="1142">1142</span>
+<span id="1143">1143</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
@@ -1187,6 +1194,7 @@
 
 
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
+<span class="kw">use</span> <span class="ident">core::hash</span>::{<span class="ident">Hash</span>, <span class="ident">Hasher</span>};
 <span class="kw">use</span> <span class="ident">core::sync::atomic</span>::{<span class="ident">Ordering</span>, <span class="ident">AtomicUsize</span>};
 <span class="kw">use</span> <span class="ident">core::any::Any</span>;
 <span class="kw">use</span> <span class="ident">core::panic::PanicInfo</span>;
@@ -1490,6 +1498,12 @@
             <span class="ident">ds</span>.<span class="ident">field</span>(<span class="string">&quot;pinned&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;&lt;Locked&gt;&quot;</span>);
         }
         <span class="ident">ds</span>.<span class="ident">finish</span>()
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Hash</span> <span class="kw">for</span> <span class="ident">Task</span> {
+    <span class="kw">fn</span> <span class="ident">hash</span><span class="op">&lt;</span><span class="ident">H</span>: <span class="ident">Hasher</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">h</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">H</span>) {
+        <span class="self">self</span>.<span class="ident">id</span>.<span class="ident">hash</span>(<span class="ident">h</span>);
     }
 }
 
@@ -1996,7 +2010,7 @@
 <span class="doccomment">/// two `TaskRef`s are considered equal if they point to the same underlying `Task`.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// `TaskRef` also auto-derefs into an immutable `Task` reference.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Hash</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TaskRef</span>(<span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Task</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">TaskRef</span> {
