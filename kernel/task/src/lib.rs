@@ -47,6 +47,7 @@ extern crate crossbeam_utils;
 
 
 use core::fmt;
+use core::hash::{Hash, Hasher};
 use core::sync::atomic::{Ordering, AtomicUsize};
 use core::any::Any;
 use core::panic::PanicInfo;
@@ -350,6 +351,12 @@ impl fmt::Debug for Task {
             ds.field("pinned", &"<Locked>");
         }
         ds.finish()
+    }
+}
+
+impl Hash for Task {
+    fn hash<H: Hasher>(&self, h: &mut H) {
+        self.id.hash(h);
     }
 }
 
@@ -856,7 +863,7 @@ impl fmt::Display for Task {
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
 /// 
 /// `TaskRef` also auto-derefs into an immutable `Task` reference.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct TaskRef(Arc<Task>);
 
 impl TaskRef {
