@@ -22,3 +22,6 @@
 [submodule "ports/backtrace"]
 	path = ports/backtrace
 	url = https://github.com/theseus-os/backtrace-rs.git
+[submodule "libs/thiserror-core2"]
+	path = libs/thiserror-core2
+	url = https://github.com/theseus-os/thiserror-core2.git

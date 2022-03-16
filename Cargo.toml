@@ -57,9 +57,17 @@ qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 
-### Patch `libc` so we can use libc-specific types when using `cfg(target-os = "theseus")`.
+### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
 libc = { path = "ports/libc" }
 
+##############################################################################################
+#################### Below are patches for wasmtime-related crates. ##########################
+################# These are currently unused, but are available for use. #####################
+##############################################################################################
+# object = { path = "libs/object" }
+# backtrace = { path = "ports/backtrace" }
+# region = { path = "ports/region" }
+# thiserror_core2 = { path = "libs/thiserror-core2" }
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!
