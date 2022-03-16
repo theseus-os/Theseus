@@ -384,6 +384,8 @@ impl AllocatedFrames {
     /// * If `at_frame == self.end + 1`, the second returned `AllocatedFrames` object will be empty.
     /// 
     /// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is otherwise out of bounds.
+    /// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
     pub fn split(self, at_frame: Frame) -> Result<(AllocatedFrames, AllocatedFrames), AllocatedFrames> {
         let end_of_first = at_frame - 1;
 
