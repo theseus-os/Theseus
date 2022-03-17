@@ -3180,6 +3180,7 @@ dependencies = [
 name = "unwind_test"
 version = "0.1.0"
 dependencies = [
+ "catch_unwind",
  "log",
  "task",
  "terminal_print",
