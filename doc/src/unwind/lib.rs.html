@@ -917,6 +917,11 @@
 <span id="914">914</span>
 <span id="915">915</span>
 <span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.</span>
 <span class="doccomment">//! </span>
@@ -1609,8 +1614,13 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// # Arguments</span>
 <span class="doccomment">/// * `reason`: the reason why the current task is being killed, e.g., due to a panic, exception, etc.</span>
-<span class="doccomment">/// * `stack_frames_to_skip`: the number of stack frames that should be skipped in order to avoid unwinding them.</span>
+<span class="doccomment">/// * `stack_frames_to_skip`: the number of stack frames that can be skipped in order to avoid unwinding them.</span>
+<span class="doccomment">///   Those frames should have nothing that needs to be unwound, e.g., no landing pads that invoke drop handlers.</span>
 <span class="doccomment">///   For example, for a panic, the first `5` frames in the call stack can be ignored.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// ## Note: Skipping frames</span>
+<span class="doccomment">/// If you are unsure how many frames you could possibly skip, then it&#39;s always safe to pass `0`</span>
+<span class="doccomment">/// such that all function frames on the stack are unwound.</span>
 <span class="doccomment">/// </span>
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_unwinding</span>(<span class="ident">reason</span>: <span class="ident">KillReason</span>, <span class="ident">stack_frames_to_skip</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
