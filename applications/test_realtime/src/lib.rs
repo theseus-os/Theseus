@@ -15,6 +15,11 @@ use alloc::{
     string::String
 };
 
+/// Main method to ensure the functionality is only tested if the `realtime_scheduler` option is enabled.
+/// One potential direction from future testing could be the following:
+/// Let the program take in arguments n and p1, ..., pm. 
+/// For each pi, we spawn a task with period pi, then instead of the logging statement, we use `hpet()` to measure the time elapsed between successive calls and let each of the spawned tasks run for n periods. 
+/// We can use these measurements to get statistics on how much the time between successive calls of the timing statement deviates from the expected time, i.e. the period pi.
 pub fn main(_args: Vec<String>) -> isize {
     if cfg!(realtime_scheduler) {
         // build and spawn two real time periodic tasks
@@ -34,7 +39,8 @@ pub fn main(_args: Vec<String>) -> isize {
     0
 }    
 
-fn task_delay_tester(arg: usize) {
+/// A simple periodic task using the `sleep_periodic` API that will log a string at regular intervals.
+fn task_delay_tester(_arg: usize) {
     let start_time : AtomicUsize = AtomicUsize::new(sleep::get_current_time_in_ticks());
     loop {
         info!("I run periodically!");

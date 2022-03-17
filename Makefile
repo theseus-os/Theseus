@@ -790,13 +790,7 @@ bochs : export override THESEUS_CONFIG += apic_timer_fixed
 bochs: $(iso) 
 	bochs -f bochsrc.txt -q
 
-### Compile Theseus for realtime scheduling algorithm
-build-realtime: export override THESEUS_CONFIG += realtime_scheduler
-build-realtime: build
 
-### Configure Theseus to run realtime scheduling algorithm
-run-realtime: export override THESEUS_CONFIG += realtime_scheduler
-run-realtime: run
 
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).

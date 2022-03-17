@@ -2,6 +2,15 @@
 //! `RunQueue` structure is essentially a list of `Task`s
 //! that is used for scheduling purposes.
 //!
+//! Each `RealtimeTaskRef`contains a `TaskRef`representing an underlying task, as well as a `period` value.
+//! In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.
+//! Thus, the `period` value of a `RealtimeTaskRef` will be a stand-in for the task's priority, and
+//! each `RunQueue` will consist of a `VecDeque` of `RealtimeTaskRef`s sorted in increasing order of their `period` values.
+//! The sorting will be maintained by inserting each `RealtimeTaskRef` at the proper index according to its `period` value.
+//! Any aperiodic tasks are assigned a `period` value of `None` and are placed at the back of the queue.
+//! Since the scheduler will iterate through the queue and select the first `Runnable` task it finds, lower-period/higher-priority
+//! tasks will be selected first by the scheduler, and aperiodic tasks will be selected only when no periodic tasks are currently
+//! runnable.
 
 #![no_std]
 
@@ -19,14 +28,13 @@ use core::ops::{Deref, DerefMut};
 use atomic_linked_list::atomic_map::AtomicMap;
 
 /// A cloneable reference to a `Taskref` that exposes more methods
-/// related to task scheduling
-/// 
-/// Each `RealtimeTaskRef` contains additional information on top a `TaskRef` object
+/// related to task scheduling.  
+/// Each `RealtimeTaskRef` contains additional information on top a `TaskRef` object.
 /// In the case of realtime scheduling, we will be using the RMS algorithm,
 /// thus, it is necessary to know whether a task is periodic.
 /// If so, the field `period` will contain the period as an integer wrapped in a `Some` object.
 /// If the task is aperiodic, `period` will contain the value `None`
-/// `RealtimeTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`
+/// `RealtimeTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
 #[derive(Debug, Clone)]
 pub struct RealtimeTaskRef {
     /// `TaskRef` wrapped by `RealtimeTaskRef`
@@ -101,7 +109,10 @@ lazy_static! {
 /// This is used to store the `Task`s (and associated scheduler related data) 
 /// that are runnable on a given core.
 /// A queue is used for the round robin scheduler.
-/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.
+/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.  
+/// In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.
+/// Thus, the `period` value of a `RealtimeTaskRef` will be a stand-in for the task's priority, and
+/// each `RunQueue` will consist of a `VecDeque` of `RealtimeTaskRef`s sorted in increasing order of their `period` values.
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
