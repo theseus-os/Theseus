@@ -20,7 +20,7 @@ use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
 use task::{get_my_current_task, TaskRef};
 
-/// Contains the task id and the associated wakeup time for an entry in DELAYED_TASKLIST.
+/// Contains the `TaskRef` and the associated wakeup time for an entry in DELAYED_TASKLIST.
 #[derive(Clone, Eq, PartialEq)]
 struct SleepingTaskNode {
     resume_time: usize,
