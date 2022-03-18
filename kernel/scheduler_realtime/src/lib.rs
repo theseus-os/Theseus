@@ -1,15 +1,13 @@
-//! This crate picks the next task in accordance with the Rate Monotonic Scheduling algorithm,
-//! a realtime scheduling algorithm that selects the task with the shortest period that is ready for execution.
-//! We achieve this here by having the `RunQueue` structure internally sort the tasks in order of increasing periodicity.
-//! Whenever a task is selected, it will be reinserted into the `RunQueue` at the same location if it is a periodic
-//! task, or at the end if it is an aperiodic task.
+//! This scheduler implements the Rate Monotonic Scheduling algorithm.
+//!
+//! Because the [`runqueue_realtime::RunQueue`] internally sorts the tasks 
+//! in increasing order of periodicity, it's trivially easy to choose the next task.
 
 #![no_std]
 
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate task;
-extern crate runqueue;
 extern crate runqueue_realtime;
 
 use task::TaskRef;

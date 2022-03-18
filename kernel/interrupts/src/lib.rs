@@ -389,7 +389,6 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     
     // we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn't return
     eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
-
     
     scheduler::schedule();
 }

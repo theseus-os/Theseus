@@ -2520,7 +2520,6 @@ name = "scheduler_realtime"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue",
  "runqueue_realtime",
  "task",
 ]

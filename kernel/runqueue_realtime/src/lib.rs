@@ -1,16 +1,20 @@
-//! This crate contains the `RunQueue` structure, for a realtime scheduler using rate monotonic scheduling.
-//! `RunQueue` structure is essentially a list of `Task`s
-//! that is used for scheduling purposes.
+//! Runqueue structures for a realtime scheduler using rate monotonic scheduling.
 //!
-//! Each `RealtimeTaskRef`contains a `TaskRef`representing an underlying task, as well as a `period` value.
+//! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.
+//! Each `RealtimeTaskRef` element in the runqueue contains a `TaskRef` 
+//! representing an underlying task and as well as a `period` value.
+//! 
 //! In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.
-//! Thus, the `period` value of a `RealtimeTaskRef` will be a stand-in for the task's priority, and
-//! each `RunQueue` will consist of a `VecDeque` of `RealtimeTaskRef`s sorted in increasing order of their `period` values.
-//! The sorting will be maintained by inserting each `RealtimeTaskRef` at the proper index according to its `period` value.
-//! Any aperiodic tasks are assigned a `period` value of `None` and are placed at the back of the queue.
-//! Since the scheduler will iterate through the queue and select the first `Runnable` task it finds, lower-period/higher-priority
-//! tasks will be selected first by the scheduler, and aperiodic tasks will be selected only when no periodic tasks are currently
-//! runnable.
+//! Thus, the `period` value of a `RealtimeTaskRef` acts as a form of priority.
+//! Each `RunQueue` consists of a `VecDeque` of `RealtimeTaskRef`s 
+//! sorted in increasing order of their `period` values.
+//! The sorting is maintained by inserting each `RealtimeTaskRef` at the proper index
+//! according to its `period` value.
+//!
+//! Aperiodic tasks are assigned a `period` value of `None` and are placed at the back of the queue.
+//! Since the scheduler iterates through the runqueue to select the first `Runnable` task,
+//! lower-period tasks are "higher priority" and will be selected first, 
+//! with aperiodic tasks being selected only when no periodic tasks are runnable.
 
 #![no_std]
 
@@ -27,23 +31,15 @@ use alloc::collections::VecDeque;
 use core::ops::{Deref, DerefMut};
 use atomic_linked_list::atomic_map::AtomicMap;
 
-/// A cloneable reference to a `Taskref` that exposes more methods
-/// related to task scheduling.  
-/// Each `RealtimeTaskRef` contains additional information on top a `TaskRef` object.
-/// In the case of realtime scheduling, we will be using the RMS algorithm,
-/// thus, it is necessary to know whether a task is periodic.
-/// If so, the field `period` will contain the period as an integer wrapped in a `Some` object.
-/// If the task is aperiodic, `period` will contain the value `None`
+/// A reference to a task with its period for realtime scheduling.
+///
 /// `RealtimeTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
 #[derive(Debug, Clone)]
 pub struct RealtimeTaskRef {
     /// `TaskRef` wrapped by `RealtimeTaskRef`
     taskref: TaskRef,
-
-    /// If the task is periodic, this value will be the period in ticks wrapped in `Some`
-    /// If the task is aperiodic, this value will be `None`
+    /// `Some` if the task is periodic, `None` if it is aperiodic.
     period: Option<usize>,
-
     /// Number of context switches the task has undergone. Not used in scheduling algorithm
     context_switches: usize,
 }
@@ -78,18 +74,17 @@ impl RealtimeTaskRef {
 
     /// Checks whether the `RealtimeTaskRef` refers to a task that is periodic
     pub fn is_periodic(&self) -> bool {
-        match self.period {
-            Some(_) => true,
-            None => false,
-        }
+        self.period.is_some()
     }
 
-    /// Checks whether the period of this `RealtimeTaskRef` is shorter than the period of another `RealtimeTaskRef`
-    /// If the `RealtimeTaskRef` is aperiodic, i.e. if `period` is `None`, we will always return false
-    /// Additionally, a periodic task will always return `true` if `other_taskref` is aperiodic
-    pub fn has_smaller_period(&self, other_taskref: &RealtimeTaskRef) -> bool{
+    /// Returns `true` if the period of this `RealtimeTaskRef` is shorter (less) than
+    /// the period of the other `RealtimeTaskRef`.
+    ///
+    /// Returns `false` if this `RealtimeTaskRef` is aperiodic, i.e. if `period` is `None`.
+    /// Returns `true` if this task is periodic and `other` is aperiodic.
+    pub fn has_smaller_period(&self, other: &RealtimeTaskRef) -> bool {
         match self.period {
-            Some(period_val) => if let Some(other_period_val) = other_taskref.period {
+            Some(period_val) => if let Some(other_period_val) = other.period {
                 period_val < other_period_val
             } else {
                 true
@@ -105,14 +100,11 @@ lazy_static! {
     static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 }
 
-/// A list of references to `Task`s (`RealtimeTaskRef`s). 
-/// This is used to store the `Task`s (and associated scheduler related data) 
-/// that are runnable on a given core.
-/// A queue is used for the round robin scheduler.
-/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.  
-/// In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.
-/// Thus, the `period` value of a `RealtimeTaskRef` will be a stand-in for the task's priority, and
-/// each `RunQueue` will consist of a `VecDeque` of `RealtimeTaskRef`s sorted in increasing order of their `period` values.
+/// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.
+///
+/// In rate monotonic scheduling, tasks are sorted in order of increasing periods.
+/// Thus, the `period` value acts as a form of task "priority",
+/// with higher priority (shorter period) tasks coming first.
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
@@ -134,9 +126,11 @@ impl DerefMut for RunQueue {
 
 
 impl RunQueue {
-    /// Moves the `RealtimeTaskRef` at the given index in this `RunQueue` to the appropriate location in this `RunQueue`,
-    /// and returns a cloned reference to the underlying `TaskRef`.
-    /// Under the Rate Monotonic scheduling algorithm, periodic tasks are assigned priorities in order from the smallest period.
+    /// Moves the `RealtimeTaskRef` at the given `index` in this `RunQueue`
+    /// to the appropriate location in this `RunQueue` based on its period.
+    ///
+    /// Returns a reference to the underlying `Task`.
+    ///
     /// Thus, the `RealtimeTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
     /// `RealtimeTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
     /// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.
@@ -222,30 +216,29 @@ impl RunQueue {
             .add_task(task, None)
     }
 
-    /// Inserts a `RealtimeTaskRef` at its proper position in the queue
-    /// Under the RMS scheduling algorithm, tasks should be ordered in increasing value of their periods, with aperiodic tasks being placed at the back
-    /// Thus, we will insert all `RealtimeTaskRef`s whose `period` is `None` and all `RealtimeTaskRef`s with a proper value for period will be place at the location where they belong in the sorted list
+    /// Inserts a `RealtimeTaskRef` at its proper position in the queue.
+    ///
+    /// Under the RMS scheduling algorithm, tasks should be sorted in increasing value 
+    /// of their periods, with aperiodic tasks being placed at the end.
     fn insert_realtime_taskref_at_proper_location(&mut self, taskref: RealtimeTaskRef) {
         match taskref.period {
             None => self.push_back(taskref),
             Some(_) => {
                 if self.is_empty() {
-                    self.push_back(taskref)
+                    self.push_back(taskref);
                 } else {
-                    let mut index_to_insert: usize = 0;
-                    let mut found_index_to_insert = false;
+                    let mut index_to_insert: Option<usize> = None;
                     for (index, inserted_taskref) in self.iter().enumerate() {
                         if taskref.has_smaller_period(inserted_taskref) {
-                            index_to_insert = index;
-                            found_index_to_insert = true;
+                            index_to_insert = Some(index);
                             break;
                         }
                     }
 
-                    if found_index_to_insert {
-                        self.insert(index_to_insert, taskref);
+                    if let Some(index) = index_to_insert {
+                        self.insert(index, taskref);
                     } else {
-                        self.push_back(taskref)
+                        self.push_back(taskref);
                     }
                 }
             }
@@ -286,7 +279,11 @@ impl RunQueue {
 
     /// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`
     /// then reinserts the `RealtimeTaskRef` at the proper location
-    fn set_periodicity_internal(&mut self, task: &TaskRef, period: usize) -> Result<(), &'static str> {
+    fn set_periodicity_internal(
+        &mut self, 
+        task: &TaskRef, 
+        period: usize
+    ) -> Result<(), &'static str> {
         match self.iter().position(|rt| rt.taskref == *task ) {
             Some(i) => {
                 if let Some(mut realtime_taskref) = self.remove(i) {
