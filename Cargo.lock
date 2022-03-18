@@ -130,7 +130,7 @@ dependencies = [
 name = "app_io"
 version = "0.1.0"
 dependencies = [
- "core2 0.3.2",
+ "core2",
  "event_types",
  "keycodes_ascii",
  "lazy_static",
@@ -362,7 +362,7 @@ name = "cat"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core2 0.3.2",
+ "core2",
  "fs_node",
  "getopts",
  "log",
@@ -440,7 +440,7 @@ name = "console"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "core2 0.3.2",
+ "core2",
  "io",
  "irq_safety",
  "log",
@@ -490,15 +490,6 @@ name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
-
-[[package]]
-name = "core2"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cf12d2dad3ed124aa116f59561428478993d69ab81ae4d30e5349c9c5b5a5f6"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "core2"
@@ -713,7 +704,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
- "core2 0.3.2",
+ "core2",
  "derive_more",
  "e1000",
  "ethernet_smoltcp_device",
@@ -912,7 +903,7 @@ checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 [[package]]
 name = "fatfs"
 version = "0.4.0"
-source = "git+https://github.com/theseus-os/rust-fatfs?branch=config_log_features#cf9fa6a5315b78c0316d38c6fc60c915263e2281"
+source = "git+https://github.com/rafalh/rust-fatfs#87fc1ed5074a32b4e0344fcdde77359ef9e75432"
 dependencies = [
  "bitflags",
  "log",
@@ -1186,7 +1177,7 @@ name = "immediate_input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core2 0.3.2",
+ "core2",
  "log",
  "stdio",
 ]
@@ -1207,7 +1198,7 @@ name = "input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core2 0.3.2",
+ "core2",
  "log",
 ]
 
@@ -1262,7 +1253,7 @@ dependencies = [
 name = "io"
 version = "0.1.0"
 dependencies = [
- "core2 0.3.2",
+ "core2",
  "delegate",
  "lazy_static",
  "lockable",
@@ -1381,7 +1372,7 @@ name = "keyboard_echo"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core2 0.3.2",
+ "core2",
  "keycodes_ascii",
  "log",
  "scheduler",
@@ -1419,7 +1410,7 @@ name = "less"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core2 0.3.2",
+ "core2",
  "fs_node",
  "getopts",
  "keycodes_ascii",
@@ -2183,7 +2174,7 @@ dependencies = [
 name = "path_std"
 version = "0.1.0"
 dependencies = [
- "core2 0.3.2",
+ "core2",
  "task",
 ]
 
@@ -2485,7 +2476,7 @@ name = "region"
 version = "3.0.0"
 dependencies = [
  "bitflags",
- "core2 0.4.0",
+ "core2",
  "libc",
  "mach",
  "memory",
@@ -2740,7 +2731,7 @@ name = "serial_port"
 version = "0.1.0"
 dependencies = [
  "async_channel",
- "core2 0.3.2",
+ "core2",
  "deferred_interrupt_tasks",
  "interrupts",
  "irq_safety",
@@ -2782,7 +2773,7 @@ name = "shell"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core2 0.3.2",
+ "core2",
  "dfqueue",
  "environment",
  "event_types",
@@ -3011,7 +3002,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "stdio"
 version = "0.1.0"
 dependencies = [
- "core2 0.3.2",
+ "core2",
  "keycodes_ascii",
  "spin 0.9.0",
 ]
@@ -3139,7 +3130,7 @@ name = "test_block_io"
 version = "0.1.0"
 dependencies = [
  "ata",
- "core2 0.3.2",
+ "core2",
  "io",
  "log",
  "storage_manager",
@@ -3221,7 +3212,7 @@ dependencies = [
 name = "test_serial_echo"
 version = "0.1.0"
 dependencies = [
- "core2 0.3.2",
+ "core2",
  "io",
  "irq_safety",
  "log",
@@ -3243,7 +3234,7 @@ dependencies = [
 name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
- "core2 0.4.0",
+ "core2",
  "cranelift-entity",
  "libc",
  "log",
@@ -3272,7 +3263,7 @@ name = "text_terminal"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "core2 0.3.2",
+ "core2",
  "derive_more",
  "event_types",
  "log",
@@ -3285,7 +3276,7 @@ dependencies = [
 name = "thiserror_core2"
 version = "2.0.0"
 dependencies = [
- "core2 0.4.0",
+ "core2",
  "thiserror_core2-impl",
 ]
 
@@ -3405,6 +3396,7 @@ dependencies = [
 name = "unwind_test"
 version = "0.1.0"
 dependencies = [
+ "catch_unwind",
  "log",
  "task",
  "terminal_print",
@@ -3549,7 +3541,7 @@ name = "wasi_interpreter"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "core2 0.3.2",
+ "core2",
  "fs_node",
  "hashbrown",
  "memfs",
@@ -3630,7 +3622,7 @@ dependencies = [
  "backtrace",
  "cc",
  "cfg-if 1.0.0",
- "core2 0.4.0",
+ "core2",
  "hashbrown",
  "indexmap",
  "lazy_static",

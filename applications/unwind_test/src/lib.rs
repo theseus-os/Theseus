@@ -5,6 +5,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 // #[macro_use] extern crate terminal_print;
 extern crate task;
+extern crate catch_unwind;
 
 
 use alloc::vec::Vec;
@@ -15,7 +16,7 @@ use alloc::string::String;
 struct MyStruct(pub usize);
 impl Drop for MyStruct {
     fn drop(&mut self) {
-        warn!("DROPPING MYSTRUCT({})", self.0);
+        warn!("\nDROPPING MYSTRUCT({})\n", self.0);
     }
 }
 
@@ -36,7 +37,7 @@ fn foo(cause_page_fault: bool) {
 }
 
 
-pub fn main(_args: Vec<String>) -> isize {
+pub fn main(args: Vec<String>) -> isize {
 
     // // dump some info about the this loaded app crate
     // {
@@ -52,11 +53,37 @@ pub fn main(_args: Vec<String>) -> isize {
 
     let _my_struct = MyStruct(5);
 
-    let cause_page_fault = match _args.get(0).map(|s| &**s) {
-        Some("-e") => true,
-        _ => false,
+    match args.get(0).map(|s| &**s) {
+        // cause a page fault to test unwinding through a machine exception
+        Some("-e") => foo(true),
+        // test catch_unwind and then resume_unwind
+        Some("-c") => catch_resume_unwind(),
+        _ => foo(false),
     };
 
-    foo(cause_page_fault);
+    error!("Test failure: unwind_test::main should not return!");
+
     0
+}
+
+#[inline(never)]
+fn catch_resume_unwind() {
+    let _my_struct6 = MyStruct(6);
+
+    let res = catch_unwind::catch_unwind_with_arg(fn_to_catch, MyStruct(22));
+    warn!("CAUGHT UNWINDING ACTION, as expected.");
+    let _my_struct7 = MyStruct(7);
+    if let Err(e) = res {
+        let _my_struct8 = MyStruct(8);
+        catch_unwind::resume_unwind(e);
+    }
+
+    error!("Test failure: catch_resume_unwind should not return!");
+}
+
+#[inline(never)]
+fn fn_to_catch(_s: MyStruct) {
+    let _my_struct9 = MyStruct(9);
+
+    panic!("intentional panic in unwind_test::fn_to_catch()")
 }
