@@ -36,7 +36,7 @@ impl Ord for SleepingTaskNode {
         // In case of a tie we compare taskids - this step is necessary
         // to make implementations of `PartialEq` and `Ord` consistent.
         other.resume_time.cmp(&self.resume_time)
-            .then_with(|| (*self.taskref).id.cmp(&(*other.taskref).id))
+            .then_with(|| self.taskref.id.cmp(&other.taskref.id))
     }
 }
 
@@ -100,27 +100,27 @@ fn remove_next_task_from_delayed_tasklist() {
 
 /// Remove all tasks that have been delayed but are able to be unblocked now,
 /// the current tick count is provided by the system's interrupt tick count.
-pub fn unblock_delayed_tasks() {
+pub fn unblock_sleeping_tasks() {
     let ticks = TICK_COUNT.load(Ordering::SeqCst);
     while ticks > NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst) {
         remove_next_task_from_delayed_tasklist();
     }
 }
 
-/// Put the current task to sleep for `duration` ticks
+/// Blocks the current task by putting it to sleep for `duration` ticks.
 pub fn sleep(duration: usize) {
     let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
     let resume_time = current_tick_count + duration;
 
-    if let Some(current_task) = get_my_current_task() {
-        // block current task and add it to the delayed tasklist
-        current_task.block();
-        add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
-        scheduler::schedule();
-    }
+    let current_task = get_my_current_task().unwrap().clone();
+    // Add the current task to the delayed tasklist and then block it.
+    add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
+    current_task.block();
+    scheduler::schedule();
 }
 
-/// Put the task to sleep until a specific tick count is reached, represented by `resume_time`
+/// Blocks the current task by putting it to sleep until a specific tick count is reached,
+/// given by `resume_time`.
 pub fn sleep_until(resume_time: usize) {
     let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
 
@@ -129,7 +129,7 @@ pub fn sleep_until(resume_time: usize) {
     }
 }
 
-/// Delay the current task for a fixed time `period` after the time in ticks specified by `last_resume_time`.
+/// Blocks the current task for a fixed time `period`, which starts from the given `last_resume_time`.
 pub fn sleep_periodic(last_resume_time: &AtomicUsize, period: usize) {
     let new_resume_time = last_resume_time.fetch_add(period, Ordering::SeqCst) + period;
     sleep_until(new_resume_time);
