@@ -18,13 +18,13 @@ extern crate scheduler;
 use core::sync::atomic::{Ordering, AtomicUsize};
 use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
-use task::get_my_current_task;
+use task::{get_my_current_task, TaskRef};
 
 /// Contains the task id and the associated wakeup time for an entry in DELAYED_TASKLIST.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 struct SleepingTaskNode {
     resume_time: usize,
-    taskid: usize,
+    taskref: TaskRef,
 }
 
 // The priority queue depends on `Ord`.
@@ -36,7 +36,7 @@ impl Ord for SleepingTaskNode {
         // In case of a tie we compare taskids - this step is necessary
         // to make implementations of `PartialEq` and `Ord` consistent.
         other.resume_time.cmp(&self.resume_time)
-            .then_with(|| self.taskid.cmp(&other.taskid))
+            .then_with(|| (*self.taskref).id.cmp(&(*other.taskref).id))
     }
 }
 
@@ -87,10 +87,8 @@ fn add_to_delayed_tasklist(new_node: SleepingTaskNode) {
 /// Remove the next task from the delayed task list and unblock that task
 fn remove_next_task_from_delayed_tasklist() {
     let mut delayed_tasklist = DELAYED_TASKLIST.lock();
-    if let Some(SleepingTaskNode { taskid, .. }) = delayed_tasklist.pop() {
-        if let Some(task) = task::TASKLIST.lock().get(&taskid) {
-            task.unblock();
-        }
+    if let Some(SleepingTaskNode { taskref, .. }) = delayed_tasklist.pop() {
+        taskref.unblock();
 
         match delayed_tasklist.peek() {
             Some(SleepingTaskNode { resume_time, .. }) => 
@@ -117,8 +115,7 @@ pub fn sleep(duration: usize) {
     if let Some(current_task) = get_my_current_task() {
         // block current task and add it to the delayed tasklist
         current_task.block();
-        let taskid = current_task.id;
-        add_to_delayed_tasklist(SleepingTaskNode{taskid, resume_time});
+        add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
         scheduler::schedule();
     }
 }
