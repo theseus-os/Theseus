@@ -1153,6 +1153,7 @@ dependencies = [
  "port_io",
  "ps2",
  "scheduler",
+ "sleep",
  "spin 0.9.0",
  "task",
  "tlb_shootdown",
@@ -2415,10 +2416,12 @@ name = "runqueue"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
+ "cfg-if 1.0.0",
  "irq_safety",
  "lazy_static",
  "log",
  "runqueue_priority",
+ "runqueue_realtime",
  "runqueue_round_robin",
  "single_simd_task_optimization",
  "task",
@@ -2433,6 +2436,17 @@ dependencies = [
  "lazy_static",
  "log",
  "single_simd_task_optimization",
+ "task",
+]
+
+[[package]]
+name = "runqueue_realtime"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list",
+ "irq_safety",
+ "lazy_static",
+ "log",
  "task",
 ]
 
@@ -2468,10 +2482,12 @@ name = "scheduler"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cfg-if 1.0.0",
  "irq_safety",
  "log",
  "runqueue",
  "scheduler_priority",
+ "scheduler_realtime",
  "scheduler_round_robin",
  "spin 0.9.0",
  "task",
@@ -2496,6 +2512,15 @@ dependencies = [
  "runqueue",
  "runqueue_priority",
  "spin 0.9.0",
+ "task",
+]
+
+[[package]]
+name = "scheduler_realtime"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "runqueue_realtime",
  "task",
 ]
 
@@ -2681,6 +2706,16 @@ name = "slabmalloc_unsafe"
 version = "0.7.0"
 dependencies = [
  "log",
+]
+
+[[package]]
+name = "sleep"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "lazy_static",
+ "scheduler",
+ "task",
 ]
 
 [[package]]
@@ -3009,6 +3044,17 @@ version = "0.1.0"
 dependencies = [
  "log",
  "task",
+ "terminal_print",
+]
+
+[[package]]
+name = "test_realtime"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "scheduler",
+ "sleep",
+ "spawn",
  "terminal_print",
 ]
 
