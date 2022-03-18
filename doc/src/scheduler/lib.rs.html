@@ -79,6 +79,20 @@
 <span id="76">76</span>
 <span id="77">77</span>
 <span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
 </pre><pre class="rust">
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
@@ -88,16 +102,21 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_priority</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_round_robin</span>;
-
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
+<span class="macro">cfg_if!</span> {
+    <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> {
+        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_priority</span> <span class="kw">as</span> <span class="ident">scheduler</span>;
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">realtime_scheduler</span>)]</span> {
+        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_realtime</span> <span class="kw">as</span> <span class="ident">scheduler</span>;
+    } <span class="kw">else</span> {
+        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler_round_robin</span> <span class="kw">as</span> <span class="ident">scheduler</span>;
+    }
+}
 
 <span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::hold_interrupts</span>;
 <span class="kw">use</span> <span class="ident">apic::get_my_apic_id</span>;
 <span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">get_my_current_task</span>, <span class="ident">TaskRef</span>};
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> <span class="kw">use</span> <span class="ident">scheduler_priority::select_next_task</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> <span class="kw">use</span> <span class="ident">scheduler_round_robin::select_next_task</span>;
 
 <span class="doccomment">/// Yields the current CPU by selecting a new `Task` to run </span>
 <span class="doccomment">/// and then performs a task switch to that new `Task`.</span>
@@ -114,7 +133,7 @@
         <span class="kw">return</span> <span class="bool-val">false</span>; <span class="comment">// keep running the same current task</span>
     };
 
-    <span class="kw">let</span> <span class="ident">next_task</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next</span>) <span class="op">=</span> <span class="ident">select_next_task</span>(<span class="ident">apic_id</span>) {
+    <span class="kw">let</span> <span class="ident">next_task</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next</span>) <span class="op">=</span> <span class="ident">scheduler::select_next_task</span>(<span class="ident">apic_id</span>) {
         <span class="ident">next</span>
     } <span class="kw">else</span> {
         <span class="kw">return</span> <span class="bool-val">false</span>; <span class="comment">// keep running the same current task</span>
@@ -154,6 +173,15 @@
     }
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> {
         <span class="prelude-val">None</span>
+    }
+}
+
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_periodicity</span>(<span class="ident">_task</span>: <span class="kw-2">&amp;</span><span class="ident">TaskRef</span>, <span class="ident">_period</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">realtime_scheduler</span>)]</span> {
+        <span class="ident">scheduler_realtime::set_periodicity</span>(<span class="ident">_task</span>, <span class="ident">_period</span>)
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">realtime_scheduler</span>))]</span> {
+        <span class="prelude-val">Err</span>(<span class="string">&quot;no scheduler that supports periodic tasks is currently loaded&quot;</span>)
     }
 }
 

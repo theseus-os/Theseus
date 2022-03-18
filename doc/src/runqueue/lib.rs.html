@@ -57,6 +57,13 @@
 <span id="54">54</span>
 <span id="55">55</span>
 <span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
 </pre><pre class="rust">
 <span class="doccomment">//! This crate contains the API of the `RunQueue` structure, Runqueue Structure should contain</span>
 <span class="doccomment">//! list of tasks with additional scheduling information depending on the scheduler.</span>
@@ -69,16 +76,23 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">irq_safety</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">atomic_linked_list</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_priority</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_round_robin</span>;
+<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">cfg_if</span>;
+<span class="macro">cfg_if!</span> {
+    <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> {
+        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_priority</span> <span class="kw">as</span> <span class="ident">runqueue</span>;
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">realtime_scheduler</span>)]</span> {
+        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_realtime</span> <span class="kw">as</span> <span class="ident">runqueue</span>;
+    } <span class="kw">else</span> {
+        <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue_round_robin</span> <span class="kw">as</span> <span class="ident">runqueue</span>;
+    }
+}
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">single_simd_task_optimization</span>)]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">single_simd_task_optimization</span>;
 
 <span class="kw">use</span> <span class="ident">irq_safety</span>::{<span class="ident">RwLockIrqSafe</span>};
 <span class="kw">use</span> <span class="ident">task</span>::{<span class="ident">TaskRef</span>};
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">priority_scheduler</span>)]</span> <span class="kw">use</span> <span class="ident">runqueue_priority::RunQueue</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">priority_scheduler</span>))]</span> <span class="kw">use</span> <span class="ident">runqueue_round_robin::RunQueue</span>;
+<span class="kw">use</span> <span class="ident">runqueue::RunQueue</span>;
 
 
 <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`.</span>

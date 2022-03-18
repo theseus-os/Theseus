@@ -490,6 +490,12 @@
 <span id="487">487</span>
 <span id="488">488</span>
 <span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Basic interrupt handling structures and simple handler routines.</span>
 
@@ -516,6 +522,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keyboard</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mouse</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">ps2</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">sleep</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tlb_shootdown</span>;
 
 
@@ -873,6 +880,11 @@
 <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">lapic_timer_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
     <span class="kw">let</span> <span class="ident">_ticks</span> <span class="op">=</span> <span class="ident">APIC_TIMER_TICKS</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
     <span class="comment">// info!(&quot; ({}) APIC TIMER HANDLER! TICKS = {}&quot;, apic::get_my_apic_id(), _ticks);</span>
+
+    <span class="comment">// Callback to the sleep API to unblock tasks whose waiting time is over</span>
+    <span class="comment">// and alert to update the number of ticks elapsed</span>
+    <span class="ident">sleep::increment_tick_count</span>();
+    <span class="ident">sleep::unblock_sleeping_tasks</span>();
     
     <span class="comment">// we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn&#39;t return</span>
     <span class="ident">eoi</span>(<span class="prelude-val">None</span>); <span class="comment">// None, because 0x22 IRQ cannot possibly be a PIC interrupt</span>
