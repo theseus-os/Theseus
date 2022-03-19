@@ -3620,6 +3620,7 @@ version = "0.30.0"
 dependencies = [
  "anyhow",
  "backtrace",
+ "catch_unwind",
  "cc",
  "cfg-if 1.0.0",
  "core2",
