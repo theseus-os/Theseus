@@ -372,48 +372,48 @@ impl MappedPages {
         Ok(())
     }
 
-
     /// Splits this `MappedPages` into two separate `MappedPages` objects:
     /// * `[beginning : at_page - 1]`
     /// * `[at_page : end]`
     /// 
-    /// Depending on the size of this `MappedPages`, either one of the 
-    /// returned `MappedPages` objects may be empty. 
+    /// This function follows the behavior of [`core::slice::split_at()`],
+    /// thus, either one of the returned `MappedPages` objects may be empty. 
+    /// * If `at_page == self.pages.start`, the first returned `MappedPages` object will be empty.
+    /// * If `at_page == self.pages.end + 1`, the second returned `MappedPages` object will be empty.
     /// 
-    /// Returns an `Err` containing this `MappedPages` if `at_page` is not within its bounds.
+    /// Returns an `Err` containing this `MappedPages` (`self`) if `at_page` is not within its bounds.
     /// 
     /// # Note
     /// No remapping actions or page reallocations will occur on either a failure or a success.
-    pub fn split(mut self, at_page: Page) -> Result<(MappedPages, MappedPages), (&'static str, MappedPages)> {
-        // First, take ownership of the AllocatedPages inside of the `MappedPages`.
+    /// 
+    /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
+    pub fn split(mut self, at_page: Page) -> Result<(MappedPages, MappedPages), MappedPages> {
+        // Take ownership of the `AllocatedPages` inside of the `MappedPages` so we can split it.
         let alloc_pages_owned = core::mem::replace(&mut self.pages, AllocatedPages::empty());
 
         match alloc_pages_owned.split(at_page) {
-            Ok((alloc_pages_begin, alloc_pages_end)) => {
-                let mp1 = MappedPages{
+            Ok((first_ap, second_ap)) => Ok((
+                MappedPages{
                     page_table_p4: self.page_table_p4,
-                    pages: alloc_pages_begin,
+                    pages: first_ap,
                     flags: self.flags,
-                };
-                let mp2 = MappedPages {
+                },
+                MappedPages {
                     page_table_p4: self.page_table_p4,
-                    pages: alloc_pages_end,
+                    pages: second_ap,
                     flags: self.flags,
-                };
-                mem::forget(self); 
-                Ok((mp1, mp2))
-            },
-            Err(orig) => {
-                // Upon error, restore the `self.pages` AllocatedPages that we took ownership of.
-                self.pages = orig;
-                error!("MappedPages::split(): Given page is not within the MappedPages: The Page address is {:?}, MappedPages span {:?} to {:?}",
-                    at_page.start_address(), self.pages.start(), self.pages.end()
-                );
-                return Err(("failed to split MappedPages", self));  
+                }
+                // When returning here, `self` will be dropped, but it's empty so it has no effect.
+            )),
+            Err(orig_ap) => {
+                // Upon error, restore the `self.pages` (`AllocatedPages`) that we took ownership of.
+                self.pages = orig_ap;
+                Err(self)
             }
         }
     }
 
+    
     // Removing this function for now since it's unused and untested.
     // /// Creates a deep copy of this `MappedPages` memory region,
     // /// by duplicating not only the virtual memory mapping

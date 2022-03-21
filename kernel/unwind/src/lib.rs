@@ -689,8 +689,13 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 /// 
 /// # Arguments
 /// * `reason`: the reason why the current task is being killed, e.g., due to a panic, exception, etc.
-/// * `stack_frames_to_skip`: the number of stack frames that should be skipped in order to avoid unwinding them.
+/// * `stack_frames_to_skip`: the number of stack frames that can be skipped in order to avoid unwinding them.
+///   Those frames should have nothing that needs to be unwound, e.g., no landing pads that invoke drop handlers.
 ///   For example, for a panic, the first `5` frames in the call stack can be ignored.
+/// 
+/// ## Note: Skipping frames
+/// If you are unsure how many frames you could possibly skip, then it's always safe to pass `0`
+/// such that all function frames on the stack are unwound.
 /// 
 #[doc(hidden)]
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {

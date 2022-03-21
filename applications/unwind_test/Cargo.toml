@@ -17,3 +17,6 @@ path = "../../kernel/terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"
+
+[dependencies.catch_unwind]
+path = "../../kernel/catch_unwind"

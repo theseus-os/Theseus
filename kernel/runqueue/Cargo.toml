@@ -7,6 +7,9 @@ build = "../../build.rs"
 
 [dependencies]
 
+[dependencies.cfg-if]
+version = "1.0.0"
+
 [dependencies.log]
 version = "0.4.8"
 
@@ -28,6 +31,9 @@ path = "../runqueue_round_robin"
 
 [dependencies.runqueue_priority]
 path = "../runqueue_priority"
+
+[dependencies.runqueue_realtime]
+path = "../runqueue_realtime"
 
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.

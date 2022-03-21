@@ -5,7 +5,7 @@ authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
 
 [dependencies]
-core2 = { version = "0.3.2", default-features = false, features = ["alloc", "nightly"] }
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 
 [dependencies.app_io]
 path = "../../kernel/app_io"
