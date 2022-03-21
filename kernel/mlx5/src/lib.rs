@@ -128,7 +128,12 @@ impl ConnectX5Nic {
     /// * `num_tx_descs`: The number of descriptors in each transmit queue.
     /// * `num_rx_descs`: The number of descriptors in each receive queue.
     /// * `mtu`: Maximum Transmission Unit in bytes
-    pub fn init(mlx5_pci_dev: &PciDevice, num_tx_descs: usize, num_rx_descs: usize, mtu: u16) -> Result<&'static MutexIrqSafe<ConnectX5Nic> , &'static str> {
+    pub fn init(
+        mlx5_pci_dev: &PciDevice, 
+        num_tx_descs: usize, 
+        num_rx_descs: usize, 
+        mtu: u16
+    ) -> Result<&'static MutexIrqSafe<ConnectX5Nic> , &'static str> {
         let sq_size_in_bytes = num_tx_descs * core::mem::size_of::<WorkQueueEntrySend>();
         let rq_size_in_bytes = num_rx_descs * core::mem::size_of::<WorkQueueEntryReceive>();
         
@@ -224,8 +229,8 @@ impl ConnectX5Nic {
         // execute MANAGE_PAGES command to transfer boot pages to device
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::ManagePages)
-            .opmod(ManagePagesOpMod::AllocationSuccess as u16)
-            .allocated_pages(boot_pa), 
+                .opmod(ManagePagesOpMod::AllocationSuccess as u16)
+                .allocated_pages(boot_pa), 
             &mut init_segment
         )?;
         trace!("ManagePages boot: {:?}", cmdq.get_command_status(completed_cmd)?);
@@ -369,9 +374,9 @@ impl ConnectX5Nic {
     
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateEq)
-            .allocated_pages(vec!(eq_pa))
-            .uar(uar)
-            .queue_size(num_eq_entries as u32), 
+                .allocated_pages(vec!(eq_pa))
+                .uar(uar)
+                .queue_size(num_eq_entries as u32), 
             &mut init_segment
         )?;
         let (eqn, status) = cmdq.get_eq_number(completed_cmd)?;
@@ -418,12 +423,12 @@ impl ConnectX5Nic {
         
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateCq) 
-            .allocated_pages(vec!(cq_pa))
-            .uar(uar)
-            .queue_size(NUM_CQ_ENTRIES_SEND as u32)
-            .eqn(eqn)
-            .db_page(db_pa)
-            .collapsed_cq(), 
+                .allocated_pages(vec!(cq_pa))
+                .uar(uar)
+                .queue_size(NUM_CQ_ENTRIES_SEND as u32)
+                .eqn(eqn)
+                .db_page(db_pa)
+                .collapsed_cq(), 
             &mut init_segment
         )?;
         let (cqn_s, status) = cmdq.get_cq_number(completed_cmd)?;
@@ -446,11 +451,11 @@ impl ConnectX5Nic {
         
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateCq) 
-            .allocated_pages(vec!(cq_pa))
-            .uar(uar)
-            .queue_size(cq_entries_r as u32)
-            .eqn(eqn)
-            .db_page(db_pa), 
+                .allocated_pages(vec!(cq_pa))
+                .uar(uar)
+                .queue_size(cq_entries_r as u32)
+                .eqn(eqn)
+                .db_page(db_pa), 
             &mut init_segment
         )?;
         let (cqn_r, status) = cmdq.get_cq_number(completed_cmd)?;
@@ -520,11 +525,11 @@ impl ConnectX5Nic {
         // Create the RQ
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateRq) 
-            .allocated_pages(vec!(q_pa)) 
-            .queue_size(num_rx_descs as u32)
-            .db_page(db_pa)
-            .cqn(cqn_r) 
-            .pd(pd), 
+                .allocated_pages(vec!(q_pa)) 
+                .queue_size(num_rx_descs as u32)
+                .db_page(db_pa)
+                .cqn(cqn_r) 
+                .pd(pd), 
             &mut init_segment
         )?;
         let (rqn, status) = cmdq.get_receive_queue_number(completed_cmd)?;
