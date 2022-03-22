@@ -685,4 +685,3 @@ impl ConnectX5Nic {
         self.send_queue.send(buffer_addr, buffer);
     }
 }
-

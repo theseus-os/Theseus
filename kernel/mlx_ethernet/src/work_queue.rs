@@ -402,4 +402,3 @@ impl MemoryPointerDataSegment {
         self.local_address_l.write(U32::new((local_address.value() & 0xFFFF_FFFF) as u32));
     }
 }
-

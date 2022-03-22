@@ -44,5 +44,3 @@ fn rmain() -> Result<(), &'static str> {
     }
     Ok(())
 }
-
-
