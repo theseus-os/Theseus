@@ -2,10 +2,9 @@
 //! that helps to manage the complex configuration options involving SIMD and personalities.
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(naked_functions)]
 
 #[macro_use] extern crate cfg_if;
-
 
 // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
 // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
@@ -19,6 +18,7 @@ cfg_if! {
         #[macro_use(save_registers_avx, restore_registers_avx)] 
         #[macro_use] extern crate context_switch_avx;
 
+        use core::arch::asm;
         pub use context_switch_sse::*;
         pub use context_switch_regular::*;
         pub use context_switch_avx::*;
@@ -32,7 +32,6 @@ cfg_if! {
         /// # Safety
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
-        #[inline(never)]
         pub unsafe extern "C" fn context_switch_regular_to_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
             // you CANNOT place any log statements or other instructions here
@@ -56,7 +55,6 @@ cfg_if! {
         /// # Safety
         /// This function is unsafe because it changes the content on both task's stacks.
         #[naked]
-        #[inline(never)]
         pub unsafe extern "C" fn context_switch_sse_to_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
             // you CANNOT place any log statements or other instructions here
@@ -79,7 +77,6 @@ cfg_if! {
         /// # Safety
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
-        #[inline(never)]
         pub unsafe extern "C" fn context_switch_regular_to_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
             // you CANNOT place any log statements or other instructions here
@@ -102,7 +99,6 @@ cfg_if! {
         /// # Safety
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
-        #[inline(never)]
         pub unsafe extern "C" fn context_switch_sse_to_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
             // you CANNOT place any log statements or other instructions here
@@ -126,7 +122,6 @@ cfg_if! {
         /// # Safety
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
-        #[inline(never)]
         pub unsafe extern "C" fn context_switch_avx_to_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
             // you CANNOT place any log statements or other instructions here
@@ -149,7 +144,6 @@ cfg_if! {
         /// # Safety
         /// This function is unsafe because it changes the content on both task's stacks. 
         #[naked]
-        #[inline(never)]
         pub unsafe extern "C" fn context_switch_avx_to_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
             // Since this is a naked function that expects its arguments in two registers,
             // you CANNOT place any log statements or other instructions here

@@ -8,7 +8,6 @@
 //! No effect is noticeable on KVM or on real hardware.
 
 #![no_std]
-#![feature(llvm_asm)]
 
 /// A wrapper around the `pause` x86 ASM function. 
 /// On non-x86_64 architectures, this is a no-op (empty function).
@@ -16,5 +15,5 @@
 pub fn spin_loop_hint() {
     // core::hint::spin_loop();
     #[cfg(target_arch = "x86_64")]
-    unsafe { llvm_asm!("pause" ::: "memory" : "volatile"); }
+    unsafe { core::arch::asm!("pause", options(nomem, nostack)); }
 }

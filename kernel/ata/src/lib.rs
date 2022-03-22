@@ -197,7 +197,7 @@ struct AtaBus {
 	error: PortReadOnly<u8>,
 	/// The features port, shared with the `error` port.
 	/// Located at `BAR0 + 1`.
-	features: PortWriteOnly<u8>,
+	_features: PortWriteOnly<u8>,
 	/// The number of sectors to read or write.
 	/// Located at `BAR0 + 2`.
 	sector_count: Port<u8>,
@@ -232,7 +232,7 @@ struct AtaBus {
 	control: PortWriteOnly<u8>,
 	/// `DEVADDRESS`, located at `BAR1 + 3`. 
 	/// Not sure what this is used for.
-	drive_address: Port<u8>,
+	_drive_address: Port<u8>,
 }
 
 impl AtaBus {
@@ -243,7 +243,7 @@ impl AtaBus {
 		AtaBus { 
 			data: Port::new(data_bar + 0),
 			error: PortReadOnly::new(data_bar + 1),
-			features: PortWriteOnly::new(data_bar + 1),
+			_features: PortWriteOnly::new(data_bar + 1),
 			sector_count: Port::new(data_bar + 2),
 			lba_low: Port::new(data_bar + 3),
 			lba_mid: Port::new(data_bar + 4),
@@ -254,7 +254,7 @@ impl AtaBus {
 
 			alternate_status: PortReadOnly::new(control_bar + 2),
 			control: PortWriteOnly::new(control_bar + 2),
-			drive_address: Port::new(control_bar + 3),
+			_drive_address: Port::new(control_bar + 3),
 		}
 	}
 

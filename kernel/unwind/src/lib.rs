@@ -34,8 +34,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(asm, naked_functions)]
-#![feature(unwind_attributes)]
+#![feature(naked_functions)]
 #![feature(trait_alias)]
 
 extern crate alloc;
@@ -53,7 +52,7 @@ extern crate interrupts;
 mod registers;
 mod lsda;
 
-use core::fmt;
+use core::{arch::asm, fmt};
 use alloc::{
     sync::Arc,
     boxed::Box,
@@ -469,7 +468,6 @@ pub fn invoke_with_current_registers<F>(f: &mut F) -> Result<(), &'static str>
     /// 
     /// The argument is a pointer to a function reference, so effectively a pointer to a pointer. 
     #[naked]
-    #[inline(never)]
     unsafe extern "C" fn unwind_trampoline(_func: *mut FuncWithRegistersRefMut) -> *mut Result<(), &'static str> {
         // This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.
         // This is because we rely on the value of registers to stay the same as whatever the caller set them to.
@@ -584,7 +582,6 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
     /// It is marked as divergent (returning `!`) because it doesn't return to the caller,
     /// instead it returns (jumps to) that landing pad address.
     #[naked]
-    #[inline(never)]
     unsafe extern "C" fn unwind_lander(_regs: *const LandingRegisters) -> ! {
         asm!("
             movq %rdi, %rsp

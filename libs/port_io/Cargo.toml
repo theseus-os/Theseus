@@ -2,7 +2,7 @@
 name = "port_io"
 version = "0.2.1"
 authors = ["Kevin Boos <kevinaboos@gmail.com>", "Eric Kidd <git@randomhacks.net>"]
-
+edition = "2018"
 description = "Bare metal (no_std) inb, outb, inw, outw, inl, outw instructions with Rust-like API"
 homepage = "https://github.com/emk/toyos.rs/tree/master/crates/cpuio"
 repository = "https://github.com/emk/toyos.rs"

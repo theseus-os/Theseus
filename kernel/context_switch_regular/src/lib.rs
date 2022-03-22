@@ -2,7 +2,7 @@
 //! when SSE/SIMD extensions are not active. 
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(naked_functions)]
 
 extern crate zerocopy;
 
@@ -109,12 +109,11 @@ macro_rules! restore_registers_regular {
 /// # Safety
 /// This function is unsafe because it changes the content on both task's stacks. 
 #[naked]
-#[inline(never)]
 pub unsafe extern "C" fn context_switch_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     // Since this is a naked function that expects its arguments in two registers,
     // you CANNOT place any log statements or other instructions here
     // before, in between, or after anything below.
-    asm!(
+    core::arch::asm!(
         save_registers_regular!(),
         switch_stacks!(),
         restore_registers_regular!(),

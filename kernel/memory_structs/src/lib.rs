@@ -1,7 +1,7 @@
 //! This crate contains common types used for memory mapping. 
 
 #![no_std]
-#![feature(step_trait, step_trait_ext)]
+#![feature(step_trait)]
 
 extern crate kernel_config;
 extern crate multiboot2;
@@ -246,7 +246,7 @@ macro_rules! implement_page_frame {
                 }
             }
             #[doc = "Implementing `Step` allows `" $TypeName "` to be used in an [`Iterator`]."]
-            unsafe impl Step for $TypeName {
+            impl Step for $TypeName {
                 #[inline]
                 fn steps_between(start: &$TypeName, end: &$TypeName) -> Option<usize> {
                     Step::steps_between(&start.number, &end.number)
