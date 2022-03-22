@@ -143,7 +143,7 @@ impl ConnectX5Nic {
             return Err("RQ size in bytes must be a multiple of the page size.");
         }
 
-        if !check_pow_2(num_tx_descs) || !check_pow_2(num_rx_descs) {
+        if !num_tx_descs.is_power_of_two() || !num_rx_descs.is_power_of_two() {
             return Err("The number of descriptors must be a power of two.");
         } 
 
@@ -384,7 +384,7 @@ impl ConnectX5Nic {
         let event_queue = EventQueue::init(eq_mp, num_eq_entries, eqn)?;
         trace!("CreateEq: {:?}, eqn: {:?}", status, eqn); 
 
-        #[cfg(mlx_logger)]
+        #[cfg(mlx_verbose_log)]
         {
             event_queue.dump()
         }
@@ -436,7 +436,7 @@ impl ConnectX5Nic {
         let send_completion_queue = CompletionQueue::init(cq_mp, NUM_CQ_ENTRIES_SEND, db_page, cqn_s)?;
         trace!("CreateCq: {:?}, cqn_s: {:?}", status, cqn_s);
 
-        #[cfg(mlx_logger)]
+        #[cfg(mlx_verbose_log)]
         {
             send_completion_queue.dump()
         }
@@ -514,7 +514,7 @@ impl ConnectX5Nic {
         )?;
         trace!("Create SQ status: {:?}, number: {:?}", status, sqn);
         
-        #[cfg(mlx_logger)]
+        #[cfg(mlx_verbose_log)]
         {
             send_queue.dump()
         }
@@ -686,7 +686,3 @@ impl ConnectX5Nic {
     }
 }
 
-/// Returns true if `num` is a power of 2.
-fn check_pow_2(num: usize) -> bool {
-    (num & (num - 1) == 0) && (num != 0)
-}

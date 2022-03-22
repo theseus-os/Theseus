@@ -622,7 +622,7 @@ impl CommandQueue {
         let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
         let num_pages = parameters.allocated_pages.as_ref().and_then(|pages| Some(pages.len())); 
 
-        #[cfg(mlx_logger)]
+        #[cfg(mlx_verbose_log)]
         {
             if let Some(pages) = parameters.allocated_pages.as_ref() {
                 debug!("pages: {:?}", pages);
@@ -916,7 +916,7 @@ impl CommandQueue {
         // claim the command entry as in use
         self.available_entries[entry_num] = false;
 
-        #[cfg(mlx_logger)]
+        #[cfg(mlx_verbose_log)]
         {
             debug!("command INPUT: {:?}", parameters.opcode);
             self.entries[entry_num].dump_command();
@@ -1247,7 +1247,7 @@ impl CommandQueue {
     }
 
     pub fn get_command_status(&mut self, command: Command<{State::Completed}>) -> Result<CommandCompletionStatus, CommandQueueError> {
-        #[cfg(mlx_logger)]
+        #[cfg(mlx_verbose_log)]
         {
             debug!("command OUTPUT");
             self.entries[command.entry_num].dump_command();
@@ -1666,7 +1666,7 @@ impl CommandQueueEntry {
         CommandReturnStatus::try_from(status).map_err(|_e| CommandQueueError::InvalidCommandReturnStatus)
     }
 
-    #[cfg(mlx_logger)]
+    #[cfg(mlx_verbose_log)]
     fn dump_command(&self) {
         unsafe {
             let ptr = self as *const CommandQueueEntry as *const u32;
@@ -1719,7 +1719,7 @@ impl CommandInterfaceMailbox {
         self.next_pointer_l.write(U32::new((next_mb_addr & 0xFFFF_FFFF) as u32));
     }
 
-    #[cfg(mlx_logger)]
+    #[cfg(mlx_verbose_log)]
     fn dump_mailbox(&self, block_num: usize) {
         debug!("Mailbox {}", block_num);
         unsafe {
