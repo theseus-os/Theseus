@@ -478,7 +478,7 @@ dependencies = [
 [[package]]
 name = "core_simd"
 version = "0.1.0"
-source = "git+https://github.com/rust-lang/stdsimd#57e67c905fe9fb3d45a1714d25baa5dfc143299c"
+source = "git+https://github.com/rust-lang/stdsimd#0711e11593e7d3ce7cffdb7bd966553e4a4f858f"
 
 [[package]]
 name = "cortex-m"
