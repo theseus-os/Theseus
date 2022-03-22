@@ -330,12 +330,12 @@ pub enum HcaPortType {
 #[derive(FromBytes)]
 #[repr(C)]
 struct NicVportContext {
-    /// This field is not necessarily padding, just unused fields that are not relevant.
-    _padding0: [u8; 36],
+    /// Unused fields that are not relevant.
+    unused0: [u8; 36],
     /// Maximum transmission unit size in bytes
     mtu: Volatile<U32<BigEndian>>,
-    /// This field is not necessarily padding, just unused fields that are not relevant.
-    _padding1: [u8; 200],
+    /// Unused fields that are not relevant.
+    unused1: [u8; 200],
     allowed_list_size: Volatile<U32<BigEndian>>,
     /// The upper bytes of the NIC's MAC address
     permanent_address_h: Volatile<U32<BigEndian>>,
