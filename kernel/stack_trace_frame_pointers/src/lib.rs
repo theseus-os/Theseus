@@ -56,7 +56,6 @@ pub fn stack_trace_using_frame_pointers(
     // SAFE: just reading current register value
     unsafe {
         asm!("mov {}, rbp", out(reg) rbp);
-        // llvm_asm!("" : "={rbp}"(rbp) : : "memory" : "intel", "volatile");
     }
 
     for _i in 0 .. max_recursion.unwrap_or(64) {
