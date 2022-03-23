@@ -384,10 +384,10 @@ impl ConnectX5Nic {
         let event_queue = EventQueue::init(eq_mp, num_eq_entries, eqn)?;
         trace!("CreateEq: {:?}, eqn: {:?}", status, eqn); 
 
-        #[cfg(mlx_verbose_log)]
-        {
-            event_queue.dump()
-        }
+        // #[cfg(mlx_verbose_log)]
+        // {
+        //     event_queue.dump()
+        // }
 
         // execute ALLOC_PD
         let completed_cmd = cmdq.create_and_execute_command(
@@ -436,10 +436,10 @@ impl ConnectX5Nic {
         let send_completion_queue = CompletionQueue::init(cq_mp, NUM_CQ_ENTRIES_SEND, db_page, cqn_s)?;
         trace!("CreateCq: {:?}, cqn_s: {:?}", status, cqn_s);
 
-        #[cfg(mlx_verbose_log)]
-        {
-            send_completion_queue.dump()
-        }
+        // #[cfg(mlx_verbose_log)]
+        // {
+        //     send_completion_queue.dump()
+        // }
 
         // execute CREATE_CQ for RQ
 
@@ -514,10 +514,10 @@ impl ConnectX5Nic {
         )?;
         trace!("Create SQ status: {:?}, number: {:?}", status, sqn);
         
-        #[cfg(mlx_verbose_log)]
-        {
-            send_queue.dump()
-        }
+        // #[cfg(mlx_verbose_log)]
+        // {
+        //     send_queue.dump()
+        // }
 
         // initialize the rx buffer pool
         init_rx_buf_pool(num_rx_descs, mtu, &RX_BUFFER_POOL)?;

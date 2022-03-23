@@ -3,7 +3,10 @@
 //! 
 //! (PRM Section 8.18: Completion Queues)
 
-use core::convert::TryFrom;
+use core::{
+    convert::TryFrom,
+    fmt
+};
 
 use bit_field::BitField;
 use zerocopy::*;
@@ -61,8 +64,18 @@ pub(crate) struct CompletionQueueContext {
 
 const_assert_eq!(core::mem::size_of::<CompletionQueueContext>(), 64);
 
+impl fmt::Debug for CompletionQueueContext {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("CompletionQueueContext")
+            .field("status", &self.status.read().get())
+            .field("page_offset", &self.page_offset.read().get())
+            .field("uar_log_cq_size", &self.uar_log_cq_size.read().get())
+            .finish()
+    }
+}
+
 impl CompletionQueueContext {
-    /// Initialize the fields of the CQ context.
+    /// Create and initialize the fields of the CQ context.
     /// The CQ context is then passed to the HCA when creating the CQ.
     /// 
     /// # Arguments
@@ -71,29 +84,30 @@ impl CompletionQueueContext {
     /// * `c_eqn`: number of the EQ this CQ reports completion events to.
     /// * `db_addr`: physical address of the [`CompletionQueueDoorbellRecord`].
     /// * `collapsed`: set to true if all CQE's are collapsed to the first.
-    pub fn init(&mut self, uar_page: u32, cq_size: u32, c_eqn: u8, db_addr: PhysicalAddress, collapsed: bool) {
+    pub fn init(uar_page: u32, cq_size: u32, c_eqn: u8, db_addr: PhysicalAddress, collapsed: bool) -> CompletionQueueContext {
         const COLLAPSE_CQE:     u32 = 1 << 20;
         const OVERRUN_IGNORE:   u32 = 1 << 17;
 
         // set all fields to zero
-        *self = CompletionQueueContext::default();
+        let mut ctxt = CompletionQueueContext::default();
         let mut status = OVERRUN_IGNORE; 
         if collapsed {
             status |= COLLAPSE_CQE; 
         }
-        self.status.write(U32::new(status)); 
+        ctxt.status.write(U32::new(status)); 
 
         let uar = uar_page & UAR_MASK;
         let size = (libm::log2(cq_size as f64) as u32 & LOG_QUEUE_SIZE_MASK) << LOG_QUEUE_SIZE_SHIFT;
-        self.uar_log_cq_size.write(U32::new(uar | size));
+        ctxt.uar_log_cq_size.write(U32::new(uar | size));
 
-        self.c_eqn.write(U32::new(c_eqn as u32));
+        ctxt.c_eqn.write(U32::new(c_eqn as u32));
 
         let log_page_size = log_page_size(cq_size * core::mem::size_of::<CompletionQueueEntry>() as u32); 
-        self.log_page_size.write(U32::new(log_page_size << LOG_PAGE_SIZE_SHIFT));
+        ctxt.log_page_size.write(U32::new(log_page_size << LOG_PAGE_SIZE_SHIFT));
         
-        self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
-        self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
+        ctxt.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
+        ctxt.dbr_addr_l.write(U32::new(db_addr.value() as u32));
+        ctxt
     }
 }
 

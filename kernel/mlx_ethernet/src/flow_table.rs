@@ -4,7 +4,7 @@
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
-use core::fmt;
+use core::{fmt, num};
 use num_enum::TryFromPrimitive;
 
 /// Value written to the flow table context to set the flow table's role in packet processing.
@@ -34,6 +34,15 @@ impl fmt::Debug for FlowTableContext {
         f.debug_struct("FlowTableContext")
             .field("log_size", &self.log_size.read().get())
             .finish()
+    }
+}
+
+impl FlowTableContext {
+    pub(crate) fn init(num_entries: u32) -> FlowTableContext {
+        let mut ctxt = FlowTableContext::default();
+        let log_size = libm::log2(num_entries as f64) as u32;
+        ctxt.log_size.write(U32::new(log_size));
+        ctxt
     }
 }
 
@@ -76,19 +85,19 @@ const_assert_eq!(core::mem::size_of::<FlowGroupInput>(), 48);
 
 impl FlowGroupInput {
     pub(crate) fn init(
-        &mut self, 
         table_type: FlowTableType, 
         table_id: u32, 
         start_flow_index: u32, 
         end_flow_index: u32, 
-        match_criteria_enable: MatchCriteriaEnable) 
-    {
-        *self = FlowGroupInput::default();
-        self.table_type.write(U32::new((table_type as u32) << 24));
-        self.table_id.write(U32::new(table_id & 0xFF_FFFF));
-        self.start_flow_index.write(U32::new(start_flow_index));
-        self.end_flow_index.write(U32::new(end_flow_index));
-        self.match_criteria_enable.write(U32::new(match_criteria_enable as u32)); 
+        match_criteria_enable: MatchCriteriaEnable
+    ) -> FlowGroupInput {
+        let mut fgi = FlowGroupInput::default();
+        fgi.table_type.write(U32::new((table_type as u32) << 24));
+        fgi.table_id.write(U32::new(table_id & 0xFF_FFFF));
+        fgi.start_flow_index.write(U32::new(start_flow_index));
+        fgi.end_flow_index.write(U32::new(end_flow_index));
+        fgi.match_criteria_enable.write(U32::new(match_criteria_enable as u32)); 
+        fgi
     }
 }
 
@@ -122,11 +131,12 @@ pub(crate) struct FlowEntryInput {
 const_assert_eq!(core::mem::size_of::<FlowEntryInput>(), 48);
 
 impl FlowEntryInput {
-    pub(crate) fn init(&mut self, table_type: FlowTableType, table_id: u32, flow_index: u32) {
-        *self = FlowEntryInput::default();
-        self.table_type.write(U32::new((table_type as u32) << 24));
-        self.table_id.write(U32::new(table_id & 0xFF_FFFF));
-        self.flow_index.write(U32::new(flow_index));
+    pub(crate) fn init(table_type: FlowTableType, table_id: u32, flow_index: u32) -> FlowEntryInput {
+        let mut fei = FlowEntryInput::default();
+        fei.table_type.write(U32::new((table_type as u32) << 24));
+        fei.table_id.write(U32::new(table_id & 0xFF_FFFF));
+        fei.flow_index.write(U32::new(flow_index));
+        fei
     }
 }
 
@@ -176,11 +186,12 @@ impl Default for FlowContext {
     }
 }
 impl FlowContext {
-    pub(crate) fn init(&mut self, group_id: u32, action: FlowContextAction, dest_list_size: u32) {
-        *self = FlowContext::default();
-        self.group_id.write(U32::new(group_id));
-        self.action.write(U32::new(action as u32));
-        self.dest_list_size.write(U32::new(dest_list_size)); 
+    pub(crate) fn init(group_id: u32, action: FlowContextAction, dest_list_size: u32) -> FlowContext {
+        let mut ctxt = FlowContext::default();
+        ctxt.group_id.write(U32::new(group_id));
+        ctxt.action.write(U32::new(action as u32));
+        ctxt.dest_list_size.write(U32::new(dest_list_size)); 
+        ctxt
     }
 }
 
@@ -212,8 +223,9 @@ pub(crate) struct DestinationEntry {
 const_assert_eq!(core::mem::size_of::<DestinationEntry>(), 8);
 
 impl DestinationEntry {
-    pub(crate) fn init(&mut self, dest_type: DestinationType, dest_id: u32) {
-        *self = DestinationEntry::default();
-        self.id_and_type.write(U32::new((dest_type as u32) << 24 | (dest_id & 0xFF_FFFF)));
+    pub(crate) fn init(dest_type: DestinationType, dest_id: u32) -> DestinationEntry {
+        let mut entry = DestinationEntry::default();
+        entry.id_and_type.write(U32::new((dest_type as u32) << 24 | (dest_id & 0xFF_FFFF)));
+        entry
     }
 }

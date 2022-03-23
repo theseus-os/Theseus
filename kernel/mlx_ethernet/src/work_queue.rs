@@ -82,7 +82,7 @@ pub(crate) struct WorkQueue {
 const_assert_eq!(core::mem::size_of::<WorkQueue>(), 192);
 
 impl WorkQueue {
-    /// Initialize the fields of the WQ for a SQ or RQ context.
+    /// Create and initialize the fields of the WQ for a SQ or RQ context.
     /// This is then passed to the HCA as part of the Context when creating the queue.
     /// 
     /// # Arguments
@@ -90,28 +90,29 @@ impl WorkQueue {
     /// * `db_addr`: physical address of the doorbell record
     /// * `wq_size`: number of WQ entries
     /// * `wqe_size_in_bytes`: size of the WQE
-    fn init(&mut self, pd: u32, db_addr: PhysicalAddress, wq_size: u32, wqe_size_in_bytes: u32) {
+    fn init(pd: u32, db_addr: PhysicalAddress, wq_size: u32, wqe_size_in_bytes: u32) -> WorkQueue {
         const WQ_TYPE_SHIFT: u32 = 28;
         const PD_MASK: u32 = 0xFF_FFFF;
         const WQ_STRIDE_SHIFT: u32 = 16;
         const WQ_PAGE_SIZE_SHIFT: u32 = 8;
 
         // set all fields to zero
-        *self = WorkQueue::default();
+        let mut wq = WorkQueue::default();
         
-        self.wq_type_signature.write(U32::new((WQType::Cyclic as u32) << WQ_TYPE_SHIFT)); 
-        self.pd.write(U32::new(pd & PD_MASK));
-        self.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
-        self.dbr_addr_l.write(U32::new(db_addr.value() as u32));
+        wq.wq_type_signature.write(U32::new((WQType::Cyclic as u32) << WQ_TYPE_SHIFT)); 
+        wq.pd.write(U32::new(pd & PD_MASK));
+        wq.dbr_addr_h.write(U32::new((db_addr.value() >> 32) as u32));
+        wq.dbr_addr_l.write(U32::new(db_addr.value() as u32));
         
         // the stride of the WQE is equal to the size of the WQE
         let log_wq_stride = libm::log2(wqe_size_in_bytes as f64) as u32; 
         let log_wq_size = libm::log2(wq_size as f64) as u32;
         let log_wq_page_size = log_page_size(wq_size * wqe_size_in_bytes);
-        self.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride << WQ_STRIDE_SHIFT) | (log_wq_page_size << WQ_PAGE_SIZE_SHIFT) | log_wq_size));
+        wq.log_wq_stride_pg_sz_sz.write(U32::new((log_wq_stride << WQ_STRIDE_SHIFT) | (log_wq_page_size << WQ_PAGE_SIZE_SHIFT) | log_wq_size));
+        wq
     }
 
-    /// Initialize the fields of the WQ for a SQ context.
+    /// Create and initialize the fields of the WQ for a SQ context.
     /// This is then passed to the HCA as part of the SQ Context when creating the SQ.
     /// 
     /// # Arguments
@@ -119,15 +120,16 @@ impl WorkQueue {
     /// * `uar_page`: UAR page number (only provided for a SQ)
     /// * `db_addr`: physical address of the doorbell record
     /// * `wq_size`: number of WQ entries
-    pub fn init_sq(&mut self, pd: u32, uar_page: u32, db_addr: PhysicalAddress, wq_size: u32) {
+    pub fn init_sq(pd: u32, uar_page: u32, db_addr: PhysicalAddress, wq_size: u32) -> WorkQueue {
         const UAR_PAGE_MASK: u32 = 0xFF_FFFF;
 
-        self.init(pd, db_addr, wq_size, core::mem::size_of::<WorkQueueEntrySend>() as u32);
-        self.uar_page.write(U32::new(uar_page & UAR_PAGE_MASK));
+        let mut wq = Self::init(pd, db_addr, wq_size, core::mem::size_of::<WorkQueueEntrySend>() as u32);
+        wq.uar_page.write(U32::new(uar_page & UAR_PAGE_MASK));
+        wq
     }
 
-    pub fn init_rq(&mut self, pd: u32, db_addr: PhysicalAddress, wq_size: u32) {
-        self.init(pd, db_addr, wq_size, core::mem::size_of::<WorkQueueEntryReceive>() as u32);
+    pub fn init_rq(pd: u32, db_addr: PhysicalAddress, wq_size: u32) -> WorkQueue {
+        Self::init(pd, db_addr, wq_size, core::mem::size_of::<WorkQueueEntryReceive>() as u32)
     }
 }
 

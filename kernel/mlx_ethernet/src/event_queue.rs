@@ -47,23 +47,24 @@ pub(crate) struct EventQueueContext {
 const_assert_eq!(core::mem::size_of::<EventQueueContext>(), 64);
 
 impl EventQueueContext {
-    /// Initialize the fields of the EQ context.
+    /// Create and initialize the fields of the EQ context.
     /// The EQ context is then passed to the HCA when creating the EQ.
     /// 
     /// # Arguments
     /// * `uar_page`: UAR page the EQ can be accessed through. 
     /// * `eq_size`: number of entries in the EQ.
-    pub fn init(&mut self, uar_page: u32, eq_size: u32) {
+    pub fn init(uar_page: u32, eq_size: u32) -> EventQueueContext {
         // set all entries to zero
-        *self = EventQueueContext::default();
+        let mut ctxt = EventQueueContext::default();
 
         // initialize all other required fields
         let uar = uar_page & UAR_MASK;
         let size = (libm::log2(eq_size as f64) as u32 & LOG_QUEUE_SIZE_MASK) << LOG_QUEUE_SIZE_SHIFT;
-        self.uar_log_eq_size.write(U32::new(uar | size));
+        ctxt.uar_log_eq_size.write(U32::new(uar | size));
         
         let log_eq_page_size = log_page_size(eq_size * core::mem::size_of::<EventQueueEntry>() as u32);
-        self.log_pg_size.write(U32::new(log_eq_page_size << LOG_PAGE_SIZE_SHIFT));
+        ctxt.log_pg_size.write(U32::new(log_eq_page_size << LOG_PAGE_SIZE_SHIFT));
+        ctxt
     }
 }
 

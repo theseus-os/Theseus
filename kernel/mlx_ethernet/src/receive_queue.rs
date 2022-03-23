@@ -47,10 +47,11 @@ impl TransportInterfaceReceiveContext {
     /// # Arguments
     /// * `rqn`: RQ number
     /// * `td`: transport domain ID 
-    pub fn init(&mut self, rqn: u32, td: u32) {
-        *self = TransportInterfaceReceiveContext::default();
-        self.inline_rqn.write(U32::new(rqn));
-        self.transport_domain.write(U32::new(td));
+    pub fn init(rqn: u32, td: u32) -> TransportInterfaceReceiveContext {
+        let mut ctxt = TransportInterfaceReceiveContext::default();
+        ctxt.inline_rqn.write(U32::new(rqn));
+        ctxt.transport_domain.write(U32::new(td));
+        ctxt
     }
 }
 
@@ -110,19 +111,20 @@ impl fmt::Debug for ReceiveQueueContext {
 
 #[allow(unused)]
 impl ReceiveQueueContext {
-    /// Initialize the fields of the RQ context.
+    /// Create and initialize the fields of the RQ context.
     /// The RQ context is then passed to the HCA when creating the RQ.
     /// 
     /// # Arguments
     /// * `cqn`: number of CQ associated with this RQ 
-    pub fn init(&mut self, cqn: u32) {
+    pub fn init(cqn: u32) -> ReceiveQueueContext {
         const ENABLE_RLKEY:             u32 = 1 << 31;
         const VLAN_STRIP_DISABLE:       u32 = 1 << 28;
         
         // set all fields to zero
-        *self = ReceiveQueueContext::default();
-        self.rlky_state.write(U32::new(ENABLE_RLKEY | VLAN_STRIP_DISABLE)); 
-        self.cqn.write(U32::new(cqn & CQN_MASK));
+        let mut ctxt = ReceiveQueueContext::default();
+        ctxt.rlky_state.write(U32::new(ENABLE_RLKEY | VLAN_STRIP_DISABLE)); 
+        ctxt.cqn.write(U32::new(cqn & CQN_MASK));
+        ctxt
     }
 
     /// set state of the RQ in the RQ context to `next_state`

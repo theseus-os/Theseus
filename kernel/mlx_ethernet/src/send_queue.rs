@@ -41,13 +41,14 @@ pub(crate) struct TransportInterfaceSendContext {
 const_assert_eq!(core::mem::size_of::<TransportInterfaceSendContext>(), 160);
 
 impl TransportInterfaceSendContext {
-    /// Initialize the TIS object
+    /// Create and initialize a TIS object
     /// 
     /// # Arguments
     /// * `td`: transport domain ID 
-    pub fn init(&mut self, td: u32) {
-        *self = TransportInterfaceSendContext::default();
-        self.transport_domain.write(U32::new(td));
+    pub fn init(td: u32) -> TransportInterfaceSendContext {
+        let mut ctxt = TransportInterfaceSendContext::default();
+        ctxt.transport_domain.write(U32::new(td));
+        ctxt
     }
 }
 
@@ -109,13 +110,13 @@ pub enum SendQueueState {
 }
 
 impl SendQueueContext {
-    /// Initialize the fields of the SQ context.
+    /// Create and initialize the fields of the SQ context.
     /// The SQ context is then passed to the HCA when creating the SQ.
     /// 
     /// # Arguments
     /// * `cqn`: number of CQ associated with this SQ 
     /// * `tisn`: number of the TIS context associated with this SQ
-    pub fn init(&mut self, cqn: u32, tisn: u32) {
+    pub fn init(cqn: u32, tisn: u32) -> SendQueueContext{
         // We are always using 1 TIS per SQ
         const TIS_LST_SZ:               u32 = 1 << 16;
         const TISN_MASK:                u32 = 0xFF_FFFF;
@@ -125,12 +126,13 @@ impl SendQueueContext {
         const ONE_INLINE_HEADER:        u32 = 1 << 24;
 
         // set all fields to zero
-        *self = SendQueueContext::default();
+        let mut ctxt = SendQueueContext::default();
 
-        self.rlky_state.write(U32::new(ENABLE_RLKEY | FAST_REGISTER_ENABLE | FLUSH_IN_ERROR_ENABLE | ONE_INLINE_HEADER));
-        self.cqn.write(U32::new(cqn & CQN_MASK));
-        self.tis_lst_sz.write(U32::new(TIS_LST_SZ));
-        self.tis_num_0.write(U32::new(tisn & TISN_MASK));
+        ctxt.rlky_state.write(U32::new(ENABLE_RLKEY | FAST_REGISTER_ENABLE | FLUSH_IN_ERROR_ENABLE | ONE_INLINE_HEADER));
+        ctxt.cqn.write(U32::new(cqn & CQN_MASK));
+        ctxt.tis_lst_sz.write(U32::new(TIS_LST_SZ));
+        ctxt.tis_num_0.write(U32::new(tisn & TISN_MASK));
+        ctxt
     }
 
     /// set state of the SQ in the SQ context to `next_state`
