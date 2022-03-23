@@ -8,7 +8,6 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"
-x86_64 = { path = "../../libs/x86_64" }
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
