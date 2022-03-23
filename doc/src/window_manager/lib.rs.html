@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../window_manager/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window_manager/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../window_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../window_manager/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../window_manager/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -830,8 +832,7 @@
 <span id="827">827</span>
 <span id="828">828</span>
 <span id="829">829</span>
-</pre><pre class="rust">
-<span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.</span>
 <span class="doccomment">//!</span>
@@ -938,13 +939,13 @@
     <span class="doccomment">/// </span>
     <span class="doccomment">/// TODO FIXME: (kevinaboos) remove this dumb notion of &quot;first active&quot;. This is a bad hack. </span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_active</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">inner_ref</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">refresh</span>: <span class="ident">bool</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// if it is currently actived, just return</span>
         <span class="kw">let</span> <span class="ident">first_active</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
-            <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) =&gt; {
                 <span class="kw">if</span> <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span>(<span class="ident">current_active</span>), <span class="ident">inner_ref</span>) {
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>); <span class="comment">// do nothing</span>
                 } <span class="kw">else</span> {
@@ -953,22 +954,22 @@
                 }
                 <span class="bool-val">false</span>
             }
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
+            <span class="prelude-val">None</span> =&gt; <span class="bool-val">true</span>,
         };
         
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">is_window_in_show_list</span>(<span class="kw-2">&amp;</span><span class="ident">inner_ref</span>) {
             <span class="comment">// remove item in current list</span>
-            <span class="prelude-val">Some</span>(<span class="ident">i</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">i</span>) =&gt; {
                 <span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">remove</span>(<span class="ident">i</span>);
             }
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="prelude-val">None</span> =&gt; {}
         }
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">is_window_in_hide_list</span>(<span class="kw-2">&amp;</span><span class="ident">inner_ref</span>) {
             <span class="comment">// remove item in current list</span>
-            <span class="prelude-val">Some</span>(<span class="ident">i</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">i</span>) =&gt; {
                 <span class="self">self</span>.<span class="ident">hide_list</span>.<span class="ident">remove</span>(<span class="ident">i</span>);
             }
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="prelude-val">None</span> =&gt; {}
         }
         <span class="self">self</span>.<span class="ident">active</span> <span class="op">=</span> <span class="ident">Arc::downgrade</span>(<span class="ident">inner_ref</span>);
         <span class="kw">let</span> <span class="ident">area</span> <span class="op">=</span> {
@@ -987,7 +988,7 @@
     }
 
     <span class="doccomment">/// Returns the index of a window if it is in the show list</span>
-    <span class="kw">fn</span> <span class="ident">is_window_in_show_list</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">is_window_in_show_list</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0_usize</span>;
         <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">show_list</span>.<span class="ident">iter</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item_ptr</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">upgrade</span>() {
@@ -1001,7 +1002,7 @@
     }
 
     <span class="doccomment">/// Returns the index of a window if it is in the hide list</span>
-    <span class="kw">fn</span> <span class="ident">is_window_in_hide_list</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">is_window_in_hide_list</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0_usize</span>;
         <span class="kw">for</span> <span class="ident">item</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">hide_list</span>.<span class="ident">iter</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">item_ptr</span>) <span class="op">=</span> <span class="ident">item</span>.<span class="ident">upgrade</span>() {
@@ -1015,7 +1016,7 @@
     }
 
     <span class="doccomment">/// delete a window and refresh its region</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">delete_window</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">inner_ref</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">delete_window</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">inner_ref</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">top_left</span>, <span class="ident">bottom_right</span>) <span class="op">=</span> {
             <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">inner_ref</span>.<span class="ident">lock</span>();
             <span class="kw">let</span> <span class="ident">top_left</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">get_position</span>();
@@ -1059,10 +1060,10 @@
 
     <span class="doccomment">/// Refresh the region in `bounding_box`. Only render the bottom final framebuffer and windows. Ignore the active window if `active` is false.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_bottom_windows</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">CompositableRegion</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, 
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
         <span class="ident">bounding_box</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">B</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
         <span class="ident">active</span>: <span class="ident">bool</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// bottom framebuffer</span>
         <span class="kw">let</span> <span class="ident">bottom_fb_area</span> <span class="op">=</span> <span class="ident">FramebufferUpdates</span> {
             <span class="ident">src_framebuffer</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">bottom_fb</span>,
@@ -1099,29 +1100,29 @@
         }).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
         
         <span class="kw">let</span> <span class="ident">buffer_iter</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">bottom_fb_area</span>).<span class="ident">into_iter</span>().<span class="ident">chain</span>(<span class="ident">window_bufferlist</span>.<span class="ident">into_iter</span>());
-        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">buffer_iter</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)<span class="question-mark">?</span>;
+        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">buffer_iter</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)<span class="question-mark">?</span>;
         
         <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">/// Refresh the region of `bounding_box` in the top framebuffer</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_top</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">CompositableRegion</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, 
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
         <span class="ident">bounding_box</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">B</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">top_buffer</span> <span class="op">=</span> <span class="ident">FramebufferUpdates</span> {
             <span class="ident">src_framebuffer</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">top_fb</span>,
             <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
         }; 
 
-        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="prelude-val">Some</span>(<span class="ident">top_buffer</span>), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
+        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="prelude-val">Some</span>(<span class="ident">top_buffer</span>), <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
     }
 
     <span class="doccomment">/// Refresh the part in `bounding_box` of every window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_windows</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">CompositableRegion</span> <span class="op">+</span> <span class="ident">Clone</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, 
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>, 
         <span class="ident">bounding_box</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">B</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// reference of windows</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">window_ref_list</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
         <span class="kw">for</span> <span class="ident">window</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">hide_list</span> {
@@ -1149,26 +1150,26 @@
             }
         }).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
 
-        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">bufferlist</span>.<span class="ident">into_iter</span>(), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
+        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">bufferlist</span>.<span class="ident">into_iter</span>(), <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
     }
 
 
     <span class="doccomment">/// Refresh the part in `bounding_box` of the active window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_active_window</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bounding_box</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_active_window</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bounding_box</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">window_ref</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
             <span class="kw">let</span> <span class="ident">window</span> <span class="op">=</span> <span class="ident">window_ref</span>.<span class="ident">lock</span>();
             <span class="kw">let</span> <span class="ident">buffer_update</span> <span class="op">=</span> <span class="ident">FramebufferUpdates</span> {
                 <span class="ident">src_framebuffer</span>: <span class="ident">window</span>.<span class="ident">framebuffer</span>(),
                 <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">window</span>.<span class="ident">get_position</span>(),
             };
-            <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="prelude-val">Some</span>(<span class="ident">buffer_update</span>), <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
+            <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="prelude-val">Some</span>(<span class="ident">buffer_update</span>), <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
         } <span class="kw">else</span> {
             <span class="prelude-val">Ok</span>(())
         } 
     }
     
     <span class="doccomment">/// Passes the given keyboard event to the currently active window.</span>
-    <span class="kw">fn</span> <span class="ident">pass_keyboard_event_to_window</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key_event</span>: <span class="ident">KeyEvent</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">pass_keyboard_event_to_window</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key_event</span>: <span class="ident">KeyEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">active_window</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>().<span class="ident">ok_or</span>(<span class="string">&quot;no window was set as active to receive a keyboard event&quot;</span>)<span class="question-mark">?</span>;
         <span class="ident">active_window</span>.<span class="ident">lock</span>().<span class="ident">send_event</span>(<span class="ident">Event::new_keyboard_event</span>(<span class="ident">key_event</span>))
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;Failed to enqueue the keyboard event; window event queue was full.&quot;</span>)<span class="question-mark">?</span>;
@@ -1180,7 +1181,7 @@
     <span class="doccomment">/// If the mouse is not over any window, an error is returned; </span>
     <span class="doccomment">/// however, this error is quite common and expected when the mouse is not positioned within a window,</span>
     <span class="doccomment">/// and is not a true failure. </span>
-    <span class="kw">fn</span> <span class="ident">pass_mouse_event_to_window</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mouse_event</span>: <span class="ident">MouseEvent</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">pass_mouse_event_to_window</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mouse_event</span>: <span class="ident">MouseEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> { <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mouse</span> };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">event</span>: <span class="ident">MousePositionEvent</span> <span class="op">=</span> <span class="ident">MousePositionEvent</span> {
             <span class="ident">coordinate</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>),
@@ -1202,8 +1203,8 @@
             <span class="kw">let</span> <span class="ident">current_active_win</span> <span class="op">=</span> <span class="ident">current_active</span>.<span class="ident">lock</span>();
             <span class="kw">let</span> <span class="ident">current_coordinate</span> <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_position</span>();
             <span class="kw">if</span> <span class="ident">current_active_win</span>.<span class="ident">contains</span>(<span class="kw-2">*</span><span class="ident">coordinate</span> <span class="op">-</span> <span class="ident">current_coordinate</span>) <span class="op">|</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">current_active_win</span>.<span class="ident">moving</span> {
-                <span class="ident">WindowMovingStatus::Moving</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">true</span>,
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
+                <span class="ident">WindowMovingStatus::Moving</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
+                <span class="kw">_</span> =&gt; <span class="bool-val">false</span>,
             }{
                 <span class="ident">event</span>.<span class="ident">coordinate</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">coordinate</span> <span class="op">-</span> <span class="ident">current_coordinate</span>;
                 <span class="comment">// debug!(&quot;pass to active: {}, {}&quot;, event.x, event.y);</span>
@@ -1236,17 +1237,17 @@
     <span class="doccomment">/// `show` indicates whether to show the border or not.</span>
     <span class="doccomment">/// `new_border` defines the rectangular outline of the border.</span>
     <span class="kw">fn</span> <span class="ident">refresh_floating_border</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">show</span>: <span class="ident">bool</span>,
         <span class="ident">new_border</span>: <span class="ident">Rectangle</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// first clear old border if exists</span>
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">repositioned_border</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">border</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">border</span>) =&gt; {
                 <span class="kw">let</span> <span class="ident">pixels</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">draw_floating_border</span>(<span class="kw-2">&amp;</span><span class="ident">border</span>, <span class="ident">color::TRANSPARENT</span>);
                 <span class="self">self</span>.<span class="ident">refresh_bottom_windows</span>(<span class="ident">pixels</span>.<span class="ident">into_iter</span>(), <span class="bool-val">true</span>)<span class="question-mark">?</span>;
             },
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span>{}
+            <span class="prelude-val">None</span> =&gt;{}
         }
 
         <span class="comment">// then draw current border</span>
@@ -1264,7 +1265,7 @@
     <span class="doccomment">/// draw the floating border with `pixel`. Return the list of coordinates of pixels that were updated.</span>
     <span class="doccomment">/// `border` indicates the position of the border as a rectangle.</span>
     <span class="doccomment">/// `color` is the color of the floating border.</span>
-    <span class="kw">fn</span> <span class="ident">draw_floating_border</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">border</span>: <span class="kw-2">&amp;</span><span class="ident">Rectangle</span>, <span class="ident">color</span>: <span class="ident">Color</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Coord</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">draw_floating_border</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">border</span>: <span class="kw-2">&amp;</span><span class="ident">Rectangle</span>, <span class="ident">color</span>: <span class="ident">Color</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Coord</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">coordinates</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
         <span class="kw">let</span> <span class="ident">pixel</span> <span class="op">=</span> <span class="ident">color</span>.<span class="ident">into</span>();
         <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..(<span class="ident">WINDOW_BORDER_SIZE</span>) <span class="kw">as</span> <span class="ident">isize</span> {
@@ -1275,7 +1276,7 @@
                 <span class="kw">break</span>;
             }
             <span class="ident">framebuffer_drawer::draw_rectangle</span>(
-                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">top_fb</span>, 
+                <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">top_fb</span>, 
                 <span class="ident">coordinate</span>, 
                 <span class="ident">width</span> <span class="kw">as</span> <span class="ident">usize</span>, 
                 <span class="ident">height</span> <span class="kw">as</span> <span class="ident">usize</span>, 
@@ -1297,7 +1298,7 @@
     }
 
     <span class="doccomment">/// take active window&#39;s base position and current mouse, move the window with delta</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_active_window</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_active_window</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">current_active</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>() {
             <span class="kw">let</span> <span class="ident">border</span> <span class="op">=</span> <span class="ident">Rectangle</span> { 
                 <span class="ident">top_left</span>: <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>), 
@@ -1312,7 +1313,7 @@
                     (<span class="ident">m</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">m</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">isize</span>)
                 };
                 <span class="kw">match</span> <span class="ident">current_active_win</span>.<span class="ident">moving</span> {
-                    <span class="ident">WindowMovingStatus::Moving</span>(<span class="ident">base</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="ident">WindowMovingStatus::Moving</span>(<span class="ident">base</span>) =&gt; {
                         <span class="kw">let</span> <span class="ident">old_top_left</span> <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_position</span>();
                         <span class="kw">let</span> <span class="ident">new_top_left</span> <span class="op">=</span> <span class="ident">old_top_left</span> <span class="op">+</span> ((<span class="ident">current_x</span> <span class="op">-</span> <span class="ident">base</span>.<span class="ident">x</span>), (<span class="ident">current_y</span> <span class="op">-</span> <span class="ident">base</span>.<span class="ident">y</span>));
                         <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_size</span>();
@@ -1321,7 +1322,7 @@
                         <span class="ident">current_active_win</span>.<span class="ident">set_position</span>(<span class="ident">new_top_left</span>);
                         (<span class="ident">old_top_left</span>, <span class="ident">old_bottom_right</span>, <span class="ident">new_top_left</span>, <span class="ident">new_bottom_right</span>)        
                     },
-                    <span class="ident">WindowMovingStatus::Stationary</span> <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="ident">WindowMovingStatus::Stationary</span> =&gt; {
                         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;The window is not moving&quot;</span>);
                     }
                 }
@@ -1337,7 +1338,7 @@
     }
 
     <span class="doccomment">/// Refresh the mouse display</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_mouse</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">refresh_mouse</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">bounding_box</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
             <span class="ident">top_left</span>: <span class="self">self</span>.<span class="ident">mouse</span>,
             <span class="ident">bottom_right</span>: <span class="self">self</span>.<span class="ident">mouse</span> <span class="op">+</span> (<span class="ident">MOUSE_POINTER_SIZE_X</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">MOUSE_POINTER_SIZE_Y</span> <span class="kw">as</span> <span class="ident">isize</span>)
@@ -1347,7 +1348,7 @@
     }
 
     <span class="doccomment">/// Move mouse. `relative` indicates the new position relative to current position.</span>
-    <span class="kw">fn</span> <span class="ident">move_mouse</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">relative</span>: <span class="ident">Coord</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">move_mouse</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">relative</span>: <span class="ident">Coord</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">mouse</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new</span> <span class="op">=</span> <span class="ident">old</span> <span class="op">+</span> <span class="ident">relative</span>;
         
@@ -1368,7 +1369,7 @@
     }
     
     <span class="comment">// Move mouse to absolute position `new`</span>
-    <span class="kw">fn</span> <span class="ident">move_mouse_to</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">new</span>: <span class="ident">Coord</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">move_mouse_to</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new</span>: <span class="ident">Coord</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// clear old mouse</span>
         <span class="kw">for</span> <span class="ident">y</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">mouse</span>.<span class="ident">y</span>..<span class="self">self</span>.<span class="ident">mouse</span>.<span class="ident">y</span> <span class="op">+</span> <span class="ident">MOUSE_POINTER_SIZE_Y</span> <span class="kw">as</span> <span class="ident">isize</span> {
             <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span>
@@ -1398,7 +1399,7 @@
     }
 
     <span class="doccomment">/// Move the floating border when a window is moving.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_floating_border</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">move_floating_border</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">new_x</span>, <span class="ident">new_y</span>) <span class="op">=</span> {
             <span class="kw">let</span> <span class="ident">m</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mouse</span>;
             (<span class="ident">m</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">m</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">isize</span>)
@@ -1408,7 +1409,7 @@
             <span class="kw">let</span> (<span class="ident">is_draw</span>, <span class="ident">border_start</span>, <span class="ident">border_end</span>) <span class="op">=</span> {
                 <span class="kw">let</span> <span class="ident">current_active_win</span> <span class="op">=</span> <span class="ident">current_active</span>.<span class="ident">lock</span>();
                 <span class="kw">match</span> <span class="ident">current_active_win</span>.<span class="ident">moving</span> {
-                    <span class="ident">WindowMovingStatus::Moving</span>(<span class="ident">base</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                    <span class="ident">WindowMovingStatus::Moving</span>(<span class="ident">base</span>) =&gt; {
                         <span class="comment">// move this window</span>
                         <span class="comment">// for better performance, while moving window, only border is shown for indication</span>
                         <span class="kw">let</span> <span class="ident">coordinate</span> <span class="op">=</span> <span class="ident">current_active_win</span>.<span class="ident">get_position</span>();
@@ -1418,7 +1419,7 @@
                         <span class="kw">let</span> <span class="ident">border_end</span> <span class="op">=</span> <span class="ident">border_start</span> <span class="op">+</span> (<span class="ident">width</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">height</span> <span class="kw">as</span> <span class="ident">isize</span>);
                         (<span class="bool-val">true</span>, <span class="ident">border_start</span>, <span class="ident">border_end</span>)
                     }
-                    <span class="ident">WindowMovingStatus::Stationary</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="bool-val">false</span>, <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>), <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>)),
+                    <span class="ident">WindowMovingStatus::Stationary</span> =&gt; (<span class="bool-val">false</span>, <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>), <span class="ident">Coord::new</span>(<span class="number">0</span>, <span class="number">0</span>)),
                 }
             };
             <span class="kw">let</span> <span class="ident">border</span> <span class="op">=</span> <span class="ident">Rectangle</span> {
@@ -1438,20 +1439,20 @@
     }
 
     <span class="doccomment">/// Returns true if the given `window` is the currently active window.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_active</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_active</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">window</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">WindowInner</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">active</span>.<span class="ident">upgrade</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">active</span><span class="op">|</span> <span class="ident">Arc::ptr_eq</span>(<span class="kw-2">&amp;</span><span class="ident">active</span>, <span class="ident">window</span>))
             .<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>)
     }
 
     <span class="doccomment">/// Returns the `(width, height)` in pixels of the screen itself (the final framebuffer).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_screen_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">usize</span>, <span class="ident">usize</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_screen_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
         <span class="self">self</span>.<span class="ident">final_fb</span>.<span class="ident">get_size</span>()
     }
 }
 
 <span class="doccomment">/// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">final_framebuffer</span>: <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">framebuffer::init</span>()<span class="question-mark">?</span>;
     <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">final_framebuffer</span>.<span class="ident">get_size</span>();
 
@@ -1500,7 +1501,7 @@
 <span class="doccomment">/// handles all keyboard and mouse movement in this window manager</span>
 <span class="kw">fn</span> <span class="ident">window_manager_loop</span>(
     (<span class="ident">key_consumer</span>, <span class="ident">mouse_consumer</span>): (<span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="ident">Queue</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>),
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">loop</span> {
         <span class="kw">let</span> <span class="ident">event_opt</span> <span class="op">=</span> <span class="ident">key_consumer</span>.<span class="ident">pop</span>()
             .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span><span class="ident">mouse_consumer</span>.<span class="ident">pop</span>())
@@ -1512,11 +1513,11 @@
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">event</span>) <span class="op">=</span> <span class="ident">event_opt</span> {
             <span class="comment">// Currently, the window manager only cares about keyboard or mouse events</span>
             <span class="kw">match</span> <span class="ident">event</span> {
-                <span class="ident">Event::KeyboardEvent</span>(<span class="kw-2">ref</span> <span class="ident">input_event</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">Event::KeyboardEvent</span>(<span class="kw-2">ref</span> <span class="ident">input_event</span>) =&gt; {
                     <span class="kw">let</span> <span class="ident">key_input</span> <span class="op">=</span> <span class="ident">input_event</span>.<span class="ident">key_event</span>;
                     <span class="ident">keyboard_handle_application</span>(<span class="ident">key_input</span>)<span class="question-mark">?</span>;
                 }
-                <span class="ident">Event::MouseMovementEvent</span>(<span class="kw-2">ref</span> <span class="ident">mouse_event</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">Event::MouseMovementEvent</span>(<span class="kw-2">ref</span> <span class="ident">mouse_event</span>) =&gt; {
                     <span class="comment">// mouse::mouse_to_print(&amp;mouse_event);</span>
                     <span class="kw">let</span> <span class="ident">mouse_displacement</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">mouse_event</span>.<span class="ident">displacement</span>;
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> (<span class="ident">mouse_displacement</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
@@ -1524,31 +1525,31 @@
                     <span class="comment">// need to combine mouse events if there pending a lot</span>
                     <span class="kw">loop</span> {
                         <span class="kw">let</span> <span class="ident">next_event</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">mouse_consumer</span>.<span class="ident">pop</span>() {
-                            <span class="prelude-val">Some</span>(<span class="ident">ev</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ev</span>,
-                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="prelude-val">Some</span>(<span class="ident">ev</span>) =&gt; <span class="ident">ev</span>,
+                            <span class="kw">_</span> =&gt; {
                                 <span class="kw">break</span>;
                             }
                         };
                         <span class="kw">match</span> <span class="ident">next_event</span> {
-                            <span class="ident">Event::MouseMovementEvent</span>(<span class="kw-2">ref</span> <span class="ident">next_mouse_event</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="ident">Event::MouseMovementEvent</span>(<span class="kw-2">ref</span> <span class="ident">next_mouse_event</span>) =&gt; {
                                 <span class="kw">if</span> <span class="ident">next_mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_up</span>
-                                    <span class="op">=</span><span class="op">=</span> <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_up</span>
+                                    <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_up</span>
                                     <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_down</span>
-                                        <span class="op">=</span><span class="op">=</span> <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_down</span>
+                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_down</span>
                                     <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">left_button_hold</span>
-                                        <span class="op">=</span><span class="op">=</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">left_button_hold</span>
+                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">left_button_hold</span>
                                     <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">right_button_hold</span>
-                                        <span class="op">=</span><span class="op">=</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">right_button_hold</span>
+                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">right_button_hold</span>
                                     <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fourth_button_hold</span>
-                                        <span class="op">=</span><span class="op">=</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fourth_button_hold</span>
+                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fourth_button_hold</span>
                                     <span class="op">&amp;&amp;</span> <span class="ident">next_mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fifth_button_hold</span>
-                                        <span class="op">=</span><span class="op">=</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fifth_button_hold</span>
+                                        <span class="op">==</span> <span class="ident">mouse_event</span>.<span class="ident">buttonact</span>.<span class="ident">fifth_button_hold</span>
                                 {
                                     <span class="ident">x</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">next_mouse_event</span>.<span class="ident">displacement</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
                                     <span class="ident">y</span> <span class="op">+</span><span class="op">=</span> (<span class="ident">next_mouse_event</span>.<span class="ident">displacement</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
                                 }
                             }
-                            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
+                            <span class="kw">_</span> =&gt; {
                                 <span class="kw">break</span>;
                             }
                         }
@@ -1565,7 +1566,7 @@
                     }
                     <span class="ident">cursor_handle_application</span>(<span class="kw-2">*</span><span class="ident">mouse_event</span>)<span class="question-mark">?</span>; <span class="comment">// tell the event to application, or moving window</span>
                 }
-                <span class="ident">_other</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">_other</span> =&gt; {
                     <span class="macro">trace!</span>(<span class="string">&quot;WINDOW_MANAGER: ignoring unexpected event: {:?}&quot;</span>, <span class="ident">_other</span>);
                 }
             }
@@ -1574,33 +1575,33 @@
 }
 
 <span class="doccomment">/// handle keyboard event, push it to the active window if one exists</span>
-<span class="kw">fn</span> <span class="ident">keyboard_handle_application</span>(<span class="ident">key_input</span>: <span class="ident">KeyEvent</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">keyboard_handle_application</span>(<span class="ident">key_input</span>: <span class="ident">KeyEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">win_mgr</span> <span class="op">=</span> <span class="ident">WINDOW_MANAGER</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;The window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>;
     
     <span class="comment">// First, we handle keyboard shortcuts understood by the window manager.</span>
     
     <span class="comment">// &quot;Super + Arrow&quot; will resize and move windows to the specified half of the screen (left, right, top, or bottom)</span>
-    <span class="kw">if</span> <span class="ident">key_input</span>.<span class="ident">modifiers</span>.<span class="ident">is_super_key</span>() <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">action</span> <span class="op">=</span><span class="op">=</span> <span class="ident">KeyAction::Pressed</span> {
+    <span class="kw">if</span> <span class="ident">key_input</span>.<span class="ident">modifiers</span>.<span class="ident">is_super_key</span>() <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">action</span> <span class="op">==</span> <span class="ident">KeyAction::Pressed</span> {
         <span class="kw">let</span> <span class="ident">screen_dimensions</span> <span class="op">=</span> <span class="ident">win_mgr</span>.<span class="ident">lock</span>().<span class="ident">get_screen_size</span>();
         <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> (<span class="ident">screen_dimensions</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">isize</span>, <span class="ident">screen_dimensions</span>.<span class="number">1</span> <span class="kw">as</span> <span class="ident">isize</span>);
         <span class="kw">let</span> <span class="ident">new_position</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">key_input</span>.<span class="ident">keycode</span> {
-            <span class="ident">Keycode::Left</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
+            <span class="ident">Keycode::Left</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
                 <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="number">0</span>, <span class="ident">y</span>: <span class="number">0</span> },
                 <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span> <span class="op">/</span> <span class="number">2</span>, <span class="ident">y</span>: <span class="ident">height</span> },
             }),
-            <span class="ident">Keycode::Right</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
+            <span class="ident">Keycode::Right</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
                 <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span> <span class="op">/</span> <span class="number">2</span>, <span class="ident">y</span>: <span class="number">0</span> },
                 <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span>, <span class="ident">y</span>: <span class="ident">height</span> },
             }),
-            <span class="ident">Keycode::Up</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
+            <span class="ident">Keycode::Up</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
                 <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="number">0</span>, <span class="ident">y</span>: <span class="number">0</span> },
                 <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span>, <span class="ident">y</span>: <span class="ident">height</span> <span class="op">/</span> <span class="number">2</span> },
             }),
-            <span class="ident">Keycode::Down</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
+            <span class="ident">Keycode::Down</span> =&gt; <span class="prelude-val">Some</span>(<span class="ident">Rectangle</span> {
                 <span class="ident">top_left</span>:     <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="number">0</span>, <span class="ident">y</span>: <span class="ident">height</span> <span class="op">/</span> <span class="number">2</span> },
                 <span class="ident">bottom_right</span>: <span class="ident">Coord</span> { <span class="ident">x</span>: <span class="ident">width</span>, <span class="ident">y</span>: <span class="ident">height</span> },
             }),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
+            <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
         };
         
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">position</span>) <span class="op">=</span> <span class="ident">new_position</span> {
@@ -1621,8 +1622,8 @@
     <span class="comment">// Spawn a new terminal via Ctrl+Alt+T</span>
     <span class="kw">if</span> <span class="ident">key_input</span>.<span class="ident">modifiers</span>.<span class="ident">is_control</span>()
         <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">modifiers</span>.<span class="ident">is_alt</span>()
-        <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">keycode</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Keycode::T</span>
-        <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">action</span> <span class="op">=</span><span class="op">=</span> <span class="ident">KeyAction::Pressed</span>
+        <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">keycode</span> <span class="op">==</span> <span class="ident">Keycode::T</span>
+        <span class="op">&amp;&amp;</span> <span class="ident">key_input</span>.<span class="ident">action</span> <span class="op">==</span> <span class="ident">KeyAction::Pressed</span>
     {
         <span class="comment">// Because this task (the window manager loop) runs in a kernel-only namespace,</span>
         <span class="comment">// we have to create a new application namespace in order to be able to actually spawn a shell.</span>
@@ -1650,7 +1651,7 @@
 }
 
 <span class="doccomment">/// handle mouse event, push it to related window or anyone asked for it</span>
-<span class="kw">fn</span> <span class="ident">cursor_handle_application</span>(<span class="ident">mouse_event</span>: <span class="ident">MouseEvent</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">cursor_handle_application</span>(<span class="ident">mouse_event</span>: <span class="ident">MouseEvent</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">wm</span> <span class="op">=</span> <span class="ident">WINDOW_MANAGER</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>.<span class="ident">lock</span>();
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="ident">wm</span>.<span class="ident">pass_mouse_event_to_window</span>(<span class="ident">mouse_event</span>) {
         <span class="comment">// the mouse event should be passed to the window that satisfies:</span>
@@ -1660,6 +1661,6 @@
     }
     <span class="prelude-val">Ok</span>(())
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window_manager" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window_manager" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

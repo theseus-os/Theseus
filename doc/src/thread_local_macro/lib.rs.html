@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/thread_local_macro/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../thread_local_macro/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/thread_local_macro/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../thread_local_macro/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../thread_local_macro/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../thread_local_macro/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -616,9 +618,7 @@
 <span id="613">613</span>
 <span id="614">614</span>
 <span id="615">615</span>
-<span id="616">616</span>
-</pre><pre class="rust">
-<span class="doccomment">//! Provides a `thread_local!()` macro, a helper to instantiate lazily-initialized </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Provides a `thread_local!()` macro, a helper to instantiate lazily-initialized </span>
 <span class="doccomment">//! thread-local storage (TLS) variables.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The primary difference between using this crate&#39;s `thread_local!()` macro</span>
@@ -649,7 +649,6 @@
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">thread_local</span>)]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_fn_fn_ptr_basics</span>)]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">allow_internal_unstable</span>)]</span>
 
 <span class="comment">// The code from Rust std uses unsafe blocks within unsafe functions,</span>
@@ -683,10 +682,10 @@
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">TlsObjectDestructor</span> {
     <span class="doccomment">/// The raw pointer to the object that needs to be dropped.</span>
-    <span class="kw">pub</span> <span class="ident">object_ptr</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>,
+    <span class="kw">pub</span> <span class="ident">object_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>,
     <span class="doccomment">/// The destructor function that should be invoked with `object_ptr` as its only parameter.</span>
     <span class="doccomment">/// The function itself must be an unsafe one, as it dereferences raw pointers.</span>
-    <span class="kw">pub</span> <span class="ident">dtor</span>: <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>(<span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>),
+    <span class="kw">pub</span> <span class="ident">dtor</span>: <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>(<span class="kw-2">*mut</span> <span class="ident">u8</span>),
 }
 <span class="comment">// See the above [`TLS_DESTRUCTORS`] docs for why this is necessary.</span>
 <span class="macro">const_assert!</span>(<span class="op">!</span><span class="ident">core::mem::needs_drop</span>::<span class="op">&lt;</span><span class="ident">TlsObjectDestructor</span><span class="op">&gt;</span>());
@@ -697,7 +696,7 @@
 <span class="doccomment">/// This is only intended to be used by the task cleanup functions</span>
 <span class="doccomment">/// after the current task has exited.</span>
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_current_tls_destructors</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TlsObjectDestructor</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_current_tls_destructors</span>() -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">TlsObjectDestructor</span><span class="op">&gt;</span> {
     <span class="ident">TLS_DESTRUCTORS</span>.<span class="ident">take</span>()
 }
 
@@ -712,7 +711,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// Currently the only value of `dtor` that is used is a type-specific monomorphized</span>
 <span class="doccomment">/// version of the above [`fast::destroy_value()`] function.</span>
-<span class="kw">fn</span> <span class="ident">register_dtor</span>(<span class="ident">object_ptr</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>, <span class="ident">dtor</span>: <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>(<span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>)) {
+<span class="kw">fn</span> <span class="ident">register_dtor</span>(<span class="ident">object_ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">dtor</span>: <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span>(<span class="kw-2">*mut</span> <span class="ident">u8</span>)) {
     <span class="ident">TLS_DESTRUCTORS</span>.<span class="ident">borrow_mut</span>().<span class="ident">push</span>(<span class="ident">TlsObjectDestructor</span> { <span class="ident">object_ptr</span>, <span class="ident">dtor</span> });
 }
 
@@ -796,11 +795,11 @@
     <span class="comment">// trivially devirtualizable by LLVM because the value of `inner` never</span>
     <span class="comment">// changes and the constant should be readonly within a crate. This mainly</span>
     <span class="comment">// only runs into problems when TLS statics are exported across crates.</span>
-    <span class="ident">inner</span>: <span class="kw">unsafe</span> <span class="kw">fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span>,
+    <span class="ident">inner</span>: <span class="kw">unsafe</span> <span class="kw">fn</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;LocalKey&quot;</span>).<span class="ident">finish_non_exhaustive</span>()
     }
 }
@@ -827,26 +826,26 @@
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules!</span> <span class="ident">thread_local</span> {
     <span class="comment">// empty (base case for the recursion)</span>
-    () <span class="op">=</span><span class="op">&gt;</span> {};
+    () =&gt; {};
 
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="kw">const</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span> }; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
-        <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::thread_local!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>)<span class="kw-2">*</span>);
+    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="kw">const</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span> }; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
+        <span class="macro-nonterminal">$</span><span class="macro">crate::thread_local!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>)<span class="kw-2">*</span>);
     );
 
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="kw">const</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span> }) <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
+    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="kw">const</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span> }) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
     );
 
     <span class="comment">// process multiple declarations</span>
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
-        <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::thread_local!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>)<span class="kw-2">*</span>);
+    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>; $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
+        <span class="macro-nonterminal">$</span><span class="macro">crate::thread_local!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">rest</span>)<span class="kw-2">*</span>);
     );
 
     <span class="comment">// handle a single declaration</span>
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> (
-        <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
+    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="kw">static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) =&gt; (
+        <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>);
     );
 }
 
@@ -858,15 +857,15 @@
 <span class="attribute">#[<span class="ident">allow_internal_unstable</span>(<span class="ident">thread_local</span>)]</span>
 <span class="macro">macro_rules!</span> <span class="ident">__thread_local_inner</span> {
     <span class="comment">// used to generate the `LocalKey` value for const-initialized thread locals</span>
-    (@<span class="ident">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {{
+    (@<span class="ident">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) =&gt; {{
         <span class="attribute">#[<span class="ident">inline</span>]</span>
-        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">__getit</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::option::Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> {
+        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">__getit</span>() -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::option::Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> {
 
             <span class="comment">// Theseus supports `#[thread_local]`, so use it directly.</span>
             {
                 <span class="comment">// If a dtor isn&#39;t needed we can do something &quot;very raw&quot; and</span>
                 <span class="comment">// just get going.</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::mem::needs_drop</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span>() {
+                <span class="kw">if</span> <span class="op">!</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::mem::needs_drop</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span>() {
                     <span class="attribute">#[<span class="ident">thread_local</span>]</span>
                     <span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">VAL</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>;
                     <span class="kw">unsafe</span> {
@@ -882,13 +881,13 @@
                 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
                 <span class="kw">static</span> <span class="kw-2">mut</span> <span class="ident">STATE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0</span>;
 
-                <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="ident">ptr</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>) {
-                    <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>;
+                <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">destroy</span>(<span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>) {
+                    <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>;
 
                     <span class="kw">unsafe</span> {
                         <span class="macro">assert_eq!</span>(<span class="ident">STATE</span>, <span class="number">1</span>);
                         <span class="ident">STATE</span> <span class="op">=</span> <span class="number">2</span>;
-                        <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::ptr::drop_in_place</span>(<span class="ident">ptr</span>);
+                        <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::ptr::drop_in_place</span>(<span class="ident">ptr</span>);
                     }
                 }
 
@@ -896,9 +895,9 @@
                     <span class="kw">match</span> <span class="ident">STATE</span> {
                         <span class="comment">// 0 == we haven&#39;t registered a destructor, so do</span>
                         <span class="comment">//   so now.</span>
-                        <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> {
-                            <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::fast::Key</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span><span class="ident">::register_dtor</span>(
-                                <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::ptr::addr_of_mut!</span>(<span class="macro-nonterminal">VAL</span>) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>,
+                        <span class="number">0</span> =&gt; {
+                            <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::fast::Key</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span><span class="ident">::register_dtor</span>(
+                                <span class="macro-nonterminal">$</span><span class="macro">crate::ptr::addr_of_mut!</span>(<span class="macro-nonterminal">VAL</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>,
                                 <span class="ident">destroy</span>,
                             );
                             <span class="ident">STATE</span> <span class="op">=</span> <span class="number">1</span>;
@@ -906,31 +905,31 @@
                         }
                         <span class="comment">// 1 == the destructor is registered and the value</span>
                         <span class="comment">//   is valid, so return the pointer.</span>
-                        <span class="number">1</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">VAL</span>),
+                        <span class="number">1</span> =&gt; <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">VAL</span>),
                         <span class="comment">// otherwise the destructor has already run, so we</span>
                         <span class="comment">// can&#39;t give access.</span>
-                        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
+                        <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
                     }
                 }
             }
         }
 
         <span class="kw">unsafe</span> {
-            <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::LocalKey::new</span>(<span class="ident">__getit</span>)
+            <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::LocalKey::new</span>(<span class="ident">__getit</span>)
         }
     }};
 
     <span class="comment">// used to generate the `LocalKey` value for `thread_local!`</span>
-    (@<span class="ident">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+    (@<span class="ident">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">expr</span>) =&gt; {
         {
             <span class="attribute">#[<span class="ident">inline</span>]</span>
-            <span class="kw">fn</span> <span class="ident">__init</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span> }
+            <span class="kw">fn</span> <span class="ident">__init</span>() -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span> { <span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span> }
 
             <span class="attribute">#[<span class="ident">inline</span>]</span>
-            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">__getit</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::option::Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> {
+            <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">__getit</span>() -&gt; <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::option::Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> {
                 <span class="attribute">#[<span class="ident">thread_local</span>]</span>
-                <span class="kw">static</span> <span class="ident">__KEY</span>: <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::fast::Key</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> <span class="op">=</span>
-                    <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::fast::Key::new</span>();
+                <span class="kw">static</span> <span class="ident">__KEY</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::fast::Key</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> <span class="op">=</span>
+                    <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::fast::Key::new</span>();
 
                 <span class="comment">// FIXME: remove the #[allow(...)] marker when macros don&#39;t</span>
                 <span class="comment">// raise warning for missing/extraneous unsafe blocks anymore.</span>
@@ -940,13 +939,13 @@
             }
 
             <span class="kw">unsafe</span> {
-                <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::LocalKey::new</span>(<span class="ident">__getit</span>)
+                <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::LocalKey::new</span>(<span class="ident">__getit</span>)
             }
         }
     };
-    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {
-        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro-nonterminal">::LocalKey</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> <span class="op">=</span>
-            <span class="macro-nonterminal">$</span><span class="kw">crate</span><span class="macro">::__thread_local_inner!</span>(@<span class="macro-nonterminal">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>)<span class="kw-2">*</span>);
+    ($(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>:<span class="ident">meta</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span>:<span class="ident">vis</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>:<span class="ident">ty</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
+        $(<span class="attribute">#[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">attr</span>]</span>)<span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">vis</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">crate::LocalKey</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span><span class="op">&gt;</span> <span class="op">=</span>
+            <span class="macro-nonterminal">$</span><span class="macro">crate::__thread_local_inner!</span>(@<span class="macro-nonterminal">key</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">t</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">init</span>)<span class="kw-2">*</span>);
     }
 }
 
@@ -956,13 +955,13 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">AccessError</span>;
 
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AccessError</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;AccessError&quot;</span>).<span class="ident">finish</span>()
     }
 }
 
 <span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">AccessError</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="ident">fmt::Display::fmt</span>(<span class="string">&quot;already destroyed&quot;</span>, <span class="ident">f</span>)
     }
 }
@@ -972,7 +971,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">inner</span>: <span class="kw">unsafe</span> <span class="kw">fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">inner</span>: <span class="kw">unsafe</span> <span class="kw">fn</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span>) -&gt; <span class="ident">LocalKey</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">LocalKey</span> { <span class="ident">inner</span> }
     }
 
@@ -986,9 +985,9 @@
     <span class="doccomment">/// This function will `panic!()` if the key currently has its</span>
     <span class="doccomment">/// destructor running, and it **may** panic if the destructor has</span>
     <span class="doccomment">/// previously been run for this thread.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="ident">R</span>
     <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>,
+        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">R</span>,
     {
         <span class="self">self</span>.<span class="ident">try_with</span>(<span class="ident">f</span>).<span class="ident">expect</span>(
             <span class="string">&quot;cannot access a Thread Local Storage value \
@@ -1007,9 +1006,9 @@
     <span class="doccomment">/// This function will still `panic!()` if the key is uninitialized and the</span>
     <span class="doccomment">/// key&#39;s initializer panics.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_with</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">AccessError</span><span class="op">&gt;</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_with</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">AccessError</span><span class="op">&gt;</span>
     <span class="kw">where</span>
-        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">R</span>,
+        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">R</span>,
     {
         <span class="kw">unsafe</span> {
             <span class="kw">let</span> <span class="ident">thread_local</span> <span class="op">=</span> (<span class="self">self</span>.<span class="ident">inner</span>)().<span class="ident">ok_or</span>(<span class="ident">AccessError</span>)<span class="question-mark">?</span>;
@@ -1019,20 +1018,20 @@
 }
 
 <span class="kw">mod</span> <span class="ident">lazy</span> {
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::UnsafeCell</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::hint</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mem</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::UnsafeCell</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::hint</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mem</span>;
 
     <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">inner</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     }
 
     <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">LazyKeyInner</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
             <span class="ident">LazyKeyInner</span> { <span class="ident">inner</span>: <span class="ident">UnsafeCell::new</span>(<span class="prelude-val">None</span>) }
         }
 
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
             <span class="comment">// SAFETY: The caller must ensure no reference is ever handed out to</span>
             <span class="comment">// the inner cell nor mutable reference to the Option&lt;T&gt; inside said</span>
             <span class="comment">// cell. This make it safe to hand a reference, though the lifetime</span>
@@ -1042,7 +1041,7 @@
 
         <span class="doccomment">/// The caller must ensure that no reference is active: this method</span>
         <span class="doccomment">/// needs unique access.</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">initialize</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span> {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">initialize</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() -&gt; <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span> {
             <span class="comment">// Execute the initialization up front, *then* move it into our slot,</span>
             <span class="comment">// just in case initialization fails.</span>
             <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="ident">init</span>();
@@ -1066,7 +1065,7 @@
             <span class="comment">// The precondition also ensures that we are the only one accessing</span>
             <span class="comment">// `self` at the moment so replacing is fine.</span>
             <span class="kw">unsafe</span> {
-                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">mem::replace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="ident">ptr</span>, <span class="prelude-val">Some</span>(<span class="ident">value</span>));
+                <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">mem::replace</span>(<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">ptr</span>, <span class="prelude-val">Some</span>(<span class="ident">value</span>));
             }
 
             <span class="comment">// SAFETY: With the call to `mem::replace` it is guaranteed there is</span>
@@ -1079,8 +1078,8 @@
                 <span class="comment">// which means that using something like `try_with` can pull in</span>
                 <span class="comment">// panicking code and cause a large size bloat.</span>
                 <span class="kw">match</span> <span class="kw-2">*</span><span class="ident">ptr</span> {
-                    <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">x</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">x</span>,
-                    <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">hint::unreachable_unchecked</span>(),
+                    <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">x</span>) =&gt; <span class="ident">x</span>,
+                    <span class="prelude-val">None</span> =&gt; <span class="ident">hint::unreachable_unchecked</span>(),
                 }
             }
         }
@@ -1089,7 +1088,7 @@
         <span class="doccomment">/// As such, callers of this method must ensure no `&amp;` and `&amp;mut` are</span>
         <span class="doccomment">/// available and used at the same time.</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">take</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
             <span class="comment">// SAFETY: See doc comment for this method.</span>
             <span class="kw">unsafe</span> { (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get</span>()).<span class="ident">take</span>() }
         }
@@ -1098,11 +1097,11 @@
 
 <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">fast</span> {
-    <span class="kw">use</span> <span class="kw">super</span><span class="ident">::lazy::LazyKeyInner</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::Cell</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::fmt</span>;
-    <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::mem</span>;
-    <span class="kw">use</span> <span class="kw">super</span><span class="ident">::register_dtor</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::lazy::LazyKeyInner</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::Cell</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::fmt</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mem</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::register_dtor</span>;
 
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
     <span class="kw">enum</span> <span class="ident">DtorState</span> {
@@ -1133,13 +1132,13 @@
     }
 
     <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+        <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
             <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;Key&quot;</span>).<span class="ident">finish_non_exhaustive</span>()
         }
     }
 
     <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
             <span class="ident">Key</span> { <span class="ident">inner</span>: <span class="ident">LazyKeyInner::new</span>(), <span class="ident">dtor_state</span>: <span class="ident">Cell::new</span>(<span class="ident">DtorState::Unregistered</span>) }
         }
 
@@ -1156,7 +1155,7 @@
         }
         */</span>
 
-        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() -&gt; <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
             <span class="comment">// SAFETY: See the definitions of `LazyKeyInner::get` and</span>
             <span class="comment">// `try_initialize` for more informations.</span>
             <span class="comment">//</span>
@@ -1166,8 +1165,8 @@
             <span class="comment">// for this.</span>
             <span class="kw">unsafe</span> {
                 <span class="kw">match</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">get</span>() {
-                    <span class="prelude-val">Some</span>(<span class="ident">val</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">val</span>),
-                    <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">try_initialize</span>(<span class="ident">init</span>),
+                    <span class="prelude-val">Some</span>(<span class="ident">val</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">val</span>),
+                    <span class="prelude-val">None</span> =&gt; <span class="self">self</span>.<span class="ident">try_initialize</span>(<span class="ident">init</span>),
                 }
             }
         }
@@ -1180,7 +1179,7 @@
         <span class="comment">// be performed for every call to `Key::get`.</span>
         <span class="comment">// LLVM issue: https://bugs.llvm.org/show_bug.cgi?id=41722</span>
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
-        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">try_initialize</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">try_initialize</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnOnce</span>() -&gt; <span class="ident">T</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">init</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">T</span><span class="op">&gt;</span> {
             <span class="comment">// SAFETY: See comment above (this function doc).</span>
             <span class="kw">if</span> <span class="op">!</span><span class="ident">mem::needs_drop</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>() <span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">try_register_dtor</span>() } {
                 <span class="comment">// SAFETY: See comment above (his function doc).</span>
@@ -1193,29 +1192,29 @@
         <span class="comment">// `try_register_dtor` is only called once per fast thread local</span>
         <span class="comment">// variable, except in corner cases where thread_local dtors reference</span>
         <span class="comment">// other thread_local&#39;s, or it is being recursively initialized.</span>
-        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">try_register_dtor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">try_register_dtor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">dtor_state</span>.<span class="ident">get</span>() {
-                <span class="ident">DtorState::Unregistered</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">DtorState::Unregistered</span> =&gt; {
                     <span class="comment">// SAFETY: dtor registration happens before initialization.</span>
                     <span class="comment">// Passing `self` as a pointer while using `destroy_value&lt;T&gt;`</span>
                     <span class="comment">// is safe because the function will build a pointer to a</span>
                     <span class="comment">// Key&lt;T&gt;, which is the type of self and so find the correct</span>
                     <span class="comment">// size.</span>
-                    <span class="kw">unsafe</span> { <span class="ident">register_dtor</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>, <span class="ident">destroy_value</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) };
+                    <span class="kw">unsafe</span> { <span class="ident">register_dtor</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">u8</span>, <span class="ident">destroy_value</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) };
                     <span class="self">self</span>.<span class="ident">dtor_state</span>.<span class="ident">set</span>(<span class="ident">DtorState::Registered</span>);
                     <span class="bool-val">true</span>
                 }
-                <span class="ident">DtorState::Registered</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">DtorState::Registered</span> =&gt; {
                     <span class="comment">// recursively initialized</span>
                     <span class="bool-val">true</span>
                 }
-                <span class="ident">DtorState::RunningOrHasRun</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
+                <span class="ident">DtorState::RunningOrHasRun</span> =&gt; <span class="bool-val">false</span>,
             }
         }
     }
 
-    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">destroy_value</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">ptr</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">u8</span>) {
-        <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
+    <span class="kw">unsafe</span> <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> <span class="kw">fn</span> <span class="ident">destroy_value</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">ptr</span>: <span class="kw-2">*mut</span> <span class="ident">u8</span>) {
+        <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">ptr</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">Key</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>;
 
         <span class="comment">// SAFETY:</span>
         <span class="comment">//</span>
@@ -1234,6 +1233,6 @@
         }
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="thread_local_macro" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="thread_local_macro" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

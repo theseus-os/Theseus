@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/e1000/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../e1000/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/e1000/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../e1000/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../e1000/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../e1000/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -437,8 +439,7 @@
 <span id="434">434</span>
 <span id="435">435</span>
 <span id="436">436</span>
-</pre><pre class="rust">
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span> <span class="comment">//  to suppress warnings for unused functions/methods</span>
 <span class="attribute">#![<span class="ident">allow</span>(<span class="ident">unaligned_references</span>)]</span> <span class="comment">// temporary, just to suppress unsafe packed borrows </span>
@@ -509,7 +510,7 @@
 
 <span class="doccomment">/// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,</span>
 <span class="doccomment">/// if it exists and has been initialized.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_e1000_nic</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">E1000Nic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_e1000_nic</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">E1000Nic</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="ident">E1000_NIC</span>.<span class="ident">get</span>()
 }
 
@@ -527,19 +528,19 @@
 <span class="kw">struct</span> <span class="ident">E1000RxQueueRegisters</span>(<span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000RxRegisters</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">RxQueueRegisters</span> <span class="kw">for</span> <span class="ident">E1000RxQueueRegisters</span> {
-    <span class="kw">fn</span> <span class="ident">set_rdbal</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_rdbal</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">rx_regs</span>.<span class="ident">rdbal</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }    
-    <span class="kw">fn</span> <span class="ident">set_rdbah</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_rdbah</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">rx_regs</span>.<span class="ident">rdbah</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
-    <span class="kw">fn</span> <span class="ident">set_rdlen</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_rdlen</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">rx_regs</span>.<span class="ident">rdlen</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
-    <span class="kw">fn</span> <span class="ident">set_rdh</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_rdh</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">rx_regs</span>.<span class="ident">rdh</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
-    <span class="kw">fn</span> <span class="ident">set_rdt</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_rdt</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">rx_regs</span>.<span class="ident">rdt</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
 } 
@@ -549,19 +550,19 @@
 <span class="kw">struct</span> <span class="ident">E1000TxQueueRegisters</span>(<span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000TxRegisters</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span> <span class="ident">TxQueueRegisters</span> <span class="kw">for</span> <span class="ident">E1000TxQueueRegisters</span> {
-    <span class="kw">fn</span> <span class="ident">set_tdbal</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_tdbal</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">tx_regs</span>.<span class="ident">tdbal</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }    
-    <span class="kw">fn</span> <span class="ident">set_tdbah</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_tdbah</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">tx_regs</span>.<span class="ident">tdbah</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
-    <span class="kw">fn</span> <span class="ident">set_tdlen</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_tdlen</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">tx_regs</span>.<span class="ident">tdlen</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
-    <span class="kw">fn</span> <span class="ident">set_tdh</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_tdh</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">tx_regs</span>.<span class="ident">tdh</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
-    <span class="kw">fn</span> <span class="ident">set_tdt</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
+    <span class="kw">fn</span> <span class="ident">set_tdt</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">value</span>: <span class="ident">u32</span>) {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">tx_regs</span>.<span class="ident">tdt</span>.<span class="ident">write</span>(<span class="ident">value</span>); 
     }
 }
@@ -591,20 +592,20 @@
 
 <span class="kw">impl</span> <span class="ident">NetworkInterfaceCard</span> <span class="kw">for</span> <span class="ident">E1000Nic</span> {
 
-    <span class="kw">fn</span> <span class="ident">send_packet</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer</span>: <span class="ident">TransmitBuffer</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">send_packet</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer</span>: <span class="ident">TransmitBuffer</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">tx_queue</span>.<span class="ident">send_on_queue</span>(<span class="ident">transmit_buffer</span>);
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">get_received_frame</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReceivedFrame</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">get_received_frame</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ReceivedFrame</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">rx_queue</span>.<span class="ident">received_frames</span>.<span class="ident">pop_front</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">poll_receive</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">poll_receive</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">rx_queue</span>.<span class="ident">poll_queue_and_store_received_packets</span>()  
     }
 
-    <span class="kw">fn</span> <span class="ident">mac_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> [<span class="ident">u8</span>; <span class="number">6</span>] {
+    <span class="kw">fn</span> <span class="ident">mac_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [<span class="ident">u8</span>; <span class="number">6</span>] {
         <span class="self">self</span>.<span class="ident">mac_spoofed</span>.<span class="ident">unwrap_or</span>(<span class="self">self</span>.<span class="ident">mac_hardware</span>)
     }
 }
@@ -614,7 +615,7 @@
 <span class="doccomment">/// Functions that setup the NIC struct and handle the sending and receiving of packets.</span>
 <span class="kw">impl</span> <span class="ident">E1000Nic</span> {
     <span class="doccomment">/// Initializes the new E1000 network interface card that is connected as the given PciDevice.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">e1000_pci_dev</span>: <span class="kw-2">&amp;</span><span class="ident">PciDevice</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">E1000Nic</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="ident">e1000_pci_dev</span>: <span class="kw-2">&amp;</span><span class="ident">PciDevice</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">E1000Nic</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">use</span> <span class="ident">interrupts::IRQ_BASE_OFFSET</span>;
 
         <span class="comment">//debug!(&quot;e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}&quot;, e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);</span>
@@ -628,7 +629,7 @@
         <span class="kw">let</span> <span class="ident">bar_type</span> <span class="op">=</span> (<span class="ident">bar0</span> <span class="kw">as</span> <span class="ident">u8</span>) <span class="op">&amp;</span> <span class="number">0x1</span>;    
 
         <span class="comment">// If the base address is not memory mapped then exit</span>
-        <span class="kw">if</span> <span class="ident">bar_type</span> <span class="op">=</span><span class="op">=</span> <span class="ident">PciConfigSpaceAccessMechanism::IoPort</span> <span class="kw">as</span> <span class="ident">u8</span> {
+        <span class="kw">if</span> <span class="ident">bar_type</span> <span class="op">==</span> <span class="ident">PciConfigSpaceAccessMechanism::IoPort</span> <span class="kw">as</span> <span class="ident">u8</span> {
             <span class="macro">error!</span>(<span class="string">&quot;e1000::init(): BAR0 is of I/O type&quot;</span>);
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;e1000::init(): BAR0 is of I/O type&quot;</span>)
         }
@@ -639,17 +640,17 @@
         <span class="comment">// set the bus mastering bit for this PciDevice, which allows it to use DMA</span>
         <span class="ident">e1000_pci_dev</span>.<span class="ident">pci_set_command_bus_master_bit</span>();
 
-        <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">mapped_registers</span>, <span class="ident">rx_registers</span>, <span class="ident">tx_registers</span>, <span class="kw-2">mut</span> <span class="ident">mac_registers</span>)  <span class="op">=</span> <span class="self">Self</span><span class="ident">::map_e1000_regs</span>(<span class="ident">e1000_pci_dev</span>, <span class="ident">mem_base</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">mapped_registers</span>, <span class="ident">rx_registers</span>, <span class="ident">tx_registers</span>, <span class="kw-2">mut</span> <span class="ident">mac_registers</span>)  <span class="op">=</span> <span class="ident"><span class="self">Self</span>::map_e1000_regs</span>(<span class="ident">e1000_pci_dev</span>, <span class="ident">mem_base</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx_registers</span> <span class="op">=</span>  <span class="ident">E1000RxQueueRegisters</span>(<span class="ident">rx_registers</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tx_registers</span> <span class="op">=</span>  <span class="ident">E1000TxQueueRegisters</span>(<span class="ident">tx_registers</span>);
 
-        <span class="self">Self</span><span class="ident">::start_link</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mapped_registers</span>);
+        <span class="ident"><span class="self">Self</span>::start_link</span>(<span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers</span>);
         
-        <span class="kw">let</span> <span class="ident">mac_addr_hardware</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::read_mac_address_from_nic</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mac_registers</span>);
+        <span class="kw">let</span> <span class="ident">mac_addr_hardware</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::read_mac_address_from_nic</span>(<span class="kw-2">&amp;mut</span> <span class="ident">mac_registers</span>);
         <span class="comment">//e1000_nc.clear_multicast();</span>
         <span class="comment">//e1000_nc.clear_statistics();</span>
         
-        <span class="self">Self</span><span class="ident">::enable_interrupts</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mapped_registers</span>);
+        <span class="ident"><span class="self">Self</span>::enable_interrupts</span>(<span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers</span>);
         <span class="ident">register_interrupt</span>(<span class="ident">interrupt_num</span>, <span class="ident">e1000_handler</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_handler_addr</span><span class="op">|</span> {
             <span class="macro">error!</span>(<span class="string">&quot;e1000 IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.&quot;</span>, <span class="ident">interrupt_num</span>, <span class="ident">_handler_addr</span>);
             <span class="string">&quot;e1000 interrupt number was already in use! Sharing IRQs is currently unsupported.&quot;</span>
@@ -658,7 +659,7 @@
         <span class="comment">// initialize the buffer pool</span>
         <span class="ident">init_rx_buf_pool</span>(<span class="ident">RX_BUFFER_POOL_SIZE</span>, <span class="ident">E1000_RX_BUFFER_SIZE_IN_BYTES</span>, <span class="kw-2">&amp;</span><span class="ident">RX_BUFFER_POOL</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let</span> (<span class="ident">rx_descs</span>, <span class="ident">rx_buffers</span>) <span class="op">=</span> <span class="self">Self</span><span class="ident">::rx_init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mapped_registers</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">rx_registers</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> (<span class="ident">rx_descs</span>, <span class="ident">rx_buffers</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::rx_init</span>(<span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers</span>, <span class="kw-2">&amp;mut</span> <span class="ident">rx_registers</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">rxq</span> <span class="op">=</span> <span class="ident">RxQueue</span> {
             <span class="ident">id</span>: <span class="number">0</span>,
             <span class="ident">regs</span>: <span class="ident">rx_registers</span>,
@@ -674,7 +675,7 @@
             <span class="ident">filter_num</span>: <span class="prelude-val">None</span>
         };
 
-        <span class="kw">let</span> <span class="ident">tx_descs</span> <span class="op">=</span> <span class="self">Self</span><span class="ident">::tx_init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">mapped_registers</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">tx_registers</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">tx_descs</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::tx_init</span>(<span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers</span>, <span class="kw-2">&amp;mut</span> <span class="ident">tx_registers</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">txq</span> <span class="op">=</span> <span class="ident">TxQueue</span> {
             <span class="ident">id</span>: <span class="number">0</span>,
             <span class="ident">regs</span>: <span class="ident">tx_registers</span>,
@@ -709,7 +710,7 @@
     <span class="kw">fn</span> <span class="ident">map_e1000_regs</span>(
         <span class="ident">_device</span>: <span class="kw-2">&amp;</span><span class="ident">PciDevice</span>, 
         <span class="ident">mem_base</span>: <span class="ident">PhysicalAddress</span>
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
         <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000Registers</span><span class="op">&gt;</span>, 
         <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000RxRegisters</span><span class="op">&gt;</span>, 
         <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, <span class="ident">E1000TxRegisters</span><span class="op">&gt;</span>, 
@@ -734,12 +735,12 @@
         <span class="prelude-val">Ok</span>((<span class="ident">regs</span>, <span class="ident">rx_regs</span>, <span class="ident">tx_regs</span>, <span class="ident">mac_regs</span>))
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spoof_mac</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">spoofed_mac_addr</span>: [<span class="ident">u8</span>; <span class="number">6</span>]) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spoof_mac</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">spoofed_mac_addr</span>: [<span class="ident">u8</span>; <span class="number">6</span>]) {
         <span class="self">self</span>.<span class="ident">mac_spoofed</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">spoofed_mac_addr</span>);
     }
 
     <span class="doccomment">/// Reads the actual MAC address burned into the NIC hardware.</span>
-    <span class="kw">fn</span> <span class="ident">read_mac_address_from_nic</span>(<span class="ident">regs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E1000MacRegisters</span>) <span class="op">-</span><span class="op">&gt;</span> [<span class="ident">u8</span>; <span class="number">6</span>] {
+    <span class="kw">fn</span> <span class="ident">read_mac_address_from_nic</span>(<span class="ident">regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000MacRegisters</span>) -&gt; [<span class="ident">u8</span>; <span class="number">6</span>] {
         <span class="kw">let</span> <span class="ident">mac_32_low</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">ral</span>.<span class="ident">read</span>();
         <span class="kw">let</span> <span class="ident">mac_32_high</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">rah</span>.<span class="ident">read</span>();
 
@@ -756,7 +757,7 @@
     }   
 
     <span class="doccomment">/// Start up the network</span>
-    <span class="kw">fn</span> <span class="ident">start_link</span>(<span class="ident">regs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E1000Registers</span>) {
+    <span class="kw">fn</span> <span class="ident">start_link</span>(<span class="ident">regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000Registers</span>) {
         <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">regs</span>.<span class="ident">ctrl</span>.<span class="ident">read</span>();
         <span class="ident">regs</span>.<span class="ident">ctrl</span>.<span class="ident">write</span>(<span class="ident">val</span> <span class="op">|</span> <span class="number">0x40</span> <span class="op">|</span> <span class="number">0x20</span>);
 
@@ -785,9 +786,9 @@
     <span class="doccomment">/// Initialize the array of receive descriptors and their corresponding receive buffers,</span>
     <span class="doccomment">/// and returns a tuple including both of them.</span>
     <span class="kw">fn</span> <span class="ident">rx_init</span>(
-        <span class="ident">regs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E1000Registers</span>, 
-        <span class="ident">rx_regs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E1000RxQueueRegisters</span>
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
+        <span class="ident">regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000Registers</span>, 
+        <span class="ident">rx_regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000RxQueueRegisters</span>
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(
         <span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">LegacyRxDescriptor</span>]<span class="op">&gt;</span>, 
         <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ReceiveBuffer</span><span class="op">&gt;</span>
     ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
@@ -810,9 +811,9 @@
     
     <span class="doccomment">/// Initialize the array of tramsmit descriptors and return them.</span>
     <span class="kw">fn</span> <span class="ident">tx_init</span>(
-        <span class="ident">regs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E1000Registers</span>, 
-        <span class="ident">tx_regs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E1000TxQueueRegisters</span>
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">LegacyTxDescriptor</span>]<span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+        <span class="ident">regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000Registers</span>, 
+        <span class="ident">tx_regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000TxQueueRegisters</span>
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">BoxRefMut</span><span class="op">&lt;</span><span class="ident">MappedPages</span>, [<span class="ident">LegacyTxDescriptor</span>]<span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// get the queue of tx descriptors     </span>
         <span class="kw">let</span> <span class="ident">tx_descs</span> <span class="op">=</span> <span class="ident">init_tx_queue</span>(<span class="ident">E1000_NUM_TX_DESC</span> <span class="kw">as</span> <span class="ident">usize</span>, <span class="ident">tx_regs</span>)<span class="question-mark">?</span>;
         <span class="ident">regs</span>.<span class="ident">tctl</span>.<span class="ident">write</span>(<span class="ident">regs::TCTL_EN</span> <span class="op">|</span> <span class="ident">regs::TCTL_PSP</span>);
@@ -820,7 +821,7 @@
     }       
     
     <span class="doccomment">/// Enable Interrupts </span>
-    <span class="kw">fn</span> <span class="ident">enable_interrupts</span>(<span class="ident">regs</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E1000Registers</span>) {
+    <span class="kw">fn</span> <span class="ident">enable_interrupts</span>(<span class="ident">regs</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E1000Registers</span>) {
         <span class="comment">//self.write_command(REG_IMASK ,0x1F6DC);</span>
         <span class="comment">//self.write_command(REG_IMASK ,0xff &amp; !4);</span>
     
@@ -829,26 +830,26 @@
     }      
 
     <span class="comment">// reads status and clears interrupt</span>
-    <span class="kw">fn</span> <span class="ident">clear_interrupt_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u32</span> {
+    <span class="kw">fn</span> <span class="ident">clear_interrupt_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u32</span> {
         <span class="self">self</span>.<span class="ident">regs</span>.<span class="ident">icr</span>.<span class="ident">read</span>()
     }
 
 
     <span class="doccomment">/// The main interrupt handling routine for the e1000 NIC.</span>
     <span class="doccomment">/// This should be invoked from the actual interrupt handler entry point.</span>
-    <span class="kw">fn</span> <span class="ident">handle_interrupt</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">handle_interrupt</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">status</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">clear_interrupt_status</span>();        
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">handled</span> <span class="op">=</span> <span class="bool-val">false</span>;
 
         <span class="comment">// a link status change</span>
-        <span class="kw">if</span> (<span class="ident">status</span> <span class="op">&amp;</span> <span class="ident">INT_LSC</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">INT_LSC</span> {
+        <span class="kw">if</span> (<span class="ident">status</span> <span class="op">&amp;</span> <span class="ident">INT_LSC</span>) <span class="op">==</span> <span class="ident">INT_LSC</span> {
             <span class="macro">debug!</span>(<span class="string">&quot;e1000::handle_interrupt(): link status changed&quot;</span>);
-            <span class="self">Self</span><span class="ident">::start_link</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">regs</span>);
+            <span class="ident"><span class="self">Self</span>::start_link</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">regs</span>);
             <span class="ident">handled</span> <span class="op">=</span> <span class="bool-val">true</span>;
         }
 
         <span class="comment">// receiver timer interrupt</span>
-        <span class="kw">if</span> (<span class="ident">status</span> <span class="op">&amp;</span> <span class="ident">INT_RX</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">INT_RX</span> {
+        <span class="kw">if</span> (<span class="ident">status</span> <span class="op">&amp;</span> <span class="ident">INT_RX</span>) <span class="op">==</span> <span class="ident">INT_RX</span> {
             <span class="comment">// debug!(&quot;e1000::handle_interrupt(): receive interrupt&quot;);</span>
             <span class="self">self</span>.<span class="ident">poll_receive</span>()<span class="question-mark">?</span>;
             <span class="ident">handled</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -862,7 +863,7 @@
     }
 }
 
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">e1000_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">e1000_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">e1000_nic_ref</span>) <span class="op">=</span> <span class="ident">E1000_NIC</span>.<span class="ident">get</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e1000_nic</span> <span class="op">=</span> <span class="ident">e1000_nic_ref</span>.<span class="ident">lock</span>();
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">e1000_nic</span>.<span class="ident">handle_interrupt</span>() {
@@ -874,6 +875,6 @@
     }
 
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="e1000" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="e1000" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

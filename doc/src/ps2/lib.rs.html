@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ps2/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../ps2/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/ps2/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../ps2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../ps2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../ps2/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -514,8 +516,7 @@
 <span id="511">511</span>
 <span id="512">512</span>
 <span id="513">513</span>
-</pre><pre class="rust">
-<span class="attribute">#![<span class="ident">no_std</span>]</span>
+</pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
@@ -532,11 +533,11 @@
 
 <span class="doccomment">/// clean the PS2 data port (0x60) output buffer</span>
 <span class="doccomment">/// also return the vec of data previously in the buffer which may be useful</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_clean_buffer</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_clean_buffer</span>() -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer_data</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
     <span class="kw">loop</span> {
         <span class="comment">// if no more data in the output buffer</span>
-        <span class="kw">if</span> <span class="ident">ps2_status_register</span>() <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">if</span> <span class="ident">ps2_status_register</span>() <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0</span> {
             <span class="kw">break</span>;
         } <span class="kw">else</span> {
             <span class="ident">buffer_data</span>.<span class="ident">push</span>(<span class="ident">ps2_read_data</span>());
@@ -553,17 +554,17 @@
 }
 
 <span class="doccomment">/// read the ps2 status register</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_status_register</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_status_register</span>() -&gt; <span class="ident">u8</span> {
     <span class="ident">PS2_COMMAND_PORT</span>.<span class="ident">lock</span>().<span class="ident">read</span>()
 }
 
 <span class="doccomment">/// read dat from ps2 data port (0x60)</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_read_data</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_read_data</span>() -&gt; <span class="ident">u8</span> {
     <span class="ident">PS2_PORT</span>.<span class="ident">lock</span>().<span class="ident">read</span>()
 }
 
 <span class="doccomment">/// read the config of the ps2 port</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_read_config</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ps2_read_config</span>() -&gt; <span class="ident">u8</span> {
     <span class="ident">ps2_write_command</span>(<span class="number">0x20</span>);
     <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
     <span class="ident">config</span>
@@ -603,9 +604,9 @@
     {
         <span class="ident">ps2_write_command</span>(<span class="number">0xAA</span>);
         <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-        <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">=</span><span class="op">=</span> <span class="number">0xFC</span> {
+        <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0xFC</span> {
             <span class="macro">warn!</span>(<span class="string">&quot;ps2 controller test failed!!!&quot;</span>)
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">=</span><span class="op">=</span> <span class="number">0x55</span> {
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0x55</span> {
             <span class="macro">info!</span>(<span class="string">&quot;ps2 controller test pass!!!&quot;</span>)
         }
     }
@@ -615,19 +616,19 @@
         <span class="ident">ps2_write_command</span>(<span class="number">0xAB</span>);
         <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
         <span class="kw">match</span> <span class="ident">test_flag</span> {
-            <span class="number">0x00</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">info!</span>(<span class="string">&quot;first ps2 port test pass!!!&quot;</span>),
-            <span class="number">0x01</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck low&quot;</span>),
-            <span class="number">0x02</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck high&quot;</span>),
-            <span class="number">0x03</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck low&quot;</span>),
-            <span class="number">0x04</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck high&quot;</span>),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="number">0x00</span> =&gt; <span class="macro">info!</span>(<span class="string">&quot;first ps2 port test pass!!!&quot;</span>),
+            <span class="number">0x01</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck low&quot;</span>),
+            <span class="number">0x02</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port clock line stuck high&quot;</span>),
+            <span class="number">0x03</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck low&quot;</span>),
+            <span class="number">0x04</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port data line stuck high&quot;</span>),
+            <span class="kw">_</span> =&gt; {}
         }
     }
 
     <span class="comment">// enable PS2 interrupt and see the new config</span>
     {
         <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">ps2_read_config</span>();
-        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">=</span><span class="op">=</span> <span class="number">0x01</span> {
+        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x01</span> <span class="op">==</span> <span class="number">0x01</span> {
             <span class="macro">info!</span>(<span class="string">&quot;first ps2 port interrupt enabled&quot;</span>)
         } <span class="kw">else</span> {
             <span class="macro">warn!</span>(<span class="string">&quot;first ps2 port interrupt disabled&quot;</span>)
@@ -671,9 +672,9 @@
     {
         <span class="ident">ps2_write_command</span>(<span class="number">0xAA</span>);
         <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-        <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">=</span><span class="op">=</span> <span class="number">0xFC</span> {
+        <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0xFC</span> {
             <span class="macro">warn!</span>(<span class="string">&quot;ps2 controller test failed!!!&quot;</span>)
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">=</span><span class="op">=</span> <span class="number">0x55</span> {
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">test_flag</span> <span class="op">==</span> <span class="number">0x55</span> {
             <span class="macro">info!</span>(<span class="string">&quot;ps2 controller test pass!!!&quot;</span>)
         }
     }
@@ -682,18 +683,18 @@
         <span class="ident">ps2_write_command</span>(<span class="number">0xA9</span>);
         <span class="kw">let</span> <span class="ident">test_flag</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
         <span class="kw">match</span> <span class="ident">test_flag</span> {
-            <span class="number">0x00</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">info!</span>(<span class="string">&quot;second ps2 port test pass!!!&quot;</span>),
-            <span class="number">0x01</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck low&quot;</span>),
-            <span class="number">0x02</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck high&quot;</span>),
-            <span class="number">0x03</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck low&quot;</span>),
-            <span class="number">0x04</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck high&quot;</span>),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
+            <span class="number">0x00</span> =&gt; <span class="macro">info!</span>(<span class="string">&quot;second ps2 port test pass!!!&quot;</span>),
+            <span class="number">0x01</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck low&quot;</span>),
+            <span class="number">0x02</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port clock line stuck high&quot;</span>),
+            <span class="number">0x03</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck low&quot;</span>),
+            <span class="number">0x04</span> =&gt; <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port data line stuck high&quot;</span>),
+            <span class="kw">_</span> =&gt; {}
         }
     }
     <span class="comment">// enable PS2 interrupt and see the new config</span>
     {
         <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">ps2_read_config</span>();
-        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x02</span> <span class="op">=</span><span class="op">=</span> <span class="number">0x02</span> {
+        <span class="kw">if</span> <span class="ident">config</span> <span class="op">&amp;</span> <span class="number">0x02</span> <span class="op">==</span> <span class="number">0x02</span> {
             <span class="macro">info!</span>(<span class="string">&quot;second ps2 port interrupt enabled&quot;</span>)
         } <span class="kw">else</span> {
             <span class="macro">warn!</span>(<span class="string">&quot;second ps2 port interrupt disabled&quot;</span>)
@@ -707,40 +708,40 @@
 }
 
 <span class="doccomment">/// write data to the first ps2 data port and return the response</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_to_port1</span>(<span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_to_port1</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="ident">u8</span> {
     <span class="kw">unsafe</span> { <span class="ident">PS2_PORT</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">value</span>) };
     <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
     <span class="ident">response</span>
 }
 
 <span class="doccomment">/// write data to the second ps2 data port and return the response</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_to_port2</span>(<span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">data_to_port2</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="ident">u8</span> {
     <span class="ident">ps2_write_command</span>(<span class="number">0xD4</span>);
     <span class="ident">data_to_port1</span>(<span class="ident">value</span>)
 }
 
 <span class="doccomment">/// write command to the keyboard and return the result</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">command_to_keyboard</span>(<span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">command_to_keyboard</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">data_to_port1</span>(<span class="ident">value</span>);
 
     <span class="kw">match</span> <span class="ident">response</span> {
-        <span class="number">0xFA</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="number">0xFA</span> =&gt; {
             <span class="comment">// keyboard acknowledges the command</span>
             <span class="prelude-val">Ok</span>(())
         }
 
-        <span class="number">0xFE</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="number">0xFE</span> =&gt; {
             <span class="comment">// keyboard doesn&#39;t acknowledge the command</span>
             <span class="prelude-val">Err</span>(<span class="string">&quot;Fail to send the command to the keyboard&quot;</span>)
         }
 
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="kw">_</span> =&gt; {
             <span class="kw">for</span> <span class="ident">_x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">14</span> {
                 <span class="comment">// wait for response</span>
                 <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-                <span class="kw">if</span> <span class="ident">response</span> <span class="op">=</span><span class="op">=</span> <span class="number">0xFA</span> {
+                <span class="kw">if</span> <span class="ident">response</span> <span class="op">==</span> <span class="number">0xFA</span> {
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
-                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">response</span> <span class="op">=</span><span class="op">=</span> <span class="number">0xfe</span> {
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">response</span> <span class="op">==</span> <span class="number">0xfe</span> {
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Please resend the command to the keyboard&quot;</span>);
                 }
             }
@@ -750,14 +751,14 @@
 }
 
 <span class="doccomment">/// write command to the mouse and return the result</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">command_to_mouse</span>(<span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">command_to_mouse</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// if the mouse doesn&#39;t acknowledge the command return error</span>
     <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">data_to_port2</span>(<span class="ident">value</span>);
     <span class="kw">if</span> <span class="ident">response</span> <span class="op">!</span><span class="op">=</span> <span class="number">0xFA</span> {
         <span class="kw">for</span> <span class="ident">_x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">14</span> {
             <span class="kw">let</span> <span class="ident">response</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
 
-            <span class="kw">if</span> <span class="ident">response</span> <span class="op">=</span><span class="op">=</span> <span class="number">0xFA</span> {
+            <span class="kw">if</span> <span class="ident">response</span> <span class="op">==</span> <span class="number">0xFA</span> {
                 <span class="comment">//                info!(&quot;mouse command is responded !!!!&quot;);</span>
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
             }
@@ -776,7 +777,7 @@
 }
 
 <span class="doccomment">/// read mouse data packet</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mouse_packet</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u32</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mouse_packet</span>() -&gt; <span class="ident">u32</span> {
     <span class="comment">// since nowadays almost every mouse has scroll, so there is a 4 byte packet</span>
     <span class="comment">// which means that only mouse with ID 3 or 4 can be applied this function</span>
     <span class="comment">// because the mouse is initialized to have ID 3 or 4, so this function can</span>
@@ -791,7 +792,7 @@
 }
 
 <span class="doccomment">/// set ps2 mouse&#39;s sampling rate</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_sampling_rate</span>(<span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_sampling_rate</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// if command is not acknowledged</span>
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xF3</span>) {
         <span class="prelude-val">Err</span>(<span class="string">&quot;set mouse sampling rate failled, please try again&quot;</span>)
@@ -808,7 +809,7 @@
 <span class="doccomment">/// set the mouse ID (3 or 4 ) by magic sequence</span>
 <span class="doccomment">/// 3 means that the mouse has scroll</span>
 <span class="doccomment">/// 4 means that the mouse has scroll, fourth and fifth buttons</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_mouse_id</span>(<span class="ident">id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_mouse_id</span>(<span class="ident">id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// stop the mouse&#39;s streaming before trying to set the ID</span>
     <span class="comment">// if fail to stop the streaming, return error</span>
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">mouse_packet_streaming</span>(<span class="bool-val">false</span>) {
@@ -816,7 +817,7 @@
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
     } <span class="kw">else</span> {
         <span class="comment">// set the id to 3</span>
-        <span class="kw">if</span> <span class="ident">id</span> <span class="op">=</span><span class="op">=</span> <span class="number">3</span> {
+        <span class="kw">if</span> <span class="ident">id</span> <span class="op">==</span> <span class="number">3</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">200</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
@@ -831,7 +832,7 @@
             }
         }
         <span class="comment">// set the id to 4</span>
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">id</span> <span class="op">=</span><span class="op">=</span> <span class="number">4</span> {
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">id</span> <span class="op">==</span> <span class="number">4</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">set_sampling_rate</span>(<span class="number">200</span>) {
                 <span class="macro">warn!</span>(<span class="string">&quot;fail to stop streaming, before trying to read mouse id&quot;</span>);
                 <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;fail to set the mouse id!!!&quot;</span>);
@@ -869,15 +870,15 @@
 }
 
 <span class="doccomment">/// check the mouse&#39;s id</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_mouse_id</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_mouse_id</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// stop the streaming before trying to read the mouse&#39;s id</span>
     <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">mouse_packet_streaming</span>(<span class="bool-val">false</span>);
     <span class="kw">match</span> <span class="ident">result</span> {
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
             <span class="macro">warn!</span>(<span class="string">&quot;check_mouse_id(): please try read the mouse id later, error: {}&quot;</span>, <span class="ident">e</span>);
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>);
         }
-        <span class="prelude-val">Ok</span>(<span class="ident">_buffer_data</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="prelude-val">Ok</span>(<span class="ident">_buffer_data</span>) =&gt; {
             <span class="kw">let</span> <span class="ident">id_num</span>: <span class="ident">u8</span>;
             <span class="comment">// check whether the command is acknowledged</span>
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xF2</span>) {
@@ -897,13 +898,13 @@
 }
 
 <span class="doccomment">/// reset the mouse</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_mouse</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_mouse</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xFF</span>) {
         <span class="prelude-val">Err</span>(<span class="string">&quot;reset mouse failled please try again&quot;</span>)
     } <span class="kw">else</span> {
         <span class="kw">for</span> <span class="ident">_x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">14</span> {
             <span class="kw">let</span> <span class="ident">more_bytes</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
-            <span class="kw">if</span> <span class="ident">more_bytes</span> <span class="op">=</span><span class="op">=</span> <span class="number">0xAA</span> {
+            <span class="kw">if</span> <span class="ident">more_bytes</span> <span class="op">==</span> <span class="number">0xAA</span> {
                 <span class="comment">// command reset mouse succeeded</span>
                 <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
             }
@@ -914,7 +915,7 @@
 }
 
 <span class="doccomment">/// resend the most recent packet again</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_resend</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_resend</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xFE</span>) {
         <span class="prelude-val">Err</span>(<span class="string">&quot;mouse resend request failled, please request again&quot;</span>)
     } <span class="kw">else</span> {
@@ -925,7 +926,7 @@
 
 <span class="doccomment">/// enable or disable the packet streaming</span>
 <span class="doccomment">/// also return the vec of data previously in the buffer which may be useful</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_packet_streaming</span>(<span class="ident">enable</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_packet_streaming</span>(<span class="ident">enable</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">enable</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xf4</span>) {
             <span class="macro">warn!</span>(<span class="string">&quot;enable streaming failed&quot;</span>);
@@ -939,7 +940,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer_data</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
         <span class="kw">if</span> <span class="ident">data_to_port2</span>(<span class="number">0xf5</span>) <span class="op">!</span><span class="op">=</span> <span class="number">0xfa</span> {
             <span class="kw">for</span> <span class="ident">x</span> <span class="kw">in</span> <span class="number">0</span>..<span class="number">15</span> {
-                <span class="kw">if</span> <span class="ident">x</span> <span class="op">=</span><span class="op">=</span> <span class="number">14</span> {
+                <span class="kw">if</span> <span class="ident">x</span> <span class="op">==</span> <span class="number">14</span> {
                     <span class="macro">warn!</span>(<span class="string">&quot;disable mouse streaming failed&quot;</span>);
                     <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;disable mouse streaming failed&quot;</span>);
                 }
@@ -960,7 +961,7 @@
 <span class="doccomment">/// parameter :</span>
 <span class="doccomment">/// 0x00: 1 count/mm; 0x01 2 count/mm;</span>
 <span class="doccomment">/// 0x02 4 count/mm; 0x03 8 count/mm;</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_resolution</span>(<span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mouse_resolution</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_mouse</span>(<span class="number">0xE8</span>) {
         <span class="macro">warn!</span>(<span class="string">&quot;command set mouse resolution is not accepted&quot;</span>);
         <span class="prelude-val">Err</span>(<span class="string">&quot;set mouse resolution failed!!!&quot;</span>)
@@ -989,7 +990,7 @@
 <span class="doccomment">/// set the scancode set of the keyboard</span>
 <span class="doccomment">/// 0: get the current set; 1: set 1</span>
 <span class="doccomment">/// 2: set 2; 3: set 3</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">keyboard_scancode_set</span>(<span class="ident">value</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">keyboard_scancode_set</span>(<span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_keyboard</span>(<span class="number">0xF0</span>) {
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;failed to set the keyboard scancode set&quot;</span>);
     } <span class="kw">else</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">_e</span>) <span class="op">=</span> <span class="ident">command_to_keyboard</span>(<span class="ident">value</span>) {
@@ -1005,7 +1006,7 @@
 }
 
 <span class="doccomment">///detect the keyboard&#39;s type</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">keyboard_detect</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KeyboardType</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">keyboard_detect</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">KeyboardType</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">//    let reply = data_to_port1(0xF2);</span>
     <span class="comment">//    info!(&quot;{:x}&quot;,reply);</span>
     <span class="comment">//    match reply {</span>
@@ -1020,14 +1021,14 @@
     } <span class="kw">else</span> {
         <span class="kw">let</span> <span class="ident">reply</span> <span class="op">=</span> <span class="ident">ps2_read_data</span>();
         <span class="kw">match</span> <span class="ident">reply</span> {
-            <span class="number">0xAB</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
-            <span class="number">0x41</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
-            <span class="number">0xC1</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
-            <span class="number">0x83</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2Keyboard</span>),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::AncientATKeyboard</span>),
+            <span class="number">0xAB</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
+            <span class="number">0x41</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
+            <span class="number">0xC1</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2KeyboardWithPSControllerTranslator</span>),
+            <span class="number">0x83</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::MF2Keyboard</span>),
+            <span class="kw">_</span> =&gt; <span class="prelude-val">Ok</span>(<span class="ident">KeyboardType::AncientATKeyboard</span>),
         }
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ps2" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ps2" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

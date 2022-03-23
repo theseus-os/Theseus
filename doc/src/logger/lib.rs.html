@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/logger/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../logger/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/logger/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../logger/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../logger/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../logger/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -283,8 +285,7 @@
 <span id="280">280</span>
 <span id="281">281</span>
 <span id="282">282</span>
-</pre><pre class="rust">
-<span class="doccomment">//! A basic logger implementation for system-wide logging in Theseus. </span>
+</pre><pre class="rust"><code><span class="doccomment">//! A basic logger implementation for system-wide logging in Theseus. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This enables Theseus crates to use the `log` crate&#39;s macros anywhere,</span>
 <span class="doccomment">//! such as `error!()`, `warn!()`, `info!()`, `debug!()`, and `trace!()`.</span>
@@ -342,9 +343,9 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// This is intended to allow the caller to take ownership of the early logger writers</span>
 <span class="doccomment">/// such that they can switch to initializing the full logger.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_early_log_writers</span>() <span class="op">-</span><span class="op">&gt;</span> [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span>; <span class="ident">LOG_MAX_WRITERS</span>] {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_early_log_writers</span>() -&gt; [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span>; <span class="ident">LOG_MAX_WRITERS</span>] {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">list</span> <span class="op">=</span> [<span class="prelude-val">None</span>, <span class="prelude-val">None</span>];
-    <span class="kw">for</span> (<span class="ident">opt</span>, <span class="ident">ret</span>) <span class="kw">in</span> <span class="ident">EARLY_LOGGER</span>.<span class="ident">lock</span>().<span class="number">0</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">list</span>) {
+    <span class="kw">for</span> (<span class="ident">opt</span>, <span class="ident">ret</span>) <span class="kw">in</span> <span class="ident">EARLY_LOGGER</span>.<span class="ident">lock</span>().<span class="number">0</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="kw-2">&amp;mut</span> <span class="ident">list</span>) {
         <span class="kw-2">*</span><span class="ident">ret</span> <span class="op">=</span> <span class="ident">opt</span>.<span class="ident">take</span>();
     }
     <span class="ident">list</span>
@@ -368,7 +369,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// This function writes to the real (fully-featured) [`LOGGER`] if it has been initialized;</span>
     <span class="doccomment">/// otherwise, it falls back to writing to the [`EARLY_LOGGER`] instead.</span>
-    <span class="kw">fn</span> <span class="ident">write_fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">arguments</span>: <span class="ident">fmt::Arguments</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">write_fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">arguments</span>: <span class="ident">fmt::Arguments</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">logger</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">LOGGER</span>.<span class="ident">lock</span>() {
             <span class="kw">for</span> <span class="ident">writer</span> <span class="kw">in</span> <span class="ident">logger</span>.<span class="ident">writers</span>.<span class="ident">iter</span>() {
                 <span class="kw">let</span> <span class="ident">_result</span> <span class="op">=</span> <span class="ident">writer</span>.<span class="ident">deref</span>().<span class="ident">borrow</span>().<span class="ident">lock</span>().<span class="ident">write_fmt</span>(<span class="ident">arguments</span>);
@@ -386,7 +387,7 @@
 
 <span class="kw">impl</span> <span class="ident">Log</span> <span class="kw">for</span> <span class="ident">DummyLogger</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">enabled</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">Metadata</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">enabled</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">metadata</span>: <span class="kw-2">&amp;</span><span class="ident">Metadata</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident">metadata</span>.<span class="ident">level</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">log::max_level</span>()
     }
 
@@ -396,11 +397,11 @@
         }
 
         <span class="kw">let</span> (<span class="ident">level_str</span>, <span class="ident">color</span>) <span class="op">=</span> <span class="kw">match</span> <span class="ident">record</span>.<span class="ident">level</span>() {
-            <span class="ident">Level::Error</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="string">&quot;[E] &quot;</span>, <span class="ident">LogColor::Red</span>),
-            <span class="ident">Level::Warn</span> <span class="op">=</span><span class="op">&gt;</span>  (<span class="string">&quot;[W] &quot;</span>, <span class="ident">LogColor::Yellow</span>),
-            <span class="ident">Level::Info</span> <span class="op">=</span><span class="op">&gt;</span>  (<span class="string">&quot;[I] &quot;</span>, <span class="ident">LogColor::Cyan</span>),
-            <span class="ident">Level::Debug</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="string">&quot;[D] &quot;</span>, <span class="ident">LogColor::Green</span>),
-            <span class="ident">Level::Trace</span> <span class="op">=</span><span class="op">&gt;</span> (<span class="string">&quot;[T] &quot;</span>, <span class="ident">LogColor::Purple</span>),
+            <span class="ident">Level::Error</span> =&gt; (<span class="string">&quot;[E] &quot;</span>, <span class="ident">LogColor::Red</span>),
+            <span class="ident">Level::Warn</span> =&gt;  (<span class="string">&quot;[W] &quot;</span>, <span class="ident">LogColor::Yellow</span>),
+            <span class="ident">Level::Info</span> =&gt;  (<span class="string">&quot;[I] &quot;</span>, <span class="ident">LogColor::Cyan</span>),
+            <span class="ident">Level::Debug</span> =&gt; (<span class="string">&quot;[D] &quot;</span>, <span class="ident">LogColor::Green</span>),
+            <span class="ident">Level::Trace</span> =&gt; (<span class="string">&quot;[T] &quot;</span>, <span class="ident">LogColor::Purple</span>),
         };
         <span class="kw">let</span> <span class="ident">file_loc</span> <span class="op">=</span> <span class="ident">record</span>.<span class="ident">file</span>().<span class="ident">unwrap_or</span>(<span class="string">&quot;??&quot;</span>);
         <span class="kw">let</span> <span class="ident">line_loc</span> <span class="op">=</span> <span class="ident">record</span>.<span class="ident">line</span>().<span class="ident">unwrap_or</span>(<span class="number">0</span>);
@@ -448,11 +449,11 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">early_init</span>(
     <span class="ident">log_level</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Level</span><span class="op">&gt;</span>,
     <span class="ident">serial_ports</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">SerialPort</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span> {
     <span class="comment">// Populate the fields of the early logger instance</span>
     {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">EARLY_LOGGER</span>.<span class="ident">lock</span>();
-        <span class="kw">for</span> (<span class="ident">sp</span>, <span class="ident">logger_writer</span>) <span class="kw">in</span> <span class="ident">serial_ports</span>.<span class="ident">into_iter</span>().<span class="ident">take</span>(<span class="ident">LOG_MAX_WRITERS</span>).<span class="ident">zip</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">logger</span>.<span class="number">0</span>) {
+        <span class="kw">for</span> (<span class="ident">sp</span>, <span class="ident">logger_writer</span>) <span class="kw">in</span> <span class="ident">serial_ports</span>.<span class="ident">into_iter</span>().<span class="ident">take</span>(<span class="ident">LOG_MAX_WRITERS</span>).<span class="ident">zip</span>(<span class="kw-2">&amp;mut</span> <span class="ident">logger</span>.<span class="number">0</span>) {
             <span class="kw-2">*</span><span class="ident">logger_writer</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">sp</span>);
         }
     }
@@ -475,7 +476,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">I</span>, <span class="ident">W</span><span class="op">&gt;</span>(
     <span class="ident">log_level</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Level</span><span class="op">&gt;</span>,
     <span class="ident">writers</span>: <span class="kw">impl</span> <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">I</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span>
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">SetLoggerError</span><span class="op">&gt;</span>
     <span class="kw">where</span> <span class="ident">W</span>: <span class="ident">Write</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
           <span class="ident">I</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 {
@@ -512,7 +513,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// Tip: use the `format_args!()` macro from the core library to create</span>
 <span class="doccomment">/// the `Arguments` parameter needed here.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_fmt</span>(<span class="ident">args</span>: <span class="ident">fmt::Arguments</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_fmt</span>(<span class="ident">args</span>: <span class="ident">fmt::Arguments</span>) -&gt; <span class="ident">fmt::Result</span> {
     <span class="ident">DUMMY_LOGGER</span>.<span class="ident">write_fmt</span>(<span class="ident">args</span>)
 }
 
@@ -520,8 +521,8 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// If the logger has not yet been initialized, no log messages will be emitted.</span>
 <span class="doccomment">/// and an `Error` will be returned.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
-    <span class="kw">crate</span><span class="ident">::write_fmt</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">s</span>))
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">write_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">fmt::Result</span> {
+    <span class="ident"><span class="kw">crate</span>::write_fmt</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">s</span>))
 }
 
 
@@ -539,18 +540,18 @@
     <span class="ident">Reset</span>,
 }
 <span class="kw">impl</span> <span class="ident">LogColor</span> {
-    <span class="kw">fn</span> <span class="ident">as_terminal_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">as_terminal_string</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
         <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
             <span class="comment">// \x1b is the ESC character (0x1B)</span>
-			<span class="ident">LogColor::Black</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[30m&quot;</span>,
-			<span class="ident">LogColor::Red</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[31m&quot;</span>,
-			<span class="ident">LogColor::Green</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[32m&quot;</span>,
-			<span class="ident">LogColor::Yellow</span>  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[33m&quot;</span>,
-			<span class="ident">LogColor::Blue</span>	  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[34m&quot;</span>,
-			<span class="ident">LogColor::Purple</span>  <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[35m&quot;</span>,
-            <span class="ident">LogColor::Cyan</span>    <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[36m&quot;</span>,
-            <span class="ident">LogColor::White</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[37m&quot;</span>,
-            <span class="ident">LogColor::Reset</span>   <span class="op">=</span><span class="op">&gt;</span>  <span class="string">&quot;\x1b[0m\n&quot;</span>, 
+			<span class="ident">LogColor::Black</span>	  =&gt;  <span class="string">&quot;\x1b[30m&quot;</span>,
+			<span class="ident">LogColor::Red</span>	  =&gt;  <span class="string">&quot;\x1b[31m&quot;</span>,
+			<span class="ident">LogColor::Green</span>   =&gt;  <span class="string">&quot;\x1b[32m&quot;</span>,
+			<span class="ident">LogColor::Yellow</span>  =&gt;  <span class="string">&quot;\x1b[33m&quot;</span>,
+			<span class="ident">LogColor::Blue</span>	  =&gt;  <span class="string">&quot;\x1b[34m&quot;</span>,
+			<span class="ident">LogColor::Purple</span>  =&gt;  <span class="string">&quot;\x1b[35m&quot;</span>,
+            <span class="ident">LogColor::Cyan</span>    =&gt;  <span class="string">&quot;\x1b[36m&quot;</span>,
+            <span class="ident">LogColor::White</span>   =&gt;  <span class="string">&quot;\x1b[37m&quot;</span>,
+            <span class="ident">LogColor::Reset</span>   =&gt;  <span class="string">&quot;\x1b[0m\n&quot;</span>, 
         }
     }
 }
@@ -566,6 +567,6 @@
 <span class="doccomment">/// See [`mirror_to_vga()`].</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">LogOutputFunc</span> <span class="op">=</span> <span class="kw">fn</span>(<span class="ident">fmt::Arguments</span>);
 <span class="kw">static</span> <span class="ident">MIRROR_VGA_FUNC</span>: <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">LogOutputFunc</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="logger" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="logger" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

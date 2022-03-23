@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/ansi_style.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ansi_style.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../text_terminal/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/ansi_style.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>ansi_style.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../text_terminal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../text_terminal/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../text_terminal/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -586,8 +588,7 @@
 <span id="583">583</span>
 <span id="584">584</span>
 <span id="585">585</span>
-</pre><pre class="rust">
-<span class="doccomment">//! Style and formatting of text displayed in a terminal,</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Style and formatting of text displayed in a terminal,</span>
 <span class="doccomment">//! following the ANSI, VT100, and xterm standards.</span>
 
 <span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">convert::TryFrom</span>, <span class="ident">fmt</span>};
@@ -605,7 +606,7 @@
     <span class="ident">format_flags</span>: <span class="ident">FormatFlags</span>,
 }
 <span class="kw">impl</span> <span class="ident">Style</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">diff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">diff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>) -&gt; <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
         <span class="ident">StyleDiff::new</span>(<span class="self">self</span>, <span class="ident">other</span>)
     }
 }
@@ -626,7 +627,7 @@
     <span class="ident">new</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>,
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">old</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="ident">Style</span>, <span class="ident">new</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">old</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;old</span> <span class="ident">Style</span>, <span class="ident">new</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;new</span> <span class="ident">Style</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">format_flags_diff</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">format_flags</span>.<span class="ident">diff</span>(<span class="ident">new</span>.<span class="ident">format_flags</span>);
         <span class="kw">let</span> <span class="ident">fg_color_changed</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">color_foreground</span> <span class="op">!</span><span class="op">=</span> <span class="ident">new</span>.<span class="ident">color_foreground</span>;
         <span class="kw">let</span> <span class="ident">bg_color_changed</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">color_background</span> <span class="op">!</span><span class="op">=</span> <span class="ident">new</span>.<span class="ident">color_background</span>;
@@ -644,9 +645,9 @@
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">StyleDiff</span><span class="op">&lt;</span><span class="lifetime">&#39;old</span>, <span class="lifetime">&#39;new</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">AnsiStyleCodes</span>;
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::Item</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
         <span class="comment">// Stage 0: return all the diffs for the format flags.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">==</span> <span class="number">0</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">diff</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">format_flags_diff</span>.<span class="ident">next</span>() {
                 <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">diff</span>);
             } <span class="kw">else</span> {
@@ -655,7 +656,7 @@
         }
 
         <span class="comment">// Stage 1: return foreground color diff.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span><span class="op">=</span> <span class="number">1</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">==</span> <span class="number">1</span> {
             <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span> <span class="number">2</span>;
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">format_flags_diff</span>.<span class="ident">reset_issued</span> {
                 <span class="comment">// Optimization: no need to issue a default color parameter after a reset.</span>
@@ -671,7 +672,7 @@
         }
 
         <span class="comment">// Stage 2: return background color diff.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span><span class="op">=</span> <span class="number">2</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">stage</span> <span class="op">==</span> <span class="number">2</span> {
             <span class="self">self</span>.<span class="ident">stage</span> <span class="op">=</span> <span class="number">3</span>;
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">format_flags_diff</span>.<span class="ident">reset_issued</span> {
                 <span class="comment">// Optimization: no need to issue a default color parameter after a reset.</span>
@@ -713,7 +714,7 @@
     <span class="ident">reset_issued</span>: <span class="ident">bool</span>,
 }
 <span class="kw">impl</span> <span class="ident">FormatFlagsDiff</span> {
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">old</span>: <span class="ident">FormatFlags</span>, <span class="ident">new</span>: <span class="ident">FormatFlags</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">old</span>: <span class="ident">FormatFlags</span>, <span class="ident">new</span>: <span class="ident">FormatFlags</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">bits_that_differ</span> <span class="op">=</span> <span class="ident">old</span>.<span class="ident">bits_that_differ</span>(<span class="ident">new</span>);
         <span class="kw">let</span> <span class="ident">num_different_bits</span> <span class="op">=</span> <span class="ident">bits_that_differ</span>.<span class="ident">bits</span>().<span class="ident">count_ones</span>();
         <span class="ident">FormatFlagsDiff</span> {
@@ -730,7 +731,7 @@
 
 <span class="kw">impl</span> <span class="ident">Iterator</span> <span class="kw">for</span> <span class="ident">FormatFlagsDiff</span> {
     <span class="kw">type</span> <span class="ident">Item</span> <span class="op">=</span> <span class="ident">AnsiStyleCodes</span>;
-    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::Item</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Item</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">next_bit</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">FormatFlags::MAX_BIT</span> { <span class="kw">return</span> <span class="prelude-val">None</span>; }
 
         <span class="comment">// Optimization: the set of new flags is empty, so we only need to issue one `Reset`. </span>
@@ -794,8 +795,8 @@
     <span class="kw">let</span> <span class="ident">old_ff</span> <span class="op">=</span> <span class="ident">FormatFlags::BRIGHT</span> <span class="op">|</span> <span class="ident">FormatFlags::UNDERLINE</span> <span class="op">|</span> <span class="ident">FormatFlags::INVERSE</span> <span class="op">|</span> <span class="ident">FormatFlags::HIDDEN</span>;
     <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="ident">Style</span> { 
         <span class="ident">format_flags</span>: <span class="ident">old_ff</span>,
-        <span class="ident">color_foreground</span>: <span class="ident">ForegroundColor</span>(<span class="kw">crate</span><span class="ident">::Color::BrightCyan</span>),
-        <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>(<span class="kw">crate</span><span class="ident">::Color::Cyan</span>),
+        <span class="ident">color_foreground</span>: <span class="ident">ForegroundColor</span>(<span class="ident"><span class="kw">crate</span>::Color::BrightCyan</span>),
+        <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>(<span class="ident"><span class="kw">crate</span>::Color::Cyan</span>),
     };
 
     <span class="kw">let</span> <span class="ident">new_ff</span> <span class="op">=</span> <span class="ident">FormatFlags::empty</span>() <span class="op">|</span> <span class="ident">FormatFlags::STRIKETHROUGH</span>;
@@ -804,7 +805,7 @@
         <span class="ident">format_flags</span>: <span class="ident">new_ff</span>,
         <span class="ident">color_foreground</span>: <span class="ident">Default::default</span>(),
         <span class="comment">// color_foreground: ForegroundColor(crate::Color::BrightMagenta),</span>
-        <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>(<span class="kw">crate</span><span class="ident">::Color::Red</span>),
+        <span class="ident">color_background</span>: <span class="ident">BackgroundColor</span>(<span class="ident"><span class="kw">crate</span>::Color::Red</span>),
     };
 
     <span class="macro">println!</span>(<span class="string">&quot;old: {:?}&quot;</span>, <span class="ident">old</span>);
@@ -817,11 +818,11 @@
 
 <span class="attribute">#[<span class="ident">test</span>]</span>
 <span class="kw">fn</span> <span class="ident">test_size</span>() {
-    <span class="macro">println!</span>(<span class="string">&quot;Unit: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="kw">crate</span><span class="ident">::Unit</span><span class="op">&gt;</span>());
-    <span class="macro">println!</span>(<span class="string">&quot;      Character: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="kw">crate</span><span class="ident">::Character</span><span class="op">&gt;</span>());
+    <span class="macro">println!</span>(<span class="string">&quot;Unit: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Unit</span><span class="op">&gt;</span>());
+    <span class="macro">println!</span>(<span class="string">&quot;      Character: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Character</span><span class="op">&gt;</span>());
     <span class="macro">println!</span>(<span class="string">&quot;      Style: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">Style</span><span class="op">&gt;</span>());
     <span class="macro">println!</span>(<span class="string">&quot;      FormatFlags: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">FormatFlags</span><span class="op">&gt;</span>());
-    <span class="macro">println!</span>(<span class="string">&quot;      Color: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="kw">crate</span><span class="ident">::Color</span><span class="op">&gt;</span>());
+    <span class="macro">println!</span>(<span class="string">&quot;      Color: {}&quot;</span>, <span class="ident">std::mem::size_of</span>::<span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::Color</span><span class="op">&gt;</span>());
 }
 
 
@@ -934,59 +935,59 @@
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESCAPE_DELIM</span>:  <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;;&quot;</span>;
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ESCAPE_SUFFIX</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="string">b&quot;m&quot;</span>;
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_escape_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_escape_code</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Cow</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span>, <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="self">Self</span><span class="ident">::Reset</span>                     <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;0&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Bright</span>                    <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;1&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Dim</span>                       <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;2&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Italic</span>                    <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;3&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Underlined</span>                <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;4&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Blink</span>                     <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;5&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::BlinkRapid</span>                <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;6&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Inverse</span>                   <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;7&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Hidden</span>                    <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;8&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Strikethrough</span>             <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;9&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::PrimaryFont</span>               <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;10&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">0</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;10&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">1</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;11&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">2</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;12&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">3</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;13&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">4</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;14&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">5</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;15&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">6</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;16&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">7</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;17&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="number">8</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;18&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::AlternateFont</span>(<span class="ident">_9_and_up</span>)  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;19&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Fraktur</span>                   <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;20&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::DoulbeUnderlinedOrNotBright</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;21&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotBrightNorDim</span>           <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;22&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotItalicNorFraktur</span>       <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;23&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotUnderlined</span>             <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;24&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotBlink</span>                  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;25&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::_ProportionalSpacing</span>      <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;26&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotInverse</span>                <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;27&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotHidden</span>                 <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;28&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotStrikethrough</span>          <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;29&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::ForegroundColor</span>(<span class="ident">fgc</span>)      <span class="op">=</span><span class="op">&gt;</span> <span class="ident">fgc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;30&quot;-&quot;39&quot; and &quot;90&quot;-&quot;97&quot;</span>
-            <span class="self">Self</span><span class="ident">::BackgroundColor</span>(<span class="ident">bgc</span>)      <span class="op">=</span><span class="op">&gt;</span> <span class="ident">bgc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;40&quot;-&quot;49&quot; and &quot;100&quot;-&quot;107&quot;</span>
-            <span class="self">Self</span><span class="ident">::_NotProportionalSpacing</span>   <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;50&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Framed</span>                    <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;51&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Circled</span>                   <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;52&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Overlined</span>                 <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;53&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotFramedOrCircled</span>        <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;54&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotOverlined</span>              <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;55&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Reset</span>                     =&gt; <span class="string">&quot;0&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Bright</span>                    =&gt; <span class="string">&quot;1&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Dim</span>                       =&gt; <span class="string">&quot;2&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Italic</span>                    =&gt; <span class="string">&quot;3&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Underlined</span>                =&gt; <span class="string">&quot;4&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Blink</span>                     =&gt; <span class="string">&quot;5&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::BlinkRapid</span>                =&gt; <span class="string">&quot;6&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Inverse</span>                   =&gt; <span class="string">&quot;7&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Hidden</span>                    =&gt; <span class="string">&quot;8&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Strikethrough</span>             =&gt; <span class="string">&quot;9&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::PrimaryFont</span>               =&gt; <span class="string">&quot;10&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">0</span>)          =&gt; <span class="string">&quot;10&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">1</span>)          =&gt; <span class="string">&quot;11&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">2</span>)          =&gt; <span class="string">&quot;12&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">3</span>)          =&gt; <span class="string">&quot;13&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">4</span>)          =&gt; <span class="string">&quot;14&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">5</span>)          =&gt; <span class="string">&quot;15&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">6</span>)          =&gt; <span class="string">&quot;16&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">7</span>)          =&gt; <span class="string">&quot;17&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="number">8</span>)          =&gt; <span class="string">&quot;18&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::AlternateFont</span>(<span class="ident">_9_and_up</span>)  =&gt; <span class="string">&quot;19&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Fraktur</span>                   =&gt; <span class="string">&quot;20&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::DoulbeUnderlinedOrNotBright</span> =&gt; <span class="string">&quot;21&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotBrightNorDim</span>           =&gt; <span class="string">&quot;22&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotItalicNorFraktur</span>       =&gt; <span class="string">&quot;23&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotUnderlined</span>             =&gt; <span class="string">&quot;24&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotBlink</span>                  =&gt; <span class="string">&quot;25&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::_ProportionalSpacing</span>      =&gt; <span class="string">&quot;26&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotInverse</span>                =&gt; <span class="string">&quot;27&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotHidden</span>                 =&gt; <span class="string">&quot;28&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotStrikethrough</span>          =&gt; <span class="string">&quot;29&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::ForegroundColor</span>(<span class="ident">fgc</span>)      =&gt; <span class="ident">fgc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;30&quot;-&quot;39&quot; and &quot;90&quot;-&quot;97&quot;</span>
+            <span class="ident"><span class="self">Self</span>::BackgroundColor</span>(<span class="ident">bgc</span>)      =&gt; <span class="ident">bgc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;40&quot;-&quot;49&quot; and &quot;100&quot;-&quot;107&quot;</span>
+            <span class="ident"><span class="self">Self</span>::_NotProportionalSpacing</span>   =&gt; <span class="string">&quot;50&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Framed</span>                    =&gt; <span class="string">&quot;51&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Circled</span>                   =&gt; <span class="string">&quot;52&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Overlined</span>                 =&gt; <span class="string">&quot;53&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotFramedOrCircled</span>        =&gt; <span class="string">&quot;54&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotOverlined</span>              =&gt; <span class="string">&quot;55&quot;</span>.<span class="ident">into</span>(),
             <span class="comment">// 56 - 57 are unknown</span>
-            <span class="self">Self</span><span class="ident">::UnderlinedColor</span>(<span class="ident">ulc</span>)      <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ulc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;58&quot;-&quot;59&quot;</span>
-            <span class="self">Self</span><span class="ident">::_IdeogramUnderlined</span>       <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;60&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::_IdeogramDoubleUnderlined</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;61&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::_IdeogramOverlined</span>        <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;62&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::_IdeogramDoubleOverlined</span>  <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;63&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::_IdeogramStressMarking</span>    <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;64&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::_NotIdeogram</span>              <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;65&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::UnderlinedColor</span>(<span class="ident">ulc</span>)      =&gt; <span class="ident">ulc</span>.<span class="ident">to_escape_code</span>(), <span class="comment">// Covers &quot;58&quot;-&quot;59&quot;</span>
+            <span class="ident"><span class="self">Self</span>::_IdeogramUnderlined</span>       =&gt; <span class="string">&quot;60&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::_IdeogramDoubleUnderlined</span> =&gt; <span class="string">&quot;61&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::_IdeogramOverlined</span>        =&gt; <span class="string">&quot;62&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::_IdeogramDoubleOverlined</span>  =&gt; <span class="string">&quot;63&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::_IdeogramStressMarking</span>    =&gt; <span class="string">&quot;64&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::_NotIdeogram</span>              =&gt; <span class="string">&quot;65&quot;</span>.<span class="ident">into</span>(),
             <span class="comment">// 66 - 72 are unknown</span>
-            <span class="self">Self</span><span class="ident">::Superscript</span>               <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;73&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::Subscript</span>                 <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;74&quot;</span>.<span class="ident">into</span>(),
-            <span class="self">Self</span><span class="ident">::NotSuperOrSubscript</span>       <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;75&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Superscript</span>               =&gt; <span class="string">&quot;73&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::Subscript</span>                 =&gt; <span class="string">&quot;74&quot;</span>.<span class="ident">into</span>(),
+            <span class="ident"><span class="self">Self</span>::NotSuperOrSubscript</span>       =&gt; <span class="string">&quot;75&quot;</span>.<span class="ident">into</span>(),
             <span class="comment">// 76 - 89 are unknown</span>
             <span class="comment">// 90 - 97 are covered by `Self::ForegroundColor`</span>
             <span class="comment">// 98 - 99 are unknown</span>
@@ -997,7 +998,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">AnsiStyleCodes</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">to_escape_code</span>())
     }
 }
@@ -1041,11 +1042,11 @@
     <span class="doccomment">/// in which the bit is set if that bit was different across `self` vs `other`.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// This is merely a bit-wise logical XOR of `self` and `other`. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bits_that_differ</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">FormatFlags</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FormatFlags</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bits_that_differ</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">FormatFlags</span>) -&gt; <span class="ident">FormatFlags</span> {
         <span class="self">self</span> <span class="op">^</span> <span class="ident">other</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">diff</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">FormatFlags</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">FormatFlagsDiff</span> {
+    <span class="kw">fn</span> <span class="ident">diff</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="ident">FormatFlags</span>) -&gt; <span class="ident">FormatFlagsDiff</span> {
         <span class="ident">FormatFlagsDiff::new</span>(<span class="self">self</span>, <span class="ident">other</span>)
     }
 
@@ -1053,26 +1054,26 @@
     <span class="doccomment">/// given by the single bit that is set in this `Format`Flags` (`self`). </span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Returns `None` if more than one bit is set in this `FormatFlags` (`self`).</span>
-    <span class="kw">fn</span> <span class="ident">to_style_code</span>(<span class="self">self</span>, <span class="ident">enable</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AnsiStyleCodes</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">to_style_code</span>(<span class="self">self</span>, <span class="ident">enable</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AnsiStyleCodes</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">code</span> <span class="op">=</span> <span class="kw">match</span> (<span class="self">self</span>, <span class="ident">enable</span>) {
-            (<span class="ident">FormatFlags::BRIGHT</span>, <span class="bool-val">true</span>)            <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Bright</span>,
-            (<span class="ident">FormatFlags::BRIGHT</span>, <span class="bool-val">false</span>)           <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotBrightNorDim</span>,
-            (<span class="ident">FormatFlags::DIM</span>, <span class="bool-val">true</span>)               <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Dim</span>,
-            (<span class="ident">FormatFlags::DIM</span>, <span class="bool-val">false</span>)              <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotBrightNorDim</span>,
-            (<span class="ident">FormatFlags::ITALIC</span>, <span class="bool-val">true</span>)            <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Italic</span>,
-            (<span class="ident">FormatFlags::ITALIC</span>, <span class="bool-val">false</span>)           <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotItalicNorFraktur</span>,
-            (<span class="ident">FormatFlags::UNDERLINE</span>, <span class="bool-val">true</span>)         <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Underlined</span>,
-            (<span class="ident">FormatFlags::UNDERLINE</span>, <span class="bool-val">false</span>)        <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotUnderlined</span>,
-            (<span class="ident">FormatFlags::BLINK</span>, <span class="bool-val">true</span>)             <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Blink</span>,
-            (<span class="ident">FormatFlags::BLINK</span>, <span class="bool-val">false</span>)            <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotBlink</span>,
-            (<span class="ident">FormatFlags::INVERSE</span>, <span class="bool-val">true</span>)           <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Inverse</span>,
-            (<span class="ident">FormatFlags::INVERSE</span>, <span class="bool-val">false</span>)          <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotInverse</span>,
-            (<span class="ident">FormatFlags::HIDDEN</span>, <span class="bool-val">true</span>)            <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Hidden</span>,
-            (<span class="ident">FormatFlags::HIDDEN</span>, <span class="bool-val">false</span>)           <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotHidden</span>,
-            (<span class="ident">FormatFlags::STRIKETHROUGH</span>, <span class="bool-val">true</span>)     <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::Strikethrough</span>,
-            (<span class="ident">FormatFlags::STRIKETHROUGH</span>, <span class="bool-val">false</span>)    <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AnsiStyleCodes::NotStrikethrough</span>,
+            (<span class="ident">FormatFlags::BRIGHT</span>, <span class="bool-val">true</span>)            =&gt; <span class="ident">AnsiStyleCodes::Bright</span>,
+            (<span class="ident">FormatFlags::BRIGHT</span>, <span class="bool-val">false</span>)           =&gt; <span class="ident">AnsiStyleCodes::NotBrightNorDim</span>,
+            (<span class="ident">FormatFlags::DIM</span>, <span class="bool-val">true</span>)               =&gt; <span class="ident">AnsiStyleCodes::Dim</span>,
+            (<span class="ident">FormatFlags::DIM</span>, <span class="bool-val">false</span>)              =&gt; <span class="ident">AnsiStyleCodes::NotBrightNorDim</span>,
+            (<span class="ident">FormatFlags::ITALIC</span>, <span class="bool-val">true</span>)            =&gt; <span class="ident">AnsiStyleCodes::Italic</span>,
+            (<span class="ident">FormatFlags::ITALIC</span>, <span class="bool-val">false</span>)           =&gt; <span class="ident">AnsiStyleCodes::NotItalicNorFraktur</span>,
+            (<span class="ident">FormatFlags::UNDERLINE</span>, <span class="bool-val">true</span>)         =&gt; <span class="ident">AnsiStyleCodes::Underlined</span>,
+            (<span class="ident">FormatFlags::UNDERLINE</span>, <span class="bool-val">false</span>)        =&gt; <span class="ident">AnsiStyleCodes::NotUnderlined</span>,
+            (<span class="ident">FormatFlags::BLINK</span>, <span class="bool-val">true</span>)             =&gt; <span class="ident">AnsiStyleCodes::Blink</span>,
+            (<span class="ident">FormatFlags::BLINK</span>, <span class="bool-val">false</span>)            =&gt; <span class="ident">AnsiStyleCodes::NotBlink</span>,
+            (<span class="ident">FormatFlags::INVERSE</span>, <span class="bool-val">true</span>)           =&gt; <span class="ident">AnsiStyleCodes::Inverse</span>,
+            (<span class="ident">FormatFlags::INVERSE</span>, <span class="bool-val">false</span>)          =&gt; <span class="ident">AnsiStyleCodes::NotInverse</span>,
+            (<span class="ident">FormatFlags::HIDDEN</span>, <span class="bool-val">true</span>)            =&gt; <span class="ident">AnsiStyleCodes::Hidden</span>,
+            (<span class="ident">FormatFlags::HIDDEN</span>, <span class="bool-val">false</span>)           =&gt; <span class="ident">AnsiStyleCodes::NotHidden</span>,
+            (<span class="ident">FormatFlags::STRIKETHROUGH</span>, <span class="bool-val">true</span>)     =&gt; <span class="ident">AnsiStyleCodes::Strikethrough</span>,
+            (<span class="ident">FormatFlags::STRIKETHROUGH</span>, <span class="bool-val">false</span>)    =&gt; <span class="ident">AnsiStyleCodes::NotStrikethrough</span>,
             <span class="comment">// When more bit flags exist, add those cases here.</span>
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span> <span class="prelude-val">None</span>,
+            <span class="kw">_</span> =&gt; <span class="kw">return</span> <span class="prelude-val">None</span>,
         };
         <span class="prelude-val">Some</span>(<span class="ident">code</span>)
     }
@@ -1172,6 +1173,6 @@
     <span class="doccomment">/// The value that comes after one of the above command values.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">SUFFIX</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="string">b&#39;n&#39;</span>;
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_terminal" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="text_terminal" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

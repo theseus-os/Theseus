@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/frame_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../frame_allocator/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/frame_allocator/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../frame_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../frame_allocator/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../frame_allocator/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -990,9 +992,7 @@
 <span id="987">987</span>
 <span id="988">988</span>
 <span id="989">989</span>
-<span id="990">990</span>
-</pre><pre class="rust">
-<span class="doccomment">//! Provides an allocator for physical memory frames.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.</span>
 <span class="doccomment">//! The minimum unit of allocation is a single frame. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This is currently a modified and more complex version of the `page_allocator` crate.</span>
@@ -1013,7 +1013,6 @@
 <span class="doccomment">//! a requested address is in a chunk that needs to be merged.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
-<span class="attribute">#![<span class="ident">feature</span>(<span class="ident">const_fn_trait_bound</span>)]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
@@ -1071,7 +1070,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span><span class="op">&lt;</span><span class="ident">F</span>, <span class="ident">R</span>, <span class="ident">P</span><span class="op">&gt;</span>(
     <span class="ident">free_physical_memory_areas</span>: <span class="ident">F</span>,
     <span class="ident">reserved_physical_memory_areas</span>: <span class="ident">R</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> 
     <span class="kw">where</span> <span class="ident">P</span>: <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">PhysicalMemoryRegion</span><span class="op">&gt;</span>,
           <span class="ident">F</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">P</span><span class="op">&gt;</span>,
           <span class="ident">R</span>: <span class="ident">IntoIterator</span><span class="op">&lt;</span><span class="ident">Item</span> <span class="op">=</span> <span class="ident">P</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Clone</span>,
@@ -1095,8 +1094,8 @@
         <span class="comment">// debug!(&quot;Frame Allocator: looking to add free physical memory area: {:?}&quot;, area);</span>
         <span class="ident">check_and_add_free_region</span>(
             <span class="kw-2">&amp;</span><span class="ident">area</span>,
-            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">free_list</span>,
-            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">free_list_idx</span>,
+            <span class="kw-2">&amp;mut</span> <span class="ident">free_list</span>,
+            <span class="kw-2">&amp;mut</span> <span class="ident">free_list_idx</span>,
             <span class="ident">reserved_physical_memory_areas</span>.<span class="ident">clone</span>(),
         );
     }
@@ -1157,8 +1156,8 @@
 <span class="doccomment">/// the given list of `reserved_physical_memory_areas`.</span>
 <span class="kw">fn</span> <span class="ident">check_and_add_free_region</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">R</span><span class="op">&gt;</span>(
     <span class="ident">area</span>: <span class="kw-2">&amp;</span><span class="ident">FrameRange</span>,
-    <span class="ident">free_list</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>; <span class="number">32</span>],
-    <span class="ident">free_list_idx</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">usize</span>,
+    <span class="ident">free_list</span>: <span class="kw-2">&amp;mut</span> [<span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>; <span class="number">32</span>],
+    <span class="ident">free_list_idx</span>: <span class="kw-2">&amp;mut</span> <span class="ident">usize</span>,
     <span class="ident">reserved_physical_memory_areas</span>: <span class="ident">R</span>,
 )
     <span class="kw">where</span> <span class="ident">P</span>: <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">PhysicalMemoryRegion</span><span class="op">&gt;</span>,
@@ -1219,13 +1218,13 @@
     <span class="kw">pub</span> <span class="ident">typ</span>: <span class="ident">MemoryRegionType</span>,
 }
 <span class="kw">impl</span> <span class="ident">PhysicalMemoryRegion</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">frames</span>: <span class="ident">FrameRange</span>, <span class="ident">typ</span>: <span class="ident">MemoryRegionType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PhysicalMemoryRegion</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">frames</span>: <span class="ident">FrameRange</span>, <span class="ident">typ</span>: <span class="ident">MemoryRegionType</span>) -&gt; <span class="ident">PhysicalMemoryRegion</span> {
         <span class="ident">PhysicalMemoryRegion</span> { <span class="ident">frames</span>, <span class="ident">typ</span> }
     }
 }
 <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">PhysicalMemoryRegion</span> {
     <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">FrameRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frames</span>
     }
 }
@@ -1264,14 +1263,14 @@
     <span class="ident">frames</span>: <span class="ident">FrameRange</span>,
 }
 <span class="kw">impl</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">as_allocated_frames</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AllocatedFrames</span> {
+    <span class="kw">fn</span> <span class="ident">as_allocated_frames</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AllocatedFrames</span> {
         <span class="ident">AllocatedFrames</span> {
             <span class="ident">frames</span>: <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">clone</span>(),
         }
     }
 
     <span class="doccomment">/// Returns a new `Chunk` with an empty range of frames. </span>
-    <span class="kw">fn</span> <span class="ident">empty</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Chunk</span> {
+    <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">Chunk</span> {
         <span class="ident">Chunk</span> {
             <span class="ident">typ</span>: <span class="ident">MemoryRegionType::Unknown</span>,
             <span class="ident">frames</span>: <span class="ident">FrameRange::empty</span>(),
@@ -1280,27 +1279,27 @@
 }
 <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
     <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">FrameRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frames</span>
     }
 }
 <span class="kw">impl</span> <span class="ident">Ord</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Ordering</span> {
+    <span class="kw">fn</span> <span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">Ordering</span> {
         <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">start</span>().<span class="ident">cmp</span>(<span class="ident">other</span>.<span class="ident">frames</span>.<span class="ident">start</span>())
     }
 }
 <span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
         <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">cmp</span>(<span class="ident">other</span>))
     }
 }
 <span class="kw">impl</span> <span class="ident">PartialEq</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">start</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">other</span>.<span class="ident">frames</span>.<span class="ident">start</span>()
+    <span class="kw">fn</span> <span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">start</span>() <span class="op">==</span> <span class="ident">other</span>.<span class="ident">frames</span>.<span class="ident">start</span>()
     }
 }
 <span class="kw">impl</span> <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">Frame</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;_</span> <span class="ident">Chunk</span> {
-    <span class="kw">fn</span> <span class="ident">borrow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Frame</span> {
+    <span class="kw">fn</span> <span class="ident">borrow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Frame</span> {
         <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">start</span>()
     }
 }
@@ -1322,12 +1321,12 @@
 
 <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">AllocatedFrames</span> {
     <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">FrameRange</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">FrameRange</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">frames</span>
     }
 }
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AllocatedFrames</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;AllocatedFrames({:?})&quot;</span>, <span class="self">self</span>.<span class="ident">frames</span>)
     }
 }
@@ -1335,7 +1334,7 @@
 <span class="kw">impl</span> <span class="ident">AllocatedFrames</span> {
     <span class="doccomment">/// Returns an empty AllocatedFrames object that performs no frame allocation. </span>
     <span class="doccomment">/// Can be used as a placeholder, but will not permit any real usage. </span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AllocatedFrames</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">empty</span>() -&gt; <span class="ident">AllocatedFrames</span> {
         <span class="ident">AllocatedFrames</span> {
             <span class="ident">frames</span>: <span class="ident">FrameRange::empty</span>()
         }
@@ -1349,12 +1348,12 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// If either of those conditions are met, `self` is modified and `Ok(())` is returned,</span>
     <span class="doccomment">/// otherwise `Err(other)` is returned.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="ident">AllocatedFrames</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">merge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">other</span>: <span class="ident">AllocatedFrames</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">==</span> <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> {
             <span class="comment">// `other` comes contiguously before `self`</span>
             <span class="self">self</span>.<span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
         } 
-        <span class="kw">else</span> <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">start</span>() {
+        <span class="kw">else</span> <span class="kw">if</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">start</span>() {
             <span class="comment">// `self` comes contiguously before `other`</span>
             <span class="self">self</span>.<span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">other</span>.<span class="ident">end</span>());
         }
@@ -1380,15 +1379,15 @@
     <span class="doccomment">/// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is otherwise out of bounds.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="self">self</span>, <span class="ident">at_frame</span>: <span class="ident">Frame</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">AllocatedFrames</span>), <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">split</span>(<span class="self">self</span>, <span class="ident">at_frame</span>: <span class="ident">Frame</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">AllocatedFrames</span>), <span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">end_of_first</span> <span class="op">=</span> <span class="ident">at_frame</span> <span class="op">-</span> <span class="number">1</span>;
 
-        <span class="kw">let</span> (<span class="ident">first</span>, <span class="ident">second</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">at_frame</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">at_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
+        <span class="kw">let</span> (<span class="ident">first</span>, <span class="ident">second</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">at_frame</span> <span class="op">==</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">at_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() {
             <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">FrameRange::empty</span>();
             <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="ident">at_frame</span>, <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>());
             (<span class="ident">first</span>, <span class="ident">second</span>)
         } 
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_frame</span> <span class="op">=</span><span class="op">=</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>) <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() {
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">at_frame</span> <span class="op">==</span> (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span>) <span class="op">&amp;&amp;</span> <span class="ident">end_of_first</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>() {
             <span class="kw">let</span> <span class="ident">first</span>  <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">end</span>()); 
             <span class="kw">let</span> <span class="ident">second</span> <span class="op">=</span> <span class="ident">FrameRange::empty</span>();
             (<span class="ident">first</span>, <span class="ident">second</span>)
@@ -1418,7 +1417,7 @@
 <span class="comment">// Therefore, they can be safely converted into `AllocatedFrames`</span>
 <span class="comment">// which can then be dropped and subsequently deallocated.</span>
 <span class="kw">impl</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">UnmappedFrames</span> {
-    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AllocatedFrames</span> {
+    <span class="kw">fn</span> <span class="ident">into</span>(<span class="self">self</span>) -&gt; <span class="ident">AllocatedFrames</span> {
         <span class="ident">AllocatedFrames</span> {
             <span class="ident">frames</span>: <span class="self">self</span>.<span class="ident">deref</span>().<span class="ident">clone</span>(),
         }
@@ -1426,8 +1425,8 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">AllocatedFrames</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">size_in_frames</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0</span> { <span class="kw">return</span>; }
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">size_in_frames</span>() <span class="op">==</span> <span class="number">0</span> { <span class="kw">return</span>; }
 
         <span class="kw">let</span> (<span class="ident">list</span>, <span class="ident">typ</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">frame_is_in_list</span>(<span class="kw-2">&amp;</span><span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>(), <span class="self">self</span>.<span class="ident">start</span>()) {
             (<span class="kw-2">&amp;</span><span class="ident">FREE_RESERVED_FRAMES_LIST</span>, <span class="ident">MemoryRegionType::Reserved</span>)
@@ -1443,8 +1442,8 @@
             <span class="ident">frames</span>: <span class="self">self</span>.<span class="ident">frames</span>.<span class="ident">clone</span>(),
         });
         <span class="kw">match</span> <span class="ident">res</span> {
-            <span class="prelude-val">Ok</span>(<span class="ident">_inserted_free_chunk</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">return</span>,
-            <span class="prelude-val">Err</span>(<span class="ident">c</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free frame list&quot;</span>, <span class="ident">c</span>),
+            <span class="prelude-val">Ok</span>(<span class="ident">_inserted_free_chunk</span>) =&gt; <span class="kw">return</span>,
+            <span class="prelude-val">Err</span>(<span class="ident">c</span>) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free frame list&quot;</span>, <span class="ident">c</span>),
         }
         
         <span class="comment">// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks</span>
@@ -1480,7 +1479,7 @@
     <span class="ident">free2</span>: <span class="ident">Chunk</span>,
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">F1</span>, <span class="ident">F2</span><span class="op">&gt;</span>(<span class="ident">free1</span>: <span class="ident">F1</span>, <span class="ident">free2</span>: <span class="ident">F2</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> 
+    <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">F1</span>, <span class="ident">F2</span><span class="op">&gt;</span>(<span class="ident">free1</span>: <span class="ident">F1</span>, <span class="ident">free2</span>: <span class="ident">F2</span>) -&gt; <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> 
         <span class="kw">where</span> <span class="ident">F1</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
               <span class="ident">F2</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     {
@@ -1495,20 +1494,20 @@
     }
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="comment">// Insert all of the chunks, both allocated and free ones, into the list. </span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">size_in_frames</span>() <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">typ</span> {
-                <span class="ident">MemoryRegionType::Free</span>     <span class="op">=</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="ident">MemoryRegionType::Reserved</span> <span class="op">=</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">reserved_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free1 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.<span class="ident">free1</span>),
+                <span class="ident">MemoryRegionType::Free</span>     =&gt; { <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
+                <span class="ident">MemoryRegionType::Reserved</span> =&gt; { <span class="self">self</span>.<span class="ident">reserved_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free1</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
+                <span class="kw">_</span> =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free1 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.<span class="ident">free1</span>),
             }
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">size_in_frames</span>() <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">typ</span> {
-                <span class="ident">MemoryRegionType::Free</span>     <span class="op">=</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="ident">MemoryRegionType::Reserved</span> <span class="op">=</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">reserved_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free2 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.<span class="ident">free2</span>),
+                <span class="ident">MemoryRegionType::Free</span>     =&gt; { <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
+                <span class="ident">MemoryRegionType::Reserved</span> =&gt; { <span class="self">self</span>.<span class="ident">reserved_list</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="self">self</span>.<span class="ident">free2</span>.<span class="ident">clone</span>()).<span class="ident">unwrap</span>(); }
+                <span class="kw">_</span> =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG likely: DeferredAllocAction encountered free2 chunk {:?} of a type Unknown&quot;</span>, <span class="self">self</span>.<span class="ident">free2</span>),
             };
         }
     }
@@ -1524,10 +1523,10 @@
     <span class="ident">OutOfAddressSpace</span>(<span class="ident">usize</span>),
 }
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">AllocationError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">alloc_err</span>: <span class="ident">AllocationError</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">alloc_err</span>: <span class="ident">AllocationError</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
         <span class="kw">match</span> <span class="ident">alloc_err</span> {
-            <span class="ident">AllocationError::AddressNotFree</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;address was in use or outside of this allocator&#39;s range&quot;</span>,
-            <span class="ident">AllocationError::OutOfAddressSpace</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;out of address space&quot;</span>,
+            <span class="ident">AllocationError::AddressNotFree</span>(..) =&gt; <span class="string">&quot;address was in use or outside of this allocator&#39;s range&quot;</span>,
+            <span class="ident">AllocationError::OutOfAddressSpace</span>(..) =&gt; <span class="string">&quot;out of address space&quot;</span>,
         }
     }
 }
@@ -1536,16 +1535,16 @@
 <span class="doccomment">/// Searches the given `list` for the chunk that contains the range of frames from</span>
 <span class="doccomment">/// `requested_frame` to `requested_frame + num_frames`.</span>
 <span class="kw">fn</span> <span class="ident">find_specific_chunk</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
+    <span class="ident">list</span>: <span class="kw-2">&amp;mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
     <span class="ident">requested_frame</span>: <span class="ident">Frame</span>,
     <span class="ident">num_frames</span>: <span class="ident">usize</span>
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
 
     <span class="comment">// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.</span>
     <span class="kw">let</span> <span class="ident">requested_end_frame</span> <span class="op">=</span> <span class="ident">requested_frame</span> <span class="op">+</span> (<span class="ident">num_frames</span> <span class="op">-</span> <span class="number">1</span>);
 
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+    <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="ident">list</span>.<span class="number">0</span> {
+        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
             <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter_mut</span>() {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
                     <span class="kw">if</span> <span class="ident">requested_frame</span> <span class="op">&gt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&amp;&amp;</span> <span class="ident">requested_end_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() {
@@ -1555,7 +1554,7 @@
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor_mut</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound::Included</span>(<span class="kw-2">&amp;</span><span class="ident">requested_frame</span>));
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>().<span class="ident">clone</span>()) {
                 <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">requested_frame</span>) {
@@ -1574,7 +1573,7 @@
                         <span class="kw">let</span> <span class="ident">next_contiguous_chunk</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span> <span class="op">=</span> {
                             <span class="kw">let</span> <span class="ident">next_cursor</span> <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">peek_next</span>();
                             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next_chunk</span>) <span class="op">=</span> <span class="ident">next_cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-                                <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">start</span>() {
+                                <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">end</span>() <span class="op">+</span> <span class="number">1</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">start</span>() {
                                     <span class="comment">// Here: next chunk was contiguous with the original chunk. </span>
                                     <span class="kw">if</span> <span class="ident">requested_end_frame</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">next_chunk</span>.<span class="ident">end</span>() {
                                         <span class="comment">// trace!(&quot;Frame allocator: found suitably-large contiguous next {:?} after initial too-small {:?}&quot;, next_chunk, chunk);</span>
@@ -1620,10 +1619,10 @@
 <span class="kw">fn</span> <span class="ident">find_any_chunk</span><span class="op">&lt;</span><span class="lifetime">&#39;list</span><span class="op">&gt;</span>(
     <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list</span> <span class="kw-2">mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
     <span class="ident">num_frames</span>: <span class="ident">usize</span>
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
     <span class="comment">// During the first pass, we ignore designated regions.</span>
     <span class="kw">match</span> <span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
             <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter_mut</span>() {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
                     <span class="comment">// Skip chunks that are too-small or in the designated regions.</span>
@@ -1636,13 +1635,13 @@
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
             <span class="comment">// Because we allocate new frames by peeling them off from the beginning part of a chunk, </span>
             <span class="comment">// it&#39;s MUCH faster to start the search for free frames from higher addresses moving down. </span>
             <span class="comment">// This results in an O(1) allocation time in the general case, until all address ranges are already in use.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound</span>::<span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="ident">::Unbounded</span>);
             <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
-                <span class="kw">if</span> <span class="ident">num_frames</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">size_in_frames</span>() <span class="op">&amp;&amp;</span> <span class="ident">chunk</span>.<span class="ident">typ</span> <span class="op">=</span><span class="op">=</span> <span class="ident">MemoryRegionType::Free</span> {
+                <span class="kw">if</span> <span class="ident">num_frames</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">size_in_frames</span>() <span class="op">&amp;&amp;</span> <span class="ident">chunk</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">MemoryRegionType::Free</span> {
                     <span class="kw">return</span> <span class="ident">allocate_from_chosen_chunk</span>(<span class="kw-2">*</span><span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">num_frames</span>, <span class="kw-2">&amp;</span><span class="ident">chunk</span>.<span class="ident">clone</span>(), <span class="ident">ValueRefMut::RBTree</span>(<span class="ident">cursor</span>));
                 }
                 <span class="macro">warn!</span>(<span class="string">&quot;Frame allocator: inefficient scenario: had to search multiple chunks \
@@ -1673,7 +1672,7 @@
     <span class="ident">num_frames</span>: <span class="ident">usize</span>,
     <span class="ident">chosen_chunk</span>: <span class="kw-2">&amp;</span><span class="ident">Chunk</span>,
     <span class="kw-2">mut</span> <span class="ident">chosen_chunk_ref</span>: <span class="ident">ValueRefMut</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="ident">AllocationError</span><span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">new_allocation</span>, <span class="ident">before</span>, <span class="ident">after</span>) <span class="op">=</span> <span class="ident">split_chosen_chunk</span>(<span class="ident">start_frame</span>, <span class="ident">num_frames</span>, <span class="ident">chosen_chunk</span>);
 
     <span class="comment">// Remove the chosen chunk from the free frame list.</span>
@@ -1699,7 +1698,7 @@
     <span class="ident">start_frame</span>: <span class="ident">Frame</span>,
     <span class="ident">num_frames</span>: <span class="ident">usize</span>,
     <span class="ident">chosen_chunk</span>: <span class="kw-2">&amp;</span><span class="ident">Chunk</span>,
-) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">Chunk</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>) {
+) -&gt; (<span class="ident">Chunk</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>, <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>) {
     <span class="comment">// The new allocated chunk might start in the middle of an existing chunk,</span>
     <span class="comment">// so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.</span>
     <span class="comment">//</span>
@@ -1710,7 +1709,7 @@
         <span class="comment">// The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.</span>
         <span class="ident">frames</span>: <span class="ident">FrameRange::new</span>(<span class="ident">start_frame</span>, <span class="ident">start_frame</span> <span class="op">+</span> (<span class="ident">num_frames</span> <span class="op">-</span> <span class="number">1</span>)),
     };
-    <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start_frame</span> <span class="op">=</span><span class="op">=</span> <span class="ident">MIN_FRAME</span> {
+    <span class="kw">let</span> <span class="ident">before</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start_frame</span> <span class="op">==</span> <span class="ident">MIN_FRAME</span> {
         <span class="prelude-val">None</span>
     } <span class="kw">else</span> {
         <span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
@@ -1718,7 +1717,7 @@
             <span class="ident">frames</span>: <span class="ident">FrameRange::new</span>(<span class="kw-2">*</span><span class="ident">chosen_chunk</span>.<span class="ident">start</span>(), <span class="kw-2">*</span><span class="ident">new_allocation</span>.<span class="ident">start</span>() <span class="op">-</span> <span class="number">1</span>),
         })
     };
-    <span class="kw">let</span> <span class="ident">after</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">new_allocation</span>.<span class="ident">end</span>() <span class="op">=</span><span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">MAX_FRAME</span> { 
+    <span class="kw">let</span> <span class="ident">after</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">new_allocation</span>.<span class="ident">end</span>() <span class="op">==</span> <span class="kw-2">&amp;</span><span class="ident">MAX_FRAME</span> { 
         <span class="prelude-val">None</span>
     } <span class="kw">else</span> {
         <span class="prelude-val">Some</span>(<span class="ident">Chunk</span> {
@@ -1745,9 +1744,9 @@
 <span class="kw">fn</span> <span class="ident">frame_is_in_list</span>(
     <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
     <span class="ident">frame</span>: <span class="kw-2">&amp;</span><span class="ident">Frame</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+) -&gt; <span class="ident">bool</span> {
     <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="ident">arr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="ident">arr</span>) =&gt; {
             <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter</span>() {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
                     <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">contains</span>(<span class="ident">frame</span>) { 
@@ -1756,7 +1755,7 @@
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="ident">tree</span>) <span class="op">=</span><span class="op">&gt;</span> {     
+        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="ident">tree</span>) =&gt; {     
             <span class="kw">let</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound</span>(<span class="ident">Bound::Included</span>(<span class="ident">frame</span>));
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
                 <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">contains</span>(<span class="ident">frame</span>) {
@@ -1779,13 +1778,13 @@
 <span class="doccomment">/// overlap any existing regions at all. </span>
 <span class="doccomment">/// TODO: handle partially-overlapping regions by extending existing regions on either end.</span>
 <span class="kw">fn</span> <span class="ident">add_reserved_region</span>(
-    <span class="ident">list</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
+    <span class="ident">list</span>: <span class="kw-2">&amp;mut</span> <span class="ident">StaticArrayRBTree</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span>,
     <span class="ident">frames</span>: <span class="ident">FrameRange</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FrameRange</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">FrameRange</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
 
     <span class="comment">// Check whether the reserved region overlaps any existing regions.</span>
-    <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">list</span>.<span class="number">0</span> {
-        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+    <span class="kw">match</span> <span class="kw-2">&amp;mut</span> <span class="ident">list</span>.<span class="number">0</span> {
+        <span class="ident">Inner::Array</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">arr</span>) =&gt; {
             <span class="kw">for</span> <span class="ident">elem</span> <span class="kw">in</span> <span class="ident">arr</span>.<span class="ident">iter</span>() {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">elem</span> {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_overlap</span>) <span class="op">=</span> <span class="ident">chunk</span>.<span class="ident">overlap</span>(<span class="kw-2">&amp;</span><span class="ident">frames</span>) {
@@ -1797,7 +1796,7 @@
                 }
             }
         }
-        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">Inner::RBTree</span>(<span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">tree</span>) =&gt; {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor_mut</span> <span class="op">=</span> <span class="ident">tree</span>.<span class="ident">upper_bound_mut</span>(<span class="ident">Bound::Included</span>(<span class="ident">frames</span>.<span class="ident">start</span>()));
             <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">chunk</span>) <span class="op">=</span> <span class="ident">cursor_mut</span>.<span class="ident">get</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">deref</span>()) {
                 <span class="kw">if</span> <span class="ident">chunk</span>.<span class="ident">start</span>() <span class="op">&gt;</span> <span class="ident">frames</span>.<span class="ident">end</span>() {
@@ -1850,8 +1849,8 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_deferred</span>(
     <span class="ident">requested_paddr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>,
     <span class="ident">num_frames</span>: <span class="ident">usize</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">if</span> <span class="ident">num_frames</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">if</span> <span class="ident">num_frames</span> <span class="op">==</span> <span class="number">0</span> {
         <span class="macro">warn!</span>(<span class="string">&quot;frame_allocator: requested an allocation of 0 frames... stupid!&quot;</span>);
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;cannot allocate zero frames&quot;</span>);
     }
@@ -1861,13 +1860,13 @@
         <span class="kw">let</span> <span class="ident">end_frame</span> <span class="op">=</span> <span class="ident">start_frame</span> <span class="op">+</span> (<span class="ident">num_frames</span> <span class="op">-</span> <span class="number">1</span>);
         <span class="comment">// Try to allocate the frames at the specific address.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">free_reserved_frames_list</span> <span class="op">=</span> <span class="ident">FREE_RESERVED_FRAMES_LIST</span>.<span class="ident">lock</span>();
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">success</span>) <span class="op">=</span> <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">start_frame</span>, <span class="ident">num_frames</span>) {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">success</span>) <span class="op">=</span> <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">start_frame</span>, <span class="ident">num_frames</span>) {
             <span class="prelude-val">Ok</span>(<span class="ident">success</span>)
         } <span class="kw">else</span> {
             <span class="comment">// If allocation failed, then the requested `start_frame` may be found in the general-purpose list</span>
             <span class="comment">// or may represent a new, previously-unknown reserved region that we must add.</span>
             <span class="comment">// We first attempt to allocate it from the general-purpose free regions.</span>
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">result</span>) <span class="op">=</span> <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>(), <span class="ident">start_frame</span>, <span class="ident">num_frames</span>) {
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">result</span>) <span class="op">=</span> <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>(), <span class="ident">start_frame</span>, <span class="ident">num_frames</span>) {
                 <span class="prelude-val">Ok</span>(<span class="ident">result</span>)
             } 
             <span class="comment">// If we failed to allocate the requested frames from the general list,</span>
@@ -1878,19 +1877,19 @@
                 <span class="op">!</span><span class="ident">frame_is_in_list</span>(<span class="kw-2">&amp;</span><span class="ident">g</span>, <span class="kw-2">&amp;</span><span class="ident">start_frame</span>) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">frame_is_in_list</span>(<span class="kw-2">&amp;</span><span class="ident">g</span>, <span class="kw-2">&amp;</span><span class="ident">end_frame</span>)
             } {
                 <span class="kw">let</span> <span class="ident">frames</span> <span class="op">=</span> <span class="ident">FrameRange::new</span>(<span class="ident">start_frame</span>, <span class="ident">end_frame</span>);
-                <span class="kw">let</span> <span class="ident">new_reserved_frames</span> <span class="op">=</span> <span class="ident">add_reserved_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>(), <span class="ident">frames</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">new_reserved_frames</span> <span class="op">=</span> <span class="ident">add_reserved_region</span>(<span class="kw-2">&amp;mut</span> <span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>(), <span class="ident">frames</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;
                 <span class="comment">// If we successfully added a new reserved region,</span>
                 <span class="comment">// then add those frames to the actual list of *available* reserved regions.</span>
-                <span class="kw">let</span> <span class="ident">_new_free_reserved_frames</span> <span class="op">=</span> <span class="ident">add_reserved_region</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">new_reserved_frames</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">_new_free_reserved_frames</span> <span class="op">=</span> <span class="ident">add_reserved_region</span>(<span class="kw-2">&amp;mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">new_reserved_frames</span>.<span class="ident">clone</span>())<span class="question-mark">?</span>;
                 <span class="macro">assert_eq!</span>(<span class="ident">new_reserved_frames</span>, <span class="ident">_new_free_reserved_frames</span>);
-                <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">start_frame</span>, <span class="ident">num_frames</span>)
+                <span class="ident">find_specific_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">free_reserved_frames_list</span>, <span class="ident">start_frame</span>, <span class="ident">num_frames</span>)
             } 
             <span class="kw">else</span> {
                 <span class="prelude-val">Err</span>(<span class="ident">AllocationError::AddressNotFree</span>(<span class="ident">start_frame</span>, <span class="ident">num_frames</span>))
             }
         }
     } <span class="kw">else</span> {
-        <span class="ident">find_any_chunk</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>(), <span class="ident">num_frames</span>)
+        <span class="ident">find_any_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="ident">FREE_GENERAL_FRAMES_LIST</span>.<span class="ident">lock</span>(), <span class="ident">num_frames</span>)
     }.<span class="ident">map_err</span>(<span class="ident">From::from</span>) <span class="comment">// convert from AllocationError to &amp;str</span>
 }
 
@@ -1902,7 +1901,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes_deferred</span>(
     <span class="ident">requested_paddr</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PhysicalAddress</span><span class="op">&gt;</span>,
     <span class="ident">num_bytes</span>: <span class="ident">usize</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">AllocatedFrames</span>, <span class="ident">DeferredAllocAction</span><span class="op">&lt;</span><span class="lifetime">&#39;static</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">actual_num_bytes</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">paddr</span>) <span class="op">=</span> <span class="ident">requested_paddr</span> {
         <span class="ident">num_bytes</span> <span class="op">+</span> (<span class="ident">paddr</span>.<span class="ident">value</span>() <span class="op">%</span> <span class="ident">FRAME_SIZE</span>)
     } <span class="kw">else</span> {
@@ -1916,7 +1915,7 @@
 <span class="doccomment">/// Allocates the given number of frames with no constraints on the starting physical address.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames</span>(<span class="ident">num_frames</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames</span>(<span class="ident">num_frames</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
     <span class="ident">allocate_frames_deferred</span>(<span class="prelude-val">None</span>, <span class="ident">num_frames</span>)
         .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
         .<span class="ident">ok</span>()
@@ -1928,7 +1927,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// This function still allocates whole frames by rounding up the number of bytes. </span>
 <span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes</span>(<span class="ident">num_bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes</span>(<span class="ident">num_bytes</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span><span class="op">&gt;</span> {
     <span class="ident">allocate_frames_by_bytes_deferred</span>(<span class="prelude-val">None</span>, <span class="ident">num_bytes</span>)
         .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
         .<span class="ident">ok</span>()
@@ -1939,7 +1938,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// This function still allocates whole frames by rounding up the number of bytes. </span>
 <span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes_at</span>(<span class="ident">paddr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">num_bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_by_bytes_at</span>(<span class="ident">paddr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">num_bytes</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="ident">allocate_frames_by_bytes_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">paddr</span>), <span class="ident">num_bytes</span>)
         .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
 }
@@ -1948,7 +1947,7 @@
 <span class="doccomment">/// Allocates the given number of frames starting at (inclusive of) the frame containing the given `PhysicalAddress`.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_at</span>(<span class="ident">paddr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">num_frames</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">allocate_frames_at</span>(<span class="ident">paddr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">num_frames</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">AllocatedFrames</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="ident">allocate_frames_deferred</span>(<span class="prelude-val">Some</span>(<span class="ident">paddr</span>), <span class="ident">num_frames</span>)
         .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">af</span>, <span class="ident">_action</span>)<span class="op">|</span> <span class="ident">af</span>)
 }
@@ -1982,6 +1981,6 @@
     <span class="ident">RESERVED_REGIONS</span>.<span class="ident">lock</span>().<span class="ident">iter</span>().<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="macro">debug!</span>(<span class="string">&quot;\t {:?}&quot;</span>, <span class="ident">e</span>) );
     <span class="macro">debug!</span>(<span class="string">&quot;-----------------------------------------------------&quot;</span>);
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="frame_allocator" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="frame_allocator" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

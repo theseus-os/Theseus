@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../dfqueue/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../dfqueue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../dfqueue/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../dfqueue/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -674,8 +676,7 @@
 <span id="671">671</span>
 <span id="672">672</span>
 <span id="673">673</span>
-</pre><pre class="rust">
-<span class="doccomment">//! DFQ is a decoupled, fault-tolerant, multi-producer single-consumer queue.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! DFQ is a decoupled, fault-tolerant, multi-producer single-consumer queue.</span>
 <span class="doccomment">//! DFQ is compatible with `no_std` and is interrupt-safe by being entirely lock-free and mostly wait-free.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! DFQ accepts immutable data items only and does not allow the consumer</span>
@@ -732,7 +733,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// This object cannot be used directly, you must obtain a producer or consumer to the queue</span>
     <span class="doccomment">/// using the functions `into_consumer()` or `obtain_producer()`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">DFQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">DFQueue</span> {
             <span class="ident">queue</span>: <span class="ident">InnerQueue::new</span>(),
             <span class="ident">has_consumer</span>: <span class="ident">AtomicBool::default</span>(),
@@ -742,8 +743,8 @@
 
     <span class="doccomment">/// Consumes the DFQueue and returns the one and only consumer for this DFQueue. </span>
     <span class="doccomment">/// It consumes the DFQueue instance because there is only one consumer allowed per DFQueue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_consumer</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">has_consumer</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">=</span><span class="op">=</span> <span class="bool-val">false</span>, 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_consumer</span>(<span class="self">self</span>) -&gt; <span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">has_consumer</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="bool-val">false</span>, 
                       <span class="string">&quot;DFQueue::into_consumer(): FATAL ERROR: already had a consumer!&quot;</span>);
         <span class="self">self</span>.<span class="ident">has_consumer</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
 
@@ -755,7 +756,7 @@
     <span class="doccomment">/// Consumes the DFQueue and returns a producer. </span>
     <span class="doccomment">/// To obtain another DFQueueProducer for this DFQueue, call `obtain_producer()` on the returned DFQueueProducer. </span>
     <span class="doccomment">/// DFQueueProducer does not implement the standard Clone trait, to avoid accidentally cloning it implicity. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_producer</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_producer</span>(<span class="self">self</span>) -&gt; <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">DFQueueProducer</span> {
             <span class="ident">qref</span>: <span class="ident">Arc::new</span>(<span class="self">self</span>),
         }
@@ -779,7 +780,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
 
     <span class="doccomment">/// Returns a new DFQueueProducer cloned from this consumer instance, since there can be multiple producers.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">obtain_producer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">obtain_producer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">DFQueueProducer</span> {
             <span class="ident">qref</span>: <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">clone</span>(),
         }
@@ -787,11 +788,11 @@
 
     <span class="doccomment">/// Returns the next non-completed element in the queue without actually removing it from the queue,</span>
     <span class="doccomment">/// or `None` if the queue is empty or in a temporarily-inconsistent state. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">peek</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">peek</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">peek_result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">queue</span>.<span class="ident">peek</span>();
         <span class="kw">match</span> <span class="ident">peek_result</span> {
-            <span class="ident">PeekResult::Data</span>(<span class="ident">data</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">data</span>),
-            <span class="ident">PeekResult::Empty</span> <span class="op">|</span> <span class="ident">PeekResult::Inconsistent</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
+            <span class="ident">PeekResult::Data</span>(<span class="ident">data</span>) =&gt; <span class="prelude-val">Some</span>(<span class="ident">data</span>),
+            <span class="ident">PeekResult::Empty</span> <span class="op">|</span> <span class="ident">PeekResult::Inconsistent</span> =&gt; <span class="prelude-val">None</span>,
         }
     }
 }
@@ -808,7 +809,7 @@
 
     <span class="doccomment">/// Call this to obtain another DFQueueProducer. </span>
     <span class="doccomment">/// DFQueueProducer does not implement the standard Clone trait, to avoid accidentally cloning it implicity. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">obtain_producer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">obtain_producer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">DFQueueProducer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">DFQueueProducer</span> {
             <span class="ident">qref</span>: <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">clone</span>(),
         }
@@ -818,11 +819,11 @@
     <span class="doccomment">/// Returns a DFQueueConsumer for this queue, if it hasn&#39;t yet been obtained </span>
     <span class="doccomment">/// (either via this function or via `DFQueue::into_consumer()`).</span>
     <span class="doccomment">/// To ensure there is only a single DFQueueConsumer, it will return `None` if there is already a `DFQueueConsumer`.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_consumer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_consumer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DFQueueConsumer</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">has_consumer</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">has_consumer</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         <span class="kw">match</span> <span class="ident">has_consumer</span> {
-            <span class="bool-val">true</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
-            <span class="bool-val">false</span> <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="bool-val">true</span> =&gt; <span class="prelude-val">None</span>,
+            <span class="bool-val">false</span> =&gt; {
                 <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">has_consumer</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
                 <span class="prelude-val">Some</span>(
                     <span class="ident">DFQueueConsumer</span> {
@@ -839,7 +840,7 @@
     <span class="doccomment">/// # Returns </span>
     <span class="doccomment">/// Returns a QueuedData instance, an Arc-like reference to the given `data` on the queue.</span>
     <span class="doccomment">/// This ensures that the producer can still retain the given `data` if the queue experiences a failure. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enqueue</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">data</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enqueue</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">data</span>: <span class="ident">T</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>{
         <span class="self">self</span>.<span class="ident">qref</span>.<span class="ident">queue</span>.<span class="ident">push</span>(<span class="ident">data</span>)
     }
 }
@@ -902,7 +903,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
 
     <span class="doccomment">/// Not public, a DFQueueProducer must call an enqueue function to receive one of these back.</span>
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">data</span>: <span class="ident">T</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">QueuedData</span>(<span class="ident">Arc::new</span>(<span class="ident">InnerQueuedData</span>{
             <span class="ident">data</span>: <span class="ident">data</span>,
             <span class="ident">completed</span>: <span class="ident">AtomicBool::default</span>(),
@@ -912,7 +913,7 @@
 
     <span class="doccomment">/// Whether this item has been completed (handled) by the DFQueueConsumer.</span>
     <span class="doccomment">/// If an item is completed, it&#39;s okay to remove it from the queue (and it will be removed).</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_completed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_completed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">completed</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
     }
 
@@ -926,7 +927,7 @@
     <span class="doccomment">/// may also be holding a reference to it, in order for that producer to retain a reference to it.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Private note: do not call this internally! This is a public API meant for the producer thread to use.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_enqueued</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_enqueued</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident">Arc::strong_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) <span class="op">&gt;</span> <span class="number">1</span>
     }
 
@@ -940,16 +941,16 @@
     <span class="doccomment">/// and not on the queue anymore. </span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Private note: do not call this internally! This is a public API meant for the producer thread to use.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_failed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_failed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="comment">// an item that has been completed could not have possibly failed!</span>
         (<span class="op">!</span><span class="self">self</span>.<span class="ident">is_completed</span>()) <span class="op">&amp;&amp;</span> 
-        (<span class="ident">Arc::strong_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) <span class="op">=</span><span class="op">=</span> <span class="number">1</span>)
+        (<span class="ident">Arc::strong_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>) <span class="op">==</span> <span class="number">1</span>)
     }
 
 
     <span class="doccomment">/// not public, because we want to control when this is cloned </span>
     <span class="doccomment">/// so we can keep track of the number of Arc references to the InnerQueuedData.</span>
-    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">clone</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">QueuedData</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">clone</span>())
     }
 
@@ -957,14 +958,14 @@
     <span class="doccomment">/// creates a clone of this, marshalled as a PeekedData </span>
     <span class="doccomment">/// so that a consumer can access the InnerQueuedData without being able to access </span>
     <span class="doccomment">/// all of the QueuedData methods here.</span>
-    <span class="kw">fn</span> <span class="ident">as_peeked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">as_peeked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">PeekedData</span>(<span class="self">self</span>.<span class="number">0</span>.<span class="ident">clone</span>())
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">T</span> {
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">data</span>
     }
 }
@@ -982,7 +983,7 @@
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">PeekedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
-    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">T</span> {
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">T</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">data</span>
     }
 }
@@ -1007,14 +1008,14 @@
     <span class="ident">head</span>: <span class="ident">AtomicPtr</span><span class="op">&lt;</span><span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// the tail is a placeholder that exists right after the one that was pushed first.</span>
     <span class="doccomment">/// The tail&#39;s next pointer points to the next Node to be popped off.</span>
-    <span class="ident">tail</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">tail</span>: <span class="ident">UnsafeCell</span><span class="op">&lt;</span><span class="kw-2">*mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> { }
 <span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Send</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> { }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">v</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">v</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">Node</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">Box::into_raw</span>(<span class="kw">box</span> <span class="ident">Node</span> {
             <span class="ident">next</span>: <span class="ident">AtomicPtr::new</span>(<span class="ident">ptr::null_mut</span>()),
             <span class="comment">// prev: AtomicPtr::new(ptr::null_mut()), // we don&#39;t need prev</span>
@@ -1026,7 +1027,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Creates a new queue that is safe to share among multiple producers and one consumer. </span>
     <span class="doccomment">/// Its storage semantics are push onto the front, pop off the back. </span>
-    <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">stub</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Node::new</span>(<span class="prelude-val">None</span>) };
         <span class="ident">InnerQueue</span> {
             <span class="ident">head</span>: <span class="ident">AtomicPtr::new</span>(<span class="ident">stub</span>),
@@ -1035,7 +1036,7 @@
     }
 
     <span class="doccomment">/// Pushes a new value onto the front of this queue.</span>
-    <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">t</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">t</span>: <span class="ident">T</span>) -&gt; <span class="ident">QueuedData</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">queued_data</span> <span class="op">=</span> <span class="ident">QueuedData::new</span>(<span class="ident">t</span>);
 
         <span class="kw">unsafe</span> {
@@ -1060,7 +1061,7 @@
     <span class="doccomment">/// An Inconsistent state means that this queue does indeed have data, but</span>
     <span class="doccomment">/// it does not currently have access to it at this time.</span>
     <span class="doccomment">/// If Inconsistent is returned, try to peek again after a short wait.</span>
-    <span class="kw">fn</span> <span class="ident">peek</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">PeekResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">peek</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">PeekResult</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="kw">unsafe</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tail</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">tail</span>.<span class="ident">get</span>();
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">next</span> <span class="op">=</span> (<span class="kw-2">*</span><span class="ident">tail</span>).<span class="ident">next</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
@@ -1090,13 +1091,13 @@
                 <span class="kw">return</span> <span class="ident">PeekResult::Data</span>(<span class="ident">ret</span>);
             }
 
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">tail</span> {<span class="ident">PeekResult::Empty</span>} <span class="kw">else</span> {<span class="ident">PeekResult::Inconsistent</span>}
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">head</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>) <span class="op">==</span> <span class="ident">tail</span> {<span class="ident">PeekResult::Empty</span>} <span class="kw">else</span> {<span class="ident">PeekResult::Inconsistent</span>}
         }
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">InnerQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">unsafe</span> {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cur</span> <span class="op">=</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">tail</span>.<span class="ident">get</span>();
             <span class="kw">while</span> <span class="op">!</span><span class="ident">cur</span>.<span class="ident">is_null</span>() {
@@ -1198,8 +1199,8 @@
         <span class="kw">let</span> <span class="ident">top_range</span> <span class="op">=</span> <span class="number">10</span>;
         <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">InnerQueue::new</span>();
         <span class="kw">match</span> <span class="ident">q</span>.<span class="ident">peek</span>() {
-            <span class="ident">PeekResult::Empty</span> <span class="op">=</span><span class="op">&gt;</span> {}
-            <span class="ident">PeekResult::Inconsistent</span> <span class="op">|</span> <span class="ident">PeekResult::Data</span>(..) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>()
+            <span class="ident">PeekResult::Empty</span> =&gt; {}
+            <span class="ident">PeekResult::Inconsistent</span> <span class="op">|</span> <span class="ident">PeekResult::Data</span>(..) =&gt; <span class="macro">panic!</span>()
         }
         
         <span class="kw">let</span> <span class="ident">q</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">q</span>);
@@ -1256,10 +1257,10 @@
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">peeked</span> <span class="op">=</span> <span class="ident">q</span>.<span class="ident">peek</span>();
             <span class="kw">match</span> <span class="ident">peeked</span> {
-                <span class="ident">PeekResult::Empty</span> <span class="op">|</span> <span class="ident">PeekResult::Inconsistent</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">PeekResult::Empty</span> <span class="op">|</span> <span class="ident">PeekResult::Inconsistent</span> =&gt; {
                     <span class="comment">// println!(&quot;peeked data None&quot;);</span>
                 },
-                <span class="ident">PeekResult::Data</span>(<span class="ident">x</span>) <span class="op">=</span><span class="op">&gt;</span> { 
+                <span class="ident">PeekResult::Data</span>(<span class="ident">x</span>) =&gt; { 
                     <span class="comment">// i += 1;</span>
                     <span class="macro">println!</span>(<span class="string">&quot;peeked data {}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">x</span>);
                     <span class="ident">x</span>.<span class="ident">mark_completed</span>();
@@ -1274,7 +1275,7 @@
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">mpsc_queue_test</span>() {
-        <span class="kw">use</span> <span class="kw">super</span><span class="ident">::mpsc_queue</span>::{<span class="ident">MpscQueue</span>, <span class="ident">PopResult</span>};
+        <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mpsc_queue</span>::{<span class="ident">MpscQueue</span>, <span class="ident">PopResult</span>};
 
         <span class="kw">let</span> <span class="ident">nthreads</span> <span class="op">=</span> <span class="number">16</span>;
         <span class="kw">let</span> <span class="ident">top_range</span> <span class="op">=</span> <span class="number">100</span>;
@@ -1335,10 +1336,10 @@
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">popped</span> <span class="op">=</span> <span class="ident">q</span>.<span class="ident">pop</span>();
             <span class="kw">match</span> <span class="ident">popped</span> {
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="prelude-val">None</span> =&gt; {
                     <span class="comment">// println!(&quot;popped data None&quot;);</span>
                 },
-                <span class="prelude-val">Some</span>(<span class="ident">x</span>) <span class="op">=</span><span class="op">&gt;</span> { 
+                <span class="prelude-val">Some</span>(<span class="ident">x</span>) =&gt; { 
                     <span class="comment">// i += 1;</span>
                     <span class="macro">println!</span>(<span class="string">&quot;popped data {}&quot;</span>, <span class="ident">x</span>);
                 }
@@ -1348,6 +1349,6 @@
         <span class="macro">println!</span>(<span class="string">&quot;done!&quot;</span>);
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dfqueue" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="dfqueue" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/intel_ethernet/src/descriptors.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>descriptors.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../intel_ethernet/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/intel_ethernet/src/descriptors.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>descriptors.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../intel_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../intel_ethernet/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../intel_ethernet/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -386,8 +388,7 @@
 <span id="383">383</span>
 <span id="384">384</span>
 <span id="385">385</span>
-</pre><pre class="rust">
-<span class="doccomment">//! The different descriptor types used by Intel NICs.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! The different descriptor types used by Intel NICs.</span>
 <span class="doccomment">//! Usually the newer NICs use more advanced descriptor types but retain support for older ones.</span>
 <span class="doccomment">//! The difference in the types is the amount of packet information that is included in the descriptor, and the format.</span>
 
@@ -441,25 +442,25 @@
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `packet_buffer_address`: starting physical address of the receive buffer.</span>
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>);
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>);
 
     <span class="doccomment">/// Updates the descriptor&#39;s physical address.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `packet_buffer_address`: starting physical address of the receive buffer.</span>
-    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>);
+    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>);
 
     <span class="doccomment">/// Clears the status bits of the descriptor.</span>
-    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
+    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
 
     <span class="doccomment">/// Returns true if the descriptor has a received packet copied to its buffer.</span>
-    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
 
     <span class="doccomment">/// Returns true if the descriptor&#39;s packet buffer is the last in a frame.</span>
-    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
 
     <span class="doccomment">/// The length of the packet in the descriptor&#39;s packet buffer.</span>
-    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>;
+    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>;
 }
 
 <span class="doccomment">/// A trait for the minimum set of functions needed to transmit a packet using one of Intel&#39;s transmit descriptor types.</span>
@@ -469,7 +470,7 @@
 <span class="doccomment">/// Transmit functions defined in the Network_Interface_Card crate expect a transmit descriptor to implement this trait.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TxDescriptor</span>: <span class="ident">FromBytes</span> {
     <span class="doccomment">/// Initializes a transmit descriptor by clearing all of its values.</span>
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
 
     <span class="doccomment">/// Updates the transmit descriptor to send the packet.</span>
     <span class="doccomment">/// We assume that one transmit descriptor will be used to send one packet.</span>
@@ -477,7 +478,7 @@
     <span class="doccomment">/// # Arguments</span>
     <span class="doccomment">/// * `transmit_buffer_addr`: physical address of the transmit buffer. </span>
     <span class="doccomment">/// * `transmit_buffer_length`: length of packet we want to send.</span>
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>);
+    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>);
 
     <span class="doccomment">/// Polls the Descriptor Done bit until the packet has been sent.</span>
     <span class="kw">fn</span> <span class="ident">wait_for_packet_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>);
@@ -507,7 +508,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">TxDescriptor</span> <span class="kw">for</span> <span class="ident">LegacyTxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="number">0</span>);
         <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">write</span>(<span class="number">0</span>);
         <span class="self">self</span>.<span class="ident">cso</span>.<span class="ident">write</span>(<span class="number">0</span>);
@@ -517,7 +518,7 @@
         <span class="self">self</span>.<span class="ident">vlan</span>.<span class="ident">write</span>(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>) {
+    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>) {
         <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_addr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
         <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_length</span>);
         <span class="self">self</span>.<span class="ident">cmd</span>.<span class="ident">write</span>(<span class="ident">TX_CMD_EOP</span> <span class="op">|</span> <span class="ident">TX_CMD_IFCS</span> <span class="op">|</span> <span class="ident">TX_CMD_RPS</span> <span class="op">|</span> <span class="ident">TX_CMD_RS</span>); 
@@ -525,14 +526,14 @@
     }
 
     <span class="kw">fn</span> <span class="ident">wait_for_packet_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">while</span> (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">TX_STATUS_DD</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">while</span> (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">TX_STATUS_DD</span>) <span class="op">==</span> <span class="number">0</span> {
             <span class="comment">// debug!(&quot;tx desc status: {}&quot;, self.status.read());</span>
         } 
     }
 }
 
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LegacyTxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
             <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">cso</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">cmd</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">css</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">vlan</span>.<span class="ident">read</span>())
     }
@@ -561,35 +562,35 @@
 }
 
 <span class="kw">impl</span> <span class="ident">RxDescriptor</span> <span class="kw">for</span> <span class="ident">LegacyRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
         <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
         <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">write</span>(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
+    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
         <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">write</span>(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_DD</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">RX_STATUS_DD</span>
+    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_DD</span>) <span class="op">==</span> <span class="ident">RX_STATUS_DD</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_EOP</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">RX_STATUS_EOP</span>        
+    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        (<span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_EOP</span>) <span class="op">==</span> <span class="ident">RX_STATUS_EOP</span>        
     }
 
-    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
         <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">read</span>() <span class="kw">as</span> <span class="ident">u64</span>
     }
 }
 
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LegacyRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
             <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">phys_addr</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">length</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">checksum</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">status</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">errors</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">vlan</span>.<span class="ident">read</span>())
     }
@@ -613,29 +614,29 @@
 }
 
 <span class="kw">impl</span> <span class="ident">RxDescriptor</span> <span class="kw">for</span> <span class="ident">AdvancedRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span> (<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
+    <span class="kw">fn</span> <span class="ident">init</span> (<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
         <span class="comment">// set the header address to 0 because packet splitting is not supposed to be enabled in the 82599</span>
         <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">write</span>(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
+    <span class="kw">fn</span> <span class="ident">set_packet_address</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">packet_buffer_address</span>: <span class="ident">PhysicalAddress</span>) {
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="ident">packet_buffer_address</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">reset_status</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">write</span>(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>{
-        (<span class="self">self</span>.<span class="ident">get_ext_status</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_DD</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">RX_STATUS_DD</span> <span class="kw">as</span> <span class="ident">u64</span>
+    <span class="kw">fn</span> <span class="ident">descriptor_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>{
+        (<span class="self">self</span>.<span class="ident">get_ext_status</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_DD</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">==</span> <span class="ident">RX_STATUS_DD</span> <span class="kw">as</span> <span class="ident">u64</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="ident">get_ext_status</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_EOP</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">RX_STATUS_EOP</span> <span class="kw">as</span> <span class="ident">u64</span>        
+    <span class="kw">fn</span> <span class="ident">end_of_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        (<span class="self">self</span>.<span class="ident">get_ext_status</span>() <span class="op">&amp;</span> <span class="ident">RX_STATUS_EOP</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">==</span> <span class="ident">RX_STATUS_EOP</span> <span class="kw">as</span> <span class="ident">u64</span>        
     }
 
-    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="kw">fn</span> <span class="ident">length</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
         <span class="self">self</span>.<span class="ident">get_pkt_len</span>() <span class="kw">as</span> <span class="ident">u64</span>
     }
 }
@@ -644,74 +645,74 @@
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns the packet type that was used for the Receive Side Scaling hash function.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rss_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rss_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">0</span>..<span class="number">3</span>) 
     }
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns the packet type as identified by the hardware.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_packet_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_packet_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">4</span>..<span class="number">16</span>) 
     }
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns the number of Receive Side Coalesced packets that start in this descriptor.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rsccnt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rsccnt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">17</span>..<span class="number">20</span>) 
     }
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns the size of the packet header in bytes.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_hdr_len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_hdr_len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">21</span>..<span class="number">30</span>) 
     }
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// When set to 1b, indicates that the hardware has found the length of the header.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_sph</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_sph</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>{
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bit</span>(<span class="number">31</span>) 
     }
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns the Receive Side Scaling hash.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rss_hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_rss_hash</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">32</span>..<span class="number">63</span>) 
     }
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns the Flow Director Filter ID if the packet matches a filter.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_fdf_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_fdf_id</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">32</span>..<span class="number">63</span>) 
     }
 
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Status information indicates whether a descriptor has been used </span>
     <span class="doccomment">/// and whether the buffer is the last one for a packet</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ext_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ext_status</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">0</span>..<span class="number">19</span>) 
     }
     
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns errors reported by hardware for different packet types</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ext_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ext_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">20</span>..<span class="number">31</span>) 
     }
     
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// Returns the number of bytes posted to the packet buffer</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pkt_len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pkt_len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">32</span>..<span class="number">47</span>) 
     }
     
     <span class="doccomment">/// Write Back mode function for the Advanced Receive Descriptor.</span>
     <span class="doccomment">/// If the vlan header is stripped from the packet, then the 16 bits of the VLAN tag are posted here</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_vlan_tag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span>{
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_vlan_tag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span>{
         <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>().<span class="ident">get_bits</span>(<span class="number">48</span>..<span class="number">63</span>) 
     }    
 }
 
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">AdvancedRxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{{Packet buffer address: {:#X}, Packet header address: {:#X}}}&quot;</span>,
             <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">read</span>(), <span class="self">self</span>.<span class="ident">header_buffer_address</span>.<span class="ident">read</span>())
     }
@@ -750,7 +751,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">TxDescriptor</span> <span class="kw">for</span> <span class="ident">AdvancedTxDescriptor</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="number">0</span>);
         <span class="self">self</span>.<span class="ident">paylen_popts_cc_idx_sta</span>.<span class="ident">write</span>(<span class="number">0</span>);
         <span class="self">self</span>.<span class="ident">dcmd</span>.<span class="ident">write</span>(<span class="number">0</span>);
@@ -758,7 +759,7 @@
         <span class="self">self</span>.<span class="ident">data_len</span>.<span class="ident">write</span>(<span class="number">0</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>) {
+    <span class="kw">fn</span> <span class="ident">send</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">transmit_buffer_addr</span>: <span class="ident">PhysicalAddress</span>, <span class="ident">transmit_buffer_length</span>: <span class="ident">u16</span>) {
         <span class="self">self</span>.<span class="ident">packet_buffer_address</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_addr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
         <span class="self">self</span>.<span class="ident">data_len</span>.<span class="ident">write</span>(<span class="ident">transmit_buffer_length</span>);
         <span class="self">self</span>.<span class="ident">dtyp_mac_rsv</span>.<span class="ident">write</span>(<span class="ident">TX_DTYP_ADV</span>);
@@ -767,11 +768,11 @@
     }
 
     <span class="kw">fn</span> <span class="ident">wait_for_packet_tx</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">while</span> (<span class="self">self</span>.<span class="ident">paylen_popts_cc_idx_sta</span>.<span class="ident">read</span>() <span class="kw">as</span> <span class="ident">u8</span> <span class="op">&amp;</span> <span class="ident">TX_STATUS_DD</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">while</span> (<span class="self">self</span>.<span class="ident">paylen_popts_cc_idx_sta</span>.<span class="ident">read</span>() <span class="kw">as</span> <span class="ident">u8</span> <span class="op">&amp;</span> <span class="ident">TX_STATUS_DD</span>) <span class="op">==</span> <span class="number">0</span> {
             <span class="comment">// error!(&quot;tx desc status: {:#X}&quot;, self.desc.read());</span>
         } 
     }
 }
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="intel_ethernet" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="intel_ethernet" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

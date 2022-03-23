@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../window/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/window/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../window/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../window/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../window/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -512,8 +514,7 @@
 <span id="509">509</span>
 <span id="510">510</span>
 <span id="511">511</span>
-</pre><pre class="rust">
-<span class="doccomment">//! A `Window` object should be owned by an application. It can display a `Displayable` object in its framebuffer. See `applications/new_window` as a demo to use this library.</span>
+</pre><pre class="rust"><code><span class="doccomment">//! A `Window` object should be owned by an application. It can display a `Displayable` object in its framebuffer. See `applications/new_window` as a demo to use this library.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This library will create a window with default title bar and border. It handles the commonly used interactions like moving</span>
 <span class="doccomment">//! the window or close the window. Also, it is responsible to show title bar differently when window is active. </span>
@@ -585,12 +586,12 @@
 }
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">TopButton</span> {
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">item</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">item</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">match</span> <span class="ident">item</span> {
-            <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TopButton::Close</span>,
-            <span class="number">1</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TopButton::MinimizeMaximize</span>,
-            <span class="number">2</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TopButton::Hide</span>,
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">TopButton::Close</span>,
+            <span class="number">0</span> =&gt; <span class="ident">TopButton::Close</span>,
+            <span class="number">1</span> =&gt; <span class="ident">TopButton::MinimizeMaximize</span>,
+            <span class="number">2</span> =&gt; <span class="ident">TopButton::Hide</span>,
+            <span class="kw">_</span> =&gt; <span class="ident">TopButton::Close</span>,
         }
     }
 }
@@ -630,7 +631,7 @@
         <span class="ident">width</span>: <span class="ident">usize</span>,
         <span class="ident">height</span>: <span class="ident">usize</span>,
         <span class="ident">initial_background</span>: <span class="ident">Color</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Window</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Window</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">wm_ref</span> <span class="op">=</span> <span class="ident">window_manager::WINDOW_MANAGER</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;The window manager is not initialized&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// Create a new virtual framebuffer to hold this window&#39;s contents only,</span>
@@ -661,9 +662,9 @@
         <span class="ident">window</span>.<span class="ident">draw_border</span>(<span class="bool-val">true</span>);
         {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">window</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
-            <span class="ident">window</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Close</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
-            <span class="ident">window</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::MinimizeMaximize</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
-            <span class="ident">window</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Hide</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
+            <span class="ident">window</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Close</span>, <span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
+            <span class="ident">window</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::MinimizeMaximize</span>, <span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
+            <span class="ident">window</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Hide</span>, <span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
         }
 
         <span class="kw">let</span> <span class="ident">_window_bounding_box</span> <span class="op">=</span> <span class="ident">Rectangle</span> {
@@ -689,7 +690,7 @@
     <span class="doccomment">/// If an error occurs while obtaining the event (or when handling internal events),</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Otherwise, the event at the front of this window&#39;s event queue will be popped off and returned. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_event</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_event</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">call_later_do_refresh_floating_border</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">call_later_do_move_active_window</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">need_to_set_active</span> <span class="op">=</span> <span class="bool-val">false</span>;
@@ -705,9 +706,9 @@
             <span class="self">self</span>.<span class="ident">draw_border</span>(<span class="ident">is_active</span>);
             <span class="self">self</span>.<span class="ident">last_is_active</span> <span class="op">=</span> <span class="ident">is_active</span>;
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
-            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Close</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
-            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::MinimizeMaximize</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
-            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Hide</span>, <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
+            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Close</span>, <span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
+            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::MinimizeMaximize</span>, <span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
+            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::Hide</span>, <span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
         }
 
         <span class="comment">// If we cannot handle this event as an &quot;internal&quot; event (e.g., clicking on the window title bar or border),</span>
@@ -716,8 +717,8 @@
 
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">event_consumer</span>.<span class="ident">pop</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">ev</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ev</span>,
-                <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">break</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">ev</span>) =&gt; <span class="ident">ev</span>,
+                <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
             };
             
             <span class="comment">// TODO FIXME: for a performant design, the goal is to AVOID holding the lock on `inner` as much as possible. </span>
@@ -726,9 +727,9 @@
             <span class="kw">let</span> (<span class="ident">width</span>, <span class="ident">height</span>) <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">get_size</span>();
 
             <span class="kw">match</span> <span class="ident">event</span> {
-                <span class="ident">Event::MousePositionEvent</span>(<span class="kw-2">ref</span> <span class="ident">mouse_event</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">Event::MousePositionEvent</span>(<span class="kw-2">ref</span> <span class="ident">mouse_event</span>) =&gt; {
                     <span class="kw">match</span> <span class="ident">inner</span>.<span class="ident">moving</span> {
-                        <span class="ident">WindowMovingStatus::Moving</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">WindowMovingStatus::Moving</span>(<span class="kw">_</span>) =&gt; {
                             <span class="comment">// only wait for left button up to exit this mode</span>
                             <span class="kw">if</span> <span class="op">!</span><span class="ident">mouse_event</span>.<span class="ident">left_button_hold</span> {
                                 <span class="self">self</span>.<span class="ident">last_mouse_position_event</span> <span class="op">=</span> <span class="ident">mouse_event</span>.<span class="ident">clone</span>();
@@ -736,7 +737,7 @@
                             }
                             <span class="ident">call_later_do_refresh_floating_border</span> <span class="op">=</span> <span class="bool-val">true</span>;
                         },
-                        <span class="ident">WindowMovingStatus::Stationary</span> <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">WindowMovingStatus::Stationary</span> =&gt; {
                             <span class="kw">if</span> (<span class="ident">mouse_event</span>.<span class="ident">coordinate</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span> <span class="ident">inner</span>.<span class="ident">title_bar_height</span>
                                 <span class="op">&amp;&amp;</span> (<span class="ident">mouse_event</span>.<span class="ident">coordinate</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span> <span class="ident">width</span>
                             {
@@ -755,10 +756,10 @@
                                     {
                                         <span class="ident">is_three_button</span> <span class="op">=</span> <span class="bool-val">true</span>;
                                         <span class="kw">if</span> <span class="ident">mouse_event</span>.<span class="ident">left_button_hold</span> {
-                                            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::from</span>(<span class="ident">i</span>), <span class="number">2</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
+                                            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::from</span>(<span class="ident">i</span>), <span class="number">2</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
                                             <span class="ident">need_refresh_three_button</span> <span class="op">=</span> <span class="bool-val">true</span>;
                                         } <span class="kw">else</span> {
-                                            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::from</span>(<span class="ident">i</span>), <span class="number">0</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
+                                            <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::from</span>(<span class="ident">i</span>), <span class="number">0</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
                                             <span class="ident">need_refresh_three_button</span> <span class="op">=</span> <span class="bool-val">true</span>;
                                             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">last_mouse_position_event</span>.<span class="ident">left_button_hold</span> {
                                                 <span class="comment">// Kevin: disabling the close button until it actually works</span>
@@ -773,7 +774,7 @@
                                             }
                                         }
                                     } <span class="kw">else</span> {
-                                        <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::from</span>(<span class="ident">i</span>), <span class="number">1</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">inner</span>);
+                                        <span class="self">self</span>.<span class="ident">show_button</span>(<span class="ident">TopButton::from</span>(<span class="ident">i</span>), <span class="number">1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">inner</span>);
                                         <span class="ident">need_refresh_three_button</span> <span class="op">=</span> <span class="bool-val">true</span>;
                                     }
                                 }
@@ -801,7 +802,7 @@
                         }
                     }
                 }
-                <span class="ident">unhandled</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">unhandled</span> =&gt; {
                     <span class="ident">unhandled_event</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">unhandled</span>);
                 }
             }
@@ -842,13 +843,13 @@
     <span class="doccomment">/// Refreshes the whole window if `bounding_box` is `None`.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// This method should be invoked after updating the window&#39;s contents in order to see its new content.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">render</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bounding_box</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">render</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bounding_box</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Rectangle</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
 
         <span class="comment">// Induced bug rendering attempting to access out of bound memory</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">downtime_eval</span>)]</span>
         {
-            <span class="kw">if</span> <span class="ident">bounding_box</span>.<span class="ident">unwrap</span>().<span class="ident">top_left</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Coord::new</span>(<span class="number">150</span>,<span class="number">150</span>) {
-                <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">usize</span>) <span class="op">=</span> <span class="number">0x5555_5555_5555</span>; }
+            <span class="kw">if</span> <span class="ident">bounding_box</span>.<span class="ident">unwrap</span>().<span class="ident">top_left</span> <span class="op">==</span> <span class="ident">Coord::new</span>(<span class="number">150</span>,<span class="number">150</span>) {
+                <span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">usize</span>) <span class="op">=</span> <span class="number">0x5555_5555_5555</span>; }
             }
         }
 
@@ -869,31 +870,31 @@
     <span class="doccomment">/// that is available for rendering application content. </span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// The returned `Rectangle` is expressed relative to this Window&#39;s position.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">area</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Rectangle</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">area</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Rectangle</span> {
         <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">content_area</span>()
     }
 
     <span class="doccomment">/// Returns an immutable reference to this window&#39;s virtual `Framebuffer`. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">framebuffer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutexGuardRef</span><span class="op">&lt;</span><span class="ident">WindowInner</span>, <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">framebuffer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuardRef</span><span class="op">&lt;</span><span class="ident">WindowInner</span>, <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">MutexGuardRef::new</span>(<span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>()).<span class="ident">map</span>(<span class="op">|</span><span class="ident">inner</span><span class="op">|</span> <span class="ident">inner</span>.<span class="ident">framebuffer</span>())
     }
 
     <span class="doccomment">/// Returns a mutable reference to this window&#39;s virtual `Framebuffer`. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">framebuffer_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutexGuardRefMut</span><span class="op">&lt;</span><span class="ident">WindowInner</span>, <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">framebuffer_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">MutexGuardRefMut</span><span class="op">&lt;</span><span class="ident">WindowInner</span>, <span class="ident">Framebuffer</span><span class="op">&lt;</span><span class="ident">AlphaPixel</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">MutexGuardRefMut::new</span>(<span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>()).<span class="ident">map_mut</span>(<span class="op">|</span><span class="ident">inner</span><span class="op">|</span> <span class="ident">inner</span>.<span class="ident">framebuffer_mut</span>())
     }
 
     <span class="doccomment">/// Returns `true` if this window is the currently active window. </span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Obtains the lock on the window manager instance. </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_active</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_active</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident">WINDOW_MANAGER</span>.<span class="ident">get</span>()
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">wm</span><span class="op">|</span> <span class="ident">wm</span>.<span class="ident">lock</span>().<span class="ident">is_active</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>))
             .<span class="ident">unwrap_or</span>(<span class="bool-val">false</span>)
     }
 
     <span class="doccomment">/// Draw the border of this window, with argument of whether this window is active now</span>
-    <span class="kw">fn</span> <span class="ident">draw_border</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">active</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn</span> <span class="ident">draw_border</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">active</span>: <span class="ident">bool</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
         <span class="kw">let</span> <span class="ident">border_size</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">border_size</span>;
         <span class="kw">let</span> <span class="ident">title_bar_height</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">title_bar_height</span>;
@@ -975,19 +976,19 @@
     }
 
     <span class="doccomment">/// show three button with status. state = 0,1,2 for three different color</span>
-    <span class="kw">fn</span> <span class="ident">show_button</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">button</span>: <span class="ident">TopButton</span>, <span class="ident">state</span>: <span class="ident">usize</span>, <span class="ident">inner</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">WindowInner</span>) {
+    <span class="kw">fn</span> <span class="ident">show_button</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">button</span>: <span class="ident">TopButton</span>, <span class="ident">state</span>: <span class="ident">usize</span>, <span class="ident">inner</span>: <span class="kw-2">&amp;mut</span> <span class="ident">WindowInner</span>) {
         <span class="kw">let</span> <span class="ident">y</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">title_bar_height</span> <span class="op">/</span> <span class="number">2</span>;
         <span class="kw">let</span> <span class="ident">x</span> <span class="op">=</span> <span class="ident">WINDOW_BUTTON_BIAS_X</span>
             <span class="op">+</span> <span class="ident">WINDOW_BUTTON_BETWEEN</span>
                 <span class="op">*</span> <span class="kw">match</span> <span class="ident">button</span> {
-                    <span class="ident">TopButton::Close</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">0</span>,
-                    <span class="ident">TopButton::MinimizeMaximize</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">1</span>,
-                    <span class="ident">TopButton::Hide</span> <span class="op">=</span><span class="op">&gt;</span> <span class="number">2</span>,
+                    <span class="ident">TopButton::Close</span> =&gt; <span class="number">0</span>,
+                    <span class="ident">TopButton::MinimizeMaximize</span> =&gt; <span class="number">1</span>,
+                    <span class="ident">TopButton::Hide</span> =&gt; <span class="number">2</span>,
                 };
         <span class="kw">let</span> <span class="ident">color</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">button</span> {
-            <span class="ident">TopButton::Close</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WINDOW_BUTTON_COLOR_CLOSE</span>,
-            <span class="ident">TopButton::MinimizeMaximize</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE</span>,
-            <span class="ident">TopButton::Hide</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">WINDOW_BUTTON_COLOR_HIDE</span>,
+            <span class="ident">TopButton::Close</span> =&gt; <span class="ident">WINDOW_BUTTON_COLOR_CLOSE</span>,
+            <span class="ident">TopButton::MinimizeMaximize</span> =&gt; <span class="ident">WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE</span>,
+            <span class="ident">TopButton::Hide</span> =&gt; <span class="ident">WINDOW_BUTTON_COLOR_HIDE</span>,
         };
         <span class="ident">framebuffer_drawer::draw_circle</span>(
             <span class="ident">inner</span>.<span class="ident">framebuffer_mut</span>(),
@@ -1002,7 +1003,7 @@
     }
 
     <span class="doccomment">/// Gets the rectangle occupied by the three buttons</span>
-    <span class="kw">fn</span> <span class="ident">get_button_area</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Rectangle</span> {
+    <span class="kw">fn</span> <span class="ident">get_button_area</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Rectangle</span> {
         <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
         <span class="kw">let</span> <span class="ident">width</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">get_size</span>().<span class="number">0</span>;
         <span class="ident">Rectangle</span> {
@@ -1014,7 +1015,7 @@
 
 
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Window</span>{
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>){
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>){
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">wm</span>) <span class="op">=</span> <span class="ident">WINDOW_MANAGER</span>.<span class="ident">get</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">wm</span>.<span class="ident">lock</span>().<span class="ident">delete_window</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">inner</span>) {
                 <span class="macro">error!</span>(<span class="string">&quot;Failed to delete_window upon drop: {:?}&quot;</span>, <span class="ident">err</span>);
@@ -1023,6 +1024,6 @@
             <span class="macro">error!</span>(<span class="string">&quot;BUG: Could not delete_window upon drop because the window manager was not initialized&quot;</span>);
         }
     }
-}</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+}</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="window" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>

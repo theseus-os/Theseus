@@ -1,105 +1,107 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/pmu_x86/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled ><script id="default-settings"></script><script src="../../storage.js"></script><script src="../../crates.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../favicon.svg">
-<link rel="alternate icon" type="image/png" href="../../favicon-16x16.png">
-<link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../pmu_x86/index.html'><div class='logo-container rust-logo'><img src='../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../brush.svg" width="18" height="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button">?</button>
-                <a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" height="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
-<span id="2">  2</span>
-<span id="3">  3</span>
-<span id="4">  4</span>
-<span id="5">  5</span>
-<span id="6">  6</span>
-<span id="7">  7</span>
-<span id="8">  8</span>
-<span id="9">  9</span>
-<span id="10"> 10</span>
-<span id="11"> 11</span>
-<span id="12"> 12</span>
-<span id="13"> 13</span>
-<span id="14"> 14</span>
-<span id="15"> 15</span>
-<span id="16"> 16</span>
-<span id="17"> 17</span>
-<span id="18"> 18</span>
-<span id="19"> 19</span>
-<span id="20"> 20</span>
-<span id="21"> 21</span>
-<span id="22"> 22</span>
-<span id="23"> 23</span>
-<span id="24"> 24</span>
-<span id="25"> 25</span>
-<span id="26"> 26</span>
-<span id="27"> 27</span>
-<span id="28"> 28</span>
-<span id="29"> 29</span>
-<span id="30"> 30</span>
-<span id="31"> 31</span>
-<span id="32"> 32</span>
-<span id="33"> 33</span>
-<span id="34"> 34</span>
-<span id="35"> 35</span>
-<span id="36"> 36</span>
-<span id="37"> 37</span>
-<span id="38"> 38</span>
-<span id="39"> 39</span>
-<span id="40"> 40</span>
-<span id="41"> 41</span>
-<span id="42"> 42</span>
-<span id="43"> 43</span>
-<span id="44"> 44</span>
-<span id="45"> 45</span>
-<span id="46"> 46</span>
-<span id="47"> 47</span>
-<span id="48"> 48</span>
-<span id="49"> 49</span>
-<span id="50"> 50</span>
-<span id="51"> 51</span>
-<span id="52"> 52</span>
-<span id="53"> 53</span>
-<span id="54"> 54</span>
-<span id="55"> 55</span>
-<span id="56"> 56</span>
-<span id="57"> 57</span>
-<span id="58"> 58</span>
-<span id="59"> 59</span>
-<span id="60"> 60</span>
-<span id="61"> 61</span>
-<span id="62"> 62</span>
-<span id="63"> 63</span>
-<span id="64"> 64</span>
-<span id="65"> 65</span>
-<span id="66"> 66</span>
-<span id="67"> 67</span>
-<span id="68"> 68</span>
-<span id="69"> 69</span>
-<span id="70"> 70</span>
-<span id="71"> 71</span>
-<span id="72"> 72</span>
-<span id="73"> 73</span>
-<span id="74"> 74</span>
-<span id="75"> 75</span>
-<span id="76"> 76</span>
-<span id="77"> 77</span>
-<span id="78"> 78</span>
-<span id="79"> 79</span>
-<span id="80"> 80</span>
-<span id="81"> 81</span>
-<span id="82"> 82</span>
-<span id="83"> 83</span>
-<span id="84"> 84</span>
-<span id="85"> 85</span>
-<span id="86"> 86</span>
-<span id="87"> 87</span>
-<span id="88"> 88</span>
-<span id="89"> 89</span>
-<span id="90"> 90</span>
-<span id="91"> 91</span>
-<span id="92"> 92</span>
-<span id="93"> 93</span>
-<span id="94"> 94</span>
-<span id="95"> 95</span>
-<span id="96"> 96</span>
-<span id="97"> 97</span>
-<span id="98"> 98</span>
-<span id="99"> 99</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/pmu_x86/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script src="../../crates.js"></script><script defer src="../../main.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../pmu_x86/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a><h2 class="location"></h2>
+    </nav>
+    <nav class="sidebar"><a class="sidebar-logo" href="../../pmu_x86/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../pmu_x86/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
+<span id="91">91</span>
+<span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
+<span id="99">99</span>
 <span id="100">100</span>
 <span id="101">101</span>
 <span id="102">102</span>
@@ -879,8 +881,7 @@
 <span id="876">876</span>
 <span id="877">877</span>
 <span id="878">878</span>
-</pre><pre class="rust">
-<span class="doccomment">//! Support for the Performance Monitoring Unit </span>
+</pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.</span>
 <span class="doccomment">//! </span>
@@ -1053,34 +1054,34 @@
     <span class="ident">BranchMissesRetired</span> <span class="op">=</span> (<span class="number">0x03</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">16</span>) <span class="op">|</span> (<span class="number">0x00</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>) <span class="op">|</span> <span class="number">0xC5</span>,
 }
 
-<span class="kw">fn</span> <span class="ident">num_general_purpose_counters</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u8</span> {
+<span class="kw">fn</span> <span class="ident">num_general_purpose_counters</span>() -&gt; <span class="ident">u8</span> {
     <span class="kw-2">*</span><span class="ident">NUM_PMC</span>
 }
 
-<span class="kw">fn</span> <span class="ident">get_pmcs_available</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>{
+<span class="kw">fn</span> <span class="ident">get_pmcs_available</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>{
     <span class="prelude-val">Ok</span>(<span class="ident">PMCS_AVAILABLE</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;pmu_x86: The variable storing the available counters for each core hasn&#39;t been initialized&quot;</span>)<span class="question-mark">?</span>)
 }
 
-<span class="kw">fn</span> <span class="ident">get_pmcs_available_for_core</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>{
+<span class="kw">fn</span> <span class="ident">get_pmcs_available_for_core</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">AtomicU8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>{
     <span class="kw">let</span> <span class="ident">pmc</span> <span class="op">=</span> <span class="ident">PMCS_AVAILABLE</span>.<span class="ident">get</span>().<span class="ident">ok_or</span>(<span class="string">&quot;pmu_x86: The variable storing the available counters for each core hasn&#39;t been initialized&quot;</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(<span class="kw-2">&amp;</span><span class="ident">pmc</span>[<span class="ident">core_id</span> <span class="kw">as</span> <span class="ident">usize</span>])
 }
 
 <span class="doccomment">/// Returns the maximum core id for this machine</span>
-<span class="kw">fn</span> <span class="ident">max_core_id</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">max_core_id</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u8</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">lapics</span> <span class="op">=</span> <span class="ident">apic::get_lapics</span>();
     <span class="kw">let</span> <span class="ident">core</span> <span class="op">=</span> <span class="ident">lapics</span>.<span class="ident">iter</span>().<span class="ident">max_by_key</span>(<span class="op">|</span><span class="ident">core</span><span class="op">|</span> <span class="ident">core</span>.<span class="number">0</span>).<span class="ident">ok_or</span>(<span class="string">&quot;pmu_x86: Could not find a maximum core id&quot;</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(<span class="kw-2">*</span><span class="ident">core</span>.<span class="number">0</span>)
 }
 
 <span class="doccomment">/// Returns true if there are core ids that are larger than can be handled by the current PMU data structures</span>
-<span class="kw">fn</span> <span class="ident">greater_core_id_than_expected</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">greater_core_id_than_expected</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">max_core</span> <span class="op">=</span> <span class="ident">max_core_id</span>()<span class="question-mark">?</span> <span class="kw">as</span> <span class="ident">usize</span>;
     <span class="prelude-val">Ok</span>(<span class="ident">max_core</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">CORES_SUPPORTED_BY_PMU</span>)
 }
 
 <span class="doccomment">/// Returns true if there are more general purpose PMCs than can be handled by the current PMU data structures</span>
-<span class="kw">fn</span> <span class="ident">more_pmcs_than_expected</span>(<span class="ident">num_pmc</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">more_pmcs_than_expected</span>(<span class="ident">num_pmc</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="prelude-val">Ok</span>(<span class="ident">num_pmc</span> <span class="op">&gt;</span> <span class="ident">PMCS_SUPPORTED_BY_PMU</span>)
 }
 
@@ -1103,7 +1104,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// # Warning</span>
 <span class="doccomment">/// This function should only be called after all the cores have been booted up.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cores_initialized</span> <span class="op">=</span> <span class="ident">CORES_INITIALIZED</span>.<span class="ident">lock</span>();
     <span class="kw">let</span> <span class="ident">core_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
 
@@ -1184,20 +1185,20 @@
 <span class="kw">impl</span> <span class="ident">Counter</span> {
     <span class="doccomment">/// Creates a Counter object and assigns a physical counter for it. </span>
     <span class="doccomment">/// If it&#39;s a general PMC, writes the UMASK and Event Code to the relevant MSR, but leaves enable bit clear.  </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">event</span>: <span class="ident">EventType</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">event</span>: <span class="ident">EventType</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// ensures PMU available and initialized</span>
         <span class="ident">check_pmu_availability</span>()<span class="question-mark">?</span>;
         
         <span class="kw">match</span> <span class="ident">event</span> {
-            <span class="ident">EventType::InstructionsRetired</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">create_fixed_counter</span>(<span class="ident">FIXED_FUNC_0_RDPMC</span>),
-            <span class="ident">EventType::UnhaltedCoreCycles</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">create_fixed_counter</span>(<span class="ident">FIXED_FUNC_1_RDPMC</span>),
-            <span class="ident">EventType::UnhaltedReferenceCycles</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">create_fixed_counter</span>(<span class="ident">FIXED_FUNC_2_RDPMC</span>),
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">create_general_counter</span>(<span class="ident">event</span> <span class="kw">as</span> <span class="ident">u64</span>)	
+            <span class="ident">EventType::InstructionsRetired</span> =&gt; <span class="ident">create_fixed_counter</span>(<span class="ident">FIXED_FUNC_0_RDPMC</span>),
+            <span class="ident">EventType::UnhaltedCoreCycles</span> =&gt; <span class="ident">create_fixed_counter</span>(<span class="ident">FIXED_FUNC_1_RDPMC</span>),
+            <span class="ident">EventType::UnhaltedReferenceCycles</span> =&gt; <span class="ident">create_fixed_counter</span>(<span class="ident">FIXED_FUNC_2_RDPMC</span>),
+            <span class="kw">_</span> =&gt; <span class="ident">create_general_counter</span>(<span class="ident">event</span> <span class="kw">as</span> <span class="ident">u64</span>)	
         }
     }
     
     <span class="doccomment">/// Starts the count.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">num_pmc</span> <span class="op">=</span> <span class="ident">num_general_purpose_counters</span>();
 
         <span class="comment">// for a fixed value counter (that&#39;s already enabled), simply saves the current value as the starting count</span>
@@ -1214,7 +1215,7 @@
     }
     
     <span class="doccomment">/// Allows user to get count since start without stopping/releasing the counter.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_count_since_start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_count_since_start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">num_pmc</span> <span class="op">=</span> <span class="ident">num_general_purpose_counters</span>();
 
         <span class="comment">//checks to make sure the counter hasn&#39;t already been released</span>
@@ -1229,7 +1230,7 @@
     
     <span class="doccomment">/// Stops counting, releases the counter, and returns the count of events since the counter was initialized.</span>
     <span class="doccomment">/// This will consume the counter object since after freeing the counter, the counter should not be accessed.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">end</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">end</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">u64</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">end_val</span> <span class="op">=</span> <span class="ident">rdpmc</span>(<span class="self">self</span>.<span class="ident">msr_mask</span>);
         <span class="kw">let</span> <span class="ident">start_count</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start_count</span>;
         <span class="ident">drop</span>(<span class="self">self</span>);
@@ -1237,13 +1238,13 @@
     }
 
     <span class="doccomment">/// lightweight function with no checks to get the counter value from when it was started.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">diff</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">diff</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">u64</span> {
         <span class="ident">rdpmc</span>(<span class="self">self</span>.<span class="ident">msr_mask</span>) <span class="op">-</span> <span class="self">self</span>.<span class="ident">start_count</span>
     }
 }
 
 <span class="kw">impl</span> <span class="ident">Drop</span> <span class="kw">for</span> <span class="ident">Counter</span> {
-    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">drop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">num_pmc</span> <span class="op">=</span> <span class="ident">num_general_purpose_counters</span>(); 
 
         <span class="comment">// A programmable counter would be claimed at this point, so free it now so it can be used again.</span>
@@ -1261,7 +1262,7 @@
 }
 
 <span class="doccomment">/// Returns true if the counter is not in use</span>
-<span class="kw">fn</span> <span class="ident">counter_is_available</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>, <span class="ident">counter</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">counter_is_available</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>, <span class="ident">counter</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">pmcs</span> <span class="op">=</span> <span class="ident">get_pmcs_available_for_core</span>(<span class="ident">core_id</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(<span class="ident">pmcs</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>).<span class="ident">get_bit</span>(<span class="ident">counter</span> <span class="kw">as</span> <span class="ident">usize</span>))
 }
@@ -1289,7 +1290,7 @@
 }
 
 <span class="doccomment">/// Clears the counter bit to show it&#39;s in use</span>
-<span class="kw">fn</span> <span class="ident">claim_counter</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>, <span class="ident">counter</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">claim_counter</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>, <span class="ident">counter</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">pmcs</span> <span class="op">=</span> <span class="ident">get_pmcs_available_for_core</span>(<span class="ident">core_id</span>)<span class="question-mark">?</span>;
 
     <span class="ident">pmcs</span>.<span class="ident">fetch_update</span>(
@@ -1311,7 +1312,7 @@
 
 <span class="doccomment">/// Frees all counters and make them available to be used.</span>
 <span class="doccomment">/// Essentially sets the PMU to its initial state.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_pmu</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_pmu</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">for</span> <span class="ident">pmc</span> <span class="kw">in</span> <span class="ident">get_pmcs_available</span>()<span class="question-mark">?</span>.<span class="ident">iter</span>() {
         <span class="ident">pmc</span>.<span class="ident">store</span>(<span class="ident">INIT_VAL_PMCS_AVAILABLE</span>, <span class="ident">Ordering::SeqCst</span>);
     }
@@ -1328,7 +1329,7 @@
 
 <span class="doccomment">/// Returns the word position and the bit in the word for the given bit number</span>
 <span class="doccomment">/// which will be used to access the bitmap. </span>
-<span class="kw">fn</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">bit_num</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> (<span class="ident">usize</span>, <span class="ident">usize</span>) {
+<span class="kw">fn</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">bit_num</span>: <span class="ident">u8</span>) -&gt; (<span class="ident">usize</span>, <span class="ident">usize</span>) {
     <span class="kw">let</span> <span class="ident">total_bits_in_word</span> <span class="op">=</span> <span class="ident">core::mem::size_of</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>() <span class="op">*</span> <span class="number">8</span>;
     <span class="kw">let</span> <span class="ident">word_num</span> <span class="op">=</span> <span class="ident">bit_num</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">/</span> <span class="ident">total_bits_in_word</span>;
     <span class="kw">let</span> <span class="ident">bit_in_word</span> <span class="op">=</span> <span class="ident">bit_num</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">%</span> <span class="ident">total_bits_in_word</span>;
@@ -1337,7 +1338,7 @@
 
 <span class="doccomment">/// Adds the core to the list of those where PMU sampling is underway</span>
 <span class="doccomment">/// by setting the core_id bit</span>
-<span class="kw">fn</span> <span class="ident">add_core_to_sampling_list</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">add_core_to_sampling_list</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">word_num</span>, <span class="ident">bit_in_word</span>) <span class="op">=</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">core_id</span>);
 
     <span class="ident">CORES_SAMPLING</span>[<span class="ident">word_num</span>].<span class="ident">fetch_update</span>(
@@ -1359,7 +1360,7 @@
 
 <span class="doccomment">/// Removes the core from the list of those where PMU sampling is underway</span>
 <span class="doccomment">/// by clearing the core_id bit</span>
-<span class="kw">fn</span> <span class="ident">remove_core_from_sampling_list</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">remove_core_from_sampling_list</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">word_num</span>, <span class="ident">bit_in_word</span>) <span class="op">=</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">core_id</span>);
 
     <span class="ident">CORES_SAMPLING</span>[<span class="ident">word_num</span>].<span class="ident">fetch_update</span>(
@@ -1379,13 +1380,13 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">fn</span> <span class="ident">core_is_currently_sampling</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">fn</span> <span class="ident">core_is_currently_sampling</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
     <span class="kw">let</span> (<span class="ident">word_num</span>, <span class="ident">bit_in_word</span>) <span class="op">=</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">core_id</span>);
     <span class="ident">CORES_SAMPLING</span>[<span class="ident">word_num</span>].<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>).<span class="ident">get_bit</span>(<span class="ident">bit_in_word</span>)
 }
 
 <span class="doccomment">/// Notify that sampling results are ready to be retrieved by setting the core_id bit</span>
-<span class="kw">fn</span> <span class="ident">notify_sampling_results_are_ready</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">notify_sampling_results_are_ready</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">word_num</span>, <span class="ident">bit_in_word</span>) <span class="op">=</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">core_id</span>);
 
     <span class="ident">RESULTS_READY</span>[<span class="ident">word_num</span>].<span class="ident">fetch_update</span>(
@@ -1406,7 +1407,7 @@
 }
 
 <span class="doccomment">/// Notify that sampling results have been retrieved by clearing the core_id bit</span>
-<span class="kw">fn</span> <span class="ident">sampling_results_have_been_retrieved</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">sampling_results_have_been_retrieved</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> (<span class="ident">word_num</span>, <span class="ident">bit_in_word</span>) <span class="op">=</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">core_id</span>);
 
     <span class="ident">RESULTS_READY</span>[<span class="ident">word_num</span>].<span class="ident">fetch_update</span>(
@@ -1426,18 +1427,18 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">fn</span> <span class="ident">sampling_results_are_ready</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">fn</span> <span class="ident">sampling_results_are_ready</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
     <span class="kw">let</span> (<span class="ident">word_num</span>, <span class="ident">bit_in_word</span>) <span class="op">=</span> <span class="ident">find_word_and_offset_from_bit</span>(<span class="ident">core_id</span>);
     <span class="ident">RESULTS_READY</span>[<span class="ident">word_num</span>].<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>).<span class="ident">get_bit</span>(<span class="ident">bit_in_word</span>)
 }
 
 <span class="doccomment">/// Creates a counter object for a general purpose PMC given the event type.</span>
-<span class="kw">fn</span> <span class="ident">create_general_counter</span>(<span class="ident">event_mask</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">create_general_counter</span>(<span class="ident">event_mask</span>: <span class="ident">u64</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="ident">programmable_start</span>(<span class="ident">event_mask</span>)
 }
 
 <span class="doccomment">/// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free</span>
-<span class="kw">fn</span> <span class="ident">programmable_start</span>(<span class="ident">event_mask</span>: <span class="ident">u64</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">programmable_start</span>(<span class="ident">event_mask</span>: <span class="ident">u64</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">my_core</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
     <span class="kw">let</span> <span class="ident">num_pmc</span> <span class="op">=</span> <span class="ident">num_general_purpose_counters</span>();
 
@@ -1464,7 +1465,7 @@
 }
 
 <span class="doccomment">/// Creates a counter object for a fixed hardware counter</span>
-<span class="kw">fn</span> <span class="ident">create_fixed_counter</span>(<span class="ident">msr_mask</span>: <span class="ident">u32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">create_fixed_counter</span>(<span class="ident">msr_mask</span>: <span class="ident">u32</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Counter</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">my_core</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
     <span class="kw">let</span> <span class="ident">count</span> <span class="op">=</span> <span class="ident">rdpmc</span>(<span class="ident">msr_mask</span>);
     
@@ -1478,7 +1479,7 @@
 
 <span class="doccomment">/// Checks that the PMU has been initialized. If it has been,</span>
 <span class="doccomment">/// the version ID tells whether the system has performance monitoring capabilities. </span>
-<span class="kw">fn</span> <span class="ident">check_pmu_availability</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>  {
+<span class="kw">fn</span> <span class="ident">check_pmu_availability</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>  {
     <span class="kw">let</span> <span class="ident">core_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
     <span class="kw">if</span> <span class="op">!</span><span class="ident">CORES_INITIALIZED</span>.<span class="ident">lock</span>().<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">core_id</span>) {
         <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">PMU_VERSION</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">MIN_PMU_VERSION</span> {
@@ -1506,7 +1507,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">SampledEvents</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_capacity</span>(<span class="ident">capacity</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SampledEvents</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">with_capacity</span>(<span class="ident">capacity</span>: <span class="ident">usize</span>) -&gt; <span class="ident">SampledEvents</span> {
         <span class="ident">SampledEvents</span> {
             <span class="ident">start_value</span>: <span class="number">0</span>,
             <span class="ident">task_id</span>: <span class="number">0</span>,
@@ -1531,7 +1532,7 @@
 <span class="doccomment">/// The function clears any previous values from sampling stored for this core, so values must be retrieved before starting a new sampling process.</span>
 <span class="doccomment">/// Currently can only sample &quot;this&quot; core - core that the function was called on. </span>
 <span class="doccomment">/// </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_samples</span>(<span class="ident">event_type</span>: <span class="ident">EventType</span>, <span class="ident">event_per_sample</span>: <span class="ident">u32</span>, <span class="ident">task_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">sample_count</span>: <span class="ident">u32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(),<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {        
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_samples</span>(<span class="ident">event_type</span>: <span class="ident">EventType</span>, <span class="ident">event_per_sample</span>: <span class="ident">u32</span>, <span class="ident">task_id</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>, <span class="ident">sample_count</span>: <span class="ident">u32</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(),<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {        
     <span class="ident">check_pmu_availability</span>()<span class="question-mark">?</span>;
 
     <span class="comment">// perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded</span>
@@ -1595,7 +1596,7 @@
 }
 
 <span class="doccomment">/// Function to manually stop the sampling interrupts. Marks the stored instruction pointers and task IDs as ready to retrieve. </span>
-<span class="kw">fn</span> <span class="ident">stop_samples</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>, <span class="ident">samples</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SampledEvents</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">stop_samples</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>, <span class="ident">samples</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SampledEvents</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// immediately stops counting and clears the counter</span>
     <span class="kw">unsafe</span>{
         <span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span>, <span class="number">0</span>);
@@ -1626,7 +1627,7 @@
 
 <span class="doccomment">/// Returns the samples that were stored during sampling in the form of a SampleResults object. </span>
 <span class="doccomment">/// If samples are not yet finished, forces them to stop.  </span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">retrieve_samples</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SampleResults</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">retrieve_samples</span>() -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">SampleResults</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">my_core_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sampling_info</span> <span class="op">=</span> <span class="ident">SAMPLING_INFO</span>.<span class="ident">lock</span>();
@@ -1634,7 +1635,7 @@
 
     <span class="comment">// the interrupt handler might have stopped samples already so thsi check is required</span>
     <span class="kw">if</span> <span class="ident">core_is_currently_sampling</span>(<span class="ident">my_core_id</span>) {
-        <span class="ident">stop_samples</span>(<span class="ident">my_core_id</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">samples</span>)<span class="question-mark">?</span>;
+        <span class="ident">stop_samples</span>(<span class="ident">my_core_id</span>, <span class="kw-2">&amp;mut</span> <span class="ident">samples</span>)<span class="question-mark">?</span>;
     }
     
     <span class="ident">sampling_results_have_been_retrieved</span>(<span class="ident">my_core_id</span>)<span class="question-mark">?</span>;
@@ -1651,7 +1652,7 @@
 }
 
 <span class="doccomment">/// Finds the corresponding function for each instruction pointer and calculates the percentage amount each function occured in the samples</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_function_names_from_samples</span>(<span class="ident">sample_results</span>: <span class="kw-2">&amp;</span><span class="ident">SampleResults</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_function_names_from_samples</span>(<span class="ident">sample_results</span>: <span class="kw-2">&amp;</span><span class="ident">SampleResults</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">taskref</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>().<span class="ident">ok_or</span>(<span class="string">&quot;pmu_x86::get_function_names_from_samples: Could not get reference to current task&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">get_namespace</span>();
     <span class="macro">debug!</span>(<span class="string">&quot;Analyze Samples:&quot;</span>);
@@ -1698,13 +1699,13 @@
 <span class="doccomment">/// * Returns an `Err` if PMU is supported and initialized and a sample was pending, </span>
 <span class="doccomment">///   but an error occurred while logging the sample.</span>
 <span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_sample</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ExceptionStackFrame</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_sample</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// Check that PMU hardware exists and is supported on this machine.</span>
     <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">PMU_VERSION</span> <span class="op">&lt;</span> <span class="ident">MIN_PMU_VERSION</span> {
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
     }
     <span class="comment">// Check that a PMU sampling event is currently pending.</span>
-    <span class="kw">if</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_PERF_GLOBAL_STAUS</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+    <span class="kw">if</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_PERF_GLOBAL_STAUS</span>) <span class="op">==</span> <span class="number">0</span> {
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
     }
 
@@ -1719,8 +1720,8 @@
 
     <span class="kw">let</span> <span class="ident">current_count</span> <span class="op">=</span> <span class="ident">samples</span>.<span class="ident">sample_count</span>;
     <span class="comment">// if all samples have already been taken, calls the function to turn off the counter</span>
-    <span class="kw">if</span> <span class="ident">current_count</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
-        <span class="ident">stop_samples</span>(<span class="ident">my_core_id</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">samples</span>)<span class="question-mark">?</span>; 
+    <span class="kw">if</span> <span class="ident">current_count</span> <span class="op">==</span> <span class="number">0</span> {
+        <span class="ident">stop_samples</span>(<span class="ident">my_core_id</span>, <span class="kw-2">&amp;mut</span> <span class="ident">samples</span>)<span class="question-mark">?</span>; 
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
     }
 
@@ -1731,7 +1732,7 @@
         <span class="kw">let</span> <span class="ident">requested_task_id</span> <span class="op">=</span> <span class="ident">samples</span>.<span class="ident">task_id</span>;
         
         <span class="kw">let</span> <span class="ident">task_id</span> <span class="op">=</span> <span class="ident">taskref</span>.<span class="ident">id</span>;
-        <span class="kw">if</span> (<span class="ident">requested_task_id</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span>) <span class="op">|</span> (<span class="ident">requested_task_id</span> <span class="op">=</span><span class="op">=</span> <span class="ident">task_id</span>) {
+        <span class="kw">if</span> (<span class="ident">requested_task_id</span> <span class="op">==</span> <span class="number">0</span>) <span class="op">|</span> (<span class="ident">requested_task_id</span> <span class="op">==</span> <span class="ident">task_id</span>) {
             <span class="ident">samples</span>.<span class="ident">ip_list</span>.<span class="ident">push</span>(<span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>);
             <span class="ident">samples</span>.<span class="ident">task_id_list</span>.<span class="ident">push</span>(<span class="ident">task_id</span>);
         }
@@ -1758,6 +1759,6 @@
     <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
 }
 
-</pre></div>
-</section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pmu_x86" data-search-index-js="../../search-index.js" data-search-js="../../search.js"></div>
-    <script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script></body></html>
+</code></pre></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pmu_x86" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
+</body></html>
