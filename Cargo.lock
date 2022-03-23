@@ -121,7 +121,6 @@ dependencies = [
  "stdio",
  "task",
  "window_manager",
- "x86_64",
 ]
 
 [[package]]
@@ -998,7 +997,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -1096,7 +1094,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -1430,7 +1427,6 @@ dependencies = [
  "runqueue",
  "spin 0.9.0",
  "task",
- "x86_64",
 ]
 
 [[package]]
@@ -1555,7 +1551,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -2098,7 +2093,6 @@ dependencies = [
  "root",
  "spin 0.9.0",
  "vfs_node",
- "x86_64",
 ]
 
 [[package]]
@@ -2414,7 +2408,6 @@ dependencies = [
  "lazy_static",
  "log",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -2693,7 +2686,6 @@ dependencies = [
  "task",
  "terminal_print",
  "window_manager",
- "x86_64",
 ]
 
 [[package]]
@@ -3013,7 +3005,6 @@ dependencies = [
  "root",
  "spin 0.9.0",
  "task",
- "x86_64",
 ]
 
 [[package]]
@@ -3026,7 +3017,6 @@ dependencies = [
  "logger",
  "spin 0.9.0",
  "task",
- "x86_64",
 ]
 
 [[package]]
@@ -3207,7 +3197,6 @@ version = "0.1.0"
 dependencies = [
  "log",
  "pit_clock",
- "x86_64",
 ]
 
 [[package]]
@@ -3336,7 +3325,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
