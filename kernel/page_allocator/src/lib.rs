@@ -15,7 +15,6 @@
 //! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
 
 #![no_std]
-#![feature(const_fn_trait_bound)]
 
 extern crate alloc;
 #[macro_use] extern crate log;

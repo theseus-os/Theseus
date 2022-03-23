@@ -25,7 +25,7 @@ extern crate core2;
 #[macro_use] extern crate derive_more;
 extern crate mlx5;
 
-use core::{array::IntoIter, convert::TryFrom};
+use core::convert::TryFrom;
 use mpmc::Queue;
 use event_types::Event;
 use memory::MemoryManagementInfo;
@@ -70,7 +70,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
 
     let serial_ports = logger::take_early_log_writers();
-    let logger_writers = IntoIter::new(serial_ports)
+    let logger_writers = IntoIterator::into_iter(serial_ports)
         .flatten()
         .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
             .ok()

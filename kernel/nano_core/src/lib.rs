@@ -37,7 +37,6 @@ extern crate memory_initialization;
 
 
 use core::ops::DerefMut;
-use core::array::IntoIter;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use serial_port_basic::{take_serial_port, SerialPortAddress};
@@ -98,7 +97,7 @@ pub extern "C" fn nano_core_start(
 
     // Initialize the logger up front so we can see early log messages for debugging.
     let logger_ports = [take_serial_port(SerialPortAddress::COM1)]; // some servers use COM2 instead. 
-    try_exit!(logger::early_init(None, IntoIter::new(logger_ports).flatten()).map_err(|_a| "logger::early_init() failed."));
+    try_exit!(logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten()).map_err(|_a| "logger::early_init() failed."));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
@@ -243,10 +242,6 @@ extern {
     static ap_start_realmode_end: usize;
 }
 
-
-/// This module is a hack to get around the lack of the 
-/// `__truncdfsf2` function in the `compiler_builtins` crate.
-mod truncate;
 
 /// This module is a hack to get around the issue of no_mangle symbols
 /// not being exported properly from the `libm` crate in no_std environments.
