@@ -226,6 +226,7 @@ impl<'t> DmarEntry<'t> {
 /// An instance of this struct describes a memory region
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
+#[allow(dead_code)]
 pub struct DmarRmrr {
     header: DmarEntryRecord,
     _reserved: u16,
@@ -243,6 +244,7 @@ const_assert_eq!(core::mem::size_of::<DmarRmrr>(), 24);
 /// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
+#[allow(dead_code)]
 pub struct DmarAtsr {
     header: DmarEntryRecord,
     flags: u8,
@@ -257,6 +259,7 @@ const_assert_eq!(core::mem::size_of::<DmarAtsr>(), 8);
 /// RHSA: DMAR Remapping Hardware Static Affinity Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
+#[allow(dead_code)]
 pub struct DmarRhsa {
     header: DmarEntryRecord,
     _reserved: u32,
@@ -269,6 +272,7 @@ const_assert_eq!(core::mem::size_of::<DmarRhsa>(), 20);
 /// ANDD: DMAR ACPI Name-space Device Declaration Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
+#[allow(dead_code)]
 pub struct DmarAndd {
     header: DmarEntryRecord,
     _reserved: [u8; 3],
@@ -284,6 +288,7 @@ const_assert_eq!(core::mem::size_of::<DmarAndd>(), 8);
 /// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. 
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
+#[allow(dead_code)]
 pub struct DmarSatc {
     header: DmarEntryRecord,
     flags: u8,

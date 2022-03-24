@@ -8,7 +8,7 @@ use super::*;
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
 pub(crate) struct Drhd {
-    header: DmarEntryRecord,
+    _header: DmarEntryRecord,
     flags: u8,
     _reserved: u8,
     segment_number: u16,

@@ -121,8 +121,8 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
 ### then we need to define a preprocessor variable 
 ### that will cause the AVX flag to be enabled in the boot-up assembly code. 
-ifneq (,$(findstring avx, $(TARGET)))
-$(eval CFLAGS += -DENABLE_AVX)
+ifneq (,$(findstring avx,$(TARGET)))
+export override CFLAGS+=-DENABLE_AVX
 endif
 
 
