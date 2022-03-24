@@ -7,7 +7,6 @@
 #![no_std]
 
 extern crate port_io;
-extern crate x86_64;
 
 use core::fmt;
 
@@ -252,6 +251,5 @@ fn io_wait() {
     // older versions of Linux and other PC operating systems have
     // worked around this by writing garbage data to port 0x80, which
     // allegedly takes long enough to make everything work on most hardware.
-    use x86_64::instructions::port::outb;
-    unsafe { outb(0x80, 0); }
+    unsafe { port_io::Port::<u8>::new(0x80).write(0); }
 }
