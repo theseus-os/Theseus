@@ -22,7 +22,7 @@ use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
     PhysicalAddress, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
 };
-use x86_64::{registers::control_regs, instructions::tlb};
+use x86_64::{registers::control::Cr3, instructions::tlb};
 
 
 /// Finds and returns the relevant addresses for the kernel image loaded into memory by the bootloader.
@@ -328,7 +328,7 @@ pub fn get_vga_mem_addr(
 
 /// Flushes the specific virtual address in TLB. 
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
-    tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+    tlb::flush(x86_64::VirtAddr::new(vaddr.value() as u64));
 }
 
 /// Flushes the whole TLB. 
@@ -338,5 +338,7 @@ pub fn tlb_flush_all() {
 
 /// Returns the current top-level page table address.
 pub fn get_p4() -> PhysicalAddress {
-    PhysicalAddress::new_canonical(control_regs::cr3().0 as usize)
+    PhysicalAddress::new_canonical(
+        Cr3::read_raw().0.start_address().as_u64() as usize
+    )
 }

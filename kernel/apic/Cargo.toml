@@ -28,6 +28,9 @@ git = "https://github.com/theseus-os/irq_safety"
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 
+[dependencies.msr]
+path = "../../libs/msr"
+
 [dependencies.pit_clock]
 path = "../pit_clock"
 

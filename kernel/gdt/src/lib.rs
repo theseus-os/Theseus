@@ -18,6 +18,7 @@ use x86_64::{
         gdt::SegmentSelector,
     },
     PrivilegeLevel,
+    VirtAddr,
 };
 use spin::Once;
 use memory::VirtualAddress;
@@ -211,7 +212,7 @@ impl Gdt {
         use core::mem::size_of;
 
         let ptr = DescriptorTablePointer {
-            base: self.table.as_ptr() as u64,
+            base: VirtAddr::new(self.table.as_ptr() as u64),
             limit: (self.table.len() * size_of::<u64>() - 1) as u16,
         };
 

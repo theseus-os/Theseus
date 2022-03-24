@@ -63,6 +63,7 @@
 extern crate spin;
 #[macro_use] extern crate lazy_static;
 extern crate x86_64;
+extern crate msr;
 extern crate raw_cpuid;
 extern crate task;
 extern crate memory;
@@ -73,10 +74,8 @@ extern crate apic;
 extern crate mod_mgmt;
 extern crate bit_field;
 
-use x86_64::registers::msr::*;
-use x86_64::VirtualAddress;
-use x86_64::structures::idt::ExceptionStackFrame;
-use x86_64::instructions::rdpmc;
+use msr::*;
+use x86_64::{VirtAddr, registers::model_specific::Msr, structures::idt::InterruptStackFrame};
 use raw_cpuid::*;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
@@ -270,20 +269,20 @@ pub fn init() -> Result<(), &'static str> {
 fn init_registers() {
     unsafe {
         // disables all the performance counters
-        wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
+        Msr::new(IA32_PERF_GLOBAL_CTRL).write(0);
         // clear the general purpose PMCs
-        wrmsr(IA32_PMC0, 0);
-        wrmsr(IA32_PMC1, 0);
-        wrmsr(IA32_PMC2, 0);
-        wrmsr(IA32_PMC3, 0);
+        Msr::new(IA32_PMC0).write(0);
+        Msr::new(IA32_PMC1).write(0);
+        Msr::new(IA32_PMC2).write(0);
+        Msr::new(IA32_PMC3).write(0);
         // clear the fixed event counters
-        wrmsr(IA32_FIXED_CTR0, 0);
-        wrmsr(IA32_FIXED_CTR1, 0);
-        wrmsr(IA32_FIXED_CTR2, 0);
+        Msr::new(IA32_FIXED_CTR0).write(0);
+        Msr::new(IA32_FIXED_CTR1).write(0);
+        Msr::new(IA32_FIXED_CTR2).write(0);
         // sets fixed function counters to count events at all privilege levels
-        wrmsr(IA32_FIXED_CTR_CTRL, ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
+        Msr::new(IA32_FIXED_CTR_CTRL).write(ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
         // enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
-        wrmsr(IA32_PERF_GLOBAL_CTRL, ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
+        Msr::new(IA32_PERF_GLOBAL_CTRL).write(ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
     }
 }
 
@@ -325,8 +324,10 @@ impl Counter {
         // for a general PMC, it enables the counter to start counting from 0
         else {
             self.start_count = 0;
-            let umask = rdmsr(IA32_PERFEVTSEL0 + self.pmc as u32);
-            unsafe{wrmsr(IA32_PERFEVTSEL0 + self.pmc as u32, umask | PMC_ENABLE);}
+            unsafe { 
+                let umask = Msr::new(IA32_PERFEVTSEL0 + self.pmc as u32).read();
+                Msr::new(IA32_PERFEVTSEL0 + self.pmc as u32).write(umask | PMC_ENABLE);
+            }
         }
         Ok(())
     }
@@ -369,8 +370,8 @@ impl Drop for Counter {
         if self.msr_mask < num_pmc as u32 {
             // clears event counting settings and counter 
             unsafe{
-                wrmsr(IA32_PERFEVTSEL0 + self.msr_mask as u32, 0);
-                wrmsr(IA32_PMC0 + self.msr_mask as u32, 0);
+                Msr::new(IA32_PERFEVTSEL0 + self.msr_mask as u32).write(0);
+                Msr::new(IA32_PMC0 + self.msr_mask as u32).write(0);
             }
             free_counter(self.core, self.msr_mask as u8); 
         }
@@ -568,8 +569,8 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
         claim_counter(my_core, pmc)?;
 
         unsafe{
-            wrmsr(IA32_PMC0 + (pmc as u32), 0);
-            wrmsr(IA32_PERFEVTSEL0 + (pmc as u32), event_mask);
+            Msr::new(IA32_PMC0 + (pmc as u32)).write(0);
+            Msr::new(IA32_PERFEVTSEL0 + (pmc as u32)).write(event_mask);
         }
         return Ok(Counter {
             start_count: 0, 
@@ -619,7 +620,7 @@ struct SampledEvents{
     start_value: usize,
     task_id: usize,
     sample_count: u32,
-    ip_list: Vec<VirtualAddress>,
+    ip_list: Vec<VirtAddr>,
     task_id_list: Vec<usize>,
 }
 
@@ -704,8 +705,8 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     let event_mask = event_type as u64;
 
     unsafe{
-        wrmsr(IA32_PMC0, start_value as u64);
-        wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
+        Msr::new(IA32_PMC0).write(start_value as u64);
+        Msr::new(IA32_PERFEVTSEL0).write(event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
     }
 
     return Ok(());
@@ -716,9 +717,9 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
 fn stop_samples(core_id: u8, samples: &mut SampledEvents) -> Result<(), &'static str> {
     // immediately stops counting and clears the counter
     unsafe{
-        wrmsr(IA32_PERFEVTSEL0, 0);
-        wrmsr(IA32_PMC0, 0);
-        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR);
+        Msr::new(IA32_PERFEVTSEL0).write(0);
+        Msr::new(IA32_PMC0).write(0);
+        Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR);
     }
 
     // clears values so that even if exception is somehow triggered, it stops at the next iteration
@@ -738,7 +739,7 @@ fn stop_samples(core_id: u8, samples: &mut SampledEvents) -> Result<(), &'static
 
 /// Stores the instruction pointers and corresponding task IDs from the samples
 pub struct SampleResults {
-    pub instruction_pointers: Vec<VirtualAddress>,
+    pub instruction_pointers: Vec<memory::VirtualAddress>,
     pub task_ids:  Vec<usize>,
 }
 
@@ -757,7 +758,10 @@ pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
     
     sampling_results_have_been_retrieved(my_core_id)?;
 
-    Ok(SampleResults{instruction_pointers: samples.ip_list.clone(), task_ids: samples.task_id_list.clone()})   
+    let mut instruction_pointers = Vec::with_capacity(samples.ip_list.len());
+    instruction_pointers.extend(samples.ip_list.iter().map(|va| memory::VirtualAddress::new_canonical(va.as_u64() as usize)));
+
+    Ok(SampleResults { instruction_pointers, task_ids: samples.task_id_list.clone() })   
 }
 
 /// Simple function to print values from SampleResults in a form that the script "post-mortem pmu analysis.py" can parse. 
@@ -778,10 +782,8 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
     let total_samples = sample_results.instruction_pointers.len();
 
     for ip in sample_results.instruction_pointers.iter() {
-        let (section_ref, _offset) = namespace.get_section_containing_address(
-            memory::VirtualAddress::new(ip.0).ok_or("sampled instruction pointer was an invalid virtual address")?,
-            true
-        ).ok_or("Can't find section containing sampled instruction pointer")?;
+        let (section_ref, _offset) = namespace.get_section_containing_address(*ip, false)
+            .ok_or("Can't find section containing sampled instruction pointer")?;
         let section_name = section_ref.name_without_hash().to_string();
 
         sections.entry(section_name).and_modify(|e| {*e += 1}).or_insert(1);
@@ -816,20 +818,19 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
 /// * Returns an `Err` if PMU is supported and initialized and a sample was pending, 
 ///   but an error occurred while logging the sample.
 ///
-pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<bool, &'static str> {
+pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static str> {
     // Check that PMU hardware exists and is supported on this machine.
     if *PMU_VERSION < MIN_PMU_VERSION {
         return Ok(false);
     }
     // Check that a PMU sampling event is currently pending.
-    if rdmsr(IA32_PERF_GLOBAL_STAUS) == 0 {
+    if unsafe { Msr::new(IA32_PERF_GLOBAL_STAUS).read() } == 0 {
         return Ok(false);
     }
 
-    unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR); }
+    unsafe { Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR); }
 
     let my_core_id = apic::get_my_apic_id();
-    let event_mask = rdmsr(IA32_PERFEVTSEL0);
 
     let mut sampling_info = SAMPLING_INFO.lock();
     let mut samples = sampling_info.get_mut(&my_core_id)
@@ -860,10 +861,10 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<bool, &'st
 
     // stops the counter, resets it, and restarts it
     unsafe {
-        wrmsr(IA32_PERFEVTSEL0, 0);
-        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR);
-        wrmsr(IA32_PMC0, samples.start_value as u64);
-        wrmsr(IA32_PERFEVTSEL0, event_mask);
+        Msr::new(IA32_PERFEVTSEL0).write(0);
+        Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR);
+        Msr::new(IA32_PMC0).write(samples.start_value as u64);
+        Msr::new(IA32_PERFEVTSEL0).write(Msr::new(IA32_PERFEVTSEL0).read());
     }
 
     if let Some(my_apic) = apic::get_my_apic() {
@@ -876,3 +877,17 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<bool, &'st
     Ok(true)
 }
 
+
+/// Reads the given PMC (performance monitor counter) register.
+fn rdpmc(msr: u32) -> u64 {
+    let (high, low): (u32, u32);
+    unsafe {
+        core::arch::asm!(
+            "rdpmc",
+            in("ecx") msr,
+            out("eax") low, out("edx") high,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    ((high as u64) << 32) | (low as u64)
+}

@@ -27,7 +27,7 @@ dependencies = [
  "rsdp",
  "rsdt",
  "spin 0.9.0",
- "volatile",
+ "volatile 0.2.7",
 ]
 
 [[package]]
@@ -95,12 +95,13 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
+ "msr",
  "owning_ref",
  "pit_clock",
  "raw-cpuid",
  "spin 0.9.0",
  "static_assertions",
- "volatile",
+ "volatile 0.2.7",
  "x86_64",
  "zerocopy",
 ]
@@ -758,7 +759,7 @@ dependencies = [
  "pci",
  "spin 0.9.0",
  "static_assertions",
- "volatile",
+ "volatile 0.2.7",
  "x86_64",
  "zerocopy",
 ]
@@ -1115,7 +1116,7 @@ dependencies = [
  "owning_ref",
  "sdt",
  "spin 0.9.0",
- "volatile",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1164,7 +1165,7 @@ dependencies = [
  "bit_field 0.7.0",
  "log",
  "memory",
- "volatile",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1227,7 +1228,7 @@ dependencies = [
  "memory",
  "owning_ref",
  "spin 0.9.0",
- "volatile",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1242,7 +1243,7 @@ dependencies = [
  "owning_ref",
  "spin 0.9.0",
  "static_assertions",
- "volatile",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1297,7 +1298,7 @@ dependencies = [
  "spin 0.9.0",
  "static_assertions",
  "virtual_nic",
- "volatile",
+ "volatile 0.2.7",
  "x86_64",
  "zerocopy",
 ]
@@ -1671,7 +1672,7 @@ dependencies = [
  "num_enum",
  "owning_ref",
  "static_assertions",
- "volatile",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1745,6 +1746,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf78b1242a953be96e01b5f8ed8ffdfc8055c0a2b779899b3835e5d27a69dced"
 
 [[package]]
+name = "msr"
+version = "0.1.0"
+
+[[package]]
 name = "multiboot2"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1770,7 +1775,7 @@ dependencies = [
  "pit_clock",
  "spin 0.9.0",
  "stack",
- "volatile",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1895,7 +1900,7 @@ dependencies = [
  "nic_queues",
  "owning_ref",
  "pci",
- "volatile",
+ "volatile 0.2.7",
 ]
 
 [[package]]
@@ -2128,9 +2133,7 @@ name = "pic"
 version = "0.1.0"
 dependencies = [
  "log",
- "memory",
  "port_io",
- "x86_64",
 ]
 
 [[package]]
@@ -2157,7 +2160,6 @@ dependencies = [
  "log",
  "port_io",
  "spin 0.9.0",
- "x86_64",
 ]
 
 [[package]]
@@ -2196,6 +2198,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "msr",
  "pit_clock",
  "port_io",
  "raw-cpuid",
@@ -3334,7 +3337,7 @@ dependencies = [
  "kernel_config",
  "logger",
  "spin 0.9.0",
- "volatile",
+ "volatile 0.2.7",
 ]
 
 [[package]]
@@ -3362,6 +3365,12 @@ source = "git+https://github.com/theseus-os/volatile#73a307a2906c9f67fa4b951ce85
 dependencies = [
  "zerocopy",
 ]
+
+[[package]]
+name = "volatile"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4c2dbd44eb8b53973357e6e207e370f0c1059990df850aca1eca8947cf464f0"
 
 [[package]]
 name = "volatile-register"
@@ -3531,11 +3540,12 @@ dependencies = [
 
 [[package]]
 name = "x86_64"
-version = "0.1.2"
+version = "0.14.8"
 dependencies = [
- "bit_field 0.7.0",
+ "bit_field 0.10.1",
  "bitflags",
  "irq_safety",
+ "volatile 0.4.4",
 ]
 
 [[package]]
