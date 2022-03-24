@@ -37,10 +37,7 @@ const MAILBOX_DATA_SIZE_IN_BYTES:           usize = 512;
 const DEFAULT_MAILBOX_OFFSET_IN_PAGE:       usize = 0;
 /// Each physical address takes 8 bytes
 const SIZE_PADDR_IN_BYTES:                  usize = 8; 
-/// When passing physical addresses to the NIC, we always send the higher 4 bytes in one field.
-const SIZE_PADDR_H_IN_BYTES:                usize = 4; 
-/// When passing physical addresses to the NIC, we always send the lower 4 bytes in one field.
-const SIZE_PADDR_L_IN_BYTES:                usize = 4; 
+
 
 /// Type of transport that carries the command.
 pub enum CommandTransportType {

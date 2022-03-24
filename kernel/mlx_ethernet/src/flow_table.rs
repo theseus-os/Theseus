@@ -4,7 +4,7 @@
 use zerocopy::*;
 use volatile::Volatile;
 use byteorder::BigEndian;
-use core::{fmt, num};
+use core::fmt;
 use num_enum::TryFromPrimitive;
 
 /// Value written to the flow table context to set the flow table's role in packet processing.
