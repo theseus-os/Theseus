@@ -1143,9 +1143,6 @@
 <span id="1138">1138</span>
 <span id="1139">1139</span>
 <span id="1140">1140</span>
-<span id="1141">1141</span>
-<span id="1142">1142</span>
-<span id="1143">1143</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
 <span class="doccomment">//! </span>
@@ -1214,7 +1211,7 @@
 <span class="kw">use</span> <span class="ident">mod_mgmt</span>::{<span class="ident">AppCrateRef</span>, <span class="ident">CrateNamespace</span>, <span class="ident">TlsDataImage</span>};
 <span class="kw">use</span> <span class="ident">environment::Environment</span>;
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">x86_64::registers::msr</span>::{<span class="ident">IA32_FS_BASE</span>, <span class="ident">IA32_GS_BASE</span>, <span class="ident">rdmsr</span>, <span class="ident">wrmsr</span>};
+<span class="kw">use</span> <span class="ident">x86_64::registers::model_specific</span>::{<span class="ident">GsBase</span>, <span class="ident">FsBase</span>};
 
 
 <span class="doccomment">/// The function signature of the callback that will be invoked</span>
@@ -1785,21 +1782,18 @@
     <span class="doccomment">/// </span>
     <span class="doccomment">/// Currently this is achieved by writing a pointer to the `TaskLocalData` </span>
     <span class="doccomment">/// into the `GS_BASE` register.</span>
+    <span class="doccomment">/// This also updates the current TLS region, which is stored in `FS_BASE`.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Locking / Deadlock</span>
     <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to access it. </span>
     <span class="kw">fn</span> <span class="ident">set_as_current_task</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">unsafe</span> {
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_FS_BASE</span>, <span class="self">self</span>.<span class="ident">tls_area</span>.<span class="ident">pointer_value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
-        }
+        <span class="ident">FsBase::write</span>(<span class="ident">x86_64::VirtAddr::new</span>(<span class="self">self</span>.<span class="ident">tls_area</span>.<span class="ident">pointer_value</span>() <span class="kw">as</span> <span class="ident">u64</span>));
 
         <span class="comment">// TODO: now that proper ELF TLS areas are supported, </span>
         <span class="comment">//       use that TLS area for the `TaskLocalData` instead of `GS_BASE`. </span>
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">tld</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">task_local_data</span> {
-            <span class="kw">unsafe</span> {
-                <span class="ident">wrmsr</span>(<span class="ident">IA32_GS_BASE</span>, <span class="ident">tld</span>.<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">u64</span>);
-            }
+            <span class="ident">GsBase::write</span>(<span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">tld</span>.<span class="ident">deref</span>() <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="ident">u64</span>));
         } <span class="kw">else</span> {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: failed to set current task, it had no TaskLocalData. {:?}&quot;</span>, <span class="self">self</span>);
         }
@@ -2269,7 +2263,7 @@
 <span class="doccomment">/// by using the `TaskLocalData` pointer stored in the `GS_BASE` register.</span>
 <span class="kw">fn</span> <span class="ident">get_task_local_data</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">TaskLocalData</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">tld</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">TaskLocalData</span> <span class="op">=</span> {
-        <span class="kw">let</span> <span class="ident">tld_ptr</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_GS_BASE</span>) <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">TaskLocalData</span>;
+        <span class="kw">let</span> <span class="ident">tld_ptr</span> <span class="op">=</span> <span class="ident">GsBase::read</span>().<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">TaskLocalData</span>;
         <span class="kw">if</span> <span class="ident">tld_ptr</span>.<span class="ident">is_null</span>() {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }

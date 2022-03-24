@@ -881,6 +881,21 @@
 <span id="876">876</span>
 <span id="877">877</span>
 <span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.</span>
@@ -946,6 +961,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">msr</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">raw_cpuid</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
@@ -956,10 +972,8 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">bit_field</span>;
 
-<span class="kw">use</span> <span class="ident">x86_64::registers::msr</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">x86_64::VirtualAddress</span>;
-<span class="kw">use</span> <span class="ident">x86_64::structures::idt::ExceptionStackFrame</span>;
-<span class="kw">use</span> <span class="ident">x86_64::instructions::rdpmc</span>;
+<span class="kw">use</span> <span class="ident">msr</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">x86_64</span>::{<span class="ident">VirtAddr</span>, <span class="ident">registers::model_specific::Msr</span>, <span class="ident">structures::idt::InterruptStackFrame</span>};
 <span class="kw">use</span> <span class="ident">raw_cpuid</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
@@ -1153,20 +1167,20 @@
 <span class="kw">fn</span> <span class="ident">init_registers</span>() {
     <span class="kw">unsafe</span> {
         <span class="comment">// disables all the performance counters</span>
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERF_GLOBAL_CTRL</span>, <span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERF_GLOBAL_CTRL</span>).<span class="ident">write</span>(<span class="number">0</span>);
         <span class="comment">// clear the general purpose PMCs</span>
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC0</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC1</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC2</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC3</span>, <span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC0</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC1</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC2</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC3</span>).<span class="ident">write</span>(<span class="number">0</span>);
         <span class="comment">// clear the fixed event counters</span>
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_FIXED_CTR0</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_FIXED_CTR1</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_FIXED_CTR2</span>, <span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_FIXED_CTR0</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_FIXED_CTR1</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_FIXED_CTR2</span>).<span class="ident">write</span>(<span class="number">0</span>);
         <span class="comment">// sets fixed function counters to count events at all privilege levels</span>
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_FIXED_CTR_CTRL</span>, <span class="ident">ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_FIXED_CTR_CTRL</span>).<span class="ident">write</span>(<span class="ident">ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS</span>);
         <span class="comment">// enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set</span>
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERF_GLOBAL_CTRL</span>, <span class="ident">ENABLE_FIXED_PERFORMANCE_COUNTERS</span> <span class="op">|</span> <span class="ident">ENABLE_GENERAL_PERFORMANCE_COUNTERS</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERF_GLOBAL_CTRL</span>).<span class="ident">write</span>(<span class="ident">ENABLE_FIXED_PERFORMANCE_COUNTERS</span> <span class="op">|</span> <span class="ident">ENABLE_GENERAL_PERFORMANCE_COUNTERS</span>);
     }
 }
 
@@ -1208,8 +1222,10 @@
         <span class="comment">// for a general PMC, it enables the counter to start counting from 0</span>
         <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">start_count</span> <span class="op">=</span> <span class="number">0</span>;
-            <span class="kw">let</span> <span class="ident">umask</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>);
-            <span class="kw">unsafe</span>{<span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="ident">umask</span> <span class="op">|</span> <span class="ident">PMC_ENABLE</span>);}
+            <span class="kw">unsafe</span> { 
+                <span class="kw">let</span> <span class="ident">umask</span> <span class="op">=</span> <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>).<span class="ident">read</span>();
+                <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>).<span class="ident">write</span>(<span class="ident">umask</span> <span class="op">|</span> <span class="ident">PMC_ENABLE</span>);
+            }
         }
         <span class="prelude-val">Ok</span>(())
     }
@@ -1252,8 +1268,8 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="op">&lt;</span> <span class="ident">num_pmc</span> <span class="kw">as</span> <span class="ident">u32</span> {
             <span class="comment">// clears event counting settings and counter </span>
             <span class="kw">unsafe</span>{
-                <span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="number">0</span>);
-                <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="number">0</span>);
+                <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="kw">as</span> <span class="ident">u32</span>).<span class="ident">write</span>(<span class="number">0</span>);
+                <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC0</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="kw">as</span> <span class="ident">u32</span>).<span class="ident">write</span>(<span class="number">0</span>);
             }
             <span class="ident">free_counter</span>(<span class="self">self</span>.<span class="ident">core</span>, <span class="self">self</span>.<span class="ident">msr_mask</span> <span class="kw">as</span> <span class="ident">u8</span>); 
         }
@@ -1451,8 +1467,8 @@
         <span class="ident">claim_counter</span>(<span class="ident">my_core</span>, <span class="ident">pmc</span>)<span class="question-mark">?</span>;
 
         <span class="kw">unsafe</span>{
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC0</span> <span class="op">+</span> (<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>), <span class="number">0</span>);
-            <span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> (<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>), <span class="ident">event_mask</span>);
+            <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC0</span> <span class="op">+</span> (<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>)).<span class="ident">write</span>(<span class="number">0</span>);
+            <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span> <span class="op">+</span> (<span class="ident">pmc</span> <span class="kw">as</span> <span class="ident">u32</span>)).<span class="ident">write</span>(<span class="ident">event_mask</span>);
         }
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">Counter</span> {
             <span class="ident">start_count</span>: <span class="number">0</span>, 
@@ -1502,7 +1518,7 @@
     <span class="ident">start_value</span>: <span class="ident">usize</span>,
     <span class="ident">task_id</span>: <span class="ident">usize</span>,
     <span class="ident">sample_count</span>: <span class="ident">u32</span>,
-    <span class="ident">ip_list</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
+    <span class="ident">ip_list</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">VirtAddr</span><span class="op">&gt;</span>,
     <span class="ident">task_id_list</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
 }
 
@@ -1587,8 +1603,8 @@
     <span class="kw">let</span> <span class="ident">event_mask</span> <span class="op">=</span> <span class="ident">event_type</span> <span class="kw">as</span> <span class="ident">u64</span>;
 
     <span class="kw">unsafe</span>{
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC0</span>, <span class="ident">start_value</span> <span class="kw">as</span> <span class="ident">u64</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span>, <span class="ident">event_mask</span> <span class="op">|</span> <span class="ident">PMC_ENABLE</span> <span class="op">|</span> <span class="ident">INTERRUPT_ENABLE</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC0</span>).<span class="ident">write</span>(<span class="ident">start_value</span> <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span>).<span class="ident">write</span>(<span class="ident">event_mask</span> <span class="op">|</span> <span class="ident">PMC_ENABLE</span> <span class="op">|</span> <span class="ident">INTERRUPT_ENABLE</span>);
     }
 
     <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
@@ -1599,9 +1615,9 @@
 <span class="kw">fn</span> <span class="ident">stop_samples</span>(<span class="ident">core_id</span>: <span class="ident">u8</span>, <span class="ident">samples</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SampledEvents</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// immediately stops counting and clears the counter</span>
     <span class="kw">unsafe</span>{
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC0</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERF_GLOBAL_OVF_CTRL</span>, <span class="ident">CLEAR_PERF_STATUS_MSR</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC0</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERF_GLOBAL_OVF_CTRL</span>).<span class="ident">write</span>(<span class="ident">CLEAR_PERF_STATUS_MSR</span>);
     }
 
     <span class="comment">// clears values so that even if exception is somehow triggered, it stops at the next iteration</span>
@@ -1621,7 +1637,7 @@
 
 <span class="doccomment">/// Stores the instruction pointers and corresponding task IDs from the samples</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SampleResults</span> {
-    <span class="kw">pub</span> <span class="ident">instruction_pointers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">VirtualAddress</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">instruction_pointers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">memory::VirtualAddress</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">task_ids</span>:  <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
 }
 
@@ -1640,7 +1656,10 @@
     
     <span class="ident">sampling_results_have_been_retrieved</span>(<span class="ident">my_core_id</span>)<span class="question-mark">?</span>;
 
-    <span class="prelude-val">Ok</span>(<span class="ident">SampleResults</span>{<span class="ident">instruction_pointers</span>: <span class="ident">samples</span>.<span class="ident">ip_list</span>.<span class="ident">clone</span>(), <span class="ident">task_ids</span>: <span class="ident">samples</span>.<span class="ident">task_id_list</span>.<span class="ident">clone</span>()})   
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">instruction_pointers</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">samples</span>.<span class="ident">ip_list</span>.<span class="ident">len</span>());
+    <span class="ident">instruction_pointers</span>.<span class="ident">extend</span>(<span class="ident">samples</span>.<span class="ident">ip_list</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">va</span><span class="op">|</span> <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">va</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>)));
+
+    <span class="prelude-val">Ok</span>(<span class="ident">SampleResults</span> { <span class="ident">instruction_pointers</span>, <span class="ident">task_ids</span>: <span class="ident">samples</span>.<span class="ident">task_id_list</span>.<span class="ident">clone</span>() })   
 }
 
 <span class="doccomment">/// Simple function to print values from SampleResults in a form that the script &quot;post-mortem pmu analysis.py&quot; can parse. </span>
@@ -1661,10 +1680,8 @@
     <span class="kw">let</span> <span class="ident">total_samples</span> <span class="op">=</span> <span class="ident">sample_results</span>.<span class="ident">instruction_pointers</span>.<span class="ident">len</span>();
 
     <span class="kw">for</span> <span class="ident">ip</span> <span class="kw">in</span> <span class="ident">sample_results</span>.<span class="ident">instruction_pointers</span>.<span class="ident">iter</span>() {
-        <span class="kw">let</span> (<span class="ident">section_ref</span>, <span class="ident">_offset</span>) <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">get_section_containing_address</span>(
-            <span class="ident">memory::VirtualAddress::new</span>(<span class="ident">ip</span>.<span class="number">0</span>).<span class="ident">ok_or</span>(<span class="string">&quot;sampled instruction pointer was an invalid virtual address&quot;</span>)<span class="question-mark">?</span>,
-            <span class="bool-val">true</span>
-        ).<span class="ident">ok_or</span>(<span class="string">&quot;Can&#39;t find section containing sampled instruction pointer&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> (<span class="ident">section_ref</span>, <span class="ident">_offset</span>) <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">get_section_containing_address</span>(<span class="kw-2">*</span><span class="ident">ip</span>, <span class="bool-val">false</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;Can&#39;t find section containing sampled instruction pointer&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">section_name</span> <span class="op">=</span> <span class="ident">section_ref</span>.<span class="ident">name_without_hash</span>().<span class="ident">to_string</span>();
 
         <span class="ident">sections</span>.<span class="ident">entry</span>(<span class="ident">section_name</span>).<span class="ident">and_modify</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> {<span class="kw-2">*</span><span class="ident">e</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>}).<span class="ident">or_insert</span>(<span class="number">1</span>);
@@ -1699,20 +1716,19 @@
 <span class="doccomment">/// * Returns an `Err` if PMU is supported and initialized and a sample was pending, </span>
 <span class="doccomment">///   but an error occurred while logging the sample.</span>
 <span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_sample</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_sample</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;</span><span class="ident">InterruptStackFrame</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">bool</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="comment">// Check that PMU hardware exists and is supported on this machine.</span>
     <span class="kw">if</span> <span class="kw-2">*</span><span class="ident">PMU_VERSION</span> <span class="op">&lt;</span> <span class="ident">MIN_PMU_VERSION</span> {
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
     }
     <span class="comment">// Check that a PMU sampling event is currently pending.</span>
-    <span class="kw">if</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_PERF_GLOBAL_STAUS</span>) <span class="op">==</span> <span class="number">0</span> {
+    <span class="kw">if</span> <span class="kw">unsafe</span> { <span class="ident">Msr::new</span>(<span class="ident">IA32_PERF_GLOBAL_STAUS</span>).<span class="ident">read</span>() } <span class="op">==</span> <span class="number">0</span> {
         <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
     }
 
-    <span class="kw">unsafe</span> { <span class="ident">wrmsr</span>(<span class="ident">IA32_PERF_GLOBAL_OVF_CTRL</span>, <span class="ident">CLEAR_PERF_STATUS_MSR</span>); }
+    <span class="kw">unsafe</span> { <span class="ident">Msr::new</span>(<span class="ident">IA32_PERF_GLOBAL_OVF_CTRL</span>).<span class="ident">write</span>(<span class="ident">CLEAR_PERF_STATUS_MSR</span>); }
 
     <span class="kw">let</span> <span class="ident">my_core_id</span> <span class="op">=</span> <span class="ident">apic::get_my_apic_id</span>();
-    <span class="kw">let</span> <span class="ident">event_mask</span> <span class="op">=</span> <span class="ident">rdmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span>);
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sampling_info</span> <span class="op">=</span> <span class="ident">SAMPLING_INFO</span>.<span class="ident">lock</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">samples</span> <span class="op">=</span> <span class="ident">sampling_info</span>.<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="ident">my_core_id</span>)
@@ -1743,10 +1759,10 @@
 
     <span class="comment">// stops the counter, resets it, and restarts it</span>
     <span class="kw">unsafe</span> {
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span>, <span class="number">0</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERF_GLOBAL_OVF_CTRL</span>, <span class="ident">CLEAR_PERF_STATUS_MSR</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PMC0</span>, <span class="ident">samples</span>.<span class="ident">start_value</span> <span class="kw">as</span> <span class="ident">u64</span>);
-        <span class="ident">wrmsr</span>(<span class="ident">IA32_PERFEVTSEL0</span>, <span class="ident">event_mask</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span>).<span class="ident">write</span>(<span class="number">0</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERF_GLOBAL_OVF_CTRL</span>).<span class="ident">write</span>(<span class="ident">CLEAR_PERF_STATUS_MSR</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PMC0</span>).<span class="ident">write</span>(<span class="ident">samples</span>.<span class="ident">start_value</span> <span class="kw">as</span> <span class="ident">u64</span>);
+        <span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span>).<span class="ident">write</span>(<span class="ident">Msr::new</span>(<span class="ident">IA32_PERFEVTSEL0</span>).<span class="ident">read</span>());
     }
 
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">my_apic</span>) <span class="op">=</span> <span class="ident">apic::get_my_apic</span>() {
@@ -1759,6 +1775,20 @@
     <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
 }
 
+
+<span class="doccomment">/// Reads the given PMC (performance monitor counter) register.</span>
+<span class="kw">fn</span> <span class="ident">rdpmc</span>(<span class="ident">msr</span>: <span class="ident">u32</span>) -&gt; <span class="ident">u64</span> {
+    <span class="kw">let</span> (<span class="ident">high</span>, <span class="ident">low</span>): (<span class="ident">u32</span>, <span class="ident">u32</span>);
+    <span class="kw">unsafe</span> {
+        <span class="macro">core::arch::asm!</span>(
+            <span class="string">&quot;rdpmc&quot;</span>,
+            <span class="kw">in</span>(<span class="string">&quot;ecx&quot;</span>) <span class="ident">msr</span>,
+            <span class="ident">out</span>(<span class="string">&quot;eax&quot;</span>) <span class="ident">low</span>, <span class="ident">out</span>(<span class="string">&quot;edx&quot;</span>) <span class="ident">high</span>,
+            <span class="ident">options</span>(<span class="ident">nomem</span>, <span class="ident">nostack</span>, <span class="ident">preserves_flags</span>),
+        );
+    }
+    ((<span class="ident">high</span> <span class="kw">as</span> <span class="ident">u64</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">32</span>) <span class="op">|</span> (<span class="ident">low</span> <span class="kw">as</span> <span class="ident">u64</span>)
+}
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pmu_x86" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
 </body></html>

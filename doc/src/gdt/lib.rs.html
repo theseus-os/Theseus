@@ -324,21 +324,6 @@
 <span id="319">319</span>
 <span id="320">320</span>
 <span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
@@ -354,11 +339,16 @@
 <span class="kw">use</span> <span class="ident">core::ops::Deref</span>;
 <span class="kw">use</span> <span class="ident">atomic_linked_list::atomic_map::AtomicMap</span>;
 <span class="kw">use</span> <span class="ident">x86_64</span>::{
+    <span class="ident">instructions</span>::{
+        <span class="ident">segmentation</span>::{<span class="ident">CS</span>, <span class="ident">DS</span>, <span class="ident">SS</span>, <span class="ident">Segment</span>},
+        <span class="ident">tables::load_tss</span>,
+    },
+    <span class="ident">PrivilegeLevel</span>,
     <span class="ident">structures</span>::{
         <span class="ident">tss::TaskStateSegment</span>,
         <span class="ident">gdt::SegmentSelector</span>,
     },
-    <span class="ident">PrivilegeLevel</span>,
+    <span class="ident">VirtAddr</span>, 
 };
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="kw">use</span> <span class="ident">memory::VirtualAddress</span>;
@@ -379,8 +369,8 @@
 <span class="kw">static</span> <span class="ident">TSS_SELECTOR</span>:          <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">SegmentSelector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
 
 
-<span class="doccomment">/// The GDT SegmentSelectors available in Theseus.</span>
-<span class="doccomment">/// Use this type with `get_segment_selector()`. </span>
+<span class="doccomment">/// The GDT `SegmentSelector`s available in Theseus.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AvailableSegmentSelector</span> {
     <span class="ident">KernelCode</span>,
     <span class="ident">KernelData</span>,
@@ -390,34 +380,19 @@
     <span class="ident">UserData64</span>,
     <span class="ident">Tss</span>,
 }
-
-<span class="doccomment">/// Stupid hack because SegmentSelector is not Cloneable/Copyable</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_segment_selector</span>(<span class="ident">selector</span>: <span class="ident">AvailableSegmentSelector</span>) -&gt; <span class="ident">SegmentSelector</span> {
-    <span class="kw">let</span> <span class="ident">seg</span>: <span class="kw-2">&amp;</span><span class="ident">SegmentSelector</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">selector</span> {
-        <span class="ident">AvailableSegmentSelector::KernelCode</span> =&gt; {
-            <span class="ident">KERNEL_CODE_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">expect</span>(<span class="string">&quot;KERNEL_CODE_SELECTOR wasn&#39;t yet inited!&quot;</span>)
+<span class="kw">impl</span> <span class="ident">AvailableSegmentSelector</span> {
+    <span class="doccomment">/// Returns the requested `SegmentSelector`, or `None` if it hasn&#39;t yet been initialized.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">SegmentSelector</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">AvailableSegmentSelector::KernelCode</span> =&gt; <span class="ident">KERNEL_CODE_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">cloned</span>(),
+            <span class="ident">AvailableSegmentSelector::KernelData</span> =&gt; <span class="ident">KERNEL_DATA_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">cloned</span>(),
+            <span class="ident">AvailableSegmentSelector::UserCode32</span> =&gt; <span class="ident">USER_CODE_32_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">cloned</span>(),
+            <span class="ident">AvailableSegmentSelector::UserData32</span> =&gt; <span class="ident">USER_DATA_32_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">cloned</span>(),
+            <span class="ident">AvailableSegmentSelector::UserCode64</span> =&gt; <span class="ident">USER_CODE_64_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">cloned</span>(),
+            <span class="ident">AvailableSegmentSelector::UserData64</span> =&gt; <span class="ident">USER_DATA_64_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">cloned</span>(),
+            <span class="ident">AvailableSegmentSelector::Tss</span>        =&gt; <span class="ident">TSS_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">cloned</span>(),
         }
-        <span class="ident">AvailableSegmentSelector::KernelData</span> =&gt; {
-            <span class="ident">KERNEL_DATA_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">expect</span>(<span class="string">&quot;KERNEL_DATA_SELECTOR wasn&#39;t yet inited!&quot;</span>)
-        }
-        <span class="ident">AvailableSegmentSelector::UserCode32</span> =&gt; {
-            <span class="ident">USER_CODE_32_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">expect</span>(<span class="string">&quot;USER_CODE_32_SELECTOR wasn&#39;t yet inited!&quot;</span>)
-        }
-        <span class="ident">AvailableSegmentSelector::UserData32</span> =&gt; {
-            <span class="ident">USER_DATA_32_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">expect</span>(<span class="string">&quot;USER_DATA_32_SELECTOR wasn&#39;t yet inited!&quot;</span>)
-        }
-        <span class="ident">AvailableSegmentSelector::UserCode64</span> =&gt; {
-            <span class="ident">USER_CODE_64_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">expect</span>(<span class="string">&quot;USER_CODE_64_SELECTOR wasn&#39;t yet inited!&quot;</span>)
-        }
-        <span class="ident">AvailableSegmentSelector::UserData64</span> =&gt; {
-            <span class="ident">USER_DATA_64_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">expect</span>(<span class="string">&quot;USER_DATA_64_SELECTOR wasn&#39;t yet inited!&quot;</span>)
-        }
-        <span class="ident">AvailableSegmentSelector::Tss</span> =&gt; {
-            <span class="ident">TSS_SELECTOR</span>.<span class="ident">get</span>().<span class="ident">expect</span>(<span class="string">&quot;TSS_SELECTOR wasn&#39;t yet inited!&quot;</span>)
-        }
-    };
-
-    <span class="ident">SegmentSelector::new</span>(<span class="ident">seg</span>.<span class="ident">index</span>(), <span class="ident">seg</span>.<span class="ident">rpl</span>())
+    }
 }
 
 
@@ -436,11 +411,6 @@
     <span class="ident">double_fault_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>, 
     <span class="ident">privilege_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>
 ) { 
-    <span class="kw">use</span> <span class="ident">x86_64::instructions</span>::{
-        <span class="ident">segmentation</span>::{<span class="ident">set_cs</span>, <span class="ident">load_ds</span>, <span class="ident">load_ss</span>},
-        <span class="ident">tables::load_tss</span>,
-    };
-
     <span class="kw">let</span> <span class="ident">tss_ref</span> <span class="op">=</span> <span class="ident">tss::create_tss</span>(<span class="ident">apic_id</span>, <span class="ident">double_fault_stack_top_unusable</span>, <span class="ident">privilege_stack_top_unusable</span>);
     <span class="kw">let</span> (<span class="ident">gdt</span>, <span class="ident">kernel_cs</span>, <span class="ident">kernel_ds</span>, <span class="ident">user_cs_32</span>, <span class="ident">user_ds_32</span>, <span class="ident">user_cs_64</span>, <span class="ident">user_ds_64</span>, <span class="ident">tss_segment</span>) 
         <span class="op">=</span> <span class="ident">create_gdt</span>(<span class="ident">tss_ref</span>.<span class="ident">lock</span>().<span class="ident">deref</span>());
@@ -459,10 +429,10 @@
     <span class="comment">// debug!(&quot;Loaded GDT for apic {}: {}&quot;, apic_id, gdt_ref);</span>
 
     <span class="kw">unsafe</span> {
-        <span class="ident">set_cs</span>(<span class="ident">get_segment_selector</span>(<span class="ident">AvailableSegmentSelector::KernelCode</span>)); <span class="comment">// reload code segment register</span>
-        <span class="ident">load_tss</span>(<span class="ident">get_segment_selector</span>(<span class="ident">AvailableSegmentSelector::Tss</span>));      <span class="comment">// load TSS</span>
-        <span class="ident">load_ss</span>(<span class="ident">get_segment_selector</span>(<span class="ident">AvailableSegmentSelector::KernelData</span>)); <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
-        <span class="ident">load_ds</span>(<span class="ident">get_segment_selector</span>(<span class="ident">AvailableSegmentSelector::KernelData</span>)); <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
+        <span class="ident">CS::set_reg</span>(<span class="ident">kernel_cs</span>);  <span class="comment">// reload code segment register</span>
+        <span class="ident">load_tss</span>(<span class="ident">tss_segment</span>);   <span class="comment">// load TSS</span>
+        <span class="ident">SS::set_reg</span>(<span class="ident">kernel_ds</span>);  <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
+        <span class="ident">DS::set_reg</span>(<span class="ident">kernel_ds</span>);  <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
     }
 }
 
@@ -552,7 +522,7 @@
         <span class="kw">use</span> <span class="ident">core::mem::size_of</span>;
 
         <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">DescriptorTablePointer</span> {
-            <span class="ident">base</span>: <span class="self">self</span>.<span class="ident">table</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">u64</span>,
+            <span class="ident">base</span>: <span class="ident">VirtAddr::new</span>(<span class="self">self</span>.<span class="ident">table</span>.<span class="ident">as_ptr</span>() <span class="kw">as</span> <span class="ident">u64</span>),
             <span class="ident">limit</span>: (<span class="self">self</span>.<span class="ident">table</span>.<span class="ident">len</span>() <span class="op">*</span> <span class="ident">size_of</span>::<span class="op">&lt;</span><span class="ident">u64</span><span class="op">&gt;</span>() <span class="op">-</span> <span class="number">1</span>) <span class="kw">as</span> <span class="ident">u16</span>,
         };
 

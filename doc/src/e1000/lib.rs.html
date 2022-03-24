@@ -480,8 +480,8 @@
 <span class="kw">use</span> <span class="ident">pci</span>::{<span class="ident">PciDevice</span>, <span class="ident">PCI_INTERRUPT_LINE</span>, <span class="ident">PciConfigSpaceAccessMechanism</span>};
 <span class="kw">use</span> <span class="ident">kernel_config::memory::PAGE_SIZE</span>;
 <span class="kw">use</span> <span class="ident">owning_ref::BoxRefMut</span>;
-<span class="kw">use</span> <span class="ident">interrupts</span>::{<span class="ident">eoi</span>,<span class="ident">register_interrupt</span>};
-<span class="kw">use</span> <span class="ident">x86_64::structures::idt</span>::{<span class="ident">ExceptionStackFrame</span>};
+<span class="kw">use</span> <span class="ident">interrupts</span>::{<span class="ident">eoi</span>, <span class="ident">register_interrupt</span>};
+<span class="kw">use</span> <span class="ident">x86_64::structures::idt::InterruptStackFrame</span>;
 <span class="kw">use</span> <span class="ident">network_interface_card</span>:: <span class="ident">NetworkInterfaceCard</span>;
 <span class="kw">use</span> <span class="ident">nic_initialization</span>::{<span class="ident">allocate_memory</span>, <span class="ident">init_rx_buf_pool</span>, <span class="ident">init_rx_queue</span>, <span class="ident">init_tx_queue</span>};
 <span class="kw">use</span> <span class="ident">intel_ethernet::descriptors</span>::{<span class="ident">LegacyRxDescriptor</span>, <span class="ident">LegacyTxDescriptor</span>};
@@ -863,7 +863,7 @@
     }
 }
 
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">e1000_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">e1000_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">ref</span> <span class="ident">e1000_nic_ref</span>) <span class="op">=</span> <span class="ident">E1000_NIC</span>.<span class="ident">get</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">e1000_nic</span> <span class="op">=</span> <span class="ident">e1000_nic_ref</span>.<span class="ident">lock</span>();
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span> <span class="ident">e1000_nic</span>.<span class="ident">handle_interrupt</span>() {

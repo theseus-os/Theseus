@@ -258,8 +258,6 @@
 <span id="253">253</span>
 <span id="254">254</span>
 <span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the x86 PIC (8259 Programmable Interrupt Controller),</span>
 <span class="doccomment">//! which handles basic interrupts.</span>
 <span class="doccomment">//! In multicore mode, this isn&#39;t used in favor of the APIC interface.</span>
@@ -269,7 +267,6 @@
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">port_io</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
 
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 
@@ -514,8 +511,7 @@
     <span class="comment">// older versions of Linux and other PC operating systems have</span>
     <span class="comment">// worked around this by writing garbage data to port 0x80, which</span>
     <span class="comment">// allegedly takes long enough to make everything work on most hardware.</span>
-    <span class="kw">use</span> <span class="ident">x86_64::instructions::port::outb</span>;
-    <span class="kw">unsafe</span> { <span class="ident">outb</span>(<span class="number">0x80</span>, <span class="number">0</span>); }
+    <span class="kw">unsafe</span> { <span class="ident">port_io::Port</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="number">0x80</span>).<span class="ident">write</span>(<span class="number">0</span>); }
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="pic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>

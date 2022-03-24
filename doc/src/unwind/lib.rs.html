@@ -1109,7 +1109,7 @@
     <span class="doccomment">/// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.</span>
     <span class="ident">cfa_adjustment</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span>,
     <span class="doccomment">/// This is set to true when the previous stack frame was an exception/interrupt handler,</span>
-    <span class="doccomment">/// which is useful in the case of taking into account the CPU pushing an `ExceptionStackFrame` onto the stack.</span>
+    <span class="doccomment">/// which is useful in the case of taking into account the CPU pushing an `InterruptStackFrame` onto the stack.</span>
     <span class="doccomment">/// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening </span>
     <span class="doccomment">/// is not the same as a regular function &quot;call&quot; happening.</span>
     <span class="ident">last_frame_was_exception_handler</span>: <span class="ident">bool</span>,
@@ -1204,7 +1204,7 @@
                     }
 
                     <span class="comment">// If this stack frame is an exception handler, the return address wouldn&#39;t have been pushed onto the stack as with normal call instructions.</span>
-                    <span class="comment">// Instead, it would&#39;ve been pushed onto the stack by the CPU as part of the ExceptionStackFrame, so we have to look for it there.</span>
+                    <span class="comment">// Instead, it would&#39;ve been pushed onto the stack by the CPU as part of the InterruptStackFrame, so we have to look for it there.</span>
                     <span class="comment">//</span>
                     <span class="comment">// We know that the stack currently looks like this:</span>
                     <span class="comment">// |-- address --|------------  Item on the stack -------------|</span>
@@ -1304,7 +1304,7 @@
             
             <span class="comment">// trace!(&quot;initial_address: {:#X}&quot;, fde.initial_address());</span>
 
-            <span class="comment">// If the next stack frame is an exception handler, then the CPU pushed an `ExceptionStackFrame`</span>
+            <span class="comment">// If the next stack frame is an exception handler, then the CPU pushed an `InterruptStackFrame`</span>
             <span class="comment">// onto the stack, completely unbeknownst to the DWARF debug info. </span>
             <span class="comment">// Thus, we need to adjust this next frame&#39;s stack pointer (i.e., `cfa` which becomes the stack pointer)</span>
             <span class="comment">// to account for the change in stack contents. </span>

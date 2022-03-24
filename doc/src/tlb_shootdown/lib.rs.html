@@ -164,7 +164,7 @@
     <span class="comment">// trace!(&quot;handle_tlb_shootdown_ipi(): AP {}, pages: {:?}&quot;, apic::get_my_apic_id(), pages_to_invalidate);</span>
 
     <span class="kw">for</span> <span class="ident">page</span> <span class="kw">in</span> <span class="ident">pages_to_invalidate</span> {
-        <span class="ident">x86_64::instructions::tlb::flush</span>(<span class="ident">x86_64::VirtualAddress</span>(<span class="ident">page</span>.<span class="ident">start_address</span>().<span class="ident">value</span>()));
+        <span class="ident">x86_64::instructions::tlb::flush</span>(<span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">page</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>));
     }
     <span class="ident">TLB_SHOOTDOWN_IPI_COUNT</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
 }

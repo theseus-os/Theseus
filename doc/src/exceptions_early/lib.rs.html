@@ -216,7 +216,6 @@
 <span id="211">211</span>
 <span id="212">212</span>
 <span id="213">213</span>
-<span id="214">214</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -231,9 +230,15 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">gdt</span>;
 
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
-<span class="kw">use</span> <span class="ident">x86_64::structures</span>::{
-    <span class="ident">idt</span>::{<span class="ident">LockedIdt</span>, <span class="ident">ExceptionStackFrame</span>, <span class="ident">PageFaultErrorCode</span>},
-    <span class="ident">tss::TaskStateSegment</span>,
+<span class="kw">use</span> <span class="ident">x86_64</span>::{
+    <span class="ident">structures</span>::{
+        <span class="ident">idt</span>::{<span class="ident">LockedIdt</span>, <span class="ident">InterruptStackFrame</span>, <span class="ident">PageFaultErrorCode</span>},
+        <span class="ident">tss::TaskStateSegment</span>,
+    },
+    <span class="ident">instructions</span>::{
+        <span class="ident">segmentation</span>::{<span class="ident">CS</span>, <span class="ident">DS</span>, <span class="ident">SS</span>, <span class="ident">Segment</span>}, 
+        <span class="ident">tables::load_tss</span>,
+    },
 };
 <span class="kw">use</span> <span class="ident">gdt</span>::{<span class="ident">Gdt</span>, <span class="ident">create_gdt</span>};
 
@@ -262,7 +267,7 @@
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">df_stack_top</span>) <span class="op">=</span> <span class="ident">double_fault_stack_top_unusable</span> {
         <span class="comment">// Create and load an initial TSS and GDT so we can handle early exceptions such as double faults. </span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tss</span> <span class="op">=</span> <span class="ident">TaskStateSegment::new</span>();
-        <span class="ident">tss</span>.<span class="ident">interrupt_stack_table</span>[<span class="ident">tss::DOUBLE_FAULT_IST_INDEX</span>] <span class="op">=</span> <span class="ident">x86_64::VirtualAddress</span>(<span class="ident">df_stack_top</span>.<span class="ident">value</span>());
+        <span class="ident">tss</span>.<span class="ident">interrupt_stack_table</span>[<span class="ident">tss::DOUBLE_FAULT_IST_INDEX</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">df_stack_top</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
         <span class="macro">println_raw!</span>(<span class="string">&quot;exceptions_early(): Created TSS: {:?}&quot;</span>, <span class="ident">tss</span>);
         <span class="kw-2">*</span><span class="ident">EARLY_TSS</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">tss</span>;
         
@@ -270,17 +275,11 @@
         <span class="kw-2">*</span><span class="ident">EARLY_GDT</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">gdt</span>;
         <span class="ident">EARLY_GDT</span>.<span class="ident">lock</span>().<span class="ident">load</span>();
 
-        <span class="kw">use</span> <span class="ident">x86_64::instructions</span>::{
-            <span class="ident">segmentation</span>::{<span class="ident">set_cs</span>, <span class="ident">load_ds</span>, <span class="ident">load_ss</span>},
-            <span class="ident">tables::load_tss</span>,
-        };
-
         <span class="kw">unsafe</span> {
-            <span class="ident">set_cs</span>(<span class="ident">kernel_cs</span>); <span class="comment">// reload code segment register</span>
-            <span class="ident">load_tss</span>(<span class="ident">tss_segment</span>);      <span class="comment">// load TSS</span>
-            <span class="kw">let</span> <span class="ident">kernel_ds_2</span> <span class="op">=</span> <span class="ident">x86_64::structures::gdt::SegmentSelector::new</span>(<span class="ident">kernel_ds</span>.<span class="ident">index</span>(), <span class="ident">kernel_ds</span>.<span class="ident">rpl</span>());
-            <span class="ident">load_ss</span>(<span class="ident">kernel_ds</span>); <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
-            <span class="ident">load_ds</span>(<span class="ident">kernel_ds_2</span>); <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
+            <span class="ident">CS::set_reg</span>(<span class="ident">kernel_cs</span>);          <span class="comment">// reload code segment register</span>
+            <span class="ident">load_tss</span>(<span class="ident">tss_segment</span>);           <span class="comment">// load TSS</span>
+            <span class="ident">SS::set_reg</span>(<span class="ident">kernel_ds</span>.<span class="ident">clone</span>());  <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
+            <span class="ident">DS::set_reg</span>(<span class="ident">kernel_ds</span>);          <span class="comment">// unsure if necessary, but doesn&#39;t hurt</span>
         }
     }
 
@@ -288,7 +287,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idt</span> <span class="op">=</span> <span class="ident">EARLY_IDT</span>.<span class="ident">lock</span>(); <span class="comment">// withholds interrupts</span>
 
         <span class="comment">// SET UP FIXED EXCEPTION HANDLERS</span>
-        <span class="ident">idt</span>.<span class="ident">divide_by_zero</span>.<span class="ident">set_handler_fn</span>(<span class="ident">divide_by_zero_handler</span>);
+        <span class="ident">idt</span>.<span class="ident">divide_error</span>.<span class="ident">set_handler_fn</span>(<span class="ident">divide_error_handler</span>);
         <span class="comment">// missing: 0x01 debug exception</span>
         <span class="ident">idt</span>.<span class="ident">non_maskable_interrupt</span>.<span class="ident">set_handler_fn</span>(<span class="ident">nmi_handler</span>);
         <span class="ident">idt</span>.<span class="ident">breakpoint</span>.<span class="ident">set_handler_fn</span>(<span class="ident">breakpoint_handler</span>);
@@ -328,8 +327,8 @@
 
 
 <span class="doccomment">/// exception 0x00</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">divide_by_zero_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DIVIDE BY ZERO\n{:#?}&quot;</span>, <span class="ident">stack_frame</span>);
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">divide_error_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+    <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DIVIDE ERROR\n{:#?}&quot;</span>, <span class="ident">stack_frame</span>);
 
     <span class="kw">loop</span> {}
 }
@@ -337,7 +336,7 @@
 
 
 <span class="doccomment">/// exception 0x02</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">nmi_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">nmi_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): NON-MASKABLE INTERRUPT at {:#x}\n{:#?}&quot;</span>,
              <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
              <span class="ident">stack_frame</span>);
@@ -347,7 +346,7 @@
 
 
 <span class="doccomment">/// exception 0x03</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">breakpoint_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">breakpoint_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): BREAKPOINT at {:#x}\n{:#?}&quot;</span>,
              <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
              <span class="ident">stack_frame</span>);
@@ -356,7 +355,7 @@
 }
 
 <span class="doccomment">/// exception 0x06</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_opcode_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_opcode_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID OPCODE at {:#x}\n{:#?}&quot;</span>,
              <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
              <span class="ident">stack_frame</span>);
@@ -368,7 +367,7 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// For more information about &quot;spurious interrupts&quot;, </span>
 <span class="doccomment">/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}&quot;</span>,
              <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
              <span class="ident">stack_frame</span>);
@@ -377,7 +376,7 @@
 }
 
 
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">double_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>, <span class="ident">_error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">double_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">_error_code</span>: <span class="ident">u64</span>) -&gt; <span class="op">!</span> {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DOUBLE FAULT\n{:#?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nNote: this may be caused by stack overflow. Is the size of the initial_bsp_stack is too small?&quot;</span>);
 
@@ -385,7 +384,7 @@
 }
 
 
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">segment_not_present_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">segment_not_present_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}&quot;</span>,
              <span class="ident">error_code</span>,
@@ -395,7 +394,7 @@
 }
 
 
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">general_protection_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">general_protection_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): GENERAL PROTECTION FAULT \nerror code: \
                                   {:#X}\n{:#?}&quot;</span>,
              <span class="ident">error_code</span>,
@@ -405,9 +404,8 @@
 }
 
 
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">early_page_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">PageFaultErrorCode</span>) {
-    <span class="kw">use</span> <span class="ident">x86_64::registers::control_regs</span>;
-    <span class="kw">let</span> <span class="ident">accessed_address</span> <span class="op">=</span> <span class="ident">control_regs::cr2</span>();
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">early_page_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">PageFaultErrorCode</span>) {
+    <span class="kw">let</span> <span class="ident">accessed_address</span> <span class="op">=</span> <span class="ident">x86_64::registers::control::Cr2::read_raw</span>();
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): PAGE FAULT (early handler) while accessing {:#x}\nerror code: \
         {:?}\n{:#?}&quot;</span>,
         <span class="ident">accessed_address</span>,
@@ -418,14 +416,14 @@
     <span class="macro">println_raw!</span>(<span class="string">&quot;Exception IP {:#X} is at {:?}&quot;</span>, 
         <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>, 
         <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">ns</span><span class="op">|</span> <span class="ident">ns</span>.<span class="ident">get_section_containing_address</span>(
-            <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>),
+            <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>),
             <span class="bool-val">false</span> <span class="comment">// only look at .text sections, not all other types</span>
         )),
     );
     <span class="macro">println_raw!</span>(<span class="string">&quot;Faulted access address {:#X} is at {:?}&quot;</span>,
         <span class="ident">accessed_address</span>,
         <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">ns</span><span class="op">|</span> <span class="ident">ns</span>.<span class="ident">get_section_containing_address</span>(
-            <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">accessed_address</span>.<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>),
+            <span class="ident">memory::VirtualAddress::new_canonical</span>(<span class="ident">accessed_address</span> <span class="kw">as</span> <span class="ident">usize</span>),
             <span class="bool-val">true</span>, <span class="comment">// look at all sections (.data/.bss/.rodata), not just .text</span>
         )),
     );

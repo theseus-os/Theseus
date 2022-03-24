@@ -417,7 +417,7 @@
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
 <span class="kw">use</span> <span class="ident">spin::Once</span>;
 <span class="kw">use</span> <span class="ident">interrupts::IRQ_BASE_OFFSET</span>;
-<span class="kw">use</span> <span class="ident">x86_64::structures::idt</span>::{<span class="ident">HandlerFunc</span>, <span class="ident">ExceptionStackFrame</span>};
+<span class="kw">use</span> <span class="ident">x86_64::structures::idt</span>::{<span class="ident">HandlerFunc</span>, <span class="ident">InterruptStackFrame</span>};
 
 <span class="comment">// Dependencies below here are temporary and will be removed</span>
 <span class="comment">// after we have support for separate interrupt handling tasks.</span>
@@ -735,7 +735,7 @@
 
 
 <span class="doccomment">/// IRQ 0x24: COM1 and COM3 serial port interrupt handler.</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com1_com3_interrupt_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com1_com3_interrupt_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="comment">// trace!(&quot;COM1/COM3 serial handler&quot;);</span>
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">func</span>) <span class="op">=</span> <span class="ident">INTERRUPT_ACTION_COM1_COM3</span>.<span class="ident">get</span>() {
         <span class="ident">func</span>();
@@ -744,7 +744,7 @@
 }
 
 <span class="doccomment">/// IRQ 0x23: COM2 and COM4 serial port interrupt handler.</span>
-<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com2_com4_interrupt_handler</span>(<span class="ident">_stack_frame</span>: <span class="kw-2">&amp;mut</span> <span class="ident">ExceptionStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">com2_com4_interrupt_handler</span>(<span class="ident">_stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="comment">// trace!(&quot;COM2/COM4 serial handler&quot;);</span>
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">func</span>) <span class="op">=</span> <span class="ident">INTERRUPT_ACTION_COM2_COM4</span>.<span class="ident">get</span>() {
         <span class="ident">func</span>();

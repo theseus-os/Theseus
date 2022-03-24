@@ -370,6 +370,8 @@
 <span id="365">365</span>
 <span id="366">366</span>
 <span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md</span>
 <span class="comment">// file at the top-level directory of this distribution.</span>
 <span class="comment">//</span>
@@ -533,8 +535,10 @@
 
         <span class="comment">// perform the actual page table switch</span>
         <span class="kw">unsafe</span> { 
-            <span class="ident">x86_64::registers::control_regs::cr3_write</span>(
-                <span class="ident">x86_64::PhysicalAddress</span>(<span class="ident">new_table</span>.<span class="ident">p4_table</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>)
+            <span class="kw">use</span> <span class="ident">x86_64</span>::{<span class="ident">PhysAddr</span>, <span class="ident">structures::paging::frame::PhysFrame</span>, <span class="ident">registers::control</span>::{<span class="ident">Cr3</span>, <span class="ident">Cr3Flags</span>}};
+            <span class="ident">Cr3::write</span>(
+                <span class="ident">PhysFrame::containing_address</span>(<span class="ident">PhysAddr::new_truncate</span>(<span class="ident">new_table</span>.<span class="ident">p4_table</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>)),
+                <span class="ident">Cr3Flags::empty</span>(),
             )
         };
     }

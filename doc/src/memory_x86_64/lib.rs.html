@@ -345,6 +345,8 @@
 <span id="340">340</span>
 <span id="341">341</span>
 <span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.</span>
 <span class="doccomment">//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  </span>
 <span class="doccomment">//! </span>
@@ -369,7 +371,7 @@
 <span class="kw">use</span> <span class="ident">memory_structs</span>::{
     <span class="ident">PhysicalAddress</span>, <span class="ident">VirtualAddress</span>, <span class="ident">SectionMemoryBounds</span>, <span class="ident">AggregatedSectionMemoryBounds</span>,
 };
-<span class="kw">use</span> <span class="ident">x86_64</span>::{<span class="ident">registers::control_regs</span>, <span class="ident">instructions::tlb</span>};
+<span class="kw">use</span> <span class="ident">x86_64</span>::{<span class="ident">registers::control::Cr3</span>, <span class="ident">instructions::tlb</span>};
 
 
 <span class="doccomment">/// Finds and returns the relevant addresses for the kernel image loaded into memory by the bootloader.</span>
@@ -675,7 +677,7 @@
 
 <span class="doccomment">/// Flushes the specific virtual address in TLB. </span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tlb_flush_virt_addr</span>(<span class="ident">vaddr</span>: <span class="ident">VirtualAddress</span>) {
-    <span class="ident">tlb::flush</span>(<span class="ident">x86_64::VirtualAddress</span>(<span class="ident">vaddr</span>.<span class="ident">value</span>()));
+    <span class="ident">tlb::flush</span>(<span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">vaddr</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>));
 }
 
 <span class="doccomment">/// Flushes the whole TLB. </span>
@@ -685,7 +687,9 @@
 
 <span class="doccomment">/// Returns the current top-level page table address.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_p4</span>() -&gt; <span class="ident">PhysicalAddress</span> {
-    <span class="ident">PhysicalAddress::new_canonical</span>(<span class="ident">control_regs::cr3</span>().<span class="number">0</span> <span class="kw">as</span> <span class="ident">usize</span>)
+    <span class="ident">PhysicalAddress::new_canonical</span>(
+        <span class="ident">Cr3::read_raw</span>().<span class="number">0</span>.<span class="ident">start_address</span>().<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>
+    )
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory_x86_64" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>

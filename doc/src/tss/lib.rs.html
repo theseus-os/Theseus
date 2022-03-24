@@ -99,7 +99,7 @@
         <span class="macro">error!</span>(<span class="string">&quot;tss_set_rsp0(): couldn&#39;t find TSS for apic {}&quot;</span>, <span class="ident">my_apic_id</span>);
         <span class="string">&quot;No TSS for the current core&#39;s apid id&quot;</span> 
     })<span class="question-mark">?</span>.<span class="ident">lock</span>();
-    <span class="ident">tss_entry</span>.<span class="ident">privilege_stack_table</span>[<span class="number">0</span>] <span class="op">=</span> <span class="ident">x86_64::VirtualAddress</span>(<span class="ident">new_privilege_stack_top</span>.<span class="ident">value</span>());
+    <span class="ident">tss_entry</span>.<span class="ident">privilege_stack_table</span>[<span class="number">0</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">new_privilege_stack_top</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
     <span class="comment">// trace!(&quot;tss_set_rsp0: new TSS {:?}&quot;, tss_entry);</span>
     <span class="prelude-val">Ok</span>(())
 }
@@ -107,15 +107,15 @@
 
 <span class="doccomment">/// set up TSS entry for the given AP core. </span>
 <span class="doccomment">/// Returns a reference to a Mutex wrapping the new TSS entry.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_tss</span>(<span class="ident">apic_id</span>: <span class="ident">u8</span>, 
-                <span class="ident">double_fault_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>, 
-                <span class="ident">privilege_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>) 
-                -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span>
-{
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_tss</span>(
+    <span class="ident">apic_id</span>: <span class="ident">u8</span>, 
+    <span class="ident">double_fault_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>, 
+    <span class="ident">privilege_stack_top_unusable</span>: <span class="ident">VirtualAddress</span>
+) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">TaskStateSegment</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tss</span> <span class="op">=</span> <span class="ident">TaskStateSegment::new</span>();
     <span class="comment">// TSS.RSP0 is used in kernel space after a transition from Ring 3 -&gt; Ring 0</span>
-    <span class="ident">tss</span>.<span class="ident">privilege_stack_table</span>[<span class="number">0</span>] <span class="op">=</span> <span class="ident">x86_64::VirtualAddress</span>(<span class="ident">privilege_stack_top_unusable</span>.<span class="ident">value</span>());
-    <span class="ident">tss</span>.<span class="ident">interrupt_stack_table</span>[<span class="ident">DOUBLE_FAULT_IST_INDEX</span>] <span class="op">=</span> <span class="ident">x86_64::VirtualAddress</span>(<span class="ident">double_fault_stack_top_unusable</span>.<span class="ident">value</span>());
+    <span class="ident">tss</span>.<span class="ident">privilege_stack_table</span>[<span class="number">0</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">privilege_stack_top_unusable</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
+    <span class="ident">tss</span>.<span class="ident">interrupt_stack_table</span>[<span class="ident">DOUBLE_FAULT_IST_INDEX</span>] <span class="op">=</span> <span class="ident">x86_64::VirtAddr::new</span>(<span class="ident">double_fault_stack_top_unusable</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
 
     <span class="comment">// insert into TSS list</span>
     <span class="ident">TSS</span>.<span class="ident">insert</span>(<span class="ident">apic_id</span>, <span class="ident">Mutex::new</span>(<span class="ident">tss</span>));
