@@ -12,9 +12,15 @@ extern crate tss;
 extern crate gdt;
 
 use spin::Mutex;
-use x86_64::structures::{
-    idt::{LockedIdt, InterruptStackFrame, PageFaultErrorCode},
-    tss::TaskStateSegment,
+use x86_64::{
+    structures::{
+        idt::{LockedIdt, InterruptStackFrame, PageFaultErrorCode},
+        tss::TaskStateSegment,
+    },
+    instructions::{
+        segmentation::{CS, DS, SS, Segment}, 
+        tables::load_tss,
+    },
 };
 use gdt::{Gdt, create_gdt};
 
@@ -51,17 +57,11 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         *EARLY_GDT.lock() = gdt;
         EARLY_GDT.lock().load();
 
-        use x86_64::instructions::{
-            segmentation::{set_cs, load_ds, load_ss},
-            tables::load_tss,
-        };
-
         unsafe {
-            set_cs(kernel_cs); // reload code segment register
-            load_tss(tss_segment);      // load TSS
-            let kernel_ds_2 = x86_64::structures::gdt::SegmentSelector::new(kernel_ds.index(), kernel_ds.rpl());
-            load_ss(kernel_ds); // unsure if necessary, but doesn't hurt
-            load_ds(kernel_ds_2); // unsure if necessary, but doesn't hurt
+            CS::set_reg(kernel_cs);          // reload code segment register
+            load_tss(tss_segment);           // load TSS
+            SS::set_reg(kernel_ds.clone());  // unsure if necessary, but doesn't hurt
+            DS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
         }
     }
 
