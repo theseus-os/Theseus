@@ -50,6 +50,9 @@ impl TransportInterfaceSendContext {
         ctxt.transport_domain.write(U32::new(td));
         ctxt
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0x10 }
 }
 
 /// The bitmask for the state in the [`SendQueueContext`]
@@ -146,6 +149,9 @@ impl SendQueueContext {
         let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
         Ok( SendQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the SQ state")? )
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0x10 }
 }
 
 /// There are two doorbell registers we use to send packets.

@@ -44,6 +44,9 @@ impl FlowTableContext {
         ctxt.log_size.write(U32::new(log_size));
         ctxt
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0x8 }
 }
 
 /// Value written to the [`FlowGroupInput`] match_criteria_enable bitmask field.
@@ -99,6 +102,9 @@ impl FlowGroupInput {
         fgi.match_criteria_enable.write(U32::new(match_criteria_enable as u32)); 
         fgi
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0 }
 }
 
 impl fmt::Debug for FlowGroupInput {
@@ -138,6 +144,9 @@ impl FlowEntryInput {
         fei.flow_index.write(U32::new(flow_index));
         fei
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0 }
 }
 
 /// Value written to the [`FlowContext`] action bitmask field.
@@ -193,6 +202,9 @@ impl FlowContext {
         ctxt.dest_list_size.write(U32::new(dest_list_size)); 
         ctxt
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0x30 }
 }
 
 

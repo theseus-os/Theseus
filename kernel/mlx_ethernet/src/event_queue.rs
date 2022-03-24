@@ -53,7 +53,7 @@ impl EventQueueContext {
     /// # Arguments
     /// * `uar_page`: UAR page the EQ can be accessed through. 
     /// * `eq_size`: number of entries in the EQ.
-    pub fn init(uar_page: u32, eq_size: u32) -> EventQueueContext {
+    pub(crate) fn init(uar_page: u32, eq_size: u32) -> EventQueueContext {
         // set all entries to zero
         let mut ctxt = EventQueueContext::default();
 
@@ -66,6 +66,9 @@ impl EventQueueContext {
         ctxt.log_pg_size.write(U32::new(log_eq_page_size << LOG_PAGE_SIZE_SHIFT));
         ctxt
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0 }
 }
 
 /// The layout of an entry in the EQ buffer.

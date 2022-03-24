@@ -109,6 +109,9 @@ impl CompletionQueueContext {
         ctxt.dbr_addr_l.write(U32::new(db_addr.value() as u32));
         ctxt
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0 }
 }
 
 #[derive(Debug, TryFromPrimitive, PartialEq)]

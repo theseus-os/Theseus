@@ -53,6 +53,9 @@ impl TransportInterfaceReceiveContext {
         ctxt.transport_domain.write(U32::new(td));
         ctxt
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0x10 }
 }
 
 /// The possible states the RQ can be in.
@@ -138,6 +141,9 @@ impl ReceiveQueueContext {
         let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
         Ok( ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")? )
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0x10 }
 }
 
 /// A data structure that contains the RQ ring of descriptors 

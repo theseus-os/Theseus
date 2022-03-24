@@ -131,6 +131,9 @@ impl WorkQueue {
     pub fn init_rq(pd: u32, db_addr: PhysicalAddress, wq_size: u32) -> WorkQueue {
         Self::init(pd, db_addr, wq_size, core::mem::size_of::<WorkQueueEntryReceive>() as u32)
     }
+
+    /// Offset that this context is written to in the mailbox buffer
+    pub(crate) fn mailbox_offset() -> usize { 0x10 + 0x30 }
 }
 
 /// The possible values of the opcode field in the control segment of a WQE

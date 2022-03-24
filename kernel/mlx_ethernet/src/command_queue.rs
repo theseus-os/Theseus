@@ -208,7 +208,7 @@ impl CommandOpcode {
             Self::SetFlowTableRoot          => 0x40,
             Self::CreateFlowTable           => 0x40,
             Self::CreateFlowGroup           => 0x400,
-            Self::SetFlowTableEntry         => 0x40 + 0x300 + 8, //TODO: allow more than one entry?
+            Self::SetFlowTableEntry         => 0x40 + 0x300 + 8,
             _ => return Err(CommandQueueError::NotImplemented)           
         };
         Ok(len)
@@ -1033,9 +1033,8 @@ impl CommandQueue {
         eq_size: u32
     ) -> Result<(), CommandQueueError> 
     {    
-
         let eq_context = EventQueueContext::init(uar, eq_size);
-        input_mailbox_buffers[0].write_to_mailbox(eq_context, 0)?;
+        input_mailbox_buffers[0].write_to_mailbox(eq_context, EventQueueContext::mailbox_offset())?;
 
         // initialize the bitmask. this function only activates the page request event
         // const BITMASK_OFFSET: usize  = 0x58 - 0x10;
@@ -1043,7 +1042,7 @@ impl CommandQueue {
         // const PAGE_REQUEST_BIT: u64 = 1 << 0xB;
         // *eq_bitmask = U64::new(PAGE_REQUEST_BIT);
 
-        // TODO: I think this is wrong but matches the snabb
+        // Warning: I think this is wrong but matches the snabb driver, haven't had any issues yet
         const BITMASK_OFFSET: usize  = 0x6C - 0x10;
         const PAGE_REQUEST_BIT: u32 = 1 << 0xB;
         let eq_bitmask: U32<BigEndian> = U32::new(PAGE_REQUEST_BIT);
@@ -1056,7 +1055,6 @@ impl CommandQueue {
         Ok(())
     }
 
-
     fn write_completion_queue_context_to_mailbox(
         input_mailbox_buffers: &mut [MailboxBuffer],
         pages: Vec<PhysicalAddress>, 
@@ -1068,7 +1066,7 @@ impl CommandQueue {
     ) -> Result<(), CommandQueueError> {
         // initialize the completion queue context
         let cq_context: CompletionQueueContext = CompletionQueueContext::init(uar, cq_size, c_eqn, doorbell_pa, collapsed);
-        input_mailbox_buffers[0].write_to_mailbox(cq_context, 0)?;
+        input_mailbox_buffers[0].write_to_mailbox(cq_context, CompletionQueueContext::mailbox_offset())?;
 
         // Now use the remainder of the mailbox for page entries
         const CQ_PADDR_OFFSET: usize = 0x110 - 0x10;
@@ -1078,10 +1076,9 @@ impl CommandQueue {
     }
 
     fn write_transport_interface_send_context_to_mailbox(input_mailbox_buffer: &mut MailboxBuffer, td: u32) -> Result<(), CommandQueueError> {
-        const TIS_OFFSET: usize = 0x10;
         // initialize the TIS context
         let tis_context = TransportInterfaceSendContext::init(td);
-        input_mailbox_buffer.write_to_mailbox(tis_context, TIS_OFFSET)?;
+        input_mailbox_buffer.write_to_mailbox(tis_context, TransportInterfaceSendContext::mailbox_offset())?;
         Ok(())
     }
 
@@ -1096,14 +1093,12 @@ impl CommandQueue {
         wq_size: u32
     ) -> Result<(), CommandQueueError> {
         // initialize the send queue context
-        const SEND_QUEUE_CONTEXT_OFFSET: usize = 0x10;
         let sq_context = SendQueueContext::init(cqn, tisn);
-        input_mailbox_buffers[0].write_to_mailbox(sq_context, SEND_QUEUE_CONTEXT_OFFSET)?;
+        input_mailbox_buffers[0].write_to_mailbox(sq_context, SendQueueContext::mailbox_offset())?;
 
         // initialize the work queue
-        const WORK_QUEUE_OFFSET: usize = 0x10 + 0x30;
         let wq = WorkQueue::init_sq(pd, uar_page, db_addr, wq_size);
-        input_mailbox_buffers[0].write_to_mailbox(wq, WORK_QUEUE_OFFSET)?;
+        input_mailbox_buffers[0].write_to_mailbox(wq, WorkQueue::mailbox_offset())?;
 
         // Now use the remainder of the mailbox for page entries
         const SQ_PADDR_OFFSET: usize = 0x10 + 0x30 + 0xC0;
@@ -1112,23 +1107,23 @@ impl CommandQueue {
         Ok(())
     }
 
-    /// TODO: only sets state to ready
+    /// # Warning
+    /// Only sets state to ready
     fn modify_sq_state(input_mailbox_buffer: &mut MailboxBuffer) -> Result<(), CommandQueueError> {        
-        const SEND_QUEUE_CONTEXT_OFFSET:usize = 0x10;
         // initialize the TIS context
         let mut sq_context = SendQueueContext::default();
         sq_context.set_state(SendQueueState::Ready);
-        input_mailbox_buffer.write_to_mailbox(sq_context, SEND_QUEUE_CONTEXT_OFFSET)?;
+        input_mailbox_buffer.write_to_mailbox(sq_context, SendQueueContext::mailbox_offset())?;
 
         Ok(())
     }
 
-    /// TODO: only sets state to ready
+    /// # Warning 
+    /// Only sets state to ready
     fn modify_rq_state(input_mailbox_buffer: &mut MailboxBuffer) -> Result<(), CommandQueueError> {        
-        const RECEIVE_QUEUE_CONTEXT_OFFSET:usize = 0x10;
         let mut rq_context = ReceiveQueueContext::default();
         rq_context.set_state(ReceiveQueueState::Ready);
-        input_mailbox_buffer.write_to_mailbox(rq_context, RECEIVE_QUEUE_CONTEXT_OFFSET)?;
+        input_mailbox_buffer.write_to_mailbox(rq_context, ReceiveQueueContext::mailbox_offset())?;
 
         Ok(())
     }
@@ -1142,14 +1137,12 @@ impl CommandQueue {
         wq_size: u32
     ) -> Result<(), CommandQueueError> {            
         // initialize the send queue context
-        const RECEIVE_QUEUE_CONTEXT_OFFSET: usize = 0x10;
         let rq_context = ReceiveQueueContext::init(cqn);
-        input_mailbox_buffers[0].write_to_mailbox(rq_context, RECEIVE_QUEUE_CONTEXT_OFFSET)?;
+        input_mailbox_buffers[0].write_to_mailbox(rq_context, ReceiveQueueContext::mailbox_offset())?;
 
         // initialize the work queue
-        const WORK_QUEUE_OFFSET: usize = 0x10 + 0x30;
         let wq = WorkQueue::init_rq(pd, db_addr, wq_size);
-        input_mailbox_buffers[0].write_to_mailbox(wq, WORK_QUEUE_OFFSET)?;
+        input_mailbox_buffers[0].write_to_mailbox(wq, WorkQueue::mailbox_offset())?;
 
         // Now use the remainder of the mailbox for page entries
         const RQ_PADDR_OFFSET: usize = 0x10 + 0x30 + 0xC0;
@@ -1162,9 +1155,8 @@ impl CommandQueue {
         let table_type: U32<BigEndian> = U32::new((FlowTableType::NicRx as u32) << 24);
         input_mailbox_buffer.write_to_mailbox(table_type, 0)?;
 
-        const FLOW_TABLE_CONTEXT_OFFSET: usize = 0x8;
         let ft_context = FlowTableContext::init(num_ft_entries);
-        input_mailbox_buffer.write_to_mailbox(ft_context, FLOW_TABLE_CONTEXT_OFFSET)?;
+        input_mailbox_buffer.write_to_mailbox(ft_context, FlowTableContext::mailbox_offset())?;
 
         Ok(())
     }
@@ -1179,7 +1171,7 @@ impl CommandQueue {
             0,
             MatchCriteriaEnable::None
         );
-        input_mailbox_buffer.write_to_mailbox(flow_group_input, 0)?;
+        input_mailbox_buffer.write_to_mailbox(flow_group_input, FlowGroupInput::mailbox_offset())?;
 
         Ok(())
     }
@@ -1187,10 +1179,9 @@ impl CommandQueue {
     /// # Warning
     /// This function currently only creates a TIR in direct dispatching mode
     fn write_transport_interface_receive_context_to_mailbox(input_mailbox_buffer: &mut MailboxBuffer, rqn: u32, td: u32) -> Result<(), CommandQueueError> {
-        const TIR_OFFSET: usize = 0x10;
         // initialize the TIS context
         let tir_context = TransportInterfaceReceiveContext::init(rqn, td);
-        input_mailbox_buffer.write_to_mailbox(tir_context, TIR_OFFSET)?;
+        input_mailbox_buffer.write_to_mailbox(tir_context, TransportInterfaceReceiveContext::mailbox_offset())?;
         Ok(())
     }
 
@@ -1198,12 +1189,13 @@ impl CommandQueue {
     /// This function currently only adds one flow entry to the flow table.
     /// We have not tested this with anything but the wildcard flow group which is flow 0.
     fn write_flow_entry_info_to_mailbox(input_mailbox_buffers: &mut [MailboxBuffer], ft_id: u32, fg_id: u32, tirn: u32) -> Result<(), CommandQueueError> {        
+        // we only add one flow, which will have flow index 0
         let flow_entry_input = FlowEntryInput::init(FlowTableType::NicRx, ft_id, 0);
-        input_mailbox_buffers[0].write_to_mailbox(flow_entry_input, 0)?;
+        input_mailbox_buffers[0].write_to_mailbox(flow_entry_input, FlowEntryInput::mailbox_offset())?;
         
-        const FLOW_CONTEXT_OFFSET:usize = 0x30;
-        let flow_context = FlowContext::init(fg_id, FlowContextAction::FwdDest, 1); //TODO: magic number
-        input_mailbox_buffers[0].write_to_mailbox(flow_context, FLOW_CONTEXT_OFFSET)?;
+        // we only add 1 flow, so dest list size is 1
+        let flow_context = FlowContext::init(fg_id, FlowContextAction::FwdDest, 1); 
+        input_mailbox_buffers[0].write_to_mailbox(flow_context, FlowContext::mailbox_offset())?;
 
         let dest_list_mb: usize = libm::ceilf((0x30 + 0x300) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         const DEST_LIST_MB_OFFSET: usize = 304; 
