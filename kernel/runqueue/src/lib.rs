@@ -9,16 +9,23 @@ extern crate alloc;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate task;
-#[cfg(priority_scheduler)] extern crate runqueue_priority;
-#[cfg(not(priority_scheduler))] extern crate runqueue_round_robin;
+#[macro_use] extern crate cfg_if;
+cfg_if! {
+    if #[cfg(priority_scheduler)] {
+        extern crate runqueue_priority as runqueue;
+    } else if #[cfg(realtime_scheduler)] {
+        extern crate runqueue_realtime as runqueue;
+    } else {
+        extern crate runqueue_round_robin as runqueue;
+    }
+}
 
 #[cfg(single_simd_task_optimization)]
 extern crate single_simd_task_optimization;
 
 use irq_safety::{RwLockIrqSafe};
 use task::{TaskRef};
-#[cfg(priority_scheduler)] use runqueue_priority::RunQueue;
-#[cfg(not(priority_scheduler))] use runqueue_round_robin::RunQueue;
+use runqueue::RunQueue;
 
 
 /// Creates a new `RunQueue` for the given core, which is an `apic_id`.

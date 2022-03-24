@@ -1,8 +1,8 @@
 //! Error number definitions taken from running `errno -l` on Linux. 
 
-use crate::types::c_int;
+use libc::c_int;
 
-// TODO: this should be #[thread_local]
+#[thread_local]
 #[no_mangle]
 pub static mut errno: c_int = 0;
 

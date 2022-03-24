@@ -15,7 +15,6 @@
 //! which in Rust is achieved via the `-C force-frame-pointers=yes` rust flags option.
 
 #![no_std]
-#![feature(llvm_asm)]
 
 // This entire crate depends upon the `frame_pointers` config option.
 #[macro_use] extern crate cfg_if;
@@ -56,7 +55,7 @@ pub fn stack_trace_using_frame_pointers(
     let mut rbp: usize;
     // SAFE: just reading current register value
     unsafe {
-        llvm_asm!("" : "={rbp}"(rbp) : : "memory" : "intel", "volatile");
+        asm!("mov {}, rbp", out(reg) rbp);
     }
 
     for _i in 0 .. max_recursion.unwrap_or(64) {

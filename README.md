@@ -28,9 +28,10 @@ On Linux (Debian-like distros), do the following:
     ```
  4. Build and run (in QEMU):
     ```sh
-     cd Theseus
-     make run
-     ```
+    cd Theseus
+    make run
+    ```
+    To exit QEMU, press <kbd>Ctrl</kbd> + <kbd>A</kbd>, then <kbd>X</kbd>. 
 
 See below for more detailed instructions.
 
@@ -68,7 +69,8 @@ sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qe
     ```
 
 If you're on WSL, also do the following steps:
-  * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
+  * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/) or [VcXsvr](https://sourceforge.net/projects/vcxsrv/).
+    * You'll likely need to invoke those X servers with the `-ac` argument (or use the GUI to disable access control). 
   * Setup an X display as follows:
     * on original WSL (version 1), run:
       ```sh
@@ -80,7 +82,7 @@ If you're on WSL, also do the following steps:
       ```
 
     You'll need to do this each time you open up a new WSL terminal, so it's best to add it to the end of your `.bashrc` or `.profile` file in your `$HOME` directory.
-  * If you get an error like `Could not initialize SDL (No available video device) ...`, then make sure that your X Server is running and that you have set the `DISPLAY` environment variable above.
+  * If you get an error like `Could not initialize SDL (No available video device) ...` or any type of GTK or video device error, then make sure that your X Server is running and that you have set the `DISPLAY` environment variable above.
   * **NOTE**: WSL and WSL2 do not currently support using KVM.
 
 ### Building on MacOS
@@ -143,9 +145,12 @@ Run `make help` to see other make targets and the various command-line options.
 
 ## Using QEMU
 QEMU allows us to run Theseus quickly and easily in its own virtual machine.
-To exit Theseus in QEMU, press `Ctrl+Alt+G` (or `Ctrl+Alt` on some systems), which releases your keyboard and mouse focus from the QEMU window. Then press `Ctrl+C` in the terminal window that you ran `make run` from originally to kill QEMU, or you can also quit QEMU using the GUI `(x)` button on the title bar.
+To release, press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>G</kbd> (or just <kbd>Ctrl</kbd> + <kbd>Alt</kbd> on some systems), which releases your keyboard and mouse focus from the QEMU window. 
+To exit QEMU, in the terminal window that you originally ran `make run`, press <kbd>Ctrl</kbd> + <kbd>A</kbd> then <kbd>X</kbd>, or you can also click the GUI `ⓧ` button on the title bar if running QEMU in graphical mode.
 
-To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`. On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU menu bar.
+To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>2</kbd>.
+Switch back to the main window with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>1</kbd>.
+On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU menu bar.
 
 To access/expose a PCI device in QEMU using PCI passthrough via VFIO, see [these instructions](https://theseus-os.github.io/Theseus/book/running/virtual_machine/pci_passthrough.html).
 

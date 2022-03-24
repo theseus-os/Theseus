@@ -31,17 +31,21 @@
 
 ## Overview of Key Subsystems 
 - [Overview of Key Subsystems](subsystems/subsystems.md)
-    - [Memory Management]() <!-- TODO: memory.md -->
-    - [Task Management]() <!-- TODO: task.md -->
+    - [Memory Management](subsystems/memory.md)
+        - [Mapping Virtual to Physical Memory](subsystems/memory_mapping.md)
+        - [Heap Allocators](subsystems/heap.md)
+    - [Task Management](subsystems/task.md)
+        - [Task Management Invariants](subsystems/task_invariants.md)
     - [Display and Window Management](subsystems/display/display.md)
         - [The Window Manager](subsystems/display/window_manager.md)
         - [Creating and Displaying Windows](subsystems/display/window_tutorial.md)
 
 
-## Running Theseus on Real Hardware
+## Running Theseus
 - [Running Theseus on Virtual Machines & Real Hardware](running/running.md)
     - [Running Theseus in a Virtual Machine](running/virtual_machine/virtual_machine.md)
         - [Using PCI device Passthrough on QEMU](running/virtual_machine/pci_passthrough.md)
+    - [Theseus on Headless Systems](running/headless.md)
     - [Booting via USB drive](running/usb.md)
     - [Booting over the network (PXE)](running/pxe.md)
 

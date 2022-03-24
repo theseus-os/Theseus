@@ -18,11 +18,11 @@ path = "../shapes"
 path = "../compositor"
 
 [dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [dependencies.hashbrown]
-version = "0.9.1"
+version = "0.11.2"
 features = ["nightly"]
 
 [lib]

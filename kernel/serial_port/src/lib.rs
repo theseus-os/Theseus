@@ -5,7 +5,7 @@
 //! This crate extends that functionality to provide interrupt handlers for receiving data
 //! and handling data access in a deferred, asynchronous manner.
 //! It also implements additional higher-level I/O traits for serial ports,
-//! namely [`bare_io::Read`] and [`bare_io::Write`].
+//! namely [`core2::io::Read`] and [`core2::io::Write`].
 //!
 //! # Notes
 //! Typically, drivers do not need to be designed in this split manner. 
@@ -22,7 +22,7 @@ extern crate spin;
 extern crate irq_safety;
 extern crate interrupts;
 extern crate deferred_interrupt_tasks;
-extern crate bare_io;
+extern crate core2;
 extern crate x86_64;
 extern crate serial_port_basic;
 
@@ -38,7 +38,7 @@ use core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 use interrupts::IRQ_BASE_OFFSET;
-use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
+use x86_64::structures::idt::{HandlerFunc, InterruptStackFrame};
 
 // Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
@@ -226,33 +226,33 @@ impl SerialPort {
 }
 
 
-/// A non-blocking implementation of [`bare_io::Read`] that will read bytes into the given `buf`
+/// A non-blocking implementation of [`core2::io::Read`] that will read bytes into the given `buf`
 /// so long as more bytes are available.
 /// The read operation will be completed when there are no more bytes to be read,
 /// or when the `buf` is filled, whichever comes first.
 ///
-/// Because it's non-blocking, a [`bare_io::ErrorKind::WouldBlock`] error is returned
+/// Because it's non-blocking, a [`core2::io::ErrorKind::WouldBlock`] error is returned
 /// if there are no bytes available to be read, indicating that the read would block.
-impl bare_io::Read for SerialPort {
-    fn read(&mut self, buf: &mut [u8]) -> bare_io::Result<usize> {
+impl core2::io::Read for SerialPort {
+    fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize> {
         if !self.data_available() {
-            return Err(bare_io::ErrorKind::WouldBlock.into());
+            return Err(core2::io::ErrorKind::WouldBlock.into());
         }
         Ok(self.in_bytes(buf))
     }
 }
 
-/// A blocking implementation of [`bare_io::Write`] that will write bytes from the given `buf`
+/// A blocking implementation of [`core2::io::Write`] that will write bytes from the given `buf`
 /// to the `SerialPort`, waiting until it is ready to transfer all bytes. 
 ///
 /// The `flush()` function is a no-op, since the `SerialPort` does not have buffering. 
-impl bare_io::Write for SerialPort {
-    fn write(&mut self, buf: &[u8]) -> bare_io::Result<usize> {
+impl core2::io::Write for SerialPort {
+    fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize> {
         self.out_bytes(buf);
         Ok(buf.len())
     }
 
-    fn flush(&mut self) -> bare_io::Result<()> {
+    fn flush(&mut self) -> core2::io::Result<()> {
         Ok(())
     }    
 }
@@ -356,7 +356,7 @@ static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 
 
 /// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
-extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: InterruptStackFrame) {
     // trace!("COM1/COM3 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
         func();
@@ -365,7 +365,7 @@ extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: &mut Excepti
 }
 
 /// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
-extern "x86-interrupt" fn com2_com4_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn com2_com4_interrupt_handler(_stack_frame: InterruptStackFrame) {
     // trace!("COM2/COM4 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func();

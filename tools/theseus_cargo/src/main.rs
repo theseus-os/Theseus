@@ -130,14 +130,17 @@ fn main() -> Result<(), String> {
             }
             Some(RMETA_FILE_EXTENSION) | Some(RLIB_FILE_EXTENSION) => {
                 let libcrate_name = get_plain_crate_name_from_path(&path)?;
-                if libcrate_name.starts_with(RMETA_FILE_PREFIX) {
+                if libcrate_name.starts_with(RMETA_RLIB_FILE_PREFIX) {
                     &libcrate_name[PREFIX_END ..]
                 } else {
                     return Err(format!("Found .rlib or .rmeta file in out_dir that didn't start with 'lib' prefix: {}", path.display()));
                 }
             }
             _ => {
-                println!("Skipping potentially-redundant file with unexpected extension: {}", path.display());
+                println!("Removing potentially-redundant file with unexpected extension: {}", path.display());
+                fs::remove_file(&path).map_err(|e| 
+                    format!("Failed to remove potentially-redundant file with unexpected extension: {}. Error: {}", path.display(), e)
+                )?;
                 continue;
             }
         };
@@ -150,9 +153,39 @@ fn main() -> Result<(), String> {
                 format!("Failed to remove redundant crate file in out_dir: {}. Error: {}", path.display(), e)
             )?;
         } else {
-            // do nothing: keep the non-redundant file
+            // Here, do nothing. We must keep the non-redundant files,
+            // as they represent new dependencies that were not part of
+            // the original in-tree Theseus build.
         }
     }
+
+    // Here, remove the ".fingerprint/` directory, in order to force rustc
+    // to rebuild all artifacts for all of the modified rustc commands that we re-run below.
+    // Those fingerprint files are in the actual target directory, which is the parent directory of `out_dir`.
+    let target_dir = out_dir.parent().unwrap();
+    let mut fingerprint_dir_path = target_dir.to_path_buf();
+    fingerprint_dir_path.push(".fingerprint");
+    println!("--> Removing .fingerprint directory: {}", fingerprint_dir_path.display());
+    fs::remove_dir_all(&fingerprint_dir_path).map_err(|_e| 
+        format!("Failed to remove .fingerprint directory: {}. Error: {:?}", fingerprint_dir_path.display(), _e)
+    )?;
+
+        // if dir_entry.file_type().unwrap().is_file() {
+        //     match path.extension().and_then(|os_str| os_str.to_str()) {
+        //         Some("d") 
+        //         | Some("o")
+        //         | Some("a")
+        //         | Some(RMETA_FILE_EXTENSION)
+        //         | Some(RLIB_FILE_EXTENSION) => {
+        //             println!("Removing potentially-redundant target file: {}", path.display());
+        //             fs::remove_file(&path).map_err(|e| 
+        //                 format!("Failed to remove potentially-redundant target file: {}. Error: {}", path.display(), e)
+        //             )?;
+        //         }
+        //         _ => println!("Skipping existing file with unknown extension in target directory: {:?}", path.display()),
+        //     }
+        // }
+
 
     // Obtain the directory for the host system dependencies
     let mut host_deps_dir_path = PathBuf::from(&input_dir_path);
@@ -212,11 +245,11 @@ const COMMAND_END:                &str = "`";
 const RUSTC_CMD_START:            &str = "rustc --crate-name";
 const BUILD_SCRIPT_CRATE_NAME:    &str = "build_script_build";
 
-// The format of rmeta file names. 
-const RMETA_FILE_PREFIX:          &str = "lib";
+// The format of rmeta/rlib file names. 
+const RMETA_RLIB_FILE_PREFIX:     &str = "lib";
 const RMETA_FILE_EXTENSION:       &str = "rmeta";
 const RLIB_FILE_EXTENSION:        &str = "rlib";
-const PREFIX_END: usize = RMETA_FILE_PREFIX.len();
+const PREFIX_END: usize = RMETA_RLIB_FILE_PREFIX.len();
 
 
 /// Runs the actual cargo build command.
@@ -505,16 +538,32 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>, H: AsRef<Path>>(
 
     // After adding the initial stuff: rustc command, crate name, (optional --edition), and crate source file, 
     // the other arguments are added in the loop below. 
+    'args_label: 
     for (&arg, values) in matches.args.iter() {
-        // println!("Arg {:?} has values:\n\t {:?}", arg, values.vals);
+        println!("Arg {:?} has values:\n\t {:?}", arg, values.vals);
         if ignore_arg(arg) { continue; }
 
         for value in &values.vals {
             let value = value.to_string_lossy();
             let mut new_value = value.to_string();
 
-            if arg == "--extern" {
-                if value.ends_with(RMETA_FILE_EXTENSION) {
+            if arg == "--crate-type" && value == "proc-macro" {
+                // Don't re-run proc_macro builds, as those are built to run on the host.
+                args_changed = false;
+                break 'args_label;
+            } else if arg == "--extern" {
+                let rmeta_or_rlib_extension = if value.ends_with(RMETA_FILE_EXTENSION) {
+                    Some(RMETA_FILE_EXTENSION)
+                } else if value.ends_with(RLIB_FILE_EXTENSION) {
+                    Some(RLIB_FILE_EXTENSION)
+                } else if value == "proc_macro" {
+                    None
+                } else {
+                    // println!("Skipping non-rlib --extern value: {:?}", value);
+                    return Err(format!("Unsupported --extern arg value {:?}. We only support '.rlib' or '.rmeta' files.", value));
+                };
+
+                if let Some(extension) = rmeta_or_rlib_extension {
                     let (extern_crate_name, crate_rmeta_path) = value
                         .find('=')
                         .map(|idx| value.split_at(idx))
@@ -523,12 +572,10 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>, H: AsRef<Path>>(
                     println!("Found --extern arg, {:?} --> {:?}", extern_crate_name, crate_rmeta_path);
                     if let Some(extern_crate_name_with_hash) = prebuilt_crates.get(extern_crate_name) {
                         let mut new_crate_path = prebuilt_dir.to_path_buf();
-                        new_crate_path.push(format!("{}{}.{}", RMETA_FILE_PREFIX, extern_crate_name_with_hash, RMETA_FILE_EXTENSION));
+                        new_crate_path.push(format!("{}{}.{}", RMETA_RLIB_FILE_PREFIX, extern_crate_name_with_hash, extension));
                         println!("#### Replacing crate {:?} with prebuilt crate at {}", extern_crate_name, new_crate_path.display());
                         new_value = format!("{}={}", extern_crate_name, new_crate_path.display());
                     }
-                } else {
-                    // println!("Skipping non-rlib --extern value: {:?}", value);
                 }
             } else if arg == "-L" {
                 let (kind, _path) = value.as_ref()
@@ -537,8 +584,8 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>, H: AsRef<Path>>(
                     .map(|(kind, path)| (kind, &path[1..])) // ignore the '=' delimiter
                     .ok_or_else(|| format!("Failed to parse value of -L arg as KIND=PATH: {:?}", value))?;
                 // println!("Found -L arg, {:?} --> {:?}", kind, _path);
-                if kind != "dependency" {
-                    return Err(format!("Unsupported -L arg value {:?}. We only support 'dependency=PATH'.", value));
+                if !(kind == "dependency" || kind == "native") {
+                    println!("WARNING: Unsupported -L arg value {:?}. We only support 'dependency=PATH' or 'native=PATH'.", value);
                 }
                 // TODO: if we need to actually modify any -L argument values, then set `new_value` accordingly here. 
             }
@@ -551,16 +598,16 @@ fn run_rustc_command<P: AsRef<Path>, T: AsRef<Path>, H: AsRef<Path>>(
         }
     }
 
-    // Add our directory of prebuilt crates as a library search path, for dependency resolution. 
-    // This is okay because we removed all of the potentially conflicting crates from the local target/ directory,
-    // which ensures that adding in the directory of prebuilt crate .rmeta/.rlib files won't cause rustc to complain
-    // about multiple "potentially newer" versions of a given crate.
-    recreated_cmd.arg("-L").arg(prebuilt_dir);
-    // We also need to add the directory of host dependencies, e.g., proc macro crates and such. 
-    recreated_cmd.arg("-L").arg(host_deps_dir_path);
-
     // If any args actually changed, we need to run the re-created command. 
     if args_changed {
+        // Add our directory of prebuilt crates as a library search path, for dependency resolution. 
+        // This is okay because we removed all of the potentially conflicting crates from the local target/ directory,
+        // which ensures that adding in the directory of prebuilt crate .rmeta/.rlib files won't cause rustc to complain
+        // about multiple "potentially newer" versions of a given crate.
+        recreated_cmd.arg("-L").arg(prebuilt_dir);
+        // We also need to add the directory of host dependencies, e.g., proc macro crates and such. 
+        recreated_cmd.arg("-L").arg(host_deps_dir_path);
+
         // println!("\n\n--------------- Inherited Environment Variables ----------------\n");
         // let _env_cmd = Command::new("env").spawn().unwrap().wait().unwrap();
         println!("About to execute recreated_cmd that had changed arguments:\n{:?}", recreated_cmd);
@@ -677,8 +724,13 @@ impl BuildConfig {
         pathbuf.push("TheseusBuild.toml");
         let theseus_build_toml = fs::read_to_string(&pathbuf)
             .map_err(|e| format!("Error reading {}: {}", pathbuf.display(), e))?;
-        let build_config: BuildConfig = toml::from_str(&theseus_build_toml)
+        let mut build_config: BuildConfig = toml::from_str(&theseus_build_toml)
             .map_err(|e| format!("Error parsing TheseusBuild.toml: {}", e))?;
+        
+        // Trim errant whitespace from the various parsed items.
+        build_config.target     = build_config.target    .trim().into();
+        build_config.rustflags  = build_config.rustflags .trim().into();
+        build_config.cargoflags = build_config.cargoflags.trim().into();
         Ok(build_config)
     }
 }
@@ -696,8 +748,16 @@ fn rustc_clap_options<'a, 'b>(app_name: &str) -> clap::App<'a, 'b> {
             .long("crate-name")
             .takes_value(true)
         )
+
+        // Note: add any other arguments that you encounter in a rustc invocation here.
+
         .arg(clap::Arg::with_name("-L")
             .short("L")
+            .takes_value(true)
+            .multiple(true)
+        )
+        .arg(clap::Arg::with_name("-l")
+            .short("l")
             .takes_value(true)
             .multiple(true)
         )
@@ -749,6 +809,7 @@ fn rustc_clap_options<'a, 'b>(app_name: &str) -> clap::App<'a, 'b> {
         .arg(clap::Arg::with_name("--crate-type")
             .long("crate-type")
             .takes_value(true)
+            .multiple(true)
         )
         .arg(clap::Arg::with_name("--emit")
             .long("emit")
@@ -805,5 +866,4 @@ fn rustc_clap_options<'a, 'b>(app_name: &str) -> clap::App<'a, 'b> {
             .takes_value(false)
             .multiple(true)
         )
-        // Note: add any other arguments that you encounter in a rustc invocation here.
 }

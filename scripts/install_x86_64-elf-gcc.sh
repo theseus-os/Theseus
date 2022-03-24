@@ -91,11 +91,11 @@ make install-gcc
 make install-target-libgcc
 
 
-echo "\033[1;32m\n\nThe build of $TARGET gcc and binutils has completed.\033[0m \nShowing relevant libgcc files below:"
+echo -e "\033[1;32m\n\nThe build of $TARGET gcc and binutils has completed.\033[0m \nShowing relevant libgcc files below:"
 $TARGET-gcc -print-libgcc-file-name
 $TARGET-gcc -mno-red-zone -print-libgcc-file-name
 
-echo "\n[Optional] to clean up the build files, you can run the following:
+echo -e "\n[Optional] to clean up the build files, you can run the following:
 	rm -rf $SRC/binutils-2.35.1
 	rm -rf $SRC/binutils-2.35.1.tar.gz
 	rm -rf $SRC/build-binutils
@@ -106,7 +106,7 @@ echo "\n[Optional] to clean up the build files, you can run the following:
 	rm -rf $SRC/gcc-10.2.0.tar.gz
 	"
 
-echo "\n\033[1;33mYou must add the new gcc binaries to your path by running the following command:
+echo -e "\n\033[1;33mYou must add the new gcc binaries to your path by running the following command:
 (to make it permanent, add it to the end of your .bashrc or your shell's .profile file)\033[0m
 	export PATH=\"$DEST/cross/bin:\$PATH\"
 	"

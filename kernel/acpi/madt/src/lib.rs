@@ -231,7 +231,7 @@ pub enum MadtEntry<'t> {
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtLocalApic {
-    header: EntryRecord,
+    _header: EntryRecord,
     /// Processor ID
     pub processor: u8,
     /// Local APIC ID
@@ -244,7 +244,7 @@ pub struct MadtLocalApic {
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtIoApic {
-    header: EntryRecord,
+    _header: EntryRecord,
     /// I/O APIC ID
     pub id: u8,
     _reserved: u8,
@@ -258,7 +258,7 @@ pub struct MadtIoApic {
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtIntSrcOverride {
-    header: EntryRecord,
+    _header: EntryRecord,
     /// Bus Source
     pub bus_source: u8,
     /// IRQ Source
@@ -275,7 +275,7 @@ pub struct MadtIntSrcOverride {
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtNonMaskableInterrupt {
-    header: EntryRecord,
+    _header: EntryRecord,
     /// which processor this is for, 0xFF means all processors
     pub processor: u8,
     /// Flags
@@ -291,7 +291,7 @@ pub struct MadtNonMaskableInterrupt {
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct MadtLocalApicAddressOverride {
-    header: EntryRecord,
+    _header: EntryRecord,
     _reserved: u16,
     /// Local APIC physical address
     pub phys_addr: u64,

@@ -7,7 +7,6 @@
 extern crate spin;
 #[macro_use] extern crate log;
 extern crate port_io;
-extern crate x86_64;
 
 use port_io::Port;
 use spin::Mutex;
@@ -45,12 +44,12 @@ pub fn init(freq_hertz: u32) {
 
     // SAFE because we're simply configuring the PIT clock, and the code below is correct.
     unsafe {
-        use x86_64::instructions::port::inb;
         PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
 
         // must write the low byte and then the high byte
         PIT_CHANNEL_0.lock().write(divisor as u8);
-        inb(0x60); //xread from PS/2 port 0x60, i.e., a short delay + acknowledging status register
+        // read from PS/2 port 0x60, which acts as a short delay and acknowledges the status register
+        let _ignore: u8 = Port::new(0x60).read();
         PIT_CHANNEL_0.lock().write((divisor >> 8) as u8);
     }
 }
@@ -67,32 +66,32 @@ pub fn pit_wait(microseconds: u32) -> Result<(), &'static str> {
 
     // SAFE because we're simply configuring the PIT clock, and the code below is correct.
     unsafe {
-        use x86_64::instructions::port::{inb, outb};
+        let port_60 = Port::<u8>::new(0x60);
+        let port_61 = Port::<u8>::new(0x61);
+
         // see code example: https://wiki.osdev.org/APIC_timer
-        let port_61_val = inb(0x61); 
-        outb(0x61, port_61_val & 0xFD | 0x1); // sets the speaker channel 2 to be controlled by PIT hardware
+        let port_61_val = port_61.read(); 
+        port_61.write(port_61_val & 0xFD | 0x1); // sets the speaker channel 2 to be controlled by PIT hardware
         PIT_COMMAND.lock().write(0b10110010); // channel 2, access mode: lobyte/hibyte, hardware-retriggerable one shot mode, 16-bit binary (not BCD)
 
         // set frequency; must write the low byte first and then the high byte
         PIT_CHANNEL_2.lock().write(divisor as u8);
-        inb(0x60); //xread from PS/2 port 0x60, i.e., a short delay + acknowledging status register
+        // read from PS/2 port 0x60, which acts as a short delay and acknowledges the status register
+        let _ignore: u8 = port_60.read();
         PIT_CHANNEL_2.lock().write((divisor >> 8) as u8);
         
         // reset PIT one-shot counter
-        let port_61_val = inb(0x61) & 0xFE;
-        outb(0x61, port_61_val); // clear bit 0
-        outb(0x61, port_61_val | 0x1); // set bit 0
+        let port_61_val = port_61.read() & 0xFE;
+        port_61.write(port_61_val); // clear bit 0
+        port_61.write(port_61_val | 0x1); // set bit 0
         // here, PIT channel 2 timer has started counting
         // here, should also run custom reset function (closure input), e.g., resetting APIC counter
         
         // wait for PIT timer to reach 0, which is tested by checking bit 5
-        while inb(0x61) & 0x20 != 0 { }
+        while port_61.read() & 0x20 != 0 { }
         Ok(())
     }
 }
-
-
-
 
 /// this occurs on every PIT timer tick.
 /// Called by the PIT's interrupt handler

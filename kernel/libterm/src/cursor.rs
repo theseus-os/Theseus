@@ -7,7 +7,7 @@ pub struct Cursor {
     /// Whether the cursor is enabled in the terminal.
     enabled: bool,
     /// The blinking frequency.
-    freq: u64,
+    freq: u128,
     /// The last time it blinks.
     time: TscTicks,
     /// The current blinking state show/hidden

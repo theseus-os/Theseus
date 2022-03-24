@@ -24,7 +24,7 @@ features = ["elf64"]
 path = "../../libs/cow_arc"
 
 [dependencies.hashbrown]
-version = "0.9.1"
+version = "0.11.2"
 features = ["nightly"]
 
 [dependencies.memory]

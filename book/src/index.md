@@ -5,7 +5,7 @@
 
 Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
-Continue to the next chapter to learn more about Theseus, or feel free to check out our [published academic papers](misc/papers_presentations.md) for a deep dive into the research and design concept behind Theseus.
+Continue to the next chapter to learn more about Theseus, or feel free to check out our [published academic papers](misc/papers_presentations.md) for a deep dive into the research and design concepts behind Theseus.
 
 
 ### What's in a name? 
@@ -15,4 +15,4 @@ Continue to the next chapter to learn more about Theseus, or feel free to check 
 
 The name "Theseus" was inspired by *The Ship of Theseus*, an ancient Greek metaphysical paradox and thought experiment that pondered: "if you iteratively replace every individual piece of an object, is that re-built object still the same object?"
 
-Though we do not attempt to answer this question, we do wish to enable any and every OS component to be replaced,  across all layers of the system, at runtime without rebooting. This goal of easy and arbitrary *live evolution* was (and still is) one of the original motivating factors behind Theseus.
+Though we do not attempt to answer this question, we do wish to enable any and every OS component to be replaced — across all layers of the system — at runtime without rebooting. This goal of easy and arbitrary *live evolution* was (and still is) one of the original motivating factors behind Theseus.

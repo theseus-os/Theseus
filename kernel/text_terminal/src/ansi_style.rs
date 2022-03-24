@@ -1,19 +1,19 @@
 //! Style and formatting of text displayed in a terminal,
 //! following the ANSI, VT100, and xterm standards.
 
-use core::fmt;
+use core::{convert::TryFrom, fmt};
 use alloc::borrow::Cow;
-use crate::{ForegroundColor, BackgroundColor, UnderlinedColor};
+use crate::{BackgroundColor, ForegroundColor, ScreenPoint, ScrollbackBufferPoint, UnderlinedColor};
 
 /// The style of text, including formatting and color choice, 
 /// for the character(s) displayed in a `Unit`.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Style {
-    format_flags: FormatFlags,
     /// The color of the text itself.
     color_foreground: ForegroundColor,
     /// The color behind the text.
     color_background: BackgroundColor,
+    format_flags: FormatFlags,
 }
 impl Style {
     pub fn diff<'old, 'new>(&'old self, other: &'new Style) -> StyleDiff<'old, 'new> {
@@ -492,33 +492,94 @@ impl FormatFlags {
 
 /// The set of ASCII values that are non-printable characters 
 /// and require special handling by a terminal emulator. 
-#[derive(Debug)]
-pub enum AsciiControlCodes {
+pub struct AsciiControlCodes;
+
+// Use associated consts instead of an enum for easy matching.
+#[allow(non_upper_case_globals)]
+impl AsciiControlCodes {
     /// (BEL) Plays a terminal bell or beep.
+    ///
     /// `Ctrl + G`, or `'\a'`.
-    Bell         = 0x07,
-    /// (BS) Backspaces over the previous character before (to the left of) the cursor.
+    pub const Bell: u8 = 0x07;
+    /// (BS) Moves the cursor backwards by one unit/character, but does not remove it.
+    /// Note that this is different than the typical behavior of the "Backspace" key on a keyboard.
+    ///
     /// `Ctrl + H`, or `'\b'`.
-    Backspace    = 0x08,
+    pub const Backspace: u8 = 0x08;
     /// (HT) Inserts a horizontal tab.
+    ///
     /// `Ctrl + I`, or `'\t'`.
-    Tab          = 0x09,
-    /// (LF) Moves the cursor to the next line, i.e., Line feed.
+    pub const Tab: u8 = 0x09;
+    /// (LF) Moves the cursor to the next line, i.e., Line feed, or new line / newline.
+    ///
     /// `Ctrl + J`, or `'\n'`.
-    NewLine      = 0x0A,
+    pub const LineFeed: u8 = 0x0A;
     /// (VT) Inserts a vertical tab.
+    ///
     /// `Ctrl + K`, or `'\v'`.
-    VerticalTab  = 0x0B,
+    pub const VerticalTab: u8 = 0x0B;
     /// (FF) Inserts a page break (form feed) to move the cursor/prompt to the beginning of a new page (screen).
-    /// `Ctrl + K`, or `'\v'`.
-    NewPage  = 0x0C,
+    ///
+    /// `Ctrl + L`, or `'\f'`.
+    pub const PageBreak: u8 = 0x0C;
     /// (CR) Moves the cursor to the beginning of the line, i.e., carriage return.
+    ///
     /// `Ctrl + M`, or `'\r'`.
-    CarriageReturn  = 0x0D,
+    pub const CarriageReturn: u8 = 0x0D;
     /// (ESC) The escape character.
+    ///
     /// `ESC`, or `'\e'`.
-    Escape = 0x1B,
-    /// (DEL) Deletes the next character after (to the right of) the cursor.
+    pub const Escape: u8 = 0x1B;
+    /// (DEL) Backwards-deletes the character before (to the left of) the cursor.
+    /// This is equivalent to what the Backspace key on a keyboard typically does.
+    ///
     /// `DEL`.
-    Delete = 0x7F,
+    pub const BackwardsDelete: u8 = 0x7F;
+}
+
+
+/// The set of "frequently-supported" commands to switch terminal modes.
+///
+/// These are sometimes referred to as "ECMA-48" modes or commands.
+pub struct ModeSwitch;
+#[allow(non_upper_case_globals)]
+impl ModeSwitch {
+    /// (DECCRM) Display control characters.
+    /// This is off by default.
+    pub const DisplayControlChars: u8 = b'3';
+
+    /// (DECIM) Set insert mode.
+    /// This is off by default, meaning the terminal is in replace mode.
+    pub const InsertMode: u8 = b'4';
+
+    /// (LF/NL) Automatically follow a Line Feed (LF), Vertical Tab (VT),
+    /// and Form Feed (FF) with a Carriage Return (CR).
+    /// This is off by default.
+    pub const AutomaticCarriageReturn: &'static [u8; 2] = b"20";
+
+    /// If this value comes after one of the above command values,
+    /// it means that the mode should be set, replacing the default value.
+    pub const SET_SUFFIX: u8 = b'h';
+
+    /// If this value comes after one of the above command values,
+    /// it means that the mode should be "unset" or "reset" to the default.
+    pub const RESET_SUFFIX: u8 = b'l';
+}
+
+pub struct StatusReportCommands;
+#[allow(non_upper_case_globals)]
+impl StatusReportCommands {
+    /// (DSR) Queries the terminal device for its status.
+    /// A reply of `"ESC [ 0 n"` indicates the terminal is okay.
+    pub const DeviceStatusRequest: u8 = b'5';
+
+    /// The response to a [`DeviceStatusRequest`] indicating the terminal device is Ok.
+    pub const DeviceStatusOk: u8 = b'0';
+
+    /// (CSR) Queries the terminal device for a cursor position report.
+    /// A reply will be `"ESC [ y ; x R"`, in which `(x,y)` is the cursor position.
+    pub const CursosPositionReport: u8 = b'6';
+
+    /// The value that comes after one of the above command values.
+    pub const SUFFIX: u8 = b'n';
 }
