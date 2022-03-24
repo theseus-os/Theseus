@@ -9,7 +9,8 @@ use byteorder::BigEndian;
 use alloc::boxed::Box;
 use memory::MappedPages;
 use owning_ref::BoxRefMut;
-use crate::*;
+#[allow(unused_imports)]
+use crate::{*, command_queue::CommandOpcode};
 
 
 /// The data structure containing EQ initialization parameters.

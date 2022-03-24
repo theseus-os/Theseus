@@ -11,7 +11,7 @@
 #![feature(slice_pattern)]
 #![feature(core_intrinsics)]
 #![allow(incomplete_features)]
-#![feature(const_generics)]
+#![feature(adt_const_params)]
 
 #[macro_use]extern crate log;
 #[macro_use] extern crate alloc;

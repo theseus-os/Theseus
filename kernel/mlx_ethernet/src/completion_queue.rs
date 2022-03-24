@@ -16,8 +16,11 @@ use alloc::boxed::Box;
 use memory::{PhysicalAddress, MappedPages};
 use owning_ref::BoxRefMut;
 use num_enum::TryFromPrimitive;
+
+#[allow(unused_imports)]
 use crate::{
     *,
+    command_queue::CommandOpcode,
     work_queue::WQEOpcode
 };
 

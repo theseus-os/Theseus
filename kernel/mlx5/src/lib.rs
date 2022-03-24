@@ -10,7 +10,6 @@
 //! unless otherwise specified. 
 
 #![no_std]
-#![feature(destructuring_assignment)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;

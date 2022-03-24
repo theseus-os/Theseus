@@ -19,7 +19,8 @@ use alloc::{
 use nic_buffers::ReceiveBuffer;
 use nic_initialization::NIC_MAPPING_FLAGS;
 
-use crate::{*, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
+#[allow(unused_imports)]
+use crate::{*, command_queue::CommandOpcode, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
 
 
 /// The Transport Interface Receive (TIR) object is responsible for performing 

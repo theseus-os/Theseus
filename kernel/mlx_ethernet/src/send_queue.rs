@@ -15,7 +15,9 @@ use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
 
+#[allow(unused_imports)]
 use crate::{ *,
+    command_queue::CommandOpcode,
     work_queue::{WorkQueueEntrySend, DoorbellRecord},
     uar::UserAccessRegion
 };
