@@ -7,7 +7,6 @@ description = "contains the MappedPages-backed implementation of the fs_node tra
 
 [dependencies]
 spin = "0.9.0"
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.fs_node]
 path = "../fs_node"

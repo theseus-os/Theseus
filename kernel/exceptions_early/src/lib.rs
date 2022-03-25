@@ -12,9 +12,15 @@ extern crate tss;
 extern crate gdt;
 
 use spin::Mutex;
-use x86_64::structures::{
-    idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode},
-    tss::TaskStateSegment,
+use x86_64::{
+    structures::{
+        idt::{LockedIdt, InterruptStackFrame, PageFaultErrorCode},
+        tss::TaskStateSegment,
+    },
+    instructions::{
+        segmentation::{CS, DS, SS, Segment}, 
+        tables::load_tss,
+    },
 };
 use gdt::{Gdt, create_gdt};
 
@@ -43,7 +49,7 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
     if let Some(df_stack_top) = double_fault_stack_top_unusable {
         // Create and load an initial TSS and GDT so we can handle early exceptions such as double faults. 
         let mut tss = TaskStateSegment::new();
-        tss.interrupt_stack_table[tss::DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(df_stack_top.value());
+        tss.interrupt_stack_table[tss::DOUBLE_FAULT_IST_INDEX] = x86_64::VirtAddr::new(df_stack_top.value() as u64);
         println_raw!("exceptions_early(): Created TSS: {:?}", tss);
         *EARLY_TSS.lock() = tss;
         
@@ -51,17 +57,11 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         *EARLY_GDT.lock() = gdt;
         EARLY_GDT.lock().load();
 
-        use x86_64::instructions::{
-            segmentation::{set_cs, load_ds, load_ss},
-            tables::load_tss,
-        };
-
         unsafe {
-            set_cs(kernel_cs); // reload code segment register
-            load_tss(tss_segment);      // load TSS
-            let kernel_ds_2 = x86_64::structures::gdt::SegmentSelector::new(kernel_ds.index(), kernel_ds.rpl());
-            load_ss(kernel_ds); // unsure if necessary, but doesn't hurt
-            load_ds(kernel_ds_2); // unsure if necessary, but doesn't hurt
+            CS::set_reg(kernel_cs);          // reload code segment register
+            load_tss(tss_segment);           // load TSS
+            SS::set_reg(kernel_ds.clone());  // unsure if necessary, but doesn't hurt
+            DS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
         }
     }
 
@@ -69,12 +69,12 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         let mut idt = EARLY_IDT.lock(); // withholds interrupts
 
         // SET UP FIXED EXCEPTION HANDLERS
-        idt.divide_by_zero.set_handler_fn(divide_by_zero_handler);
-        // missing: 0x01 debug exception
+        idt.divide_error.set_handler_fn(divide_error_handler);
+        idt.debug.set_handler_fn(debug_handler);
         idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        // missing: 0x04 overflow exception
-        // missing: 0x05 bound range exceeded exception
+        idt.overflow.set_handler_fn(overflow_handler);
+        idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded_handler);
         idt.invalid_opcode.set_handler_fn(invalid_opcode_handler);
         idt.device_not_available.set_handler_fn(device_not_available_handler);
         let double_fault_idt_entry_options = idt.double_fault.set_handler_fn(double_fault_handler);
@@ -86,62 +86,66 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         }
 
         // reserved: 0x09 coprocessor segment overrun exception
-        // missing: 0x0a invalid TSS exception
+        idt.invalid_tss.set_handler_fn(invalid_tss_handler);
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
-        // missing: 0x0c stack segment exception
+        idt.stack_segment_fault.set_handler_fn(stack_segment_fault_handler);
         idt.general_protection_fault.set_handler_fn(general_protection_fault_handler);
         idt.page_fault.set_handler_fn(early_page_fault_handler);
-        // reserved: 0x0f vector 15
-        // missing: 0x10 floating point exception
-        // missing: 0x11 alignment check exception
-        // missing: 0x12 machine check exception
-        // missing: 0x13 SIMD floating point exception
-        // missing: 0x14 virtualization vector 20
-        // missing: 0x15 - 0x1d SIMD floating point exception
-        // missing: 0x1e security exception
-        // reserved: 0x1f
+        // reserved: 0x0F
+        idt.x87_floating_point.set_handler_fn(x87_floating_point_handler);
+        idt.alignment_check.set_handler_fn(alignment_check_handler);
+        idt.machine_check.set_handler_fn(machine_check_handler);
+        idt.simd_floating_point.set_handler_fn(simd_floating_point_handler);
+        idt.virtualization.set_handler_fn(virtualization_handler);
+        // reserved: 0x15 - 0x1C
+        idt.vmm_communication_exception.set_handler_fn(vmm_communication_exception_handler);
+        idt.security_exception.set_handler_fn(security_exception_handler);
+        // reserved: 0x1F
     }
 
     EARLY_IDT.load();
 }
 
 
-
-
 /// exception 0x00
-pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_raw!("\nEXCEPTION (early): DIVIDE BY ZERO\n{:#?}", stack_frame);
-
+pub extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): DIVIDE ERROR\n{:#X?}", stack_frame);
     loop {}
 }
 
-
-
-/// exception 0x02
-pub extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_raw!("\nEXCEPTION (early): NON-MASKABLE INTERRUPT at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-    
-    loop { }
-}
-
-
-/// exception 0x03
-pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_raw!("\nEXCEPTION (early): BREAKPOINT at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-
+/// exception 0x01
+pub extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): DEBUG EXCEPTION\n{:#X?}", stack_frame);
     // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
 }
 
-/// exception 0x06
-pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_raw!("\nEXCEPTION (early): INVALID OPCODE at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
+/// exception 0x02
+pub extern "x86-interrupt" fn nmi_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): NON-MASKABLE INTERRUPT\n{:#X?}", stack_frame);
+    loop { }
+}
 
+/// exception 0x03
+pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): BREAKPOINT\n{:#X?}", stack_frame);
+    // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
+}
+
+/// exception 0x04
+pub extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): OVERFLOW\n{:#X?}", stack_frame);
+    loop { }
+}
+
+/// exception 0x05
+pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): BOUND RANGE EXCEEDED\n{:#X?}", stack_frame);
+    loop { }
+}
+
+/// exception 0x06
+pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): INVALID OPCODE\n{:#X?}", stack_frame);
     loop {}
 }
 
@@ -149,48 +153,47 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
 /// 
 /// For more information about "spurious interrupts", 
 /// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).
-pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
-    println_raw!("\nEXCEPTION (early): DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}",
-             stack_frame.instruction_pointer,
-             stack_frame);
-
+pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): DEVICE NOT AVAILABLE\n{:#X?}", stack_frame);
     loop {}
 }
 
-
-pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
-    println_raw!("\nEXCEPTION (early): DOUBLE FAULT\n{:#?}", stack_frame);
+/// exception 0x08
+pub extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
+    println_raw!("\nEXCEPTION (early): DOUBLE FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
     println_raw!("\nNote: this may be caused by stack overflow. Is the size of the initial_bsp_stack is too small?");
-
     loop {}
 }
 
-
-pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_raw!("\nEXCEPTION (early): SEGMENT_NOT_PRESENT FAULT\nerror code: \
-                                  {:#b}\n{:#?}",
-             error_code,
-             stack_frame);
-
+/// exception 0x0A
+pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    println_raw!("\nEXCEPTION (early): INVALID TSS\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
     loop {}
 }
 
-
-pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
-    println_raw!("\nEXCEPTION (early): GENERAL PROTECTION FAULT \nerror code: \
-                                  {:#X}\n{:#?}",
-             error_code,
-             stack_frame);
-
+/// exception 0x0B
+pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    println_raw!("\nEXCEPTION (early): SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
     loop {}
 }
 
+/// exception 0x0C
+pub extern "x86-interrupt" fn stack_segment_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    println_raw!("\nEXCEPTION (early): STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
+    loop {}
+}
 
-pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
-    use x86_64::registers::control_regs;
-    let accessed_address = control_regs::cr2();
-    println_raw!("\nEXCEPTION (early): PAGE FAULT (early handler) while accessing {:#x}\nerror code: \
-        {:?}\n{:#?}",
+/// exception 0x0D
+pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    println_raw!("\nEXCEPTION (early): GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
+    loop {}
+}
+
+/// exception 0x0E
+pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
+    let accessed_address = x86_64::registers::control::Cr2::read_raw();
+    println_raw!("\nEXCEPTION (early): PAGE FAULT (early handler) while accessing {:#x}\n\
+        error code: {:?}\n{:#X?}",
         accessed_address,
         error_code,
         stack_frame
@@ -199,16 +202,58 @@ pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut Excepti
     println_raw!("Exception IP {:#X} is at {:?}", 
         stack_frame.instruction_pointer, 
         mod_mgmt::get_initial_kernel_namespace().and_then(|ns| ns.get_section_containing_address(
-            memory::VirtualAddress::new_canonical(stack_frame.instruction_pointer.0 as usize),
+            memory::VirtualAddress::new_canonical(stack_frame.instruction_pointer.as_u64() as usize),
             false // only look at .text sections, not all other types
         )),
     );
     println_raw!("Faulted access address {:#X} is at {:?}",
         accessed_address,
         mod_mgmt::get_initial_kernel_namespace().and_then(|ns| ns.get_section_containing_address(
-            memory::VirtualAddress::new_canonical(accessed_address.0 as usize),
+            memory::VirtualAddress::new_canonical(accessed_address as usize),
             true, // look at all sections (.data/.bss/.rodata), not just .text
         )),
     );
+    loop {}
+}
+
+/// exception 0x10
+pub extern "x86-interrupt" fn x87_floating_point_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): x87 FLOATING POINT\n{:#X?}", stack_frame);
+    loop {}
+}
+
+/// exception 0x11
+pub extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    println_raw!("\nEXCEPTION (early): ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
+    loop {}
+}
+
+/// exception 0x12
+pub extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) -> ! {
+    println_raw!("\nEXCEPTION (early): MACHINE CHECK\n{:#X?}", stack_frame);
+    loop {}
+}
+
+/// exception 0x13
+pub extern "x86-interrupt" fn simd_floating_point_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): SIMD FLOATING POINT\n{:#X?}", stack_frame);
+    loop {}
+}
+
+/// exception 0x14
+pub extern "x86-interrupt" fn virtualization_handler(stack_frame: InterruptStackFrame) {
+    println_raw!("\nEXCEPTION (early): VIRTUALIZATION\n{:#X?}", stack_frame);
+    loop {}
+}
+
+/// exception 0x1D
+pub extern "x86-interrupt" fn vmm_communication_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    println_raw!("\nEXCEPTION (early): VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
+    loop {}
+}
+
+/// exception 0x1E
+pub extern "x86-interrupt" fn security_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    println_raw!("\nEXCEPTION (early): SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
     loop {}
 }

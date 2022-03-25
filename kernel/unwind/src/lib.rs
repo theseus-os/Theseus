@@ -186,7 +186,7 @@ pub struct StackFrameIter {
     /// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.
     cfa_adjustment: Option<i64>,
     /// This is set to true when the previous stack frame was an exception/interrupt handler,
-    /// which is useful in the case of taking into account the CPU pushing an `ExceptionStackFrame` onto the stack.
+    /// which is useful in the case of taking into account the CPU pushing an `InterruptStackFrame` onto the stack.
     /// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening 
     /// is not the same as a regular function "call" happening.
     last_frame_was_exception_handler: bool,
@@ -281,7 +281,7 @@ impl FallibleIterator for StackFrameIter {
                     }
 
                     // If this stack frame is an exception handler, the return address wouldn't have been pushed onto the stack as with normal call instructions.
-                    // Instead, it would've been pushed onto the stack by the CPU as part of the ExceptionStackFrame, so we have to look for it there.
+                    // Instead, it would've been pushed onto the stack by the CPU as part of the InterruptStackFrame, so we have to look for it there.
                     //
                     // We know that the stack currently looks like this:
                     // |-- address --|------------  Item on the stack -------------|
@@ -381,7 +381,7 @@ impl FallibleIterator for StackFrameIter {
             
             // trace!("initial_address: {:#X}", fde.initial_address());
 
-            // If the next stack frame is an exception handler, then the CPU pushed an `ExceptionStackFrame`
+            // If the next stack frame is an exception handler, then the CPU pushed an `InterruptStackFrame`
             // onto the stack, completely unbeknownst to the DWARF debug info. 
             // Thus, we need to adjust this next frame's stack pointer (i.e., `cfa` which becomes the stack pointer)
             // to account for the change in stack contents. 
