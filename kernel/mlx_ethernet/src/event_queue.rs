@@ -3,14 +3,17 @@
 //! 
 //! (PRM Section 8.19: Events and Interrupts)
 
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
 use alloc::boxed::Box;
 use memory::MappedPages;
 use owning_ref::BoxRefMut;
 #[allow(unused_imports)]
-use crate::{*, command_queue::CommandOpcode};
+use crate::{
+    log_page_size, Cqn, Eqn, UAR_MASK, LOG_QUEUE_SIZE_MASK, LOG_QUEUE_SIZE_SHIFT, LOG_PAGE_SIZE_SHIFT, HW_OWNERSHIP,
+    command_queue::CommandOpcode
+};
 
 
 /// The data structure containing EQ initialization parameters.

@@ -5,7 +5,7 @@
 //! 
 //! (PRM Section 8.15: Send Queue)
 
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
 use alloc::boxed::Box;
@@ -16,7 +16,8 @@ use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
 
 #[allow(unused_imports)]
-use crate::{ *,
+use crate::{ 
+    Tisn, Sqn, Lkey, CQN_MASK,
     command_queue::CommandOpcode,
     work_queue::{WorkQueueEntrySend, DoorbellRecord},
     uar::UserAccessRegion

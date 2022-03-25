@@ -4,7 +4,7 @@
 //! 
 //! (PRM Section 8.13: Receive Queue)
 
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
 use memory::{MappedPages, create_contiguous_mapping};
@@ -20,7 +20,7 @@ use nic_buffers::ReceiveBuffer;
 use nic_initialization::NIC_MAPPING_FLAGS;
 
 #[allow(unused_imports)]
-use crate::{*, command_queue::CommandOpcode, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
+use crate::{Rqn, Lkey, CQN_MASK, command_queue::CommandOpcode, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
 
 
 /// The Transport Interface Receive (TIR) object is responsible for performing 

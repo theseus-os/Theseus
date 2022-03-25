@@ -8,7 +8,7 @@ use alloc::{
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping};
 use volatile::{ReadOnly,Volatile};
 use bit_field::BitField;
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use byteorder::BigEndian;
 use owning_ref:: BoxRefMut;
 use nic_initialization::NIC_MAPPING_FLAGS;
@@ -17,14 +17,14 @@ use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
 use crate::{
-    *,
+    Rqn, Sqn, Cqn, Pd, Td, Lkey, Eqn, Tirn, Tisn, FtId, FgId,
     initialization_segment::InitializationSegment,
-    event_queue::*,
-    completion_queue::*,
-    send_queue::*,
-    work_queue::*,
-    receive_queue::*,
-    flow_table::*
+    event_queue::EventQueueContext,
+    completion_queue::CompletionQueueContext,
+    send_queue::{SendQueueContext, SendQueueState, TransportInterfaceSendContext},
+    work_queue::WorkQueue,
+    receive_queue::{ReceiveQueueContext, ReceiveQueueState, TransportInterfaceReceiveContext},
+    flow_table::{FlowContext, FlowEntryInput, FlowGroupInput, FlowTableContext, FlowTableType, FlowContextAction, MatchCriteriaEnable, DestinationEntry, DestinationType}
 };
 
 
@@ -429,11 +429,11 @@ pub enum HcaPortType {
 #[repr(C)]
 struct NicVportContext {
     /// Unused fields that are not relevant.
-    unused0: [u8; 36],
+    _unused0: [u8; 36],
     /// Maximum transmission unit size in bytes
     mtu: Volatile<U32<BigEndian>>,
     /// Unused fields that are not relevant.
-    unused1: [u8; 200],
+    _unused1: [u8; 200],
     allowed_list_size: Volatile<U32<BigEndian>>,
     /// The upper bytes of the NIC's MAC address
     permanent_address_h: Volatile<U32<BigEndian>>,

@@ -7,9 +7,8 @@ use core::{
     convert::TryFrom,
     fmt
 };
-
 use bit_field::BitField;
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
 use alloc::boxed::Box;
@@ -19,7 +18,7 @@ use num_enum::TryFromPrimitive;
 
 #[allow(unused_imports)]
 use crate::{
-    *,
+    log_page_size, Cqn, UAR_MASK, LOG_QUEUE_SIZE_MASK, LOG_QUEUE_SIZE_SHIFT, LOG_PAGE_SIZE_SHIFT, HW_OWNERSHIP,
     command_queue::CommandOpcode,
     work_queue::WQEOpcode
 };

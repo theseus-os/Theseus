@@ -5,7 +5,7 @@ use command_queue::{Command, CmdState};
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
 use bit_field::BitField;
-use zerocopy::*;
+use zerocopy::{U16, U32, U64, FromBytes};
 use byteorder::BigEndian;
 use core::fmt;
 

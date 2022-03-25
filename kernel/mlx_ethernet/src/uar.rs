@@ -4,7 +4,7 @@
 //! UAR page used to post the command matches the one specified in the object's context.
 //! 
 //! (PRM Section 8.2: User Access Region)
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
 use crate::send_queue::CurrentUARDoorbell;

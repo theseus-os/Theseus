@@ -1,7 +1,7 @@
 //! The flow table sets rules for forwarding packets to different queues.
 //! This module defines the layout of the context used to initialize a flow table.
 
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
 use core::fmt;

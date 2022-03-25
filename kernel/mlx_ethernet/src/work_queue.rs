@@ -7,7 +7,7 @@
 //! 
 //! (PRM Section 8.8: Work Queues)
 //! 
-use zerocopy::*;
+use zerocopy::{U32, FromBytes};
 use volatile::{ReadOnly, Volatile};
 use byteorder::BigEndian;
 use memory::PhysicalAddress;
