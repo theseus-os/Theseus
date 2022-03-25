@@ -51,20 +51,22 @@ static PIC: Once<pic::ChainedPics> = Once::new();
 /// Returns `true` if the given address is the exception handler in the current `IDT`
 /// for any exception in which the CPU pushes an error code onto the stack.
 /// 
-/// On x86, only these exceptions cause the CPU to push error codes: 8, 10, 11, 12, 13, 14, 17, 30.
+/// On x86, only these exceptions cause the CPU to push error codes: 8, 10, 11, 12, 13, 14, 17, 29, 30.
 /// 
 /// Obtains a lock on the global `IDT` instance.
 pub fn is_exception_handler_with_error_code(address: u64) -> bool {
     let idt = IDT.lock();
     
-    idt.double_fault.handler_addr() == address || 
-    idt.invalid_tss.handler_addr() == address || 
-    idt.segment_not_present.handler_addr() == address || 
-    idt.stack_segment_fault.handler_addr() == address || 
-    idt.general_protection_fault.handler_addr() == address || 
-    idt.page_fault.handler_addr() == address || 
-    idt.alignment_check.handler_addr() == address || 
-    idt.security_exception.handler_addr() == address
+    // These are sorted from most to least likely, in order to short-circuit sooner.
+    idt.page_fault.handler_addr() == address 
+        || idt.double_fault.handler_addr() == address
+        || idt.general_protection_fault.handler_addr() == address
+        || idt.invalid_tss.handler_addr() == address
+        || idt.segment_not_present.handler_addr() == address
+        || idt.stack_segment_fault.handler_addr() == address
+        || idt.alignment_check.handler_addr() == address
+        || idt.security_exception.handler_addr() == address
+        || idt.vmm_communication_exception.handler_addr() == address
 }
 
 
@@ -88,32 +90,34 @@ pub fn init(
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
-    // Copy over all exception handlers from the early IDT,
-    // but preserve any handlers that were registered to this real IDT during early boot.
+    // Before loading this new IDT, we must copy over all exception handlers from the early IDT.
+    // However, we can't just clone `EARLY_IDT` into `IDT`, because we must 
+    // preserve any handlers that were already registered to this `IDT` during early boot and device init.
     {
         let mut new_idt = IDT.lock();
         let early_idt = exceptions_early::EARLY_IDT.lock();
 
-        new_idt.divide_error             = early_idt.divide_error;
-        new_idt.debug                    = early_idt.debug;
-        new_idt.non_maskable_interrupt   = early_idt.non_maskable_interrupt;
-        new_idt.breakpoint               = early_idt.breakpoint;
-        new_idt.overflow                 = early_idt.overflow;
-        new_idt.bound_range_exceeded     = early_idt.bound_range_exceeded;
-        new_idt.invalid_opcode           = early_idt.invalid_opcode;
-        new_idt.device_not_available     = early_idt.device_not_available;
+        new_idt.divide_error                = early_idt.divide_error;
+        new_idt.debug                       = early_idt.debug;
+        new_idt.non_maskable_interrupt      = early_idt.non_maskable_interrupt;
+        new_idt.breakpoint                  = early_idt.breakpoint;
+        new_idt.overflow                    = early_idt.overflow;
+        new_idt.bound_range_exceeded        = early_idt.bound_range_exceeded;
+        new_idt.invalid_opcode              = early_idt.invalid_opcode;
+        new_idt.device_not_available        = early_idt.device_not_available;
         // double fault handler is dealt with below.
-        new_idt.invalid_tss              = early_idt.invalid_tss;
-        new_idt.segment_not_present      = early_idt.segment_not_present;
-        new_idt.stack_segment_fault      = early_idt.stack_segment_fault;
-        new_idt.general_protection_fault = early_idt.general_protection_fault;
-        new_idt.page_fault               = early_idt.page_fault;
-        new_idt.x87_floating_point       = early_idt.x87_floating_point;
-        new_idt.alignment_check          = early_idt.alignment_check;
-        new_idt.machine_check            = early_idt.machine_check;
-        new_idt.simd_floating_point      = early_idt.simd_floating_point;
-        new_idt.virtualization           = early_idt.virtualization;
-        new_idt.security_exception       = early_idt.security_exception;
+        new_idt.invalid_tss                 = early_idt.invalid_tss;
+        new_idt.segment_not_present         = early_idt.segment_not_present;
+        new_idt.stack_segment_fault         = early_idt.stack_segment_fault;
+        new_idt.general_protection_fault    = early_idt.general_protection_fault;
+        new_idt.page_fault                  = early_idt.page_fault;
+        new_idt.x87_floating_point          = early_idt.x87_floating_point;
+        new_idt.alignment_check             = early_idt.alignment_check;
+        new_idt.machine_check               = early_idt.machine_check;
+        new_idt.simd_floating_point         = early_idt.simd_floating_point;
+        new_idt.virtualization              = early_idt.virtualization;
+        new_idt.vmm_communication_exception = early_idt.vmm_communication_exception;
+        new_idt.security_exception          = early_idt.security_exception;
 
         // The only special case is the double fault handler, 
         // as it needs to use the newly-provided double fault stack.
@@ -122,7 +126,7 @@ pub fn init(
             double_fault_options.set_stack_index(tss::DOUBLE_FAULT_IST_INDEX as u16);
         }
 
-        // Fill only missing IDT entries with a default unimplemented interrupt handler.
+        // Fill only *missing* IDT entries with a default unimplemented interrupt handler.
         for (_idx, new_entry) in new_idt.slice_mut(32..=255).iter_mut().enumerate() {
             if new_entry.handler_addr() != 0 {
                 debug!("Preserved early registered interrupt handler for IRQ {:#X} at address {:#X}", 
@@ -204,8 +208,8 @@ pub fn init_handlers_pic() {
 /// The function fails if the interrupt number is already in use. 
 /// 
 /// # Arguments 
-/// * `interrupt_num` - the interrupt (IRQ vector) that is being requested.
-/// * `func` - the handler to be registered, which will be invoked when the interrupt occurs.
+/// * `interrupt_num`: the interrupt (IRQ vector) that is being requested.
+/// * `func`: the handler to be registered, which will be invoked when the interrupt occurs.
 /// 
 /// # Return
 /// * `Ok(())` if successfully registered, or
