@@ -1649,9 +1649,14 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "kernel_config",
+ "lazy_static",
+ "libm",
  "log",
  "memory",
+ "memory_structs",
  "mlx_ethernet",
+ "mpmc",
+ "nic_buffers",
  "nic_initialization",
  "owning_ref",
  "pci",
@@ -1668,6 +1673,8 @@ dependencies = [
  "libm",
  "log",
  "memory",
+ "mpmc",
+ "nic_buffers",
  "nic_initialization",
  "num_enum",
  "owning_ref",
@@ -3082,6 +3089,16 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "log",
+]
+
+[[package]]
+name = "test_mlx5"
+version = "0.1.0"
+dependencies = [
+ "ixgbe",
+ "log",
+ "mlx5",
+ "terminal_print",
 ]
 
 [[package]]
