@@ -411,6 +411,31 @@
 <span id="406">406</span>
 <span id="407">407</span>
 <span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -464,18 +489,19 @@
         <span class="comment">// reserved: 0x09 coprocessor segment overrun exception</span>
         <span class="ident">idt</span>.<span class="ident">invalid_tss</span>.<span class="ident">set_handler_fn</span>(<span class="ident">invalid_tss_handler</span>);
         <span class="ident">idt</span>.<span class="ident">segment_not_present</span>.<span class="ident">set_handler_fn</span>(<span class="ident">segment_not_present_handler</span>);
-        <span class="comment">// missing: 0x0c stack segment exception</span>
+        <span class="ident">idt</span>.<span class="ident">stack_segment_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">stack_segment_fault_handler</span>);
         <span class="ident">idt</span>.<span class="ident">general_protection_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">general_protection_fault_handler</span>);
         <span class="ident">idt</span>.<span class="ident">page_fault</span>.<span class="ident">set_handler_fn</span>(<span class="ident">page_fault_handler</span>);
-        <span class="comment">// reserved: 0x0f vector 15</span>
-        <span class="comment">// missing: 0x10 floating point exception</span>
-        <span class="comment">// missing: 0x11 alignment check exception</span>
-        <span class="comment">// missing: 0x12 machine check exception</span>
-        <span class="comment">// missing: 0x13 SIMD floating point exception</span>
-        <span class="comment">// missing: 0x14 virtualization vector 20</span>
-        <span class="comment">// missing: 0x15 - 0x1d SIMD floating point exception</span>
-        <span class="comment">// missing: 0x1e security exception</span>
-        <span class="comment">// reserved: 0x1f</span>
+        <span class="comment">// reserved: 0x0F</span>
+        <span class="ident">idt</span>.<span class="ident">x87_floating_point</span>.<span class="ident">set_handler_fn</span>(<span class="ident">x87_floating_point_handler</span>);
+        <span class="ident">idt</span>.<span class="ident">alignment_check</span>.<span class="ident">set_handler_fn</span>(<span class="ident">alignment_check_handler</span>);
+        <span class="ident">idt</span>.<span class="ident">machine_check</span>.<span class="ident">set_handler_fn</span>(<span class="ident">machine_check_handler</span>);
+        <span class="ident">idt</span>.<span class="ident">simd_floating_point</span>.<span class="ident">set_handler_fn</span>(<span class="ident">simd_floating_point_handler</span>);
+        <span class="ident">idt</span>.<span class="ident">virtualization</span>.<span class="ident">set_handler_fn</span>(<span class="ident">virtualization_handler</span>);
+        <span class="comment">// reserved: 0x15 - 0x1C</span>
+        <span class="ident">idt</span>.<span class="ident">vmm_communication_exception</span>.<span class="ident">set_handler_fn</span>(<span class="ident">vmm_communication_exception_handler</span>);
+        <span class="ident">idt</span>.<span class="ident">security_exception</span>.<span class="ident">set_handler_fn</span>(<span class="ident">security_exception_handler</span>);
+        <span class="comment">// reserved: 0x1F</span>
     }
 
     <span class="ident">idt_ref</span>.<span class="ident">load</span>();
@@ -634,22 +660,18 @@
 
 <span class="doccomment">/// exception 0x00</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">divide_error_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DIVIDE ERROR\n{:#?}\n&quot;</span>, <span class="ident">stack_frame</span>);
-
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DIVIDE ERROR\n{:#X?}\n&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="ident">log_exception</span>(<span class="number">0x0</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0x0</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
 
 <span class="doccomment">/// exception 0x01</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">debug_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DEBUG at {:#X}\n{:#?}\n&quot;</span>,
-             <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
-             <span class="ident">stack_frame</span>);
-
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DEBUG EXCEPTION\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.</span>
 }
 
-<span class="doccomment">/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts</span>
+<span class="doccomment">/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// # Important Note</span>
 <span class="doccomment">/// Acquiring ANY locks in this function, even irq-safe ones, could cause a deadlock</span>
@@ -698,39 +720,27 @@
 
 <span class="doccomment">/// exception 0x03</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">breakpoint_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: BREAKPOINT at {:#X}\n{:#?}\n&quot;</span>,
-             <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
-             <span class="ident">stack_frame</span>);
-
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: BREAKPOINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.</span>
 }
 
 <span class="doccomment">/// exception 0x04</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">overflow_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: OVERFLOW at {:#X}\n{:#?}\n&quot;</span>,
-             <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
-             <span class="ident">stack_frame</span>);
-    
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: OVERFLOW\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="ident">log_exception</span>(<span class="number">0x4</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0x4</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
 
 <span class="comment">// exception 0x05</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">bound_range_exceeded_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: BOUND RANGE EXCEEDED at {:#X}\n{:#?}\n&quot;</span>,
-             <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
-             <span class="ident">stack_frame</span>);
-    
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: BOUND RANGE EXCEEDED\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="ident">log_exception</span>(<span class="number">0x5</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0x5</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
 
 <span class="doccomment">/// exception 0x06</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_opcode_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: INVALID OPCODE at {:#X}\n{:#?}\n&quot;</span>,
-             <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
-             <span class="ident">stack_frame</span>);
-
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: INVALID OPCODE\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="ident">log_exception</span>(<span class="number">0x6</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0x6</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
@@ -740,10 +750,7 @@
 <span class="doccomment">/// For more information about &quot;spurious interrupts&quot;, </span>
 <span class="doccomment">/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#X}\n{:#?}\n&quot;</span>,
-             <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>,
-             <span class="ident">stack_frame</span>);
-
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DEVICE NOT AVAILABLE\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="ident">log_exception</span>(<span class="number">0x7</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0x7</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
@@ -751,7 +758,7 @@
 <span class="doccomment">/// exception 0x08</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">double_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) -&gt; <span class="op">!</span> {
     <span class="kw">let</span> <span class="ident">accessed_vaddr</span> <span class="op">=</span> <span class="ident">Cr2::read_raw</span>();
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DOUBLE FAULT\n{:#?}\nTried to access {:#X}
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: DOUBLE FAULT\n{:#X?}\nTried to access {:#X}
         Note: double faults in Theseus are typically caused by stack overflow, is the stack large enough?&quot;</span>,
         <span class="ident">stack_frame</span>, <span class="ident">accessed_vaddr</span>,
     );
@@ -761,64 +768,107 @@
     
     <span class="ident">log_exception</span>(<span class="number">0x8</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0x8</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">false</span>);
-
-    <span class="kw">loop</span> { }
+    <span class="kw">loop</span> {}
 }
 
-<span class="doccomment">/// exception 0x0a</span>
+<span class="doccomment">/// exception 0x0A</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_tss_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: INVALID_TSS FAULT\nerror code: \
-                                  {:#b}\n{:#?}\n&quot;</span>,
-             <span class="ident">error_code</span>,
-             <span class="ident">stack_frame</span>);
-    
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: INVALID TSS\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="ident">log_exception</span>(<span class="number">0xA</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0xA</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
 
-<span class="doccomment">/// exception 0x0b</span>
+<span class="doccomment">/// exception 0x0B</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">segment_not_present_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
-                                  {:#b}\n{:#?}\n&quot;</span>,
-             <span class="ident">error_code</span>,
-             <span class="ident">stack_frame</span>);
-
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="ident">log_exception</span>(<span class="number">0xB</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0xB</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
 
-<span class="doccomment">/// exception 0x0d</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">general_protection_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
-    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
-                                  {:#X}\n{:#?}\n&quot;</span>,
-             <span class="ident">error_code</span>,
-             <span class="ident">stack_frame</span>);
+<span class="doccomment">/// exception 0x0C</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">stack_segment_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
+    <span class="ident">log_exception</span>(<span class="number">0xC</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0xC</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
+}
 
+<span class="doccomment">/// exception 0x0D</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">general_protection_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="ident">log_exception</span>(<span class="number">0xD</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
     <span class="ident">kill_and_halt</span>(<span class="number">0xD</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
 
-<span class="doccomment">/// exception 0x0e</span>
+<span class="doccomment">/// exception 0x0E</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">page_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">PageFaultErrorCode</span>) {
     <span class="kw">let</span> <span class="ident">accessed_vaddr</span> <span class="op">=</span> <span class="ident">Cr2::read_raw</span>() <span class="kw">as</span> <span class="ident">usize</span>;
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span> {
-        <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: PAGE FAULT while accessing {:#X}\nerror code: \
-            {:?}\n{:#?}&quot;</span>,
+        <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: PAGE FAULT while accessing {:#x}\n\
+            error code: {:?}\n{:#X?}&quot;</span>,
             <span class="ident">accessed_vaddr</span>,
             <span class="ident">error_code</span>,
-            <span class="ident">stack_frame</span>,
+            <span class="ident">stack_frame</span>
         );
         <span class="kw">if</span> <span class="ident">is_stack_overflow</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">accessed_vaddr</span>)) {
             <span class="macro">println_both!</span>(<span class="string">&quot;--&gt; Page fault was caused by stack overflow, tried to access {:#X}\n.&quot;</span>, <span class="ident">accessed_vaddr</span>);
         }
     }
     
-    <span class="ident">log_exception</span>(<span class="number">0xD</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>.<span class="ident">bits</span>()), <span class="prelude-val">Some</span>(<span class="ident">accessed_vaddr</span>));
+    <span class="ident">log_exception</span>(<span class="number">0xE</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>.<span class="ident">bits</span>()), <span class="prelude-val">Some</span>(<span class="ident">accessed_vaddr</span>));
     <span class="ident">kill_and_halt</span>(<span class="number">0xE</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
 }
 
-<span class="comment">// exception 0x0F is reserved on x86</span>
+
+<span class="doccomment">/// exception 0x10</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">x87_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: x87 FLOATING POINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
+    <span class="ident">log_exception</span>(<span class="number">0x10</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0x10</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
+}
+
+<span class="doccomment">/// exception 0x11</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">alignment_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
+    <span class="ident">log_exception</span>(<span class="number">0x11</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0x11</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
+}
+
+<span class="doccomment">/// exception 0x12</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">machine_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) -&gt; <span class="op">!</span> {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: MACHINE CHECK\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
+    <span class="ident">log_exception</span>(<span class="number">0x12</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0x12</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>);
+    <span class="kw">loop</span> {}
+}
+
+<span class="doccomment">/// exception 0x13</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">simd_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: SIMD FLOATING POINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
+    <span class="ident">log_exception</span>(<span class="number">0x13</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0x13</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
+}
+
+<span class="doccomment">/// exception 0x14</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">virtualization_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: VIRTUALIZATION\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
+    <span class="ident">log_exception</span>(<span class="number">0x14</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0x14</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
+}
+
+<span class="doccomment">/// exception 0x1D</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">vmm_communication_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
+    <span class="ident">log_exception</span>(<span class="number">0x1D</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0x1D</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
+}
+
+<span class="doccomment">/// exception 0x1E</span>
+<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">security_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
+    <span class="ident">log_exception</span>(<span class="number">0x1E</span>, <span class="ident">stack_frame</span>.<span class="ident">instruction_pointer</span>.<span class="ident">as_u64</span>() <span class="kw">as</span> <span class="ident">usize</span>, <span class="prelude-val">Some</span>(<span class="ident">error_code</span>), <span class="prelude-val">None</span>);
+    <span class="ident">kill_and_halt</span>(<span class="number">0x1E</span>, <span class="kw-2">&amp;</span><span class="ident">stack_frame</span>, <span class="bool-val">true</span>)
+}
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="exceptions_full" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
 </body></html>
