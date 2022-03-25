@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["ReceiveQueueState","The possible states the RQ can be in."]],"struct":[["ReceiveQueue","A data structure that contains the RQ ring of descriptors  and is used to interact with the RQ once initialized."]]});
