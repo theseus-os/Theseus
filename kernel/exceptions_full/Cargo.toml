@@ -48,5 +48,8 @@ path = "../tss"
 [dependencies.debug_info]
 path = "../debug_info"
 
+[dependencies.signal_handler]
+path = "../signal_handler"
+
 [lib]
 crate-type = ["rlib"]

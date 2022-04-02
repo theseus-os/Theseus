@@ -855,6 +855,7 @@ dependencies = [
  "pmu_x86",
  "print",
  "runqueue",
+ "signal_handler",
  "stack_trace",
  "task",
  "tlb_shootdown",
@@ -2704,6 +2705,9 @@ dependencies = [
  "bitflags",
  "log",
  "memory",
+ "spin 0.9.0",
+ "task",
+ "thread_local_macro",
  "x86_64",
 ]
 
