@@ -180,8 +180,10 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         // | (11) | .stack            | separate .data-like section   |
         // |------|-------------------|-------------------------------|
         //
-        // Note that because the TLS data areas (.tdata and .tbss) are nothing more than
-        // read-only initializer data, we combine their pages into the end of the read-only pages.
+        // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
+        // because they contain read-only initializer data "images" for each TLS area.
+        // In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,
+        // so there's no point in keeping it around.
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
@@ -207,15 +209,13 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
                 "nano_core .gcc_except_table"
             }
             // The following four sections are optional: .tdata, .tbss, .data, .bss.
-            //
-            // If .tdata or .tbss exist, we place them at the end of the rodata pages.
             ".tdata" => {
                 rodata_end = Some((end_virt_addr, end_phys_addr));
                 "nano_core .tdata"
             }
-            ".tbss" =>{
-                rodata_end = Some((end_virt_addr, end_phys_addr));
-                "nano_core .tbss"
+            ".tbss" => {
+                // Ignore .tbss (see above) because it is a read-only section of all zeroes.
+                continue;
             }
             ".data" => {
                 data_start.get_or_insert((start_virt_addr, start_phys_addr));
