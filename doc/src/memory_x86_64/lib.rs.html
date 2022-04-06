@@ -340,13 +340,6 @@
 <span id="335">335</span>
 <span id="336">336</span>
 <span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.</span>
 <span class="doccomment">//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  </span>
 <span class="doccomment">//! </span>
@@ -504,13 +497,6 @@
         <span class="kw">let</span> <span class="ident">end_virt_addr</span> <span class="op">=</span> <span class="ident">start_virt_addr</span> <span class="op">+</span> (<span class="ident">section</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
         <span class="kw">let</span> <span class="ident">end_phys_addr</span> <span class="op">=</span> <span class="ident">start_phys_addr</span> <span class="op">+</span> (<span class="ident">section</span>.<span class="ident">size</span>() <span class="kw">as</span> <span class="ident">usize</span>);
 
-        <span class="comment">// Currently, we require that the linker script specify that each section should be page-aligned.</span>
-        <span class="comment">// This isn&#39;t truly necessary, but it simplifies the logic here quite a bit. </span>
-        <span class="kw">if</span> <span class="ident">start_phys_addr</span>.<span class="ident">frame_offset</span>() <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;Section {} at {:#X}, size {:#X} was not page-aligned!&quot;</span>, <span class="ident">section</span>.<span class="ident">name</span>(), <span class="ident">section</span>.<span class="ident">start_address</span>(), <span class="ident">section</span>.<span class="ident">size</span>());
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Kernel ELF Section was not page-aligned&quot;</span>);
-        }
-
         <span class="comment">// The linker script (linker_higher_half.ld) defines the following order of sections:</span>
         <span class="comment">// |------|-------------------|-------------------------------|</span>
         <span class="comment">// | Sec  |    Sec Name       |    Description / purpose      |</span>
@@ -529,8 +515,10 @@
         <span class="comment">// | (11) | .stack            | separate .data-like section   |</span>
         <span class="comment">// |------|-------------------|-------------------------------|</span>
         <span class="comment">//</span>
-        <span class="comment">// Note that because the TLS data areas (.tdata and .tbss) are nothing more than</span>
-        <span class="comment">// read-only initializer data, we combine their pages into the end of the read-only pages.</span>
+        <span class="comment">// Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,</span>
+        <span class="comment">// because they contain read-only initializer data &quot;images&quot; for each TLS area.</span>
+        <span class="comment">// In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,</span>
+        <span class="comment">// so there&#39;s no point in keeping it around.</span>
         <span class="comment">//</span>
         <span class="comment">// Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).</span>
         <span class="kw">let</span> <span class="ident">static_str_name</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">section</span>.<span class="ident">name</span>() {
@@ -556,15 +544,13 @@
                 <span class="string">&quot;nano_core .gcc_except_table&quot;</span>
             }
             <span class="comment">// The following four sections are optional: .tdata, .tbss, .data, .bss.</span>
-            <span class="comment">//</span>
-            <span class="comment">// If .tdata or .tbss exist, we place them at the end of the rodata pages.</span>
             <span class="string">&quot;.tdata&quot;</span> =&gt; {
                 <span class="ident">rodata_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
                 <span class="string">&quot;nano_core .tdata&quot;</span>
             }
-            <span class="string">&quot;.tbss&quot;</span> =&gt;{
-                <span class="ident">rodata_end</span> <span class="op">=</span> <span class="prelude-val">Some</span>((<span class="ident">end_virt_addr</span>, <span class="ident">end_phys_addr</span>));
-                <span class="string">&quot;nano_core .tbss&quot;</span>
+            <span class="string">&quot;.tbss&quot;</span> =&gt; {
+                <span class="comment">// Ignore .tbss (see above) because it is a read-only section of all zeroes.</span>
+                <span class="kw">continue</span>;
             }
             <span class="string">&quot;.data&quot;</span> =&gt; {
                 <span class="ident">data_start</span>.<span class="ident">get_or_insert</span>((<span class="ident">start_virt_addr</span>, <span class="ident">start_phys_addr</span>));

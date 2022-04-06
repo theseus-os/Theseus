@@ -752,6 +752,27 @@
 <span id="747">747</span>
 <span id="748">748</span>
 <span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,</span>
 <span class="doccomment">//! in other words, the code that is currently executing.</span>
 <span class="doccomment">//! As such, it performs no loading, but rather just creates metadata that represents</span>
@@ -1465,7 +1486,7 @@
         <span class="kw">let</span> <span class="ident">tls_sec_data_vaddr</span> <span class="op">=</span> <span class="ident">shndxs</span>.<span class="ident">tls_data_shndx</span>.<span class="ident">unwrap</span>().<span class="number">1</span> <span class="op">+</span> <span class="ident">tls_offset</span>; 
 
         <span class="kw">let</span> <span class="ident">tls_section</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-            <span class="ident">SectionType::Tls</span>,
+            <span class="ident">SectionType::TlsData</span>,
             <span class="ident">sec_name</span>,
             <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>),
             <span class="comment">// TLS sections are lumped into the &quot;.rodata&quot; MappedPages with the read-only data sections.</span>
@@ -1480,7 +1501,28 @@
         <span class="prelude-val">Some</span>(<span class="ident">tls_section</span>)
     }
     <span class="kw">else</span> <span class="kw">if</span> <span class="ident">shndxs</span>.<span class="ident">tls_bss_shndx</span>.<span class="ident">map_or</span>(<span class="bool-val">false</span>, <span class="op">|</span>(<span class="ident">shndx</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">sec_ndx</span> <span class="op">==</span> <span class="ident">shndx</span>) {
-        <span class="macro">todo!</span>(<span class="string">&quot;parse_nano_core(): found unsupported TLS .bss section&quot;</span>);
+        <span class="comment">// TLS sections encode their TLS offset in the virtual address field,</span>
+        <span class="comment">// which is necessary to properly calculate relocation entries that depend upon them.</span>
+        <span class="kw">let</span> <span class="ident">tls_offset</span> <span class="op">=</span> <span class="ident">sec_vaddr</span>;
+        <span class="comment">// TLS BSS sections (.tbss) do not have any real loaded data in the ELF file,</span>
+        <span class="comment">// since they are read-only initializer sections that would hold all zeroes.</span>
+        <span class="comment">// Thus, we just use a max-value mapped pages offset as a canary value here,</span>
+        <span class="comment">// as that value should never be used anyway.</span>
+        <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">usize::MAX</span>;
+
+        <span class="kw">let</span> <span class="ident">tls_section</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
+            <span class="ident">SectionType::TlsBss</span>,
+            <span class="ident">sec_name</span>,
+            <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>),
+            <span class="ident">mapped_pages_offset</span>,
+            <span class="ident">VirtualAddress::new</span>(<span class="ident">tls_offset</span>).<span class="ident">ok_or</span>(<span class="string">&quot;new TLS .tbss section had invalid virtual address (TLS offset)&quot;</span>)<span class="question-mark">?</span>,
+            <span class="ident">sec_size</span>,
+            <span class="ident">global</span>,
+            <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
+        ));
+        <span class="comment">// Add this new TLS section to this namespace&#39;s TLS area image.</span>
+        <span class="ident">namespace</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>().<span class="ident">add_existing_static_tls_section</span>(<span class="ident">tls_offset</span>, <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">tls_section</span>)).<span class="ident">unwrap</span>();
+        <span class="prelude-val">Some</span>(<span class="ident">tls_section</span>)
     }
     <span class="kw">else</span> {
         <span class="ident">crate_items</span>.<span class="ident">init_symbols</span>.<span class="ident">insert</span>(<span class="ident">sec_name</span>, <span class="ident">sec_vaddr</span>);

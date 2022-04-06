@@ -2722,6 +2722,19 @@
 <span id="2717">2717</span>
 <span id="2718">2718</span>
 <span id="2719">2719</span>
+<span id="2720">2720</span>
+<span id="2721">2721</span>
+<span id="2722">2722</span>
+<span id="2723">2723</span>
+<span id="2724">2724</span>
+<span id="2725">2725</span>
+<span id="2726">2726</span>
+<span id="2727">2727</span>
+<span id="2728">2728</span>
+<span id="2729">2729</span>
+<span id="2730">2730</span>
+<span id="2731">2731</span>
+<span id="2732">2732</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -3984,25 +3997,30 @@
                 <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
-                    <span class="comment">// here: we&#39;re ready to copy the TLS section to the proper address in the read-only pages</span>
-                    <span class="kw">let</span> <span class="ident">dest_vaddr</span> <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">address_at_offset</span>(<span class="ident">rodata_offset</span>)
-                        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: for TLS section, rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
-                    <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">as_slice_mut</span>(<span class="ident">rodata_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
-                    <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
-                        <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
-                        <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Empty</span>) =&gt; <span class="ident">dest_slice</span>.<span class="ident">fill</span>(<span class="number">0</span>),
-                        <span class="ident">_other</span> =&gt; {
-                            <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for TLS section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
-                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in TLS section&quot;</span>);
-                        }
-                    }
+                    <span class="kw">let</span> (<span class="ident">mapped_pages_offset</span>, <span class="ident">sec_typ</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_bss</span> {
+                        <span class="comment">// Here: a TLS .tbss section has no actual content, so we use a max-value offset</span>
+                        <span class="comment">// as a canary value to ensure it cannot be used to index into a MappedPages.</span>
+                        (<span class="ident">usize::MAX</span>, <span class="ident">SectionType::TlsBss</span>)
+                    } <span class="kw">else</span> {
+                        <span class="comment">// Here: copy the TLS .tdata section&#39;s contents to the proper address in the read-only pages.</span>
+                        <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">as_slice_mut</span>(<span class="ident">rodata_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
+                        <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
+                            <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
+                            <span class="ident">_other</span> =&gt; {
+                                <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for TLS .tdata section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
+                                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in TLS .tdata section&quot;</span>);
+                            }
+                        };
+                        <span class="comment">// As with all other normal sections, use the current offset for these read-only pages.</span>
+                        (<span class="ident">rodata_offset</span>, <span class="ident">SectionType::TlsData</span>)
+                    };
 
                     <span class="kw">let</span> <span class="ident">new_tls_section</span> <span class="op">=</span> <span class="ident">LoadedSection::new</span>(
-                        <span class="ident">SectionType::Tls</span>,
+                        <span class="ident">sec_typ</span>,
                         <span class="ident">demangled</span>,
                         <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
-                        <span class="ident">rodata_offset</span>,
-                        <span class="ident">dest_vaddr</span>,
+                        <span class="ident">mapped_pages_offset</span>,
+                        <span class="ident">VirtualAddress::zero</span>(), <span class="comment">// will be replaced in `add_new_dynamic_tls_section()` below</span>
                         <span class="ident">sec_size</span>,
                         <span class="ident">global_sections</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>),
                         <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
@@ -4024,7 +4042,7 @@
                     <span class="ident">rodata_offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">round_up_power_of_two</span>(<span class="ident">sec_size</span>, <span class="ident">sec_align</span>);
                 }
                 <span class="kw">else</span> {
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .rodata section&quot;</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling TLS section&quot;</span>);
                 }
             }
 
@@ -4401,7 +4419,9 @@
             <span class="comment">// If the target section of the relocation was a TLS section, </span>
             <span class="comment">// that TLS section&#39;s initializer data has now changed.</span>
             <span class="comment">// Thus, we need to invalidate the TLS initializer area&#39;s cached data.</span>
-            <span class="kw">if</span> <span class="ident">target_sec_data_was_modified</span> <span class="op">&amp;&amp;</span> <span class="ident">target_sec</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">SectionType::Tls</span> {
+            <span class="kw">if</span> <span class="ident">target_sec_data_was_modified</span> <span class="op">&amp;&amp;</span> 
+                (<span class="ident">target_sec</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">SectionType::TlsData</span> <span class="op">|</span><span class="op">|</span> <span class="ident">target_sec</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">SectionType::TlsBss</span>)
+            {
                 <span class="macro">debug!</span>(<span class="string">&quot;Invalidating TlsInitializer due to relocation written to section {:?}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">target_sec</span>);
                 <span class="self">self</span>.<span class="ident">tls_initializer</span>.<span class="ident">lock</span>().<span class="ident">invalidate</span>();
             }
@@ -5069,8 +5089,12 @@
                 <span class="ident">text_max_offset</span> <span class="op">=</span> <span class="ident">core::cmp::max</span>(<span class="ident">text_max_offset</span>, (<span class="ident">sec</span>.<span class="ident">offset</span>() <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">+</span> <span class="ident">addend</span>);
             }
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">is_tls</span> {
-                <span class="comment">// TLS sections are included as part of read-only pages</span>
-                <span class="ident">ro_bytes</span> <span class="op">+</span><span class="op">=</span> <span class="ident">addend</span>;
+                <span class="comment">// TLS sections are included as part of read-only pages,</span>
+                <span class="comment">// but we only need to allocate space for .tdata sections, not .tbss.</span>
+                <span class="kw">if</span> <span class="ident">sec</span>.<span class="ident">get_type</span>() <span class="op">==</span> <span class="prelude-val">Ok</span>(<span class="ident">ShType::ProgBits</span>) {
+                    <span class="ident">ro_bytes</span> <span class="op">+</span><span class="op">=</span> <span class="ident">addend</span>;
+                }
+                <span class="comment">// Ignore .tbss sections, which have type `NoBits`.</span>
             }
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">is_write</span> {
                 <span class="comment">// this includes both .bss and .data sections</span>
@@ -5319,15 +5343,17 @@
             <span class="kw">for</span> (<span class="ident">range</span>, <span class="ident">sec</span>) <span class="kw">in</span> <span class="ident">section_offsets</span>.<span class="ident">iter</span>() {
                 <span class="comment">// Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.</span>
                 <span class="kw">let</span> <span class="ident">num_padding_bytes</span> <span class="op">=</span> <span class="ident">range</span>.<span class="ident">start</span>.<span class="ident">saturating_sub</span>(<span class="kw-2">*</span><span class="ident">end_of_previous_range</span>);
-                <span class="kw">for</span> <span class="ident">_i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">num_padding_bytes</span> {
-                    <span class="comment">// surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.</span>
-                    <span class="ident">new_data</span>.<span class="ident">push</span>(<span class="number">0</span>); 
-                }
+                <span class="ident">new_data</span>.<span class="ident">extend</span>(<span class="ident">core::iter::repeat</span>(<span class="number">0</span>).<span class="ident">take</span>(<span class="ident">num_padding_bytes</span>));
 
                 <span class="comment">// Insert the section data into the new data vec.</span>
-                <span class="kw">let</span> <span class="ident">sec_mp</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
-                <span class="kw">let</span> <span class="ident">sec_data</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">sec_mp</span>.<span class="ident">as_slice</span>(<span class="ident">sec</span>.<span class="ident">mapped_pages_offset</span>, <span class="ident">sec</span>.<span class="ident">size</span>()).<span class="ident">unwrap</span>();
-                <span class="ident">new_data</span>.<span class="ident">extend_from_slice</span>(<span class="ident">sec_data</span>);
+                <span class="kw">if</span> <span class="ident">sec</span>.<span class="ident">get_type</span>() <span class="op">==</span> <span class="ident">SectionType::TlsData</span> {
+                    <span class="kw">let</span> <span class="ident">sec_mp</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
+                    <span class="kw">let</span> <span class="ident">sec_data</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">sec_mp</span>.<span class="ident">as_slice</span>(<span class="ident">sec</span>.<span class="ident">mapped_pages_offset</span>, <span class="ident">sec</span>.<span class="ident">size</span>()).<span class="ident">unwrap</span>();
+                    <span class="ident">new_data</span>.<span class="ident">extend_from_slice</span>(<span class="ident">sec_data</span>);
+                } <span class="kw">else</span> {
+                    <span class="comment">// For TLS BSS sections (.tbss), fill the section size with all zeroes.</span>
+                    <span class="ident">new_data</span>.<span class="ident">extend</span>(<span class="ident">core::iter::repeat</span>(<span class="number">0</span>).<span class="ident">take</span>(<span class="ident">sec</span>.<span class="ident">size</span>()));
+                }
                 <span class="kw-2">*</span><span class="ident">end_of_previous_range</span> <span class="op">=</span> <span class="ident">range</span>.<span class="ident">end</span>;
             }
         }

@@ -1041,6 +1041,10 @@
 <span id="1036">1036</span>
 <span id="1037">1037</span>
 <span id="1038">1038</span>
+<span id="1039">1039</span>
+<span id="1040">1040</span>
+<span id="1041">1041</span>
+<span id="1042">1042</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! #Representing dependencies between sections</span>
@@ -1618,8 +1622,12 @@
     <span class="ident">Data</span>,
     <span class="doccomment">/// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.</span>
     <span class="ident">Bss</span>,
-    <span class="doccomment">/// A read-only section that holds the initial data for a thread-local storage (TLS) area.</span>
-    <span class="ident">Tls</span>,
+    <span class="doccomment">/// A `.tdata` section is a read-only section that holds the initial data &quot;image&quot; </span>
+    <span class="doccomment">/// for a thread-local storage (TLS) area.</span>
+    <span class="ident">TlsData</span>, 
+    <span class="doccomment">/// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.</span>
+    <span class="doccomment">/// This is is effectively an empty placeholder: the all-zero data section doesn&#39;t actually exist in memory.</span>
+    <span class="ident">TlsBss</span>,
     <span class="doccomment">/// A `.gcc_except_table` section contains landing pads for exception handling,</span>
     <span class="doccomment">/// comprising the LSDA (Language Specific Data Area),</span>
     <span class="doccomment">/// which is effectively used to determine when we should stop the stack unwinding process</span>
