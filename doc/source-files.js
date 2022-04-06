@@ -122,6 +122,7 @@ sourcesIndex["sdt"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["serial_port"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["serial_port_basic"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["shapes"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["signal_handler"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["simd_personality"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["simd_test"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["simple_ipc"] = {"name":"","files":["lib.rs"]};

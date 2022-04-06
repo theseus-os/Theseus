@@ -262,6 +262,8 @@
 <span id="257">257</span>
 <span id="258">258</span>
 <span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -372,43 +374,43 @@
 
 
 <span class="doccomment">/// exception 0x00</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">divide_error_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">divide_error_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DIVIDE ERROR\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x01</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">debug_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">debug_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEBUG EXCEPTION\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.</span>
 }
 
 <span class="doccomment">/// exception 0x02</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">nmi_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">nmi_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): NON-MASKABLE INTERRUPT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> { }
 }
 
 <span class="doccomment">/// exception 0x03</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">breakpoint_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">breakpoint_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): BREAKPOINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.</span>
 }
 
 <span class="doccomment">/// exception 0x04</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">overflow_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">overflow_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): OVERFLOW\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> { }
 }
 
 <span class="doccomment">/// exception 0x05</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">bound_range_exceeded_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">bound_range_exceeded_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): BOUND RANGE EXCEEDED\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> { }
 }
 
 <span class="doccomment">/// exception 0x06</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_opcode_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_opcode_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID OPCODE\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> {}
 }
@@ -417,12 +419,14 @@
 <span class="doccomment">/// </span>
 <span class="doccomment">/// For more information about &quot;spurious interrupts&quot;, </span>
 <span class="doccomment">/// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">device_not_available_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DEVICE NOT AVAILABLE\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x08</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// Note: this is `pub` so we can access it within `interrupts::init()`.</span>
 <span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">double_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) -&gt; <span class="op">!</span> {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): DOUBLE FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nNote: this may be caused by stack overflow. Is the size of the initial_bsp_stack is too small?&quot;</span>);
@@ -430,31 +434,31 @@
 }
 
 <span class="doccomment">/// exception 0x0A</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_tss_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">invalid_tss_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID TSS\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x0B</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">segment_not_present_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">segment_not_present_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x0C</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">stack_segment_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">stack_segment_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x0D</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">general_protection_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">general_protection_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x0E</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">early_page_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">PageFaultErrorCode</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">early_page_fault_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">PageFaultErrorCode</span>) {
     <span class="kw">let</span> <span class="ident">accessed_address</span> <span class="op">=</span> <span class="ident">x86_64::registers::control::Cr2::read_raw</span>();
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): PAGE FAULT (early handler) while accessing {:#x}\n\
         error code: {:?}\n{:#X?}&quot;</span>,
@@ -481,43 +485,43 @@
 }
 
 <span class="doccomment">/// exception 0x10</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">x87_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">x87_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): x87 FLOATING POINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x11</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">alignment_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">alignment_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x12</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">machine_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) -&gt; <span class="op">!</span> {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">machine_check_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) -&gt; <span class="op">!</span> {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): MACHINE CHECK\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x13</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">simd_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">simd_floating_point_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SIMD FLOATING POINT\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x14</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">virtualization_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">virtualization_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): VIRTUALIZATION\n{:#X?}&quot;</span>, <span class="ident">stack_frame</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x1D</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">vmm_communication_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">vmm_communication_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="kw">loop</span> {}
 }
 
 <span class="doccomment">/// exception 0x1E</span>
-<span class="kw">pub</span> <span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">security_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
+<span class="kw">extern</span> <span class="string">&quot;x86-interrupt&quot;</span> <span class="kw">fn</span> <span class="ident">security_exception_handler</span>(<span class="ident">stack_frame</span>: <span class="ident">InterruptStackFrame</span>, <span class="ident">error_code</span>: <span class="ident">u64</span>) {
     <span class="macro">println_raw!</span>(<span class="string">&quot;\nEXCEPTION (early): SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, <span class="ident">stack_frame</span>, <span class="ident">error_code</span>);
     <span class="kw">loop</span> {}
 }
