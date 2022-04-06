@@ -7,14 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.gimli]
-version = "0.19.0"
-default-features = false
-features = [ "read", "alloc" ]
+log = "0.4.8"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
@@ -54,6 +47,9 @@ path = "../tss"
 
 [dependencies.debug_info]
 path = "../debug_info"
+
+[dependencies.signal_handler]
+path = "../signal_handler"
 
 [lib]
 crate-type = ["rlib"]
