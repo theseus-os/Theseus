@@ -13,7 +13,7 @@ extern crate pmu_x86;
 #[macro_use] extern crate print; // for regular println!()
 extern crate unwind;
 extern crate debug_info;
-extern crate signal_handler;
+extern crate gimli;
 
 extern crate memory;
 extern crate tss;
@@ -21,7 +21,6 @@ extern crate stack_trace;
 extern crate fault_log;
 
 use memory::{VirtualAddress, Page};
-use signal_handler::{Signal, SignalContext, ErrorCode};
 use x86_64::{
     registers::control::Cr2,
     structures::idt::{
@@ -32,13 +31,6 @@ use x86_64::{
 };
 use fault_log::log_exception;
 
-
-/// Initialize the given `idt` with fully-featured exception handlers.
-/// 
-/// This only sets the exception `Entry`s in the `IDT`, i.e.,
-/// entries from `0` to `31` (inclusive).
-/// Entries from `32` to `255` (inclusive) are not modified, 
-/// as those are for custom OS-specfici interrupt handlers.
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
         let mut idt = idt_ref.lock(); // withholds interrupts
@@ -105,23 +97,7 @@ macro_rules! println_both {
 /// However, stack traces / backtraces work, so we are correctly traversing call stacks with exception frames.
 /// 
 #[inline(never)]
-fn kill_and_halt(
-    exception_number: u8,
-    stack_frame: &InterruptStackFrame,
-    error_code: Option<ErrorCode>,
-    print_stack_trace: bool
-) {
-    // First, log the exception that merits a kill operation.
-    {
-        let (err, addr) = match error_code {
-            Some(ErrorCode::PageFaultError {accessed_address, pf_error}) => (Some(pf_error.bits()), Some(accessed_address)),
-            Some(ErrorCode::Other(e)) => (Some(e), None),
-            None => (None, None),
-        };
-        log_exception(exception_number, stack_frame.instruction_pointer.as_u64() as usize, err, addr);
-    }
-
-
+fn kill_and_halt(exception_number: u8, stack_frame: &InterruptStackFrame, print_stack_trace: bool) {
     #[cfg(all(unwind_exceptions, not(downtime_eval)))] {
         println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
     }
@@ -198,23 +174,6 @@ fn kill_and_halt(
         }
     }
 
-    // Invoke the proper signal handler registered for this task, if one exists.
-    if let Some(signal) = exception_to_signal(exception_number) {
-        if let Some(handler) = signal_handler::take_signal_handler(signal) {
-            warn!("Invoking signal handler for {:?}", signal);
-            let signal_context = SignalContext {
-                instruction_pointer: VirtualAddress::new_canonical(stack_frame.instruction_pointer.as_u64() as usize),
-                stack_pointer: VirtualAddress::new_canonical(stack_frame.stack_pointer.as_u64() as usize),
-                signal,
-                error_code,
-            };
-            if handler(&signal_context).is_ok() {
-                warn!("Signal handler for {:?} returned Ok. Returning from exception handler is disabled and untested.", signal);
-                // TODO: test and enable this return;
-            }
-        }
-    }
-
     // Unwind the current task that failed due to the given exception.
     // This doesn't always work perfectly, so it's disabled by default for now.
     #[cfg(unwind_exceptions)] {
@@ -259,26 +218,17 @@ fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
         .unwrap_or(false)
 }
 
-/// Converts the given `exception_number` into a [`Signal`] category, if relevant.
-fn exception_to_signal(exception_number: u8) -> Option<Signal> {
-    match exception_number {
-        0x00 | 0x04 | 0x10 | 0x13         => Some(Signal::ArithmeticError),
-        0x05 | 0x0E | 0x0C                => Some(Signal::InvalidAddress),
-        0x06 | 0x07 | 0x08 | 0x0A | 0x0D  => Some(Signal::IllegalInstruction),
-        0x0B | 0x11                       => Some(Signal::BusError),
-        _                                 => None,
-    }
-}
 
 
 /// exception 0x00
-extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE ERROR\n{:#X?}\n", stack_frame);
-    kill_and_halt(0x0, &stack_frame, None, true)
+    log_exception(0x0, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x0, &stack_frame, true)
 }
 
 /// exception 0x01
-extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: DEBUG EXCEPTION\n{:#X?}", stack_frame);
     // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
 }
@@ -326,45 +276,49 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: InterruptStackFrame) {
     );
 
     log_exception(0x2, stack_frame.instruction_pointer.as_u64() as usize, None, None);
-    kill_and_halt(0x2, &stack_frame, None, true)
+    kill_and_halt(0x2, &stack_frame, true)
 }
 
 
 /// exception 0x03
-extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: BREAKPOINT\n{:#X?}", stack_frame);
     // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
 }
 
 /// exception 0x04
-extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: OVERFLOW\n{:#X?}", stack_frame);
-    kill_and_halt(0x4, &stack_frame, None, true)
+    log_exception(0x4, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x4, &stack_frame, true)
 }
 
 // exception 0x05
-extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: BOUND RANGE EXCEEDED\n{:#X?}", stack_frame);
-    kill_and_halt(0x5, &stack_frame, None, true)
+    log_exception(0x5, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x5, &stack_frame, true)
 }
 
 /// exception 0x06
-extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: INVALID OPCODE\n{:#X?}", stack_frame);
-    kill_and_halt(0x6, &stack_frame, None, true)
+    log_exception(0x6, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x6, &stack_frame, true)
 }
 
 /// exception 0x07
 ///
 /// For more information about "spurious interrupts", 
 /// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).
-extern "x86-interrupt" fn device_not_available_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: DEVICE NOT AVAILABLE\n{:#X?}", stack_frame);
-    kill_and_halt(0x7, &stack_frame, None, true)
+    log_exception(0x7, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x7, &stack_frame, true)
 }
 
 /// exception 0x08
-extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
+pub extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
     let accessed_vaddr = Cr2::read_raw();
     println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#X?}\nTried to access {:#X}
         Note: double faults in Theseus are typically caused by stack overflow, is the stack large enough?",
@@ -374,36 +328,41 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame,
         println_both!("--> This double fault was definitely caused by stack overflow, tried to access {:#X}.\n", accessed_vaddr);
     }
     
-    kill_and_halt(0x8, &stack_frame, Some(error_code.into()), false);
+    log_exception(0x8, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0x8, &stack_frame, false);
     loop {}
 }
 
 /// exception 0x0A
-extern "x86-interrupt" fn invalid_tss_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: INVALID TSS\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    kill_and_halt(0xA, &stack_frame, Some(error_code.into()), true)
+    log_exception(0xA, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0xA, &stack_frame, true)
 }
 
 /// exception 0x0B
-extern "x86-interrupt" fn segment_not_present_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    kill_and_halt(0xB, &stack_frame, Some(error_code.into()), true)
+    log_exception(0xB, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0xB, &stack_frame, true)
 }
 
 /// exception 0x0C
-extern "x86-interrupt" fn stack_segment_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+pub extern "x86-interrupt" fn stack_segment_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    kill_and_halt(0xC, &stack_frame, Some(error_code.into()), true)
+    log_exception(0xC, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0xC, &stack_frame, true)
 }
 
 /// exception 0x0D
-extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    kill_and_halt(0xD, &stack_frame, Some(error_code.into()), true)
+    log_exception(0xD, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0xD, &stack_frame, true)
 }
 
 /// exception 0x0E
-extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
+pub extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
     let accessed_vaddr = Cr2::read_raw() as usize;
 
     #[cfg(not(downtime_eval))] {
@@ -418,49 +377,57 @@ extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, e
         }
     }
     
-    kill_and_halt(0xE, &stack_frame, Some(ErrorCode::PageFaultError { accessed_address: accessed_vaddr, pf_error: error_code }), true)
+    log_exception(0xE, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code.bits()), Some(accessed_vaddr));
+    kill_and_halt(0xE, &stack_frame, true)
 }
 
 
 /// exception 0x10
-extern "x86-interrupt" fn x87_floating_point_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn x87_floating_point_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: x87 FLOATING POINT\n{:#X?}", stack_frame);
-    kill_and_halt(0x10, &stack_frame, None, true)
+    log_exception(0x10, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x10, &stack_frame, true)
 }
 
 /// exception 0x11
-extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+pub extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    kill_and_halt(0x11, &stack_frame, Some(error_code.into()), true)
+    log_exception(0x11, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0x11, &stack_frame, true)
 }
 
 /// exception 0x12
-extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) -> ! {
+pub extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) -> ! {
     println_both!("\nEXCEPTION: MACHINE CHECK\n{:#X?}", stack_frame);
-    kill_and_halt(0x12, &stack_frame, None, true);
+    log_exception(0x12, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x12, &stack_frame, true);
     loop {}
 }
 
 /// exception 0x13
-extern "x86-interrupt" fn simd_floating_point_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn simd_floating_point_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: SIMD FLOATING POINT\n{:#X?}", stack_frame);
-    kill_and_halt(0x13, &stack_frame, None, true)
+    log_exception(0x13, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x13, &stack_frame, true)
 }
 
 /// exception 0x14
-extern "x86-interrupt" fn virtualization_handler(stack_frame: InterruptStackFrame) {
+pub extern "x86-interrupt" fn virtualization_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: VIRTUALIZATION\n{:#X?}", stack_frame);
-    kill_and_halt(0x14, &stack_frame, None, true)
+    log_exception(0x14, stack_frame.instruction_pointer.as_u64() as usize, None, None);
+    kill_and_halt(0x14, &stack_frame, true)
 }
 
 /// exception 0x1D
-extern "x86-interrupt" fn vmm_communication_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+pub extern "x86-interrupt" fn vmm_communication_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    kill_and_halt(0x1D, &stack_frame, Some(error_code.into()),true)
+    log_exception(0x1D, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0x1D, &stack_frame, true)
 }
 
 /// exception 0x1E
-extern "x86-interrupt" fn security_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+pub extern "x86-interrupt" fn security_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    kill_and_halt(0x1E, &stack_frame, Some(error_code.into()), true)
+    log_exception(0x1E, stack_frame.instruction_pointer.as_u64() as usize, Some(error_code), None);
+    kill_and_halt(0x1E, &stack_frame, true)
 }

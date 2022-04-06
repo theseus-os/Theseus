@@ -850,12 +850,12 @@ dependencies = [
  "apic",
  "debug_info",
  "fault_log",
+ "gimli",
  "log",
  "memory",
  "pmu_x86",
  "print",
  "runqueue",
- "signal_handler",
  "stack_trace",
  "task",
  "tlb_shootdown",
@@ -2696,19 +2696,6 @@ dependencies = [
  "task",
  "terminal_print",
  "window_manager",
-]
-
-[[package]]
-name = "signal_handler"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "log",
- "memory",
- "spin 0.9.0",
- "task",
- "thread_local_macro",
- "x86_64",
 ]
 
 [[package]]
