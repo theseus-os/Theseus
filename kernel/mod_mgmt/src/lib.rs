@@ -1260,25 +1260,30 @@ impl CrateNamespace {
                 let demangled = demangle(name).to_string();
 
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                    // here: we're ready to copy the TLS section to the proper address in the read-only pages
-                    let dest_vaddr = rp.address_at_offset(rodata_offset)
-                        .ok_or_else(|| "BUG: for TLS section, rodata_offset wasn't within rodata_mapped_pages")?;
-                    let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
-                    match sec.get_data(&elf_file) {
-                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                        Ok(SectionData::Empty) => dest_slice.fill(0),
-                        _other => {
-                            error!("load_crate_sections(): Couldn't get section data for TLS section [{}] {}: {:?}", shndx, sec_name, _other);
-                            return Err("couldn't get section data in TLS section");
-                        }
-                    }
+                    let (mapped_pages_offset, sec_typ) = if is_bss {
+                        // Here: a TLS .tbss section has no actual content, so we use a max-value offset
+                        // as a canary value to ensure it cannot be used to index into a MappedPages.
+                        (usize::MAX, SectionType::TlsBss)
+                    } else {
+                        // Here: copy the TLS .tdata section's contents to the proper address in the read-only pages.
+                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for TLS .tdata section [{}] {}: {:?}", shndx, sec_name, _other);
+                                return Err("couldn't get section data in TLS .tdata section");
+                            }
+                        };
+                        // As with all other normal sections, use the current offset for these read-only pages.
+                        (rodata_offset, SectionType::TlsData)
+                    };
 
                     let new_tls_section = LoadedSection::new(
-                        SectionType::Tls,
+                        sec_typ,
                         demangled,
                         Arc::clone(rp_ref),
-                        rodata_offset,
-                        dest_vaddr,
+                        mapped_pages_offset,
+                        VirtualAddress::zero(), // will be replaced in `add_new_dynamic_tls_section()` below
                         sec_size,
                         global_sections.contains(&shndx),
                         new_crate_weak_ref.clone(),
@@ -1300,7 +1305,7 @@ impl CrateNamespace {
                     rodata_offset += round_up_power_of_two(sec_size, sec_align);
                 }
                 else {
-                    return Err("no rodata_pages were allocated when handling .rodata section");
+                    return Err("no rodata_pages were allocated when handling TLS section");
                 }
             }
 
@@ -1677,7 +1682,9 @@ impl CrateNamespace {
             // If the target section of the relocation was a TLS section, 
             // that TLS section's initializer data has now changed.
             // Thus, we need to invalidate the TLS initializer area's cached data.
-            if target_sec_data_was_modified && target_sec.typ == SectionType::Tls {
+            if target_sec_data_was_modified && 
+                (target_sec.typ == SectionType::TlsData || target_sec.typ == SectionType::TlsBss)
+            {
                 debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
                 self.tls_initializer.lock().invalidate();
             }
@@ -2345,8 +2352,12 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
                 text_max_offset = core::cmp::max(text_max_offset, (sec.offset() as usize) + addend);
             }
             else if is_tls {
-                // TLS sections are included as part of read-only pages
-                ro_bytes += addend;
+                // TLS sections are included as part of read-only pages,
+                // but we only need to allocate space for .tdata sections, not .tbss.
+                if sec.get_type() == Ok(ShType::ProgBits) {
+                    ro_bytes += addend;
+                }
+                // Ignore .tbss sections, which have type `NoBits`.
             }
             else if is_write {
                 // this includes both .bss and .data sections
@@ -2595,15 +2606,17 @@ impl TlsInitializer {
             for (range, sec) in section_offsets.iter() {
                 // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
                 let num_padding_bytes = range.start.saturating_sub(*end_of_previous_range);
-                for _i in 0..num_padding_bytes {
-                    // surprisingly, pushing one byte in a loop is MUCH faster than `new_data.splice(...)`.
-                    new_data.push(0); 
-                }
+                new_data.extend(core::iter::repeat(0).take(num_padding_bytes));
 
                 // Insert the section data into the new data vec.
-                let sec_mp = sec.mapped_pages.lock();
-                let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
-                new_data.extend_from_slice(sec_data);
+                if sec.get_type() == SectionType::TlsData {
+                    let sec_mp = sec.mapped_pages.lock();
+                    let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
+                    new_data.extend_from_slice(sec_data);
+                } else {
+                    // For TLS BSS sections (.tbss), fill the section size with all zeroes.
+                    new_data.extend(core::iter::repeat(0).take(sec.size()));
+                }
                 *end_of_previous_range = range.end;
             }
         }

@@ -10,6 +10,10 @@ KERNEL_OFFSET = 0xFFFFFFFF80000000;
 
 SECTIONS {
 
+	/*
+	 * In general, we align each section up to a 4K page boundary in order for Theseus 
+	 * to be able to map them to separately-owned pages.
+	 */
 	. = 1M;
 
 	.init ALIGN(4K) :
@@ -46,7 +50,8 @@ SECTIONS {
 		*(.tdata .tdata.* )
 	}
 
-	.tbss ALIGN(4K) : AT(ADDR(.tbss) - KERNEL_OFFSET)
+	/* Don't align .tbss up to a page boundary; it wastes space because .tdata and .tbss are merged. */
+	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
 	{
 		*(.tbss .tbss.*)
 	}

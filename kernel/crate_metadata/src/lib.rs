@@ -575,8 +575,12 @@ pub enum SectionType {
     Data,
     /// A `bss` section is just like a data section, but is automatically initialized to all zeroes at load time.
     Bss,
-    /// A read-only section that holds the initial data for a thread-local storage (TLS) area.
-    Tls,
+    /// A `.tdata` section is a read-only section that holds the initial data "image" 
+    /// for a thread-local storage (TLS) area.
+    TlsData, 
+    /// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
+    /// This is is effectively an empty placeholder: the all-zero data section doesn't actually exist in memory.
+    TlsBss,
     /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process

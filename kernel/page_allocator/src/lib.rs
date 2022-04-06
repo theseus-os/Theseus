@@ -342,6 +342,7 @@ impl<'list> Drop for DeferredAllocAction<'list> {
 
 
 /// Possible allocation errors.
+#[derive(Debug)]
 enum AllocationError {
 	/// The requested address was not free: it was already allocated, or is outside the range of this allocator.
 	AddressNotFree(Page, usize),
@@ -354,9 +355,9 @@ enum AllocationError {
 impl From<AllocationError> for &'static str {
 	fn from(alloc_err: AllocationError) -> &'static str {
 		match alloc_err {
-			AllocationError::AddressNotFree(..) => "address was in use or outside of this allocator's range",
-			AllocationError::OutOfAddressSpace(..) => "out of address space",
-			AllocationError::NotInitialized => "the allocator has not yet been initialized",
+			AllocationError::AddressNotFree(..) => "address was in use or outside of this page allocator's range",
+			AllocationError::OutOfAddressSpace(..) => "out of virtual address space",
+			AllocationError::NotInitialized => "the page allocator has not yet been initialized",
 		}
 	}
 }
