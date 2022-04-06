@@ -155,13 +155,6 @@ pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(Aggreg
         let end_virt_addr = start_virt_addr + (section.size() as usize);
         let end_phys_addr = start_phys_addr + (section.size() as usize);
 
-        // Currently, we require that the linker script specify that each section should be page-aligned.
-        // This isn't truly necessary, but it simplifies the logic here quite a bit. 
-        if start_phys_addr.frame_offset() != 0 {
-            error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
-            return Err("Kernel ELF Section was not page-aligned");
-        }
-
         // The linker script (linker_higher_half.ld) defines the following order of sections:
         // |------|-------------------|-------------------------------|
         // | Sec  |    Sec Name       |    Description / purpose      |
