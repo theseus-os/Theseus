@@ -1118,11 +1118,10 @@ impl CrateNamespace {
         /// A convenient macro to obtain the rest of the symbol name after its prefix,
         /// i.e., the characters after '.text', '.rodata', '.data', etc.
         /// 
-        /// The `$prefix` argument must be `const` so it can be `concat!()`-ed into a const &str.
-        /// 
-        /// If the name isn't long enough, the macro prints and returns an error str.
-        /// If the name isn't long enough but is an empty section (".text", ".rodata", or ".data")
-        /// this macro `continue`s to the next iteration of the loop.
+        /// * If the name isn't long enough, the macro prints and returns an error str.
+        /// * If the name isn't long enough but is an empty section (".text", ".rodata", or ".data")
+        ///   this macro `continue`s to the next iteration of the loop.
+        /// * The `$prefix` argument must be `const` so it can be `concat!()`-ed into a const &str.
         /// 
         /// Note: I'd prefer this to be a const function that accepts the prefix as a const &'static str,
         ///       but Rust does not support concat!()-ing const generic parameters yet.
@@ -1133,9 +1132,10 @@ impl CrateNamespace {
                 } else {
                     // Ignore special "empty" placeholder sections: .text, .rodata, .data
                     match $sec_name {
-                        TEXT_PREFIX   => continue,
-                        RODATA_PREFIX => continue,
-                        DATA_PREFIX   => continue,
+                        ".text"   => continue,
+                        ".rodata" => continue,
+                        ".data"   => continue,
+                        ".bss"    => continue,
                         _ => {
                             const ERROR_STR: &'static str = const_format::concatcp!(
                                 "Failed to get the ", $prefix, 
