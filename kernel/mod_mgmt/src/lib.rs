@@ -1115,6 +1115,40 @@ impl CrateNamespace {
         const GCC_EXCEPT_TABLE_PREFIX: &'static str = ".gcc_except_table.";
         const EH_FRAME_NAME:           &'static str = ".eh_frame";
 
+        /// A convenient macro to obtain the rest of the symbol name after its prefix,
+        /// i.e., the characters after '.text', '.rodata', '.data', etc.
+        /// 
+        /// The `$prefix` argument must be `const` so it can be `concat!()`-ed into a const &str.
+        /// 
+        /// If the name isn't long enough, the macro prints and returns an error str.
+        /// If the name isn't long enough but is an empty section (".text", ".rodata", or ".data")
+        /// this macro `continue`s to the next iteration of the loop.
+        /// 
+        /// Note: I'd prefer this to be a const function that accepts the prefix as a const &'static str,
+        ///       but Rust does not support concat!()-ing const generic parameters yet.
+        macro_rules! try_get_symbol_name_after_prefix {
+            ($sec_name:ident, $prefix:ident) => (
+                if let Some(name) = $sec_name.get($prefix.len() ..) {
+                    name
+                } else {
+                    // Ignore special "empty" placeholder sections: .text, .rodata, .data
+                    match $sec_name {
+                        TEXT_PREFIX   => continue,
+                        RODATA_PREFIX => continue,
+                        DATA_PREFIX   => continue,
+                        _ => {
+                            const ERROR_STR: &'static str = const_format::concatcp!(
+                                "Failed to get the ", $prefix, 
+                                " section's name after '", $prefix, "'"
+                            );
+                            error!("{}: {:?}", ERROR_STR, $sec_name);
+                            return Err(ERROR_STR);
+                        }
+                    }
+                }
+            );
+        }
+
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              crate_name.clone(),
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
@@ -1162,11 +1196,6 @@ impl CrateNamespace {
                 }
             };
 
-            // ignore the empty .text section at the start
-            if sec_name == ".text" {
-                continue;    
-            }
-
             // This handles the rare case of a zero-sized section. 
             // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations;
             // typically the zero-sized section itself is a reference to the next section in the list of section headers.
@@ -1206,36 +1235,31 @@ impl CrateNamespace {
 
             // First, check for executable sections, which can only be .text sections.
             if is_exec && !is_write {
-                if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
-                    let demangled = demangle(name).to_string();
+                let name = try_get_symbol_name_after_prefix!(sec_name, TEXT_PREFIX);
+                let demangled = demangle(name).to_string();
 
-                    // We already copied the content of all .text sections above, 
-                    // so here we just record the metadata into a new `LoadedSection` object.
-                    if let Some((ref tp_ref, ref tp_range)) = text_pages {
-                        let text_offset = sec.offset() as usize;
-                        let dest_vaddr = tp_range.start + text_offset;
+                // We already copied the content of all .text sections above, 
+                // so here we just record the metadata into a new `LoadedSection` object.
+                if let Some((ref tp_ref, ref tp_range)) = text_pages {
+                    let text_offset = sec.offset() as usize;
+                    let dest_vaddr = tp_range.start + text_offset;
 
-                        loaded_sections.insert(
-                            shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::Text,
-                                demangled,
-                                Arc::clone(tp_ref),
-                                text_offset,
-                                dest_vaddr,
-                                sec_size,
-                                global_sections.contains(&shndx),
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-                    }
-                    else {
-                        return Err("BUG: ELF file contained a .text* section, but no text_pages were allocated");
-                    }
+                    loaded_sections.insert(
+                        shndx, 
+                        Arc::new(LoadedSection::new(
+                            SectionType::Text,
+                            demangled,
+                            Arc::clone(tp_ref),
+                            text_offset,
+                            dest_vaddr,
+                            sec_size,
+                            global_sections.contains(&shndx),
+                            new_crate_weak_ref.clone(),
+                        ))
+                    );
                 }
                 else {
-                    error!("Failed to get the .text section's name after \".text.\": {:?}", sec_name);
-                    return Err("Failed to get the .text section's name after \".text.\"!");
+                    return Err("BUG: ELF file contained a .text* section, but no text_pages were allocated");
                 }
             }
 
@@ -1247,15 +1271,9 @@ impl CrateNamespace {
                 // check if this TLS section is .bss or .data
                 let is_bss = sec.get_type() == Ok(ShType::NoBits);
                 let name = if is_bss {
-                    sec_name.get(TLS_BSS_PREFIX.len() ..).ok_or_else(|| {
-                        error!("Failed to get the .tbss section's name: {:?}", sec_name);
-                        "Failed to get the .tbss section's name"
-                    })?
+                    try_get_symbol_name_after_prefix!(sec_name, TLS_BSS_PREFIX)
                 } else {
-                    sec_name.get(TLS_DATA_PREFIX.len() ..).ok_or_else(|| {
-                        error!("Failed to get the .tdata section's name: {:?}", sec_name);
-                        "Failed to get the .tdata section's name"
-                    })?
+                    try_get_symbol_name_after_prefix!(sec_name, TLS_DATA_PREFIX)
                 };
                 let demangled = demangle(name).to_string();
 
@@ -1314,12 +1332,9 @@ impl CrateNamespace {
                 // check if this section is .bss or .data
                 let is_bss = sec.get_type() == Ok(ShType::NoBits);
                 let name = if is_bss {
-                    sec_name.get(BSS_PREFIX.len() ..).ok_or_else(|| {
-                        error!("Failed to get the .bss section's name: {:?}", sec_name);
-                        "Failed to get the .bss section's name"
-                    })?
+                    try_get_symbol_name_after_prefix!(sec_name, BSS_PREFIX)
                 } else {
-                    sec_name.get(DATA_PREFIX.len() ..)
+                    try_get_symbol_name_after_prefix!(sec_name, DATA_PREFIX)
                         // Currently, .rel.ro sections no longer exist in object files compiled for Theseus.
                         // .and_then(|name| {
                         //     if name.starts_with(RELRO_PREFIX) {
@@ -1328,10 +1343,6 @@ impl CrateNamespace {
                         //         Some(name)
                         //     }
                         // })
-                        .ok_or_else(|| {
-                            error!("Failed to get the .data section's name: {:?}", sec_name);
-                            "Failed to get the .data section's name"
-                        })?
                 };
                 let demangled = demangle(name).to_string();
                 
@@ -1373,92 +1384,82 @@ impl CrateNamespace {
 
             // Fourth, if neither executable nor TLS nor writable, handle .rodata sections.
             else if sec_name.starts_with(RODATA_PREFIX) {
-                if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
-                    let demangled = demangle(name).to_string();
+                let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
+                let demangled = demangle(name).to_string();
 
-                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                        // here: we're ready to copy the rodata section to the proper address
-                        let dest_vaddr = rp.address_at_offset(rodata_offset)
-                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
-                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => dest_slice.fill(0),
-                            _other => {
-                                error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, _other);
-                                return Err("couldn't get section data in .rodata section");
-                            }
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    // here: we're ready to copy the rodata section to the proper address
+                    let dest_vaddr = rp.address_at_offset(rodata_offset)
+                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                    let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
+                    match sec.get_data(&elf_file) {
+                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, _other);
+                            return Err("couldn't get section data in .rodata section");
                         }
-                        
-                        loaded_sections.insert(
-                            shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::Rodata,
-                                demangled,
-                                Arc::clone(rp_ref),
-                                rodata_offset,
-                                dest_vaddr,
-                                sec_size,
-                                global_sections.contains(&shndx),
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
+                    }
+                    
+                    loaded_sections.insert(
+                        shndx, 
+                        Arc::new(LoadedSection::new(
+                            SectionType::Rodata,
+                            demangled,
+                            Arc::clone(rp_ref),
+                            rodata_offset,
+                            dest_vaddr,
+                            sec_size,
+                            global_sections.contains(&shndx),
+                            new_crate_weak_ref.clone(),
+                        ))
+                    );
 
-                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
-                    }
-                    else {
-                        return Err("no rodata_pages were allocated when handling .rodata section");
-                    }
+                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
                 }
                 else {
-                    error!("Failed to get the .rodata section's name after \".rodata.\": {:?}", sec_name);
-                    return Err("Failed to get the .rodata section's name after \".rodata.\"!");
+                    return Err("no rodata_pages were allocated when handling .rodata section");
                 }
             }
 
             // Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections
             else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
-                if let Some(name) = sec_name.get(GCC_EXCEPT_TABLE_PREFIX.len() ..) {
-                    let demangled = demangle(name).to_string();
+                let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
+                let demangled = demangle(name).to_string();
 
-                    // gcc_except_table sections are read-only, so we put them in the .rodata pages
-                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                        // here: we're ready to copy the rodata section to the proper address
-                        let dest_vaddr = rp.address_at_offset(rodata_offset)
-                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
-                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => dest_slice.fill(0),
-                            _other => {
-                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, _other);
-                                return Err("couldn't get section data in .gcc_except_table section");
-                            }
+                // gcc_except_table sections are read-only, so we put them in the .rodata pages
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    // here: we're ready to copy the rodata section to the proper address
+                    let dest_vaddr = rp.address_at_offset(rodata_offset)
+                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                    let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                    match sec.get_data(&elf_file) {
+                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                        Ok(SectionData::Empty) => dest_slice.fill(0),
+                        _other => {
+                            error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, _other);
+                            return Err("couldn't get section data in .gcc_except_table section");
                         }
-
-                        loaded_sections.insert(
-                            shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::GccExceptTable,
-                                demangled,
-                                Arc::clone(rp_ref),
-                                rodata_offset,
-                                dest_vaddr,
-                                sec_size,
-                                false, // .gcc_except_table sections are not globally visible,
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-
-                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
                     }
-                    else {
-                        return Err("no rodata_pages were allocated when handling .gcc_except_table");
-                    }
+
+                    loaded_sections.insert(
+                        shndx, 
+                        Arc::new(LoadedSection::new(
+                            SectionType::GccExceptTable,
+                            demangled,
+                            Arc::clone(rp_ref),
+                            rodata_offset,
+                            dest_vaddr,
+                            sec_size,
+                            false, // .gcc_except_table sections are not globally visible,
+                            new_crate_weak_ref.clone(),
+                        ))
+                    );
+
+                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
                 }
                 else {
-                    error!("Failed to get the .gcc_except_table section's name after \".gcc_except_table.\": {:?}", sec_name);
-                    return Err("Failed to get the .gcc_except_table section's name after \".gcc_except_table.\"!");
+                    return Err("no rodata_pages were allocated when handling .gcc_except_table");
                 }
             }
 
@@ -2430,8 +2431,6 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 		debug!("{}Section \"{}\"  (no weak dependents)", prefix, sec.name);
 	}
 }
-
-
 
 
 /// Returns a reference to the symbol table in the given `ElfFile`.
