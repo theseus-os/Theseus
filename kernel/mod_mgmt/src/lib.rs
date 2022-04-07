@@ -1130,7 +1130,7 @@ impl CrateNamespace {
                 if let Some(name) = $sec_name.get($prefix.len() ..) {
                     name
                 } else {
-                    // Ignore special "empty" placeholder sections: .text, .rodata, .data
+                    // Ignore special "empty" placeholder sections
                     match $sec_name {
                         ".text"   => continue,
                         ".rodata" => continue,
