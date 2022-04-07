@@ -1119,7 +1119,7 @@ impl CrateNamespace {
         /// i.e., the characters after '.text', '.rodata', '.data', etc.
         /// 
         /// * If the name isn't long enough, the macro prints and returns an error str.
-        /// * If the name isn't long enough but is an empty section (".text", ".rodata", or ".data")
+        /// * If the name isn't long enough but is an empty section (e.g., just ".text", ".rodata", etc)
         ///   this macro `continue`s to the next iteration of the loop.
         /// * The `$prefix` argument must be `const` so it can be `concat!()`-ed into a const &str.
         /// 
