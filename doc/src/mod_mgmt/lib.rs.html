@@ -2734,7 +2734,6 @@
 <span id="2729">2729</span>
 <span id="2730">2730</span>
 <span id="2731">2731</span>
-<span id="2732">2732</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -3748,7 +3747,7 @@
     <span class="doccomment">/// * `verbose_log`: whether to log detailed messages for debugging.</span>
     <span class="kw">fn</span> <span class="ident">load_crate_sections</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">crate_file</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;f</span> <span class="ident">dyn</span> <span class="ident">File</span>,
+        <span class="ident">crate_file</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;f</span> <span class="kw">dyn</span> <span class="ident">File</span>,
         <span class="ident">kernel_mmi_ref</span>: <span class="kw-2">&amp;</span><span class="ident">MmiRef</span>,
         <span class="ident">_verbose_log</span>: <span class="ident">bool</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(<span class="ident">StrongCrateRef</span>, <span class="ident">ElfFile</span><span class="op">&lt;</span><span class="lifetime">&#39;f</span><span class="op">&gt;</span>), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
@@ -3852,6 +3851,40 @@
         <span class="kw">const</span> <span class="ident">GCC_EXCEPT_TABLE_PREFIX</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.gcc_except_table.&quot;</span>;
         <span class="kw">const</span> <span class="ident">EH_FRAME_NAME</span>:           <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.eh_frame&quot;</span>;
 
+        <span class="doccomment">/// A convenient macro to obtain the rest of the symbol name after its prefix,</span>
+        <span class="doccomment">/// i.e., the characters after &#39;.text&#39;, &#39;.rodata&#39;, &#39;.data&#39;, etc.</span>
+        <span class="doccomment">/// </span>
+        <span class="doccomment">/// * If the name isn&#39;t long enough, the macro prints and returns an error str.</span>
+        <span class="doccomment">/// * If the name isn&#39;t long enough but is an empty section (e.g., just &quot;.text&quot;, &quot;.rodata&quot;, etc)</span>
+        <span class="doccomment">///   this macro `continue`s to the next iteration of the loop.</span>
+        <span class="doccomment">/// * The `$prefix` argument must be `const` so it can be `concat!()`-ed into a const &amp;str.</span>
+        <span class="doccomment">/// </span>
+        <span class="doccomment">/// Note: I&#39;d prefer this to be a const function that accepts the prefix as a const &amp;&#39;static str,</span>
+        <span class="doccomment">///       but Rust does not support concat!()-ing const generic parameters yet.</span>
+        <span class="macro">macro_rules!</span> <span class="ident">try_get_symbol_name_after_prefix</span> {
+            (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">sec_name</span>:<span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">prefix</span>:<span class="ident">ident</span>) =&gt; (
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">sec_name</span>.<span class="ident">get</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">prefix</span>.<span class="ident">len</span>() ..) {
+                    <span class="ident">name</span>
+                } <span class="kw">else</span> {
+                    <span class="comment">// Ignore special &quot;empty&quot; placeholder sections</span>
+                    <span class="kw">match</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">sec_name</span> {
+                        <span class="string">&quot;.text&quot;</span>   =&gt; <span class="kw">continue</span>,
+                        <span class="string">&quot;.rodata&quot;</span> =&gt; <span class="kw">continue</span>,
+                        <span class="string">&quot;.data&quot;</span>   =&gt; <span class="kw">continue</span>,
+                        <span class="string">&quot;.bss&quot;</span>    =&gt; <span class="kw">continue</span>,
+                        <span class="kw">_</span> =&gt; {
+                            <span class="kw">const</span> <span class="ident">ERROR_STR</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="macro">const_format::concatcp!</span>(
+                                <span class="string">&quot;Failed to get the &quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">prefix</span>, 
+                                <span class="string">&quot; section&#39;s name after &#39;&quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">prefix</span>, <span class="string">&quot;&#39;&quot;</span>
+                            );
+                            <span class="macro">error!</span>(<span class="string">&quot;{}: {:?}&quot;</span>, <span class="ident">ERROR_STR</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">sec_name</span>);
+                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">ERROR_STR</span>);
+                        }
+                    }
+                }
+            );
+        }
+
         <span class="kw">let</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">CowArc::new</span>(<span class="ident">LoadedCrate</span> {
             <span class="ident">crate_name</span>:              <span class="ident">crate_name</span>.<span class="ident">clone</span>(),
             <span class="ident">debug_symbols_file</span>:      <span class="ident">Arc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">crate_object_file</span>),
@@ -3899,11 +3932,6 @@
                 }
             };
 
-            <span class="comment">// ignore the empty .text section at the start</span>
-            <span class="kw">if</span> <span class="ident">sec_name</span> <span class="op">==</span> <span class="string">&quot;.text&quot;</span> {
-                <span class="kw">continue</span>;    
-            }
-
             <span class="comment">// This handles the rare case of a zero-sized section. </span>
             <span class="comment">// A section of size zero shouldn&#39;t necessarily be removed, as they are sometimes referenced in relocations;</span>
             <span class="comment">// typically the zero-sized section itself is a reference to the next section in the list of section headers.</span>
@@ -3943,36 +3971,31 @@
 
             <span class="comment">// First, check for executable sections, which can only be .text sections.</span>
             <span class="kw">if</span> <span class="ident">is_exec</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">is_write</span> {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">TEXT_PREFIX</span>.<span class="ident">len</span>() ..) {
-                    <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">TEXT_PREFIX</span>);
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
 
-                    <span class="comment">// We already copied the content of all .text sections above, </span>
-                    <span class="comment">// so here we just record the metadata into a new `LoadedSection` object.</span>
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">tp_ref</span>, <span class="kw-2">ref</span> <span class="ident">tp_range</span>)) <span class="op">=</span> <span class="ident">text_pages</span> {
-                        <span class="kw">let</span> <span class="ident">text_offset</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">offset</span>() <span class="kw">as</span> <span class="ident">usize</span>;
-                        <span class="kw">let</span> <span class="ident">dest_vaddr</span> <span class="op">=</span> <span class="ident">tp_range</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">text_offset</span>;
+                <span class="comment">// We already copied the content of all .text sections above, </span>
+                <span class="comment">// so here we just record the metadata into a new `LoadedSection` object.</span>
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">tp_ref</span>, <span class="kw-2">ref</span> <span class="ident">tp_range</span>)) <span class="op">=</span> <span class="ident">text_pages</span> {
+                    <span class="kw">let</span> <span class="ident">text_offset</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">offset</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+                    <span class="kw">let</span> <span class="ident">dest_vaddr</span> <span class="op">=</span> <span class="ident">tp_range</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">text_offset</span>;
 
-                        <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(
-                            <span class="ident">shndx</span>, 
-                            <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-                                <span class="ident">SectionType::Text</span>,
-                                <span class="ident">demangled</span>,
-                                <span class="ident">Arc::clone</span>(<span class="ident">tp_ref</span>),
-                                <span class="ident">text_offset</span>,
-                                <span class="ident">dest_vaddr</span>,
-                                <span class="ident">sec_size</span>,
-                                <span class="ident">global_sections</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>),
-                                <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
-                            ))
-                        );
-                    }
-                    <span class="kw">else</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: ELF file contained a .text* section, but no text_pages were allocated&quot;</span>);
-                    }
+                    <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(
+                        <span class="ident">shndx</span>, 
+                        <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
+                            <span class="ident">SectionType::Text</span>,
+                            <span class="ident">demangled</span>,
+                            <span class="ident">Arc::clone</span>(<span class="ident">tp_ref</span>),
+                            <span class="ident">text_offset</span>,
+                            <span class="ident">dest_vaddr</span>,
+                            <span class="ident">sec_size</span>,
+                            <span class="ident">global_sections</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>),
+                            <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
+                        ))
+                    );
                 }
                 <span class="kw">else</span> {
-                    <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .text section&#39;s name after \&quot;.text.\&quot;: {:?}&quot;</span>, <span class="ident">sec_name</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get the .text section&#39;s name after \&quot;.text.\&quot;!&quot;</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;BUG: ELF file contained a .text* section, but no text_pages were allocated&quot;</span>);
                 }
             }
 
@@ -3984,15 +4007,9 @@
                 <span class="comment">// check if this TLS section is .bss or .data</span>
                 <span class="kw">let</span> <span class="ident">is_bss</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">get_type</span>() <span class="op">==</span> <span class="prelude-val">Ok</span>(<span class="ident">ShType::NoBits</span>);
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_bss</span> {
-                    <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">TLS_BSS_PREFIX</span>.<span class="ident">len</span>() ..).<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                        <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .tbss section&#39;s name: {:?}&quot;</span>, <span class="ident">sec_name</span>);
-                        <span class="string">&quot;Failed to get the .tbss section&#39;s name&quot;</span>
-                    })<span class="question-mark">?</span>
+                    <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">TLS_BSS_PREFIX</span>)
                 } <span class="kw">else</span> {
-                    <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">TLS_DATA_PREFIX</span>.<span class="ident">len</span>() ..).<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                        <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .tdata section&#39;s name: {:?}&quot;</span>, <span class="ident">sec_name</span>);
-                        <span class="string">&quot;Failed to get the .tdata section&#39;s name&quot;</span>
-                    })<span class="question-mark">?</span>
+                    <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">TLS_DATA_PREFIX</span>)
                 };
                 <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
 
@@ -4051,12 +4068,9 @@
                 <span class="comment">// check if this section is .bss or .data</span>
                 <span class="kw">let</span> <span class="ident">is_bss</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">get_type</span>() <span class="op">==</span> <span class="prelude-val">Ok</span>(<span class="ident">ShType::NoBits</span>);
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_bss</span> {
-                    <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">BSS_PREFIX</span>.<span class="ident">len</span>() ..).<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                        <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .bss section&#39;s name: {:?}&quot;</span>, <span class="ident">sec_name</span>);
-                        <span class="string">&quot;Failed to get the .bss section&#39;s name&quot;</span>
-                    })<span class="question-mark">?</span>
+                    <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">BSS_PREFIX</span>)
                 } <span class="kw">else</span> {
-                    <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">DATA_PREFIX</span>.<span class="ident">len</span>() ..)
+                    <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">DATA_PREFIX</span>)
                         <span class="comment">// Currently, .rel.ro sections no longer exist in object files compiled for Theseus.</span>
                         <span class="comment">// .and_then(|name| {</span>
                         <span class="comment">//     if name.starts_with(RELRO_PREFIX) {</span>
@@ -4065,10 +4079,6 @@
                         <span class="comment">//         Some(name)</span>
                         <span class="comment">//     }</span>
                         <span class="comment">// })</span>
-                        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-                            <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .data section&#39;s name: {:?}&quot;</span>, <span class="ident">sec_name</span>);
-                            <span class="string">&quot;Failed to get the .data section&#39;s name&quot;</span>
-                        })<span class="question-mark">?</span>
                 };
                 <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
                 
@@ -4110,92 +4120,82 @@
 
             <span class="comment">// Fourth, if neither executable nor TLS nor writable, handle .rodata sections.</span>
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_name</span>.<span class="ident">starts_with</span>(<span class="ident">RODATA_PREFIX</span>) {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">RODATA_PREFIX</span>.<span class="ident">len</span>() ..) {
-                    <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">RODATA_PREFIX</span>);
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
 
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
-                        <span class="comment">// here: we&#39;re ready to copy the rodata section to the proper address</span>
-                        <span class="kw">let</span> <span class="ident">dest_vaddr</span> <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">address_at_offset</span>(<span class="ident">rodata_offset</span>)
-                            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
-                        <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">as_slice_mut</span>(<span class="ident">rodata_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
-                        <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
-                            <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
-                            <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Empty</span>) =&gt; <span class="ident">dest_slice</span>.<span class="ident">fill</span>(<span class="number">0</span>),
-                            <span class="ident">_other</span> =&gt; {
-                                <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .rodata section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
-                                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .rodata section&quot;</span>);
-                            }
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
+                    <span class="comment">// here: we&#39;re ready to copy the rodata section to the proper address</span>
+                    <span class="kw">let</span> <span class="ident">dest_vaddr</span> <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">address_at_offset</span>(<span class="ident">rodata_offset</span>)
+                        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
+                    <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">as_slice_mut</span>(<span class="ident">rodata_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
+                    <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
+                        <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
+                        <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Empty</span>) =&gt; <span class="ident">dest_slice</span>.<span class="ident">fill</span>(<span class="number">0</span>),
+                        <span class="ident">_other</span> =&gt; {
+                            <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .rodata section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
+                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .rodata section&quot;</span>);
                         }
-                        
-                        <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(
-                            <span class="ident">shndx</span>, 
-                            <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-                                <span class="ident">SectionType::Rodata</span>,
-                                <span class="ident">demangled</span>,
-                                <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
-                                <span class="ident">rodata_offset</span>,
-                                <span class="ident">dest_vaddr</span>,
-                                <span class="ident">sec_size</span>,
-                                <span class="ident">global_sections</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>),
-                                <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
-                            ))
-                        );
+                    }
+                    
+                    <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(
+                        <span class="ident">shndx</span>, 
+                        <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
+                            <span class="ident">SectionType::Rodata</span>,
+                            <span class="ident">demangled</span>,
+                            <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
+                            <span class="ident">rodata_offset</span>,
+                            <span class="ident">dest_vaddr</span>,
+                            <span class="ident">sec_size</span>,
+                            <span class="ident">global_sections</span>.<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">shndx</span>),
+                            <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
+                        ))
+                    );
 
-                        <span class="ident">rodata_offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">round_up_power_of_two</span>(<span class="ident">sec_size</span>, <span class="ident">sec_align</span>);
-                    }
-                    <span class="kw">else</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .rodata section&quot;</span>);
-                    }
+                    <span class="ident">rodata_offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">round_up_power_of_two</span>(<span class="ident">sec_size</span>, <span class="ident">sec_align</span>);
                 }
                 <span class="kw">else</span> {
-                    <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .rodata section&#39;s name after \&quot;.rodata.\&quot;: {:?}&quot;</span>, <span class="ident">sec_name</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get the .rodata section&#39;s name after \&quot;.rodata.\&quot;!&quot;</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .rodata section&quot;</span>);
                 }
             }
 
             <span class="comment">// Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections</span>
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_name</span>.<span class="ident">starts_with</span>(<span class="ident">GCC_EXCEPT_TABLE_PREFIX</span>) {
-                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">name</span>) <span class="op">=</span> <span class="ident">sec_name</span>.<span class="ident">get</span>(<span class="ident">GCC_EXCEPT_TABLE_PREFIX</span>.<span class="ident">len</span>() ..) {
-                    <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">RODATA_PREFIX</span>);
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
 
-                    <span class="comment">// gcc_except_table sections are read-only, so we put them in the .rodata pages</span>
-                    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
-                        <span class="comment">// here: we&#39;re ready to copy the rodata section to the proper address</span>
-                        <span class="kw">let</span> <span class="ident">dest_vaddr</span> <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">address_at_offset</span>(<span class="ident">rodata_offset</span>)
-                            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
-                        <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]  <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">as_slice_mut</span>(<span class="ident">rodata_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
-                        <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
-                            <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
-                            <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Empty</span>) =&gt; <span class="ident">dest_slice</span>.<span class="ident">fill</span>(<span class="number">0</span>),
-                            <span class="ident">_other</span> =&gt; {
-                                <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .gcc_except_table section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
-                                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .gcc_except_table section&quot;</span>);
-                            }
+                <span class="comment">// gcc_except_table sections are read-only, so we put them in the .rodata pages</span>
+                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
+                    <span class="comment">// here: we&#39;re ready to copy the rodata section to the proper address</span>
+                    <span class="kw">let</span> <span class="ident">dest_vaddr</span> <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">address_at_offset</span>(<span class="ident">rodata_offset</span>)
+                        .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;BUG: rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
+                    <span class="kw">let</span> <span class="ident">dest_slice</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>]  <span class="op">=</span> <span class="ident">rp</span>.<span class="ident">as_slice_mut</span>(<span class="ident">rodata_offset</span>, <span class="ident">sec_size</span>)<span class="question-mark">?</span>;
+                    <span class="kw">match</span> <span class="ident">sec</span>.<span class="ident">get_data</span>(<span class="kw-2">&amp;</span><span class="ident">elf_file</span>) {
+                        <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Undefined</span>(<span class="ident">sec_data</span>)) =&gt; <span class="ident">dest_slice</span>.<span class="ident">copy_from_slice</span>(<span class="ident">sec_data</span>),
+                        <span class="prelude-val">Ok</span>(<span class="ident">SectionData::Empty</span>) =&gt; <span class="ident">dest_slice</span>.<span class="ident">fill</span>(<span class="number">0</span>),
+                        <span class="ident">_other</span> =&gt; {
+                            <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for .gcc_except_table section [{}] {}: {:?}&quot;</span>, <span class="ident">shndx</span>, <span class="ident">sec_name</span>, <span class="ident">_other</span>);
+                            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .gcc_except_table section&quot;</span>);
                         }
-
-                        <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(
-                            <span class="ident">shndx</span>, 
-                            <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-                                <span class="ident">SectionType::GccExceptTable</span>,
-                                <span class="ident">demangled</span>,
-                                <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
-                                <span class="ident">rodata_offset</span>,
-                                <span class="ident">dest_vaddr</span>,
-                                <span class="ident">sec_size</span>,
-                                <span class="bool-val">false</span>, <span class="comment">// .gcc_except_table sections are not globally visible,</span>
-                                <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
-                            ))
-                        );
-
-                        <span class="ident">rodata_offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">round_up_power_of_two</span>(<span class="ident">sec_size</span>, <span class="ident">sec_align</span>);
                     }
-                    <span class="kw">else</span> {
-                        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .gcc_except_table&quot;</span>);
-                    }
+
+                    <span class="ident">loaded_sections</span>.<span class="ident">insert</span>(
+                        <span class="ident">shndx</span>, 
+                        <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
+                            <span class="ident">SectionType::GccExceptTable</span>,
+                            <span class="ident">demangled</span>,
+                            <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
+                            <span class="ident">rodata_offset</span>,
+                            <span class="ident">dest_vaddr</span>,
+                            <span class="ident">sec_size</span>,
+                            <span class="bool-val">false</span>, <span class="comment">// .gcc_except_table sections are not globally visible,</span>
+                            <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
+                        ))
+                    );
+
+                    <span class="ident">rodata_offset</span> <span class="op">+</span><span class="op">=</span> <span class="ident">round_up_power_of_two</span>(<span class="ident">sec_size</span>, <span class="ident">sec_align</span>);
                 }
                 <span class="kw">else</span> {
-                    <span class="macro">error!</span>(<span class="string">&quot;Failed to get the .gcc_except_table section&#39;s name after \&quot;.gcc_except_table.\&quot;: {:?}&quot;</span>, <span class="ident">sec_name</span>);
-                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get the .gcc_except_table section&#39;s name after \&quot;.gcc_except_table.\&quot;!&quot;</span>);
+                    <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .gcc_except_table&quot;</span>);
                 }
             }
 
@@ -5167,8 +5167,6 @@
 		<span class="macro">debug!</span>(<span class="string">&quot;{}Section \&quot;{}\&quot;  (no weak dependents)&quot;</span>, <span class="ident">prefix</span>, <span class="ident">sec</span>.<span class="ident">name</span>);
 	}
 }
-
-
 
 
 <span class="doccomment">/// Returns a reference to the symbol table in the given `ElfFile`.</span>
