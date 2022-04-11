@@ -132,6 +132,7 @@ struct LoadedExecutable {
 
 /// Represents an ELF program segment that has been loaded into memory. 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct LoadedSegment {
     /// The memory region allocated to hold this program segment.
     mp: MappedPages,

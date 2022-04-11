@@ -25,7 +25,7 @@ extern crate core2;
 #[macro_use] extern crate derive_more;
 extern crate mlx5;
 
-use core::{array::IntoIter, convert::TryFrom};
+use core::convert::TryFrom;
 use mpmc::Queue;
 use event_types::Event;
 use memory::MemoryManagementInfo;
@@ -70,7 +70,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
 
     let serial_ports = logger::take_early_log_writers();
-    let logger_writers = IntoIter::new(serial_ports)
+    let logger_writers = IntoIterator::into_iter(serial_ports)
         .flatten()
         .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
             .ok()
@@ -159,9 +159,14 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                 ixgbe_devs.push(ixgbe_nic);
                 continue;
             }
-            if dev.vendor_id == mlx5::MLX_VEND && dev.device_id == mlx5::CONNECTX5_DEV {
+            if dev.vendor_id == mlx5::MLX_VEND && (dev.device_id == mlx5::CONNECTX5_DEV || dev.device_id == mlx5::CONNECTX5_EX_DEV) {
                 info!("mlx5 PCI device found at: {:?}", dev.location);
-                mlx5::ConnectX5Nic::init(dev)?;
+                const RX_DESCS: usize = 512;
+                const TX_DESCS: usize = 8192;
+                const MAX_MTU:  u16 = 9000;
+
+                mlx5::ConnectX5Nic::init(dev, TX_DESCS, RX_DESCS, MAX_MTU)?;
+                continue;
             }
 
             // here: check for and initialize other ethernet cards

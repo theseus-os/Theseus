@@ -2,7 +2,7 @@
 //! when AVX extensions are enabled. 
 
 #![no_std]
-#![feature(asm, naked_functions)]
+#![feature(naked_functions)]
 
 extern crate zerocopy;
 #[macro_use] extern crate context_switch_regular;
@@ -133,12 +133,11 @@ macro_rules! restore_registers_avx {
 /// # Safety
 /// This function is unsafe because it changes the content on both task's stacks. 
 #[naked]
-#[inline(never)]
 pub unsafe extern "C" fn context_switch_avx(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     // Since this is a naked function that expects its arguments in two registers,
     // you CANNOT place any log statements or other instructions here
     // before, in between, or after anything below.
-    asm!(
+    core::arch::asm!(
         save_registers_regular!(),
         save_registers_avx!(),
         switch_stacks!(),

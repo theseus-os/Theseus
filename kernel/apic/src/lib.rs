@@ -19,6 +19,7 @@ extern crate x86_64;
 extern crate pit_clock;
 extern crate crossbeam_utils;
 extern crate bit_field;
+extern crate msr;
 
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
@@ -26,7 +27,7 @@ use alloc::boxed::Box;
 use owning_ref::BoxRefMut;
 use spin::Once;
 use raw_cpuid::CpuId;
-use x86_64::registers::msr::*;
+use msr::*;
 use irq_safety::RwLockIrqSafe;
 use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages, allocate_frames_at};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
@@ -706,4 +707,14 @@ impl LocalApic {
             pmr.write(reg);
         }
     }
+}
+
+// Below: temporary functions for reading MSRs that aren't yet in the `x86_64` crate.
+
+fn rdmsr(msr: u32) -> u64 {
+    unsafe { x86_64::registers::model_specific::Msr::new(msr).read() }
+}
+
+unsafe fn wrmsr(msr: u32, value: u64) {
+    x86_64::registers::model_specific::Msr::new(msr).write(value)
 }

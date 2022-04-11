@@ -24,7 +24,6 @@
 //! Lastly, it provides a default `AllocablePage` implementations `ObjectPage8k` that is 8 KiB in size 
 //! and contains allocated objects and associated meta-data
 
-#![cfg_attr(feature = "unstable", feature(const_fn_trait_bound))]
 #![feature(const_mut_refs)]
 #![no_std]
 

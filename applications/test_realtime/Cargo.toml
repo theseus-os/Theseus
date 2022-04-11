@@ -1,0 +1,21 @@
+[package]
+name = "test_realtime"
+version = "0.1.0"
+description = "Application to test scheduling of periodic tasks."
+authors = ["Jacob Earle <earlejacobt@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+log = "0.4.8"
+
+[dependencies.sleep]
+path = "../../kernel/sleep"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"

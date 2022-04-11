@@ -39,8 +39,8 @@ use memory::{PhysicalAddress, MappedPages};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
-use interrupts::{eoi,register_interrupt};
-use x86_64::structures::idt::{ExceptionStackFrame};
+use interrupts::{eoi, register_interrupt};
+use x86_64::structures::idt::InterruptStackFrame;
 use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
@@ -422,7 +422,7 @@ impl E1000Nic {
     }
 }
 
-extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.get() {
         let mut e1000_nic = e1000_nic_ref.lock();
         if let Err(e) = e1000_nic.handle_interrupt() {

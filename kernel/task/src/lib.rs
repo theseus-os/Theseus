@@ -66,7 +66,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
-use x86_64::registers::msr::{IA32_FS_BASE, IA32_GS_BASE, rdmsr, wrmsr};
+use x86_64::registers::model_specific::{GsBase, FsBase};
 
 
 /// The function signature of the callback that will be invoked
@@ -74,7 +74,7 @@ use x86_64::registers::msr::{IA32_FS_BASE, IA32_GS_BASE, rdmsr, wrmsr};
 pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default)]
 pub struct PanicInfoOwned {
     pub payload:  Option<Box<dyn Any + Send>>,
     pub msg:      String,
@@ -108,7 +108,8 @@ impl PanicInfoOwned {
     /// Useful for forwarding panic payloads through a catch and resume unwinding sequence.
     pub fn from_payload(payload: Box<dyn Any + Send>) -> PanicInfoOwned {
         PanicInfoOwned {
-            payload, ..Default::default(),
+            payload: Some(payload),
+            ..Default::default()
         }
     }
 }
@@ -649,21 +650,18 @@ impl Task {
     /// 
     /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
     /// into the `GS_BASE` register.
+    /// This also updates the current TLS region, which is stored in `FS_BASE`.
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to access it. 
     fn set_as_current_task(&self) {
-        unsafe {
-            wrmsr(IA32_FS_BASE, self.tls_area.pointer_value() as u64);
-        }
+        FsBase::write(x86_64::VirtAddr::new(self.tls_area.pointer_value() as u64));
 
         // TODO: now that proper ELF TLS areas are supported, 
         //       use that TLS area for the `TaskLocalData` instead of `GS_BASE`. 
 
         if let Some(ref tld) = self.inner.lock().task_local_data {
-            unsafe {
-                wrmsr(IA32_GS_BASE, tld.deref() as *const _ as u64);
-            }
+            GsBase::write(x86_64::VirtAddr::new(tld.deref() as *const _ as u64));
         } else {
             error!("BUG: failed to set current task, it had no TaskLocalData. {:?}", self);
         }
@@ -1133,7 +1131,7 @@ struct TaskLocalData {
 /// by using the `TaskLocalData` pointer stored in the `GS_BASE` register.
 fn get_task_local_data() -> Option<&'static TaskLocalData> {
     let tld: &'static TaskLocalData = {
-        let tld_ptr = rdmsr(IA32_GS_BASE) as *const TaskLocalData;
+        let tld_ptr = GsBase::read().as_u64() as *const TaskLocalData;
         if tld_ptr.is_null() {
             return None;
         }

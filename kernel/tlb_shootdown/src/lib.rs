@@ -53,7 +53,7 @@ pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
     // trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::get_my_apic_id(), pages_to_invalidate);
 
     for page in pages_to_invalidate {
-        x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
+        x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(page.start_address().value() as u64));
     }
     TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::SeqCst);
 }

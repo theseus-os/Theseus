@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(portable_simd)]
 
 // The entire crate is only built if both `simd_personality` and `sse2` are enabled.
 #[macro_use] extern crate cfg_if;
