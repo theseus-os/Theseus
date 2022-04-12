@@ -3778,6 +3778,7 @@ dependencies = [
  "path_std",
  "rand 0.8.5",
  "region",
+ "signal_handler",
  "spin 0.9.0",
  "task",
  "thiserror_core2",
