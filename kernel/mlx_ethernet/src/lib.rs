@@ -7,9 +7,11 @@
 //! While this version of the manual was acquired by directly contacting Nvidia through their support site (<https://support.mellanox.com/s/>),
 //! an older version of the manual can be found at <http://www.mellanox.com/related-docs/user_manuals/Ethernet_Adapters_Programming_Manual.pdf>.
 
- #![no_std]
- #![feature(slice_pattern)]
- #![feature(core_intrinsics)]
+#![no_std]
+#![feature(slice_pattern)]
+#![feature(core_intrinsics)]
+#![allow(incomplete_features)]
+#![feature(adt_const_params)]
 
 #[macro_use]extern crate log;
 #[macro_use] extern crate alloc;
@@ -24,122 +26,75 @@ extern crate nic_initialization;
 extern crate kernel_config;
 extern crate libm;
 extern crate num_enum;
+extern crate nic_buffers;
+extern crate mpmc;
 
-use memory::PhysicalAddress;
-use volatile::{Volatile, ReadOnly};
-use bit_field::BitField;
-use zerocopy::*;
-use byteorder::BigEndian;
-use core::fmt;
+use kernel_config::memory::PAGE_SIZE;
 
+pub mod initialization_segment;
 pub mod command_queue;
+pub mod event_queue;
+pub mod completion_queue;
+pub mod send_queue;
+pub mod receive_queue;
+pub mod work_queue;
+mod uar;
+mod flow_table;
 
-/// The initialization segment is located at offset 0 of PCI BAR0.
-/// It is used in the initialization procedure of the device,
-/// and it contains the 32-bit command doorbell vector used to inform the HW when a command is ready to be processed.
-#[derive(FromBytes)]
-#[repr(packed)]
-pub struct InitializationSegment {
-    /// Firmware Revision - Minor
-    fw_rev_minor:               ReadOnly<U16<BigEndian>>,
-    /// Firmware Revision - Major
-    fw_rev_major:               ReadOnly<U16<BigEndian>>,
-    /// Command Interface Interpreter Revision ID
-    cmd_interface_rev:          ReadOnly<U16<BigEndian>>,
-    /// Firmware Sub-minor version (Patch level)
-    fw_rev_subminor:            ReadOnly<U16<BigEndian>>,
-    _padding1:                  [u8; 8],
-    /// MSBs of the physical address of the command queue record.
-    cmdq_phy_addr_high:         Volatile<U32<BigEndian>>,
-    /// LSBs of the physical address of the command queue record.
-    cmdq_phy_addr_low:          Volatile<U32<BigEndian>>,
-    /// Bit per command in the cmdq.
-    /// When the bit is set, that command entry in the queue is moved to HW ownership.
-    command_doorbell_vector:    Volatile<U32<BigEndian>>,
-    _padding2:                  [u8; 484],
-    /// If bit 31 is set, the device is still initializing and driver should not post commands
-    initializing_state:         ReadOnly<U32<BigEndian>>,
-    /// Advanced debug information.
-    _health_buffer:              Volatile<[u8; 64]>,
-    /// The offset in bytes, inside the initialization segment, where the NODNIC registers can be found.
-    _no_dram_nic_offset:         ReadOnly<U32<BigEndian>>,
-    _padding3:                  [u8; 3516],
-    /// MSBs of the current internal timer value
-    _internal_timer_h:           ReadOnly<U32<BigEndian>>,
-    /// LSBs of the current internal timer value
-    _internal_timer_l:           ReadOnly<U32<BigEndian>>,
-    _padding4:                  [u8; 8],
-    /// Advanced debug information
-    _health_counter:             ReadOnly<U32<BigEndian>>,
-    _padding5:                  [u8; 44],
-    _real_time:                  ReadOnly<U64<BigEndian>>,
-    _padding6:                  [u8; 12228],
+const UAR_MASK:                 u32 = 0xFF_FFFF;
+const LOG_QUEUE_SIZE_MASK:      u32 = 0x1F;
+const CQN_MASK:                 u32 = 0xFF_FFFF;
+const LOG_QUEUE_SIZE_SHIFT:     u32 = 24;
+const LOG_PAGE_SIZE_SHIFT:      u32 = 24;
+const HW_OWNERSHIP:             u32 = 1;
+
+/// Find the page size of the given `num_bytes` in units of 4KiB pages.
+pub fn log_page_size(num_bytes: u32) -> u32 {
+    libm::log2(libm::ceil(num_bytes as f64 / PAGE_SIZE as f64)) as u32
 }
 
-const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16400);
 
-impl InitializationSegment {
-    /// Returns the maximum number of entries that can be in the command queue
-    pub fn num_cmdq_entries(&self) -> u8 {
-        let log = (self.cmdq_phy_addr_low.read().get() >> 4) & 0x0F;
-        2_u8.pow(log)
-    }
+// Below are a set of types used to keep track of handlers which are returned by the device when creating objects.
 
-    /// Returns the required stride of command queue entries (bytes between the start of consecutive entries)
-    pub fn cmdq_entry_stride(&self) -> u8 {
-        let val = self.cmdq_phy_addr_low.read().get() & 0x0F;
-        2_u8.pow(val)
-    }
-    
-    /// Sets the physical address of the command queue within the initialization segment.
-    ///
-    /// # Arguments
-    /// * `cmdq_physical_addr`: the starting physical address of the command queue, the lower 12 bits of which must be zero. 
-    pub fn set_physical_address_of_cmdq(&mut self, cmdq_physical_addr: PhysicalAddress) -> Result<(), &'static str> {
-        if cmdq_physical_addr.value() & 0xFFF != 0 {
-            return Err("cmdq physical address lower 12 bits must be zero.");
-        }
+/// receive queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Rqn(pub(crate) u32);
 
-        self.cmdq_phy_addr_high.write(U32::new((cmdq_physical_addr.value() >> 32) as u32));
-        let val = self.cmdq_phy_addr_low.read().get() & 0xFFF;
-        self.cmdq_phy_addr_low.write(U32::new(cmdq_physical_addr.value() as u32 | val));
-        Ok(())
-    }
+/// send queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Sqn(pub(crate) u32);
 
-    /// Returns true if the device is still initializing, and driver should not pass any commands to the device.
-    pub fn device_is_initializing(&self) -> bool {
-        self.initializing_state.read().get().get_bit(31)
-    }
+/// completion queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Cqn(pub(crate) u32);
 
-    /// Sets a bit in the [`InitializationSegment::command_doorbell_vector`] to inform HW that the command needs to be executed.
-    ///
-    /// # Arguments
-    /// * `command bit`: the command entry that needs to be executed. (e.g. bit 0 corresponds to entry at index 0).
-    pub fn post_command(&mut self, command_bit: usize) {
-        let val = self.command_doorbell_vector.read().get();
-        self.command_doorbell_vector.write(U32::new(val | (1 << command_bit)));
-    }
-}
+/// protection domain
+#[derive(Debug, Copy, Clone)]
+pub struct Pd(pub(crate) u32);
 
-impl fmt::Debug for InitializationSegment {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("InitializationSegment")
-            .field("Firmware Rev Major", &self.fw_rev_major.read().get()) 
-            .field("Firmware Rev Minor",&self.fw_rev_minor.read().get())
-            .field("Firmware Rev Subminor",&self.fw_rev_subminor.read().get())
-            .field("Command Interface Rev",&self.cmd_interface_rev.read().get())
-            .field("Command queue address high", &self.cmdq_phy_addr_high.read().get())
-            .field("Command queue address low", &self.cmdq_phy_addr_low.read().get())
-            .field("Command doorbell vector", &self.command_doorbell_vector.read().get())
-            .field("Initializing state", &self.initializing_state.read().get())
-            .finish()
-    }
-}
+/// transport domain
+#[derive(Debug, Copy, Clone)]
+pub struct Td(pub(crate) u32);
 
-/// The possible values of the initialization state of the device as taken from the intialization segment.
-pub enum InitializingState {
-    NotAllowed = 0,
-    WaitingPermetion = 1,
-    WaitingResources = 2,
-    Abort = 3
-}
+#[derive(Debug, Copy, Clone)]
+pub struct Lkey(pub(crate) u32);
+
+/// event queue number
+#[derive(Debug, Copy, Clone)]
+pub struct Eqn(pub(crate) u8);
+
+/// transport interface receive number
+#[derive(Debug, Copy, Clone)]
+pub struct Tirn(pub(crate) u32);
+
+/// transport interface send number
+#[derive(Debug, Copy, Clone)]
+pub struct Tisn(pub(crate) u32);
+
+/// flow table id
+#[derive(Debug, Copy, Clone)]
+pub struct FtId(pub(crate) u32);
+
+/// flow group id
+#[derive(Debug, Copy, Clone)]
+pub struct FgId(pub(crate) u32);

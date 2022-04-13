@@ -6,8 +6,6 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
 
 [dependencies.log]
 version = "0.4.8"

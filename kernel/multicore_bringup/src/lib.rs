@@ -4,7 +4,6 @@
 //! (the BSP -- bootstrap core) in order to jumpstart other cores.
 
 #![no_std]
-#![feature(asm)]
 
 extern crate alloc;
 #[macro_use] extern crate log;

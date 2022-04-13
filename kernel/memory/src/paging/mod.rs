@@ -161,8 +161,10 @@ impl PageTable {
 
         // perform the actual page table switch
         unsafe { 
-            x86_64::registers::control_regs::cr3_write(
-                x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64)
+            use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
+            Cr3::write(
+                PhysFrame::containing_address(PhysAddr::new_truncate(new_table.p4_table.start_address().value() as u64)),
+                Cr3Flags::empty(),
             )
         };
     }

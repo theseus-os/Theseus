@@ -35,6 +35,7 @@ pub struct DmarDeviceScope<'t> {
     path_starting_offset: usize,
     /// The total size in bytes of all dynamic Path entries.
     /// The number of Path entries is `path_total_size / 2`.
+    #[allow(dead_code)]
     path_total_size: usize,
 }
 

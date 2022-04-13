@@ -103,6 +103,7 @@ impl<R: Reader> GccExceptTableArea<R> {
 /// The header of an LSDA section, which is at the very beginning of the area 
 /// in the .gcc_except_table section that was pointed to by a stack frame's LSDA pointer. 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct LsdaHeader {
     /// The encoding used to read the next value `landing_pad_base`.
     landing_pad_base_encoding: DwEhPe,

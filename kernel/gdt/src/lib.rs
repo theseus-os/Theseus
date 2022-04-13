@@ -13,11 +13,16 @@ extern crate memory;
 use core::ops::Deref;
 use atomic_linked_list::atomic_map::AtomicMap;
 use x86_64::{
+    instructions::{
+        segmentation::{CS, DS, SS, Segment},
+        tables::load_tss,
+    },
+    PrivilegeLevel,
     structures::{
         tss::TaskStateSegment,
         gdt::SegmentSelector,
     },
-    PrivilegeLevel,
+    VirtAddr, 
 };
 use spin::Once;
 use memory::VirtualAddress;
@@ -38,8 +43,8 @@ static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
 static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
-/// The GDT SegmentSelectors available in Theseus.
-/// Use this type with `get_segment_selector()`. 
+/// The GDT `SegmentSelector`s available in Theseus.
+#[derive(Debug, Clone, Copy)]
 pub enum AvailableSegmentSelector {
     KernelCode,
     KernelData,
@@ -49,34 +54,19 @@ pub enum AvailableSegmentSelector {
     UserData64,
     Tss,
 }
-
-/// Stupid hack because SegmentSelector is not Cloneable/Copyable
-pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
-    let seg: &SegmentSelector = match selector {
-        AvailableSegmentSelector::KernelCode => {
-            KERNEL_CODE_SELECTOR.get().expect("KERNEL_CODE_SELECTOR wasn't yet inited!")
+impl AvailableSegmentSelector {
+    /// Returns the requested `SegmentSelector`, or `None` if it hasn't yet been initialized.
+    pub fn get(self) -> Option<SegmentSelector> {
+        match self {
+            AvailableSegmentSelector::KernelCode => KERNEL_CODE_SELECTOR.get().cloned(),
+            AvailableSegmentSelector::KernelData => KERNEL_DATA_SELECTOR.get().cloned(),
+            AvailableSegmentSelector::UserCode32 => USER_CODE_32_SELECTOR.get().cloned(),
+            AvailableSegmentSelector::UserData32 => USER_DATA_32_SELECTOR.get().cloned(),
+            AvailableSegmentSelector::UserCode64 => USER_CODE_64_SELECTOR.get().cloned(),
+            AvailableSegmentSelector::UserData64 => USER_DATA_64_SELECTOR.get().cloned(),
+            AvailableSegmentSelector::Tss        => TSS_SELECTOR.get().cloned(),
         }
-        AvailableSegmentSelector::KernelData => {
-            KERNEL_DATA_SELECTOR.get().expect("KERNEL_DATA_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserCode32 => {
-            USER_CODE_32_SELECTOR.get().expect("USER_CODE_32_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserData32 => {
-            USER_DATA_32_SELECTOR.get().expect("USER_DATA_32_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserCode64 => {
-            USER_CODE_64_SELECTOR.get().expect("USER_CODE_64_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::UserData64 => {
-            USER_DATA_64_SELECTOR.get().expect("USER_DATA_64_SELECTOR wasn't yet inited!")
-        }
-        AvailableSegmentSelector::Tss => {
-            TSS_SELECTOR.get().expect("TSS_SELECTOR wasn't yet inited!")
-        }
-    };
-
-    SegmentSelector::new(seg.index(), seg.rpl())
+    }
 }
 
 
@@ -95,11 +85,6 @@ pub fn create_and_load_tss_gdt(
     double_fault_stack_top_unusable: VirtualAddress, 
     privilege_stack_top_unusable: VirtualAddress
 ) { 
-    use x86_64::instructions::{
-        segmentation::{set_cs, load_ds, load_ss},
-        tables::load_tss,
-    };
-
     let tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
     let (gdt, kernel_cs, kernel_ds, user_cs_32, user_ds_32, user_cs_64, user_ds_64, tss_segment) 
         = create_gdt(tss_ref.lock().deref());
@@ -118,10 +103,10 @@ pub fn create_and_load_tss_gdt(
     // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
 
     unsafe {
-        set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
-        load_tss(get_segment_selector(AvailableSegmentSelector::Tss));      // load TSS
-        load_ss(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary, but doesn't hurt
-        load_ds(get_segment_selector(AvailableSegmentSelector::KernelData)); // unsure if necessary, but doesn't hurt
+        CS::set_reg(kernel_cs);  // reload code segment register
+        load_tss(tss_segment);   // load TSS
+        SS::set_reg(kernel_ds);  // unsure if necessary, but doesn't hurt
+        DS::set_reg(kernel_ds);  // unsure if necessary, but doesn't hurt
     }
 }
 
@@ -211,7 +196,7 @@ impl Gdt {
         use core::mem::size_of;
 
         let ptr = DescriptorTablePointer {
-            base: self.table.as_ptr() as u64,
+            base: VirtAddr::new(self.table.as_ptr() as u64),
             limit: (self.table.len() * size_of::<u64>() - 1) as u16,
         };
 

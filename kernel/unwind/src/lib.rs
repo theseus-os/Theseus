@@ -34,8 +34,7 @@
 
 #![no_std]
 #![feature(panic_info_message)]
-#![feature(asm, naked_functions)]
-#![feature(unwind_attributes)]
+#![feature(naked_functions)]
 #![feature(trait_alias)]
 
 extern crate alloc;
@@ -53,7 +52,7 @@ extern crate interrupts;
 mod registers;
 mod lsda;
 
-use core::fmt;
+use core::{arch::asm, fmt};
 use alloc::{
     sync::Arc,
     boxed::Box,
@@ -187,7 +186,7 @@ pub struct StackFrameIter {
     /// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.
     cfa_adjustment: Option<i64>,
     /// This is set to true when the previous stack frame was an exception/interrupt handler,
-    /// which is useful in the case of taking into account the CPU pushing an `ExceptionStackFrame` onto the stack.
+    /// which is useful in the case of taking into account the CPU pushing an `InterruptStackFrame` onto the stack.
     /// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening 
     /// is not the same as a regular function "call" happening.
     last_frame_was_exception_handler: bool,
@@ -282,7 +281,7 @@ impl FallibleIterator for StackFrameIter {
                     }
 
                     // If this stack frame is an exception handler, the return address wouldn't have been pushed onto the stack as with normal call instructions.
-                    // Instead, it would've been pushed onto the stack by the CPU as part of the ExceptionStackFrame, so we have to look for it there.
+                    // Instead, it would've been pushed onto the stack by the CPU as part of the InterruptStackFrame, so we have to look for it there.
                     //
                     // We know that the stack currently looks like this:
                     // |-- address --|------------  Item on the stack -------------|
@@ -382,7 +381,7 @@ impl FallibleIterator for StackFrameIter {
             
             // trace!("initial_address: {:#X}", fde.initial_address());
 
-            // If the next stack frame is an exception handler, then the CPU pushed an `ExceptionStackFrame`
+            // If the next stack frame is an exception handler, then the CPU pushed an `InterruptStackFrame`
             // onto the stack, completely unbeknownst to the DWARF debug info. 
             // Thus, we need to adjust this next frame's stack pointer (i.e., `cfa` which becomes the stack pointer)
             // to account for the change in stack contents. 
@@ -469,7 +468,6 @@ pub fn invoke_with_current_registers<F>(f: &mut F) -> Result<(), &'static str>
     /// 
     /// The argument is a pointer to a function reference, so effectively a pointer to a pointer. 
     #[naked]
-    #[inline(never)]
     unsafe extern "C" fn unwind_trampoline(_func: *mut FuncWithRegistersRefMut) -> *mut Result<(), &'static str> {
         // This is a naked function, so you CANNOT place anything here before the asm block, not even log statements.
         // This is because we rely on the value of registers to stay the same as whatever the caller set them to.
@@ -584,7 +582,6 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
     /// It is marked as divergent (returning `!`) because it doesn't return to the caller,
     /// instead it returns (jumps to) that landing pad address.
     #[naked]
-    #[inline(never)]
     unsafe extern "C" fn unwind_lander(_regs: *const LandingRegisters) -> ! {
         asm!("
             movq %rdi, %rsp
@@ -689,8 +686,13 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 /// 
 /// # Arguments
 /// * `reason`: the reason why the current task is being killed, e.g., due to a panic, exception, etc.
-/// * `stack_frames_to_skip`: the number of stack frames that should be skipped in order to avoid unwinding them.
+/// * `stack_frames_to_skip`: the number of stack frames that can be skipped in order to avoid unwinding them.
+///   Those frames should have nothing that needs to be unwound, e.g., no landing pads that invoke drop handlers.
 ///   For example, for a panic, the first `5` frames in the call stack can be ignored.
+/// 
+/// ## Note: Skipping frames
+/// If you are unsure how many frames you could possibly skip, then it's always safe to pass `0`
+/// such that all function frames on the stack are unwound.
 /// 
 #[doc(hidden)]
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {

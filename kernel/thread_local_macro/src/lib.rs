@@ -29,7 +29,6 @@
 
 #![no_std]
 #![feature(thread_local)]
-#![feature(const_fn_fn_ptr_basics)]
 #![feature(allow_internal_unstable)]
 
 // The code from Rust std uses unsafe blocks within unsafe functions,

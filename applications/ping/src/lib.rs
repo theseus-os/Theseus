@@ -40,7 +40,7 @@ macro_rules! hpet_ticks {
         match get_hpet().as_ref().ok_or("coudln't get HPET timer") {
             Ok(time) => time.get_counter(),
             Err(_) => return println!("couldnt get HPET timer"),
-        }; 
+        }
     };
 }
 

@@ -711,7 +711,7 @@ fn add_new_section(
         let tls_sec_data_vaddr = shndxs.tls_data_shndx.unwrap().1 + tls_offset; 
 
         let tls_section = Arc::new(LoadedSection::new(
-            SectionType::Tls,
+            SectionType::TlsData,
             sec_name,
             Arc::clone(&rodata_pages),
             // TLS sections are lumped into the ".rodata" MappedPages with the read-only data sections.
@@ -726,7 +726,28 @@ fn add_new_section(
         Some(tls_section)
     }
     else if shndxs.tls_bss_shndx.map_or(false, |(shndx, _)| sec_ndx == shndx) {
-        todo!("parse_nano_core(): found unsupported TLS .bss section");
+        // TLS sections encode their TLS offset in the virtual address field,
+        // which is necessary to properly calculate relocation entries that depend upon them.
+        let tls_offset = sec_vaddr;
+        // TLS BSS sections (.tbss) do not have any real loaded data in the ELF file,
+        // since they are read-only initializer sections that would hold all zeroes.
+        // Thus, we just use a max-value mapped pages offset as a canary value here,
+        // as that value should never be used anyway.
+        let mapped_pages_offset = usize::MAX;
+
+        let tls_section = Arc::new(LoadedSection::new(
+            SectionType::TlsBss,
+            sec_name,
+            Arc::clone(&rodata_pages),
+            mapped_pages_offset,
+            VirtualAddress::new(tls_offset).ok_or("new TLS .tbss section had invalid virtual address (TLS offset)")?,
+            sec_size,
+            global,
+            new_crate_weak_ref.clone(),
+        ));
+        // Add this new TLS section to this namespace's TLS area image.
+        namespace.tls_initializer.lock().add_existing_static_tls_section(tls_offset, Arc::clone(&tls_section)).unwrap();
+        Some(tls_section)
     }
     else {
         crate_items.init_symbols.insert(sec_name, sec_vaddr);

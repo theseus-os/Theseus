@@ -32,6 +32,9 @@ path = "../pit_clock"
 [dependencies.port_io]
 path = "../../libs/port_io"
 
+[dependencies.msr]
+path = "../../libs/msr"
+
 [dependencies.raw-cpuid]
 version = "7.0.3"
 features = [ "use_arch" ]

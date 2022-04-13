@@ -38,7 +38,7 @@ use core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 use interrupts::IRQ_BASE_OFFSET;
-use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
+use x86_64::structures::idt::{HandlerFunc, InterruptStackFrame};
 
 // Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
@@ -356,7 +356,7 @@ static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 
 
 /// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
-extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: InterruptStackFrame) {
     // trace!("COM1/COM3 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
         func();
@@ -365,7 +365,7 @@ extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: &mut Excepti
 }
 
 /// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
-extern "x86-interrupt" fn com2_com4_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn com2_com4_interrupt_handler(_stack_frame: InterruptStackFrame) {
     // trace!("COM2/COM4 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func();

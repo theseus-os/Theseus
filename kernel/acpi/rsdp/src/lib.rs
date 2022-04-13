@@ -28,6 +28,7 @@ const RSDP_SIGNATURE_ALIGNMENT: usize = 16;
 /// among other items.  
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
+#[allow(dead_code)]
 pub struct Rsdp {
     signature: [u8; 8],
     checksum: u8,

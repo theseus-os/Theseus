@@ -90,3 +90,28 @@ fn try_intrinsic_trampoline<F, A, R>(try_intrinsic_arg: *mut u8) where F: FnOnce
         );
     }
 }
+
+
+/// Resumes the unwinding procedure after it was caught with [`catch_unwind_with_arg()`].
+/// 
+/// This is analogous to the Rust's [`std::panic::resume_unwind()`] in that it is
+/// intended to be used to continue unwinding after a panic was caught.
+/// 
+/// The argument is a [`KillReason`] instead of a typical Rust panic "payload"
+/// (which is usually `Box<Any + Send>`) for two reasons:
+/// 1. `KillReason` is the type returned by [`catch_unwind_with_arg()`] upon failure, 
+///    so it makes sense to continue unwinding with that same error type.
+/// 2. It's more flexible than the standard Rust panic info type because it must also
+///    represent the possibility of a non-panic failure, e.g., a machine exception.
+/// 
+/// [`std::panic::resume_unwind()`]: https://doc.rust-lang.org/std/panic/fn.resume_unwind.html
+pub fn resume_unwind(caught_panic_reason: KillReason) -> ! {
+    // We can skip up to 2 frames here: `unwind::start_unwinding` and `resume_unwind` (this function)
+    let result = unwind::start_unwinding(caught_panic_reason, 2);
+
+    // `start_unwinding` should not return
+    panic!("BUG: start_unwinding() returned {:?}. This is an unexpected failure, as no unwinding occurred. Task: {:?}.",
+        result,
+        task::get_my_current_task()
+    );
+}

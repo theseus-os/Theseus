@@ -1,0 +1,6 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "msr"
+description = "Definitions for Model-Specific Registers (MSR) for x86"
+version = "0.1.0"
+

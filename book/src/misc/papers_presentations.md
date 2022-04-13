@@ -17,13 +17,16 @@ This page offers a selected collection of the slide decks from those talks (incl
 
 ### Older papers
 * \[PLOS 2017\] [Theseus: A State Spill-free Operating System]()
-    * A shorter, outdated ideas paper about early Theseus design. Superseded by the OSDI 2020 paper. 
+    * A shorter, outdated ideas paper about early Theseus design.
+    * Superseded by the OSDI 2020 paper. 
 * \[EuroSys 2017\] [A Characterization of State Spill in Modern Operating Systems](https://dl.acm.org/doi/10.1145/3064176.3064205)
-    * Introduces and studies the concept of state spill. Motivation for our future work on Theseus.
+    * Introduces and studies the concept of state spill.
+    * Motivation for our future work on Theseus.
 
 
 ## Selected Presentations and Slide Decks
 
+* [How Theseus uses Rust, plus Rust challenges (early 2022)](https://docs.google.com/presentation/d/e/2PACX-1vQ2InjW_5kpdepoJ9vdsH-B1G4mvcjohcj_CA2dzx-tVRz0ee52qo1bwCQ7TnDGE9PiE5doW4sIO_7W/pub?start=false&loop=false)
 * [How Safe-language OSes work, with Theseus examples](https://docs.google.com/presentation/d/e/2PACX-1vSa0gp8sbq8S9MB4V-FYjs6xJGIPm0fsZSVdtZ9U2bQWRX9gngwztXTIJiRwxtAosLWPk0v60abDMTU/pub?start=false&loop=false) — 
   [[Video Talk](https://www.youtube.com/watch?v=n7r8zO7SodE)]
 * [Overview of Theseus Design (Late 2020)](https://docs.google.com/presentation/d/e/2PACX-1vR96Oh5iiV2XTPv5KfjGykxoqqo1auGfvxahkMXxQImZsO5B9sXl5h1BEmIzBbb8Pj8lr_NDx4WUr-y/pub?start=false&loop=false)
