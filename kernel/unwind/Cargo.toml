@@ -25,17 +25,11 @@ path = "../mod_mgmt"
 [dependencies.task]
 path = "../task"
 
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.runqueue]
-path = "../runqueue"
-
 [dependencies.interrupts]
 path = "../interrupts"
 
-[dependencies.scheduler]
-path = "../scheduler"
+[dependencies.external_unwind_info]
+path = "../external_unwind_info"
 
 [lib]
 crate-type = ["rlib"]
