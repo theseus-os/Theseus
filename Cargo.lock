@@ -886,6 +886,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "external_unwind_info"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "log",
+ "memory",
+ "spin 0.9.0",
+]
+
+[[package]]
 name = "fadt"
 version = "0.1.0"
 dependencies = [
@@ -3306,15 +3316,13 @@ dependencies = [
 name = "unwind"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "external_unwind_info",
  "fallible-iterator",
  "gimli",
  "interrupts",
  "log",
  "memory",
  "mod_mgmt",
- "runqueue",
- "scheduler",
  "task",
 ]
 
