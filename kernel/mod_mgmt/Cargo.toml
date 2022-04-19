@@ -4,6 +4,7 @@ name = "mod_mgmt"
 description = "Module management, including parsing, loading, linking, unloading, and metadata management."
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
 spin = "0.9.0"
@@ -12,6 +13,7 @@ rustc-demangle = "0.1.19"
 qp-trie = "0.7.3"
 cstr_core = "0.2.3"
 rangemap = "0.1.13"
+const_format = "0.2.2"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

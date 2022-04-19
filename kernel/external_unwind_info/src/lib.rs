@@ -56,7 +56,6 @@ pub struct ExternalUnwindInfo {
     /// The bounds of the text section that this unwinding info pertains to.
     pub text_section: Range<VirtualAddress>,
     /// The bounds of the unwinding information (e.g., `.eh_frame`) for the above text section.
-    /// 
     pub unwind_info: Range<VirtualAddress>,
 }
 
