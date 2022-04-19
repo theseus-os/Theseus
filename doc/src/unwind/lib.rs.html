@@ -921,6 +921,45 @@
 <span id="916">916</span>
 <span id="917">917</span>
 <span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
+<span id="925">925</span>
+<span id="926">926</span>
+<span id="927">927</span>
+<span id="928">928</span>
+<span id="929">929</span>
+<span id="930">930</span>
+<span id="931">931</span>
+<span id="932">932</span>
+<span id="933">933</span>
+<span id="934">934</span>
+<span id="935">935</span>
+<span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.</span>
@@ -967,10 +1006,8 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">gimli</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fallible_iterator</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">scheduler</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">runqueue</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">interrupts</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">external_unwind_info</span>;
 
 <span class="kw">mod</span> <span class="ident">registers</span>;
 <span class="kw">mod</span> <span class="ident">lsda</span>;
@@ -980,6 +1017,7 @@
     <span class="ident">sync::Arc</span>,
     <span class="ident">boxed::Box</span>,
 };
+<span class="kw">use</span> <span class="ident">external_unwind_info::ExternalUnwindInfo</span>;
 <span class="kw">use</span> <span class="ident">gimli</span>::{
     <span class="ident">UnwindSection</span>, 
     <span class="ident">UnwindTableRow</span>, 
@@ -1269,15 +1307,33 @@
         <span class="kw">let</span> <span class="ident">caller</span> <span class="op">=</span> <span class="ident">return_address</span> <span class="op">-</span> <span class="number">1</span>;
         <span class="comment">// TODO FIXME: only subtract 1 for non-&quot;fault&quot; exceptions, e.g., page faults should NOT subtract 1</span>
         <span class="comment">// trace!(&quot;call_site_address: {:#X}&quot;, caller);</span>
+        <span class="kw">let</span> <span class="ident">caller_virt_addr</span> <span class="op">=</span> <span class="ident">VirtualAddress::new</span>(<span class="ident">caller</span> <span class="kw">as</span> <span class="ident">usize</span>)
+            .<span class="ident">ok_or</span>(<span class="string">&quot;caller wasn&#39;t a valid virtual address&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="comment">// Get unwind info for the call site address</span>
-        <span class="kw">let</span> <span class="ident">crate_ref</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">get_crate_containing_address</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">caller</span> <span class="kw">as</span> <span class="ident">usize</span>), <span class="bool-val">false</span>).<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
-            <span class="macro">error!</span>(<span class="string">&quot;StackTraceIter::next(): couldn&#39;t get crate containing call site address: {:#X}&quot;</span>, <span class="ident">caller</span>);
-            <span class="string">&quot;couldn&#39;t get crate containing call site address&quot;</span>
-        })<span class="question-mark">?</span>;
-        <span class="kw">let</span> (<span class="ident">eh_frame_sec</span>, <span class="ident">base_addrs</span>) <span class="op">=</span> <span class="ident">get_eh_frame_info</span>(<span class="kw-2">&amp;</span><span class="ident">crate_ref</span>)
-            .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get eh_frame section in caller&#39;s containing crate&quot;</span>)<span class="question-mark">?</span>;
+        <span class="comment">// Get unwind info for the call site (&quot;caller&quot;) address.</span>
+        <span class="kw">let</span> (<span class="ident">eh_frame_sec</span>, <span class="ident">base_addrs</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">namespace</span>
+            <span class="comment">// First: search the current namespace&#39;s crates to see if any of them contain the caller address.</span>
+            .<span class="ident">get_crate_containing_address</span>(<span class="ident">caller_virt_addr</span>, <span class="bool-val">false</span>)
+            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">crate_ref</span><span class="op">|</span> <span class="ident">get_eh_frame_info</span>(<span class="kw-2">&amp;</span><span class="ident">crate_ref</span>)
+                .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">eh_frame_sec</span>, <span class="ident">base_addrs</span>)<span class="op">|</span> 
+                    (<span class="ident">EhFrameReference::Section</span>(<span class="ident">eh_frame_sec</span>), <span class="ident">base_addrs</span>)
+                )
+            )
+            <span class="comment">// Second: search externally-registered unwind info for the caller address.</span>
+            .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">external_unwind_info::get_unwind_info</span>(<span class="ident">caller_virt_addr</span>)
+                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">uw_info</span><span class="op">|</span> {
+                    <span class="kw">let</span> <span class="ident">base_addrs</span> <span class="op">=</span> <span class="ident">BaseAddresses::default</span>()
+                        .<span class="ident">set_eh_frame</span>(<span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">start</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>)
+                        .<span class="ident">set_text</span>(<span class="ident">uw_info</span>.<span class="ident">text_section</span>.<span class="ident">start</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="ident">u64</span>);
+                    (<span class="ident">EhFrameReference::External</span>(<span class="ident">uw_info</span>), <span class="ident">base_addrs</span>)
+                })
+            )
+            <span class="comment">// Otherwise, the caller address isn&#39;t known to the system, so return an error.</span>
+            .<span class="ident">ok_or_else</span>(<span class="op">|</span><span class="op">|</span> {
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">downtime_eval</span>))]</span>
+                <span class="macro">error!</span>(<span class="string">&quot;StackTraceIter::next(): couldn&#39;t get unwind info for call site address: {:#X}&quot;</span>, <span class="ident">caller</span>);
+                <span class="string">&quot;couldn&#39;t get unwind info for call site address&quot;</span>
+            })<span class="question-mark">?</span>;
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cfa_adjustment</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">i64</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">this_frame_is_exception_handler</span> <span class="op">=</span> <span class="bool-val">false</span>;
@@ -1535,12 +1591,21 @@
 <span class="kw">type</span> <span class="ident">NativeEndianSliceReader</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">EndianSlice</span><span class="op">&lt;</span><span class="lifetime">&#39;i</span>, <span class="ident">NativeEndian</span><span class="op">&gt;</span>;
 
 
+<span class="doccomment">/// An abstraction of a reference to the contents of an `.eh_frame` section. </span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="kw">enum</span> <span class="ident">EhFrameReference</span> {
+    <span class="doccomment">/// A reference to a &quot;native&quot; (Theseus-owned) `.eh_frame` [`mod_mgmt::LoadedSection`].</span>
+    <span class="ident">Section</span>(<span class="ident">StrongSectionRef</span>),
+    <span class="doccomment">/// A reference to an externally-registered `.eh_frame` section&#39;s bounds in memory.</span>
+    <span class="ident">External</span>(<span class="ident">ExternalUnwindInfo</span>),
+}
+
 <span class="doccomment">/// Due to lifetime and locking issues, we cannot store a direct reference to an unwind table row. </span>
 <span class="doccomment">/// Instead, here we store references to the objects needed to calculate/obtain an unwind table row.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
 <span class="kw">struct</span> <span class="ident">UnwindRowReference</span> {
     <span class="ident">caller</span>: <span class="ident">u64</span>,
-    <span class="ident">eh_frame_sec</span>: <span class="ident">StrongSectionRef</span>,
+    <span class="ident">eh_frame_sec</span>: <span class="ident">EhFrameReference</span>,
     <span class="ident">base_addrs</span>: <span class="ident">BaseAddresses</span>,
 }
 <span class="kw">impl</span> <span class="ident">UnwindRowReference</span> {
@@ -1549,53 +1614,66 @@
     <span class="kw">fn</span> <span class="ident">with_unwind_info</span><span class="op">&lt;</span><span class="ident">O</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="ident">F</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">O</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
         <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="kw-2">&amp;</span><span class="ident">FrameDescriptionEntry</span><span class="op">&lt;</span><span class="ident">NativeEndianSliceReader</span>, <span class="ident">usize</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="ident">UnwindTableRow</span><span class="op">&lt;</span><span class="ident">NativeEndianSliceReader</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">O</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>
     {
-        <span class="kw">let</span> <span class="ident">sec</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">eh_frame_sec</span>;
-        <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">size</span>();
-        <span class="kw">let</span> <span class="ident">sec_pages</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="ident">eh_frame_slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">sec_pages</span>.<span class="ident">as_slice</span>(<span class="ident">sec</span>.<span class="ident">mapped_pages_offset</span>, <span class="ident">size_in_bytes</span>)<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">eh_frame</span> <span class="op">=</span> <span class="ident">EhFrame::new</span>(<span class="ident">eh_frame_slice</span>, <span class="ident">NativeEndian</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">unwind_ctx</span> <span class="op">=</span> <span class="ident">UninitializedUnwindContext::new</span>();
-        <span class="kw">let</span> <span class="ident">fde</span> <span class="op">=</span> <span class="ident">eh_frame</span>.<span class="ident">fde_for_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base_addrs</span>, <span class="self">self</span>.<span class="ident">caller</span>, <span class="ident">EhFrame::cie_from_offset</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, <span class="ident">_e</span>);
-            <span class="string">&quot;gimli error while finding FDE for address&quot;</span>
-        })<span class="question-mark">?</span>;
-        <span class="kw">let</span> <span class="ident">unwind_table_row</span> <span class="op">=</span> <span class="ident">fde</span>.<span class="ident">unwind_info_for_address</span>(<span class="kw-2">&amp;</span><span class="ident">eh_frame</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base_addrs</span>, <span class="kw-2">&amp;mut</span> <span class="ident">unwind_ctx</span>, <span class="self">self</span>.<span class="ident">caller</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
-            <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, <span class="ident">_e</span>);
-            <span class="string">&quot;gimli error while finding unwind info for address&quot;</span>
-        })<span class="question-mark">?</span>;
-        
-        <span class="comment">// debug!(&quot;FDE: {:?} &quot;, fde);</span>
-        <span class="comment">// let mut instructions = fde.instructions(&amp;eh_frame, &amp;self.base_addrs);</span>
-        <span class="comment">// while let Some(instr) = instructions.next().map_err(|_e| {</span>
-        <span class="comment">//     error!(&quot;FDE instructions gimli error: {:?}&quot;, _e);</span>
-        <span class="comment">//     &quot;gimli error while iterating through eh_frame FDE instructions list&quot;</span>
-        <span class="comment">// })? {</span>
-        <span class="comment">//     debug!(&quot;    FDE instr: {:?}&quot;, instr);</span>
-        <span class="comment">// }</span>
+        <span class="comment">// an inner closure that invokes the passed-in closure `f`.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">invoke_f_with_eh_frame_slice</span> <span class="op">=</span> <span class="op">|</span><span class="ident">eh_frame_slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]<span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">eh_frame</span> <span class="op">=</span> <span class="ident">EhFrame::new</span>(<span class="ident">eh_frame_slice</span>, <span class="ident">NativeEndian</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">unwind_ctx</span> <span class="op">=</span> <span class="ident">UninitializedUnwindContext::new</span>();
+            <span class="kw">let</span> <span class="ident">fde</span> <span class="op">=</span> <span class="ident">eh_frame</span>.<span class="ident">fde_for_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base_addrs</span>, <span class="self">self</span>.<span class="ident">caller</span>, <span class="ident">EhFrame::cie_from_offset</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
+                <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, <span class="ident">_e</span>);
+                <span class="string">&quot;gimli error while finding FDE for address&quot;</span>
+            })<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">unwind_table_row</span> <span class="op">=</span> <span class="ident">fde</span>.<span class="ident">unwind_info_for_address</span>(<span class="kw-2">&amp;</span><span class="ident">eh_frame</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base_addrs</span>, <span class="kw-2">&amp;mut</span> <span class="ident">unwind_ctx</span>, <span class="self">self</span>.<span class="ident">caller</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> {
+                <span class="macro">error!</span>(<span class="string">&quot;gimli error: {:?}&quot;</span>, <span class="ident">_e</span>);
+                <span class="string">&quot;gimli error while finding unwind info for address&quot;</span>
+            })<span class="question-mark">?</span>;
+            
+            <span class="comment">// debug!(&quot;FDE: {:?} &quot;, fde);</span>
+            <span class="comment">// let mut instructions = fde.instructions(&amp;eh_frame, &amp;self.base_addrs);</span>
+            <span class="comment">// while let Some(instr) = instructions.next().map_err(|_e| {</span>
+            <span class="comment">//     error!(&quot;FDE instructions gimli error: {:?}&quot;, _e);</span>
+            <span class="comment">//     &quot;gimli error while iterating through eh_frame FDE instructions list&quot;</span>
+            <span class="comment">// })? {</span>
+            <span class="comment">//     debug!(&quot;    FDE instr: {:?}&quot;, instr);</span>
+            <span class="comment">// }</span>
 
-        <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="ident">fde</span>, <span class="kw-2">&amp;</span><span class="ident">unwind_table_row</span>)
+            <span class="ident">f</span>(<span class="kw-2">&amp;</span><span class="ident">fde</span>, <span class="kw-2">&amp;</span><span class="ident">unwind_table_row</span>)
+        };
+
+        <span class="comment">// The actual logic of this function that handles the `EhFrameReference` abstraction.</span>
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">eh_frame_sec</span> {
+            <span class="ident">EhFrameReference::Section</span>(<span class="ident">sec</span>) =&gt; {
+                <span class="kw">let</span> <span class="ident">sec_pages</span> <span class="op">=</span> <span class="ident">sec</span>.<span class="ident">mapped_pages</span>.<span class="ident">lock</span>();
+                <span class="kw">let</span> <span class="ident">eh_frame_slice</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] <span class="op">=</span> <span class="ident">sec_pages</span>.<span class="ident">as_slice</span>(<span class="ident">sec</span>.<span class="ident">mapped_pages_offset</span>, <span class="ident">sec</span>.<span class="ident">size</span>())<span class="question-mark">?</span>;
+                <span class="ident">invoke_f_with_eh_frame_slice</span>(<span class="ident">eh_frame_slice</span>)
+            }
+            <span class="ident">EhFrameReference::External</span>(<span class="ident">uw_info</span>) =&gt; {
+                <span class="kw">let</span> <span class="ident">eh_frame_ptr</span> <span class="op">=</span> <span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">start</span>.<span class="ident">value</span>() <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">u8</span>;
+                <span class="kw">let</span> <span class="ident">eh_frame_size</span> <span class="op">=</span> <span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">end</span>.<span class="ident">value</span>() <span class="op">-</span> <span class="ident">uw_info</span>.<span class="ident">unwind_info</span>.<span class="ident">start</span>.<span class="ident">value</span>();
+                <span class="kw">let</span> <span class="ident">eh_frame_slice</span> <span class="op">=</span> <span class="kw">unsafe</span> {
+                    <span class="ident">core::slice::from_raw_parts</span>(<span class="ident">eh_frame_ptr</span>, <span class="ident">eh_frame_size</span>)
+                };
+                <span class="ident">invoke_f_with_eh_frame_slice</span>(<span class="ident">eh_frame_slice</span>)
+            }
+        }
     }
 }
 
 
-<span class="doccomment">/// Returns a tuple of .eh_frame section for the given `crate_ref`</span>
-<span class="doccomment">/// and the base addresses (its .text section address and .eh_frame section address).</span>
+<span class="doccomment">/// Returns a tuple of:</span>
+<span class="doccomment">/// 1. The `.eh_frame` section for the given `crate_ref`</span>
+<span class="doccomment">/// 2. The base addresses of that crate&#39;s main `.text` section and `.eh_frame` section.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// # Locking / Deadlock</span>
-<span class="doccomment">/// Obtains the lock on the given `crate_ref` </span>
-<span class="doccomment">/// and the lock on all of its sections while iterating through them.</span>
-<span class="doccomment">/// </span>
-<span class="doccomment">/// The latter lock on the crate&#39;s `rodata_pages` object will be held</span>
-<span class="doccomment">/// for the entire lifetime of the returned object. </span>
+<span class="doccomment">/// Obtains the lock on the given `crate_ref`.</span>
 <span class="kw">fn</span> <span class="ident">get_eh_frame_info</span>(<span class="ident">crate_ref</span>: <span class="kw-2">&amp;</span><span class="ident">StrongCrateRef</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">StrongSectionRef</span>, <span class="ident">BaseAddresses</span>)<span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">parent_crate</span> <span class="op">=</span> <span class="ident">crate_ref</span>.<span class="ident">lock_as_ref</span>();
+    <span class="kw">let</span> <span class="ident">krate</span> <span class="op">=</span> <span class="ident">crate_ref</span>.<span class="ident">lock_as_ref</span>();
 
-    <span class="kw">let</span> <span class="ident">eh_frame_sec</span> <span class="op">=</span> <span class="ident">parent_crate</span>.<span class="ident">sections</span>.<span class="ident">values</span>()
+    <span class="kw">let</span> <span class="ident">eh_frame_sec</span> <span class="op">=</span> <span class="ident">krate</span>.<span class="ident">sections</span>.<span class="ident">values</span>()
         .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">SectionType::EhFrame</span>)
         .<span class="ident">next</span>()<span class="question-mark">?</span>;
     
     <span class="kw">let</span> <span class="ident">eh_frame_vaddr</span> <span class="op">=</span> <span class="ident">eh_frame_sec</span>.<span class="ident">start_address</span>().<span class="ident">value</span>();
-    <span class="kw">let</span> <span class="ident">text_pages_vaddr</span> <span class="op">=</span> <span class="ident">parent_crate</span>.<span class="ident">text_pages</span>.<span class="ident">as_ref</span>()<span class="question-mark">?</span>.<span class="number">1</span>.<span class="ident">start</span>.<span class="ident">value</span>();
+    <span class="kw">let</span> <span class="ident">text_pages_vaddr</span> <span class="op">=</span> <span class="ident">krate</span>.<span class="ident">text_pages</span>.<span class="ident">as_ref</span>()<span class="question-mark">?</span>.<span class="number">1</span>.<span class="ident">start</span>.<span class="ident">value</span>();
     <span class="kw">let</span> <span class="ident">base_addrs</span> <span class="op">=</span> <span class="ident">BaseAddresses::default</span>()
         .<span class="ident">set_eh_frame</span>(<span class="ident">eh_frame_vaddr</span> <span class="kw">as</span> <span class="ident">u64</span>)
         .<span class="ident">set_text</span>(<span class="ident">text_pages_vaddr</span> <span class="kw">as</span> <span class="ident">u64</span>);

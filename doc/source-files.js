@@ -39,6 +39,7 @@ sourcesIndex["ethernet_smoltcp_device"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["event_types"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["exceptions_early"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["exceptions_full"] = {"name":"","files":["lib.rs"]};
+sourcesIndex["external_unwind_info"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["fadt"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["fault_crate_swap"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["fault_log"] = {"name":"","files":["lib.rs"]};
