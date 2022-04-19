@@ -3771,6 +3771,7 @@ version = "0.30.0"
 dependencies = [
  "anyhow",
  "cfg-if 1.0.0",
+ "core2",
  "cranelift-entity",
  "gimli 0.25.0",
  "hashbrown",
@@ -3780,6 +3781,7 @@ dependencies = [
  "object",
  "serde",
  "target-lexicon",
+ "thiserror_core2",
  "wasmparser",
  "wasmtime-types",
 ]
@@ -3820,8 +3822,10 @@ dependencies = [
 name = "wasmtime-types"
 version = "0.30.0"
 dependencies = [
+ "core2",
  "cranelift-entity",
  "serde",
+ "thiserror_core2",
  "wasmparser",
 ]
 
