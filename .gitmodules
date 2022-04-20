@@ -31,3 +31,6 @@
 [submodule "libs/thiserror-core2"]
 	path = libs/thiserror-core2
 	url = https://github.com/theseus-os/thiserror-core2.git
+[submodule "libs/bincode"]
+	path = libs/bincode
+	url = git@github.com:theseus-os/bincode.git

@@ -56,6 +56,15 @@ dependencies = [
 
 [[package]]
 name = "addr2line"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e61f2b7f93d2c7d2b08263acaa4a363b3e276806c68af6134c44f523bf1aacd"
+dependencies = [
+ "gimli 0.25.0",
+]
+
+[[package]]
+name = "addr2line"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9ecd88a8c8378ca913a680cd98f0f13ac67383d35993f86c90a70e3f137816b"
@@ -202,7 +211,7 @@ checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 name = "backtrace"
 version = "0.3.64"
 dependencies = [
- "addr2line",
+ "addr2line 0.17.0",
  "cc",
  "cfg-if 1.0.0",
  "libc",
@@ -224,6 +233,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5deb64efa5bd81e31fcd1938615a6d98c82eafcbcd787162b6f63b91d6bac5b3"
 dependencies = [
  "rustc_version",
+]
+
+[[package]]
+name = "bincode"
+version = "2.0.0-rc.1"
+dependencies = [
+ "bincode_derive",
+ "serde",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.0-rc.1"
+dependencies = [
+ "virtue",
 ]
 
 [[package]]
@@ -3394,6 +3418,7 @@ dependencies = [
  "region",
  "wasmparser",
  "wasmtime-environ",
+ "wasmtime-jit",
  "wasmtime-runtime",
  "wasmtime-types",
 ]
@@ -3628,6 +3653,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "virtue"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "757cfbfe0d17ee6f22fe97e536d463047d451b47cf9d11e2b7d1398b0ef274dd"
+
+[[package]]
 name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3784,6 +3815,31 @@ dependencies = [
  "thiserror_core2",
  "wasmparser",
  "wasmtime-types",
+]
+
+[[package]]
+name = "wasmtime-jit"
+version = "0.30.0"
+dependencies = [
+ "addr2line 0.16.0",
+ "anyhow",
+ "bincode",
+ "cfg-if 1.0.0",
+ "core2",
+ "external_unwind_info",
+ "gimli 0.25.0",
+ "log",
+ "more-asserts",
+ "object",
+ "path_std",
+ "region",
+ "serde",
+ "target-lexicon",
+ "thiserror_core2",
+ "wasmparser",
+ "wasmtime-environ",
+ "wasmtime-runtime",
+ "winapi",
 ]
 
 [[package]]

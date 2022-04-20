@@ -35,14 +35,17 @@ default-features = false
 [dependencies.region]
 path = "../../ports/region"
 
-
-# builds properly, but still has unfinishing stub functions for signal handling, etc.
+# working, but may be incomplete
 [dependencies.wasmtime-runtime]
 path = "../../ports/wasmtime/crates/runtime"
 default-features = false
 
+# working
+[dependencies.wasmtime-jit]
+path = "../../ports/wasmtime/crates/jit"
+default-features = false
 
-
+# # in progress
 # [dependencies.wasmtime]
 # path = "../../ports/wasmtime/crates/wasmtime"
 # default-features = false

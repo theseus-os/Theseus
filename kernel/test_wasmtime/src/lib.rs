@@ -10,9 +10,10 @@
 // extern crate cranelift_entity; // cranelift-entity (with the "enable-serde" feature) is working on no_std
 // extern crate wasmtime_types; // wasmtime-types is working on no_std
 // extern crate wasmtime_environ;  // wasmtime-environ is working on no_std
-// extern crate region;  // region is working on no_std
+// extern crate region;  // region is working on Theseus
 
-extern crate wasmtime_runtime;  // wasmtime-runtime is a WIP on no_std
+// extern crate wasmtime_runtime;  // wasmtime-runtime builds on Theseus
 
-// extern crate wasmtime;
+// extern crate jit; // WIP on Theseus
+// extern crate wasmtime; // WIP on Theseus
 
