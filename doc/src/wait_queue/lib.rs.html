@@ -396,8 +396,8 @@
 
     <span class="doccomment">/// Wake up one random `Task` that is waiting on this queue.</span>
     <span class="doccomment">/// # Return</span>
-    <span class="doccomment">/// * returns `Ok(true)` if a `Task` was successfully woken up,</span>
-    <span class="doccomment">/// * returns `Ok(false)` if there were no `Task`s waiting.</span>
+    <span class="doccomment">/// * returns `true` if a `Task` was successfully woken up,</span>
+    <span class="doccomment">/// * returns `false` if there were no `Task`s waiting.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">notify_one</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">notify</span>(<span class="prelude-val">None</span>)
     }

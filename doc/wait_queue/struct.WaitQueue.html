@@ -25,8 +25,8 @@ that can mutate its environment (a <code>FnMut</code>).</p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.notify_one" class="method has-srclink"><span class="rightside"><a class="srclink" href="../src/wait_queue/lib.rs.html#176-178">source</a></span><a href="#method.notify_one" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.notify_one" class="fnname">notify_one</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Wake up one random <code>Task</code> that is waiting on this queue.</p>
 <h5 id="return"><a href="#return">Return</a></h5>
 <ul>
-<li>returns <code>Ok(true)</code> if a <code>Task</code> was successfully woken up,</li>
-<li>returns <code>Ok(false)</code> if there were no <code>Task</code>s waiting.</li>
+<li>returns <code>true</code> if a <code>Task</code> was successfully woken up,</li>
+<li>returns <code>false</code> if there were no <code>Task</code>s waiting.</li>
 </ul>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.notify_specific" class="method has-srclink"><span class="rightside"><a class="srclink" href="../src/wait_queue/lib.rs.html#184-186">source</a></span><a href="#method.notify_specific" class="anchor"></a><h4 class="code-header">pub fn <a href="#method.notify_specific" class="fnname">notify_specific</a>(&amp;self, task_to_wakeup: &amp;<a class="struct" href="../task/struct.TaskRef.html" title="struct task::TaskRef">TaskRef</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Wake up a specific <code>Task</code> that is waiting on this queue.</p>
 <h5 id="return-1"><a href="#return-1">Return</a></h5>
