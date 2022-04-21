@@ -171,8 +171,8 @@ impl WaitQueue {
 
     /// Wake up one random `Task` that is waiting on this queue.
     /// # Return
-    /// * returns `Ok(true)` if a `Task` was successfully woken up,
-    /// * returns `Ok(false)` if there were no `Task`s waiting.
+    /// * returns `true` if a `Task` was successfully woken up,
+    /// * returns `false` if there were no `Task`s waiting.
     pub fn notify_one(&self) -> bool {
         self.notify(None)
     }
