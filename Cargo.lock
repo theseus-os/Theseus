@@ -1280,7 +1280,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#697ce590a772132adb26ccc50a4fe669356155a1"
+source = "git+https://github.com/theseus-os/irq_safety#d6be450ef6487052e5b6b174d679b77f26f93b48"
 dependencies = [
  "cortex-m",
  "owning_ref",
