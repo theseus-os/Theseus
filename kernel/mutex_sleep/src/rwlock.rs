@@ -84,7 +84,6 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     // The lock is dropped and interrupts are restored to their prior state
     /// }
     /// ```
-    #[inline]
     pub fn read<'a>(&'a self) -> Result<RwLockSleepReadGuard<'a, T>, &'static str> {
         // Fast path: check for the uncontended case.
         if let Some(guard) = self.try_read() {
@@ -114,7 +113,6 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     };
     /// }
     /// ```
-    #[inline]
     pub fn try_read(&self) -> Option<RwLockSleepReadGuard<T>> {
         self.rwlock.try_read().map(|spinlock_guard| 
             RwLockSleepReadGuard {
@@ -186,7 +184,6 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     // The lock is dropped
     /// }
     /// ```
-    #[inline]
     pub fn write<'a>(&'a self) -> Result<RwLockSleepWriteGuard<'a, T>, &'static str> {
         // Fast path: check for the uncontended case.
         if let Some(guard) = self.try_write() {
@@ -216,7 +213,6 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     };
     /// }
     /// ```
-    #[inline]
     pub fn try_write(&self) -> Option<RwLockSleepWriteGuard<T>> {
         self.rwlock.try_write().map(|spinlock_guard|
             RwLockSleepWriteGuard {
@@ -239,7 +235,6 @@ impl<T: ?Sized> RwLockSleep<T> {
     /// *lock.get_mut() = 10;
     /// assert_eq!(*lock.lock(), 10);
     /// ```
-    #[inline(always)]
     pub fn get_mut(&mut self) -> &mut T {
         self.rwlock.get_mut()
     }
