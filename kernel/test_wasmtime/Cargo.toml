@@ -45,10 +45,10 @@ default-features = false
 path = "../../ports/wasmtime/crates/jit"
 default-features = false
 
-# # in progress
-# [dependencies.wasmtime]
-# path = "../../ports/wasmtime/crates/wasmtime"
-# default-features = false
+# in progress
+[dependencies.wasmtime]
+path = "../../ports/wasmtime/crates/wasmtime"
+default-features = false
 
 
 [lib]

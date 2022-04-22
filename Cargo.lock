@@ -585,6 +585,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpp_demangle"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eeaa953eaad386a53111e47172c2fedba671e5684c8dd601a5f474f4f118710f"
+dependencies = [
+ "cfg-if 1.0.0",
+]
+
+[[package]]
 name = "cpu"
 version = "0.1.0"
 dependencies = [
@@ -2450,6 +2459,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "psm"
+version = "0.1.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "871372391786ccec00d3c5d3d6608905b3d4db263639cfe075d3b60a736d115a"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "pwd"
 version = "0.1.0"
 dependencies = [
@@ -3417,6 +3435,7 @@ dependencies = [
  "log",
  "region",
  "wasmparser",
+ "wasmtime",
  "wasmtime-environ",
  "wasmtime-jit",
  "wasmtime-runtime",
@@ -3794,6 +3813,38 @@ name = "wasmparser"
 version = "0.81.0"
 dependencies = [
  "hashbrown",
+]
+
+[[package]]
+name = "wasmtime"
+version = "0.30.0"
+dependencies = [
+ "anyhow",
+ "backtrace",
+ "bincode",
+ "catch_unwind",
+ "cfg-if 1.0.0",
+ "core2",
+ "cpp_demangle",
+ "hashbrown",
+ "indexmap",
+ "lazy_static",
+ "libc",
+ "log",
+ "mutex_sleep",
+ "object",
+ "paste",
+ "path_std",
+ "psm",
+ "region",
+ "rustc-demangle",
+ "serde",
+ "target-lexicon",
+ "wasmparser",
+ "wasmtime-environ",
+ "wasmtime-jit",
+ "wasmtime-runtime",
+ "winapi",
 ]
 
 [[package]]
