@@ -26,5 +26,8 @@ path = "../task"
 [dependencies.root]
 path = "../root"
 
+[dependencies.io]
+path = "../io"
+
 [lib]
 crate-type = ["rlib"]

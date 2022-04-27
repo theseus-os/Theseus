@@ -105,11 +105,11 @@ pub fn main(args: Vec<String>) -> isize {
                 return -1;
             }
             FileOrDir::File(file) => {
-                let file_locked = file.lock();
-                let file_size = file_locked.size();
+                let mut file_locked = file.lock();
+                let file_size = file_locked.len();
                 let mut wasm_binary_as_bytes = vec![0; file_size];
 
-                let _num_bytes_read = match file_locked.read(&mut wasm_binary_as_bytes, 0) {
+                let _num_bytes_read = match file_locked.read_at(&mut wasm_binary_as_bytes, 0) {
                     Ok(num) => num,
                     Err(e) => {
                         println!("Failed to read {:?}, error {:?}", file_locked.get_name(), e);

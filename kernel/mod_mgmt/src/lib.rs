@@ -341,7 +341,7 @@ impl NamespaceDir {
     pub fn write_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
         let cfile = MemFile::new(String::from(objfilename), &self.0)?;
-        cfile.lock().write(content, 0)?;
+        cfile.lock().write_at(content, 0)?;
         Ok(cfile)
     }
 }
@@ -1017,7 +1017,7 @@ impl CrateNamespace {
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
         
         let mapped_pages  = crate_file.as_mapping()?;
-        let size_in_bytes = crate_file.size();
+        let size_in_bytes = crate_file.len();
         let abs_path      = Path::new(crate_file.get_absolute_path());
         let crate_name    = crate_name_from_path(&abs_path).to_string();
 

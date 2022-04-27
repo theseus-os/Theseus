@@ -146,7 +146,7 @@ fn parse_nano_core_symbol_file(
     let new_crate_weak_ref = CowArc::downgrade(&new_crate_ref);
     let new_crate = new_crate_ref.lock_as_ref();
     let nano_core_object_file = new_crate.object_file.lock();
-    let size = nano_core_object_file.size();
+    let size = nano_core_object_file.len();
     let mapped_pages = nano_core_object_file.as_mapping()?;
 
     debug!("Parsing nano_core symbol file: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
@@ -410,7 +410,7 @@ fn parse_nano_core_binary(
     let new_crate_weak_ref = CowArc::downgrade(&new_crate_ref);
     let new_crate = new_crate_ref.lock_as_ref();
     let nano_core_object_file = new_crate.object_file.lock();
-    let size_in_bytes = nano_core_object_file.size();
+    let size_in_bytes = nano_core_object_file.len();
     let mapped_pages = nano_core_object_file.as_mapping()?;
 
     debug!("Parsing nano_core binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 

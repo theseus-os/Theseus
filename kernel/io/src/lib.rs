@@ -50,7 +50,7 @@ extern crate lockable;
 mod test;
 
 use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, Range}};
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use lockable::Lockable;
 use core2::io::{Seek, SeekFrom};
 
@@ -60,29 +60,42 @@ use core2::io::{Seek, SeekFrom};
 pub enum IoError {
     /// An input parameter or argument was incorrect or invalid.
     InvalidInput,
-    /// The I/O operation attempted to access data beyond the bounds of this I/O stream.
-    OutOfBounds,
     /// The I/O operation timed out and was canceled.
     TimedOut,
+    /// A miscellaneous error occurred.
+    Other(&'static str),
 }
 
 impl From<IoError> for core2::io::Error {
     fn from(io_error: IoError) -> Self {
-        use core2::io::{ErrorKind, Error};
+        use core2::io::ErrorKind;
         match io_error {
             IoError::InvalidInput => ErrorKind::InvalidInput.into(),
-            IoError::OutOfBounds  => Error::new(ErrorKind::Other, "out of bounds"),
             IoError::TimedOut     => ErrorKind::TimedOut.into(),
+            IoError::Other(_)     => ErrorKind::Other.into(),
         }
+    }
+}
+
+impl From<&'static str> for IoError {
+    fn from(s: &'static str) -> IoError {
+        IoError::Other(s)
+    }
+}
+
+impl From<IoError> for String {
+    fn from(e: IoError) -> String {
+        let s: &'static str = e.into();
+        String::from(s)
     }
 }
 
 impl From<IoError> for &'static str {
     fn from(io_error: IoError) -> Self {
         match io_error {
-            IoError::InvalidInput => "IoError: invalid input",
-            IoError::OutOfBounds  => "IoError: out of bounds",
-            IoError::TimedOut     => "IoError: timed out",
+            IoError::InvalidInput => "invalid input",
+            IoError::TimedOut     => "timed out",
+            IoError::Other(s)     => s,
         }
     }
 }
