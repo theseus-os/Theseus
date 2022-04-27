@@ -1024,6 +1024,7 @@ dependencies = [
 name = "fs_node"
 version = "0.1.0"
 dependencies = [
+ "io",
  "lazy_static",
  "log",
  "memory",
@@ -1121,6 +1122,7 @@ name = "heapfile"
 version = "0.1.0"
 dependencies = [
  "fs_node",
+ "io",
  "irq_safety",
  "log",
  "memory",
@@ -1578,6 +1580,7 @@ name = "memfs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
+ "io",
  "irq_safety",
  "log",
  "memory",
@@ -3053,6 +3056,7 @@ name = "task_fs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
+ "io",
  "log",
  "memory",
  "path",

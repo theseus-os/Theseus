@@ -223,15 +223,15 @@ impl PosixNode {
 
                 if is_append_mode {
                     // Write to end of file.
-                    let end_of_file_offset: usize = file_ref.lock().size();
-                    match file_ref.lock().write(buffer, end_of_file_offset) {
+                    let end_of_file_offset: usize = file_ref.lock().len();
+                    match file_ref.lock().write_at(buffer, end_of_file_offset) {
                         Ok(bytes_written) => Ok(bytes_written),
                         Err(_) => Err(wasi::ERRNO_NOBUFS),
                     }
                 } else {
                     // Write at offset of file and update offset.
                     let offset = self.offset;
-                    match file_ref.lock().write(buffer, offset) {
+                    match file_ref.lock().write_at(buffer, offset) {
                         Ok(bytes_written) => {
                             self.offset = self.offset.checked_add(bytes_written).unwrap();
                             Ok(bytes_written)
@@ -264,7 +264,7 @@ impl PosixNode {
             FileOrDir::File(file_ref) => {
                 // Read at offset of file and update offset.
                 let offset = self.offset;
-                match file_ref.lock().read(buffer, offset) {
+                match file_ref.lock().read_at(buffer, offset) {
                     Ok(bytes_read) => {
                         self.offset = self.offset.checked_add(bytes_read).unwrap();
                         Ok(bytes_read)
@@ -297,7 +297,7 @@ impl PosixNode {
 
         match self.theseus_file_or_dir.clone() {
             FileOrDir::File(file_ref) => {
-                let max_offset: usize = file_ref.lock().size();
+                let max_offset: usize = file_ref.lock().len();
 
                 let signed_to_file_offset = |x: i64| -> usize {
                     cmp::min(usize::try_from(cmp::max(0, x)).unwrap(), max_offset)
