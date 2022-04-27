@@ -921,7 +921,7 @@
     <span class="kw">let</span> <span class="ident">new_crate_weak_ref</span> <span class="op">=</span> <span class="ident">CowArc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">new_crate_ref</span>);
     <span class="kw">let</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">new_crate_ref</span>.<span class="ident">lock_as_ref</span>();
     <span class="kw">let</span> <span class="ident">nano_core_object_file</span> <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">object_file</span>.<span class="ident">lock</span>();
-    <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">nano_core_object_file</span>.<span class="ident">size</span>();
+    <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> <span class="ident">nano_core_object_file</span>.<span class="ident">len</span>();
     <span class="kw">let</span> <span class="ident">mapped_pages</span> <span class="op">=</span> <span class="ident">nano_core_object_file</span>.<span class="ident">as_mapping</span>()<span class="question-mark">?</span>;
 
     <span class="macro">debug!</span>(<span class="string">&quot;Parsing nano_core symbol file: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}&quot;</span>, 
@@ -1185,7 +1185,7 @@
     <span class="kw">let</span> <span class="ident">new_crate_weak_ref</span> <span class="op">=</span> <span class="ident">CowArc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">new_crate_ref</span>);
     <span class="kw">let</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">new_crate_ref</span>.<span class="ident">lock_as_ref</span>();
     <span class="kw">let</span> <span class="ident">nano_core_object_file</span> <span class="op">=</span> <span class="ident">new_crate</span>.<span class="ident">object_file</span>.<span class="ident">lock</span>();
-    <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">nano_core_object_file</span>.<span class="ident">size</span>();
+    <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">nano_core_object_file</span>.<span class="ident">len</span>();
     <span class="kw">let</span> <span class="ident">mapped_pages</span> <span class="op">=</span> <span class="ident">nano_core_object_file</span>.<span class="ident">as_mapping</span>()<span class="question-mark">?</span>;
 
     <span class="macro">debug!</span>(<span class="string">&quot;Parsing nano_core binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}&quot;</span>, 

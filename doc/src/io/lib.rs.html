@@ -919,6 +919,19 @@
 <span id="914">914</span>
 <span id="915">915</span>
 <span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
+<span id="925">925</span>
+<span id="926">926</span>
+<span id="927">927</span>
+<span id="928">928</span>
+<span id="929">929</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The important items are summarized below:</span>
@@ -971,7 +984,7 @@
 <span class="kw">mod</span> <span class="ident">test</span>;
 
 <span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">borrow::Borrow</span>, <span class="ident">cmp::min</span>, <span class="ident">marker::PhantomData</span>, <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">Range</span>}};
-<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">boxed::Box</span>, <span class="ident">vec::Vec</span>};
+<span class="kw">use</span> <span class="ident">alloc</span>::{<span class="ident">boxed::Box</span>, <span class="ident">string::String</span>, <span class="ident">vec::Vec</span>};
 <span class="kw">use</span> <span class="ident">lockable::Lockable</span>;
 <span class="kw">use</span> <span class="ident">core2::io</span>::{<span class="ident">Seek</span>, <span class="ident">SeekFrom</span>};
 
@@ -981,29 +994,42 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">IoError</span> {
     <span class="doccomment">/// An input parameter or argument was incorrect or invalid.</span>
     <span class="ident">InvalidInput</span>,
-    <span class="doccomment">/// The I/O operation attempted to access data beyond the bounds of this I/O stream.</span>
-    <span class="ident">OutOfBounds</span>,
     <span class="doccomment">/// The I/O operation timed out and was canceled.</span>
     <span class="ident">TimedOut</span>,
+    <span class="doccomment">/// A miscellaneous error occurred.</span>
+    <span class="ident">Other</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">IoError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">core2::io::Error</span> {
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">io_error</span>: <span class="ident">IoError</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">use</span> <span class="ident">core2::io</span>::{<span class="ident">ErrorKind</span>, <span class="ident">Error</span>};
+        <span class="kw">use</span> <span class="ident">core2::io::ErrorKind</span>;
         <span class="kw">match</span> <span class="ident">io_error</span> {
             <span class="ident">IoError::InvalidInput</span> =&gt; <span class="ident">ErrorKind::InvalidInput</span>.<span class="ident">into</span>(),
-            <span class="ident">IoError::OutOfBounds</span>  =&gt; <span class="ident">Error::new</span>(<span class="ident">ErrorKind::Other</span>, <span class="string">&quot;out of bounds&quot;</span>),
             <span class="ident">IoError::TimedOut</span>     =&gt; <span class="ident">ErrorKind::TimedOut</span>.<span class="ident">into</span>(),
+            <span class="ident">IoError::Other</span>(<span class="kw">_</span>)     =&gt; <span class="ident">ErrorKind::Other</span>.<span class="ident">into</span>(),
         }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IoError</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>) -&gt; <span class="ident">IoError</span> {
+        <span class="ident">IoError::Other</span>(<span class="ident">s</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">IoError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">String</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">e</span>: <span class="ident">IoError</span>) -&gt; <span class="ident">String</span> {
+        <span class="kw">let</span> <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="ident">e</span>.<span class="ident">into</span>();
+        <span class="ident">String::from</span>(<span class="ident">s</span>)
     }
 }
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">IoError</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
     <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">io_error</span>: <span class="ident">IoError</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">match</span> <span class="ident">io_error</span> {
-            <span class="ident">IoError::InvalidInput</span> =&gt; <span class="string">&quot;IoError: invalid input&quot;</span>,
-            <span class="ident">IoError::OutOfBounds</span>  =&gt; <span class="string">&quot;IoError: out of bounds&quot;</span>,
-            <span class="ident">IoError::TimedOut</span>     =&gt; <span class="string">&quot;IoError: timed out&quot;</span>,
+            <span class="ident">IoError::InvalidInput</span> =&gt; <span class="string">&quot;invalid input&quot;</span>,
+            <span class="ident">IoError::TimedOut</span>     =&gt; <span class="string">&quot;timed out&quot;</span>,
+            <span class="ident">IoError::Other</span>(<span class="ident">s</span>)     =&gt; <span class="ident">s</span>,
         }
     }
 }

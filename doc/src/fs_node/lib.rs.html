@@ -163,6 +163,39 @@
 <span id="158">158</span>
 <span id="159">159</span>
 <span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="doccomment">//! Defines traits for Files and Directories within the virtual filesystem. These files and directories mimic </span>
 <span class="doccomment">//! that of a standard unix virtual filesystem, where directories follow a hierarchical system</span>
@@ -179,22 +212,29 @@
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
 
+<span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">alloc::string::String</span>;
 <span class="kw">use</span> <span class="ident">alloc::vec::Vec</span>;
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">alloc::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>};
 <span class="kw">use</span> <span class="ident">memory::MappedPages</span>;
+<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReader</span>, <span class="ident">ByteWriter</span>, <span class="ident">KnownLength</span>};
 
 
-<span class="doccomment">/// A reference to any type that implements the Directory trait.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DirRef</span> <span class="op">=</span>  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Directory</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
-<span class="doccomment">/// A weak reference to any type that implements the Directory trait.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">WeakDirRef</span> <span class="op">=</span> <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Directory</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
-<span class="doccomment">/// A reference to any type that implements the File trait.</span>
+<span class="doccomment">/// A reference to any type that implements the [`File`] trait,</span>
+<span class="doccomment">/// which can only represent a File (not a Directory).</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">FileRef</span> <span class="op">=</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">File</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
-<span class="doccomment">/// A weak reference to any type that implements the File trait.</span>
+<span class="doccomment">/// A weak reference to any type that implements the [`File`] trait,</span>
+<span class="doccomment">/// which can only represent a File (not a Directory).</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">WeakFileRef</span> <span class="op">=</span> <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">File</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A reference to any type that implements the [`Directory`] trait,</span>
+<span class="doccomment">/// which can only represent a Directory (not a File).</span>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">DirRef</span> <span class="op">=</span>  <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Directory</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
+<span class="doccomment">/// A weak reference to any type that implements the [`Directory`] trait,</span>
+<span class="doccomment">/// which can only represent a Directory (not a File).</span>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">WeakDirRef</span> <span class="op">=</span> <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Directory</span> <span class="op">+</span> <span class="ident">Send</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 
 
 <span class="doccomment">/// A trait that covers any filesystem node, both files and directories.</span>
@@ -222,23 +262,13 @@
     <span class="kw">fn</span> <span class="ident">get_parent_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">DirRef</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Sets this node&#39;s parent directory.</span>
-    <span class="doccomment">/// This is useful for ensuring correctness when inserting or remonving </span>
+    <span class="doccomment">/// This is useful for ensuring correctness when inserting or removing </span>
     <span class="doccomment">/// files or directories from their parent directory.</span>
     <span class="kw">fn</span> <span class="ident">set_parent_dir</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">new_parent</span>: <span class="ident">WeakDirRef</span>);
-} 
+}
 
 <span class="comment">// Trait for files, implementors of File must also implement FsNode</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">File</span> : <span class="ident">FsNode</span> {
-    <span class="doccomment">/// Reads the contents of this file starting at the given `offset` and copies them into the given `buffer`.</span>
-    <span class="doccomment">/// The length of the given `buffer` determines the maximum number of bytes to be read.</span>
-    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>; 
-
-    <span class="doccomment">/// Writes the given `buffer` to this file starting at the given `offset`.</span>
-    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
-
-    <span class="doccomment">/// Returns the size in bytes of this file.</span>
-    <span class="kw">fn</span> <span class="ident">size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span>;
-
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">File</span> : <span class="ident">FsNode</span> <span class="op">+</span> <span class="ident">ByteReader</span> <span class="op">+</span> <span class="ident">ByteWriter</span> <span class="op">+</span> <span class="ident">KnownLength</span> {
     <span class="doccomment">/// Returns a view of this file as an immutable memory-mapped region.</span>
     <span class="kw">fn</span> <span class="ident">as_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span>;
 }
@@ -292,6 +322,12 @@
     <span class="ident">Dir</span>(<span class="ident">DirRef</span>),
 }
 
+<span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">FileOrDir</span> {
+	<span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
+		<span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">get_absolute_path</span>())
+	}
+}
+
 <span class="comment">// Allows us to call methods directly on an enum so we don&#39;t have to match on the underlying type</span>
 <span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">FileOrDir</span> {
     
@@ -320,6 +356,36 @@
         <span class="kw">match</span> <span class="self">self</span> {
             <span class="ident">FileOrDir::File</span>(<span class="ident">file</span>) =&gt; <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">set_parent_dir</span>(<span class="ident">new_parent</span>),
             <span class="ident">FileOrDir::Dir</span>(<span class="ident">dir</span>) =&gt; <span class="ident">dir</span>.<span class="ident">lock</span>().<span class="ident">set_parent_dir</span>(<span class="ident">new_parent</span>),
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">KnownLength</span> <span class="kw">for</span> <span class="ident">FileOrDir</span> {
+    <span class="doccomment">/// Returns the length (size) in bytes of this `FileOrDir`.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Directories currently return `0`.</span>
+    <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
+            <span class="ident">FileOrDir::File</span>(<span class="ident">f</span>) =&gt; <span class="ident">f</span>.<span class="ident">lock</span>().<span class="ident">len</span>(),
+            <span class="ident">FileOrDir::Dir</span>(<span class="kw">_</span>) =&gt; <span class="number">0</span>,
+        }
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">FileOrDir</span> {
+    <span class="doccomment">/// Returns `true` if this is a `File`, `false` if it is a `Directory`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_file</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
+            <span class="ident">FileOrDir::File</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
+            <span class="ident">FileOrDir::Dir</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">false</span>,
+        }
+    }
+
+    <span class="doccomment">/// Returns `true` if this is a `Directory`, `false` if it is a `File`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_dir</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
+            <span class="ident">FileOrDir::File</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">false</span>,
+            <span class="ident">FileOrDir::Dir</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
         }
     }
 }

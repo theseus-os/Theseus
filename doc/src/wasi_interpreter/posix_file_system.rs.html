@@ -731,15 +731,15 @@
 
                 <span class="kw">if</span> <span class="ident">is_append_mode</span> {
                     <span class="comment">// Write to end of file.</span>
-                    <span class="kw">let</span> <span class="ident">end_of_file_offset</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">size</span>();
-                    <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">buffer</span>, <span class="ident">end_of_file_offset</span>) {
+                    <span class="kw">let</span> <span class="ident">end_of_file_offset</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">len</span>();
+                    <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">write_at</span>(<span class="ident">buffer</span>, <span class="ident">end_of_file_offset</span>) {
                         <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>),
                         <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(<span class="ident">wasi::ERRNO_NOBUFS</span>),
                     }
                 } <span class="kw">else</span> {
                     <span class="comment">// Write at offset of file and update offset.</span>
                     <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>;
-                    <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">buffer</span>, <span class="ident">offset</span>) {
+                    <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">write_at</span>(<span class="ident">buffer</span>, <span class="ident">offset</span>) {
                         <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>) =&gt; {
                             <span class="self">self</span>.<span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>.<span class="ident">checked_add</span>(<span class="ident">bytes_written</span>).<span class="ident">unwrap</span>();
                             <span class="prelude-val">Ok</span>(<span class="ident">bytes_written</span>)
@@ -772,7 +772,7 @@
             <span class="ident">FileOrDir::File</span>(<span class="ident">file_ref</span>) =&gt; {
                 <span class="comment">// Read at offset of file and update offset.</span>
                 <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>;
-                <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">read</span>(<span class="ident">buffer</span>, <span class="ident">offset</span>) {
+                <span class="kw">match</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">read_at</span>(<span class="ident">buffer</span>, <span class="ident">offset</span>) {
                     <span class="prelude-val">Ok</span>(<span class="ident">bytes_read</span>) =&gt; {
                         <span class="self">self</span>.<span class="ident">offset</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">offset</span>.<span class="ident">checked_add</span>(<span class="ident">bytes_read</span>).<span class="ident">unwrap</span>();
                         <span class="prelude-val">Ok</span>(<span class="ident">bytes_read</span>)
@@ -805,7 +805,7 @@
 
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">theseus_file_or_dir</span>.<span class="ident">clone</span>() {
             <span class="ident">FileOrDir::File</span>(<span class="ident">file_ref</span>) =&gt; {
-                <span class="kw">let</span> <span class="ident">max_offset</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">size</span>();
+                <span class="kw">let</span> <span class="ident">max_offset</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">file_ref</span>.<span class="ident">lock</span>().<span class="ident">len</span>();
 
                 <span class="kw">let</span> <span class="ident">signed_to_file_offset</span> <span class="op">=</span> <span class="op">|</span><span class="ident">x</span>: <span class="ident">i64</span><span class="op">|</span> -&gt; <span class="ident">usize</span> {
                     <span class="ident">cmp::min</span>(<span class="ident">usize::try_from</span>(<span class="ident">cmp::max</span>(<span class="number">0</span>, <span class="ident">x</span>)).<span class="ident">unwrap</span>(), <span class="ident">max_offset</span>)

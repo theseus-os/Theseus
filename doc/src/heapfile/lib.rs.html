@@ -110,13 +110,6 @@
 <span id="105">105</span>
 <span id="106">106</span>
 <span id="107">107</span>
-<span id="108">108</span>
-<span id="109">109</span>
-<span id="110">110</span>
-<span id="111">111</span>
-<span id="112">112</span>
-<span id="113">113</span>
-<span id="114">114</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An implementation of in-memory files, backed by heap memory, i.e., `Vec`s.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -126,6 +119,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
 
 
 <span class="kw">use</span> <span class="ident">alloc</span>::{
@@ -133,6 +127,7 @@
     <span class="ident">sync::Arc</span>,
     <span class="ident">string::String</span>,
 };
+<span class="kw">use</span> <span class="ident">io</span>::{<span class="ident">ByteReader</span>, <span class="ident">ByteWriter</span>, <span class="ident">IoError</span>, <span class="ident">KnownLength</span>};
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">FileOrDir</span>, <span class="ident">FileRef</span>, <span class="ident">DirRef</span>, <span class="ident">WeakDirRef</span>, <span class="ident">File</span>, <span class="ident">FsNode</span>};
 <span class="kw">use</span> <span class="ident">memory::MappedPages</span>;
@@ -168,54 +163,45 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">File</span> <span class="kw">for</span> <span class="ident">HeapFile</span> {
-    <span class="kw">fn</span> <span class="ident">read</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;read offset exceeds file size&quot;</span>);
+<span class="kw">impl</span> <span class="ident">ByteReader</span> <span class="kw">for</span> <span class="ident">HeapFile</span> {
+    <span class="kw">fn</span> <span class="ident">read_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;mut</span> [<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">IoError::InvalidInput</span>);
         }
         <span class="comment">// read from the offset until the end of the file, but not more than the buffer length</span>
         <span class="kw">let</span> <span class="ident">read_bytes</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="ident">offset</span>, <span class="ident">buffer</span>.<span class="ident">len</span>());
         <span class="ident">buffer</span>[..<span class="ident">read_bytes</span>].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">vec</span>[<span class="ident">offset</span>..<span class="ident">read_bytes</span>]); 
         <span class="prelude-val">Ok</span>(<span class="ident">read_bytes</span>) 
     }
+}
 
-    <span class="kw">fn</span> <span class="ident">write</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">offset</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;offset out of bounds&quot;</span>);
+<span class="kw">impl</span> <span class="ident">ByteWriter</span> <span class="kw">for</span> <span class="ident">HeapFile</span> {
+    <span class="kw">fn</span> <span class="ident">write_at</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">buffer</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>], <span class="ident">offset</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">usize</span>, <span class="ident">IoError</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">final_len</span> <span class="op">=</span> <span class="ident">offset</span> <span class="op">+</span> <span class="ident">buffer</span>.<span class="ident">len</span>();
+        <span class="comment">// Handle the need for reallocation and padding bytes.</span>
+        <span class="kw">if</span> <span class="ident">final_len</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>() {
+            <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">resize</span>(<span class="ident">final_len</span>, <span class="number">0u8</span>);
         }
 
-        <span class="comment">// optimization for first write of an empty HeapFile</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">is_empty</span>() {
-            <span class="self">self</span>.<span class="ident">vec</span> <span class="op">=</span> <span class="ident">buffer</span>.<span class="ident">to_vec</span>();
-            <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">buffer</span>.<span class="ident">len</span>());
-        }
+        <span class="comment">// Now, `self.vec` is long enough to accommodate the entire `buffer`.</span>
+        <span class="self">self</span>.<span class="ident">vec</span>[<span class="ident">offset</span>..].<span class="ident">copy_from_slice</span>(<span class="ident">buffer</span>);
         
-        <span class="kw">let</span> <span class="ident">end_bound</span> <span class="op">=</span> <span class="ident">buffer</span>.<span class="ident">len</span>() <span class="op">+</span> <span class="ident">offset</span>;
-        <span class="comment">// first, do a fast memcpy of everything that can fit in the existing vector.</span>
-        <span class="kw">let</span> <span class="ident">copy_count</span> <span class="op">=</span> <span class="ident">core::cmp::min</span>(<span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="ident">offset</span>, <span class="ident">buffer</span>.<span class="ident">len</span>());
-        <span class="self">self</span>.<span class="ident">vec</span>[<span class="ident">offset</span>..(<span class="ident">offset</span> <span class="op">+</span> <span class="ident">copy_count</span>)].<span class="ident">copy_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">buffer</span>[..<span class="ident">copy_count</span>]);
-
-        <span class="comment">// second, if necessary, resize capacity and extend the vec with everything beyond its bounds.</span>
-        <span class="kw">if</span> <span class="ident">end_bound</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>() {
-            <span class="comment">// reallocation is needed, we should do it all at once for better performance</span>
-            <span class="kw">let</span> <span class="ident">additional_capacity</span> <span class="op">=</span> <span class="ident">end_bound</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>();
-            <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">reserve</span>(<span class="ident">additional_capacity</span>);
-            <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span><span class="ident">buffer</span>[<span class="ident">copy_count</span>..]);
-        }
-        <span class="kw">else</span> {
-            <span class="comment">// no reallocation needed</span>
-        }
         <span class="prelude-val">Ok</span>(<span class="ident">buffer</span>.<span class="ident">len</span>())
     }
 
-    <span class="kw">fn</span> <span class="ident">size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">IoError</span><span class="op">&gt;</span> { <span class="prelude-val">Ok</span>(()) }
+}
+
+<span class="kw">impl</span> <span class="ident">KnownLength</span> <span class="kw">for</span> <span class="ident">HeapFile</span> {
+    <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">vec</span>.<span class="ident">len</span>()
     }
+}
 
+<span class="kw">impl</span> <span class="ident">File</span> <span class="kw">for</span> <span class="ident">HeapFile</span> {
     <span class="kw">fn</span> <span class="ident">as_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">MappedPages</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="prelude-val">Err</span>(<span class="string">&quot;Mapping a HeapFile as a MappedPages object is unimplemented&quot;</span>)
     }
-    
 }
 
 <span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">HeapFile</span> {
