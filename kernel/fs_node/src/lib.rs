@@ -14,22 +14,29 @@
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate memory;
+extern crate io;
 
+use core::fmt;
 use alloc::string::String;
 use alloc::vec::Vec;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use memory::MappedPages;
+use io::{ByteReader, ByteWriter, KnownLength};
 
 
-/// A reference to any type that implements the Directory trait.
-pub type DirRef =  Arc<Mutex<dyn Directory + Send>>;
-/// A weak reference to any type that implements the Directory trait.
-pub type WeakDirRef = Weak<Mutex<dyn Directory + Send>>;
-/// A reference to any type that implements the File trait.
+/// A reference to any type that implements the [`File`] trait,
+/// which can only represent a File (not a Directory).
 pub type FileRef = Arc<Mutex<dyn File + Send>>;
-/// A weak reference to any type that implements the File trait.
+/// A weak reference to any type that implements the [`File`] trait,
+/// which can only represent a File (not a Directory).
 pub type WeakFileRef = Weak<Mutex<dyn File + Send>>;
+/// A reference to any type that implements the [`Directory`] trait,
+/// which can only represent a Directory (not a File).
+pub type DirRef =  Arc<Mutex<dyn Directory + Send>>;
+/// A weak reference to any type that implements the [`Directory`] trait,
+/// which can only represent a Directory (not a File).
+pub type WeakDirRef = Weak<Mutex<dyn Directory + Send>>;
 
 
 /// A trait that covers any filesystem node, both files and directories.
@@ -57,23 +64,13 @@ pub trait FsNode {
     fn get_parent_dir(&self) -> Option<DirRef>;
 
     /// Sets this node's parent directory.
-    /// This is useful for ensuring correctness when inserting or remonving 
+    /// This is useful for ensuring correctness when inserting or removing 
     /// files or directories from their parent directory.
     fn set_parent_dir(&mut self, new_parent: WeakDirRef);
-} 
+}
 
 // Trait for files, implementors of File must also implement FsNode
-pub trait File : FsNode {
-    /// Reads the contents of this file starting at the given `offset` and copies them into the given `buffer`.
-    /// The length of the given `buffer` determines the maximum number of bytes to be read.
-    fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str>; 
-
-    /// Writes the given `buffer` to this file starting at the given `offset`.
-    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str>;
-
-    /// Returns the size in bytes of this file.
-    fn size(&self) -> usize;
-
+pub trait File : FsNode + ByteReader + ByteWriter + KnownLength {
     /// Returns a view of this file as an immutable memory-mapped region.
     fn as_mapping(&self) -> Result<&MappedPages, &'static str>;
 }
@@ -127,6 +124,12 @@ pub enum FileOrDir {
     Dir(DirRef),
 }
 
+impl fmt::Debug for FileOrDir {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.get_absolute_path())
+	}
+}
+
 // Allows us to call methods directly on an enum so we don't have to match on the underlying type
 impl FsNode for FileOrDir {
     
@@ -155,6 +158,36 @@ impl FsNode for FileOrDir {
         match self {
             FileOrDir::File(file) => file.lock().set_parent_dir(new_parent),
             FileOrDir::Dir(dir) => dir.lock().set_parent_dir(new_parent),
+        }
+    }
+}
+
+impl KnownLength for FileOrDir {
+    /// Returns the length (size) in bytes of this `FileOrDir`.
+    /// 
+    /// Directories currently return `0`.
+    fn len(&self) -> usize {
+        match &self {
+            FileOrDir::File(f) => f.lock().len(),
+            FileOrDir::Dir(_) => 0,
+        }
+    }
+}
+
+impl FileOrDir {
+    /// Returns `true` if this is a `File`, `false` if it is a `Directory`.
+    pub fn is_file(&self) -> bool {
+        match &self {
+            FileOrDir::File(_) => true,
+            FileOrDir::Dir(_) => false,
+        }
+    }
+
+    /// Returns `true` if this is a `Directory`, `false` if it is a `File`.
+    pub fn is_dir(&self) -> bool {
+        match &self {
+            FileOrDir::File(_) => false,
+            FileOrDir::Dir(_) => true,
         }
     }
 }

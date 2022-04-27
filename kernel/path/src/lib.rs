@@ -20,7 +20,8 @@ pub const PATH_DELIMITER: &str = "/";
 pub const EXTENSION_DELIMITER: &str = ".";
 
 
-/// A structure that represents a file  
+/// A structure that represents a relative or absolute path
+/// to a file or directory.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Path {
     path: String

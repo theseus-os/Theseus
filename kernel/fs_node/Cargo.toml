@@ -18,5 +18,8 @@ version = "0.4.8"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.io]
+path = "../io"
+
 [lib]
 crate-type = ["rlib"]

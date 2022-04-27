@@ -60,11 +60,11 @@ fn get_content_string(file_path: String) -> Result<String, String> {
                     Err(format!("{:?} is a directory, cannot 'less' non-files.", directory.lock().get_name()))
                 }
                 FileOrDir::File(file) => {
-                    let file_locked = file.lock();
-                    let file_size = file_locked.size();
+                    let mut file_locked = file.lock();
+                    let file_size = file_locked.len();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     
-                    let _num_bytes_read = match file_locked.read(&mut string_slice_as_bytes,0) {
+                    let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes, 0) {
                         Ok(num) => num,
                         Err(e) => {
                             return Err(format!("Failed to read {:?}, error {:?}",
