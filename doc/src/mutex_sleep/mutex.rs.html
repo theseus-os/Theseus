@@ -128,12 +128,61 @@
 <span id="123">123</span>
 <span id="124">124</span>
 <span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
 <span class="kw">use</span> <span class="ident">owning_ref</span>::{<span class="ident">OwningRef</span>, <span class="ident">OwningRefMut</span>};
 <span class="kw">use</span> <span class="ident">stable_deref_trait::StableDeref</span>;
 <span class="kw">use</span> <span class="ident">wait_queue::WaitQueue</span>;
+<span class="kw">use</span> <span class="ident">lockable</span>::{<span class="ident">Lockable</span>, <span class="ident">LockableSized</span>};
 
 <span class="doccomment">/// A mutual exclusion wrapper that puts a `Task` to sleep while waiting for the lock to become available. </span>
 <span class="doccomment">/// </span>
@@ -179,6 +228,16 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">MutexSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Returns `true` if the lock is currently held.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;</span>
+    <span class="doccomment">/// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">is_locked</span>()
+    }
 
     <span class="doccomment">/// Blocks until the lock is acquired by putting this `Task` to sleep </span>
     <span class="doccomment">/// until another `Task` that has the lock releases it. </span>
@@ -205,6 +264,24 @@
                 <span class="ident">queue</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">queue</span>,
             }
         })
+    }
+
+    <span class="doccomment">/// Returns a mutable reference to the underlying data.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Since this call borrows the [`MutexSleep`] mutably, and a mutable reference is guaranteed to be exclusive in Rust,</span>
+    <span class="doccomment">/// no actual locking needs to take place -- the mutable borrow statically guarantees no locks exist. As such,</span>
+    <span class="doccomment">/// this is a &#39;zero-cost&#39; operation.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Example</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// ```</span>
+    <span class="doccomment">/// let mut lock = MutexSleep::new(0);</span>
+    <span class="doccomment">/// *lock.get_mut() = 10;</span>
+    <span class="doccomment">/// assert_eq!(*lock.lock(), 10);</span>
+    <span class="doccomment">/// ```</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> {
+        <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">get_mut</span>()
     }
 }
 
@@ -253,6 +330,25 @@
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MutexSleepGuardRef</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRef</span><span class="op">&lt;</span><span class="ident">MutexSleepGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
 <span class="doccomment">/// Typedef of a mutable owning reference that uses a `MutexSleepGuard` as the owner.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MutexSleepGuardRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRefMut</span><span class="op">&lt;</span><span class="ident">MutexSleepGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
+
+<span class="doccomment">/// Implement `Lockable` for [`MutexSleep`].</span>
+<span class="doccomment">/// Because [`MutexSleep::lock()`] returns a `Result` and may fail,</span>
+<span class="doccomment">/// the [`Lockable::lock()`] function internally `unwrap`s that `Result`.</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Lockable</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MutexSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span> {
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">MutexSleepGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">GuardMut</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::Guard</span>;
+
+    <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> { <span class="self">self</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() }
+    <span class="kw">fn</span> <span class="ident">try_lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Guard</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_lock</span>() }
+    <span class="kw">fn</span> <span class="ident">lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::GuardMut</span> { <span class="self">self</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() }
+    <span class="kw">fn</span> <span class="ident">try_lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::GuardMut</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_lock</span>() }
+    <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_locked</span>() }
+    <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="kw-2">mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">get_mut</span>() }
+}
+<span class="doccomment">/// Implement `LockableSized` for [`MutexSleep`].</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">LockableSized</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">MutexSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="ident">Sized</span> {
+    <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">into_inner</span>() }
+}
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mutex_sleep" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
 </body></html>

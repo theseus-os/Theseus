@@ -307,12 +307,44 @@
 <span id="302">302</span>
 <span id="303">303</span>
 <span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">RwLock</span>, <span class="ident">RwLockReadGuard</span>, <span class="ident">RwLockWriteGuard</span>};
 <span class="kw">use</span> <span class="ident">owning_ref</span>::{<span class="ident">OwningRef</span>, <span class="ident">OwningRefMut</span>};
 <span class="kw">use</span> <span class="ident">stable_deref_trait::StableDeref</span>;
 <span class="kw">use</span> <span class="ident">wait_queue::WaitQueue</span>;
+<span class="kw">use</span> <span class="ident">lockable</span>::{<span class="ident">Lockable</span>, <span class="ident">LockableSized</span>};
 
 <span class="doccomment">/// A multi-reader, single-writer mutual exclusion wrapper that puts a `Task` to sleep</span>
 <span class="doccomment">/// while waiting for the lock to become available. </span>
@@ -372,6 +404,17 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="question-mark">?</span><span class="ident">Sized</span><span class="op">&gt;</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Returns `true` if the lock is currently held.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;</span>
+    <span class="doccomment">/// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">rwlock</span>.<span class="ident">is_locked</span>()
+    }
+
     <span class="doccomment">/// Locks this `RwLockSleep` with shared read (immutable) access.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// If a writer has already acquired this lock, this function will put the current `Task`</span>
@@ -610,6 +653,26 @@
 <span class="doccomment">/// Typedef of a owning reference that uses a `RwLockSleepSafeReadGuard` as the owner.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">RwLockSleepReadGuardRef</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRef</span><span class="op">&lt;</span><span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
 <span class="doccomment">/// Typedef of a mutable owning reference that uses a `RwLockSleepWriteGuard` as the owner.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">RwLockSleepWriteGuardRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRefMut</span><span class="op">&lt;</span><span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;</code></pre></div>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">RwLockSleepWriteGuardRefMut</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span>, <span class="ident">U</span> <span class="op">=</span> <span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">OwningRefMut</span><span class="op">&lt;</span><span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>, <span class="ident">U</span><span class="op">&gt;</span>;
+
+<span class="doccomment">/// Implement `Lockable` for [`RwLockSleep`].</span>
+<span class="doccomment">/// Because [`RwLockSleep::read()`] and [`RwLockSleep::write()`] return `Result`s and may fail,</span>
+<span class="doccomment">/// the [`Lockable::lock()`] and `lock_mut()` functions internally `unwrap` those `Result`s.</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Lockable</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span> {
+    <span class="kw">type</span> <span class="ident">Guard</span> <span class="op">=</span> <span class="ident">RwLockSleepReadGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">GuardMut</span> <span class="op">=</span> <span class="ident">RwLockSleepWriteGuard</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span>;
+
+    <span class="kw">fn</span> <span class="ident">lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::Guard</span> { <span class="self">self</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>() }
+    <span class="kw">fn</span> <span class="ident">try_lock</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::Guard</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_read</span>() }
+    <span class="kw">fn</span> <span class="ident">lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="ident"><span class="self">Self</span>::GuardMut</span> { <span class="self">self</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>() }
+    <span class="kw">fn</span> <span class="ident">try_lock_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::GuardMut</span><span class="op">&gt;</span> { <span class="self">self</span>.<span class="ident">try_write</span>() }
+    <span class="kw">fn</span> <span class="ident">is_locked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> { <span class="self">self</span>.<span class="ident">is_locked</span>() }
+    <span class="kw">fn</span> <span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;t</span> <span class="kw-2">mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">get_mut</span>() }
+}
+<span class="doccomment">/// Implement `LockableSized` for [`RwLockSleep`].</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="ident">LockableSized</span><span class="op">&lt;</span><span class="lifetime">&#39;t</span>, <span class="ident">T</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">RwLockSleep</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">T</span>: <span class="lifetime">&#39;t</span> <span class="op">+</span> <span class="ident">Sized</span> {
+    <span class="kw">fn</span> <span class="ident">into_inner</span>(<span class="self">self</span>) -&gt; <span class="ident">T</span> { <span class="self">self</span>.<span class="ident">into_inner</span>() }
+}
+</code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="mutex_sleep" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
 </body></html>

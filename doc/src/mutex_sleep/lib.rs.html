@@ -16,12 +16,6 @@
 <span id="11">11</span>
 <span id="12">12</span>
 <span id="13">13</span>
-<span id="14">14</span>
-<span id="15">15</span>
-<span id="16">16</span>
-<span id="17">17</span>
-<span id="18">18</span>
-<span id="19">19</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Locking types that put a task to sleep while it waits for the lock. </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! These are Theseus-specific locking types that ensure mutual exclusion</span>
@@ -29,12 +23,6 @@
 <span class="doccomment">//! see those types for more details on how they work.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
-
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">owning_ref</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stable_deref_trait</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">wait_queue</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
 
 <span class="kw">mod</span> <span class="ident">mutex</span>;
 <span class="kw">mod</span> <span class="ident">rwlock</span>;
