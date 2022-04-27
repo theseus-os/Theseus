@@ -4,6 +4,7 @@ use spin::{Mutex, MutexGuard};
 use owning_ref::{OwningRef, OwningRefMut};
 use stable_deref_trait::StableDeref;
 use wait_queue::WaitQueue;
+use lockable::{Lockable, LockableSized};
 
 /// A mutual exclusion wrapper that puts a `Task` to sleep while waiting for the lock to become available. 
 /// 
@@ -49,6 +50,16 @@ impl<T> MutexSleep<T> {
 }
 
 impl<T: ?Sized> MutexSleep<T> {
+    /// Returns `true` if the lock is currently held.
+    ///
+    /// # Safety
+    ///
+    /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
+    /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    #[inline(always)]
+    pub fn is_locked(&self) -> bool {
+        self.lock.is_locked()
+    }
 
     /// Blocks until the lock is acquired by putting this `Task` to sleep 
     /// until another `Task` that has the lock releases it. 
@@ -75,6 +86,24 @@ impl<T: ?Sized> MutexSleep<T> {
                 queue: &self.queue,
             }
         })
+    }
+
+    /// Returns a mutable reference to the underlying data.
+    ///
+    /// Since this call borrows the [`MutexSleep`] mutably, and a mutable reference is guaranteed to be exclusive in Rust,
+    /// no actual locking needs to take place -- the mutable borrow statically guarantees no locks exist. As such,
+    /// this is a 'zero-cost' operation.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut lock = MutexSleep::new(0);
+    /// *lock.get_mut() = 10;
+    /// assert_eq!(*lock.lock(), 10);
+    /// ```
+    #[inline(always)]
+    pub fn get_mut(&mut self) -> &mut T {
+        self.lock.get_mut()
     }
 }
 
@@ -123,3 +152,22 @@ unsafe impl<'a, T: ?Sized> StableDeref for MutexSleepGuard<'a, T> {}
 pub type MutexSleepGuardRef<'a, T, U = T> = OwningRef<MutexSleepGuard<'a, T>, U>;
 /// Typedef of a mutable owning reference that uses a `MutexSleepGuard` as the owner.
 pub type MutexSleepGuardRefMut<'a, T, U = T> = OwningRefMut<MutexSleepGuard<'a, T>, U>;
+
+/// Implement `Lockable` for [`MutexSleep`].
+/// Because [`MutexSleep::lock()`] returns a `Result` and may fail,
+/// the [`Lockable::lock()`] function internally `unwrap`s that `Result`.
+impl<'t, T> Lockable<'t, T> for MutexSleep<T> where T: 't + ?Sized {
+    type Guard = MutexSleepGuard<'t, T>;
+    type GuardMut = Self::Guard;
+
+    fn lock(&'t self) -> Self::Guard { self.lock().unwrap() }
+    fn try_lock(&'t self) -> Option<Self::Guard> { self.try_lock() }
+    fn lock_mut(&'t self) -> Self::GuardMut { self.lock().unwrap() }
+    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_lock() }
+    fn is_locked(&self) -> bool { self.is_locked() }
+    fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+}
+/// Implement `LockableSized` for [`MutexSleep`].
+impl<'t, T> LockableSized<'t, T> for MutexSleep<T> where T: 't + Sized {
+    fn into_inner(self) -> T { self.into_inner() }
+}

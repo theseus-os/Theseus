@@ -6,12 +6,6 @@
 
 #![no_std]
 
-extern crate spin;
-extern crate owning_ref;
-extern crate stable_deref_trait;
-extern crate wait_queue;
-extern crate task;
-
 mod mutex;
 mod rwlock;
 
