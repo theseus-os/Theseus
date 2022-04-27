@@ -10,6 +10,7 @@ extern crate spin;
 extern crate fs_node;
 extern crate memory;
 extern crate irq_safety;
+extern crate io;
 
 
 use alloc::string::String;
@@ -18,14 +19,15 @@ use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, EntryFlag
 use alloc::sync::Arc;
 use spin::Mutex;
 use fs_node::{FileOrDir, FileRef};
+use io::{ByteReader, ByteWriter, IoError, KnownLength};
 
 /// The struct that represents a file in memory that is backed by MappedPages
 pub struct MemFile {
     /// The name of the file.
     name: String,
-    /// The size in bytes of the file.
+    /// The length in bytes of the file.
     /// Note that this is not the same as the capacity of its underlying MappedPages object. 
-    size: usize,
+    len: usize,
     /// The underlying contents of this file in memory.
     mp: MappedPages,
     /// The parent directory that contains this file.
@@ -40,10 +42,10 @@ impl MemFile {
     }
 
     /// Creates a new `MemFile` in the given `parent` directory with the contents of the given `mapped_pages`.
-    pub fn from_mapped_pages(mapped_pages: MappedPages, name: String, size: usize, parent: &DirRef) -> Result<FileRef, &'static str> {
+    pub fn from_mapped_pages(mapped_pages: MappedPages, name: String, len: usize, parent: &DirRef) -> Result<FileRef, &'static str> {
         let memfile = MemFile {
-            name: name, 
-            size: size, 
+            name,
+            len,
             mp: mapped_pages, 
             parent: Arc::downgrade(parent), 
         };
@@ -53,22 +55,26 @@ impl MemFile {
     }
 }
 
-impl File for MemFile {
+impl ByteReader for MemFile {
     // read will throw an error if the read offset extends past the end of the file
-    fn read(&self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
-        if offset > self.size {
-            return Err("read offset exceeds file size");
+    fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
+        if offset >= self.len {
+            return Err(IoError::InvalidInput);
         }
         // read from the offset until the end of the file, but not more than the buffer length
-        let read_bytes = core::cmp::min(self.size - offset, buffer.len());
-        buffer[..read_bytes].copy_from_slice(self.mp.as_slice(offset, read_bytes)?); 
+        let read_bytes = core::cmp::min(self.len - offset, buffer.len());
+        buffer[..read_bytes].copy_from_slice(
+            self.mp.as_slice(offset, read_bytes).map_err(IoError::from)?
+        ); 
         Ok(read_bytes) 
     }
+}
 
-    fn write(&mut self, buffer: &[u8], offset: usize) -> Result<usize, &'static str> {
+impl ByteWriter for MemFile {
+    fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError> {
         // error out if the underlying mapped pages are already allocated and not writeable
         if !self.mp.flags().is_writable() && self.mp.size_in_bytes() != 0 {
-            return Err("MemFile::write(): existing MappedPages were not writable");
+            return Err(IoError::from("MemFile::write(): existing MappedPages were not writable"));
         }
         
         let end = buffer.len() + offset;
@@ -79,8 +85,8 @@ impl File for MemFile {
             dest_slice.copy_from_slice(buffer);
             // if the buffer written into the mapped pages exceeds the current size, we set the new size equal to 
             // this value, otherwise, the size remains the same
-            if end > self.size { 
-                self.size = end; 
+            if end > self.len { 
+                self.len = end; 
             }
             Ok(buffer.len()) // we wrote all of the requested bytes successfully
         } 
@@ -105,8 +111,8 @@ impl File for MemFile {
                 // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
                 let copy_limit;
                 // The write does not overlap with existing content, so we copy all existing content
-                if offset > self.size { 
-                    copy_limit = self.size;
+                if offset > self.len { 
+                    copy_limit = self.len;
                 } else { // Otherwise, we only copy up to where the overlap begins
                     copy_limit = offset;
                 }
@@ -121,20 +127,25 @@ impl File for MemFile {
                 dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
             }
             self.mp = new_mapped_pages;
-            self.size = end;
+            self.len = end;
             Ok(buffer.len())
         }
     }
 
+    fn flush(&mut self) -> Result<(), IoError> { Ok(()) }
+}
 
-    fn size(&self) -> usize {
-        self.size
+
+impl KnownLength for MemFile {
+    fn len(&self) -> usize {
+        self.len
     }
+}
 
+impl File for MemFile {
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
         Ok(&self.mp)
     }
-    
 }
 
 impl FsNode for MemFile {
@@ -150,4 +161,3 @@ impl FsNode for MemFile {
         self.parent = new_parent;
     }
 }
-

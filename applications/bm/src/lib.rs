@@ -1264,7 +1264,7 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 	let mut _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
 	let size = match get_file(filename) {
-		Some(fileref) => {fileref.lock().size()}
+		Some(fileref) => {fileref.lock().len()}
 		_ => {
 			return Err("Cannot get the size");
 		}
@@ -1280,13 +1280,13 @@ fn do_fs_read_with_open_inner(filename: &str, overhead_ct: u64, th: usize, nr: u
 		let file_dir_enum = path.get(&get_cwd().unwrap()).expect("Cannot find file");
 		match file_dir_enum {
             FileOrDir::File(fileref) => { 
-            	let file = fileref.lock();	// so far, open()
+            	let mut file = fileref.lock();	// so far, open()
 
             	unread_size = size;
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
-                	let nr_read = file.read(&mut buf,0).expect("Cannot read");
+                	let nr_read = file.read_at(&mut buf,0).expect("Cannot read");
 					unread_size -= nr_read as i64;
 
 					// LMbench based on C does the magic to cast a type from char to int
@@ -1329,7 +1329,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let _dummy_sum: u64 = 0;
 	let mut buf = vec![0; READ_BUF_SIZE];
 	let size = match get_file(filename) {
-		Some(fileref) => {fileref.lock().size()}
+		Some(fileref) => {fileref.lock().len()}
 		_ => {
 			return Err("Cannot get the size");
 		}
@@ -1343,7 +1343,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
 	let file_dir_enum = path.get(&get_cwd().unwrap()).expect("Cannot find file");
 	match file_dir_enum {
         FileOrDir::File(fileref) => { 
-        	let file = fileref.lock();	// so far, open()
+        	let mut file = fileref.lock();	// so far, open()
 
 			start_hpet = hpet.get_counter();
 			for _ in 0..ITERATIONS 	{
@@ -1351,7 +1351,7 @@ fn do_fs_read_only_inner(filename: &str, overhead_ct: u64, th: usize, nr: usize)
             	while unread_size > 0 {	// now read()
                 	// XXX: With the Current API, we cannot specify an offset. 
                 	// But the API is coming soon. for now, pretend we have it
-                	let nr_read = file.read(&mut buf,0).expect("Cannot read");
+                	let nr_read = file.read_at(&mut buf, 0).expect("Cannot read");
 					unread_size -= nr_read as i64;
 
 					// LMbench based on C does the magic to cast a type from char to int
@@ -1442,7 +1442,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	for filename in filenames {
 		// We first create a file and then write to resemble LMBench.
 		let file = HeapFile::new(filename, &cwd).expect("File cannot be created.");
-		file.lock().write(wbuf, 0)?;
+		file.lock().write_at(wbuf, 0)?;
 	}
 	end_hpet_create = hpet.get_counter();
 
@@ -1518,7 +1518,7 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 	for filename in &filenames {
 
 		let file = HeapFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
-		file.lock().write(wbuf, 0)?;
+		file.lock().write_at(wbuf, 0)?;
 		file_list.push(file);
 	}
 	
@@ -1600,13 +1600,13 @@ fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 	}
 
 	if let Some(fileref) = get_file(filename) {
-		if fileref.lock().size() == sz {
+		if fileref.lock().len() == sz {
 			return Ok(());
 		}
 	}
 
 	let file = HeapFile::new(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
-	file.lock().write(&WRITE_BUF[0..sz], 0)?;
+	file.lock().write_at(&WRITE_BUF[0..sz], 0)?;
 
 	Ok(())
 }
@@ -1623,10 +1623,10 @@ fn del_or_err(filename: &str) -> Result<(), &'static str> {
 /// Only used to check file system
 fn cat(fileref: &FileRef, sz: usize, msg: &str) {
 	printlninfo!("{}", msg);
-	let file = fileref.lock();
+	let mut file = fileref.lock();
 	let mut buf = vec![0 as u8; sz];
 
-	match file.read(&mut buf,0) {
+	match file.read_at(&mut buf,0) {
 		Ok(nr_read) => {
 			printlninfo!("tries to read {} bytes, and {} bytes are read", sz, nr_read);
 			printlninfo!("read: '{}'", str::from_utf8(&buf).unwrap());
@@ -1646,7 +1646,7 @@ fn write(fileref: &FileRef, sz: usize, msg: &str) {
 	}
 
 	let mut file = fileref.lock();
-	match file.write(&buf,0) {
+	match file.write_at(&buf,0) {
 		Ok(nr_write) => {
 			printlninfo!("tries to write {} bytes, and {} bytes are written", sz, nr_write);
 			printlninfo!("written: '{}'", str::from_utf8(&buf).unwrap());
@@ -1657,7 +1657,7 @@ fn write(fileref: &FileRef, sz: usize, msg: &str) {
 
 /// Helper function to check file system by reading and writing
 fn test_file_inner(fileref: FileRef) {
-	let sz = {fileref.lock().size()};
+	let sz = {fileref.lock().len()};
 	printlninfo!("File size: {}", sz);
 
 	cat(&fileref, sz, 	"== Do CAT-NORMAL ==");
@@ -1667,7 +1667,7 @@ fn test_file_inner(fileref: FileRef) {
 	cat(&fileref, sz, 	"== Do CAT-NORMAL ==");
 
 	write(&fileref, sz*2, "== Do WRITE-MORE ==");
-	let sz = {fileref.lock().size()};
+	let sz = {fileref.lock().len()};
 	cat(&fileref, sz, 	"== Do CAT-NORMAL ==");
 
 }

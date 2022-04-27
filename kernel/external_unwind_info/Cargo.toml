@@ -1,0 +1,15 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "external_unwind_info"
+description = "Registers and stores unwind info from external or legacy components, à la libunwind"
+version = "0.1.0"
+build = "../../build.rs"
+edition = "2018"
+
+[dependencies]
+log = "0.4.8"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+spin = "0.9.0"
+
+[dependencies.memory]
+path = "../memory"

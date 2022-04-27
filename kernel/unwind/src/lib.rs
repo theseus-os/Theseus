@@ -44,10 +44,8 @@ extern crate mod_mgmt;
 extern crate task;
 extern crate gimli;
 extern crate fallible_iterator;
-extern crate scheduler;
-extern crate apic;
-extern crate runqueue;
 extern crate interrupts;
+extern crate external_unwind_info;
 
 mod registers;
 mod lsda;
@@ -57,6 +55,7 @@ use alloc::{
     sync::Arc,
     boxed::Box,
 };
+use external_unwind_info::ExternalUnwindInfo;
 use gimli::{
     UnwindSection, 
     UnwindTableRow, 
@@ -346,15 +345,33 @@ impl FallibleIterator for StackFrameIter {
         let caller = return_address - 1;
         // TODO FIXME: only subtract 1 for non-"fault" exceptions, e.g., page faults should NOT subtract 1
         // trace!("call_site_address: {:#X}", caller);
+        let caller_virt_addr = VirtualAddress::new(caller as usize)
+            .ok_or("caller wasn't a valid virtual address")?;
 
-        // Get unwind info for the call site address
-        let crate_ref = self.namespace.get_crate_containing_address(VirtualAddress::new_canonical(caller as usize), false).ok_or_else(|| {
-            #[cfg(not(downtime_eval))]
-            error!("StackTraceIter::next(): couldn't get crate containing call site address: {:#X}", caller);
-            "couldn't get crate containing call site address"
-        })?;
-        let (eh_frame_sec, base_addrs) = get_eh_frame_info(&crate_ref)
-            .ok_or("couldn't get eh_frame section in caller's containing crate")?;
+        // Get unwind info for the call site ("caller") address.
+        let (eh_frame_sec, base_addrs) = self.namespace
+            // First: search the current namespace's crates to see if any of them contain the caller address.
+            .get_crate_containing_address(caller_virt_addr, false)
+            .and_then(|crate_ref| get_eh_frame_info(&crate_ref)
+                .map(|(eh_frame_sec, base_addrs)| 
+                    (EhFrameReference::Section(eh_frame_sec), base_addrs)
+                )
+            )
+            // Second: search externally-registered unwind info for the caller address.
+            .or_else(|| external_unwind_info::get_unwind_info(caller_virt_addr)
+                .map(|uw_info| {
+                    let base_addrs = BaseAddresses::default()
+                        .set_eh_frame(uw_info.unwind_info.start.value() as u64)
+                        .set_text(uw_info.text_section.start.value() as u64);
+                    (EhFrameReference::External(uw_info), base_addrs)
+                })
+            )
+            // Otherwise, the caller address isn't known to the system, so return an error.
+            .ok_or_else(|| {
+                #[cfg(not(downtime_eval))]
+                error!("StackTraceIter::next(): couldn't get unwind info for call site address: {:#X}", caller);
+                "couldn't get unwind info for call site address"
+            })?;
 
         let mut cfa_adjustment: Option<i64> = None;
         let mut this_frame_is_exception_handler = false;
@@ -612,12 +629,21 @@ unsafe fn land(regs: &Registers, landing_pad_address: u64) -> Result<(), &'stati
 type NativeEndianSliceReader<'i> = EndianSlice<'i, NativeEndian>;
 
 
+/// An abstraction of a reference to the contents of an `.eh_frame` section. 
+#[derive(Debug)]
+enum EhFrameReference {
+    /// A reference to a "native" (Theseus-owned) `.eh_frame` [`mod_mgmt::LoadedSection`].
+    Section(StrongSectionRef),
+    /// A reference to an externally-registered `.eh_frame` section's bounds in memory.
+    External(ExternalUnwindInfo),
+}
+
 /// Due to lifetime and locking issues, we cannot store a direct reference to an unwind table row. 
 /// Instead, here we store references to the objects needed to calculate/obtain an unwind table row.
 #[derive(Debug)]
 struct UnwindRowReference {
     caller: u64,
-    eh_frame_sec: StrongSectionRef,
+    eh_frame_sec: EhFrameReference,
     base_addrs: BaseAddresses,
 }
 impl UnwindRowReference {
@@ -626,53 +652,66 @@ impl UnwindRowReference {
     fn with_unwind_info<O, F>(&self, mut f: F) -> Result<O, &'static str>
         where F: FnMut(&FrameDescriptionEntry<NativeEndianSliceReader, usize>, &UnwindTableRow<NativeEndianSliceReader>) -> Result<O, &'static str>
     {
-        let sec = &self.eh_frame_sec;
-        let size_in_bytes = sec.size();
-        let sec_pages = sec.mapped_pages.lock();
-        let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
-        let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
-        let mut unwind_ctx = UninitializedUnwindContext::new();
-        let fde = eh_frame.fde_for_address(&self.base_addrs, self.caller, EhFrame::cie_from_offset).map_err(|_e| {
-            error!("gimli error: {:?}", _e);
-            "gimli error while finding FDE for address"
-        })?;
-        let unwind_table_row = fde.unwind_info_for_address(&eh_frame, &self.base_addrs, &mut unwind_ctx, self.caller).map_err(|_e| {
-            error!("gimli error: {:?}", _e);
-            "gimli error while finding unwind info for address"
-        })?;
-        
-        // debug!("FDE: {:?} ", fde);
-        // let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
-        // while let Some(instr) = instructions.next().map_err(|_e| {
-        //     error!("FDE instructions gimli error: {:?}", _e);
-        //     "gimli error while iterating through eh_frame FDE instructions list"
-        // })? {
-        //     debug!("    FDE instr: {:?}", instr);
-        // }
+        // an inner closure that invokes the passed-in closure `f`.
+        let mut invoke_f_with_eh_frame_slice = |eh_frame_slice: &[u8]| {
+            let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
+            let mut unwind_ctx = UninitializedUnwindContext::new();
+            let fde = eh_frame.fde_for_address(&self.base_addrs, self.caller, EhFrame::cie_from_offset).map_err(|_e| {
+                error!("gimli error: {:?}", _e);
+                "gimli error while finding FDE for address"
+            })?;
+            let unwind_table_row = fde.unwind_info_for_address(&eh_frame, &self.base_addrs, &mut unwind_ctx, self.caller).map_err(|_e| {
+                error!("gimli error: {:?}", _e);
+                "gimli error while finding unwind info for address"
+            })?;
+            
+            // debug!("FDE: {:?} ", fde);
+            // let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
+            // while let Some(instr) = instructions.next().map_err(|_e| {
+            //     error!("FDE instructions gimli error: {:?}", _e);
+            //     "gimli error while iterating through eh_frame FDE instructions list"
+            // })? {
+            //     debug!("    FDE instr: {:?}", instr);
+            // }
 
-        f(&fde, &unwind_table_row)
+            f(&fde, &unwind_table_row)
+        };
+
+        // The actual logic of this function that handles the `EhFrameReference` abstraction.
+        match &self.eh_frame_sec {
+            EhFrameReference::Section(sec) => {
+                let sec_pages = sec.mapped_pages.lock();
+                let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, sec.size())?;
+                invoke_f_with_eh_frame_slice(eh_frame_slice)
+            }
+            EhFrameReference::External(uw_info) => {
+                let eh_frame_ptr = uw_info.unwind_info.start.value() as *const u8;
+                let eh_frame_size = uw_info.unwind_info.end.value() - uw_info.unwind_info.start.value();
+                let eh_frame_slice = unsafe {
+                    core::slice::from_raw_parts(eh_frame_ptr, eh_frame_size)
+                };
+                invoke_f_with_eh_frame_slice(eh_frame_slice)
+            }
+        }
     }
 }
 
 
-/// Returns a tuple of .eh_frame section for the given `crate_ref`
-/// and the base addresses (its .text section address and .eh_frame section address).
+/// Returns a tuple of:
+/// 1. The `.eh_frame` section for the given `crate_ref`
+/// 2. The base addresses of that crate's main `.text` section and `.eh_frame` section.
 /// 
 /// # Locking / Deadlock
-/// Obtains the lock on the given `crate_ref` 
-/// and the lock on all of its sections while iterating through them.
-/// 
-/// The latter lock on the crate's `rodata_pages` object will be held
-/// for the entire lifetime of the returned object. 
+/// Obtains the lock on the given `crate_ref`.
 fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, BaseAddresses)> {
-    let parent_crate = crate_ref.lock_as_ref();
+    let krate = crate_ref.lock_as_ref();
 
-    let eh_frame_sec = parent_crate.sections.values()
+    let eh_frame_sec = krate.sections.values()
         .filter(|s| s.typ == SectionType::EhFrame)
         .next()?;
     
     let eh_frame_vaddr = eh_frame_sec.start_address().value();
-    let text_pages_vaddr = parent_crate.text_pages.as_ref()?.1.start.value();
+    let text_pages_vaddr = krate.text_pages.as_ref()?.1.start.value();
     let base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr as u64)
         .set_text(text_pages_vaddr as u64);
