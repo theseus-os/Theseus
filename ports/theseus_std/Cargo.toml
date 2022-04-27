@@ -7,6 +7,10 @@ edition = "2018"
 build = "../../build.rs"
 
 [dependencies]
+lockable = { path = "../../libs/lockable" }
 theseus_task = { path = "../../kernel/task", package = "task" }
-# theseus_fs_node = { path = "../../kernel/fs_node", package = "fs_node" }
+theseus_path = { path = "../../kernel/path", package = "path" }
+theseus_fs_node = { path = "../../kernel/fs_node", package = "fs_node" }
+theseus_io = { path = "../../kernel/io", package = "io" }
+spin = "0.9.0"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }

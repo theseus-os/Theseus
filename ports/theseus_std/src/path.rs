@@ -3025,7 +3025,7 @@ mod sys {
                     PathBuf::new()
                 }
             } else {
-                env::current_dir()?
+                crate::env::current_dir_path()?
             };
             normalized.extend(components);
 
@@ -3041,20 +3041,5 @@ mod sys {
 
             Ok(normalized)
         }
-    }
-}
-
-/// A quick hack to use Theseus's current working directory environment variable.
-mod env {
-    use super::*;
-
-    pub fn current_dir() -> io::Result<PathBuf> {
-        theseus_task::get_my_current_task()
-            .ok_or(io::Error::new(io::ErrorKind::Other, "failed to get Theseus current task"))
-            .map(|task| task.get_env()
-                .lock()
-                .get_wd_path()
-                .into()
-            )
     }
 }

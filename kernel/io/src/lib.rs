@@ -49,7 +49,7 @@ extern crate lockable;
 #[cfg(test)]
 mod test;
 
-use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, Range}};
+use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, DerefMut, Range}};
 use alloc::{boxed::Box, string::String, vec::Vec};
 use lockable::Lockable;
 use core2::io::{Seek, SeekFrom};
@@ -478,9 +478,11 @@ impl<RW> BlockWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWrit
 /// A readable and writable "stateful" I/O stream that keeps track 
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// This implements the [`core2::io::Read`] and [`core2::io::Write`] traits for read and write access,
-/// as well as the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
-/// It also forwards all other I/O-related traits implemented by the underlying I/O stream.
+/// ## Trait implementations
+/// * This implements the [`core2::io::Read`] and [`core2::io::Write`] traits for read and write access.
+/// * This implements the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// * This also forwards all other I/O-related traits implemented by the underlying I/O stream.
+/// * This derefs into the inner `IO` type, via both [`Deref`] and [`DerefMut`].
 pub struct ReaderWriter<IO> {
     io: IO,
     offset: u64,
@@ -489,6 +491,17 @@ impl<IO> ReaderWriter<IO> where IO: ByteReader + ByteWriter {
     /// Creates a new `ReaderWriter` with an initial offset of 0.
     pub fn new(io: IO) -> ReaderWriter<IO> {
         ReaderWriter { io, offset: 0 }
+    }
+}
+impl<IO> Deref for ReaderWriter<IO> {
+    type Target = IO;
+    fn deref(&self) -> &Self::Target {
+        &self.io
+    }
+}
+impl<IO> DerefMut for ReaderWriter<IO> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.io
     }
 }
 impl<IO> core2::io::Read for ReaderWriter<IO> where IO: ByteReader {

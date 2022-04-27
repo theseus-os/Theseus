@@ -633,6 +633,7 @@ impl Read for File {
     }
 
     #[inline]
+    #[cfg(feature = "ioslice")]
     fn is_read_vectored(&self) -> bool {
         self.inner.is_read_vectored()
     }
@@ -660,6 +661,7 @@ impl Write for File {
     }
 
     #[inline]
+    #[cfg(feature = "ioslice")]
     fn is_write_vectored(&self) -> bool {
         self.inner.is_write_vectored()
     }

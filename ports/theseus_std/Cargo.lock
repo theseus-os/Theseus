@@ -247,6 +247,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
+name = "delegate"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35c47a31748d9cfa641f6cccb3608385fafe261ba36054f3d40d5a3ca11eb1af"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -310,6 +321,7 @@ dependencies = [
 name = "fs_node"
 version = "0.1.0"
 dependencies = [
+ "io",
  "lazy_static",
  "log",
  "memory",
@@ -353,6 +365,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb484b70a4ebad7f571bf84e9cd06b5bfb6a7e4db0c36e13dd1570c6b449c10d"
 dependencies = [
  "memoffset",
+]
+
+[[package]]
+name = "io"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "delegate",
+ "lazy_static",
+ "lockable",
+ "log",
+ "spin 0.9.3",
 ]
 
 [[package]]
@@ -405,6 +429,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lockable"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "spin 0.9.3",
+]
+
+[[package]]
 name = "log"
 version = "0.4.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -424,6 +456,7 @@ name = "memfs"
 version = "0.1.0"
 dependencies = [
  "fs_node",
+ "io",
  "irq_safety",
  "log",
  "memory",
@@ -527,6 +560,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13e9fc890ff2ef2ded9084c964b950da1bc9e26d480e446ae721607b899db1fd"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "mutex_sleep"
+version = "0.1.0"
+dependencies = [
+ "lockable",
+ "log",
+ "owning_ref",
+ "spin 0.9.3",
+ "stable_deref_trait",
+ "task",
+ "wait_queue",
 ]
 
 [[package]]
@@ -680,6 +726,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "runqueue"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list",
+ "cfg-if 1.0.0",
+ "irq_safety",
+ "lazy_static",
+ "log",
+ "runqueue_priority",
+ "runqueue_realtime",
+ "runqueue_round_robin",
+ "single_simd_task_optimization",
+ "task",
+]
+
+[[package]]
+name = "runqueue_priority"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list",
+ "irq_safety",
+ "lazy_static",
+ "log",
+ "single_simd_task_optimization",
+ "task",
+]
+
+[[package]]
+name = "runqueue_realtime"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list",
+ "irq_safety",
+ "lazy_static",
+ "log",
+ "task",
+]
+
+[[package]]
+name = "runqueue_round_robin"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list",
+ "irq_safety",
+ "lazy_static",
+ "log",
+ "single_simd_task_optimization",
+ "task",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -701,6 +798,53 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
  "semver 1.0.7",
+]
+
+[[package]]
+name = "scheduler"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "cfg-if 1.0.0",
+ "irq_safety",
+ "log",
+ "runqueue",
+ "scheduler_priority",
+ "scheduler_realtime",
+ "scheduler_round_robin",
+ "spin 0.9.3",
+ "task",
+]
+
+[[package]]
+name = "scheduler_priority"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "runqueue",
+ "runqueue_priority",
+ "spin 0.9.3",
+ "task",
+]
+
+[[package]]
+name = "scheduler_realtime"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "runqueue_realtime",
+ "task",
+]
+
+[[package]]
+name = "scheduler_round_robin"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "runqueue",
+ "runqueue_round_robin",
+ "spin 0.9.3",
+ "task",
 ]
 
 [[package]]
@@ -738,6 +882,15 @@ name = "semver-parser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+
+[[package]]
+name = "single_simd_task_optimization"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 0.1.10",
+ "log",
+ "task",
+]
 
 [[package]]
 name = "spin"
@@ -829,6 +982,10 @@ name = "theseus_std"
 version = "0.1.0"
 dependencies = [
  "core2",
+ "fs_node",
+ "io",
+ "mutex_sleep",
+ "path",
  "task",
 ]
 
@@ -911,6 +1068,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ee8f19f9d74293faf70901bc20ad067dc1ad390d2cbf1e3f75f721ffee908b6"
 dependencies = [
  "vcell",
+]
+
+[[package]]
+name = "wait_queue"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "log",
+ "scheduler",
+ "task",
 ]
 
 [[package]]

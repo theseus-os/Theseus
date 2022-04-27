@@ -10,11 +10,13 @@
 #![no_std]
 #![feature(toowned_clone_into)]
 #![feature(extend_one)]
+#![feature(trait_alias)]
 
 extern crate alloc;
 
+mod env;
 // pub mod fs;
-// mod fs_imp;
+mod fs_imp;
 pub mod os_str;
 mod os_str_imp;
 pub mod path;

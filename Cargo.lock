@@ -3232,6 +3232,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "theseus_std"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "fs_node",
+ "io",
+ "lockable",
+ "path",
+ "spin 0.9.0",
+ "task",
+]
+
+[[package]]
 name = "thread_local_macro"
 version = "0.1.0"
 dependencies = [
