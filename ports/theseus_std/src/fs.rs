@@ -5,19 +5,21 @@
 //! in order to make it easier to integrate back into the real std lib later
 //! once we support that on Theseus.
 //! 
-
-
-extern crate alloc;
-extern crate core2;
-extern crate theseus_fs_node;
-
+//! ---------------------------------------
+//! 
 //! Filesystem manipulation operations.
 //!
 //! This module contains basic methods to manipulate the contents of the local
 //! filesystem. All methods in this module represent cross-platform filesystem
 //! operations. Extra platform-specific functionality can be found in the
 //! extension traits of `std::os::$platform`.
+//! 
 
+extern crate alloc;
+extern crate core2;
+extern crate theseus_fs_node;
+
+use alloc::{string::String, vec::Vec};
 use crate::os_str::OsString;
 use core::fmt;
 use core2::io::{self, /*IoSlice, IoSliceMut,*/ Read, /*ReadBuf,*/ Seek, SeekFrom, Write};
@@ -691,6 +693,7 @@ impl Read for &File {
     }
 
     #[inline]
+    #[cfg(feature = "ioslice")]
     fn is_read_vectored(&self) -> bool {
         self.inner.is_read_vectored()
     }
@@ -718,6 +721,7 @@ impl Write for &File {
     }
 
     #[inline]
+    #[cfg(feature = "ioslice")]
     fn is_write_vectored(&self) -> bool {
         self.inner.is_write_vectored()
     }

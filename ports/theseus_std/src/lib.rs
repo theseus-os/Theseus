@@ -15,7 +15,7 @@
 extern crate alloc;
 
 mod env;
-// pub mod fs;
+pub mod fs;
 mod fs_imp;
 pub mod os_str;
 mod os_str_imp;

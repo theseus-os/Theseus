@@ -1,4 +1,4 @@
-//! This module is equivalent to the Rust standard lbirary's 
+//! This module is equivalent to the Rust standard library's 
 //! platform-specific "inner" fs implementation.
 //! 
 //! For example, for Unix-like systems, this module is implemented
@@ -20,30 +20,56 @@ use crate::path::{Path, PathBuf};
 #[cfg(feature = "time")]
 use crate::sys::time::SystemTime;
 use theseus_fs_node::{File as FileTrait, FileRef};
-use theseus_io::{ReaderWriter, LockableIo};
+use theseus_io::{ReaderWriter, LockableIo, KnownLength};
 use spin::Mutex;
 
-/// This is a typedef for a Theseus-native `FileRef` that is wrapped
-/// in a `ReaderWriter` to provide standard "stateful" I/O that advances a file offset.
-/// That `ReaderWriter<FileRef` is then wrapped in a `LockableIo` object 
-/// to provide interior mutability.
+/// This is a typedef for a Theseus-native `FileRef` (`Arc<Mutex<dyn File>>`)
+/// that is wrapped in a series of wrapper types, described below from inner to outer.
+/// 
+/// 1. The `FileRef` is wrapped in a `LockableIo` object 
+///    in order to forward the various I/O traits (`ByteReader` + `ByteWriter`)
+///    through the `Arc<Mutex<_>>` wrappers.
+/// 2. Then, that `LockableIo` <Arc<Mutex<File>>>` is wrapped in a `ReaderWriter`
+///    to provide standard "stateful" I/O that advances a file offset.
+/// 3. Then, that `ReaderWriter` is wrapped in another `Mutex` to provide
+///    interior mutability, as the `Read` and `Write` traits requires a mutable reference
+///    (`&mut self`) but Rust standard library allows you to call those methods on 
+///    an immutable reference to its file, `&std::fs::File`.
+/// 4. That `Mutex` is then wrapped in another `LockableIo` wrapper 
+///    to ensure that the IO traits are forwarded, similar to step 1.
+/// 
+/// In summary, the total type looks like this:
+/// ```rust 
+/// LockableIo<Mutex<ReaderWriter<LockableIo<Arc<Mutex<dyn File>>>>>>
+/// ```
 /// 
 /// ... Then we take *that* and wrap it in an authentic parisian crepe 
 /// filled with egg, gruyere, merguez sausage, and portabello mushroom
 /// ... [tacoooo townnnnn!!!!](https://www.youtube.com/watch?v=evUWersr7pc).
-type LockableFileRef = LockableIo<
-    'static,
-    dyn FileTrait + Send,
-    Mutex<dyn FileTrait + Send>,
-    FileRef,
->;
+/// 
+/// TODO: redesign this to avoid the double Mutex. Options include:
+/// * Change the Theseus `FileRef` type to always be wrapped by a `ReaderWriter`.
+/// * Use a different wrapper for interior mutability, though Mutex is probably required.
+/// * Devise another set of `Read` and `Write` traits that *don't* need `&mut self`.
 type OpenFileRef = LockableIo<
     'static,
     ReaderWriter<LockableFileRef>,
     Mutex<ReaderWriter<LockableFileRef>>,
     Mutex<ReaderWriter<LockableFileRef>>,
 >;
+/// See the above documentation for [`OpenFileRef`].
+type LockableFileRef = LockableIo<
+    'static,
+    dyn FileTrait + Send,
+    Mutex<dyn FileTrait + Send>,
+    FileRef,
+>;
 
+/// In Rust's `std` library, a `File` must represent both 
+/// an open file and an open directory.
+/// Thus, we must account for either option within this struct.
+#[derive(Debug)]
+pub struct File(FileOrDirectory);
 
 enum FileOrDirectory {
     OpenFile(OpenFileRef),
@@ -57,26 +83,22 @@ impl fmt::Debug for FileOrDirectory {
                 f, 
                 "OpenFile({})",
                 file.try_lock()
-                    .and_then(|rw| rw.try_lock())
-                    .map(|fr| fr.get_absolute_path().as_str())
-                    .unwrap_or("<Locked>")
+                    .and_then(|rw| rw.try_lock()
+                        .map(|fr| fr.get_absolute_path())
+                    )
+                    .unwrap_or_else(|| "<Locked>".into())
             ),
             Self::Directory(dir) => write!(
                 f, 
                 "Directory({})",
                 dir.try_lock()
-                    .map(|d| d.get_absolute_path().as_str())
-                    .unwrap_or("<Locked>")
+                    .map(|d| d.get_absolute_path())
+                    .unwrap_or_else(|| "<Locked>".into())
             ),
         }
     }
 }
 
-/// In Rust's `std` library, a `File` must represent both 
-/// an open file and an open directory.
-/// Thus, we must account for either option within this struct.
-#[derive(Debug)]
-pub struct File(FileOrDirectory);
 
 #[derive(Clone, Copy, Debug)]
 pub struct FileAttr {
@@ -276,7 +298,7 @@ impl File {
             .ok_or(io::ErrorKind::NotFound.into())
             .map(|theseus_file_or_dir| match theseus_file_or_dir {
                 theseus_fs_node::FileOrDir::File(f) => FileOrDirectory::OpenFile(
-                    LockableIo::from(Mutex::new(ReaderWriter::new(f)))
+                    LockableIo::from(Mutex::new(ReaderWriter::new(LockableIo::from(f))))
                 ),
                 theseus_fs_node::FileOrDir::Dir(d) => FileOrDirectory::Directory(d),
             }).map(File) // wrap it in the main `File` struct
@@ -313,7 +335,7 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.read(buf),
+            FileOrDirectory::OpenFile(f) => f.lock().read(buf),
         }
     }
 
@@ -338,7 +360,7 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.write(buf),
+            FileOrDirectory::OpenFile(f) => f.lock().write(buf),
         }
     }
 
@@ -358,7 +380,7 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.flush(),
+            FileOrDirectory::OpenFile(f) => f.lock().flush(),
         }
     }
 
@@ -368,7 +390,7 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.seek(pos),
+            FileOrDirectory::OpenFile(f) => f.lock().seek(pos),
         }
     }
 
@@ -431,7 +453,7 @@ pub fn link(_src: &Path, _dst: &Path) -> io::Result<()> {
     unimplemented!()
 }
 
-pub fn stat(_p: &Path) -> io::Result<FileAttr> {
+pub fn stat(p: &Path) -> io::Result<FileAttr> {
     unimplemented!()
 }
 

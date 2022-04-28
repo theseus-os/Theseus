@@ -63,6 +63,8 @@
 //! [`components`]: Path::components
 //! [`push`]: PathBuf::push
 
+#![allow(unsafe_op_in_unsafe_fn)]
+
 use alloc::borrow::{Borrow, Cow, ToOwned};
 use alloc::boxed::Box;
 use alloc::string::String;
