@@ -148,6 +148,7 @@ sourcesIndex["terminal_print"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["test_thread_local"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["text_display"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["text_terminal"] = {"name":"","files":["ansi_colors.rs","ansi_style.rs","lib.rs"]};
+sourcesIndex["theseus_std"] = {"name":"","files":["env.rs","fs.rs","fs_imp.rs","lib.rs","os_str.rs","os_str_imp.rs","path.rs","sys_common.rs"]};
 sourcesIndex["thread_local_macro"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["tlb_shootdown"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["tsc"] = {"name":"","files":["lib.rs"]};
