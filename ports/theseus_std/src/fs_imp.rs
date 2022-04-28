@@ -453,7 +453,7 @@ pub fn link(_src: &Path, _dst: &Path) -> io::Result<()> {
     unimplemented!()
 }
 
-pub fn stat(p: &Path) -> io::Result<FileAttr> {
+pub fn stat(_p: &Path) -> io::Result<FileAttr> {
     unimplemented!()
 }
 

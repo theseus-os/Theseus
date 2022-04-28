@@ -103,7 +103,6 @@ use crate::time::SystemTime;
 ///
 /// [`BufReader<R>`]: io::BufReader
 /// [`sync_all`]: File::sync_all
-#[cfg_attr(not(test), rustc_diagnostic_item = "File")]
 pub struct File {
     inner: fs_imp::File,
 }
@@ -203,13 +202,11 @@ pub struct Permissions(fs_imp::FilePermissions);
 /// A structure representing a type of file with accessors for each file type.
 /// It is returned by [`Metadata::file_type`] method.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
-#[cfg_attr(not(test), rustc_diagnostic_item = "FileType")]
 pub struct FileType(fs_imp::FileType);
 
 /// A builder used to create directories in various manners.
 ///
 /// This builder also supports platform-specific options.
-#[cfg_attr(not(test), rustc_diagnostic_item = "DirBuilder")]
 #[derive(Debug)]
 pub struct DirBuilder {
     inner: fs_imp::DirBuilder,
@@ -643,13 +640,7 @@ impl Read for File {
     // Reserves space in the buffer based on the file size when available.
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
         buf.reserve(buffer_capacity_required(self));
-        io::default_read_to_end(self, buf)
-    }
-
-    // Reserves space in the buffer based on the file size when available.
-    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
-        buf.reserve(buffer_capacity_required(self));
-        io::default_read_to_string(self, buf)
+        io::read_to_end(self, buf)
     }
 }
 impl Write for File {
@@ -701,13 +692,7 @@ impl Read for &File {
     // Reserves space in the buffer based on the file size when available.
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> io::Result<usize> {
         buf.reserve(buffer_capacity_required(self));
-        io::default_read_to_end(self, buf)
-    }
-
-    // Reserves space in the buffer based on the file size when available.
-    fn read_to_string(&mut self, buf: &mut String) -> io::Result<usize> {
-        buf.reserve(buffer_capacity_required(self));
-        io::default_read_to_string(self, buf)
+        io::read_to_end(self, buf)
     }
 }
 impl Write for &File {
@@ -1200,15 +1185,18 @@ impl Metadata {
 
 impl fmt::Debug for Metadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Metadata")
-            .field("file_type", &self.file_type())
+        let mut dbg = f.debug_struct("Metadata");
+        dbg.field("file_type", &self.file_type())
             .field("is_dir", &self.is_dir())
             .field("is_file", &self.is_file())
-            .field("permissions", &self.permissions())
-            .field("modified", &self.modified())
-            .field("accessed", &self.accessed())
-            .field("created", &self.created())
-            .finish_non_exhaustive()
+            .field("permissions", &self.permissions());
+            #[cfg(feature = "time")] {
+                dbg
+                    .field("modified", &self.modified())
+                    .field("accessed", &self.accessed())
+                    .field("created", &self.created());
+            }
+            dbg.finish_non_exhaustive()
     }
 }
 
@@ -1811,9 +1799,9 @@ pub fn hard_link<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> io::Re
 ///     Ok(())
 /// }
 /// ```
-#[rustc_deprecated(
+#[deprecated(
     since = "1.1.0",
-    reason = "replaced with std::os::unix::fs::symlink and \
+    note = "replaced with std::os::unix::fs::symlink and \
               std::os::windows::fs::{symlink_file, symlink_dir}"
 )]
 pub fn soft_link<P: AsRef<Path>, Q: AsRef<Path>>(original: P, link: Q) -> io::Result<()> {
@@ -2235,7 +2223,7 @@ impl DirBuilder {
         match path.parent() {
             Some(p) => self.create_dir_all(p)?,
             None => {
-                return Err(io::const_io_error!(
+                return Err(io::Error::new(
                     io::ErrorKind::Uncategorized,
                     "failed to create whole tree",
                 ));
@@ -2277,7 +2265,6 @@ impl AsInnerMut<fs_imp::DirBuilder> for DirBuilder {
 /// [`Path::exists`]: crate::path::Path::exists
 // FIXME: stabilization should modify documentation of `exists()` to recommend this method
 // instead.
-#[unstable(feature = "path_try_exists", issue = "83186")]
 #[inline]
 pub fn try_exists<P: AsRef<Path>>(path: P) -> io::Result<bool> {
     fs_imp::try_exists(path.as_ref())

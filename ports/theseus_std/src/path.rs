@@ -72,7 +72,7 @@ use alloc::vec::Vec;
 use core::cmp;
 use core2::error::Error;
 use core::fmt;
-// use crate::fs;
+use crate::fs;
 use core::hash::{Hash, Hasher};
 use core2::io;
 use core::iter::{self, FusedIterator};
@@ -2448,9 +2448,6 @@ impl Path {
         Display { path: self }
     }
 
-    /*
-     * TODO: fs components of `path`
-     * 
     /// Queries the file system to get information about a file, directory, etc.
     ///
     /// This function will traverse symbolic links to query information about the
@@ -2687,8 +2684,6 @@ impl Path {
     pub fn is_symlink(&self) -> bool {
         fs::symlink_metadata(self).map(|m| m.is_symlink()).unwrap_or(false)
     }
-    *
-    */
 
     /// Converts a [`Box<Path>`](Box) into a [`PathBuf`] without copying or
     /// allocating.
