@@ -473,6 +473,80 @@
 <span id="468">468</span>
 <span id="469">469</span>
 <span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module is equivalent to the Rust standard library&#39;s </span>
 <span class="doccomment">//! platform-specific &quot;inner&quot; fs implementation.</span>
 <span class="doccomment">//! </span>
@@ -490,7 +564,6 @@
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::hash::Hash</span>;
 <span class="kw">use</span> <span class="ident">core2::io</span>::{<span class="self">self</span>, <span class="comment">/*IoSlice, IoSliceMut, ReadBuf,*/</span> <span class="ident">SeekFrom</span>, <span class="ident">Read</span>, <span class="ident">Write</span>, <span class="ident">Seek</span>};
-<span class="kw">use</span> <span class="ident">alloc::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::path</span>::{<span class="ident">Path</span>, <span class="ident">PathBuf</span>};
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;time&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::sys::time::SystemTime</span>;
@@ -547,21 +620,25 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">File</span>(<span class="ident">FileOrDirectory</span>);
 
 <span class="kw">enum</span> <span class="ident">FileOrDirectory</span> {
-    <span class="ident">OpenFile</span>(<span class="ident">OpenFileRef</span>),
+    <span class="ident">OpenFile</span> { 
+        <span class="ident">file</span>: <span class="ident">OpenFileRef</span>,
+        <span class="ident">opts</span>: <span class="ident">OpenOptions</span>,
+    },
     <span class="ident">Directory</span>(<span class="ident">theseus_fs_node::DirRef</span>),
 }
 
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">FileOrDirectory</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span> {
-            <span class="ident"><span class="self">Self</span>::OpenFile</span>(<span class="ident">file</span>) =&gt; <span class="macro">write!</span>(
+            <span class="ident"><span class="self">Self</span>::OpenFile</span> { <span class="ident">file</span>, <span class="ident">opts</span>} =&gt; <span class="macro">write!</span>(
                 <span class="ident">f</span>, 
-                <span class="string">&quot;OpenFile({})&quot;</span>,
+                <span class="string">&quot;OpenFile({}, {:?})&quot;</span>,
                 <span class="ident">file</span>.<span class="ident">try_lock</span>()
                     .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">rw</span><span class="op">|</span> <span class="ident">rw</span>.<span class="ident">try_lock</span>()
                         .<span class="ident">map</span>(<span class="op">|</span><span class="ident">fr</span><span class="op">|</span> <span class="ident">fr</span>.<span class="ident">get_absolute_path</span>())
                     )
-                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;&lt;Locked&gt;&quot;</span>.<span class="ident">into</span>())
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;&lt;Locked&gt;&quot;</span>.<span class="ident">into</span>()),
+                <span class="ident">opts</span>,
             ),
             <span class="ident"><span class="self">Self</span>::Directory</span>(<span class="ident">dir</span>) =&gt; <span class="macro">write!</span>(
                 <span class="ident">f</span>, 
@@ -587,7 +664,7 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">DirEntry</span>();
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">OpenOptions</span> {
     <span class="comment">// Includes only the system-generic flags for now.</span>
     <span class="ident">read</span>: <span class="ident">bool</span>,
@@ -766,22 +843,78 @@
     }
 }
 
+<span class="doccomment">/// Convenience function for converting a Theseus `FileRef` into a `File`.</span>
+<span class="kw">fn</span> <span class="ident">theseus_file_ref_to_file</span>(<span class="ident">f</span>: <span class="ident">FileRef</span>, <span class="ident">opts</span>: <span class="ident">OpenOptions</span>) -&gt; <span class="ident">File</span> {
+    <span class="ident">File</span>(<span class="ident">FileOrDirectory::OpenFile</span> {
+        <span class="ident">file</span>: <span class="ident">LockableIo::from</span>(<span class="ident">Mutex::new</span>(
+            <span class="ident">ReaderWriter::new</span>(<span class="ident">LockableIo::from</span>(<span class="ident">f</span>))
+        )),
+        <span class="ident">opts</span>,
+    })
+}
+
 <span class="kw">impl</span> <span class="ident">File</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>, <span class="ident">_opts</span>: <span class="kw-2">&amp;</span><span class="ident">OpenOptions</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">File</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">working_dir</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::env::current_dir</span>()<span class="question-mark">?</span>;
-        <span class="ident">theseus_path::Path::new</span>(<span class="ident">path</span>.<span class="ident">to_string_lossy</span>().<span class="ident">into</span>()).<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">working_dir</span>)
-            .<span class="ident">ok_or</span>(<span class="ident">io::ErrorKind::NotFound</span>.<span class="ident">into</span>())
-            .<span class="ident">map</span>(<span class="op">|</span><span class="ident">theseus_file_or_dir</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">theseus_file_or_dir</span> {
-                <span class="ident">theseus_fs_node::FileOrDir::File</span>(<span class="ident">f</span>) =&gt; <span class="ident">FileOrDirectory::OpenFile</span>(
-                    <span class="ident">LockableIo::from</span>(<span class="ident">Mutex::new</span>(<span class="ident">ReaderWriter::new</span>(<span class="ident">LockableIo::from</span>(<span class="ident">f</span>))))
-                ),
-                <span class="ident">theseus_fs_node::FileOrDir::Dir</span>(<span class="ident">d</span>) =&gt; <span class="ident">FileOrDirectory::Directory</span>(<span class="ident">d</span>),
-            }).<span class="ident">map</span>(<span class="ident">File</span>) <span class="comment">// wrap it in the main `File` struct</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">open</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>, <span class="ident">opts</span>: <span class="kw-2">&amp;</span><span class="ident">OpenOptions</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">File</span><span class="op">&gt;</span> {
+        <span class="comment">// Handle file creation</span>
+        <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">create_new</span> <span class="op">|</span><span class="op">|</span> <span class="ident">opts</span>.<span class="ident">create</span> {
+            <span class="comment">// `create` and `create_new` both require either the `write` or `append` option.</span>
+            <span class="kw">if</span> <span class="op">!</span>(<span class="ident">opts</span>.<span class="ident">write</span> <span class="op">|</span><span class="op">|</span> <span class="ident">opts</span>.<span class="ident">append</span>) {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">io::ErrorKind::InvalidInput</span>.<span class="ident">into</span>());
+            }
+
+            <span class="kw">let</span> <span class="ident">curr_dir</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::env::current_dir</span>()<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">parent_dir_of_file</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">parent</span>()
+                .<span class="ident">ok_or</span>(<span class="ident">io::Error::from</span>(<span class="ident">io::ErrorKind::NotFound</span>))<span class="question-mark">?</span>;
+
+            <span class="kw">let</span> <span class="ident">theseus_file_path</span> <span class="op">=</span> <span class="ident">theseus_path::Path::new</span>(<span class="ident">path</span>.<span class="ident">to_string_lossy</span>().<span class="ident">into</span>());
+            <span class="kw">let</span> <span class="ident">theseus_dir_path</span>  <span class="op">=</span> <span class="ident">theseus_path::Path::new</span>(<span class="ident">parent_dir_of_file</span>.<span class="ident">to_string_lossy</span>().<span class="ident">into</span>());
+            
+            <span class="comment">// `create_new` requires that the file must not previously exist at all.</span>
+            <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">create_new</span> <span class="op">&amp;&amp;</span> <span class="ident">theseus_file_path</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">curr_dir</span>).<span class="ident">is_some</span>() {
+                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">io::ErrorKind::AlreadyExists</span>.<span class="ident">into</span>());
+            }
+
+            <span class="kw">let</span> <span class="ident">containing_dir</span> <span class="op">=</span> <span class="ident">theseus_dir_path</span>.<span class="ident">get_dir</span>(<span class="kw-2">&amp;</span><span class="ident">curr_dir</span>)
+                .<span class="ident">ok_or</span>(<span class="ident">io::Error::from</span>(<span class="ident">io::ErrorKind::NotFound</span>))<span class="question-mark">?</span>;
+
+            <span class="kw">let</span> <span class="ident">file_name</span> <span class="op">=</span> <span class="ident">path</span>.<span class="ident">file_name</span>().<span class="ident">ok_or</span>(<span class="ident">io::Error::from</span>(<span class="ident">io::ErrorKind::NotFound</span>))<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">new_file</span> <span class="op">=</span> <span class="ident">theseus_memfs::MemFile::new</span>(
+                <span class="ident">file_name</span>.<span class="ident">to_string_lossy</span>().<span class="ident">into</span>(), 
+                <span class="kw-2">&amp;</span><span class="ident">containing_dir</span>,
+            ).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> <span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::Other</span>, <span class="ident">e</span>))<span class="question-mark">?</span>;
+
+            <span class="prelude-val">Ok</span>(<span class="ident">theseus_file_ref_to_file</span>(<span class="ident">new_file</span>, <span class="ident">opts</span>.<span class="ident">clone</span>()))
+        }
+
+        <span class="comment">// Handle truncate (TODO)</span>
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">truncate</span> { 
+            <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">write</span> {
+                <span class="comment">// TODO: support truncate</span>
+                <span class="prelude-val">Err</span>(<span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::Uncategorized</span>, <span class="string">&quot;Theseus filesystem doesn&#39;t yet support truncate&quot;</span>))
+            } <span class="kw">else</span> {
+                <span class="prelude-val">Err</span>(<span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::InvalidInput</span>, <span class="string">&quot;`OpenOptions::truncate` requires `OpenOptions::write`&quot;</span>))
+            }
+        }
+
+        <span class="comment">// Handle accessing a file that must exist (in any mode)</span>
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">read</span> <span class="op">|</span><span class="op">|</span> <span class="ident">opts</span>.<span class="ident">write</span> <span class="op">|</span><span class="op">|</span> <span class="ident">opts</span>.<span class="ident">append</span> {
+            <span class="kw">let</span> <span class="ident">working_dir</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::env::current_dir</span>()<span class="question-mark">?</span>;
+            <span class="ident">theseus_path::Path::new</span>(<span class="ident">path</span>.<span class="ident">to_string_lossy</span>().<span class="ident">into</span>()).<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">working_dir</span>)
+                .<span class="ident">ok_or</span>(<span class="ident">io::ErrorKind::NotFound</span>.<span class="ident">into</span>())
+                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">theseus_file_or_dir</span><span class="op">|</span> <span class="kw">match</span> <span class="ident">theseus_file_or_dir</span> {
+                    <span class="ident">theseus_fs_node::FileOrDir::File</span>(<span class="ident">f</span>) =&gt; <span class="ident">theseus_file_ref_to_file</span>(<span class="ident">f</span>, <span class="ident">opts</span>.<span class="ident">clone</span>()),
+                    <span class="ident">theseus_fs_node::FileOrDir::Dir</span>(<span class="ident">d</span>) =&gt; <span class="ident">File</span>(<span class="ident">FileOrDirectory::Directory</span>(<span class="ident">d</span>)),
+                })
+        }
+
+        <span class="kw">else</span> {
+            <span class="prelude-val">Err</span>(<span class="ident">io::Error::new</span>(<span class="ident">io::ErrorKind::InvalidInput</span>, <span class="string">&quot;no `OpenOptions` were specified&quot;</span>))
+        }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">file_attr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">FileAttr</span><span class="op">&gt;</span> {
         <span class="kw">let</span> (<span class="ident">size</span>, <span class="ident">is_file</span>) <span class="op">=</span> <span class="kw">match</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span> {
-            <span class="ident">FileOrDirectory::OpenFile</span>(<span class="ident">f</span>) =&gt; (<span class="ident">f</span>.<span class="ident">lock</span>().<span class="ident">len</span>(), <span class="bool-val">true</span>),
+            <span class="ident">FileOrDirectory::OpenFile</span> { <span class="ident">file</span>, ..} =&gt; (<span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">len</span>(), <span class="bool-val">true</span>),
             <span class="ident">FileOrDirectory::Directory</span>(<span class="kw">_</span>) =&gt; (<span class="number">0</span>, <span class="bool-val">false</span>),
         };
         <span class="prelude-val">Ok</span>(<span class="ident">FileAttr</span> {
@@ -810,7 +943,13 @@
                 <span class="ident">io::ErrorKind::Other</span>,
                 <span class="string">&quot;Is A Directory (TODO: use IsADirectory)&quot;</span>
             )),
-            <span class="ident">FileOrDirectory::OpenFile</span>(<span class="ident">f</span>) =&gt; <span class="ident">f</span>.<span class="ident">lock</span>().<span class="ident">read</span>(<span class="ident">buf</span>),
+            <span class="ident">FileOrDirectory::OpenFile</span> { <span class="ident">file</span>, <span class="ident">opts</span> } =&gt; {
+                <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">read</span> {
+                    <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">read</span>(<span class="ident">buf</span>)
+                } <span class="kw">else</span> {
+                    <span class="prelude-val">Err</span>(<span class="ident">io::Error::from</span>(<span class="ident">io::ErrorKind::PermissionDenied</span>))
+                }
+            }
         }
     }
 
@@ -835,7 +974,16 @@
                 <span class="ident">io::ErrorKind::Other</span>,
                 <span class="string">&quot;Is A Directory (TODO: use IsADirectory)&quot;</span>
             )),
-            <span class="ident">FileOrDirectory::OpenFile</span>(<span class="ident">f</span>) =&gt; <span class="ident">f</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">buf</span>),
+            <span class="ident">FileOrDirectory::OpenFile</span> { <span class="ident">file</span>, <span class="ident">opts</span> } =&gt; {
+                <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">append</span> {
+                    <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">seek</span>(<span class="ident">SeekFrom::End</span>(<span class="number">0</span>))<span class="question-mark">?</span>;
+                }
+                <span class="kw">if</span> <span class="ident">opts</span>.<span class="ident">write</span> <span class="op">|</span><span class="op">|</span> <span class="ident">opts</span>.<span class="ident">append</span> {
+                    <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">write</span>(<span class="ident">buf</span>)
+                } <span class="kw">else</span> {
+                    <span class="prelude-val">Err</span>(<span class="ident">io::Error::from</span>(<span class="ident">io::ErrorKind::PermissionDenied</span>))
+                }
+            }
         }
     }
 
@@ -855,7 +1003,7 @@
                 <span class="ident">io::ErrorKind::Other</span>,
                 <span class="string">&quot;Is A Directory (TODO: use IsADirectory)&quot;</span>
             )),
-            <span class="ident">FileOrDirectory::OpenFile</span>(<span class="ident">f</span>) =&gt; <span class="ident">f</span>.<span class="ident">lock</span>().<span class="ident">flush</span>(),
+            <span class="ident">FileOrDirectory::OpenFile</span> { <span class="ident">file</span>, .. } =&gt; <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">flush</span>(),
         }
     }
 
@@ -865,7 +1013,7 @@
                 <span class="ident">io::ErrorKind::Other</span>,
                 <span class="string">&quot;Is A Directory (TODO: use IsADirectory)&quot;</span>
             )),
-            <span class="ident">FileOrDirectory::OpenFile</span>(<span class="ident">f</span>) =&gt; <span class="ident">f</span>.<span class="ident">lock</span>().<span class="ident">seek</span>(<span class="ident">pos</span>),
+            <span class="ident">FileOrDirectory::OpenFile</span> { <span class="ident">file</span>, .. } =&gt; <span class="ident">file</span>.<span class="ident">lock</span>().<span class="ident">seek</span>(<span class="ident">pos</span>),
         }
     }
 
