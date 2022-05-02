@@ -63,8 +63,6 @@
 //! [`components`]: Path::components
 //! [`push`]: PathBuf::push
 
-#![allow(unsafe_op_in_unsafe_fn)]
-
 use alloc::borrow::{Borrow, Cow, ToOwned};
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -291,6 +289,7 @@ where
 fn os_str_as_u8_slice(s: &OsStr) -> &[u8] {
     unsafe { &*(s as *const OsStr as *const [u8]) }
 }
+#[allow(unused_unsafe)]
 unsafe fn u8_slice_as_os_str(s: &[u8]) -> &OsStr {
     // SAFETY: see the comment of `os_str_as_u8_slice`
     unsafe { &*(s as *const [u8] as *const OsStr) }
@@ -1813,6 +1812,7 @@ pub struct StripPrefixError(());
 impl Path {
     // The following (private!) function allows construction of a path from a u8
     // slice, which is only safe when it is known to follow the OsStr encoding.
+    #[allow(unused_unsafe)]
     unsafe fn from_u8_slice(s: &[u8]) -> &Path {
         unsafe { Path::new(u8_slice_as_os_str(s)) }
     }
@@ -2999,6 +2999,7 @@ mod sys {
 
         
         /// Make a POSIX path absolute without changing its semantics.
+        #[allow(unused)]
         pub(crate) fn absolute(path: &Path) -> io::Result<PathBuf> {
             // This is mostly a wrapper around collecting `Path::components`, with
             // exceptions made where this conflicts with the POSIX specification.

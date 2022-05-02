@@ -9,8 +9,7 @@ extern crate core2;
 #[macro_use] extern crate terminal_print;
 
 use alloc::{string::String, vec::Vec};
-use core2::io::{self, Result, Error, Read, Write};
-use theseus_std::fs::File;
+use core2::io::{self, Write};
 
 
 pub fn main(_args: Vec<String>) -> isize {
