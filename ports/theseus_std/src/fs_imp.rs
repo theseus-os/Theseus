@@ -15,7 +15,6 @@ use crate::os_str::OsString;
 use core::fmt;
 use core::hash::Hash;
 use core2::io::{self, /*IoSlice, IoSliceMut, ReadBuf,*/ SeekFrom, Read, Write, Seek};
-use alloc::sync::Arc;
 use crate::path::{Path, PathBuf};
 #[cfg(feature = "time")]
 use crate::sys::time::SystemTime;
@@ -72,21 +71,25 @@ type LockableFileRef = LockableIo<
 pub struct File(FileOrDirectory);
 
 enum FileOrDirectory {
-    OpenFile(OpenFileRef),
+    OpenFile { 
+        file: OpenFileRef,
+        opts: OpenOptions,
+    },
     Directory(theseus_fs_node::DirRef),
 }
 
 impl fmt::Debug for FileOrDirectory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            Self::OpenFile(file) => write!(
+            Self::OpenFile { file, opts} => write!(
                 f, 
-                "OpenFile({})",
+                "OpenFile({}, {:?})",
                 file.try_lock()
                     .and_then(|rw| rw.try_lock()
                         .map(|fr| fr.get_absolute_path())
                     )
-                    .unwrap_or_else(|| "<Locked>".into())
+                    .unwrap_or_else(|| "<Locked>".into()),
+                opts,
             ),
             Self::Directory(dir) => write!(
                 f, 
@@ -112,7 +115,7 @@ pub struct ReadDir();
 
 pub struct DirEntry();
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct OpenOptions {
     // Includes only the system-generic flags for now.
     read: bool,
@@ -291,22 +294,78 @@ impl OpenOptions {
     }
 }
 
+/// Convenience function for converting a Theseus `FileRef` into a `File`.
+fn theseus_file_ref_to_file(f: FileRef, opts: OpenOptions) -> File {
+    File(FileOrDirectory::OpenFile {
+        file: LockableIo::from(Mutex::new(
+            ReaderWriter::new(LockableIo::from(f))
+        )),
+        opts,
+    })
+}
+
 impl File {
-    pub fn open(path: &Path, _opts: &OpenOptions) -> io::Result<File> {
-        let working_dir = crate::env::current_dir()?;
-        theseus_path::Path::new(path.to_string_lossy().into()).get(&working_dir)
-            .ok_or(io::ErrorKind::NotFound.into())
-            .map(|theseus_file_or_dir| match theseus_file_or_dir {
-                theseus_fs_node::FileOrDir::File(f) => FileOrDirectory::OpenFile(
-                    LockableIo::from(Mutex::new(ReaderWriter::new(LockableIo::from(f))))
-                ),
-                theseus_fs_node::FileOrDir::Dir(d) => FileOrDirectory::Directory(d),
-            }).map(File) // wrap it in the main `File` struct
+    pub fn open(path: &Path, opts: &OpenOptions) -> io::Result<File> {
+        // Handle file creation
+        if opts.create_new || opts.create {
+            // `create` and `create_new` both require either the `write` or `append` option.
+            if !(opts.write || opts.append) {
+                return Err(io::ErrorKind::InvalidInput.into());
+            }
+
+            let curr_dir = crate::env::current_dir()?;
+            let parent_dir_of_file = path.parent()
+                .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
+
+            let theseus_file_path = theseus_path::Path::new(path.to_string_lossy().into());
+            let theseus_dir_path  = theseus_path::Path::new(parent_dir_of_file.to_string_lossy().into());
+            
+            // `create_new` requires that the file must not previously exist at all.
+            if opts.create_new && theseus_file_path.get(&curr_dir).is_some() {
+                return Err(io::ErrorKind::AlreadyExists.into());
+            }
+
+            let containing_dir = theseus_dir_path.get_dir(&curr_dir)
+                .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
+
+            let file_name = path.file_name().ok_or(io::Error::from(io::ErrorKind::NotFound))?;
+            let new_file = theseus_memfs::MemFile::new(
+                file_name.to_string_lossy().into(), 
+                &containing_dir,
+            ).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+            Ok(theseus_file_ref_to_file(new_file, opts.clone()))
+        }
+
+        // Handle truncate (TODO)
+        else if opts.truncate { 
+            if opts.write {
+                // TODO: support truncate
+                Err(io::Error::new(io::ErrorKind::Uncategorized, "Theseus filesystem doesn't yet support truncate"))
+            } else {
+                Err(io::Error::new(io::ErrorKind::InvalidInput, "`OpenOptions::truncate` requires `OpenOptions::write`"))
+            }
+        }
+
+        // Handle accessing a file that must exist (in any mode)
+        else if opts.read || opts.write || opts.append {
+            let working_dir = crate::env::current_dir()?;
+            theseus_path::Path::new(path.to_string_lossy().into()).get(&working_dir)
+                .ok_or(io::ErrorKind::NotFound.into())
+                .map(|theseus_file_or_dir| match theseus_file_or_dir {
+                    theseus_fs_node::FileOrDir::File(f) => theseus_file_ref_to_file(f, opts.clone()),
+                    theseus_fs_node::FileOrDir::Dir(d) => File(FileOrDirectory::Directory(d)),
+                })
+        }
+
+        else {
+            Err(io::Error::new(io::ErrorKind::InvalidInput, "no `OpenOptions` were specified"))
+        }
     }
 
     pub fn file_attr(&self) -> io::Result<FileAttr> {
         let (size, is_file) = match &self.0 {
-            FileOrDirectory::OpenFile(f) => (f.lock().len(), true),
+            FileOrDirectory::OpenFile { file, ..} => (file.lock().len(), true),
             FileOrDirectory::Directory(_) => (0, false),
         };
         Ok(FileAttr {
@@ -335,7 +394,13 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.lock().read(buf),
+            FileOrDirectory::OpenFile { file, opts } => {
+                if opts.read {
+                    file.lock().read(buf)
+                } else {
+                    Err(io::Error::from(io::ErrorKind::PermissionDenied))
+                }
+            }
         }
     }
 
@@ -360,7 +425,16 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.lock().write(buf),
+            FileOrDirectory::OpenFile { file, opts } => {
+                if opts.append {
+                    file.lock().seek(SeekFrom::End(0))?;
+                }
+                if opts.write || opts.append {
+                    file.lock().write(buf)
+                } else {
+                    Err(io::Error::from(io::ErrorKind::PermissionDenied))
+                }
+            }
         }
     }
 
@@ -380,7 +454,7 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.lock().flush(),
+            FileOrDirectory::OpenFile { file, .. } => file.lock().flush(),
         }
     }
 
@@ -390,7 +464,7 @@ impl File {
                 io::ErrorKind::Other,
                 "Is A Directory (TODO: use IsADirectory)"
             )),
-            FileOrDirectory::OpenFile(f) => f.lock().seek(pos),
+            FileOrDirectory::OpenFile { file, .. } => file.lock().seek(pos),
         }
     }
 
