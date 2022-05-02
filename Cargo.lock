@@ -219,10 +219,10 @@ dependencies = [
  "miniz_oxide",
  "mutex_sleep",
  "object",
- "path_std",
  "rustc-demangle",
  "spin 0.9.0",
  "stack_trace",
+ "theseus_std",
  "thread_local_macro",
 ]
 
@@ -2297,14 +2297,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "path_std"
-version = "0.1.0"
-dependencies = [
- "core2",
- "task",
-]
-
-[[package]]
 name = "pause"
 version = "0.1.0"
 
@@ -3303,6 +3295,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_backtrace"
+version = "0.1.0"
+dependencies = [
+ "backtrace",
+ "log",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
 name = "test_block_io"
 version = "0.1.0"
 dependencies = [
@@ -3861,12 +3863,12 @@ dependencies = [
  "mutex_sleep",
  "object",
  "paste",
- "path_std",
  "psm",
  "region",
  "rustc-demangle",
  "serde",
  "target-lexicon",
+ "theseus_std",
  "wasmparser",
  "wasmtime-environ",
  "wasmtime-jit",
@@ -3909,10 +3911,10 @@ dependencies = [
  "log",
  "more-asserts",
  "object",
- "path_std",
  "region",
  "serde",
  "target-lexicon",
+ "theseus_std",
  "thiserror_core2",
  "wasmparser",
  "wasmtime-environ",
@@ -3940,12 +3942,12 @@ dependencies = [
  "memory",
  "more-asserts",
  "mutex_sleep",
- "path_std",
  "rand 0.8.5",
  "region",
  "signal_handler",
  "spin 0.9.0",
  "task",
+ "theseus_std",
  "thiserror_core2",
  "thread_local_macro",
  "wasmtime-environ",
