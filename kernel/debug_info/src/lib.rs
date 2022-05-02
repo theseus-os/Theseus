@@ -574,7 +574,7 @@ impl DebugSymbols {
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("couldn't get kernel MMI")?;
         let file_ref = weak_file.upgrade().ok_or("No debug symbol file found")?;
         let file = file_ref.lock();
-        let file_bytes: &[u8] = file.as_mapping()?.as_slice(0, file.size())?;
+        let file_bytes: &[u8] = file.as_mapping()?.as_slice(0, file.len())?;
         let elf_file = ElfFile::new(file_bytes)?;
         let symtab = find_symbol_table(&elf_file)?;
 

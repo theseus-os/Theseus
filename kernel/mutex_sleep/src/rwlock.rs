@@ -4,6 +4,7 @@ use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use owning_ref::{OwningRef, OwningRefMut};
 use stable_deref_trait::StableDeref;
 use wait_queue::WaitQueue;
+use lockable::{Lockable, LockableSized};
 
 /// A multi-reader, single-writer mutual exclusion wrapper that puts a `Task` to sleep
 /// while waiting for the lock to become available. 
@@ -63,6 +64,17 @@ impl<T> RwLockSleep<T> {
 }
 
 impl<T: ?Sized> RwLockSleep<T> {
+    /// Returns `true` if the lock is currently held.
+    ///
+    /// # Safety
+    ///
+    /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
+    /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    #[inline(always)]
+    pub fn is_locked(&self) -> bool {
+        self.rwlock.is_locked()
+    }
+
     /// Locks this `RwLockSleep` with shared read (immutable) access.
     /// 
     /// If a writer has already acquired this lock, this function will put the current `Task`
@@ -302,3 +314,22 @@ unsafe impl<'a, T: ?Sized> StableDeref for RwLockSleepWriteGuard<'a, T> {}
 pub type RwLockSleepReadGuardRef<'a, T, U = T> = OwningRef<RwLockSleepReadGuard<'a, T>, U>;
 /// Typedef of a mutable owning reference that uses a `RwLockSleepWriteGuard` as the owner.
 pub type RwLockSleepWriteGuardRefMut<'a, T, U = T> = OwningRefMut<RwLockSleepWriteGuard<'a, T>, U>;
+
+/// Implement `Lockable` for [`RwLockSleep`].
+/// Because [`RwLockSleep::read()`] and [`RwLockSleep::write()`] return `Result`s and may fail,
+/// the [`Lockable::lock()`] and `lock_mut()` functions internally `unwrap` those `Result`s.
+impl<'t, T> Lockable<'t, T> for RwLockSleep<T> where T: 't + ?Sized {
+    type Guard = RwLockSleepReadGuard<'t, T>;
+    type GuardMut = RwLockSleepWriteGuard<'t, T>;
+
+    fn lock(&'t self) -> Self::Guard { self.read().unwrap() }
+    fn try_lock(&'t self) -> Option<Self::Guard> { self.try_read() }
+    fn lock_mut(&'t self) -> Self::GuardMut { self.write().unwrap() }
+    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_write() }
+    fn is_locked(&self) -> bool { self.is_locked() }
+    fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+}
+/// Implement `LockableSized` for [`RwLockSleep`].
+impl<'t, T> LockableSized<'t, T> for RwLockSleep<T> where T: 't + Sized {
+    fn into_inner(self) -> T { self.into_inner() }
+}

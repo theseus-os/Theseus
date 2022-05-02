@@ -17,8 +17,7 @@ use alloc::vec::Vec;
 use spin::Mutex;
 use alloc::sync::{Arc, Weak};
 use alloc::collections::BTreeMap;
-use fs_node::{DirRef, FileRef, WeakDirRef, Directory, FileOrDir, File, FsNode};
-use memory::MappedPages;
+use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, FsNode};
 
 
 /// A struct that represents a node in the VFS 
@@ -36,7 +35,7 @@ impl VFSDirectory {
     pub fn new(name: String, parent: &DirRef)  -> Result<DirRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let directory = VFSDirectory {
-            name: name,
+            name,
             children: BTreeMap::new(),
             parent: Arc::downgrade(parent),
         };
@@ -82,63 +81,6 @@ impl FsNode for VFSDirectory {
     }
 
     /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Option<DirRef> {
-        self.parent.upgrade()
-    }
-
-    fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
-        self.parent = new_parent;
-    }
-}
-
-pub struct VFSFile {
-    /// The name of the file
-    name: String,
-    /// The file size 
-    size: usize, 
-    /// The string contents as a file: this primitive can be changed into a more complex struct as files become more complex
-    _contents: String,
-    /// A weak reference to the parent directory
-    parent: WeakDirRef,
-}
-
-impl VFSFile {
-    pub fn new(name: String, size: usize, contents: String, parent: &DirRef) -> Result<FileRef, &'static str> {
-        let file = VFSFile {
-            name: name, 
-            size: size, 
-            _contents: contents,
-            parent: Arc::downgrade(parent),
-        };
-        let file_ref = Arc::new(Mutex::new(file)) as FileRef;
-        parent.lock().insert(FileOrDir::File(file_ref.clone()))?;
-        Ok(file_ref)
-    }
-}
-
-impl File for VFSFile {
-    fn read(&self, _buf: &mut [u8], _offset: usize) -> Result<usize, &'static str> { 
-        Err("VFSFile::read() is unimplemented")
-    }
-
-    fn write(&mut self, _buf: &[u8], _offset: usize) -> Result<usize, &'static str> {
-        Err("VFSFile::write() is unimplemented")
-    }
-    
-    fn size(&self) -> usize {
-        self.size
-    }
-    
-    fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
-        Err("cannot treat a VFSFile as a memory mapped region")
-    }
-}
-
-impl FsNode for VFSFile {
-    fn get_name(&self) -> String {
-        self.name.clone()
-    }
-    
     fn get_parent_dir(&self) -> Option<DirRef> {
         self.parent.upgrade()
     }

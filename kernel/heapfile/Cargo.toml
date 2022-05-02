@@ -17,6 +17,9 @@ path = "../memory"
 [dependencies.log]
 version = "0.4.8"
 
+[dependencies.io]
+path = "../io"
+
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 

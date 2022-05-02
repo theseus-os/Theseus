@@ -49,8 +49,8 @@ extern crate lockable;
 #[cfg(test)]
 mod test;
 
-use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, Range}};
-use alloc::{boxed::Box, vec::Vec};
+use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, DerefMut, Range}};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use lockable::Lockable;
 use core2::io::{Seek, SeekFrom};
 
@@ -60,29 +60,42 @@ use core2::io::{Seek, SeekFrom};
 pub enum IoError {
     /// An input parameter or argument was incorrect or invalid.
     InvalidInput,
-    /// The I/O operation attempted to access data beyond the bounds of this I/O stream.
-    OutOfBounds,
     /// The I/O operation timed out and was canceled.
     TimedOut,
+    /// A miscellaneous error occurred.
+    Other(&'static str),
 }
 
 impl From<IoError> for core2::io::Error {
     fn from(io_error: IoError) -> Self {
-        use core2::io::{ErrorKind, Error};
+        use core2::io::ErrorKind;
         match io_error {
             IoError::InvalidInput => ErrorKind::InvalidInput.into(),
-            IoError::OutOfBounds  => Error::new(ErrorKind::Other, "out of bounds"),
             IoError::TimedOut     => ErrorKind::TimedOut.into(),
+            IoError::Other(_)     => ErrorKind::Other.into(),
         }
+    }
+}
+
+impl From<&'static str> for IoError {
+    fn from(s: &'static str) -> IoError {
+        IoError::Other(s)
+    }
+}
+
+impl From<IoError> for String {
+    fn from(e: IoError) -> String {
+        let s: &'static str = e.into();
+        String::from(s)
     }
 }
 
 impl From<IoError> for &'static str {
     fn from(io_error: IoError) -> Self {
         match io_error {
-            IoError::InvalidInput => "IoError: invalid input",
-            IoError::OutOfBounds  => "IoError: out of bounds",
-            IoError::TimedOut     => "IoError: timed out",
+            IoError::InvalidInput => "invalid input",
+            IoError::TimedOut     => "timed out",
+            IoError::Other(s)     => s,
         }
     }
 }
@@ -465,9 +478,11 @@ impl<RW> BlockWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWrit
 /// A readable and writable "stateful" I/O stream that keeps track 
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// This implements the [`core2::io::Read`] and [`core2::io::Write`] traits for read and write access,
-/// as well as the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
-/// It also forwards all other I/O-related traits implemented by the underlying I/O stream.
+/// ## Trait implementations
+/// * This implements the [`core2::io::Read`] and [`core2::io::Write`] traits for read and write access.
+/// * This implements the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// * This also forwards all other I/O-related traits implemented by the underlying I/O stream.
+/// * This derefs into the inner `IO` type, via both [`Deref`] and [`DerefMut`].
 pub struct ReaderWriter<IO> {
     io: IO,
     offset: u64,
@@ -476,6 +491,17 @@ impl<IO> ReaderWriter<IO> where IO: ByteReader + ByteWriter {
     /// Creates a new `ReaderWriter` with an initial offset of 0.
     pub fn new(io: IO) -> ReaderWriter<IO> {
         ReaderWriter { io, offset: 0 }
+    }
+}
+impl<IO> Deref for ReaderWriter<IO> {
+    type Target = IO;
+    fn deref(&self) -> &Self::Target {
+        &self.io
+    }
+}
+impl<IO> DerefMut for ReaderWriter<IO> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.io
     }
 }
 impl<IO> core2::io::Read for ReaderWriter<IO> where IO: ByteReader {

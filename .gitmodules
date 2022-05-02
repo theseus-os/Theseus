@@ -34,3 +34,6 @@
 [submodule "libs/bincode"]
 	path = libs/bincode
 	url = git@github.com:theseus-os/bincode.git
+[submodule "libs/core2"]
+	path = libs/core2
+	url = https://github.com/theseus-os/core2.git
