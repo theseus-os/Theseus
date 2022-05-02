@@ -3045,6 +3045,7 @@
 <span id="3040">3040</span>
 <span id="3041">3041</span>
 <span id="3042">3042</span>
+<span id="3043">3043</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Theseus port of the `path` module from the standard library.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Taken from &lt;https://github.com/rust-lang/rust/blob/b6f580acc0ce233d5c4d1f9680d354fded88b824/library/std/src/path.rs&gt;</span>
@@ -3109,8 +3110,6 @@
 <span class="doccomment">//!</span>
 <span class="doccomment">//! [`components`]: Path::components</span>
 <span class="doccomment">//! [`push`]: PathBuf::push</span>
-
-<span class="attribute">#![<span class="ident">allow</span>(<span class="ident">unsafe_op_in_unsafe_fn</span>)]</span>
 
 <span class="kw">use</span> <span class="ident">alloc::borrow</span>::{<span class="ident">Borrow</span>, <span class="ident">Cow</span>, <span class="ident">ToOwned</span>};
 <span class="kw">use</span> <span class="ident">alloc::boxed::Box</span>;
@@ -3338,6 +3337,7 @@
 <span class="kw">fn</span> <span class="ident">os_str_as_u8_slice</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">OsStr</span>) -&gt; <span class="kw-2">&amp;</span>[<span class="ident">u8</span>] {
     <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">s</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">OsStr</span> <span class="kw">as</span> <span class="kw-2">*const</span> [<span class="ident">u8</span>]) }
 }
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_unsafe</span>)]</span>
 <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">u8_slice_as_os_str</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="kw-2">&amp;</span><span class="ident">OsStr</span> {
     <span class="comment">// SAFETY: see the comment of `os_str_as_u8_slice`</span>
     <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">s</span> <span class="kw">as</span> <span class="kw-2">*const</span> [<span class="ident">u8</span>] <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">OsStr</span>) }
@@ -4860,6 +4860,7 @@
 <span class="kw">impl</span> <span class="ident">Path</span> {
     <span class="comment">// The following (private!) function allows construction of a path from a u8</span>
     <span class="comment">// slice, which is only safe when it is known to follow the OsStr encoding.</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_unsafe</span>)]</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">from_u8_slice</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span>[<span class="ident">u8</span>]) -&gt; <span class="kw-2">&amp;</span><span class="ident">Path</span> {
         <span class="kw">unsafe</span> { <span class="ident">Path::new</span>(<span class="ident">u8_slice_as_os_str</span>(<span class="ident">s</span>)) }
     }
@@ -6046,6 +6047,7 @@
 
         
         <span class="doccomment">/// Make a POSIX path absolute without changing its semantics.</span>
+        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
         <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">absolute</span>(<span class="ident">path</span>: <span class="kw-2">&amp;</span><span class="ident">Path</span>) -&gt; <span class="ident">io::Result</span><span class="op">&lt;</span><span class="ident">PathBuf</span><span class="op">&gt;</span> {
             <span class="comment">// This is mostly a wrapper around collecting `Path::components`, with</span>
             <span class="comment">// exceptions made where this conflicts with the POSIX specification.</span>
