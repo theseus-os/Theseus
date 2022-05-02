@@ -3194,6 +3194,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_std_fs"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "log",
+ "terminal_print",
+ "theseus_std",
+]
+
+[[package]]
 name = "test_thread_local"
 version = "0.1.0"
 dependencies = [
@@ -3237,6 +3247,7 @@ dependencies = [
  "fs_node",
  "io",
  "lockable",
+ "memfs",
  "path",
  "spin 0.9.0",
  "task",
