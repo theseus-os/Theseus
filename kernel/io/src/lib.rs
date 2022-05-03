@@ -833,6 +833,64 @@ impl<'io, IO, L, B> core::fmt::Write for LockableIo<'io, IO, L, B>
 }
 
 
+// Also implement the same set of I/O traits for an immutable reference `&LockableIo` wrapper,
+// because `LockableIo` provides inner mutability.
+// Here, we only re-implement the I/O traits with methods that require `&mut self`,
+// because traits like `BlockIo` and `KnownLength` already have blanket implementations
+// of themselves for `&self`.
+impl<'io, IO, L, B> BlockReader for &LockableIo<'io, IO, L, B>
+    where IO: BlockReader + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L, B> BlockWriter for &LockableIo<'io, IO, L, B>
+    where IO: BlockWriter + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<'io, IO, L, B> ByteReader for &LockableIo<'io, IO, L, B>
+    where IO: ByteReader + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L, B> ByteWriter for &LockableIo<'io, IO, L, B>
+    where IO: ByteWriter + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<'io, IO, L, B> core2::io::Read for &LockableIo<'io, IO, L, B>
+    where IO: core2::io::Read + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize>; } }
+}
+impl<'io, IO, L, B> core2::io::Write for &LockableIo<'io, IO, L, B>
+    where IO: core2::io::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize>;
+        fn flush(&mut self) -> core2::io::Result<()>;
+    } }
+}
+impl<'io, IO, L, B> core2::io::Seek for &LockableIo<'io, IO, L, B>
+    where IO: core2::io::Seek + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn seek(&mut self, position: core2::io::SeekFrom) -> core2::io::Result<u64>; } }
+}
+impl<'io, IO, L, B> core::fmt::Write for &LockableIo<'io, IO, L, B>
+    where IO: core::fmt::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write_str(&mut self, s: &str) -> core::fmt::Result;
+    } }
+}
+
+
 /// Calculates block-wise bounds for an I/O transfer 
 /// based on a byte-wise range into a block-wise stream.
 ///
