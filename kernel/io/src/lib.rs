@@ -697,8 +697,35 @@ pub struct LockableIo<'io, IO, L, B>
           L: for <'a> Lockable<'a, IO> + ?Sized,
           B: Borrow<L>,
 {
+    /// The actual `Borrow`-able type, which obviously must be Sized.
+    /// This is typically an `Arc` or the `Lockable` type itself, e.g., a `Mutex`.
     inner: B,
-    _phantom1: PhantomData<&'io IO>,
+    /// Phew ... this one is nasty. 
+    /// Basically, `_phantom1` ideally *should* be `PhantomData<&'io IO>`.
+    /// 
+    /// However, that causes the `LockableIo` struct to be non-`Sync` no matter what
+    /// the underlying types of `IO`, `L`, and `B` are, which is unacceptable and wrong. 
+    /// 
+    /// We want `LockableIo` to be `Send` and/or `Sync` as long as 
+    /// the underlying type `L` is `Send` and/or `Sync`.
+    /// 
+    /// Thus, we use this weird trait object inside of PhantomData to indicate
+    /// that what this struct actually holds is effectively a borrow-able object of type `L`,
+    /// which is anything that implements `Lockable` under the hood, 
+    /// typically something like `Arc<Mutex< IO >>`.
+    /// Note that the interior types (Guard, GuardMut) do not actually matter,
+    /// we just need to use the `'io` lifetime and the `IO` type parameter here.
+    /// 
+    /// We also add `Send + Sync` to the inner trait object's bounds,
+    /// merely to ensure that this `PhantomData` object does not *prevent* the outer `LockableIo`
+    /// type from auto-implementing `Send` and/or `Sync`.
+    /// We want the compiler to determine and auto-implement `Send` and/or `Sync`
+    /// based *solely* on whether `L` is `Send` and/or `Sync`.
+    /// 
+    /// Read more here: <https://users.rust-lang.org/t/looking-for-a-deeper-understanding-of-phantomdata/32477>
+    _phantom1: PhantomData<dyn Lockable<'io, IO, Guard = (), GuardMut = ()> + Send + Sync>,
+    /// This can be a regular `PhantomData` because we want the compiler to 
+    /// auto-implement `Send` and/or `Sync` based on whether `B` and `L` are `Send` and/or `Sync`.
     _phantom2: PhantomData<L>,
 }
 
