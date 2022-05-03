@@ -945,6 +945,33 @@
 <span id="940">940</span>
 <span id="941">941</span>
 <span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The important items are summarized below:</span>
@@ -1644,8 +1671,35 @@
           <span class="ident">L</span>: <span class="kw">for</span> <span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Lockable</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">IO</span><span class="op">&gt;</span> <span class="op">+</span> <span class="question-mark">?</span><span class="ident">Sized</span>,
           <span class="ident">B</span>: <span class="ident">Borrow</span><span class="op">&lt;</span><span class="ident">L</span><span class="op">&gt;</span>,
 {
+    <span class="doccomment">/// The actual `Borrow`-able type, which obviously must be Sized.</span>
+    <span class="doccomment">/// This is typically an `Arc` or the `Lockable` type itself, e.g., a `Mutex`.</span>
     <span class="ident">inner</span>: <span class="ident">B</span>,
-    <span class="ident">_phantom1</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;io</span> <span class="ident">IO</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Phew ... this one is nasty. </span>
+    <span class="doccomment">/// Basically, `_phantom1` ideally *should* be `PhantomData&lt;&amp;&#39;io IO&gt;`.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// However, that causes the `LockableIo` struct to be non-`Sync` no matter what</span>
+    <span class="doccomment">/// the underlying types of `IO`, `L`, and `B` are, which is unacceptable and wrong. </span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// We want `LockableIo` to be `Send` and/or `Sync` as long as </span>
+    <span class="doccomment">/// the underlying type `L` is `Send` and/or `Sync`.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Thus, we use this weird trait object inside of PhantomData to indicate</span>
+    <span class="doccomment">/// that what this struct actually holds is effectively a borrow-able object of type `L`,</span>
+    <span class="doccomment">/// which is anything that implements `Lockable` under the hood, </span>
+    <span class="doccomment">/// typically something like `Arc&lt;Mutex&lt; IO &gt;&gt;`.</span>
+    <span class="doccomment">/// Note that the interior types (Guard, GuardMut) do not actually matter,</span>
+    <span class="doccomment">/// we just need to use the `&#39;io` lifetime and the `IO` type parameter here.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// We also add `Send + Sync` to the inner trait object&#39;s bounds,</span>
+    <span class="doccomment">/// merely to ensure that this `PhantomData` object does not *prevent* the outer `LockableIo`</span>
+    <span class="doccomment">/// type from auto-implementing `Send` and/or `Sync`.</span>
+    <span class="doccomment">/// We want the compiler to determine and auto-implement `Send` and/or `Sync`</span>
+    <span class="doccomment">/// based *solely* on whether `L` is `Send` and/or `Sync`.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// Read more here: &lt;https://users.rust-lang.org/t/looking-for-a-deeper-understanding-of-phantomdata/32477&gt;</span>
+    <span class="ident">_phantom1</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">dyn</span> <span class="ident">Lockable</span><span class="op">&lt;</span><span class="lifetime">&#39;io</span>, <span class="ident">IO</span>, <span class="ident">Guard</span> <span class="op">=</span> (), <span class="ident">GuardMut</span> <span class="op">=</span> ()<span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// This can be a regular `PhantomData` because we want the compiler to </span>
+    <span class="doccomment">/// auto-implement `Send` and/or `Sync` based on whether `B` and `L` are `Send` and/or `Sync`.</span>
     <span class="ident">_phantom2</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">L</span><span class="op">&gt;</span>,
 }
 
