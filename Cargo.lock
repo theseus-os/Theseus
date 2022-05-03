@@ -3444,17 +3444,12 @@ dependencies = [
 name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
- "core2",
- "cranelift-entity",
- "libc",
- "log",
- "region",
- "wasmparser",
- "wasmtime",
- "wasmtime-environ",
- "wasmtime-jit",
- "wasmtime-runtime",
- "wasmtime-types",
+ "anyhow",
+ "getopts",
+ "memory",
+ "task",
+ "terminal_print",
+ "wasmtime_runner",
 ]
 
 [[package]]
@@ -3963,6 +3958,25 @@ dependencies = [
  "serde",
  "thiserror_core2",
  "wasmparser",
+]
+
+[[package]]
+name = "wasmtime_runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "core2",
+ "cranelift-entity",
+ "libc",
+ "log",
+ "region",
+ "terminal_print",
+ "wasmparser",
+ "wasmtime",
+ "wasmtime-environ",
+ "wasmtime-jit",
+ "wasmtime-runtime",
+ "wasmtime-types",
 ]
 
 [[package]]

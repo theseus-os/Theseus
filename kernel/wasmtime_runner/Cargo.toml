@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "test_wasmtime"
-description = "A crate for testing the build of wasmtime ported to Theseus"
+name = "wasmtime_runner"
+description = "Executes WASM modules with `wasmtime` from the Theseus kernel"
 version = "0.1.0"
 build = "../../build.rs"
 edition = "2018"
@@ -10,6 +10,10 @@ edition = "2018"
 log = "0.4.8"
 libc = { version = "0.2", default-features = false }
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+anyhow = { version = "1.0", default-features = false }
+
+[dependencies.terminal_print]
+path = "../terminal_print"
 
 ## working!
 [dependencies.wasmparser]
