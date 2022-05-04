@@ -56,11 +56,11 @@ dependencies = [
 
 [[package]]
 name = "addr2line"
-version = "0.17.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ecd88a8c8378ca913a680cd98f0f13ac67383d35993f86c90a70e3f137816b"
+checksum = "3e61f2b7f93d2c7d2b08263acaa4a363b3e276806c68af6134c44f523bf1aacd"
 dependencies = [
- "gimli 0.26.1",
+ "gimli",
 ]
 
 [[package]]
@@ -137,15 +137,6 @@ dependencies = [
  "stdio",
  "task",
  "window_manager",
-]
-
-[[package]]
-name = "arrayvec"
-version = "0.4.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8d73f9beda665eaa98ab9e4f7442bd4e7de6652587de55b2525e52e29c1b0ba"
-dependencies = [
- "nodrop",
 ]
 
 [[package]]
@@ -643,7 +634,7 @@ dependencies = [
  "by_address",
  "crate_metadata",
  "fs_node",
- "gimli 0.19.0",
+ "gimli",
  "goblin",
  "hashbrown",
  "log",
@@ -1108,21 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "gimli"
-version = "0.19.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "162d18ae5f2e3b90a993d202f1ba17a5633c2484426f8bcae201f86194bacd00"
-dependencies = [
- "arrayvec 0.4.11",
- "byteorder",
- "fallible-iterator",
- "stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "gimli"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78cc372d058dcf6d5ecd98510e7fbc9e5aec4d21de70f65fea8fecebcd881bd4"
+checksum = "f0a01e0497841a3b2db4f8afa483cce65f7e96a3498bd6c541734792aeac8fe7"
 
 [[package]]
 name = "goblin"
@@ -1325,7 +1304,7 @@ dependencies = [
  "cortex-m",
  "owning_ref",
  "spin 0.9.0",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -1897,7 +1876,7 @@ dependencies = [
  "log",
  "owning_ref",
  "spin 0.9.0",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait",
  "task",
  "wait_queue",
 ]
@@ -2004,12 +1983,6 @@ dependencies = [
  "nic_buffers",
  "owning_ref",
 ]
-
-[[package]]
-name = "nodrop"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
 
 [[package]]
 name = "ns"
@@ -2123,7 +2096,7 @@ version = "0.4.1"
 source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
  "spin 0.9.0",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -2941,12 +2914,6 @@ dependencies = [
 [[package]]
 name = "stable_deref_trait"
 version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
-
-[[package]]
-name = "stable_deref_trait"
-version = "1.1.1"
 source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
 dependencies = [
  "spin 0.9.0",
@@ -3414,7 +3381,7 @@ version = "0.1.0"
 dependencies = [
  "external_unwind_info",
  "fallible-iterator",
- "gimli 0.19.0",
+ "gimli",
  "interrupts",
  "log",
  "memory",
@@ -3542,7 +3509,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6cbce692ab4ca2f1f3047fcf732430249c0e971bfdd2b234cf2c47ad93af5983"
 dependencies = [
- "arrayvec 0.5.2",
+ "arrayvec",
  "utf8parse",
  "vte_generate_state_changes",
 ]
