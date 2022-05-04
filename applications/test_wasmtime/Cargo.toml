@@ -16,6 +16,9 @@ path = "../../kernel/wasmtime_runner"
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
 
+[dependencies.path]
+path = "../../kernel/path"
+
 [dependencies.memory]
 path = "../../kernel/memory"
 

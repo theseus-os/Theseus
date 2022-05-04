@@ -12,6 +12,7 @@ use alloc::{
     string::String,
     vec::Vec,
 };
+use path::Path;
 
 
 pub fn main(args: Vec<String>) -> isize {
@@ -26,7 +27,27 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(args: Vec<String>) -> Result<(), String> {
-    wasmtime_runner::hello_world()
+    let path_to_hello_cwasm = Path::new(args[0].clone());
+    let curr_dir = task::get_my_current_task()
+        .map(|t| t.get_env().lock().working_dir.clone())
+        .ok_or_else(|| format!("Failed to get task's current working dir"))?;
+
+    let file = path_to_hello_cwasm.get_file(&curr_dir)
+        .ok_or_else(|| format!("Failed to get file at {:?}", path_to_hello_cwasm))?;
+
+    let file_len = file.lock().len();
+    let mut bytes = vec![0u8; file_len];
+    let _bytes_read = file.lock().read_at(&mut bytes[..], 0)
+        .map_err(|e| format!("{:?}", e))?;
+
+    if _bytes_read != file_len {
+        return Err(format!(
+            "Short read: only read {} of {} bytes from file {}", 
+            _bytes_read, file_len, path_to_hello_cwasm
+        ));
+    }
+
+    wasmtime_runner::run_hello_world(bytes.as_slice())
         .map_err(|e| format!("{}", e))?;
 
     Ok(())

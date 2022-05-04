@@ -23,28 +23,28 @@ extern crate alloc;
 use anyhow::Result;
 use wasmtime::*;
 
+
 /// Taken from `wasmtime/crates/wasmtime/src/lib.rs` docs example code.
-pub fn hello_world() -> Result<()> {
+pub fn run_hello_world(hello_world_cwasm_contents: &[u8]) -> Result<()> {
     // Modules can be compiled through either the text or binary format
     let engine = Engine::default();
-    let wat = r#"
-        (module
-            (import "host" "hello" (func $host_hello (param i32)))
-            (func (export "hello")
-                i32.const 3
-                call $host_hello)
-        )
-    "#;
     // Theseus note: `Module::new()` requires `#[cfg(compiler)]` for wasmtime,
     // such that it can perform JIT compilation of the WASM binary. 
     // We currently don't support that, so we have to use `Module::deserialize()`.
     // Old code: 
     // ```
+    // let wat = r#"
+    //     (module
+    //         (import "host" "hello" (func $host_hello (param i32)))
+    //         (func (export "hello")
+    //             i32.const 3
+    //             call $host_hello)
+    //     )
+    // "#;
     // let module = Module::new(&engine, wat)?;
     // ```
     let module = unsafe {
-        // TODO FIXME: this is wrong, we need the serialized Module as bytes, not a WAT string
-        Module::deserialize(&engine, wat.as_bytes())? 
+        Module::deserialize(&engine, hello_world_cwasm_contents)? 
     };
     // All wasm objects operate within the context of a "store". Each
     // `Store` has a type parameter to store host-specific data, which in

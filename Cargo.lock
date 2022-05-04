@@ -3447,6 +3447,7 @@ dependencies = [
  "anyhow",
  "getopts",
  "memory",
+ "path",
  "task",
  "terminal_print",
  "wasmtime_runner",
