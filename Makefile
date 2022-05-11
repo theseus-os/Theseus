@@ -152,16 +152,14 @@ build: $(nano_core_binary)
 ## First, if an .rlib archive contains multiple object files, we need to extract them all out of the archive
 ## and combine them into one object file using partial linking (`ld -r ...`), overwriting the rustc-emitted .o file.
 ## Note: we skip "normal" .rlib archives that have 2 members: a single .o object file and a single .rmeta file.
-	for f in $(shell find ./target/$(TARGET)/$(BUILD_MODE)/deps/ -name "*.rlib"); do \
-		# echo -e "Found rlib `ar t $${f} | wc -l`: $${f}" ; \
-		if [ "`ar t $${f} | wc -l`" != "2" ]; then \
-			echo -e "Unarchiving non-standard rlib: $${f}"   ; \
+## Note: the below line with the `cut` invocations simply removes the `lib` prefix and the `.rlib` suffix from the file name.
+	@for f in $(shell find ./target/$(TARGET)/$(BUILD_MODE)/deps/ -name "*.rlib"); do \
+		if [ "`$(CROSS)ar -t $${f} | wc -l`" != "2" ]; then \
+			echo -e "\033[1;34mUnarchiving multi-file rlib: \033[0m $${f}"   ; \
 			mkdir -p "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" ; \
-			ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}   ; \
-			echo -e "OBJECT_FILES: $$(find $(BUILD_DIR)/extracted_rlibs/$$(basename $${f})-unpacked/ -name "*.o")"  ; \
-			mkdir -p "$(BUILD_DIR)/new_test/"  ; \
+			$(CROSS)ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}   ; \
 			$(CROSS)ld -r  \
-				--output "./target/$(TARGET)/$(BUILD_MODE)/deps/`basename $${f} | cut -c 4- | rev | cut -c 6- | rev `.o"  \
+				--output "./target/$(TARGET)/$(BUILD_MODE)/deps/`basename $${f} | cut -c 4- | rev | cut -c 6- | rev`.o"  \
 				$$(find $(BUILD_DIR)/extracted_rlibs/$$(basename $${f})-unpacked/ -name "*.o")  ; \
 		fi ; \
 	done
