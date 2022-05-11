@@ -54,9 +54,9 @@ path = "../pit_clock"
 path = "../interrupts"
 
 [dependencies.rand]
-version = "0.6"
+version = "0.8"
 default-features = false 
-features = [ "alloc" ]
+features = [ "alloc", "small_rng" ]
 
 [dependencies.hpet]
 path = "../acpi/hpet"
