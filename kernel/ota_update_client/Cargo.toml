@@ -50,9 +50,9 @@ features = [
 ]
 
 [dependencies.rand]
-version = "0.6"
+version = "0.8"
 default-features = false 
-features = [ "alloc" ]
+features = [ "alloc", "small_rng" ]
 
 [dependencies.smoltcp_helper]
 path = "../smoltcp_helper"
