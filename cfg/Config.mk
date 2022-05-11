@@ -50,7 +50,10 @@ BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
 BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
 
 
-## emit obj gives us the object file for the crate, instead of an rlib that we have to unpack.
+## Tell rustc to output the native object file for each crate,
+## which avoids always having to unpack the crate's .rlib archive to extract the object files within.
+## Note that we still do have to extract and partially link object files from .rlib archives for crates that
+## use a build script to generate additional object files during build time.
 RUSTFLAGS += --emit=obj
 ## enable debug info even for release builds
 RUSTFLAGS += -C debuginfo=2
