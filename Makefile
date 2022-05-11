@@ -147,7 +147,24 @@ $(iso): clean-old-build build extra_files
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
-## Copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
+## Here, the main Rust build has just occurred.
+##
+## First, if an .rlib archive contains multiple object files, we need to extract them all out of the archive
+## and combine them into one object file using partial linking (`ld -r ...`), overwriting the rustc-emitted .o file.
+## Note: we skip "normal" .rlib archives that have 2 members: a single .o object file and a single .rmeta file.
+## Note: the below line with the `cut` invocations simply removes the `lib` prefix and the `.rlib` suffix from the file name.
+	@for f in $(shell find ./target/$(TARGET)/$(BUILD_MODE)/deps/ -name "*.rlib"); do \
+		if [ "`$(CROSS)ar -t $${f} | wc -l`" != "2" ]; then \
+			echo -e "\033[1;34mUnarchiving multi-file rlib: \033[0m $${f}"   ; \
+			mkdir -p "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" ; \
+			$(CROSS)ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}   ; \
+			$(CROSS)ld -r  \
+				--output "./target/$(TARGET)/$(BUILD_MODE)/deps/`basename $${f} | cut -c 4- | rev | cut -c 6- | rev`.o"  \
+				$$(find $(BUILD_DIR)/extracted_rlibs/$$(basename $${f})-unpacked/ -name "*.o")  ; \
+		fi ; \
+	done
+
+## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
@@ -159,7 +176,7 @@ build: $(nano_core_binary)
 		--app-prefix $(APP_PREFIX) \
 		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
 
-## Create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
+## Third, create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
 ## This includes the target file, host OS dependencies (proc macros, etc)., 
 ## and most importantly, a TOML file to describe these and other config variables.
 	@rm -rf $(THESEUS_BUILD_TOML)
@@ -172,7 +189,7 @@ build: $(nano_core_binary)
 	@echo -e 'cargoflags = "$(CARGOFLAGS)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'host_deps = "./host_deps"' >> $(THESEUS_BUILD_TOML)
 
-## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
+## Fourth, strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
 	@mkdir -p $(DEBUG_SYMBOLS_DIR)
 ifeq ($(debug),full)
 # don't strip any files
