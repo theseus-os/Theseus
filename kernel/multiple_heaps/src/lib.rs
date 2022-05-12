@@ -74,8 +74,8 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = HEAP_MAPPED_PAGES_SIZE_IN_BYTES /
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
-/// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 100 KiB.
-const PAGES_PER_SIZE_CLASS: usize = 24; 
+/// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 512 KiB.
+const PAGES_PER_SIZE_CLASS: usize = 128; // was 24 
 
 /// Starting size of each per-core heap. 
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
