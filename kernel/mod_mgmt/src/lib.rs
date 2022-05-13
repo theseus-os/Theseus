@@ -1106,6 +1106,7 @@ impl CrateNamespace {
         let (mut rodata_offset, mut data_offset) = (0 , 0);
                     
         const TEXT_PREFIX:             &'static str = ".text.";
+        const UNLIKELY_PREFIX:         &'static str = "unlikely."; // the full section prefix is ".text.unlikely."
         const RODATA_PREFIX:           &'static str = ".rodata.";
         const DATA_PREFIX:             &'static str = ".data.";
         const BSS_PREFIX:              &'static str = ".bss.";
@@ -1235,7 +1236,20 @@ impl CrateNamespace {
 
             // First, check for executable sections, which can only be .text sections.
             if is_exec && !is_write {
+                let is_global = global_sections.contains(&shndx);
                 let name = try_get_symbol_name_after_prefix!(sec_name, TEXT_PREFIX);
+                // Handle cold sections, which have a section prefix of ".text.unlikely."
+                // Currently, we ignore the cold/hot designation in terms of placing a section in memory.
+                // Note: we only *truly* have to do this for global sections, because other crates
+                //       might depend on their correct section name after the ".text.unlikely." prefix.
+                let name = if is_global && name.starts_with(UNLIKELY_PREFIX) {
+                    name.get(UNLIKELY_PREFIX.len() ..).ok_or_else(|| {
+                        error!("Failed to get the .text.unlikely. section's name: {:?}", sec_name);
+                        "Failed to get the .text.unlikely. section's name after the prefix"
+                    })?
+                } else {
+                    name
+                };
                 let demangled = demangle(name).to_string();
 
                 // We already copied the content of all .text sections above, 
@@ -1253,7 +1267,7 @@ impl CrateNamespace {
                             text_offset,
                             dest_vaddr,
                             sec_size,
-                            global_sections.contains(&shndx),
+                            is_global,
                             new_crate_weak_ref.clone(),
                         ))
                     );
