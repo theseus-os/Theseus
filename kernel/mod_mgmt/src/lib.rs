@@ -1247,7 +1247,7 @@ impl CrateNamespace {
                         error!("Failed to get the .text.unlikely. section's name: {:?}", sec_name);
                         "Failed to get the .text.unlikely. section's name after the prefix"
                     })?;
-                    warn!("Note: adjusting section name:\n{}\n{}", name, new_name);
+                    warn!("Note: adjusting section name: \n    {}\n      -->    {}", name, new_name);
                     new_name
                 } else {
                     name
