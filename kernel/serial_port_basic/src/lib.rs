@@ -260,6 +260,19 @@ impl SerialPort {
 
     }
 
+    /// Enable or disable interrupts on this serial port for various events.
+    pub fn enable_interrupt(&mut self, event: SerialPortInterruptEvent, enable: bool) {
+        let existing = self.interrupt_enable.read();
+        let new = if enable {
+            existing | event as u8
+        } else {
+            existing & !(event as u8)
+        };
+        unsafe {
+            self.interrupt_enable.write(new);
+        }
+    }
+
     /// Write the given string to the serial port, blocking until data can be transmitted.
     ///
     /// # Special characters
@@ -347,4 +360,14 @@ impl fmt::Write for SerialPort {
         self.out_str(s); 
         Ok(())
     }
+}
+
+/// The types of events that can trigger an interrupt on a serial port.
+#[derive(Debug)]
+#[repr(u8)]
+pub enum SerialPortInterruptEvent {
+    DataReceived     = 1 << 0,
+    TransmitterEmpty = 1 << 1,
+    ErrorOrBreak     = 1 << 2,
+    StatusChange     = 1 << 3,
 }

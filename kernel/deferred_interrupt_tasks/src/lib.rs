@@ -155,9 +155,9 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
           Arg: Send + 'static,
 {
     let curr_task = get_my_current_task().expect("BUG: deferred_task_entry_point: couldn't get current task.");
-    trace!("Entered {:?}:\n\t action: {:?}\n\t arg:    {:?}", 
-        curr_task.name, debugit!(deferred_interrupt_action), debugit!(deferred_action_argument)
-    );
+    // trace!("Entered {:?}:\n\t action: {:?}\n\t arg:    {:?}", 
+    //     curr_task.name, debugit!(deferred_interrupt_action), debugit!(deferred_action_argument)
+    // );
 
     loop {
         let _res = deferred_interrupt_action(&deferred_action_argument);

@@ -718,6 +718,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "console",
  "core2",
  "derive_more",
  "e1000",

@@ -16,8 +16,7 @@ extern crate serial_port;
 extern crate io;
 extern crate text_terminal;
 
-use core::marker::PhantomData;
-
+use core::{marker::PhantomData, sync::atomic::{AtomicU16, Ordering}};
 use alloc::string::String;
 use task::TaskRef;
 use async_channel::Receiver;
@@ -26,6 +25,16 @@ use io::LockableIo;
 use text_terminal::{TerminalBackend, TextTerminal, TtyBackend};
 use irq_safety::MutexIrqSafe;
 
+
+/// The serial port being used for the default system logger can optionally ignore inputs.
+static IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(0);
+
+/// Configures the console connection listener to ignore inputs from the given serial port.
+/// 
+/// Only one serial port can be ignored, typically the one used for system logging.
+pub fn ignore_serial_port_input(serial_port_address: u16) {
+	IGNORED_SERIAL_PORT_INPUT.store(serial_port_address, Ordering::Relaxed)
+}
 
 /// Starts a new task that detects new console connections
 /// by waiting for new data to be received on serial ports.
@@ -84,22 +93,35 @@ fn console_connection_detector(connection_listener: Receiver<SerialPortAddress>)
 			error!("Error receiving console connection request: {:?}", e);
 			"error receiving console connection request"
 		})?;
+		
+		if IGNORED_SERIAL_PORT_INPUT.load(Ordering::Relaxed) == serial_port_address as u16 {
+			warn!(
+				"Currently ignoring inputs on serial port {:?}. \
+				 \n --> Note: QEMU is forwarding control sequences (like Ctrl+C) to Theseus. To exit QEMU, press Ctrl+A then X.",
+				serial_port_address,
+			);
+			continue;
+		}
+		
 		let serial_port = match get_serial_port(serial_port_address) {
 			Some(sp) => sp.clone(),
 			_ => {
-				warn!("Serial port {:?} was not initialized, skipping console connection request", serial_port_address);
+				error!("Serial port {:?} was not initialized, skipping console connection request", serial_port_address);
 				continue;
 			}
 		};
-		
+	
+		let (sender, receiver) = async_channel::new_channel(16);
+		if let Err(_) = serial_port.lock().set_data_sender(sender) {
+			warn!("Serial port {:?} already had a data sender, skipping console connection request", serial_port_address);
+			continue;
+		}
+
 		let new_console = new_serial_console(
 			alloc::format!("console_{:?}", serial_port_address),
 			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
 			LockableIo::<_, MutexIrqSafe<SerialPort>, _>::from(serial_port.clone()),
 		);
-		
-		let (sender, receiver) = async_channel::new_channel(16);
-		serial_port.lock().set_data_sender(sender);
 
 		let _taskref = spawn::new_task_builder(console_entry, (new_console, receiver))
 			.name(alloc::format!("console_loop_{:?}", serial_port_address))
