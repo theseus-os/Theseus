@@ -29,6 +29,7 @@ extern crate serial_port_basic;
 use deferred_interrupt_tasks::InterruptRegistrationError;
 pub use serial_port_basic::{
     SerialPortAddress,
+    SerialPortInterruptEvent,
     SerialPort as SerialPortBasic,
     take_serial_port as take_serial_port_basic,
 };
@@ -214,13 +215,18 @@ impl SerialPort {
     /// Tells this `SerialPort` to push received data bytes
     /// onto the given `sender` channel.
     ///
-    /// If a sender already existed, it is replaced
-    /// by the given `sender` and returned.
+    /// If a sender already exists for this serial port,
+    /// the existing sender is *not* replaced and an error is returned.
     pub fn set_data_sender(
         &mut self,
         sender: Sender<DataChunk>
-    ) -> Option<Sender<DataChunk>> {
-        self.data_sender.replace(sender)
+    ) -> Result<(), ()> {
+        if self.data_sender.is_some() { 
+            Err(())
+        } else {
+            self.data_sender = Some(sender);
+            Ok(())
+        }
     }
 
 }
@@ -298,7 +304,8 @@ fn serial_port_receive_deferred(
                 input_was_ignored = true;
             }
         } else {
-            // This was a "false" interrupt, no data was actually received.
+            // Ignore this interrupt, as it was caused by a `SerialPortInterruptEvent` 
+            // other than data being received, which is the only one we currently care about.
             return Ok(());
         }
     }
@@ -309,7 +316,7 @@ fn serial_port_receive_deferred(
 
     if input_was_ignored {
         if let Some(sender) = NEW_CONNECTION_NOTIFIER.get() {
-            info!("Requesting new console to be spawned for this serial port ({:#X})", base_port);
+            // info!("Requesting new console to be spawned for this serial port ({:#X})", base_port);
             if let Ok(serial_port_address) = SerialPortAddress::try_from(base_port) {
                 if let Err(err) = sender.try_send(serial_port_address) {
                     error!("Error sending request for new console to be spawned for this serial port ({:#X}): {:?}",
