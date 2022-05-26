@@ -139,6 +139,28 @@
 <span id="134">134</span>
 <span id="135">135</span>
 <span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Creation and management of virtual consoles or terminals atop Theseus.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
@@ -157,8 +179,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">io</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">text_terminal</span>;
 
-<span class="kw">use</span> <span class="ident">core::marker::PhantomData</span>;
-
+<span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">marker::PhantomData</span>, <span class="ident">sync::atomic</span>::{<span class="ident">AtomicU16</span>, <span class="ident">Ordering</span>}};
 <span class="kw">use</span> <span class="ident">alloc::string::String</span>;
 <span class="kw">use</span> <span class="ident">task::TaskRef</span>;
 <span class="kw">use</span> <span class="ident">async_channel::Receiver</span>;
@@ -167,6 +188,16 @@
 <span class="kw">use</span> <span class="ident">text_terminal</span>::{<span class="ident">TerminalBackend</span>, <span class="ident">TextTerminal</span>, <span class="ident">TtyBackend</span>};
 <span class="kw">use</span> <span class="ident">irq_safety::MutexIrqSafe</span>;
 
+
+<span class="doccomment">/// The serial port being used for the default system logger can optionally ignore inputs.</span>
+<span class="kw">static</span> <span class="ident">IGNORED_SERIAL_PORT_INPUT</span>: <span class="ident">AtomicU16</span> <span class="op">=</span> <span class="ident">AtomicU16::new</span>(<span class="number">0</span>);
+
+<span class="doccomment">/// Configures the console connection listener to ignore inputs from the given serial port.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// Only one serial port can be ignored, typically the one used for system logging.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ignore_serial_port_input</span>(<span class="ident">serial_port_address</span>: <span class="ident">u16</span>) {
+	<span class="ident">IGNORED_SERIAL_PORT_INPUT</span>.<span class="ident">store</span>(<span class="ident">serial_port_address</span>, <span class="ident">Ordering::Relaxed</span>)
+}
 
 <span class="doccomment">/// Starts a new task that detects new console connections</span>
 <span class="doccomment">/// by waiting for new data to be received on serial ports.</span>
@@ -225,22 +256,35 @@
 			<span class="macro">error!</span>(<span class="string">&quot;Error receiving console connection request: {:?}&quot;</span>, <span class="ident">e</span>);
 			<span class="string">&quot;error receiving console connection request&quot;</span>
 		})<span class="question-mark">?</span>;
+		
+		<span class="kw">if</span> <span class="ident">IGNORED_SERIAL_PORT_INPUT</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">==</span> <span class="ident">serial_port_address</span> <span class="kw">as</span> <span class="ident">u16</span> {
+			<span class="macro">warn!</span>(
+				<span class="string">&quot;Currently ignoring inputs on serial port {:?}. \
+				 \n --&gt; Note: QEMU is forwarding control sequences (like Ctrl+C) to Theseus. To exit QEMU, press Ctrl+A then X.&quot;</span>,
+				<span class="ident">serial_port_address</span>,
+			);
+			<span class="kw">continue</span>;
+		}
+		
 		<span class="kw">let</span> <span class="ident">serial_port</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">get_serial_port</span>(<span class="ident">serial_port_address</span>) {
 			<span class="prelude-val">Some</span>(<span class="ident">sp</span>) =&gt; <span class="ident">sp</span>.<span class="ident">clone</span>(),
 			<span class="kw">_</span> =&gt; {
-				<span class="macro">warn!</span>(<span class="string">&quot;Serial port {:?} was not initialized, skipping console connection request&quot;</span>, <span class="ident">serial_port_address</span>);
+				<span class="macro">error!</span>(<span class="string">&quot;Serial port {:?} was not initialized, skipping console connection request&quot;</span>, <span class="ident">serial_port_address</span>);
 				<span class="kw">continue</span>;
 			}
 		};
-		
+	
+		<span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">async_channel::new_channel</span>(<span class="number">16</span>);
+		<span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span> <span class="ident">serial_port</span>.<span class="ident">lock</span>().<span class="ident">set_data_sender</span>(<span class="ident">sender</span>) {
+			<span class="macro">warn!</span>(<span class="string">&quot;Serial port {:?} already had a data sender, skipping console connection request&quot;</span>, <span class="ident">serial_port_address</span>);
+			<span class="kw">continue</span>;
+		}
+
 		<span class="kw">let</span> <span class="ident">new_console</span> <span class="op">=</span> <span class="ident">new_serial_console</span>(
 			<span class="macro">alloc::format!</span>(<span class="string">&quot;console_{:?}&quot;</span>, <span class="ident">serial_port_address</span>),
 			<span class="ident">LockableIo</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="ident">::from</span>(<span class="ident">serial_port</span>.<span class="ident">clone</span>()),
 			<span class="ident">LockableIo</span>::<span class="op">&lt;</span><span class="kw">_</span>, <span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">SerialPort</span><span class="op">&gt;</span>, <span class="kw">_</span><span class="op">&gt;</span><span class="ident">::from</span>(<span class="ident">serial_port</span>.<span class="ident">clone</span>()),
 		);
-		
-		<span class="kw">let</span> (<span class="ident">sender</span>, <span class="ident">receiver</span>) <span class="op">=</span> <span class="ident">async_channel::new_channel</span>(<span class="number">16</span>);
-		<span class="ident">serial_port</span>.<span class="ident">lock</span>().<span class="ident">set_data_sender</span>(<span class="ident">sender</span>);
 
 		<span class="kw">let</span> <span class="ident">_taskref</span> <span class="op">=</span> <span class="ident">spawn::new_task_builder</span>(<span class="ident">console_entry</span>, (<span class="ident">new_console</span>, <span class="ident">receiver</span>))
 			.<span class="ident">name</span>(<span class="macro">alloc::format!</span>(<span class="string">&quot;console_loop_{:?}&quot;</span>, <span class="ident">serial_port_address</span>))

@@ -299,6 +299,11 @@
 <span id="294">294</span>
 <span id="295">295</span>
 <span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
 
@@ -310,6 +315,7 @@
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">apic</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">acpi</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">serial_port</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">console</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">logger</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">keyboard</span>;
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pci</span>;
@@ -381,15 +387,19 @@
     <span class="ident">logger::init</span>(<span class="prelude-val">None</span>, <span class="ident">logger_writers</span>).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_e</span><span class="op">|</span> <span class="string">&quot;BUG: logger::init() failed&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Initialized full logger.&quot;</span>);
 
-    <span class="comment">// Ensure that COM1 is initialized, even if it wasn&#39;t used in [`logger::early_init()`].</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">com1</span>) <span class="op">=</span> <span class="ident">take_serial_port_basic</span>(<span class="ident">SerialPortAddress::COM1</span>) {
-        <span class="ident">serial_port::init_serial_port</span>(<span class="ident">SerialPortAddress::COM1</span>, <span class="ident">com1</span>);
-    }
-    <span class="comment">// Also, for headless operation, ensure that COM2 is initialized.</span>
-    <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">com2</span>) <span class="op">=</span> <span class="ident">take_serial_port_basic</span>(<span class="ident">SerialPortAddress::COM2</span>) {
-        <span class="ident">serial_port::init_serial_port</span>(<span class="ident">SerialPortAddress::COM2</span>, <span class="ident">com2</span>);
-    }
-
+    <span class="comment">// Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.</span>
+    <span class="comment">// If a serial port was used for logging (as configured in [`logger::early_init()`]),</span>
+    <span class="comment">// ignore its inputs for purposes of starting new console instances.</span>
+    <span class="kw">let</span> <span class="ident">init_serial_port</span> <span class="op">=</span> <span class="op">|</span><span class="ident">spa</span>: <span class="ident">SerialPortAddress</span><span class="op">|</span> {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sp</span>) <span class="op">=</span> <span class="ident">take_serial_port_basic</span>(<span class="ident">spa</span>) {
+            <span class="ident">serial_port::init_serial_port</span>(<span class="ident">spa</span>, <span class="ident">sp</span>);
+        } <span class="kw">else</span> {
+            <span class="ident">console::ignore_serial_port_input</span>(<span class="ident">spa</span> <span class="kw">as</span> <span class="ident">u16</span>);
+            <span class="macro">info!</span>(<span class="string">&quot;Ignoring input on {:?} because it is being used for logging.&quot;</span>, <span class="ident">spa</span>);
+        }
+    };
+    <span class="ident">init_serial_port</span>(<span class="ident">SerialPortAddress::COM1</span>);
+    <span class="ident">init_serial_port</span>(<span class="ident">SerialPortAddress::COM2</span>);
 
     <span class="ident">keyboard::init</span>(<span class="ident">key_producer</span>);
     <span class="ident">mouse::init</span>(<span class="ident">mouse_producer</span>);

@@ -377,6 +377,13 @@
 <span id="372">372</span>
 <span id="373">373</span>
 <span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This crate builds on  [`serial_port_basic`], which provides the lower-level types</span>
@@ -408,6 +415,7 @@
 <span class="kw">use</span> <span class="ident">deferred_interrupt_tasks::InterruptRegistrationError</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">serial_port_basic</span>::{
     <span class="ident">SerialPortAddress</span>,
+    <span class="ident">SerialPortInterruptEvent</span>,
     <span class="ident">SerialPort</span> <span class="kw">as</span> <span class="ident">SerialPortBasic</span>,
     <span class="ident">take_serial_port</span> <span class="kw">as</span> <span class="ident">take_serial_port_basic</span>,
 };
@@ -593,13 +601,18 @@
     <span class="doccomment">/// Tells this `SerialPort` to push received data bytes</span>
     <span class="doccomment">/// onto the given `sender` channel.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// If a sender already existed, it is replaced</span>
-    <span class="doccomment">/// by the given `sender` and returned.</span>
+    <span class="doccomment">/// If a sender already exists for this serial port,</span>
+    <span class="doccomment">/// the existing sender is *not* replaced and an error is returned.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_data_sender</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">DataChunk</span><span class="op">&gt;</span>
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">DataChunk</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">data_sender</span>.<span class="ident">replace</span>(<span class="ident">sender</span>)
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), ()<span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">data_sender</span>.<span class="ident">is_some</span>() { 
+            <span class="prelude-val">Err</span>(())
+        } <span class="kw">else</span> {
+            <span class="self">self</span>.<span class="ident">data_sender</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">sender</span>);
+            <span class="prelude-val">Ok</span>(())
+        }
     }
 
 }
@@ -677,7 +690,8 @@
                 <span class="ident">input_was_ignored</span> <span class="op">=</span> <span class="bool-val">true</span>;
             }
         } <span class="kw">else</span> {
-            <span class="comment">// This was a &quot;false&quot; interrupt, no data was actually received.</span>
+            <span class="comment">// Ignore this interrupt, as it was caused by a `SerialPortInterruptEvent` </span>
+            <span class="comment">// other than data being received, which is the only one we currently care about.</span>
             <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
         }
     }
@@ -688,7 +702,7 @@
 
     <span class="kw">if</span> <span class="ident">input_was_ignored</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">sender</span>) <span class="op">=</span> <span class="ident">NEW_CONNECTION_NOTIFIER</span>.<span class="ident">get</span>() {
-            <span class="macro">info!</span>(<span class="string">&quot;Requesting new console to be spawned for this serial port ({:#X})&quot;</span>, <span class="ident">base_port</span>);
+            <span class="comment">// info!(&quot;Requesting new console to be spawned for this serial port ({:#X})&quot;, base_port);</span>
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">serial_port_address</span>) <span class="op">=</span> <span class="ident">SerialPortAddress::try_from</span>(<span class="ident">base_port</span>) {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span> <span class="ident">sender</span>.<span class="ident">try_send</span>(<span class="ident">serial_port_address</span>) {
                     <span class="macro">error!</span>(<span class="string">&quot;Error sending request for new console to be spawned for this serial port ({:#X}): {:?}&quot;</span>,

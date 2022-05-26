@@ -353,6 +353,29 @@
 <span id="348">348</span>
 <span id="349">349</span>
 <span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for basic serial port access, including initialization, transmit, and receive.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This is a near-standalone crate with very minimal dependencies and a basic feature set</span>
@@ -615,6 +638,19 @@
 
     }
 
+    <span class="doccomment">/// Enable or disable interrupts on this serial port for various events.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_interrupt</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">event</span>: <span class="ident">SerialPortInterruptEvent</span>, <span class="ident">enable</span>: <span class="ident">bool</span>) {
+        <span class="kw">let</span> <span class="ident">existing</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">interrupt_enable</span>.<span class="ident">read</span>();
+        <span class="kw">let</span> <span class="ident">new</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">enable</span> {
+            <span class="ident">existing</span> <span class="op">|</span> <span class="ident">event</span> <span class="kw">as</span> <span class="ident">u8</span>
+        } <span class="kw">else</span> {
+            <span class="ident">existing</span> <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">event</span> <span class="kw">as</span> <span class="ident">u8</span>)
+        };
+        <span class="kw">unsafe</span> {
+            <span class="self">self</span>.<span class="ident">interrupt_enable</span>.<span class="ident">write</span>(<span class="ident">new</span>);
+        }
+    }
+
     <span class="doccomment">/// Write the given string to the serial port, blocking until data can be transmitted.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Special characters</span>
@@ -702,6 +738,16 @@
         <span class="self">self</span>.<span class="ident">out_str</span>(<span class="ident">s</span>); 
         <span class="prelude-val">Ok</span>(())
     }
+}
+
+<span class="doccomment">/// The types of events that can trigger an interrupt on a serial port.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u8</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SerialPortInterruptEvent</span> {
+    <span class="ident">DataReceived</span>     <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">0</span>,
+    <span class="ident">TransmitterEmpty</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>,
+    <span class="ident">ErrorOrBreak</span>     <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>,
+    <span class="ident">StatusChange</span>     <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">3</span>,
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="serial_port_basic" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>

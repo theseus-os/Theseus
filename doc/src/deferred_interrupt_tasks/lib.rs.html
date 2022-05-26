@@ -337,9 +337,9 @@
           <span class="ident">Arg</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>,
 {
     <span class="kw">let</span> <span class="ident">curr_task</span> <span class="op">=</span> <span class="ident">get_my_current_task</span>().<span class="ident">expect</span>(<span class="string">&quot;BUG: deferred_task_entry_point: couldn&#39;t get current task.&quot;</span>);
-    <span class="macro">trace!</span>(<span class="string">&quot;Entered {:?}:\n\t action: {:?}\n\t arg:    {:?}&quot;</span>, 
-        <span class="ident">curr_task</span>.<span class="ident">name</span>, <span class="macro">debugit!</span>(<span class="ident">deferred_interrupt_action</span>), <span class="macro">debugit!</span>(<span class="ident">deferred_action_argument</span>)
-    );
+    <span class="comment">// trace!(&quot;Entered {:?}:\n\t action: {:?}\n\t arg:    {:?}&quot;, </span>
+    <span class="comment">//     curr_task.name, debugit!(deferred_interrupt_action), debugit!(deferred_action_argument)</span>
+    <span class="comment">// );</span>
 
     <span class="kw">loop</span> {
         <span class="kw">let</span> <span class="ident">_res</span> <span class="op">=</span> <span class="ident">deferred_interrupt_action</span>(<span class="kw-2">&amp;</span><span class="ident">deferred_action_argument</span>);
