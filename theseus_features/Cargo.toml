@@ -1,0 +1,19 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "theseus_features"
+description = "Set of global features used for configuration and conditional compilation in Theseus builds"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasm = { path = "../applications/wasm", optional = true }
+ps = { path = "../applications/ps", optional = true }
+cpu = { path = "../applications/cpu", optional = true }
+test_panic = { path = "../applications/test_panic", optional = true }
+
+[features]
+default = []
+wasm = [ "dep:wasm" ]
+ps = [ "dep:ps" ]
+cpu = [ "dep:cpu" ]
+test_panic = [ "dep:test_panic" ]

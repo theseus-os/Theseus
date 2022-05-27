@@ -1,34 +1,45 @@
 [workspace]
+resolver = "2"
 
 
 ## Here, we specify that all subdirectories in the kernel/ and applications/ directories should be built, 
 ## except for those starting with a "." So, we build all kernel and application crates except hidden directories.
 members = [
-	"kernel/[!.]*/",
-	"applications/[!.]*/",
+	"kernel/nano_core",
+	"applications/shell",
+
+	# "kernel/[!.]*/",
+	# "applications/[!.]*/",
 	"ports/theseus_std",
+	"theseus_features",
 ]
 
 
 
 exclude = [
-	## exclude the build directories
+	## Exclude the build directories
 	"build",
+	"target",
+
+	## Exclude configuration, tools, scripts, etc
 	"cfg",
 	"compiler_plugins",
-	"libs",
-	"old_crates",
 	"scripts",
-	"target",
 	"tools",
+
+	## Exclude old components
+	"old_crates",
 	"userspace",
 
-	## Exclude *all* ports for now, as only the ones requested by core Theseus crates
+	## Exclude third-party libs and ports for now.
+	## Only the ones used as direct dependencies by core Theseus crates
 	## should be included in the workspace build by default.
+	"libs",
 	"ports",
 
-	## exclude tlibc, since we currently build it separately.
+	## Exclude tlibc and libtheseus, which are currently built separately.
 	"tlibc",
+	"libtheseus",
 
 	## exclude unused test applications by default
 	"applications/test_exception",
@@ -40,8 +51,12 @@ exclude = [
 	"applications/test_ixgbe",
 	# "applications/test_backtrace",
 
-	## libtheseus is currently built separately and not used
-	"libtheseus",
+	## Testing: exclusion of wasm stuff
+	"applications/",
+	"applications/wasm",
+	"applications/ps",
+	"applications/cpu",
+	"kernel/wasi_interpreter",
 ]
 
 
