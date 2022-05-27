@@ -9,9 +9,9 @@ build = "../../build.rs"
 fallible-iterator = { version = "0.2.0", default-features = false }
 
 [dependencies.gimli]
-version = "0.19.0"
+version = "0.25.0"
 default-features = false
-features = [ "read", "alloc" ]
+features = [ "read" ]
 
 [dependencies.log]
 version = "0.4.8"

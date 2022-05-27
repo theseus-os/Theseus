@@ -55,6 +55,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "addr2line"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e61f2b7f93d2c7d2b08263acaa4a363b3e276806c68af6134c44f523bf1aacd"
+dependencies = [
+ "gimli",
+]
+
+[[package]]
+name = "adler"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
+
+[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -126,15 +141,6 @@ dependencies = [
 
 [[package]]
 name = "arrayvec"
-version = "0.4.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8d73f9beda665eaa98ab9e4f7442bd4e7de6652587de55b2525e52e29c1b0ba"
-dependencies = [
- "nodrop",
-]
-
-[[package]]
-name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
@@ -176,6 +182,25 @@ name = "autocfg"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
+
+[[package]]
+name = "backtrace"
+version = "0.3.64"
+dependencies = [
+ "addr2line",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memory",
+ "miniz_oxide",
+ "mutex_sleep",
+ "object",
+ "rustc-demangle",
+ "spin 0.9.0",
+ "stack_trace",
+ "theseus_std",
+ "thread_local_macro",
+]
 
 [[package]]
 name = "bare-metal"
@@ -489,8 +514,6 @@ checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 [[package]]
 name = "core2"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b49ba7ef1ad6107f8824dbe97de947cbaac53c44e7f9756a1fba0d37c1eec505"
 dependencies = [
  "memchr",
 ]
@@ -695,6 +718,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "console",
  "core2",
  "derive_more",
  "e1000",
@@ -1076,15 +1100,9 @@ dependencies = [
 
 [[package]]
 name = "gimli"
-version = "0.19.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "162d18ae5f2e3b90a993d202f1ba17a5633c2484426f8bcae201f86194bacd00"
-dependencies = [
- "arrayvec 0.4.11",
- "byteorder",
- "fallible-iterator",
- "stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
+checksum = "f0a01e0497841a3b2db4f8afa483cce65f7e96a3498bd6c541734792aeac8fe7"
 
 [[package]]
 name = "goblin"
@@ -1287,7 +1305,7 @@ dependencies = [
  "cortex-m",
  "owning_ref",
  "spin 0.9.0",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -1666,6 +1684,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "miniz_oxide"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a92518e98c078586bc6c934028adcca4c92a53d6a958196de835170a01d84e4b"
+dependencies = [
+ "adler",
+ "autocfg",
+]
+
+[[package]]
 name = "mkdir"
 version = "0.1.0"
 dependencies = [
@@ -1845,10 +1873,11 @@ dependencies = [
 name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
+ "lockable",
  "log",
  "owning_ref",
  "spin 0.9.0",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait",
  "task",
  "wait_queue",
 ]
@@ -1957,12 +1986,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nodrop"
-version = "0.1.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
-
-[[package]]
 name = "ns"
 version = "0.1.0"
 dependencies = [
@@ -2027,6 +2050,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "object"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67ac1d3f9a1d3616fd9a60c8d74296f22406a238b6a72f5cc1e6f314df4ffbf9"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2065,7 +2097,7 @@ version = "0.4.1"
 source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
  "spin 0.9.0",
- "stable_deref_trait 1.1.1 (git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin)",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -2326,71 +2358,18 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.6.1"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae9d223d52ae411a33cf7e54ec6034ec165df296ccd23533d671a28252b6f66a"
-dependencies = [
- "rand_chacha",
- "rand_core",
- "rand_hc",
- "rand_isaac",
- "rand_pcg",
- "rand_xorshift",
- "rustc_version",
-]
-
-[[package]]
-name = "rand_chacha"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "771b009e3a508cb67e8823dda454aaa5368c7bc1c16829fb77d3e980440dd34a"
+checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
  "rand_core",
- "rustc_version",
 ]
 
 [[package]]
 name = "rand_core"
-version = "0.3.0"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0905b6b7079ec73b314d4c748701f6931eb79fd97c668caa3f1899b22b32c6db"
-
-[[package]]
-name = "rand_hc"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b40677c7be09ae76218dc623efbf7b18e34bced3f38883af07bb75630a21bc4"
-dependencies = [
- "rand_core",
-]
-
-[[package]]
-name = "rand_isaac"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ded997c9d5f13925be2a6fd7e66bf1872597f759fd9dd93513dd7e92e5a5ee08"
-dependencies = [
- "rand_core",
-]
-
-[[package]]
-name = "rand_pcg"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "086bd09a33c7044e56bb44d5bdde5a60e7f119a9e95b0775f545de759a32fe05"
-dependencies = [
- "rand_core",
- "rustc_version",
-]
-
-[[package]]
-name = "rand_xorshift"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "effa3fcaa47e18db002bdde6060944b6d2f9cfd8db471c30e873448ad9187be3"
-dependencies = [
- "rand_core",
-]
+checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
 
 [[package]]
 name = "rangemap"
@@ -2883,12 +2862,6 @@ dependencies = [
 [[package]]
 name = "stable_deref_trait"
 version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
-
-[[package]]
-name = "stable_deref_trait"
-version = "1.1.1"
 source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
 dependencies = [
  "spin 0.9.0",
@@ -3078,6 +3051,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_backtrace"
+version = "0.1.0"
+dependencies = [
+ "backtrace",
+ "log",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
 name = "test_block_io"
 version = "0.1.0"
 dependencies = [
@@ -3195,6 +3178,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_std_fs"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "log",
+ "terminal_print",
+ "theseus_std",
+]
+
+[[package]]
 name = "test_thread_local"
 version = "0.1.0"
 dependencies = [
@@ -3228,6 +3221,20 @@ dependencies = [
  "unicode-width",
  "util",
  "vte",
+]
+
+[[package]]
+name = "theseus_std"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "fs_node",
+ "io",
+ "lockable",
+ "memfs",
+ "path",
+ "spin 0.9.0",
+ "task",
 ]
 
 [[package]]
@@ -3450,7 +3457,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6cbce692ab4ca2f1f3047fcf732430249c0e971bfdd2b234cf2c47ad93af5983"
 dependencies = [
- "arrayvec 0.5.2",
+ "arrayvec",
  "utf8parse",
  "vte_generate_state_changes",
 ]

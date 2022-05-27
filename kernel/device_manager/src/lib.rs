@@ -9,6 +9,7 @@ extern crate memory;
 extern crate apic;
 extern crate acpi;
 extern crate serial_port;
+extern crate console;
 extern crate logger;
 extern crate keyboard;
 extern crate pci;
@@ -80,15 +81,19 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
     info!("Initialized full logger.");
 
-    // Ensure that COM1 is initialized, even if it wasn't used in [`logger::early_init()`].
-    if let Some(com1) = take_serial_port_basic(SerialPortAddress::COM1) {
-        serial_port::init_serial_port(SerialPortAddress::COM1, com1);
-    }
-    // Also, for headless operation, ensure that COM2 is initialized.
-    if let Some(com2) = take_serial_port_basic(SerialPortAddress::COM2) {
-        serial_port::init_serial_port(SerialPortAddress::COM2, com2);
-    }
-
+    // Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.
+    // If a serial port was used for logging (as configured in [`logger::early_init()`]),
+    // ignore its inputs for purposes of starting new console instances.
+    let init_serial_port = |spa: SerialPortAddress| {
+        if let Some(sp) = take_serial_port_basic(spa) {
+            serial_port::init_serial_port(spa, sp);
+        } else {
+            console::ignore_serial_port_input(spa as u16);
+            info!("Ignoring input on {:?} because it is being used for logging.", spa);
+        }
+    };
+    init_serial_port(SerialPortAddress::COM1);
+    init_serial_port(SerialPortAddress::COM2);
 
     keyboard::init(key_producer);
     mouse::init(mouse_producer);

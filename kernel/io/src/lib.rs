@@ -49,7 +49,7 @@ extern crate lockable;
 #[cfg(test)]
 mod test;
 
-use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, Range}};
+use core::{borrow::Borrow, cmp::min, marker::PhantomData, ops::{Deref, DerefMut, Range}};
 use alloc::{boxed::Box, string::String, vec::Vec};
 use lockable::Lockable;
 use core2::io::{Seek, SeekFrom};
@@ -478,9 +478,11 @@ impl<RW> BlockWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWrit
 /// A readable and writable "stateful" I/O stream that keeps track 
 /// of its current offset within its internal stateless I/O stream.
 ///
-/// This implements the [`core2::io::Read`] and [`core2::io::Write`] traits for read and write access,
-/// as well as the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
-/// It also forwards all other I/O-related traits implemented by the underlying I/O stream.
+/// ## Trait implementations
+/// * This implements the [`core2::io::Read`] and [`core2::io::Write`] traits for read and write access.
+/// * This implements the [`core2::io::Seek`] trait if the underlying I/O stream implements [`KnownLength`].
+/// * This also forwards all other I/O-related traits implemented by the underlying I/O stream.
+/// * This derefs into the inner `IO` type, via both [`Deref`] and [`DerefMut`].
 pub struct ReaderWriter<IO> {
     io: IO,
     offset: u64,
@@ -489,6 +491,17 @@ impl<IO> ReaderWriter<IO> where IO: ByteReader + ByteWriter {
     /// Creates a new `ReaderWriter` with an initial offset of 0.
     pub fn new(io: IO) -> ReaderWriter<IO> {
         ReaderWriter { io, offset: 0 }
+    }
+}
+impl<IO> Deref for ReaderWriter<IO> {
+    type Target = IO;
+    fn deref(&self) -> &Self::Target {
+        &self.io
+    }
+}
+impl<IO> DerefMut for ReaderWriter<IO> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.io
     }
 }
 impl<IO> core2::io::Read for ReaderWriter<IO> where IO: ByteReader {
@@ -684,8 +697,35 @@ pub struct LockableIo<'io, IO, L, B>
           L: for <'a> Lockable<'a, IO> + ?Sized,
           B: Borrow<L>,
 {
+    /// The actual `Borrow`-able type, which obviously must be Sized.
+    /// This is typically an `Arc` or the `Lockable` type itself, e.g., a `Mutex`.
     inner: B,
-    _phantom1: PhantomData<&'io IO>,
+    /// Phew ... this one is nasty. 
+    /// Basically, `_phantom1` ideally *should* be `PhantomData<&'io IO>`.
+    /// 
+    /// However, that causes the `LockableIo` struct to be non-`Sync` no matter what
+    /// the underlying types of `IO`, `L`, and `B` are, which is unacceptable and wrong. 
+    /// 
+    /// We want `LockableIo` to be `Send` and/or `Sync` as long as 
+    /// the underlying type `L` is `Send` and/or `Sync`.
+    /// 
+    /// Thus, we use this weird trait object inside of PhantomData to indicate
+    /// that what this struct actually holds is effectively a borrow-able object of type `L`,
+    /// which is anything that implements `Lockable` under the hood, 
+    /// typically something like `Arc<Mutex< IO >>`.
+    /// Note that the interior types (Guard, GuardMut) do not actually matter,
+    /// we just need to use the `'io` lifetime and the `IO` type parameter here.
+    /// 
+    /// We also add `Send + Sync` to the inner trait object's bounds,
+    /// merely to ensure that this `PhantomData` object does not *prevent* the outer `LockableIo`
+    /// type from auto-implementing `Send` and/or `Sync`.
+    /// We want the compiler to determine and auto-implement `Send` and/or `Sync`
+    /// based *solely* on whether `L` is `Send` and/or `Sync`.
+    /// 
+    /// Read more here: <https://users.rust-lang.org/t/looking-for-a-deeper-understanding-of-phantomdata/32477>
+    _phantom1: PhantomData<dyn Lockable<'io, IO, Guard = (), GuardMut = ()> + Send + Sync>,
+    /// This can be a regular `PhantomData` because we want the compiler to 
+    /// auto-implement `Send` and/or `Sync` based on whether `B` and `L` are `Send` and/or `Sync`.
     _phantom2: PhantomData<L>,
 }
 
@@ -785,6 +825,64 @@ impl<'io, IO, L, B> core2::io::Seek for LockableIo<'io, IO, L, B>
     delegate!{ to self.lock_mut() { fn seek(&mut self, position: core2::io::SeekFrom) -> core2::io::Result<u64>; } }
 }
 impl<'io, IO, L, B> core::fmt::Write for LockableIo<'io, IO, L, B>
+    where IO: core::fmt::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write_str(&mut self, s: &str) -> core::fmt::Result;
+    } }
+}
+
+
+// Also implement the same set of I/O traits for an immutable reference `&LockableIo` wrapper,
+// because `LockableIo` provides inner mutability.
+// Here, we only re-implement the I/O traits with methods that require `&mut self`,
+// because traits like `BlockIo` and `KnownLength` already have blanket implementations
+// of themselves for `&self`.
+impl<'io, IO, L, B> BlockReader for &LockableIo<'io, IO, L, B>
+    where IO: BlockReader + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L, B> BlockWriter for &LockableIo<'io, IO, L, B>
+    where IO: BlockWriter + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<'io, IO, L, B> ByteReader for &LockableIo<'io, IO, L, B>
+    where IO: ByteReader + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError>; } }
+}
+impl<'io, IO, L, B> ByteWriter for &LockableIo<'io, IO, L, B>
+    where IO: ByteWriter + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write_at(&mut self, buffer: &[u8], offset: usize) -> Result<usize, IoError>; 
+        fn flush(&mut self) -> Result<(), IoError>;
+    } }
+}
+impl<'io, IO, L, B> core2::io::Read for &LockableIo<'io, IO, L, B>
+    where IO: core2::io::Read + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn read(&mut self, buf: &mut [u8]) -> core2::io::Result<usize>; } }
+}
+impl<'io, IO, L, B> core2::io::Write for &LockableIo<'io, IO, L, B>
+    where IO: core2::io::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() {
+        fn write(&mut self, buf: &[u8]) -> core2::io::Result<usize>;
+        fn flush(&mut self) -> core2::io::Result<()>;
+    } }
+}
+impl<'io, IO, L, B> core2::io::Seek for &LockableIo<'io, IO, L, B>
+    where IO: core2::io::Seek + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
+{
+    delegate!{ to self.lock_mut() { fn seek(&mut self, position: core2::io::SeekFrom) -> core2::io::Result<u64>; } }
+}
+impl<'io, IO, L, B> core::fmt::Write for &LockableIo<'io, IO, L, B>
     where IO: core::fmt::Write + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
 {
     delegate!{ to self.lock_mut() {

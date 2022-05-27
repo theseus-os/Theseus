@@ -6,6 +6,7 @@
 members = [
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
+	"ports/theseus_std",
 ]
 
 
@@ -37,7 +38,7 @@ exclude = [
 	"applications/test_mutex_sleep",
 	"applications/test_wait_queue",
 	"applications/test_ixgbe",
-	"applications/test_backtrace",
+	# "applications/test_backtrace",
 
 	## libtheseus is currently built separately and not used
 	"libtheseus",
@@ -59,6 +60,8 @@ smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 
 ### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
 libc = { path = "ports/libc" }
+### Patch `core2` with newer functions from `std::io`, e.g., additional `Seek` trait functions
+core2 = { path = "libs/core2" }
 
 ##############################################################################################
 #################### Below are patches for wasmtime-related crates. ##########################
