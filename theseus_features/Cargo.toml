@@ -5,15 +5,28 @@ description = "Set of global features used for configuration and conditional com
 version = "0.1.0"
 edition = "2021"
 
+## Note: to make a crate (or folder of crates) optional, do the following:
+## 1. Add it to the top-level Theseus `Cargo.toml` "exclude" list.
+## 2. Add it as an optional dependency below, ensuring `optional = true`.
+## 3. Add it as a feature below, in order to give it a specific name.
+##    Technically this isn't required, but it provides a lot of clarity.
+##
+## You can optionally add it to the `default` set of features,
+## or create a new group of features that includes it, 
+## or even add it to an existing set of features.
+
 [dependencies]
 wasm = { path = "../applications/wasm", optional = true }
 ps = { path = "../applications/ps", optional = true }
 cpu = { path = "../applications/cpu", optional = true }
 test_panic = { path = "../applications/test_panic", optional = true }
+theseus_std = { path = "../ports/theseus_std", optional = true }
+test_std_fs = { path = "../applications/test_std_fs", optional = true }
+cat = { path = "../applications/cat", optional = true }
 
 [features]
 default = []
 wasm = [ "dep:wasm" ]
-ps = [ "dep:ps" ]
+# ps = [ "dep:ps" ]
 cpu = [ "dep:cpu" ]
 test_panic = [ "dep:test_panic" ]

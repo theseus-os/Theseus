@@ -22,12 +22,14 @@ KERNEL_PREFIX       ?= k\#
 APP_PREFIX          ?= a\#
 EXECUTABLE_PREFIX   ?= e\#
 
+## By default, the Makefile will build the entire Theseus workspace.
+## However, one can override which crates are built by setting `CARGOFLAGS`.
+CARGOFLAGS ?= --workspace
 
 ## Build modes: debug is development mode, release is with full optimizations.
 ## We build using release mode by default, because running in debug mode is quite slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
 BUILD_MODE ?= release
-CARGOFLAGS ?=
 ifeq ($(BUILD_MODE),debug)
     ## "debug" builds are the default in cargo, so don't change cargo options. 
     ## However, we do define the DEBUG value for CFLAGS, which is used in the assembly boot code.

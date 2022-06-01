@@ -4,16 +4,29 @@ resolver = "2"
 
 ## Here, we specify that all subdirectories in the kernel/ and applications/ directories should be built, 
 ## except for those starting with a "." So, we build all kernel and application crates except hidden directories.
+##
+## The `members` field of this workspace is used to specify all of the crates that are built
+## when the entire workspace is built, e.g., with `cargo build --workspace` or `cargo build --all`.
+##
+## Note that a full workspace build will *not* include crates that are explicitly excluded below.
 members = [
-	"kernel/nano_core",
-	"applications/shell",
-
-	# "kernel/[!.]*/",
-	# "applications/[!.]*/",
-	"ports/theseus_std",
+	"kernel/[!.]*/",
+	"applications/[!.]*/",
 	"theseus_features",
 ]
 
+
+## Default members are the crates built by default if no specific packages (crates)
+## are specified when invoking `cargo build`.
+## Currently, this is only relevant when overriding the Makefile's default `CARGOFLAGS`,
+## which has the default value of `--workspace`, ensuring that all `members` above are built
+## `CARGOFLAGS` are explicitly set when invoking `make`.
+##
+## So far, this includes only the minimum crates required to allow Theseus to boot.
+default-members = [
+	"kernel/nano_core",
+	"theseus_features",
+]
 
 
 exclude = [
@@ -49,14 +62,15 @@ exclude = [
 	"applications/test_mutex_sleep",
 	"applications/test_wait_queue",
 	"applications/test_ixgbe",
-	# "applications/test_backtrace",
+	"applications/test_backtrace",
+	"applications/test_std_fs",
 
 	## Testing: exclusion of wasm stuff
-	"applications/",
+	# "applications/",
 	"applications/wasm",
-	"applications/ps",
-	"applications/cpu",
-	"kernel/wasi_interpreter",
+	# "applications/ps",
+	# "applications/cpu",
+	# "kernel/wasi_interpreter",
 ]
 
 

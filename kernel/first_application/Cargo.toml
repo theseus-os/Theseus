@@ -12,10 +12,22 @@ version = "0.4.8"
 path = "../spawn"
 
 [dependencies.mod_mgmt]
-path  = "../mod_mgmt"
+path = "../mod_mgmt"
 
 [dependencies.path]
-path  = "../path"
+path = "../path"
+
+## In general, Theseus kernel crates *cannot* depend on application crates.
+## However, this crate is a special exception in that it directly loads and runs
+## the first application crate.
+##
+## Thus, it's safest to ensure that crate is always included in the build
+## by specifying it as a direct dependency here.
+##
+## Note: if another application crate is used, make sure to change
+##       both this dependency and the invocation string in `lib.rs`.
+[dependencies.shell]
+path = "../../applications/shell"
 
 [lib]
 crate-type = ["rlib"]
