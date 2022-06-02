@@ -8,8 +8,8 @@ edition = "2021"
 ## Note: to make a crate (or folder of crates) optional, do the following:
 ## 1. Add it to the top-level Theseus `Cargo.toml` "exclude" list.
 ## 2. Add it as an optional dependency below, ensuring `optional = true`.
-## 3. Add it as a feature below, in order to give it a specific name.
-##    Technically this isn't required, but it provides a lot of clarity.
+## 3. [Optional] Add it as a feature below, in order to give it a specific name.
+##    Technically this isn't required, but it can offer a clearer/different name.
 ##
 ## You can optionally add it to the `default` set of features,
 ## or create a new group of features that includes it, 
@@ -22,7 +22,30 @@ cpu = { path = "../applications/cpu", optional = true }
 test_panic = { path = "../applications/test_panic", optional = true }
 theseus_std = { path = "../ports/theseus_std", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
+test_backtrace = { path = "../applications/test_backtrace", optional = true }
 cat = { path = "../applications/cat", optional = true }
+
+
+## Kernel crates used for only testing purposes.
+libtest = { path = "../kernel/libtest", optional = true } 
+test_thread_local = { path = "../kernel/test_thread_local", optional = true }
+mapper_spillful = { path = "../kernel/mapper_spillful", optional = true }
+unified_channel = { path = "../kernel/unified_channel", optional = true }
+
+## Test applications.
+tls_test = { path = "../applications/tls_test", optional = true }
+## TODO: finish this
+
+
+## Benchmark crates
+bm = { path = "../applications/bm", optional = true }
+channel_eval = { path = "../applications/channel_eval", optional = true }
+heap_eval = { path = "../applications/heap_eval", optional = true }
+mm_eval = { path = "../applications/mm_eval", optional = true }
+rq_eval = { path = "../applications/rq_eval",  optional = true }
+scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
+
+
 
 [features]
 default = []
@@ -30,3 +53,18 @@ wasm = [ "dep:wasm" ]
 # ps = [ "dep:ps" ]
 cpu = [ "dep:cpu" ]
 test_panic = [ "dep:test_panic" ]
+
+## Includes all benchmark application crates in the build.
+theseus_benchmarks = [
+    "dep:bm",
+    "dep:channel_eval",
+    "dep:heap_eval",
+    "dep:mm_eval",
+    "dep:rq_eval",
+    "dep:scheduler_eval",
+]
+
+## Includes all test application crates in the build.
+theseus_tests = [
+    "dep:tls_test",
+]

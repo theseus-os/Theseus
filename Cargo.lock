@@ -55,6 +55,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "addr2line"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e61f2b7f93d2c7d2b08263acaa4a363b3e276806c68af6134c44f523bf1aacd"
+dependencies = [
+ "gimli",
+]
+
+[[package]]
+name = "adler"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
+
+[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -167,6 +182,25 @@ name = "autocfg"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
+
+[[package]]
+name = "backtrace"
+version = "0.3.64"
+dependencies = [
+ "addr2line",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+ "memory",
+ "miniz_oxide",
+ "mutex_sleep",
+ "object",
+ "rustc-demangle",
+ "spin 0.9.0",
+ "stack_trace",
+ "theseus_std",
+ "thread_local_macro",
+]
 
 [[package]]
 name = "bare-metal"
@@ -377,7 +411,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "channel_app"
+name = "channel_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
@@ -1103,6 +1137,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "heap_eval"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "getopts",
+ "hashbrown",
+ "heap",
+ "hpet",
+ "libtest",
+ "log",
+ "qp-trie",
+ "runqueue",
+ "spawn",
+ "terminal_print",
+]
+
+[[package]]
 name = "heapfile"
 version = "0.1.0"
 dependencies = [
@@ -1651,6 +1702,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "miniz_oxide"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a92518e98c078586bc6c934028adcca4c92a53d6a958196de835170a01d84e4b"
+dependencies = [
+ "adler",
+ "autocfg",
+]
+
+[[package]]
 name = "mkdir"
 version = "0.1.0"
 dependencies = [
@@ -2004,6 +2065,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "object"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67ac1d3f9a1d3616fd9a60c8d74296f22406a238b6a72f5cc1e6f314df4ffbf9"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -2999,6 +3069,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_backtrace"
+version = "0.1.0"
+dependencies = [
+ "backtrace",
+ "log",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
 name = "test_block_io"
 version = "0.1.0"
 dependencies = [
@@ -3050,6 +3130,17 @@ dependencies = [
  "terminal_print",
  "unified_channel",
  "window",
+]
+
+[[package]]
+name = "test_filerw"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memfs",
+ "memory",
+ "root",
+ "terminal_print",
 ]
 
 [[package]]
@@ -3165,12 +3256,24 @@ dependencies = [
 name = "theseus_features"
 version = "0.1.0"
 dependencies = [
+ "bm",
  "cat",
+ "channel_eval",
  "cpu",
+ "heap_eval",
+ "libtest",
+ "mapper_spillful",
+ "mm_eval",
  "ps",
+ "rq_eval",
+ "scheduler_eval",
+ "test_backtrace",
  "test_panic",
  "test_std_fs",
+ "test_thread_local",
  "theseus_std",
+ "tls_test",
+ "unified_channel",
  "wasm",
 ]
 

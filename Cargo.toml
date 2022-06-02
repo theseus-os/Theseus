@@ -10,9 +10,10 @@ resolver = "2"
 ##
 ## Note that a full workspace build will *not* include crates that are explicitly excluded below.
 members = [
+	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
-	"theseus_features",
+	"ports/theseus_std",
 ]
 
 
@@ -24,8 +25,8 @@ members = [
 ##
 ## So far, this includes only the minimum crates required to allow Theseus to boot.
 default-members = [
+	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
 	"kernel/nano_core",
-	"theseus_features",
 ]
 
 
@@ -54,11 +55,31 @@ exclude = [
 	"tlibc",
 	"libtheseus",
 
-	## exclude unused test applications by default
-	"applications/test_exception",
-	"applications/test_exception2",
-	"applications/test_filerw",
+	########################################################################################
+	## Below, we exclude things that should NEVER be considered part of Theseus's workspace.
+	########################################################################################
+	##
+	## Note that if you simply need to exclude something from a custom build of Theseus,
+	## it's best to add that crate as an optional dependency and then create a feature
+	## to enable it in a non-workspace build (i.e., when not calling `cargo build --all`).
+
+	## Exclude kernel crates that exist purely for testing or benchmarking purposes.
+	"kernel/libtest",
+	"kernel/test_thread_local",
+	"kernel/mapper_spillful",
+	"kernel/unified_channel",
+
+	## Exclude benchmark-related crates in all builds; they must be explicitly included via features.
+	"applications/bm",
 	"applications/heap_eval",
+	"applications/mm_eval",
+	"applications/rq_eval",
+	"applications/scheduler_eval",
+
+	## Exclude application crates used for testing specific Theseus functionality.
+	"applications/tls_test",
+
+	
 	"applications/test_mutex_sleep",
 	"applications/test_wait_queue",
 	"applications/test_ixgbe",

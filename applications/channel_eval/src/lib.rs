@@ -46,7 +46,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     match rmain(matches) {
         Ok(_) => {
-            println!("channel_app completed successfully.");
+            println!("channel_eval completed successfully.");
             0
         }
         Err(e) => {
@@ -113,5 +113,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: channel_app [ARGS]
+const USAGE: &'static str = "Usage: channel_eval [ARGS]
 Used for evaluating live evolution between sync/async channels in Theseus.";
