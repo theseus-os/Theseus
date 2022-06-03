@@ -46,8 +46,8 @@ exclude = [
 	"userspace",
 
 	## Exclude third-party libs and ports for now.
-	## Only the ones used as direct dependencies by core Theseus crates
-	## should be included in the workspace build by default.
+	## This allows Theseus crates that *are* included in a build to pull these
+	## third-party crates in only when needed to fulfill their dependencies.
 	"libs",
 	"ports",
 
@@ -79,7 +79,7 @@ exclude = [
 	## Exclude application crates used for testing specific Theseus functionality.
 	"applications/tls_test",
 
-	
+
 	"applications/test_mutex_sleep",
 	"applications/test_wait_queue",
 	"applications/test_ixgbe",
