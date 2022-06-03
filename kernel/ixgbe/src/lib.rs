@@ -705,7 +705,7 @@ impl IxgbeNic {
         regs2.fccfg.write(0);
 
         //disable interrupts
-        regs1.eims.write(DISABLE_INTERRUPTS);
+        regs1.eimc.write(DISABLE_INTERRUPTS);
 
         //wait for eeprom auto read completion
         while !regs3.eec.read().get_bit(EEC_AUTO_RD as u8){}
