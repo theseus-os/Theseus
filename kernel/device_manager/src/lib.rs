@@ -144,8 +144,8 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                 
                 // Initialization parameters of the NIC.
                 // These can be changed according to the requirements specified in the ixgbe init function.
-                const VIRT_ENABLED: bool = true;
-                const RSS_ENABLED: bool = false;
+                const VIRT_ENABLED: bool = false;
+                const RSS_ENABLED: bool = true;
                 const RX_DESCS: u16 = 8;
                 const TX_DESCS: u16 = 8;
                 
@@ -156,7 +156,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                     VIRT_ENABLED, 
                     None, 
                     RSS_ENABLED, 
-                    ixgbe::RxBufferSizeKiB::Buffer8KiB,
+                    ixgbe::RxBufferSizeKiB::Buffer2KiB,
                     RX_DESCS,
                     TX_DESCS
                 )?;

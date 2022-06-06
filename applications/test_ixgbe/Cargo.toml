@@ -5,6 +5,7 @@ authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
+getopts = "0.2.21"
 
 [dependencies.log]
 version = "0.4.8"

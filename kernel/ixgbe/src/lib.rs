@@ -107,11 +107,11 @@ const NUM_L34_5_TUPLE_FILTERS:              usize   = 128;
 /// The number of receive queues that are enabled. 
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
 /// most likely because they need additional configuration.
-const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 64;
+pub const IXGBE_NUM_RX_QUEUES_ENABLED:          u8      = 64;
 /// The number of transmit queues that are enabled. 
 /// Do NOT set this greater than 64 since the queues 65-128 don't seem to work, 
 /// most likely because they need additional configuration.
-const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
+pub const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
 
 
 
@@ -196,6 +196,7 @@ impl NetworkInterfaceCard for IxgbeNic {
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
         // by default, when using the physical NIC interface, we send on queue 0.
         let qid = 0;
+        debug!("trying ti send packet");
         self.tx_queues[qid].send_on_queue(transmit_buffer);
         Ok(())
     }
@@ -297,6 +298,9 @@ impl IxgbeNic {
         // 16-byte aligned memory mapped base address
         let mem_base =  ixgbe_pci_dev.determine_mem_base(0)?;
 
+        // set the bus mastering bit for this PciDevice, which allows it to use DMA
+        ixgbe_pci_dev.pci_set_command_bus_master_bit();
+
         // map the IntelIxgbeRegisters structs to the address found from the pci space
         let (mut mapped_registers1, mut mapped_registers2, mut mapped_registers3, mut mapped_registers_mac, 
             mut rx_mapped_registers, mut tx_mapped_registers) = Self::mapped_reg(mem_base)?;
@@ -379,7 +383,7 @@ impl IxgbeNic {
         // wait 10 seconds for the link to come up, as seen in other ixgbe drivers
         Self::wait_for_link(&mapped_registers2, 10_000_000);
 
-        let ixgbe_nic = IxgbeNic {
+        let mut ixgbe_nic = IxgbeNic {
             dev_id: dev_id,
             bar_type: bar_type,
             mem_base: mem_base,
@@ -726,38 +730,38 @@ impl IxgbeNic {
             let _ =pit_clock::pit_wait(wait_time);
         }
 
-        //setup PHY and the link 
-        match link_speed {
-            LinkSpeedMbps::LS1000 => {
-                let mut val = regs2.autoc.read();
-                val = (val & !(AUTOC_LMS_1_GB) & !(AUTOC_1G_PMA_PMD)) | AUTOC_FLU;
-                regs2.autoc.write(val);
-            },
-            LinkSpeedMbps::LS10000 => {
-                let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
-                regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004 (as seen from Linux driver)
+        // //setup PHY and the link 
+        // match link_speed {
+        //     LinkSpeedMbps::LS1000 => {
+        //         let mut val = regs2.autoc.read();
+        //         val = (val & !(AUTOC_LMS_1_GB) & !(AUTOC_1G_PMA_PMD)) | AUTOC_FLU;
+        //         regs2.autoc.write(val);
+        //     },
+        //     LinkSpeedMbps::LS10000 => {
+        //         let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
+        //         regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004 (as seen from Linux driver)
     
-                let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
-                regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004 (as seen from Linux driver)
+        //         let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
+        //         regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004 (as seen from Linux driver)
 
-                let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
-                regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000 (as seen from Linux driver)
-            }
-            _ => {
-                return Err("Invalid link speed");
-            }
-        }
+        //         let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
+        //         regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000 (as seen from Linux driver)
+        //     }
+        //     _ => {
+        //         return Err("Invalid link speed");
+        //     }
+        // }
 
-        let val = regs2.autoc.read();
-        regs2.autoc.write(val|AUTOC_RESTART_AN); 
+        // let val = regs2.autoc.read();
+        // regs2.autoc.write(val|AUTOC_RESTART_AN); 
 
         Self::release_semaphore(regs3);        
 
-        // debug!("STATUS: {:#X}", regs.status.read()); 
-        // debug!("CTRL: {:#X}", regs.ctrl.read());
-        // debug!("LINKS: {:#X}", regs.links.read()); //b7 and b30 should be 1 for link up 
-        // debug!("AUTOC: {:#X}", regs.autoc.read()); 
-        // debug!("AUTOC2: {:#X}", regs.autoc2.read()); 
+        debug!("STATUS: {:#X}", regs1.status.read()); 
+        debug!("CTRL: {:#X}", regs1.ctrl.read());
+        debug!("LINKS: {:#X}", regs2.links.read()); //b7 and b30 should be 1 for link up 
+        debug!("AUTOC: {:#X}", regs2.autoc.read()); 
+        debug!("AUTOC2: {:#X}", regs2.autoc2.read()); 
 
         Ok(())
     }
@@ -1303,7 +1307,7 @@ pub enum FilterProtocol {
 }
 
 /// A helper function to poll the nic receive queues (only for testing purposes).
-fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
+pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();      
     nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
@@ -1312,8 +1316,8 @@ fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static
 }
 
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
-fn tx_send_mq(qid: usize, nic_id: PciLocation) -> Result<(), &'static str> {
-    let packet = test_packets::create_dhcp_test_packet()?;
+pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer>) -> Result<(), &'static str> {
+    let packet = packet.unwrap_or(test_packets::create_dhcp_test_packet()?);
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();  
 
