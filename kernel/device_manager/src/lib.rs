@@ -152,11 +152,10 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                 let ixgbe_nic = ixgbe::IxgbeNic::init(
                     dev, 
                     dev.location,
-                    ixgbe::LinkSpeedMbps::LS10000, 
                     VIRT_ENABLED, 
                     None, 
                     RSS_ENABLED, 
-                    ixgbe::RxBufferSizeKiB::Buffer8KiB,
+                    ixgbe::RxBufferSizeKiB::Buffer2KiB,
                     RX_DESCS,
                     TX_DESCS
                 )?;
