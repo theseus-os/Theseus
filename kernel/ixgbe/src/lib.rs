@@ -724,7 +724,7 @@ impl IxgbeNic {
         }
 
         // setup PHY and the link 
-        // From looking at other drivers, and testting it seems these registers are set automatically 
+        // From looking at other drivers and testing, it seems these registers are set automatically 
         // and driver doesn't need to configure link speed manually.
 
         Self::release_semaphore(regs3);        
