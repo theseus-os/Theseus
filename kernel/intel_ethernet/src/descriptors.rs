@@ -386,7 +386,13 @@ impl TxDescriptor for AdvancedTxDescriptor {
 
 impl fmt::Debug for AdvancedTxDescriptor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{Packet buffer address: {:#X},\n data len: {:#X},\n dtype_mac_rsv: {:#X},\n dcmd: {:#X},\n paylen_popts_cc_idx_sta: {:#X},\n }}",
-            self.packet_buffer_address.read(), self.data_len.read(), self.dtyp_mac_rsv.read(), self.dcmd.read(), self.paylen_popts_cc_idx_sta.read())
+        f.debug_struct("AdvancedTxDescriptor")
+            .field("packet buffer address", &self.packet_buffer_address.read())
+            .field("data len", &self.data_len.read())
+            .field("dtype_mac_rsv", &self.dtyp_mac_rsv.read())
+            .field("dcmd", &self.dcmd.read())
+            .field("paylen_popts_cc_idx_sta", &self.paylen_popts_cc_idx_sta.read())
+            .finish()
     }
 }
+

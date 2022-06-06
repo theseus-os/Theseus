@@ -42,7 +42,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optflag("v", "virtual", "Test the ixgbe nic using the virtual nic interface. 
+    opts.optflag("", "virtual", "Test the ixgbe nic using the virtual nic interface. 
     Otherwise the test will just directly access the queues through the main ixgbe object");
     opts.optflag("r", "receive", "Test receive functionality. 
     If this flag is enabled then the program will never terminate since the queues are endlessly polled for incoming packets.");
@@ -84,7 +84,7 @@ fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
         (nic.device_id(), nic.mac_address())
     };
 
-    if matches.opt_present("v") {
+    if matches.opt_present("virtual") {
         if IXGBE_NUM_RX_QUEUES_ENABLED != IXGBE_NUM_TX_QUEUES_ENABLED {
             return Err("When using the virtual nic interface, there should be an equal number of RX and TX queues");
         }
