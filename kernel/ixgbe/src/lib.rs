@@ -724,31 +724,8 @@ impl IxgbeNic {
         }
 
         // setup PHY and the link 
-        // From looking at other drivers it seems these registers are set automatically and driver doesn't need to configure link speed
-
-        // match link_speed {
-        //     LinkSpeedMbps::LS1000 => {
-        //         let mut val = regs2.autoc.read();
-        //         val = (val & !(AUTOC_LMS_1_GB) & !(AUTOC_1G_PMA_PMD)) | AUTOC_FLU;
-        //         regs2.autoc.write(val);
-        //     },
-        //     LinkSpeedMbps::LS10000 => {
-        //         let val = regs2.autoc.read() & !(AUTOC_LMS_CLEAR);
-        //         regs2.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004 (as seen from Linux driver)
-    
-        //         let val = regs2.autoc.read() & !(AUTOC_10G_PMA_PMD_CLEAR);
-        //         regs2.autoc.write(val | AUTOC_10G_PMA_PMD_XAUI); // value should be 0xC09C_6004 (as seen from Linux driver)
-
-        //         let val = regs2.autoc2.read() & !(AUTOC2_10G_PMA_PMD_S_CLEAR);
-        //         regs2.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000 (as seen from Linux driver)
-        //     }
-        //     _ => {
-        //         return Err("Invalid link speed");
-        //     }
-        // }
-
-        // let val = regs2.autoc.read();
-        // regs2.autoc.write(val|AUTOC_RESTART_AN); 
+        // From looking at other drivers, and testting it seems these registers are set automatically 
+        // and driver doesn't need to configure link speed manually.
 
         Self::release_semaphore(regs3);        
 
