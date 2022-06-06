@@ -144,15 +144,14 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                 
                 // Initialization parameters of the NIC.
                 // These can be changed according to the requirements specified in the ixgbe init function.
-                const VIRT_ENABLED: bool = false;
-                const RSS_ENABLED: bool = true;
+                const VIRT_ENABLED: bool = true;
+                const RSS_ENABLED: bool = false;
                 const RX_DESCS: u16 = 8;
                 const TX_DESCS: u16 = 8;
                 
                 let ixgbe_nic = ixgbe::IxgbeNic::init(
                     dev, 
                     dev.location,
-                    ixgbe::LinkSpeedMbps::LS10000, 
                     VIRT_ENABLED, 
                     None, 
                     RSS_ENABLED, 

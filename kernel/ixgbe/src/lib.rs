@@ -196,7 +196,6 @@ impl NetworkInterfaceCard for IxgbeNic {
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
         // by default, when using the physical NIC interface, we send on queue 0.
         let qid = 0;
-        debug!("trying ti send packet");
         self.tx_queues[qid].send_on_queue(transmit_buffer);
         Ok(())
     }
@@ -244,7 +243,6 @@ impl IxgbeNic {
     pub fn init(
         ixgbe_pci_dev: &PciDevice,
         dev_id: PciLocation,
-        link_speed: LinkSpeedMbps,
         enable_virtualization: bool,
         interrupts: Option<Vec<HandlerFunc>>,
         enable_rss: bool,
@@ -253,10 +251,6 @@ impl IxgbeNic {
         num_tx_descriptors: u16
     ) -> Result<MutexIrqSafe<IxgbeNic>, &'static str> {
         // Series of checks to determine if starting parameters are acceptable
-        if (link_speed == LinkSpeedMbps::LSUnknown) || (link_speed == LinkSpeedMbps::LS100) {
-            return Err("Ixgbe driver can only be configured for 1 Gbps or 10 Gbps link speeds");
-        }
-
         if (enable_virtualization && interrupts.is_some()) || (enable_virtualization && enable_rss) {
             return Err("Cannot enable virtualization when interrupts or RSS are enabled");
         }
@@ -309,7 +303,7 @@ impl IxgbeNic {
         let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
 
         // link initialization
-        Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac, link_speed)?;
+        Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac)?;
 
         // clear stats registers
         Self::clear_stats(&mapped_registers2);
@@ -383,7 +377,7 @@ impl IxgbeNic {
         // wait 10 seconds for the link to come up, as seen in other ixgbe drivers
         Self::wait_for_link(&mapped_registers2, 10_000_000);
 
-        let mut ixgbe_nic = IxgbeNic {
+        let ixgbe_nic = IxgbeNic {
             dev_id: dev_id,
             bar_type: bar_type,
             mem_base: mem_base,
@@ -678,7 +672,6 @@ impl IxgbeNic {
         regs2: &mut IntelIxgbeRegisters2, 
         regs3: &mut IntelIxgbeRegisters3, 
         regs_mac: &mut IntelIxgbeMacRegisters,
-        link_speed: LinkSpeedMbps
     ) -> Result<(), &'static str> {
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
         regs1.eimc.write(DISABLE_INTERRUPTS);
@@ -730,7 +723,9 @@ impl IxgbeNic {
             let _ =pit_clock::pit_wait(wait_time);
         }
 
-        // //setup PHY and the link 
+        // setup PHY and the link 
+        // From looking at other drivers it seems these registers are set automatically and driver doesn't need to configure link speed
+
         // match link_speed {
         //     LinkSpeedMbps::LS1000 => {
         //         let mut val = regs2.autoc.read();
@@ -757,11 +752,11 @@ impl IxgbeNic {
 
         Self::release_semaphore(regs3);        
 
-        debug!("STATUS: {:#X}", regs1.status.read()); 
-        debug!("CTRL: {:#X}", regs1.ctrl.read());
-        debug!("LINKS: {:#X}", regs2.links.read()); //b7 and b30 should be 1 for link up 
-        debug!("AUTOC: {:#X}", regs2.autoc.read()); 
-        debug!("AUTOC2: {:#X}", regs2.autoc2.read()); 
+        // debug!("STATUS: {:#X}", regs1.status.read()); 
+        // debug!("CTRL: {:#X}", regs1.ctrl.read());
+        // debug!("LINKS: {:#X}", regs2.links.read()); //b7 and b30 should be 1 for link up 
+        // debug!("AUTOC: {:#X}", regs2.autoc.read()); 
+        // debug!("AUTOC2: {:#X}", regs2.autoc2.read()); 
 
         Ok(())
     }
