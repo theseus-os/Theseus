@@ -1317,30 +1317,6 @@
 <span id="1312">1312</span>
 <span id="1313">1313</span>
 <span id="1314">1314</span>
-<span id="1315">1315</span>
-<span id="1316">1316</span>
-<span id="1317">1317</span>
-<span id="1318">1318</span>
-<span id="1319">1319</span>
-<span id="1320">1320</span>
-<span id="1321">1321</span>
-<span id="1322">1322</span>
-<span id="1323">1323</span>
-<span id="1324">1324</span>
-<span id="1325">1325</span>
-<span id="1326">1326</span>
-<span id="1327">1327</span>
-<span id="1328">1328</span>
-<span id="1329">1329</span>
-<span id="1330">1330</span>
-<span id="1331">1331</span>
-<span id="1332">1332</span>
-<span id="1333">1333</span>
-<span id="1334">1334</span>
-<span id="1335">1335</span>
-<span id="1336">1336</span>
-<span id="1337">1337</span>
-<span id="1338">1338</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. </span>
@@ -1450,11 +1426,11 @@
 <span class="doccomment">/// The number of receive queues that are enabled. </span>
 <span class="doccomment">/// Do NOT set this greater than 64 since the queues 65-128 don&#39;t seem to work, </span>
 <span class="doccomment">/// most likely because they need additional configuration.</span>
-<span class="kw">const</span> <span class="ident">IXGBE_NUM_RX_QUEUES_ENABLED</span>:          <span class="ident">u8</span>      <span class="op">=</span> <span class="number">64</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IXGBE_NUM_RX_QUEUES_ENABLED</span>:          <span class="ident">u8</span>      <span class="op">=</span> <span class="number">64</span>;
 <span class="doccomment">/// The number of transmit queues that are enabled. </span>
 <span class="doccomment">/// Do NOT set this greater than 64 since the queues 65-128 don&#39;t seem to work, </span>
 <span class="doccomment">/// most likely because they need additional configuration.</span>
-<span class="kw">const</span> <span class="ident">IXGBE_NUM_TX_QUEUES_ENABLED</span>:          <span class="ident">u8</span>      <span class="op">=</span> <span class="number">64</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IXGBE_NUM_TX_QUEUES_ENABLED</span>:          <span class="ident">u8</span>      <span class="op">=</span> <span class="number">64</span>;
 
 
 
@@ -1586,7 +1562,6 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(
         <span class="ident">ixgbe_pci_dev</span>: <span class="kw-2">&amp;</span><span class="ident">PciDevice</span>,
         <span class="ident">dev_id</span>: <span class="ident">PciLocation</span>,
-        <span class="ident">link_speed</span>: <span class="ident">LinkSpeedMbps</span>,
         <span class="ident">enable_virtualization</span>: <span class="ident">bool</span>,
         <span class="ident">interrupts</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">HandlerFunc</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">enable_rss</span>: <span class="ident">bool</span>,
@@ -1595,10 +1570,6 @@
         <span class="ident">num_tx_descriptors</span>: <span class="ident">u16</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">IxgbeNic</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// Series of checks to determine if starting parameters are acceptable</span>
-        <span class="kw">if</span> (<span class="ident">link_speed</span> <span class="op">==</span> <span class="ident">LinkSpeedMbps::LSUnknown</span>) <span class="op">|</span><span class="op">|</span> (<span class="ident">link_speed</span> <span class="op">==</span> <span class="ident">LinkSpeedMbps::LS100</span>) {
-            <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Ixgbe driver can only be configured for 1 Gbps or 10 Gbps link speeds&quot;</span>);
-        }
-
         <span class="kw">if</span> (<span class="ident">enable_virtualization</span> <span class="op">&amp;&amp;</span> <span class="ident">interrupts</span>.<span class="ident">is_some</span>()) <span class="op">|</span><span class="op">|</span> (<span class="ident">enable_virtualization</span> <span class="op">&amp;&amp;</span> <span class="ident">enable_rss</span>) {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Cannot enable virtualization when interrupts or RSS are enabled&quot;</span>);
         }
@@ -1640,6 +1611,9 @@
         <span class="comment">// 16-byte aligned memory mapped base address</span>
         <span class="kw">let</span> <span class="ident">mem_base</span> <span class="op">=</span>  <span class="ident">ixgbe_pci_dev</span>.<span class="ident">determine_mem_base</span>(<span class="number">0</span>)<span class="question-mark">?</span>;
 
+        <span class="comment">// set the bus mastering bit for this PciDevice, which allows it to use DMA</span>
+        <span class="ident">ixgbe_pci_dev</span>.<span class="ident">pci_set_command_bus_master_bit</span>();
+
         <span class="comment">// map the IntelIxgbeRegisters structs to the address found from the pci space</span>
         <span class="kw">let</span> (<span class="kw-2">mut</span> <span class="ident">mapped_registers1</span>, <span class="kw-2">mut</span> <span class="ident">mapped_registers2</span>, <span class="kw-2">mut</span> <span class="ident">mapped_registers3</span>, <span class="kw-2">mut</span> <span class="ident">mapped_registers_mac</span>, 
             <span class="kw-2">mut</span> <span class="ident">rx_mapped_registers</span>, <span class="kw-2">mut</span> <span class="ident">tx_mapped_registers</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::mapped_reg</span>(<span class="ident">mem_base</span>)<span class="question-mark">?</span>;
@@ -1648,7 +1622,7 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vector_table</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::mem_map_msix</span>(<span class="ident">ixgbe_pci_dev</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// link initialization</span>
-        <span class="ident"><span class="self">Self</span>::start_link</span>(<span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers2</span>, <span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers3</span>, <span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers_mac</span>, <span class="ident">link_speed</span>)<span class="question-mark">?</span>;
+        <span class="ident"><span class="self">Self</span>::start_link</span>(<span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers1</span>, <span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers2</span>, <span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers3</span>, <span class="kw-2">&amp;mut</span> <span class="ident">mapped_registers_mac</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// clear stats registers</span>
         <span class="ident"><span class="self">Self</span>::clear_stats</span>(<span class="kw-2">&amp;</span><span class="ident">mapped_registers2</span>);
@@ -2017,7 +1991,6 @@
         <span class="ident">regs2</span>: <span class="kw-2">&amp;mut</span> <span class="ident">IntelIxgbeRegisters2</span>, 
         <span class="ident">regs3</span>: <span class="kw-2">&amp;mut</span> <span class="ident">IntelIxgbeRegisters3</span>, 
         <span class="ident">regs_mac</span>: <span class="kw-2">&amp;mut</span> <span class="ident">IntelIxgbeMacRegisters</span>,
-        <span class="ident">link_speed</span>: <span class="ident">LinkSpeedMbps</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">//disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved</span>
         <span class="ident">regs1</span>.<span class="ident">eimc</span>.<span class="ident">write</span>(<span class="ident">DISABLE_INTERRUPTS</span>);
@@ -2048,7 +2021,7 @@
         <span class="ident">regs2</span>.<span class="ident">fccfg</span>.<span class="ident">write</span>(<span class="number">0</span>);
 
         <span class="comment">//disable interrupts</span>
-        <span class="ident">regs1</span>.<span class="ident">eims</span>.<span class="ident">write</span>(<span class="ident">DISABLE_INTERRUPTS</span>);
+        <span class="ident">regs1</span>.<span class="ident">eimc</span>.<span class="ident">write</span>(<span class="ident">DISABLE_INTERRUPTS</span>);
 
         <span class="comment">//wait for eeprom auto read completion</span>
         <span class="kw">while</span> <span class="op">!</span><span class="ident">regs3</span>.<span class="ident">eec</span>.<span class="ident">read</span>().<span class="ident">get_bit</span>(<span class="ident">EEC_AUTO_RD</span> <span class="kw">as</span> <span class="ident">u8</span>){}
@@ -2069,38 +2042,17 @@
             <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span><span class="ident">pit_clock::pit_wait</span>(<span class="ident">wait_time</span>);
         }
 
-        <span class="comment">//setup PHY and the link </span>
-        <span class="kw">match</span> <span class="ident">link_speed</span> {
-            <span class="ident">LinkSpeedMbps::LS1000</span> =&gt; {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">read</span>();
-                <span class="ident">val</span> <span class="op">=</span> (<span class="ident">val</span> <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">AUTOC_LMS_1_GB</span>) <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">AUTOC_1G_PMA_PMD</span>)) <span class="op">|</span> <span class="ident">AUTOC_FLU</span>;
-                <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">write</span>(<span class="ident">val</span>);
-            },
-            <span class="ident">LinkSpeedMbps::LS10000</span> =&gt; {
-                <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">AUTOC_LMS_CLEAR</span>);
-                <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">write</span>(<span class="ident">val</span> <span class="op">|</span> <span class="ident">AUTOC_LMS_10_GBE_S</span>); <span class="comment">// value should be 0xC09C_6004 (as seen from Linux driver)</span>
-    
-                <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">AUTOC_10G_PMA_PMD_CLEAR</span>);
-                <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">write</span>(<span class="ident">val</span> <span class="op">|</span> <span class="ident">AUTOC_10G_PMA_PMD_XAUI</span>); <span class="comment">// value should be 0xC09C_6004 (as seen from Linux driver)</span>
-
-                <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">regs2</span>.<span class="ident">autoc2</span>.<span class="ident">read</span>() <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">AUTOC2_10G_PMA_PMD_S_CLEAR</span>);
-                <span class="ident">regs2</span>.<span class="ident">autoc2</span>.<span class="ident">write</span>(<span class="ident">val</span> <span class="op">|</span> <span class="ident">AUTOC2_10G_PMA_PMD_S_SFI</span>); <span class="comment">// value should be 0xA_0000 (as seen from Linux driver)</span>
-            }
-            <span class="kw">_</span> =&gt; {
-                <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Invalid link speed&quot;</span>);
-            }
-        }
-
-        <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">read</span>();
-        <span class="ident">regs2</span>.<span class="ident">autoc</span>.<span class="ident">write</span>(<span class="ident">val</span><span class="op">|</span><span class="ident">AUTOC_RESTART_AN</span>); 
+        <span class="comment">// setup PHY and the link </span>
+        <span class="comment">// From looking at other drivers and testing, it seems these registers are set automatically </span>
+        <span class="comment">// and driver doesn&#39;t need to configure link speed manually.</span>
 
         <span class="ident"><span class="self">Self</span>::release_semaphore</span>(<span class="ident">regs3</span>);        
 
-        <span class="comment">// debug!(&quot;STATUS: {:#X}&quot;, regs.status.read()); </span>
-        <span class="comment">// debug!(&quot;CTRL: {:#X}&quot;, regs.ctrl.read());</span>
-        <span class="comment">// debug!(&quot;LINKS: {:#X}&quot;, regs.links.read()); //b7 and b30 should be 1 for link up </span>
-        <span class="comment">// debug!(&quot;AUTOC: {:#X}&quot;, regs.autoc.read()); </span>
-        <span class="comment">// debug!(&quot;AUTOC2: {:#X}&quot;, regs.autoc2.read()); </span>
+        <span class="comment">// debug!(&quot;STATUS: {:#X}&quot;, regs1.status.read()); </span>
+        <span class="comment">// debug!(&quot;CTRL: {:#X}&quot;, regs1.ctrl.read());</span>
+        <span class="comment">// debug!(&quot;LINKS: {:#X}&quot;, regs2.links.read()); //b7 and b30 should be 1 for link up </span>
+        <span class="comment">// debug!(&quot;AUTOC: {:#X}&quot;, regs2.autoc.read()); </span>
+        <span class="comment">// debug!(&quot;AUTOC2: {:#X}&quot;, regs2.autoc2.read()); </span>
 
         <span class="prelude-val">Ok</span>(())
     }
@@ -2646,7 +2598,7 @@
 }
 
 <span class="doccomment">/// A helper function to poll the nic receive queues (only for testing purposes).</span>
-<span class="kw">fn</span> <span class="ident">rx_poll_mq</span>(<span class="ident">qid</span>: <span class="ident">usize</span>, <span class="ident">nic_id</span>: <span class="ident">PciLocation</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ReceivedFrame</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rx_poll_mq</span>(<span class="ident">qid</span>: <span class="ident">usize</span>, <span class="ident">nic_id</span>: <span class="ident">PciLocation</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">ReceivedFrame</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">nic_ref</span> <span class="op">=</span> <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">nic</span> <span class="op">=</span> <span class="ident">nic_ref</span>.<span class="ident">lock</span>();      
     <span class="ident">nic</span>.<span class="ident">rx_queues</span>[<span class="ident">qid</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">poll_queue_and_store_received_packets</span>()<span class="question-mark">?</span>;
@@ -2655,8 +2607,8 @@
 }
 
 <span class="doccomment">/// A helper function to send a test packet on a nic transmit queue (only for testing purposes).</span>
-<span class="kw">fn</span> <span class="ident">tx_send_mq</span>(<span class="ident">qid</span>: <span class="ident">usize</span>, <span class="ident">nic_id</span>: <span class="ident">PciLocation</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">packet</span> <span class="op">=</span> <span class="ident">test_packets::create_dhcp_test_packet</span>()<span class="question-mark">?</span>;
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tx_send_mq</span>(<span class="ident">qid</span>: <span class="ident">usize</span>, <span class="ident">nic_id</span>: <span class="ident">PciLocation</span>, <span class="ident">packet</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">TransmitBuffer</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">packet</span> <span class="op">=</span> <span class="ident">packet</span>.<span class="ident">unwrap_or</span>(<span class="ident">test_packets::create_dhcp_test_packet</span>()<span class="question-mark">?</span>);
     <span class="kw">let</span> <span class="ident">nic_ref</span> <span class="op">=</span> <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">nic</span> <span class="op">=</span> <span class="ident">nic_ref</span>.<span class="ident">lock</span>();  
 

@@ -303,7 +303,6 @@
 <span id="298">298</span>
 <span id="299">299</span>
 <span id="300">300</span>
-<span id="301">301</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">trait_alias</span>)]</span>
 
@@ -458,11 +457,10 @@
                 <span class="kw">let</span> <span class="ident">ixgbe_nic</span> <span class="op">=</span> <span class="ident">ixgbe::IxgbeNic::init</span>(
                     <span class="ident">dev</span>, 
                     <span class="ident">dev</span>.<span class="ident">location</span>,
-                    <span class="ident">ixgbe::LinkSpeedMbps::LS10000</span>, 
                     <span class="ident">VIRT_ENABLED</span>, 
                     <span class="prelude-val">None</span>, 
                     <span class="ident">RSS_ENABLED</span>, 
-                    <span class="ident">ixgbe::RxBufferSizeKiB::Buffer8KiB</span>,
+                    <span class="ident">ixgbe::RxBufferSizeKiB::Buffer2KiB</span>,
                     <span class="ident">RX_DESCS</span>,
                     <span class="ident">TX_DESCS</span>
                 )<span class="question-mark">?</span>;

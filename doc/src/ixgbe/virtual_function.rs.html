@@ -78,6 +78,9 @@
 <span id="73">73</span>
 <span id="74">74</span>
 <span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Interface for an application to request a `VirtualNIC` from the ixgbe device,</span>
 <span class="doccomment">//! and implementation of the `PhysicalNic` trait for the ixgbe device.</span>
 <span class="doccomment">//! </span>
@@ -116,22 +119,25 @@
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;default queue value is out of bounds&quot;</span>);
     }
     
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">nic</span> <span class="op">=</span> <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>.<span class="ident">lock</span>();
-    <span class="comment">// Allocate queues from the physical NIC</span>
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx_queues</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">take_rx_queues_from_physical_nic</span>(<span class="ident">num_queues</span>)<span class="question-mark">?</span>;
-    <span class="kw">let</span> <span class="ident">tx_queues</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">take_tx_queues_from_physical_nic</span>(<span class="ident">num_queues</span>)<span class="question-mark">?</span>;
-    <span class="comment">// Set up the filters so that packets sent to `ip_addresses` are forwarded to these queues.</span>
-    <span class="kw">for</span> (<span class="ident">queue</span>, <span class="ident">ip_address</span>) <span class="kw">in</span> <span class="ident">rx_queues</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="ident">ip_addresses</span>.<span class="ident">iter</span>()) {
-        <span class="kw">let</span> <span class="ident">filter_num</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">set_5_tuple_filter</span>(<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">ip_address</span>), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="number">7</span> <span class="comment">/*highest priority*/</span>, <span class="ident">queue</span>.<span class="ident">id</span>)<span class="question-mark">?</span>;
-        <span class="ident">queue</span>.<span class="ident">filter_num</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">filter_num</span>);
-    }
-
+    <span class="kw">let</span> (<span class="ident">rx_queues</span>, <span class="ident">tx_queues</span>, <span class="ident">mac_address</span>) <span class="op">=</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">nic</span> <span class="op">=</span> <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>.<span class="ident">lock</span>();
+        <span class="comment">// Allocate queues from the physical NIC</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rx_queues</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">take_rx_queues_from_physical_nic</span>(<span class="ident">num_queues</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">tx_queues</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">take_tx_queues_from_physical_nic</span>(<span class="ident">num_queues</span>)<span class="question-mark">?</span>;
+        <span class="comment">// Set up the filters so that packets sent to `ip_addresses` are forwarded to these queues.</span>
+        <span class="kw">for</span> (<span class="ident">queue</span>, <span class="ident">ip_address</span>) <span class="kw">in</span> <span class="ident">rx_queues</span>.<span class="ident">iter_mut</span>().<span class="ident">zip</span>(<span class="ident">ip_addresses</span>.<span class="ident">iter</span>()) {
+            <span class="kw">let</span> <span class="ident">filter_num</span> <span class="op">=</span> <span class="ident">nic</span>.<span class="ident">set_5_tuple_filter</span>(<span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">ip_address</span>), <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>, <span class="number">7</span> <span class="comment">/*highest priority*/</span>, <span class="ident">queue</span>.<span class="ident">id</span>)<span class="question-mark">?</span>;
+            <span class="ident">queue</span>.<span class="ident">filter_num</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">filter_num</span>);
+        }
+        (<span class="ident">rx_queues</span>, <span class="ident">tx_queues</span>, <span class="ident">nic</span>.<span class="ident">mac_address</span>())
+    };
+    
     <span class="ident">VirtualNic::new</span>(
         <span class="ident">rx_queues</span>,
         <span class="ident">default_rx_queue</span>,
         <span class="ident">tx_queues</span>,
         <span class="ident">default_tx_queue</span>,
-        <span class="ident">nic</span>.<span class="ident">mac_address</span>(),
+        <span class="ident">mac_address</span>,
         <span class="ident">get_ixgbe_nic</span>(<span class="ident">nic_id</span>)<span class="question-mark">?</span>
     )
 }
