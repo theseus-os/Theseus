@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["OsStr","Borrowed reference to an OS string (see [`OsString`])."],["OsString","A type that can represent owned, mutable platform-native strings, but is cheaply inter-convertible with Rust strings."]]});

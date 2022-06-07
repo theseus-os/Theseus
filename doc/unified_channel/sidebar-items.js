@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["new_string_channel",""]],"struct":[["StringReceiver",""],["StringSender",""]]});
