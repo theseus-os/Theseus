@@ -13,7 +13,6 @@ members = [
 	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
-	"ports/theseus_std",
 ]
 
 
@@ -70,6 +69,7 @@ exclude = [
 	"kernel/unified_channel",
 
 	## Exclude benchmark-related crates in all builds; they must be explicitly included via features.
+	## TODO: move these to a specific "benches" folder so we can exclude that entire folder.
 	"applications/bm",
 	"applications/heap_eval",
 	"applications/mm_eval",
@@ -77,21 +77,24 @@ exclude = [
 	"applications/scheduler_eval",
 
 	## Exclude application crates used for testing specific Theseus functionality.
-	"applications/tls_test",
-
-
-	"applications/test_mutex_sleep",
-	"applications/test_wait_queue",
-	"applications/test_ixgbe",
+	## TODO: move these to a specific "tests" folder so we can exclude that entire folder.
 	"applications/test_backtrace",
+	"applications/test_block_io",
+	"applications/test_channel",
+	"applications/test_downtime",
+	"applications/test_filerw",
+	"applications/test_ixgbe",
+	"applications/test_libc",
+	"applications/test_mlx5",
+	"applications/test_mutex_sleep",
+	"applications/test_panic",
+	"applications/test_realtime",
+	"applications/test_restartable",
+	"applications/test_serial_echo",
 	"applications/test_std_fs",
-
-	## Testing: exclusion of wasm stuff
-	# "applications/",
-	"applications/wasm",
-	# "applications/ps",
-	# "applications/cpu",
-	# "kernel/wasi_interpreter",
+	"applications/test_wait_queue",
+	"applications/tls_test",
+	"applications/unwind_test",
 ]
 
 
