@@ -1,47 +1,100 @@
 [workspace]
+resolver = "2"
 
 
 ## Here, we specify that all subdirectories in the kernel/ and applications/ directories should be built, 
 ## except for those starting with a "." So, we build all kernel and application crates except hidden directories.
+##
+## The `members` field of this workspace is used to specify all of the crates that are built
+## when the entire workspace is built, e.g., with `cargo build --workspace` or `cargo build --all`.
+##
+## Note that a full workspace build will *not* include crates that are explicitly excluded below.
 members = [
+	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
-	"ports/theseus_std",
 ]
 
 
+## Default members are the crates built by default if no specific packages (crates)
+## are specified when invoking `cargo build`.
+## Currently, this is only relevant when overriding the Makefile's default `CARGOFLAGS`,
+## which has the default value of `--workspace`, ensuring that all `members` above are built
+## `CARGOFLAGS` are explicitly set when invoking `make`.
+##
+## So far, this includes only the minimum crates required to allow Theseus to boot.
+default-members = [
+	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
+	"kernel/nano_core",
+]
+
 
 exclude = [
-	## exclude the build directories
+	## Exclude the build directories
 	"build",
+	"target",
+
+	## Exclude configuration, tools, scripts, etc
 	"cfg",
 	"compiler_plugins",
-	"libs",
-	"old_crates",
 	"scripts",
-	"target",
 	"tools",
+
+	## Exclude old components
+	"old_crates",
 	"userspace",
 
-	## Exclude *all* ports for now, as only the ones requested by core Theseus crates
-	## should be included in the workspace build by default.
+	## Exclude third-party libs and ports for now.
+	## This allows Theseus crates that *are* included in a build to pull these
+	## third-party crates in only when needed to fulfill their dependencies.
+	"libs",
 	"ports",
 
-	## exclude tlibc, since we currently build it separately.
+	## Exclude tlibc and libtheseus, which are currently built separately.
 	"tlibc",
-
-	## exclude unused test applications by default
-	"applications/test_exception",
-	"applications/test_exception2",
-	"applications/test_filerw",
-	"applications/heap_eval",
-	"applications/test_mutex_sleep",
-	"applications/test_wait_queue",
-	"applications/test_ixgbe",
-	# "applications/test_backtrace",
-
-	## libtheseus is currently built separately and not used
 	"libtheseus",
+
+	########################################################################################
+	## Below, we exclude things that should NEVER be considered part of Theseus's workspace.
+	########################################################################################
+	##
+	## Note that if you simply need to exclude something from a custom build of Theseus,
+	## it's best to add that crate as an optional dependency and then create a feature
+	## to enable it in a non-workspace build (i.e., when not calling `cargo build --all`).
+
+	## Exclude kernel crates that exist purely for testing or benchmarking purposes.
+	"kernel/libtest",
+	"kernel/test_thread_local",
+	"kernel/mapper_spillful",
+	"kernel/unified_channel",
+
+	## Exclude benchmark-related crates in all builds; they must be explicitly included via features.
+	## TODO: move these to a specific "benches" folder so we can exclude that entire folder.
+	"applications/bm",
+	"applications/heap_eval",
+	"applications/mm_eval",
+	"applications/rq_eval",
+	"applications/scheduler_eval",
+
+	## Exclude application crates used for testing specific Theseus functionality.
+	## TODO: move these to a specific "tests" folder so we can exclude that entire folder.
+	"applications/test_backtrace",
+	"applications/test_block_io",
+	"applications/test_channel",
+	"applications/test_downtime",
+	"applications/test_filerw",
+	"applications/test_ixgbe",
+	"applications/test_libc",
+	"applications/test_mlx5",
+	"applications/test_mutex_sleep",
+	"applications/test_panic",
+	"applications/test_realtime",
+	"applications/test_restartable",
+	"applications/test_serial_echo",
+	"applications/test_std_fs",
+	"applications/test_wait_queue",
+	"applications/tls_test",
+	"applications/unwind_test",
 ]
 
 
