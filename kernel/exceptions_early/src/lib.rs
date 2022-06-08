@@ -3,18 +3,10 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-#[macro_use] extern crate vga_buffer; // for println_raw!()
-extern crate x86_64;
-extern crate mod_mgmt;
-extern crate memory; 
-extern crate spin;
-extern crate tss;
-extern crate gdt;
-
 use spin::Mutex;
 use x86_64::{
     structures::{
-        idt::{LockedIdt, InterruptStackFrame, PageFaultErrorCode},
+        idt::{InterruptStackFrame, PageFaultErrorCode},
         tss::TaskStateSegment,
     },
     instructions::{
@@ -22,7 +14,9 @@ use x86_64::{
         tables::load_tss,
     },
 };
+use locked_idt::LockedIdt;
 use gdt::{Gdt, create_gdt};
+use vga_buffer::{print_raw, println_raw};
 
 /// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.

@@ -379,7 +379,20 @@ impl TxDescriptor for AdvancedTxDescriptor {
 
     fn wait_for_packet_tx(&self) {
         while (self.paylen_popts_cc_idx_sta.read() as u8 & TX_STATUS_DD) == 0 {
-            // error!("tx desc status: {:#X}", self.desc.read());
+            // error!("tx desc status: {:#X}", self.paylen_popts_cc_idx_sta.read());
         } 
     }
 }
+
+impl fmt::Debug for AdvancedTxDescriptor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("AdvancedTxDescriptor")
+            .field("packet buffer address", &self.packet_buffer_address.read())
+            .field("data len", &self.data_len.read())
+            .field("dtype_mac_rsv", &self.dtyp_mac_rsv.read())
+            .field("dcmd", &self.dcmd.read())
+            .field("paylen_popts_cc_idx_sta", &self.paylen_popts_cc_idx_sta.read())
+            .finish()
+    }
+}
+

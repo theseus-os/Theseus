@@ -1243,12 +1243,10 @@ impl CrateNamespace {
                 // Note: we only *truly* have to do this for global sections, because other crates
                 //       might depend on their correct section name after the ".text.unlikely." prefix.
                 let name = if is_global && name.starts_with(UNLIKELY_PREFIX) {
-                    let new_name = name.get(UNLIKELY_PREFIX.len() ..).ok_or_else(|| {
+                    name.get(UNLIKELY_PREFIX.len() ..).ok_or_else(|| {
                         error!("Failed to get the .text.unlikely. section's name: {:?}", sec_name);
                         "Failed to get the .text.unlikely. section's name after the prefix"
-                    })?;
-                    warn!("Note: adjusting section name: \n    {}\n      -->    {}", name, new_name);
-                    new_name
+                    })?
                 } else {
                     name
                 };

@@ -432,7 +432,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "channel_app"
+name = "channel_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
@@ -764,6 +764,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "console",
  "core2",
  "derive_more",
  "e1000",
@@ -924,6 +925,7 @@ name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
  "gdt",
+ "locked_idt",
  "memory",
  "mod_mgmt",
  "spin 0.9.0",
@@ -939,6 +941,7 @@ dependencies = [
  "apic",
  "debug_info",
  "fault_log",
+ "locked_idt",
  "log",
  "memory",
  "pmu_x86",
@@ -1024,6 +1027,7 @@ dependencies = [
  "log",
  "mod_mgmt",
  "path",
+ "shell",
  "spawn",
 ]
 
@@ -1181,6 +1185,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "heap_eval"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "getopts",
+ "hashbrown",
+ "heap",
+ "hpet",
+ "libtest",
+ "log",
+ "qp-trie",
+ "runqueue",
+ "spawn",
+ "terminal_print",
+]
+
+[[package]]
 name = "heapfile"
 version = "0.1.0"
 dependencies = [
@@ -1286,6 +1307,7 @@ dependencies = [
  "kernel_config",
  "keyboard",
  "lazy_static",
+ "locked_idt",
  "log",
  "memory",
  "mouse",
@@ -1574,6 +1596,14 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "locked_idt"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "x86_64",
 ]
 
 [[package]]
@@ -2649,6 +2679,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustversion"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
+
+[[package]]
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
@@ -3243,6 +3279,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_filerw"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memfs",
+ "memory",
+ "root",
+ "terminal_print",
+]
+
+[[package]]
+name = "test_ixgbe"
+version = "0.1.0"
+dependencies = [
+ "getopts",
+ "ixgbe",
+ "log",
+ "network_interface_card",
+ "spawn",
+ "terminal_print",
+]
+
+[[package]]
 name = "test_libc"
 version = "0.1.0"
 dependencies = [
@@ -3258,6 +3317,18 @@ dependencies = [
  "log",
  "mlx5",
  "terminal_print",
+]
+
+[[package]]
+name = "test_mutex_sleep"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "log",
+ "mutex_sleep",
+ "scheduler",
+ "spawn",
+ "task",
 ]
 
 [[package]]
@@ -3325,6 +3396,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wait_queue"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "log",
+ "scheduler",
+ "spawn",
+ "spin 0.9.0",
+ "task",
+ "terminal_print",
+ "wait_condition",
+]
+
+[[package]]
 name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
@@ -3362,6 +3447,67 @@ dependencies = [
  "unicode-width",
  "util",
  "vte",
+]
+
+[[package]]
+name = "theseus_features"
+version = "0.1.0"
+dependencies = [
+ "bm",
+ "cat",
+ "cd",
+ "channel_eval",
+ "cpu",
+ "date",
+ "deps",
+ "example",
+ "heap_eval",
+ "hello",
+ "immediate_input_echo",
+ "input_echo",
+ "keyboard_echo",
+ "kill",
+ "less",
+ "libtest",
+ "loadc",
+ "ls",
+ "mapper_spillful",
+ "mkdir",
+ "mm_eval",
+ "ns",
+ "ping",
+ "pmu_sample_start",
+ "pmu_sample_stop",
+ "print_fault_log",
+ "ps",
+ "pwd",
+ "rm",
+ "rq_eval",
+ "scheduler_eval",
+ "shell",
+ "swap",
+ "test_backtrace",
+ "test_block_io",
+ "test_channel",
+ "test_downtime",
+ "test_filerw",
+ "test_ixgbe",
+ "test_libc",
+ "test_mlx5",
+ "test_mutex_sleep",
+ "test_panic",
+ "test_realtime",
+ "test_restartable",
+ "test_serial_echo",
+ "test_std_fs",
+ "test_thread_local",
+ "test_wait_queue",
+ "theseus_std",
+ "tls_test",
+ "unified_channel",
+ "unwind_test",
+ "upd",
+ "wasm",
 ]
 
 [[package]]
@@ -3943,11 +4089,13 @@ dependencies = [
 
 [[package]]
 name = "x86_64"
-version = "0.14.8"
+version = "0.14.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "958cd5cb28e720db2f59ee9dc4235b5f82a183d079fb0e6caf43ad074cfdc66a"
 dependencies = [
  "bit_field 0.10.1",
  "bitflags",
- "irq_safety",
+ "rustversion",
  "volatile 0.4.4",
 ]
 

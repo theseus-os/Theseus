@@ -31,6 +31,9 @@ path = "../apic"
 [dependencies.serial_port]
 path = "../serial_port"
 
+[dependencies.console]
+path = "../console"
+
 [dependencies.logger]
 path = "../logger"
 

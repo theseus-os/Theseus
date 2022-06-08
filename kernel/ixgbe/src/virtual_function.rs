@@ -36,22 +36,25 @@ pub fn create_virtual_nic(
         return Err("default queue value is out of bounds");
     }
     
-    let mut nic = get_ixgbe_nic(nic_id)?.lock();
-    // Allocate queues from the physical NIC
-    let mut rx_queues = nic.take_rx_queues_from_physical_nic(num_queues)?;
-    let tx_queues = nic.take_tx_queues_from_physical_nic(num_queues)?;
-    // Set up the filters so that packets sent to `ip_addresses` are forwarded to these queues.
-    for (queue, ip_address) in rx_queues.iter_mut().zip(ip_addresses.iter()) {
-        let filter_num = nic.set_5_tuple_filter(None, Some(*ip_address), None, None, None, 7 /*highest priority*/, queue.id)?;
-        queue.filter_num = Some(filter_num);
-    }
-
+    let (rx_queues, tx_queues, mac_address) = {
+        let mut nic = get_ixgbe_nic(nic_id)?.lock();
+        // Allocate queues from the physical NIC
+        let mut rx_queues = nic.take_rx_queues_from_physical_nic(num_queues)?;
+        let tx_queues = nic.take_tx_queues_from_physical_nic(num_queues)?;
+        // Set up the filters so that packets sent to `ip_addresses` are forwarded to these queues.
+        for (queue, ip_address) in rx_queues.iter_mut().zip(ip_addresses.iter()) {
+            let filter_num = nic.set_5_tuple_filter(None, Some(*ip_address), None, None, None, 7 /*highest priority*/, queue.id)?;
+            queue.filter_num = Some(filter_num);
+        }
+        (rx_queues, tx_queues, nic.mac_address())
+    };
+    
     VirtualNic::new(
         rx_queues,
         default_rx_queue,
         tx_queues,
         default_tx_queue,
-        nic.mac_address(),
+        mac_address,
         get_ixgbe_nic(nic_id)?
     )
 }
