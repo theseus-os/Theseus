@@ -879,6 +879,7 @@ name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
  "gdt",
+ "locked_idt",
  "memory",
  "mod_mgmt",
  "spin 0.9.0",
@@ -894,6 +895,7 @@ dependencies = [
  "apic",
  "debug_info",
  "fault_log",
+ "locked_idt",
  "log",
  "memory",
  "pmu_x86",
@@ -1248,6 +1250,7 @@ dependencies = [
  "kernel_config",
  "keyboard",
  "lazy_static",
+ "locked_idt",
  "log",
  "memory",
  "mouse",
@@ -1536,6 +1539,14 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "spin 0.9.0",
+]
+
+[[package]]
+name = "locked_idt"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "x86_64",
 ]
 
 [[package]]
@@ -2563,6 +2574,12 @@ checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
  "semver",
 ]
+
+[[package]]
+name = "rustversion"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
 
 [[package]]
 name = "scheduler"
@@ -3738,11 +3755,13 @@ dependencies = [
 
 [[package]]
 name = "x86_64"
-version = "0.14.8"
+version = "0.14.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "958cd5cb28e720db2f59ee9dc4235b5f82a183d079fb0e6caf43ad074cfdc66a"
 dependencies = [
  "bit_field 0.10.1",
  "bitflags",
- "irq_safety",
+ "rustversion",
  "volatile 0.4.4",
 ]
 

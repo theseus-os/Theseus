@@ -5,38 +5,19 @@
 
 #![allow(dead_code)]
 
-
-#[macro_use] extern crate log;
-#[macro_use] extern crate vga_buffer;
-extern crate x86_64;
-extern crate spin;
-extern crate port_io;
-extern crate kernel_config;
-extern crate memory;
-extern crate apic;
-extern crate pit_clock;
-extern crate tss;
-extern crate gdt;
-extern crate exceptions_early;
-extern crate pic;
-extern crate scheduler;
-extern crate keyboard;
-extern crate mouse;
-extern crate ps2;
-extern crate sleep;
-extern crate tlb_shootdown;
-
-
 pub use pic::IRQ_BASE_OFFSET;
 
 use ps2::handle_mouse_packet;
-use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc, InterruptDescriptorTable, LockedIdt};
+use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc, InterruptDescriptorTable};
 use spin::Once;
-use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
+use kernel_config::time::CONFIG_PIT_FREQUENCY_HZ; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
+use locked_idt::LockedIdt;
+use log::{error, warn, info, debug, trace};
+use vga_buffer::{print_raw, println_raw};
 
 
 /// The single system-wide Interrupt Descriptor Table (IDT).
@@ -56,6 +37,7 @@ static PIC: Once<pic::ChainedPics> = Once::new();
 /// Obtains a lock on the global `IDT` instance.
 pub fn is_exception_handler_with_error_code(address: u64) -> bool {
     let idt = IDT.lock();
+    let address = x86_64::VirtAddr::new_truncate(address);
     
     // These are sorted from most to least likely, in order to short-circuit sooner.
     idt.page_fault.handler_addr() == address 
@@ -128,7 +110,7 @@ pub fn init(
 
         // Fill only *missing* IDT entries with a default unimplemented interrupt handler.
         for (_idx, new_entry) in new_idt.slice_mut(32..=255).iter_mut().enumerate() {
-            if new_entry.handler_addr() != 0 {
+            if new_entry.handler_addr().as_u64() != 0 {
                 debug!("Preserved early registered interrupt handler for IRQ {:#X} at address {:#X}", 
                     _idx + IRQ_BASE_OFFSET as usize, new_entry.handler_addr(),
                 );
@@ -220,7 +202,7 @@ pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u6
     // If the existing handler stored in the IDT either missing (has an address of `0`)
     // or is the default handler, that signifies the interrupt number is available.
     let idt_entry = &mut idt[interrupt_num as usize];
-    let existing_handler_addr = idt_entry.handler_addr();
+    let existing_handler_addr = idt_entry.handler_addr().as_u64();
     if existing_handler_addr == 0 || existing_handler_addr == unimplemented_interrupt_handler as u64 {
         idt_entry.set_handler_fn(func);
         Ok(())
@@ -241,7 +223,7 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     // try to find an unused interrupt number in the IDT
     let interrupt_num = idt.slice(32..=255)
         .iter()
-        .rposition(|&entry| entry.handler_addr() == unimplemented_interrupt_handler as u64)
+        .rposition(|&entry| entry.handler_addr().as_u64() == unimplemented_interrupt_handler as u64)
         .map(|entry| entry + 32)
         .ok_or("register_msi_interrupt: no available interrupt handlers (BUG: IDT is full?)")?;
 
@@ -262,7 +244,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 
     // check if the handler stored is the same as the one provided
     // this is to make sure no other application can deregister your interrupt
-    if idt[interrupt_num as usize].handler_addr() == func as u64 {
+    if idt[interrupt_num as usize].handler_addr().as_u64() == func as u64 {
         idt[interrupt_num as usize].set_handler_fn(unimplemented_interrupt_handler);
         Ok(())
     }

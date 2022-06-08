@@ -2,11 +2,6 @@
 	path = libs/dfqueue
 	url = https://github.com/theseus-os/DFQueue
 	ignore = dirty
-[submodule "libs/x86_64"]
-	path = libs/x86_64
-	url = https://github.com/theseus-os/x86_64
-	branch = master
-	ignore = dirty
 [submodule "libs/object"]
 	path = libs/object
 	url = https://github.com/theseus-os/object.git
