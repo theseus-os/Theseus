@@ -1,0 +1,10 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "locked_idt"
+description = "A struct that wraps an x86_64 IDT (Interrupt Descriptor Table) in an interrupt-safe mutex lock"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+x86_64 = "0.14.8"

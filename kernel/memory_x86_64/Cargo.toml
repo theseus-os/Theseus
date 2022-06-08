@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 multiboot2 = "0.10.1"
-x86_64 = { path = "../../libs/x86_64" }
+x86_64 = "0.14.8"
 
 [dependencies.log]
 version = "0.4.8"

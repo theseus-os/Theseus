@@ -4,10 +4,12 @@ name = "exceptions_full"
 description = "Exception handlers that are fully-featured, i.e., aware of the apic/task subsystems, and kill tasks on an exception"
 version = "0.1.0"
 build = "../../build.rs"
+edition = "2018"
 
 [dependencies]
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+x86_64 = "0.14.8"
 log = "0.4.8"
+locked_idt = { path = "../../libs/locked_idt" }
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
