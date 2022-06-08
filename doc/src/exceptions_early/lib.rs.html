@@ -258,29 +258,15 @@
 <span id="253">253</span>
 <span id="254">254</span>
 <span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">vga_buffer</span>; <span class="comment">// for println_raw!()</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">mod_mgmt</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>; 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">spin</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tss</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">gdt</span>;
-
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
 <span class="kw">use</span> <span class="ident">x86_64</span>::{
     <span class="ident">structures</span>::{
-        <span class="ident">idt</span>::{<span class="ident">LockedIdt</span>, <span class="ident">InterruptStackFrame</span>, <span class="ident">PageFaultErrorCode</span>},
+        <span class="ident">idt</span>::{<span class="ident">InterruptStackFrame</span>, <span class="ident">PageFaultErrorCode</span>},
         <span class="ident">tss::TaskStateSegment</span>,
     },
     <span class="ident">instructions</span>::{
@@ -288,7 +274,9 @@
         <span class="ident">tables::load_tss</span>,
     },
 };
+<span class="kw">use</span> <span class="ident">locked_idt::LockedIdt</span>;
 <span class="kw">use</span> <span class="ident">gdt</span>::{<span class="ident">Gdt</span>, <span class="ident">create_gdt</span>};
+<span class="kw">use</span> <span class="ident">vga_buffer</span>::{<span class="ident">print_raw</span>, <span class="ident">println_raw</span>};
 
 <span class="doccomment">/// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.</span>
 <span class="doccomment">/// This is no longer used after interrupts are set up properly, it&#39;s just a failsafe.</span>

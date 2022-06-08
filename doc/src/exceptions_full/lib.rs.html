@@ -453,54 +453,22 @@
 <span id="448">448</span>
 <span id="449">449</span>
 <span id="450">450</span>
-<span id="451">451</span>
-<span id="452">452</span>
-<span id="453">453</span>
-<span id="454">454</span>
-<span id="455">455</span>
-<span id="456">456</span>
-<span id="457">457</span>
-<span id="458">458</span>
-<span id="459">459</span>
-<span id="460">460</span>
-<span id="461">461</span>
-<span id="462">462</span>
-<span id="463">463</span>
-<span id="464">464</span>
-<span id="465">465</span>
-<span id="466">466</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.</span>
 
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 <span class="attribute">#![<span class="ident">feature</span>(<span class="ident">abi_x86_interrupt</span>)]</span>
 
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">x86_64</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">task</span>;
-<span class="comment">// extern crate apic;</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tlb_shootdown</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">pmu_x86</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">log</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">vga_buffer</span>; <span class="comment">// for println_raw!()</span>
-<span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">print</span>; <span class="comment">// for regular println!()</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">unwind</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">debug_info</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">signal_handler</span>;
-
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">memory</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">tss</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">stack_trace</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fault_log</span>;
-
+<span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">warn</span>, <span class="ident">debug</span>, <span class="ident">trace</span>};
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">VirtualAddress</span>, <span class="ident">Page</span>};
 <span class="kw">use</span> <span class="ident">signal_handler</span>::{<span class="ident">Signal</span>, <span class="ident">SignalContext</span>, <span class="ident">ErrorCode</span>};
 <span class="kw">use</span> <span class="ident">x86_64</span>::{
     <span class="ident">registers::control::Cr2</span>,
     <span class="ident">structures::idt</span>::{
-        <span class="ident">LockedIdt</span>,
         <span class="ident">InterruptStackFrame</span>,
         <span class="ident">PageFaultErrorCode</span>
     },
 };
+<span class="kw">use</span> <span class="ident">locked_idt::LockedIdt</span>;
 <span class="kw">use</span> <span class="ident">fault_log::log_exception</span>;
 
 
@@ -549,15 +517,15 @@
 }
 
 
-<span class="doccomment">/// calls println!() and then println_raw!()</span>
+<span class="doccomment">/// calls print!() and then print_raw!()</span>
 <span class="macro">macro_rules!</span> <span class="ident">println_both</span> {
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>) =&gt; {
-        <span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>));
-        <span class="macro">print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>));
+        <span class="macro">vga_buffer::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>));
+        <span class="macro">print::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>));
     };
     (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
-        <span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>);
-        <span class="macro">print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>);
+        <span class="macro">vga_buffer::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>);
+        <span class="macro">print::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">arg</span>)<span class="kw-2">*</span>);
     };
 }
 
