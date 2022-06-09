@@ -3415,11 +3415,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "getopts",
- "memory",
+ "log",
  "path",
  "task",
  "terminal_print",
- "wasmtime_runner",
+ "wasmtime",
 ]
 
 [[package]]
@@ -3502,6 +3502,7 @@ dependencies = [
  "test_std_fs",
  "test_thread_local",
  "test_wait_queue",
+ "test_wasmtime",
  "theseus_std",
  "tls_test",
  "unified_channel",
@@ -3989,25 +3990,6 @@ dependencies = [
  "serde",
  "thiserror_core2",
  "wasmparser",
-]
-
-[[package]]
-name = "wasmtime_runner"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "core2",
- "cranelift-entity",
- "libc",
- "log",
- "region",
- "terminal_print",
- "wasmparser",
- "wasmtime",
- "wasmtime-environ",
- "wasmtime-jit",
- "wasmtime-runtime",
- "wasmtime-types",
 ]
 
 [[package]]
