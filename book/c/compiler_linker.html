@@ -158,7 +158,7 @@
 </ol>
 <p>The first two steps were <a href="tlibc.html">described previously</a>; the latter two are described below.</p>
 <p>To build and link a dummy C program to tlibc, the invocation of <code>gcc</code> currently requires several arguments to customize the compiler's behavior as well as its usage of the <code>ld</code> linker. The key arguments are shown and described below:</p>
-<pre><code class="language-sh">x86_64-elf-gcc -o dummy_works              \
+<pre><code class="language-sh">x86_64-elf-gcc                             \
     -mno-red-zone -nostdlib -nostartfiles  \
     -ffunction-sections -fdata-sections    \
     -mcmodel=large                         \
