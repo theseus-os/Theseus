@@ -16,7 +16,7 @@ The first two steps were [described previously](tlibc.md); the latter two are de
 
 To build and link a dummy C program to tlibc, the invocation of `gcc` currently requires several arguments to customize the compiler's behavior as well as its usage of the `ld` linker. The key arguments are shown and described below:
 ```sh
-x86_64-elf-gcc -o dummy_works              \
+x86_64-elf-gcc                             \
     -mno-red-zone -nostdlib -nostartfiles  \
     -ffunction-sections -fdata-sections    \
     -mcmodel=large                         \
