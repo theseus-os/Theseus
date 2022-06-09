@@ -96,6 +96,9 @@ default = [
     "unwind_test",  ## used for regular testing
 ]
 
+## Includes `wasmtime`, the WebAssembly (WASM) runtime, in the build.
+wasmtime = [ "test_wasmtime" ]
+
 ## Includes all regular applications (non-test, non-bench) in the build.
 theseus_apps = [
     "cat",

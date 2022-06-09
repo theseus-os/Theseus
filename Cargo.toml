@@ -93,6 +93,7 @@ exclude = [
 	"applications/test_serial_echo",
 	"applications/test_std_fs",
 	"applications/test_wait_queue",
+	"applications/test_wasmtime",
 	"applications/tls_test",
 	"applications/unwind_test",
 ]
