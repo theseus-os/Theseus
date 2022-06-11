@@ -3,7 +3,6 @@ name = "crate_swap"
 version = "0.1.0"
 description = "Handles crate swapping for live evolution and fault recovery purposes"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 
 [dependencies]

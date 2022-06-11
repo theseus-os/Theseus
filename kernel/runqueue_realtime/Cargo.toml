@@ -3,7 +3,6 @@ authors = ["Jacob Earle <earlejacobt@gmail.com>"]
 name = "runqueue_realtime"
 description = "Functions and types for handling runqueues in a realtime scheduling context"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies.task]
 path = "../task"

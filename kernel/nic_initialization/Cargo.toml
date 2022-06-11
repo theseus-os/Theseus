@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>", "Ramla Ijaz <ijazramla@gmail.com
 name = "nic_initialization"
 description = "A set of functions used to initialize a Network Interface Card"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }

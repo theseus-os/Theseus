@@ -3,7 +3,6 @@ name = "app_io"
 version = "0.1.0"
 authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
 description = "Offers applications the ability to read from or print to the terminal."
-build = "../../build.rs"
 
 
 [dependencies]

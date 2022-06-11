@@ -3,7 +3,6 @@ name = "framebuffer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "a framebuffer is a buffer of pixels which can be composited to another framebuffer or be mapped to some physical memory"
-build = "../../build.rs"
 
 [dependencies]
 log = "0.4.8"

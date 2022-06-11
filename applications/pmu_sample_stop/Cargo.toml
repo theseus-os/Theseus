@@ -3,7 +3,6 @@ name = "pmu_sample_stop"
 version = "0.1.0"
 description = "A basic application that starts sampling and retrieves samples."
 authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

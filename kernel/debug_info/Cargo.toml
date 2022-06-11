@@ -3,7 +3,6 @@ name = "debug_info"
 version = "0.1.0"
 description = "Support for processing and using DWARF debug information from ELF files"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }

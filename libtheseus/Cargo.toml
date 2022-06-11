@@ -3,7 +3,6 @@ name = "libtheseus"
 version = "0.1.0"
 description = "The application-facing 'library' that exposes Theseus OS features, similar to a standard library."
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../build.rs"
 
 [dependencies]
 # getopts = "0.2.21"

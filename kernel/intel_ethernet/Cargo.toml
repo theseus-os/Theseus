@@ -3,7 +3,6 @@ name = "intel_ethernet"
 description = "defines structs and traits for DMA descriptors unique to Intel NICs"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 volatile = "0.2.7"

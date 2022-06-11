@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "mapper_spillful"
 description = "A spillful version of the mapper for the virtual memory subsystem."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 cfg-if = "0.1.6"

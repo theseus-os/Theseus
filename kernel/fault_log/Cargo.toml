@@ -3,7 +3,6 @@ name = "fault_log"
 version = "0.1.0"
 description = "Logs all exceptions occuring in Theseus"
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
-build = "../../build.rs"
 
 
 [dependencies.lazy_static]

@@ -3,7 +3,6 @@ name = "fault_crate_swap"
 version = "0.1.0"
 description = "Handles crate swapping of fault crates for fault tolerance purposes"
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
-build = "../../build.rs"
 
 
 [dependencies.log]

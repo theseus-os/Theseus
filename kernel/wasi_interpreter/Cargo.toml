@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Vikram Mullick <vikram1.mullick@gmail.com>"]
 edition = "2018"
 description = "Interpreter for executing WASI-compliant WASM binaries"
-build = "../../build.rs"
 
 [dependencies]
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }

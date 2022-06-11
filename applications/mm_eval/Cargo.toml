@@ -3,7 +3,6 @@ name = "mm_eval"
 version = "0.1.0"
 description = "A application that microbenchmarks various memory mapping implementations"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

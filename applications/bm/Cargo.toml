@@ -2,7 +2,6 @@
 name = "bm"
 version = "0.1.0"
 authors = ["Minhong Yun <mhyun@rice.edu>"]
-build = "../../build.rs"
 
 [features]
 bm_in_us = []

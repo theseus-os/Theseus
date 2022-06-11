@@ -2,7 +2,6 @@
 name = "test_mlx5"
 version = "0.1.0"
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 

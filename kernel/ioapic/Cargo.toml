@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "ioapic"
 description = "IOAPIC (I/O Advanced Programmable Interrupt Controller) support (x86 only) for Theseus"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

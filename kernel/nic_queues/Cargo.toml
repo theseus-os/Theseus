@@ -3,7 +3,6 @@ name = "nic_queues"
 description = "Defines structs that hold all information related to nic receive and transmit queues"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }

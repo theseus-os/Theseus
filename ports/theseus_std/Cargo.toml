@@ -4,7 +4,6 @@ name = "theseus_std"
 description = "Theseus port of select parts of the Rust standard library `std`"
 version = "0.1.0"
 edition = "2018"
-build = "../../build.rs"
 
 [dependencies]
 lockable = { path = "../../libs/lockable" }

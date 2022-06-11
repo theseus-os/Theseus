@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "rendezvous"
 description = "Synchronous Inter-Task Communication using a rendezvous approach"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

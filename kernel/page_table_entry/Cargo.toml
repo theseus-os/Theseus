@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "page_table_entry"
 description = "Defines the structure of page table entries on x86_64"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 bit_field = "0.7.0"

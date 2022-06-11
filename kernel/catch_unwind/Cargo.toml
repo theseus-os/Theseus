@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "catch_unwind"
 description = "Support for catching unwinding after a panic, like `std::panic::catch_unwind`"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies.log]
 version = "0.4.8"
