@@ -449,7 +449,7 @@ impl LoadedCrate {
                 SectionType::Text => (
                     new_text_pages_ref
                         .clone()
-                        .ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                        .ok_or("BUG: missing text pages in newly-copied crate")?,
                     new_text_pages_locked
                         .as_ref()
                         .and_then(|tp| tp.address_at_offset(new_sec_mapped_pages_offset)),
@@ -457,7 +457,7 @@ impl LoadedCrate {
                 SectionType::Rodata | SectionType::GccExceptTable | SectionType::EhFrame => (
                     new_rodata_pages_ref
                         .clone()
-                        .ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
+                        .ok_or("BUG: missing rodata pages in newly-copied crate")?,
                     new_rodata_pages_locked
                         .as_ref()
                         .and_then(|rp| rp.address_at_offset(new_sec_mapped_pages_offset)),
@@ -465,14 +465,14 @@ impl LoadedCrate {
                 SectionType::Data | SectionType::Bss => (
                     new_data_pages_ref
                         .clone()
-                        .ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                        .ok_or("BUG: missing data pages in newly-copied crate")?,
                     new_data_pages_locked
                         .as_ref()
                         .and_then(|dp| dp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
             };
             let new_sec_virt_addr =
-                new_sec_virt_addr.ok_or_else(|| "BUG: couldn't get virt_addr for new section")?;
+                new_sec_virt_addr.ok_or("BUG: couldn't get virt_addr for new section")?;
 
             let new_sec = Arc::new(LoadedSection::with_dependencies(
                 old_sec.typ,                                 // section type is the same
@@ -499,15 +499,15 @@ impl LoadedCrate {
             let new_sec_mapped_pages = match new_sec.typ {
                 SectionType::Text => new_text_pages_locked
                     .as_mut()
-                    .ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                    .ok_or("BUG: missing text pages in newly-copied crate")?,
                 SectionType::Rodata | SectionType::GccExceptTable | SectionType::EhFrame => {
                     new_rodata_pages_locked
                         .as_mut()
-                        .ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?
+                        .ok_or("BUG: missing rodata pages in newly-copied crate")?
                 }
                 SectionType::Data | SectionType::Bss => new_data_pages_locked
                     .as_mut()
-                    .ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                    .ok_or("BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
 
@@ -545,7 +545,7 @@ impl LoadedCrate {
             // which are completely safe to clone without needing any fix ups.
             for internal_dep in &new_sec.inner.read().internal_dependencies {
                 let source_sec = new_sections.get(&internal_dep.source_sec_shndx)
-                    .ok_or_else(|| "Couldn't get new section specified by an internal dependency's source_sec_shndx")?;
+                    .ok_or("Couldn't get new section specified by an internal dependency's source_sec_shndx")?;
 
                 // The source and target (new_sec) sections might be the same, so we need to check first
                 // to ensure that we don't cause deadlock by trying to lock the same section twice.
@@ -578,7 +578,7 @@ impl LoadedCrate {
         // set the new_crate's `sections` list, since we didn't do it earlier
         {
             let mut new_crate_mut = new_crate.lock_as_mut()
-                .ok_or_else(|| "BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to newly-copied crate")?;
+                .ok_or("BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to newly-copied crate")?;
             new_crate_mut.sections = new_sections;
         }
 

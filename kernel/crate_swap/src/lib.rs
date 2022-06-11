@@ -261,17 +261,17 @@ pub fn swap_crates(
         let new_crate_ref = if is_optimized {
             debug!("swap_crates(): OPTIMIZED: looking for new crate {:?} in cache", new_crate_name);
             namespace_of_new_crates.get_crate(&new_crate_name)
-                .ok_or_else(|| "BUG: swap_crates(): Couldn't get new crate from optimized cache")?
+                .ok_or("BUG: swap_crates(): Couldn't get new crate from optimized cache")?
         } else {
             #[cfg(not(loscd_eval))]
             debug!("looking for newly-loaded crate {:?} in temp namespace", new_crate_name);
             namespace_of_new_crates.get_crate(&new_crate_name)
-                .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?
+                .ok_or("BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?
         };
 
         // scope the lock on the `new_crate_ref`
         {
-            let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| 
+            let mut new_crate = new_crate_ref.lock_as_mut().ok_or( 
                 "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?"
             )?;
 
@@ -303,7 +303,7 @@ pub fn swap_crates(
                     let mut iter = new_crate.data_sections_iter().filter(|sec| sec.name.starts_with(&*prefix));
                     iter.next()
                         .filter(|_| iter.next().is_none()) // ensure single element
-                        .ok_or_else(|| 
+                        .ok_or( 
                             "couldn't find destination section in new crate to copy old_sec's data into (.data/.bss state transfer)"
                         )
                 }?;
