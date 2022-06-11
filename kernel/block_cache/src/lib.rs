@@ -1,21 +1,21 @@
 //! A caching layer for block based storage devices.
-//! 
+//!
 //! For many storage devices, calls to the backing medium are quite expensive. This layer intends to reduce those calls,
 //! improving efficiency in exchange for additional memory usage. Note that this crate is intended to be used as a part of
 //! `block_io`, but should work on its own.
-//! 
+//!
 //! # Limitations
 //! Currently, the `BlockCache` struct is hardcoded to use a `StorageDevice` reference,
-//! when in reality it should just use anything that implements traits like `BlockReader + BlockWriter`. 
-//! 
+//! when in reality it should just use anything that implements traits like `BlockReader + BlockWriter`.
+//!
 //! The read and write functions currently only support reading/writing individual blocks from disk even
 //! when the caller might prefer reading a larger number of contiguous blocks. This is inneficient and an
 //! optimized implementation should read multiple blocks at once if possible.
-//! 
-//! Cached blocks are stored as vectors of bytes on the heap, 
-//! we should do something else such as separate mapped regions. 
-//! Cached blocks cannot yet be dropped to relieve memory pressure. 
-//! 
+//!
+//! Cached blocks are stored as vectors of bytes on the heap,
+//! we should do something else such as separate mapped regions.
+//! Cached blocks cannot yet be dropped to relieve memory pressure.
+//!
 //! Note that this cache only holds a reference to the underlying block device.
 //! As such if any other system crates perform writes to the underlying device,
 //! in that case the cache will give incorrect and potentially inconsistent results.
@@ -26,17 +26,17 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+#[macro_use]
+extern crate alloc;
 extern crate hashbrown;
 extern crate storage_device;
 
-use alloc::vec::Vec;
-use hashbrown::{
-    HashMap,
-    hash_map::Entry,
+use alloc::{
+    borrow::{Cow, ToOwned},
+    vec::Vec,
 };
+use hashbrown::{hash_map::Entry, HashMap};
 use storage_device::{StorageDevice, StorageDeviceRef};
-use alloc::borrow::{Cow, ToOwned};
 
 /// A cache to store read and written blocks from a storage device.
 pub struct BlockCache {
@@ -48,7 +48,7 @@ pub struct BlockCache {
 }
 
 impl BlockCache {
-    /// Creates a new `BlockCache` device 
+    /// Creates a new `BlockCache` device
     pub fn new(storage_device: StorageDeviceRef) -> BlockCache {
         BlockCache {
             cache: HashMap::new(),
@@ -56,7 +56,7 @@ impl BlockCache {
         }
     }
 
-    /// Flushes the given block to the backing storage device. 
+    /// Flushes the given block to the backing storage device.
     /// If the `block_to_flush` is None, all blocks in the entire cache
     /// will be written back to the storage device.
     pub fn flush(&mut self, block_num: Option<usize>) -> Result<(), &'static str> {
@@ -67,8 +67,7 @@ impl BlockCache {
                 Self::flush_block(&mut *locked_device, bn, cached_block)?;
             }
             // If the block wasn't in the cache, do nothing.
-        }
-        else {
+        } else {
             // Flush all blocks
             for (bn, cached_block) in self.cache.iter_mut() {
                 Self::flush_block(&mut *locked_device, *bn, cached_block)?;
@@ -79,9 +78,12 @@ impl BlockCache {
 
     /// An internal function that first checks the cache for a specific block
     /// in order to avoid reading from the storage device.
-    /// If that block exists in the cache, it is copied into the buffer. 
+    /// If that block exists in the cache, it is copied into the buffer.
     /// If not, it is read from the storage device into the cache, and then copied into the buffer.
-    pub fn read_block<'c>(cache: &'c mut BlockCache, block: usize) -> Result<&'c [u8], &'static str> {
+    pub fn read_block<'c>(
+        cache: &'c mut BlockCache,
+        block: usize,
+    ) -> Result<&'c [u8], &'static str> {
         let mut locked_device = cache.storage_device.lock();
         match cache.cache.entry(block) {
             Entry::Occupied(occ) => {
@@ -113,34 +115,39 @@ impl BlockCache {
         }
     }
 
-    pub fn write_block(&mut self, block_num: usize, buffer_to_write: Cow<[u8]>)
-    //pub fn write_block(&mut self, block_num: usize, buffer_to_write: Cow<[u8]>)
-        -> Result<(), &'static str> 
-        {
-            let mut locked_device = self.storage_device.lock();
+    pub fn write_block(
+        &mut self,
+        block_num: usize,
+        buffer_to_write: Cow<[u8]>,
+    ) -> Result<(), &'static str> {
+        let mut locked_device = self.storage_device.lock();
 
-            let owned_buffer: Vec<u8> = match buffer_to_write {
-                Cow::Borrowed(slice_ref) => slice_ref.to_owned(),
-                Cow::Owned(vec_owned) => vec_owned, 
-            };
+        let owned_buffer: Vec<u8> = match buffer_to_write {
+            Cow::Borrowed(slice_ref) => slice_ref.to_owned(),
+            Cow::Owned(vec_owned) => vec_owned,
+        };
 
-            let mut new_cached_block = CachedBlock {
-                block: owned_buffer,
-                state: CacheState::Modified,
-            };
-            // Currently using a write-through policy right now, so flush the block immediately
-            BlockCache::flush_block(&mut *locked_device, block_num, &mut new_cached_block)?;
-            self.cache.insert(block_num, new_cached_block);
+        let mut new_cached_block = CachedBlock {
+            block: owned_buffer,
+            state: CacheState::Modified,
+        };
+        // Currently using a write-through policy right now, so flush the block immediately
+        BlockCache::flush_block(&mut *locked_device, block_num, &mut new_cached_block)?;
+        self.cache.insert(block_num, new_cached_block);
 
-            Ok(())
+        Ok(())
     }
 
     /// An internal function that writes out the given `cached_block`
     /// to the given locked `StorageDevice` if the cached block is in the `Modified` state.
-    fn flush_block(locked_device: &mut dyn StorageDevice, block_num: usize, cached_block: &mut CachedBlock) -> Result<(), &'static str> {
+    fn flush_block(
+        locked_device: &mut dyn StorageDevice,
+        block_num: usize,
+        cached_block: &mut CachedBlock,
+    ) -> Result<(), &'static str> {
         // we only need to actually write blocks in the `Modified` state.
         match cached_block.state {
-            CacheState::Shared | CacheState::Invalid => { },
+            CacheState::Shared | CacheState::Invalid => {}
             CacheState::Modified => {
                 locked_device.write_blocks(&cached_block.block, block_num)?;
                 cached_block.state = CacheState::Shared;
@@ -150,21 +157,19 @@ impl BlockCache {
     }
 }
 
-
-
 /// A block from a storage device stored in a cache.
 /// This currently includes the actual owned cached content as a vector of bytes on the heap,
 /// in addition to the `CacheState` of the cached item.
-/// 
-/// TODO: allow non-dirty blocks to be freed (reclaimed) upon memory pressure. 
+///
+/// TODO: allow non-dirty blocks to be freed (reclaimed) upon memory pressure.
 #[derive(Debug)]
-struct CachedBlock { // Not sure if this should be public, but it seems necessary to fix type leak. TODO make non-public.
+struct CachedBlock {
+    // Not sure if this should be public, but it seems necessary to fix type leak. TODO make non-public.
     block: Vec<u8>,
     state: CacheState,
 }
 
 type InternalCache = HashMap<usize, CachedBlock>;
-
 
 /// The states of an item in the cache, following the MSI cache coherence protocol.
 #[derive(Debug)]
@@ -182,7 +187,7 @@ enum CacheState {
     /// as the backing storage has a more recent copy than the cache.
     /// Therefore, if a read of an `Invalid` cached item is requested,
     /// it must be re-read from the backing storage.
-    /// An `Invalid` item can still be overwritten in the cache without going to the backing store. 
+    /// An `Invalid` item can still be overwritten in the cache without going to the backing store.
     /// An `Invalid` item can be safely dropped from the cache.
-    Invalid,  
+    Invalid,
 }

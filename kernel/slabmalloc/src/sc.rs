@@ -102,7 +102,6 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         self.empty_slabs.pop()
     }
 
-    
     // /// Since `dealloc` can not reassign pages without requiring a lock
     // /// we check slabs and full slabs periodically as part of `alloc`
     // /// and move them to the empty or partially allocated slab lists.
@@ -204,24 +203,26 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         ptr::null_mut()
     }
 
-
     /// Creates an allocable page given a MappedPages8k object and returns a reference to the allocable page.
     /// The MappedPages8k object is stored within the metadata of the allocable page.
-    fn create_allocable_page(mp: MappedPages8k, heap_id: usize) -> &'a mut P{
+    fn create_allocable_page(mp: MappedPages8k, heap_id: usize) -> &'a mut P {
         let vaddr = mp.start_address().value();
 
         // create page and store the MappedPages object
         let page = P::new(mp, heap_id);
-        let page_ref: &'a mut P = unsafe { core::mem::transmute(vaddr) } ; // not unsafe because the allocable page was only create by a mapped page that fits the criteria
-        unsafe { (page_ref as *mut P).write(page); }
+        let page_ref: &'a mut P = unsafe { core::mem::transmute(vaddr) }; // not unsafe because the allocable page was only create by a mapped page that fits the criteria
+        unsafe {
+            (page_ref as *mut P).write(page);
+        }
 
-        page_ref 
+        page_ref
     }
 
     /// Refill the SCAllocator
     pub fn refill(&mut self, mp: MappedPages8k, heap_id: usize) {
         let page = Self::create_allocable_page(mp, heap_id);
-        page.bitfield_mut().initialize(self.size, P::SIZE - P::METADATA_SIZE);
+        page.bitfield_mut()
+            .initialize(self.size, P::SIZE - P::METADATA_SIZE);
         *page.prev() = Rawlink::none();
         *page.next() = Rawlink::none();
         // trace!("adding page to SCAllocator {:p}", page);
@@ -231,13 +232,11 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
     /// Returns an empty page from the allocator if available.
     /// It removes the MappedPages object from the allocable page where it is stored.
     pub fn retrieve_empty_page(&mut self) -> Option<MappedPages8k> {
-        match self.remove_empty(){
+        match self.remove_empty() {
             Some(page) => {
                 page.retrieve_mapped_pages() //safe because the page has been removed from the heap's linked lists
             }
-            None => {
-                None
-            }
+            None => None,
         }
     }
 
@@ -252,7 +251,7 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         // trace!(
         //     "SCAllocator({}) is trying to allocate {:?}, {}",
         //     self.size,
-        //     layout, 
+        //     layout,
         //     P::SIZE - CACHE_LINE_SIZE
         // );
         assert!(layout.size() <= self.size);
@@ -307,7 +306,11 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
     /// # Safety
     /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
     /// and `layout` argument is correct.
-    pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
+    pub unsafe fn deallocate(
+        &mut self,
+        ptr: NonNull<u8>,
+        layout: Layout,
+    ) -> Result<(), &'static str> {
         assert!(layout.size() <= self.size);
         assert!(self.size <= (P::SIZE - CACHE_LINE_SIZE));
         // trace!(

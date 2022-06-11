@@ -7,8 +7,7 @@
 //! This abstraction is necessary as WASI assumes a POSIX-style file descriptor table interface.
 //!
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::{cmp, convert::TryFrom as _};
 use core2::io::{Read, Write};
 use fs_node::{DirRef, FileOrDir, FileRef, FsNode};

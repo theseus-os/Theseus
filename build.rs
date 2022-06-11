@@ -1,9 +1,8 @@
-//! The build script that is used to specify which conditional compilation 
+//! The build script that is used to specify which conditional compilation
 //! options should be enabled when building Theseus.  
 
 /// The prefix that must come before each custom cfg option.
 const CFG_PREFIX: &'static str = "cargo:rustc-cfg=";
-
 
 // const APIC_TIMER_FIXED: &'static str = "apic_timer_fixed";
 // const LOADABLE: &'static str = "loadable";
@@ -13,9 +12,11 @@ const CFG_PREFIX: &'static str = "cargo:rustc-cfg=";
 
 fn main() {
     println!("cargo:rerun-if-env-changed=THESEUS_CONFIG");
-    let configs = std::env::var("THESEUS_CONFIG").unwrap_or(String::new()).to_lowercase();
-    
-	// here we just need to print out every provided config option
+    let configs = std::env::var("THESEUS_CONFIG")
+        .unwrap_or(String::new())
+        .to_lowercase();
+
+    // here we just need to print out every provided config option
     for s in configs.split_whitespace() {
         println!("{}{}", CFG_PREFIX, s);
     }
@@ -32,19 +33,14 @@ fn main() {
     eprintln!("ran build script, configs: {}", configs);
 }
 
-
-
 // fn loadable() -> Vec<String> {
 //     vec![
 //         LOADABLE,
 //     ]
 // }
 
-
 // fn bochs<S>() -> Vec<S> where S: Into<String>
 //     vec![
 //         APIC_TIMER_FIXED,
 //     ]
 // }
-
-

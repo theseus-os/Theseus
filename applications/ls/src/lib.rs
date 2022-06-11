@@ -1,20 +1,23 @@
 #![no_std]
 
 extern crate task;
-#[macro_use] extern crate terminal_print;
-#[macro_use] extern crate alloc;
+#[macro_use]
+extern crate terminal_print;
+#[macro_use]
+extern crate alloc;
 // #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate getopts;
 extern crate path;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
-use fs_node::{FileOrDir, DirRef};
+use alloc::{
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use fs_node::{DirRef, FileOrDir};
 use getopts::Options;
 use path::Path;
-use alloc::sync::Arc;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -25,7 +28,7 @@ pub fn main(args: Vec<String>) -> isize {
         Err(_f) => {
             println!("{}", _f);
             print_usage(opts);
-            return -1; 
+            return -1;
         }
     };
 
@@ -43,7 +46,7 @@ pub fn main(args: Vec<String>) -> isize {
     };
 
     let curr_wd = Arc::clone(&taskref.get_env().lock().working_dir);
-    
+
     // print children of working directory if no child is specified
     if matches.free.is_empty() {
         print_children(&curr_wd);
@@ -59,11 +62,14 @@ pub fn main(args: Vec<String>) -> isize {
             return 0;
         }
         Some(FileOrDir::File(file)) => {
-            println!("'{}' is not a directory; `ls` currently only supports listing directory contents.", file.lock().get_name());
+            println!(
+                "'{}' is not a directory; `ls` currently only supports listing directory contents.",
+                file.lock().get_name()
+            );
             return -1;
         }
         _ => {
-            println!("Couldn't find path: {}", path); 
+            println!("Couldn't find path: {}", path);
             return -1;
         }
     };
@@ -71,7 +77,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn print_children(dir: &DirRef) {
     let mut child_string = String::new();
-    let mut child_list = dir.lock().list(); 
+    let mut child_list = dir.lock().list();
     child_list.reverse();
     for child in child_list.iter() {
         child_string.push_str(&format!("{}\n", child));
@@ -82,7 +88,6 @@ fn print_children(dir: &DirRef) {
 fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
-
 
 const USAGE: &'static str = "Usage: ls [DIR | FILE]
 List the contents of the given directory or info about the given file.

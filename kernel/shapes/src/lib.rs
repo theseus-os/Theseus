@@ -2,8 +2,10 @@
 
 #![no_std]
 
-use core::ops::{Add, Sub};
-use core::cmp::{Ord, Ordering};
+use core::{
+    cmp::{Ord, Ordering},
+    ops::{Add, Sub},
+};
 
 /// A 2-D integer coordinate.
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]
@@ -25,7 +27,10 @@ impl Add<(isize, isize)> for Coord {
     type Output = Coord;
 
     fn add(self, rhs: (isize, isize)) -> Coord {
-        Coord { x: self.x + rhs.0, y: self.y + rhs.1 }
+        Coord {
+            x: self.x + rhs.0,
+            y: self.y + rhs.1,
+        }
     }
 }
 
@@ -33,7 +38,10 @@ impl Sub<(isize, isize)> for Coord {
     type Output = Coord;
 
     fn sub(self, rhs: (isize, isize)) -> Coord {
-        Coord { x: self.x - rhs.0, y: self.y - rhs.1 }
+        Coord {
+            x: self.x - rhs.0,
+            y: self.y - rhs.1,
+        }
     }
 }
 
@@ -68,7 +76,6 @@ impl Ord for Coord {
         } else {
             return self.x.cmp(&other.x);
         }
-
     }
 }
 
@@ -78,8 +85,7 @@ impl PartialOrd for Coord {
     }
 }
 
-impl Eq for Coord { }
-
+impl Eq for Coord {}
 
 /// A rectangle given by its top-left coordinate and bottom-right coordinate.
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]

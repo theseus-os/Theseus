@@ -4,9 +4,8 @@
 // A slab allocator adapted from the slabmalloc crate.
 // The original can be found at https://crates.io/crates/slabmalloc
 
-
 //! A slab allocator implementation for objects less than 8KiB.
-//! This allocator does not use any of Theseus's memory management abstractions, and 
+//! This allocator does not use any of Theseus's memory management abstractions, and
 //! works with pointers to the start of allocable pages.
 //!
 //! # Overview
@@ -19,7 +18,7 @@
 //!    It stores the objects and meta-data in one or multiple `AllocablePage` objects.
 //!  * A trait `AllocablePage` that defines the page-type from which we allocate objects.
 //!
-//! Lastly, it provides a default `AllocablePage` implementations `ObjectPage8k` that is 8 KiB in size 
+//! Lastly, it provides a default `AllocablePage` implementations `ObjectPage8k` that is 8 KiB in size
 //! and contains allocated objects and associated meta-data
 
 #![feature(const_mut_refs)]
@@ -34,11 +33,11 @@ mod zone;
 pub use pages::*;
 pub use zone::*;
 
-use core::alloc::Layout;
-use core::fmt;
-use core::mem;
-use core::ptr::{self, NonNull};
-
+use core::{
+    alloc::Layout,
+    fmt, mem,
+    ptr::{self, NonNull},
+};
 
 #[cfg(target_arch = "x86_64")]
 const CACHE_LINE_SIZE: usize = 64;

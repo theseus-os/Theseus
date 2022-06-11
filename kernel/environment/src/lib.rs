@@ -4,21 +4,18 @@ extern crate alloc;
 extern crate fs_node;
 extern crate root;
 
-use alloc::{
-    string::String,
-    sync::Arc,
-};
+use alloc::{string::String, sync::Arc};
 use fs_node::DirRef;
 
 /// A structure that contains environment state for a given `Task` or group of `Task`s.
-/// 
+///
 /// A default environment can be created with the following state:
 /// * The working directory is the `root` directory.
 ///
 pub struct Environment {
-    /// The "current working directory", i.e., 
+    /// The "current working directory", i.e.,
     /// where a task's relative path begins upon first execution.
-    pub working_dir: DirRef, 
+    pub working_dir: DirRef,
 }
 
 impl Environment {

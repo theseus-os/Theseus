@@ -1,25 +1,26 @@
-//! Support for the MADT ACPI table, 
+//! Support for the MADT ACPI table,
 //! which includes interrupt and multicore info.
 
 #![no_std]
 #![allow(unaligned_references)]
 
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
+extern crate acpi_table;
+extern crate apic;
+extern crate ioapic;
 extern crate irq_safety;
 extern crate memory;
-extern crate ioapic;
-extern crate apic;
 extern crate pic;
 extern crate sdt;
-extern crate acpi_table;
 extern crate zerocopy;
 
-use core::mem::size_of;
-use memory::{MappedPages, PageTable, PhysicalAddress}; 
-use apic::{LocalApic, get_my_apic_id, get_lapics, get_bsp_id};
-use irq_safety::RwLockIrqSafe;
-use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
+use apic::{get_bsp_id, get_lapics, get_my_apic_id, LocalApic};
+use core::mem::size_of;
+use irq_safety::RwLockIrqSafe;
+use memory::{MappedPages, PageTable, PhysicalAddress};
+use sdt::Sdt;
 use zerocopy::FromBytes;
 
 pub const MADT_SIGNATURE: &'static [u8; 4] = b"APIC";
@@ -29,20 +30,19 @@ pub fn handle(
     acpi_tables: &mut AcpiTables,
     signature: AcpiSignature,
     _length: usize,
-    phys_addr: PhysicalAddress
+    phys_addr: PhysicalAddress,
 ) -> Result<(), &'static str> {
-    // The MADT has a variable number of entries, and each entry is of variable size. 
+    // The MADT has a variable number of entries, and each entry is of variable size.
     // So we can't determine the slice_length (just use 0 instead), but we can determine where it starts.
     let slice_start_paddr = phys_addr + size_of::<MadtAcpiTable>();
     acpi_tables.add_table_location(signature, phys_addr, Some((slice_start_paddr, 0)))
 }
 
-
 /// The fixed-size components of the MADT ACPI table (Multiple APIC Descriptor Table).
 /// Its layout and total size must exactly match that of the ACPI specification.
-/// 
+///
 /// Note that this is only the fixed-size part of the MADT table.
-/// At the end, there is an unknown number of table entries, each of variable size. 
+/// At the end, there is an unknown number of table entries, each of variable size.
 /// Thus, we cannot pre-define them here, but only discover/define them in the iterator.
 #[derive(Debug, FromBytes)]
 #[repr(C)]
@@ -54,10 +54,9 @@ struct MadtAcpiTable {
     // so we cannot include them here.
 }
 
-
 /// A wrapper around the MADT ACPI table (Multiple APIC Descriptor Table),
 /// which contains details about multicore and interrupt configuration.
-/// 
+///
 /// You most likely only care about the `iter()` method,
 /// though other fields of the MADT are accessible.
 pub struct Madt<'t> {
@@ -90,7 +89,7 @@ impl<'t> Madt<'t> {
 
     /// Performs initialization functions of the IOAPIC and bootstrap processor.
     /// # Important Note
-    /// This should only be called once from the initial bootstrap processor 
+    /// This should only be called once from the initial bootstrap processor
     /// (the first core to run).
     pub fn bsp_init(&self, page_table: &mut PageTable) -> Result<(), &'static str> {
         handle_ioapic_entries(self.iter(), page_table)?;
@@ -124,10 +123,9 @@ impl<'t> Madt<'t> {
     }
 }
 
-
 /// An [`Iterator`] over the dynamic entries of the MADT.
 /// Its lifetime is dependent upon the lifetime of its `Madt` instance,
-/// which itself is bound to the lifetime of the underlying `AcpiTables`. 
+/// which itself is bound to the lifetime of the underlying `AcpiTables`.
 #[derive(Clone)]
 pub struct MadtIter<'t> {
     /// The underlying MappedPages that contain all ACPI tables.
@@ -135,7 +133,7 @@ pub struct MadtIter<'t> {
     /// The offset of the next entry, which should point to a `EntryRecord`
     /// at the start of each iteration.
     offset: usize,
-    /// The end bound of all MADT entries. 
+    /// The end bound of all MADT entries.
     /// This is fixed and should not ever change throughout iteration.
     end_of_entries: usize,
 }
@@ -146,45 +144,61 @@ impl<'t> Iterator for MadtIter<'t> {
     fn next(&mut self) -> Option<Self::Item> {
         if (self.offset + ENTRY_RECORD_SIZE) < self.end_of_entries {
             // First, we get the next entry record to get the type and size of the actual entry.
-            let (entry_type, entry_size) = { 
+            let (entry_type, entry_size) = {
                 let entry_record: &EntryRecord = self.mapped_pages.as_type(self.offset).ok()?;
                 (entry_record.typ, entry_record.size as usize)
             };
             // Second, use that entry type and size to return the specific Madt entry struct.
             if (self.offset + entry_size) <= self.end_of_entries {
                 let entry: Option<MadtEntry> = match entry_type {
-                    ENTRY_TYPE_LOCAL_APIC if entry_size == size_of::<MadtLocalApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::LocalApic(ent))
-                    },
-                    ENTRY_TYPE_IO_APIC if entry_size == size_of::<MadtIoApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::IoApic(ent))
-                    },
-                    ENTRY_TYPE_INT_SRC_OVERRIDE if entry_size == size_of::<MadtIntSrcOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::IntSrcOverride(ent))
-                    },
-                    ENTRY_TYPE_NON_MASKABLE_INTERRUPT if entry_size == size_of::<MadtNonMaskableInterrupt>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::NonMaskableInterrupt(ent))
-                    },
-                    ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE if entry_size == size_of::<MadtLocalApicAddressOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::LocalApicAddressOverride(ent))
-                    },
+                    ENTRY_TYPE_LOCAL_APIC if entry_size == size_of::<MadtLocalApic>() => self
+                        .mapped_pages
+                        .as_type(self.offset)
+                        .ok()
+                        .map(|ent| MadtEntry::LocalApic(ent)),
+                    ENTRY_TYPE_IO_APIC if entry_size == size_of::<MadtIoApic>() => self
+                        .mapped_pages
+                        .as_type(self.offset)
+                        .ok()
+                        .map(|ent| MadtEntry::IoApic(ent)),
+                    ENTRY_TYPE_INT_SRC_OVERRIDE
+                        if entry_size == size_of::<MadtIntSrcOverride>() =>
+                    {
+                        self.mapped_pages
+                            .as_type(self.offset)
+                            .ok()
+                            .map(|ent| MadtEntry::IntSrcOverride(ent))
+                    }
+                    ENTRY_TYPE_NON_MASKABLE_INTERRUPT
+                        if entry_size == size_of::<MadtNonMaskableInterrupt>() =>
+                    {
+                        self.mapped_pages
+                            .as_type(self.offset)
+                            .ok()
+                            .map(|ent| MadtEntry::NonMaskableInterrupt(ent))
+                    }
+                    ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE
+                        if entry_size == size_of::<MadtLocalApicAddressOverride>() =>
+                    {
+                        self.mapped_pages
+                            .as_type(self.offset)
+                            .ok()
+                            .map(|ent| MadtEntry::LocalApicAddressOverride(ent))
+                    }
                     _ => None,
                 };
                 // move the offset to the end of this entry, i.e., the beginning of the next entry record
                 self.offset += entry_size;
                 // return the MADT entry if properly formed, or if not, return an unknown/corrupt entry.
                 entry.or(Some(MadtEntry::UnknownOrCorrupt(entry_type)))
-            }
-            else {
+            } else {
                 None
             }
-        }
-        else {
+        } else {
             None
         }
     }
 }
-
 
 /// A MADT entry record, which precedes each actual MADT entry
 /// and describes its type and size.
@@ -198,15 +212,13 @@ struct EntryRecord {
 }
 const ENTRY_RECORD_SIZE: usize = size_of::<EntryRecord>();
 
-
 // The following list specifies MADT entry type IDs.
-const ENTRY_TYPE_LOCAL_APIC:                  u8 = 0;
-const ENTRY_TYPE_IO_APIC:                     u8 = 1;
-const ENTRY_TYPE_INT_SRC_OVERRIDE:            u8 = 2;
+const ENTRY_TYPE_LOCAL_APIC: u8 = 0;
+const ENTRY_TYPE_IO_APIC: u8 = 1;
+const ENTRY_TYPE_INT_SRC_OVERRIDE: u8 = 2;
 // entry type 3 doesn't exist
-const ENTRY_TYPE_NON_MASKABLE_INTERRUPT:      u8 = 4;
+const ENTRY_TYPE_NON_MASKABLE_INTERRUPT: u8 = 4;
 const ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE: u8 = 5;
-
 
 /// The set of possible MADT Entries.
 #[derive(Copy, Clone, Debug)]
@@ -224,7 +236,7 @@ pub enum MadtEntry<'t> {
     /// The MADT table had an entry of an unknown type or mismatched length,
     /// so the table entry was malformed and unusable.
     /// The entry type ID is included.
-    UnknownOrCorrupt(u8)
+    UnknownOrCorrupt(u8),
 }
 
 /// MADT Local APIC
@@ -237,7 +249,7 @@ pub struct MadtLocalApic {
     /// Local APIC ID
     pub apic_id: u8,
     /// Flags. 1 means that the processor is enabled
-    pub flags: u32
+    pub flags: u32,
 }
 
 /// MADT I/O APIC
@@ -251,7 +263,7 @@ pub struct MadtIoApic {
     /// I/O APIC address
     pub address: u32,
     /// Global system interrupt base
-    pub gsi_base: u32
+    pub gsi_base: u32,
 }
 
 /// MADT Interrupt Source Override
@@ -266,7 +278,7 @@ pub struct MadtIntSrcOverride {
     /// Global system interrupt
     pub gsi: u32,
     /// Flags
-    pub flags: u16
+    pub flags: u16,
 }
 
 /// MADT Non-maskable Interrupt.
@@ -284,7 +296,7 @@ pub struct MadtNonMaskableInterrupt {
     pub lint: u8,
 }
 
-/// MADT Local APIC Address Override. 
+/// MADT Local APIC Address Override.
 /// If this struct exists, the contained physical address
 /// should be used in place of the local APIC physical address
 /// specified in the MADT ACPI table itself.
@@ -297,22 +309,32 @@ pub struct MadtLocalApicAddressOverride {
     pub phys_addr: u64,
 }
 
-
 /// Handles the BSP's (bootstrap processor, the first core to boot) entry in the given MADT iterator.
-/// This should be the first function invoked to initialize the BSP information, 
+/// This should be the first function invoked to initialize the BSP information,
 /// and should come before any other entries in the MADT are handled.
-fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
+fn handle_bsp_lapic_entry(
+    madt_iter: MadtIter,
+    page_table: &mut PageTable,
+) -> Result<(), &'static str> {
     use pic::IRQ_BASE_OFFSET;
 
     let all_lapics = get_lapics();
     let me = get_my_apic_id();
 
     for madt_entry in madt_iter.clone() {
-        if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
+        if let MadtEntry::LocalApic(lapic_entry) = madt_entry {
             if lapic_entry.apic_id == me {
-                let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
+                let (nmi_lint, nmi_flags) =
+                    find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
 
-                let bsp_lapic = LocalApic::new(page_table, lapic_entry.processor, lapic_entry.apic_id, true, nmi_lint, nmi_flags)?;
+                let bsp_lapic = LocalApic::new(
+                    page_table,
+                    lapic_entry.processor,
+                    lapic_entry.apic_id,
+                    true,
+                    nmi_lint,
+                    nmi_flags,
+                )?;
                 let bsp_id = bsp_lapic.id();
 
                 // redirect every IoApic's interrupts to the one BSP
@@ -322,14 +344,14 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
 
                     // Set the BSP to receive regular PIC interrupts routed through the IoApic.
                     // Skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used.
-                    for irq in (0x0 ..= 0x1).chain(0x3 ..= 0xF) {
+                    for irq in (0x0..=0x1).chain(0x3..=0xF) {
                         ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq);
                     }
 
-                    // ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
-                    // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one. 
+                    // ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1);
+                    // FIXME: the above line does indeed send the interrupt to all cores, but then they all handle it, instead of just one.
                 }
-                
+
                 // add the BSP lapic to the list (should be empty until here)
                 if all_lapics.iter().next().is_some() {
                     return Err("BUG: LocalApics list wasn't empty when adding BSP!! BSP must be the first core added.");
@@ -342,7 +364,8 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
         }
     }
 
-    let bsp_id = get_bsp_id().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!")?;
+    let bsp_id =
+        get_bsp_id().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!")?;
 
     // now that we've established the BSP,  go through the interrupt source override entries
     for madt_entry in madt_iter {
@@ -354,7 +377,11 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 let mut ioapic_ref = ioapic.lock();
                 if ioapic_ref.handles_irq(int_src.gsi) {
                     // using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                    ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + IRQ_BASE_OFFSET); 
+                    ioapic_ref.set_irq(
+                        int_src.irq_source,
+                        bsp_id,
+                        int_src.gsi as u8 + IRQ_BASE_OFFSET,
+                    );
                     trace!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}.",
                     int_src.bus_source, int_src.irq_source, int_src.gsi, int_src.flags, ioapic_ref.id);
                     handled = true;
@@ -370,21 +397,27 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
     Ok(())
 }
 
-
-/// Handles the IOAPIC entries in the given MADT iterator 
+/// Handles the IOAPIC entries in the given MADT iterator
 /// by creating IoApic instances for them and initializing them appropriately.
-fn handle_ioapic_entries(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
+fn handle_ioapic_entries(
+    madt_iter: MadtIter,
+    page_table: &mut PageTable,
+) -> Result<(), &'static str> {
     for madt_entry in madt_iter {
         if let MadtEntry::IoApic(ioa) = madt_entry {
-            ioapic::IoApic::new(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address as usize), ioa.gsi_base)?;
+            ioapic::IoApic::new(
+                page_table,
+                ioa.id,
+                PhysicalAddress::new_canonical(ioa.address as usize),
+                ioa.gsi_base,
+            )?;
         }
     }
     Ok(())
 }
 
-
 /// Finds the Non-Maskable Interrupt (NMI) entry in the MADT ACPI table (i.e., the given `MadtIter`)
-/// corresponding to the given processor. 
+/// corresponding to the given processor.
 /// If no entry exists, it returns the default NMI entry value: `(lint = 1, flags = 0)`.
 pub fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
     for madt_entry in madt_iter {
@@ -392,11 +425,11 @@ pub fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, 
             MadtEntry::NonMaskableInterrupt(nmi) => {
                 // NMI entries are based on the "processor" id, not the "apic_id"
                 // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
-                if nmi.processor == processor || nmi.processor == 0xFF  {
+                if nmi.processor == processor || nmi.processor == 0xFF {
                     return (nmi.lint, nmi.flags);
                 }
             }
-            _ => {  }
+            _ => {}
         }
     }
 

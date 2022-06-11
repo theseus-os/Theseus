@@ -4,15 +4,15 @@
 
 #![no_std]
 
+extern crate color;
 extern crate framebuffer;
 extern crate shapes;
-extern crate color;
 
+use color::Color;
 use framebuffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
-use color::Color;
 
-/// The `Displayable` trait is an abstraction for any object that can display itself onto a framebuffer. 
+/// The `Displayable` trait is an abstraction for any object that can display itself onto a framebuffer.
 /// Examples include a text box, button, window border, etc.
 pub trait Displayable {
     /// Displays this `Displayable`'s content in the given framebuffer.

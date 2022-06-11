@@ -3,13 +3,13 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use]
+extern crate print;
 extern crate getopts;
 extern crate pmu_x86;
 extern crate spawn;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 
 pub fn main(_args: Vec<String>) -> isize {
     if let Err(e) = pmu_x86::init() {
@@ -28,9 +28,14 @@ pub fn main(_args: Vec<String>) -> isize {
         },
         Err(x) => println!("Could not create counters for PMU stat: {:?}", x)
     } */
-    
+
     // run event based sampling on this core
-    if let Err(e) = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xF_FFFF, None, 10) {
+    if let Err(e) = pmu_x86::start_samples(
+        pmu_x86::EventType::UnhaltedReferenceCycles,
+        0xF_FFFF,
+        None,
+        10,
+    ) {
         println!("Could not start PMU sampling: {:?}", e);
         return -1;
     }

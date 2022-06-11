@@ -1,7 +1,7 @@
 //! A `Window` object should be owned by an application. It can display a `Displayable` object in its framebuffer. See `applications/new_window` as a demo to use this library.
 //!
 //! This library will create a window with default title bar and border. It handles the commonly used interactions like moving
-//! the window or close the window. Also, it is responsible to show title bar differently when window is active. 
+//! the window or close the window. Also, it is responsible to show title bar differently when window is active.
 //!
 //! A window can render itself to the screen via a window manager. The window manager will compute the bounding box of the updated part and composites it with other existing windows according to their order.
 //!
@@ -12,31 +12,32 @@
 
 #![no_std]
 extern crate alloc;
-extern crate mpmc;
 extern crate event_types;
+extern crate mpmc;
 extern crate spin;
 #[macro_use]
 extern crate log;
-extern crate owning_ref;
+extern crate color;
 extern crate framebuffer;
 extern crate framebuffer_drawer;
 extern crate mouse;
+extern crate owning_ref;
+extern crate shapes;
 extern crate window_inner;
 extern crate window_manager;
-extern crate shapes;
-extern crate color;
 
 use alloc::sync::Arc;
-use mpmc::Queue;
+use color::Color;
 use event_types::{Event, MousePositionEvent};
+use framebuffer::{AlphaPixel, Framebuffer};
+use mpmc::Queue;
 use owning_ref::{MutexGuardRef, MutexGuardRefMut};
-use framebuffer::{Framebuffer, AlphaPixel};
-use color::{Color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
-use window_inner::{WindowInner, WindowMovingStatus, DEFAULT_BORDER_SIZE, DEFAULT_TITLE_BAR_HEIGHT};
-use window_manager::{WINDOW_MANAGER};
-
+use window_inner::{
+    WindowInner, WindowMovingStatus, DEFAULT_BORDER_SIZE, DEFAULT_TITLE_BAR_HEIGHT,
+};
+use window_manager::WINDOW_MANAGER;
 
 // border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
@@ -80,33 +81,32 @@ impl From<usize> for TopButton {
     }
 }
 
-
 /// This struct is the application-facing representation of a window.
-/// 
+///
 pub struct Window {
     /// The system-facing inner representation of this window.
     /// The window manager interacts with this object directly;
-    /// thus, applications should not be able to access this directly. 
-    /// 
+    /// thus, applications should not be able to access this directly.
+    ///
     /// This is wrapped in an `Arc` such that the window manager can hold `Weak` references to it.
     inner: Arc<Mutex<WindowInner>>,
     /// The event queue
     event_consumer: Queue<Event>,
     /// last mouse position event, used to judge click and press-moving event
-    /// TODO FIXME (kevinaboos): why is mouse-specific stuff here? 
+    /// TODO FIXME (kevinaboos): why is mouse-specific stuff here?
     last_mouse_position_event: MousePositionEvent,
     /// record last result of whether this window is active, to reduce redraw overhead
     last_is_active: bool,
 }
 
 impl Window {
-    /// Creates a new window to be displayed on screen. 
-    /// 
+    /// Creates a new window to be displayed on screen.
+    ///
     /// The given `framebuffer` will be filled with the `initial_background` color.
-    /// 
-    /// The newly-created `Window` will be set as the "active" window that has current focus. 
-    /// 
-    /// # Arguments: 
+    ///
+    /// The newly-created `Window` will be set as the "active" window that has current focus.
+    ///
+    /// # Arguments:
     /// * `coordinate`: the position of the window relative to the top-left corner of the screen.
     /// * `width`, `height`: the dimensions of the window in pixels.
     /// * `initial_background`: the default color of the window.
@@ -116,7 +116,9 @@ impl Window {
         height: usize,
         initial_background: Color,
     ) -> Result<Window, &'static str> {
-        let wm_ref = window_manager::WINDOW_MANAGER.get().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER
+            .get()
+            .ok_or("The window manager is not initialized")?;
 
         // Create a new virtual framebuffer to hold this window's contents only,
         // and fill it with the initial background color.
@@ -125,8 +127,12 @@ impl Window {
         let (width, height) = framebuffer.get_size();
 
         // TODO: FIXME: (kevinaboos) this condition seems wrong... at least the first conditional does.
-        if width <= 2 * DEFAULT_TITLE_BAR_HEIGHT || height <= DEFAULT_TITLE_BAR_HEIGHT + DEFAULT_BORDER_SIZE {
-            return Err("window dimensions must be large enough for the title bar and borders to be drawn");
+        if width <= 2 * DEFAULT_TITLE_BAR_HEIGHT
+            || height <= DEFAULT_TITLE_BAR_HEIGHT + DEFAULT_BORDER_SIZE
+        {
+            return Err(
+                "window dimensions must be large enough for the title bar and borders to be drawn",
+            );
         }
 
         // Create an event queue to allow the window manager to pass events to this `Window` via its `WindowInner` instance,
@@ -139,7 +145,7 @@ impl Window {
             inner: Arc::new(Mutex::new(window_inner)),
             event_consumer,
             last_mouse_position_event: MousePositionEvent::default(),
-            last_is_active: true, // new window is now set as the active window by default 
+            last_is_active: true, // new window is now set as the active window by default
         };
 
         // Draw the actual window frame, the title bar and borders.
@@ -153,35 +159,36 @@ impl Window {
 
         let _window_bounding_box = Rectangle {
             top_left: coordinate,
-            bottom_right: coordinate + (width as isize, height as isize)
+            bottom_right: coordinate + (width as isize, height as isize),
         };
 
         let mut wm = wm_ref.lock();
-        wm.set_active(&window.inner, false)?; 
+        wm.set_active(&window.inner, false)?;
 
         // Currently, refresh the whole screen instead of just the new window's bounds
         // wm.refresh_bottom_windows(Some(window_bounding_box), true)?;
         wm.refresh_bottom_windows(Option::<Rectangle>::None, true)?;
-        
+
         Ok(window)
     }
 
-
     /// Tries to receive an `Event` that has been sent to this `Window`.
-    /// If no events exist on the queue, it returns `Ok(None)`. 
-    /// 
-    /// "Internal" events will be automatically handled rather than returned. 
+    /// If no events exist on the queue, it returns `Ok(None)`.
+    ///
+    /// "Internal" events will be automatically handled rather than returned.
     /// If an error occurs while obtaining the event (or when handling internal events),
     ///
-    /// Otherwise, the event at the front of this window's event queue will be popped off and returned. 
+    /// Otherwise, the event at the front of this window's event queue will be popped off and returned.
     pub fn handle_event(&mut self) -> Result<Option<Event>, &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
         let mut need_refresh_three_button = false;
 
-        let wm_ref = window_manager::WINDOW_MANAGER.get().ok_or("The window manager is not initialized")?;
-        
+        let wm_ref = window_manager::WINDOW_MANAGER
+            .get()
+            .ok_or("The window manager is not initialized")?;
+
         let is_active = {
             let wm = wm_ref.lock();
             wm.is_active(&self.inner)
@@ -196,7 +203,7 @@ impl Window {
         }
 
         // If we cannot handle this event as an "internal" event (e.g., clicking on the window title bar or border),
-        // we simply return that event from this function such that the application can handle it. 
+        // we simply return that event from this function such that the application can handle it.
         let mut unhandled_event: Option<Event> = None;
 
         loop {
@@ -204,8 +211,8 @@ impl Window {
                 Some(ev) => ev,
                 None => break,
             };
-            
-            // TODO FIXME: for a performant design, the goal is to AVOID holding the lock on `inner` as much as possible. 
+
+            // TODO FIXME: for a performant design, the goal is to AVOID holding the lock on `inner` as much as possible.
             //             That means that most of the drawing logic should be moved into the `window_inner` crate itself.
             let mut inner = self.inner.lock();
             let (width, height) = inner.get_size();
@@ -220,7 +227,7 @@ impl Window {
                                 call_later_do_move_active_window = true;
                             }
                             call_later_do_refresh_floating_border = true;
-                        },
+                        }
                         WindowMovingStatus::Stationary => {
                             if (mouse_event.coordinate.y as usize) < inner.title_bar_height
                                 && (mouse_event.coordinate.x as usize) < width
@@ -233,7 +240,8 @@ impl Window {
                                         mouse_event.coordinate.x
                                             - WINDOW_BUTTON_BIAS_X as isize
                                             - (i as isize) * WINDOW_BUTTON_BETWEEN as isize,
-                                        mouse_event.coordinate.y - inner.title_bar_height as isize / 2,
+                                        mouse_event.coordinate.y
+                                            - inner.title_bar_height as isize / 2,
                                     );
                                     if dcoordinate.x * dcoordinate.x + dcoordinate.y * dcoordinate.y
                                         <= r2 as isize
@@ -267,13 +275,15 @@ impl Window {
                                     && !self.last_mouse_position_event.left_button_hold
                                     && mouse_event.left_button_hold
                                 {
-                                    inner.moving = WindowMovingStatus::Moving(mouse_event.gcoordinate);
+                                    inner.moving =
+                                        WindowMovingStatus::Moving(mouse_event.gcoordinate);
                                     call_later_do_refresh_floating_border = true;
                                 }
                             } else {
                                 // The mouse event occurred within the actual window content, not in the title bar.
                                 // Thus, we let the caller handle it.
-                                unhandled_event = Some(Event::MousePositionEvent(mouse_event.clone()));
+                                unhandled_event =
+                                    Some(Event::MousePositionEvent(mouse_event.clone()));
                             }
                             if (mouse_event.coordinate.y as usize) < height
                                 && (mouse_event.coordinate.x as usize) < width
@@ -323,21 +333,24 @@ impl Window {
 
     /// Renders the area of this `Window` specified by the given `bounding_box`,
     /// which is relative to the top-left coordinate of this `Window`.
-    /// 
+    ///
     /// Refreshes the whole window if `bounding_box` is `None`.
-    /// 
+    ///
     /// This method should be invoked after updating the window's contents in order to see its new content.
     pub fn render(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
-
         // Induced bug rendering attempting to access out of bound memory
         #[cfg(downtime_eval)]
         {
-            if bounding_box.unwrap().top_left == Coord::new(150,150) {
-                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+            if bounding_box.unwrap().top_left == Coord::new(150, 150) {
+                unsafe {
+                    *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555;
+                }
             }
         }
 
-        let wm_ref = WINDOW_MANAGER.get().ok_or("The static window manager was not yet initialized")?;
+        let wm_ref = WINDOW_MANAGER
+            .get()
+            .ok_or("The static window manager was not yet initialized")?;
 
         // Convert the given relative `bounding_box` to an absolute one (relative to the screen, not the window).
         let coordinate = {
@@ -351,28 +364,29 @@ impl Window {
 
     /// Returns a `Rectangle` describing the position and dimensions of this Window's content region,
     /// i.e., the area within the window excluding the title bar and border
-    /// that is available for rendering application content. 
-    /// 
+    /// that is available for rendering application content.
+    ///
     /// The returned `Rectangle` is expressed relative to this Window's position.
     pub fn area(&self) -> Rectangle {
         self.inner.lock().content_area()
     }
 
-    /// Returns an immutable reference to this window's virtual `Framebuffer`. 
+    /// Returns an immutable reference to this window's virtual `Framebuffer`.
     pub fn framebuffer(&self) -> MutexGuardRef<WindowInner, Framebuffer<AlphaPixel>> {
         MutexGuardRef::new(self.inner.lock()).map(|inner| inner.framebuffer())
     }
 
-    /// Returns a mutable reference to this window's virtual `Framebuffer`. 
+    /// Returns a mutable reference to this window's virtual `Framebuffer`.
     pub fn framebuffer_mut(&mut self) -> MutexGuardRefMut<WindowInner, Framebuffer<AlphaPixel>> {
         MutexGuardRefMut::new(self.inner.lock()).map_mut(|inner| inner.framebuffer_mut())
     }
 
-    /// Returns `true` if this window is the currently active window. 
-    /// 
-    /// Obtains the lock on the window manager instance. 
+    /// Returns `true` if this window is the currently active window.
+    ///
+    /// Obtains the lock on the window manager instance.
     pub fn is_active(&self) -> bool {
-        WINDOW_MANAGER.get()
+        WINDOW_MANAGER
+            .get()
             .map(|wm| wm.lock().is_active(&self.inner))
             .unwrap_or(false)
     }
@@ -408,10 +422,7 @@ impl Window {
         );
         framebuffer_drawer::draw_rectangle(
             inner.framebuffer_mut(),
-            Coord::new(
-                (width - border_size) as isize,
-                title_bar_height as isize,
-            ),
+            Coord::new((width - border_size) as isize, title_bar_height as isize),
             border_size,
             height - title_bar_height,
             border_color.into(),
@@ -428,9 +439,9 @@ impl Window {
                     framebuffer::Pixel::weight_blend(
                         WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.into(),
                         WINDOW_BORDER_COLOR_ACTIVE_TOP.into(),
-                        (i as f32) / (title_bar_height as f32)
-                    )
-                ); 
+                        (i as f32) / (title_bar_height as f32),
+                    ),
+                );
             }
         } else {
             framebuffer_drawer::draw_rectangle(
@@ -445,15 +456,20 @@ impl Window {
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
         let trans_pixel = color::TRANSPARENT.into();
-  
+
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
                 let dx1 = WINDOW_RADIUS - i;
                 let dy1 = WINDOW_RADIUS - j;
                 if dx1 * dx1 + dy1 * dy1 > r2 {
                     // draw this to transparent
-                    inner.framebuffer_mut().overwrite_pixel(Coord::new(i as isize, j as isize), trans_pixel);
-                    inner.framebuffer_mut().overwrite_pixel(Coord::new((width - i - 1) as isize, j as isize), trans_pixel);
+                    inner
+                        .framebuffer_mut()
+                        .overwrite_pixel(Coord::new(i as isize, j as isize), trans_pixel);
+                    inner.framebuffer_mut().overwrite_pixel(
+                        Coord::new((width - i - 1) as isize, j as isize),
+                        trans_pixel,
+                    );
                 }
             }
         }
@@ -479,7 +495,7 @@ impl Window {
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             framebuffer::Pixel::weight_blend(
-                color::BLACK.into(), 
+                color::BLACK.into(),
                 color.into(),
                 0.2f32 * (state as f32),
             ),
@@ -492,14 +508,13 @@ impl Window {
         let width = inner.get_size().0;
         Rectangle {
             top_left: Coord::new(0, 0),
-            bottom_right: Coord::new(width as isize, inner.title_bar_height as isize)
+            bottom_right: Coord::new(width as isize, inner.title_bar_height as isize),
         }
     }
 }
 
-
-impl Drop for Window{
-    fn drop(&mut self){
+impl Drop for Window {
+    fn drop(&mut self) {
         if let Some(wm) = WINDOW_MANAGER.get() {
             if let Err(err) = wm.lock().delete_window(&self.inner) {
                 error!("Failed to delete_window upon drop: {:?}", err);

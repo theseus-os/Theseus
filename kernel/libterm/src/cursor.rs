@@ -75,7 +75,10 @@ impl Cursor {
         column: usize,
         line: usize,
         framebuffer: &mut Framebuffer<P>,
-    ) -> Result<Rectangle, &'static str> where Color: Into<P> {
+    ) -> Result<Rectangle, &'static str>
+    where
+        Color: Into<P>,
+    {
         if self.blink() {
             if self.show() {
                 framebuffer_drawer::fill_rectangle(
@@ -137,7 +140,7 @@ impl Cursor {
     }
 }
 
-impl Default for Cursor  {
+impl Default for Cursor {
     fn default() -> Self {
         Cursor {
             enabled: true,
@@ -150,4 +153,3 @@ impl Default for Cursor  {
         }
     }
 }
-

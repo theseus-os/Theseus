@@ -13,8 +13,7 @@
 //!
 
 use alloc::vec::Vec;
-use core::convert::TryFrom;
-use core::str::FromStr;
+use core::{convert::TryFrom, str::FromStr};
 use wasmi::{Signature, ValueType};
 
 /// Generates wasmi function signature.

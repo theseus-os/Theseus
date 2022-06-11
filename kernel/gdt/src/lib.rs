@@ -1,47 +1,42 @@
 #![no_std]
 
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 // #[macro_use] extern crate log;
-#[macro_use] extern crate bitflags;
-extern crate bit_field;
+#[macro_use]
+extern crate bitflags;
 extern crate atomic_linked_list;
-extern crate x86_64;
+extern crate bit_field;
+extern crate memory;
 extern crate spin;
 extern crate tss;
-extern crate memory;
+extern crate x86_64;
 
-use core::ops::Deref;
 use atomic_linked_list::atomic_map::AtomicMap;
+use core::ops::Deref;
+use memory::VirtualAddress;
+use spin::Once;
 use x86_64::{
     instructions::{
-        segmentation::{CS, DS, SS, Segment},
+        segmentation::{Segment, CS, DS, SS},
         tables::load_tss,
     },
-    PrivilegeLevel,
-    structures::{
-        tss::TaskStateSegment,
-        gdt::SegmentSelector,
-    },
-    VirtAddr, 
+    structures::{gdt::SegmentSelector, tss::TaskStateSegment},
+    PrivilegeLevel, VirtAddr,
 };
-use spin::Once;
-use memory::VirtualAddress;
-
 
 lazy_static! {
     /// The GDT list, one per core, indexed by a key of apic_id
     static ref GDT: AtomicMap<u8, Gdt> = AtomicMap::new();
 }
 
-
-static KERNEL_CODE_SELECTOR:  Once<SegmentSelector> = Once::new();
-static KERNEL_DATA_SELECTOR:  Once<SegmentSelector> = Once::new();
+static KERNEL_CODE_SELECTOR: Once<SegmentSelector> = Once::new();
+static KERNEL_DATA_SELECTOR: Once<SegmentSelector> = Once::new();
 static USER_CODE_32_SELECTOR: Once<SegmentSelector> = Once::new();
 static USER_DATA_32_SELECTOR: Once<SegmentSelector> = Once::new();
 static USER_CODE_64_SELECTOR: Once<SegmentSelector> = Once::new();
 static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
-static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
-
+static TSS_SELECTOR: Once<SegmentSelector> = Once::new();
 
 /// The GDT `SegmentSelector`s available in Theseus.
 #[derive(Debug, Clone, Copy)]
@@ -64,38 +59,41 @@ impl AvailableSegmentSelector {
             AvailableSegmentSelector::UserData32 => USER_DATA_32_SELECTOR.get().cloned(),
             AvailableSegmentSelector::UserCode64 => USER_CODE_64_SELECTOR.get().cloned(),
             AvailableSegmentSelector::UserData64 => USER_DATA_64_SELECTOR.get().cloned(),
-            AvailableSegmentSelector::Tss        => TSS_SELECTOR.get().cloned(),
+            AvailableSegmentSelector::Tss => TSS_SELECTOR.get().cloned(),
         }
     }
 }
 
-
 /// This function first creates and sets up a new TSS with the given double fault stack and privilege stack.
 ///
-/// It then creates a new GDT with an entry that references that TSS and loads that new GDT into memory. 
+/// It then creates a new GDT with an entry that references that TSS and loads that new GDT into memory.
 ///
 /// Finally, it switches the various code and segment selectors to use that new GDT.
 ///
 /// # Important Note
 /// The GDT entries (segment descriptors) are only created **once** upon first invocation of this function,
-/// such that the segment selectors are usable 
+/// such that the segment selectors are usable
 /// Future invocations will not change those initial values and load the same GDT based on them.
 pub fn create_and_load_tss_gdt(
-    apic_id: u8, 
-    double_fault_stack_top_unusable: VirtualAddress, 
-    privilege_stack_top_unusable: VirtualAddress
-) { 
-    let tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
-    let (gdt, kernel_cs, kernel_ds, user_cs_32, user_ds_32, user_cs_64, user_ds_64, tss_segment) 
-        = create_gdt(tss_ref.lock().deref());
+    apic_id: u8,
+    double_fault_stack_top_unusable: VirtualAddress,
+    privilege_stack_top_unusable: VirtualAddress,
+) {
+    let tss_ref = tss::create_tss(
+        apic_id,
+        double_fault_stack_top_unusable,
+        privilege_stack_top_unusable,
+    );
+    let (gdt, kernel_cs, kernel_ds, user_cs_32, user_ds_32, user_cs_64, user_ds_64, tss_segment) =
+        create_gdt(tss_ref.lock().deref());
 
-    KERNEL_CODE_SELECTOR .call_once(|| kernel_cs);
-    KERNEL_DATA_SELECTOR .call_once(|| kernel_ds);
+    KERNEL_CODE_SELECTOR.call_once(|| kernel_cs);
+    KERNEL_DATA_SELECTOR.call_once(|| kernel_ds);
     USER_CODE_32_SELECTOR.call_once(|| user_cs_32);
     USER_DATA_32_SELECTOR.call_once(|| user_ds_32);
     USER_CODE_64_SELECTOR.call_once(|| user_cs_64);
     USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
-    TSS_SELECTOR         .call_once(|| tss_segment);
+    TSS_SELECTOR.call_once(|| tss_segment);
 
     GDT.insert(apic_id, gdt);
     let gdt_ref = GDT.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
@@ -103,15 +101,14 @@ pub fn create_and_load_tss_gdt(
     // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
 
     unsafe {
-        CS::set_reg(kernel_cs);  // reload code segment register
-        load_tss(tss_segment);   // load TSS
-        SS::set_reg(kernel_ds);  // unsure if necessary, but doesn't hurt
-        DS::set_reg(kernel_ds);  // unsure if necessary, but doesn't hurt
+        CS::set_reg(kernel_cs); // reload code segment register
+        load_tss(tss_segment); // load TSS
+        SS::set_reg(kernel_ds); // unsure if necessary, but doesn't hurt
+        DS::set_reg(kernel_ds); // unsure if necessary, but doesn't hurt
     }
 }
 
-
-/// Creates and sets up a new GDT that refers to the given `TSS`. 
+/// Creates and sets up a new GDT that refers to the given `TSS`.
 ///
 /// Returns a tuple including:
 /// 1. the new GDT
@@ -122,13 +119,21 @@ pub fn create_and_load_tss_gdt(
 /// 6. user 64-bit code segment selector
 /// 7. user 64-bit data segment selector
 /// 8. tss segment selector
-pub fn create_gdt(tss: &TaskStateSegment) -> (
-    Gdt, SegmentSelector, SegmentSelector, SegmentSelector, 
-    SegmentSelector, SegmentSelector, SegmentSelector, SegmentSelector
+pub fn create_gdt(
+    tss: &TaskStateSegment,
+) -> (
+    Gdt,
+    SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
+    SegmentSelector,
 ) {
     let mut gdt = Gdt::new();
 
-    // The following order of segments must be preserved: 
+    // The following order of segments must be preserved:
     // 0)   null descriptor  (ensured by the Gdt type constructor)
     // 1)   kernel code segment
     // 2)   kernel data segment
@@ -140,30 +145,39 @@ pub fn create_gdt(tss: &TaskStateSegment) -> (
     //
     // DO NOT rearrange the below calls to gdt.add_entry(), x86_64 has **VERY PARTICULAR** rules about this
 
-    let kernel_cs   = gdt.add_entry(Descriptor::kernel_code_segment(),  PrivilegeLevel::Ring0);
-    let kernel_ds   = gdt.add_entry(Descriptor::kernel_data_segment(),  PrivilegeLevel::Ring0);
-    let user_cs_32  = gdt.add_entry(Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3);
-    let user_ds_32  = gdt.add_entry(Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3);
-    let user_cs_64  = gdt.add_entry(Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3);
-    let user_ds_64  = gdt.add_entry(Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3);
-    let tss_segment = gdt.add_entry(Descriptor::tss_segment(tss),       PrivilegeLevel::Ring0);
+    let kernel_cs = gdt.add_entry(Descriptor::kernel_code_segment(), PrivilegeLevel::Ring0);
+    let kernel_ds = gdt.add_entry(Descriptor::kernel_data_segment(), PrivilegeLevel::Ring0);
+    let user_cs_32 = gdt.add_entry(Descriptor::user_code_32_segment(), PrivilegeLevel::Ring3);
+    let user_ds_32 = gdt.add_entry(Descriptor::user_data_32_segment(), PrivilegeLevel::Ring3);
+    let user_cs_64 = gdt.add_entry(Descriptor::user_code_64_segment(), PrivilegeLevel::Ring3);
+    let user_ds_64 = gdt.add_entry(Descriptor::user_data_64_segment(), PrivilegeLevel::Ring3);
+    let tss_segment = gdt.add_entry(Descriptor::tss_segment(tss), PrivilegeLevel::Ring0);
 
-    (gdt, kernel_cs, kernel_ds, user_cs_32, user_ds_32, user_cs_64, user_ds_64, tss_segment)
+    (
+        gdt,
+        kernel_cs,
+        kernel_ds,
+        user_cs_32,
+        user_ds_32,
+        user_cs_64,
+        user_ds_64,
+        tss_segment,
+    )
 }
 
 /// The Global Descriptor Table, as specified by the x86_64 architecture.
-/// 
+///
 /// See more info about GDT [here](http://wiki.osdev.org/Global_Descriptor_Table)
 /// and [here](http://www.flingos.co.uk/docs/reference/Global-Descriptor-Table/).
 pub struct Gdt {
-    table: [u64; 10],  // max size is 8192 entries, but we don't need that many.
+    table: [u64; 10], // max size is 8192 entries, but we don't need that many.
     next_free: usize,
 }
 
 impl Gdt {
     pub const fn new() -> Gdt {
         Gdt {
-            table: [0; 10], 
+            table: [0; 10],
             next_free: 1, // skip the 0th entry because that must be null
         }
     }
@@ -192,8 +206,8 @@ impl Gdt {
     }
 
     pub fn load(&self) {
-        use x86_64::instructions::tables::{DescriptorTablePointer, lgdt};
         use core::mem::size_of;
+        use x86_64::instructions::tables::{lgdt, DescriptorTablePointer};
 
         let ptr = DescriptorTablePointer {
             base: VirtAddr::new(self.table.as_ptr() as u64),
@@ -209,7 +223,7 @@ impl fmt::Display for Gdt {
     fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         fmtr.write_fmt(format_args!("\nGdt: [\n"))?;
         for (index, entry) in self.table.iter().enumerate() {
-             fmtr.write_fmt(format_args!("  {}:  {:#016x}\n", index, entry))?;
+            fmtr.write_fmt(format_args!("  {}:  {:#016x}\n", index, entry))?;
         }
         fmtr.write_fmt(format_args!("]"))?;
         Ok(())
@@ -218,7 +232,7 @@ impl fmt::Display for Gdt {
 
 /// The two kinds of descriptor entries in the GDT.
 pub enum Descriptor {
-    /// UserSegment is used for both code and data segments, 
+    /// UserSegment is used for both code and data segments,
     /// in both the kernel and in user space.
     UserSegment(u64),
     /// SystemSegment is used only for TSS.
@@ -227,62 +241,61 @@ pub enum Descriptor {
 
 impl Descriptor {
     pub const fn kernel_code_segment() -> Descriptor {
-        let flags = DescriptorFlags::LONG_MODE.bits() | 
-                    DescriptorFlags::PRESENT.bits() | 
-                    DescriptorFlags::PRIVILEGE_RING0.bits() | 
-                    DescriptorFlags::USER_SEGMENT.bits() | 
-                    DescriptorFlags::EXECUTABLE.bits() | 
-                    DescriptorFlags::READ_WRITE.bits();
+        let flags = DescriptorFlags::LONG_MODE.bits()
+            | DescriptorFlags::PRESENT.bits()
+            | DescriptorFlags::PRIVILEGE_RING0.bits()
+            | DescriptorFlags::USER_SEGMENT.bits()
+            | DescriptorFlags::EXECUTABLE.bits()
+            | DescriptorFlags::READ_WRITE.bits();
         Descriptor::UserSegment(flags)
     }
 
     pub const fn kernel_data_segment() -> Descriptor {
-        let flags = DescriptorFlags::PRESENT.bits() | 
-                    DescriptorFlags::PRIVILEGE_RING0.bits() | 
-                    DescriptorFlags::USER_SEGMENT.bits() | 
-                    DescriptorFlags::READ_WRITE.bits(); 
+        let flags = DescriptorFlags::PRESENT.bits()
+            | DescriptorFlags::PRIVILEGE_RING0.bits()
+            | DescriptorFlags::USER_SEGMENT.bits()
+            | DescriptorFlags::READ_WRITE.bits();
         Descriptor::UserSegment(flags)
     }
 
     pub const fn user_code_32_segment() -> Descriptor {
-        let flags = DescriptorFlags::SIZE.bits() | 
-                    DescriptorFlags::PRESENT.bits() | 
-                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
-                    DescriptorFlags::USER_SEGMENT.bits() | 
-                    DescriptorFlags::EXECUTABLE.bits();
+        let flags = DescriptorFlags::SIZE.bits()
+            | DescriptorFlags::PRESENT.bits()
+            | DescriptorFlags::PRIVILEGE_RING3.bits()
+            | DescriptorFlags::USER_SEGMENT.bits()
+            | DescriptorFlags::EXECUTABLE.bits();
         Descriptor::UserSegment(flags)
     }
 
     pub const fn user_data_32_segment() -> Descriptor {
-        let flags = DescriptorFlags::SIZE.bits() | 
-                    DescriptorFlags::PRESENT.bits() | 
-                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
-                    DescriptorFlags::USER_SEGMENT.bits() | 
-                    DescriptorFlags::READ_WRITE.bits(); 
+        let flags = DescriptorFlags::SIZE.bits()
+            | DescriptorFlags::PRESENT.bits()
+            | DescriptorFlags::PRIVILEGE_RING3.bits()
+            | DescriptorFlags::USER_SEGMENT.bits()
+            | DescriptorFlags::READ_WRITE.bits();
         Descriptor::UserSegment(flags)
     }
 
     pub const fn user_code_64_segment() -> Descriptor {
-        let flags = DescriptorFlags::LONG_MODE.bits() | 
-                    DescriptorFlags::PRESENT.bits() | 
-                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
-                    DescriptorFlags::USER_SEGMENT.bits() | 
-                    DescriptorFlags::EXECUTABLE.bits();
+        let flags = DescriptorFlags::LONG_MODE.bits()
+            | DescriptorFlags::PRESENT.bits()
+            | DescriptorFlags::PRIVILEGE_RING3.bits()
+            | DescriptorFlags::USER_SEGMENT.bits()
+            | DescriptorFlags::EXECUTABLE.bits();
         Descriptor::UserSegment(flags)
     }
 
     pub const fn user_data_64_segment() -> Descriptor {
-        let flags = DescriptorFlags::PRESENT.bits() | 
-                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
-                    DescriptorFlags::USER_SEGMENT.bits() | 
-                    DescriptorFlags::READ_WRITE.bits(); 
+        let flags = DescriptorFlags::PRESENT.bits()
+            | DescriptorFlags::PRIVILEGE_RING3.bits()
+            | DescriptorFlags::USER_SEGMENT.bits()
+            | DescriptorFlags::READ_WRITE.bits();
         Descriptor::UserSegment(flags)
     }
-    
 
     pub fn tss_segment(tss: &TaskStateSegment) -> Descriptor {
-        use core::mem::size_of;
         use bit_field::BitField;
+        use core::mem::size_of;
 
         let ptr = tss as *const _ as u64;
 
@@ -308,7 +321,7 @@ bitflags! {
         const READ_WRITE        = 1 << 41; // ignored by 64-bit CPU modes
         // const _CONFORMING       = 1 << 42; // not used yet ??
         const EXECUTABLE        = 1 << 43; // should be 1 for code segments, 0 for data segments
-        const USER_SEGMENT      = 1 << 44; 
+        const USER_SEGMENT      = 1 << 44;
         const PRIVILEGE_RING0   = 0 << 45; // sets 45 and 46
         const PRIVILEGE_RING1   = 1 << 45; // sets 45 and 46
         const PRIVILEGE_RING2   = 2 << 45; // sets 45 and 46

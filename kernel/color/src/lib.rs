@@ -1,7 +1,6 @@
 //! A simple representation of the standard RGB color model.
 #![no_std]
 
-
 pub const BLACK: Color = Color::new(0x000000);
 pub const BLUE: Color = Color::new(0x0000FF);
 pub const GREEN: Color = Color::new(0x00FF00);
@@ -20,7 +19,6 @@ pub const YELLOW: Color = Color::new(0xFFFF00);
 pub const WHITE: Color = Color::new(0xFFFFFF);
 pub const TRANSPARENT: Color = Color::new(0xFF000000);
 
-
 /// This structure represents a color value in the standard RGB color model,
 /// comprised of red, blue, green, and transparency components.
 #[derive(Debug, Clone, Copy)]
@@ -29,7 +27,7 @@ pub struct Color {
     alpha: u8,
     red: u8,
     green: u8,
-    blue: u8
+    blue: u8,
 }
 
 impl Color {
@@ -76,11 +74,11 @@ impl Color {
 
 impl PartialEq for Color {
     fn eq(&self, other: &Color) -> bool {
-        self.alpha == other.alpha &&
-            self.red == other.red &&
-            self.green == other.green &&
-            self.blue == other.blue
+        self.alpha == other.alpha
+            && self.red == other.red
+            && self.green == other.green
+            && self.blue == other.blue
     }
 }
 
-impl Eq for Color { }
+impl Eq for Color {}

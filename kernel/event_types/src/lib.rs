@@ -1,13 +1,13 @@
 #![no_std]
 
+extern crate alloc;
 extern crate keycodes_ascii;
 extern crate mouse_data;
-extern crate alloc;
 extern crate shapes;
 
+use alloc::string::String;
 use keycodes_ascii::KeyEvent;
 use mouse_data::MouseEvent;
-use alloc::string::String;
 use shapes::{Coord, Rectangle};
 
 /// An event describing mouse position rather than movement differential from last event.
@@ -32,7 +32,7 @@ pub struct MousePositionEvent {
     pub fifth_button_hold: bool,
 }
 
-impl Default for MousePositionEvent  {
+impl Default for MousePositionEvent {
     fn default() -> Self {
         MousePositionEvent {
             coordinate: Coord::new(0, 0),
@@ -57,10 +57,10 @@ pub enum Event {
     OutputEvent(String),
     /// Tells an application that the window manager has resized or moved its window
     /// so that it knows to refresh its display and perform any necessary tasks, such as text reflow.
-    /// 
+    ///
     /// The new position and size of the window is given by the `Rectangle` within,
     /// and represents the content area within the window that is accessible to the application,
-    /// which excludes the window title bar, borders, etc. 
+    /// which excludes the window title bar, borders, etc.
     WindowResizeEvent(Rectangle),
     /// The event tells application about mouse's position currently (including relative to a window and relative to a screen)
     MousePositionEvent(MousePositionEvent),
@@ -74,7 +74,10 @@ impl Event {
     }
 
     /// Create a new output event
-    pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
+    pub fn new_output_event<S>(s: S) -> Event
+    where
+        S: Into<String>,
+    {
         Event::OutputEvent(s.into())
     }
 
@@ -94,8 +97,6 @@ pub struct KeyboardInputEvent {
 impl KeyboardInputEvent {
     /// Create a new key board input event. `key` is the key input from the keyboard
     pub fn new(key: KeyEvent) -> KeyboardInputEvent {
-        KeyboardInputEvent { 
-            key_event: key 
-        }
+        KeyboardInputEvent { key_event: key }
     }
 }

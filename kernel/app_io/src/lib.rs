@@ -1,7 +1,7 @@
 //! A simple library that handles stdio queues for applications running in terminal instances.
-//! 
+//!
 //! This provides some APIs similar to Rust's `std::io` for applications to access those queues.
-//! 
+//!
 //! Usage example:
 //! 1. shell spawns a new app, and creates queues of `stdin`, `stdout`, and `stderr` for that app.
 //! 2. shell stores the reader for `stdin` and writers for `stdout` and `stderr` to `app_io`,
@@ -16,24 +16,24 @@
 
 #![no_std]
 
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate log;
-extern crate stdio;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
 extern crate spin;
-#[macro_use] extern crate alloc;
+extern crate stdio;
+#[macro_use]
+extern crate alloc;
+extern crate core2;
 extern crate keycodes_ascii;
 extern crate libterm;
 extern crate logger;
-extern crate core2;
 extern crate window_manager;
 
-use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
-            KeyEventQueueReader};
-use spin::{Mutex, MutexGuard};
-use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
+use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 use libterm::Terminal;
+use spin::{Mutex, MutexGuard};
+use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
@@ -50,7 +50,7 @@ pub struct IoStreams {
     /// shell. Apps can take this reader to directly access keyboard events.
     key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
     /// Points to the terminal.
-    terminal: Arc<Mutex<Terminal>>
+    terminal: Arc<Mutex<Terminal>>,
 }
 
 /// Applications set the flags in this structure to inform the parent shell to
@@ -58,7 +58,7 @@ pub struct IoStreams {
 pub struct IoControlFlags {
     /// When set to be `true`, the shell will immediately flush received character
     /// input to stdin rather than waiting for enter keystrike.
-    stdin_instant_flush: bool
+    stdin_instant_flush: bool,
 }
 
 impl IoControlFlags {
@@ -66,29 +66,32 @@ impl IoControlFlags {
     /// be `false` on default.
     pub fn new() -> IoControlFlags {
         IoControlFlags {
-            stdin_instant_flush: false
+            stdin_instant_flush: false,
         }
     }
 }
 
 impl IoStreams {
-    pub fn new(stdin: StdioReader, stdout: StdioWriter,
-               stderr: StdioWriter,
-               key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
-               terminal: Arc<Mutex<Terminal>>) -> IoStreams {
+    pub fn new(
+        stdin: StdioReader,
+        stdout: StdioWriter,
+        stderr: StdioWriter,
+        key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
+        terminal: Arc<Mutex<Terminal>>,
+    ) -> IoStreams {
         IoStreams {
             stdin,
             stdout,
             stderr,
             key_event_reader,
-            terminal
+            terminal,
         }
     }
 }
 
 mod shared_maps {
-    use spin::{Mutex, MutexGuard};
     use alloc::collections::BTreeMap;
+    use spin::{Mutex, MutexGuard};
     use IoControlFlags;
     use IoStreams;
 
@@ -102,7 +105,7 @@ mod shared_maps {
     lazy_static! {
         /// Map a task id to its IoStreams structure.
         /// Shells should call `insert_child_streams` when spawning a new app,
-        /// which effectively stores a new key value pair to this map. 
+        /// which effectively stores a new key value pair to this map.
         /// After a shell's child app exits, the shell should call `remove_child_streams` to clean it up.
         static ref APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
     }
@@ -122,20 +125,21 @@ mod shared_maps {
     /// Lock two maps `APP_IO_CTRL_FLAGS` and `APP_IO_STREAMS` at the same time and returns a
     /// tuple containing their `MutexGuard`s. This function exerts a sequence of locking when
     /// we need to lock more than one of them. This prevents deadlock.
-    pub fn lock_all_maps() -> (MutexGuard<'static, BTreeMap<usize, IoControlFlags>>,
-                               MutexGuard<'static, BTreeMap<usize, IoStreams>>) {
+    pub fn lock_all_maps() -> (
+        MutexGuard<'static, BTreeMap<usize, IoControlFlags>>,
+        MutexGuard<'static, BTreeMap<usize, IoStreams>>,
+    ) {
         (APP_IO_CTRL_FLAGS.lock(), APP_IO_STREAMS.lock())
     }
 }
 
-
 /// An application can call this function to get the terminal to which it should print.
 pub fn get_my_terminal() -> Option<Arc<Mutex<Terminal>>> {
-    task::get_my_current_task_id()
-        .and_then(|id| shared_maps::lock_stream_map()
+    task::get_my_current_task_id().and_then(|id| {
+        shared_maps::lock_stream_map()
             .get(&id)
             .map(|property| property.terminal.clone())
-        )
+    })
 }
 
 /// Lock all shared states (i.e. those defined in `lazy_static!`) and execute the closure.
@@ -144,8 +148,12 @@ pub fn get_my_terminal() -> Option<Arc<Mutex<Terminal>>> {
 /// application from holding the lock of these shared maps before killing it. Otherwise, the
 /// lock will never get a chance to be released. Since we currently don't have stack unwinding.
 pub fn lock_and_execute<'a, F>(f: &F)
-    where F: Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
-                MutexGuard<'a, BTreeMap<usize, IoStreams>>) {
+where
+    F: Fn(
+        MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
+        MutexGuard<'a, BTreeMap<usize, IoStreams>>,
+    ),
+{
     let (locked_flags, locked_streams) = shared_maps::lock_all_maps();
     f(locked_flags, locked_streams);
 }
@@ -166,7 +174,7 @@ pub fn remove_child_streams(task_id: &usize) -> Option<IoStreams> {
 }
 
 /// Applications call this function to acquire a reader to its stdin queue.
-/// 
+///
 /// Errors can occur in two cases. One is when it fails to get the task_id of the calling
 /// task, and the second is that there's no stdin reader stored in the map. Shells should
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
@@ -176,12 +184,12 @@ pub fn stdin() -> Result<StdioReader, &'static str> {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdin.clone()),
-        None => Err("no stdin for this task")
+        None => Err("no stdin for this task"),
     }
 }
 
 /// Applications call this function to acquire a writer to its stdout queue.
-/// 
+///
 /// Errors can occur in two cases. One is when it fails to get the task_id of the calling
 /// task, and the second is that there's no stdout writer stored in the map. Shells should
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
@@ -191,12 +199,12 @@ pub fn stdout() -> Result<StdioWriter, &'static str> {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdout.clone()),
-        None => Err("no stdout for this task")
+        None => Err("no stdout for this task"),
     }
 }
 
 /// Applications call this function to acquire a writer to its stderr queue.
-/// 
+///
 /// Errors can occur in two cases. One is when it fails to get the task_id of the calling
 /// task, and the second is that there's no stderr writer stored in the map. Shells should
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
@@ -206,13 +214,13 @@ pub fn stderr() -> Result<StdioWriter, &'static str> {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stderr.clone()),
-        None => Err("no stderr for this task")
+        None => Err("no stderr for this task"),
     }
 }
 
 /// Applications call this function to take reader to the key event queue to directly
 /// access keyboard events.
-/// 
+///
 /// Errors can occur in three cases. One is when it fails to get the task_id of the calling
 /// task, and the second is that there's no key event reader stored in the map. Shells should
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
@@ -220,19 +228,20 @@ pub fn stderr() -> Result<StdioWriter, &'static str> {
 /// already been taken by some other task, which may be running simultaneously, or be killed
 /// prematurely so that it cannot return the key event reader on exit.
 pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
+    let task_id =
+        task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
-        Some(queues) => {
-            match queues.key_event_reader.lock().take() {
-                Some(reader) => Ok(KeyEventReadGuard::new(
-                    reader,
-                    Box::new(|reader: &mut Option<KeyEventQueueReader>|  { return_event_queue(reader); }),
-                )),
-                None => Err("currently the reader to key event queue is not available")
-            }
+        Some(queues) => match queues.key_event_reader.lock().take() {
+            Some(reader) => Ok(KeyEventReadGuard::new(
+                reader,
+                Box::new(|reader: &mut Option<KeyEventQueueReader>| {
+                    return_event_queue(reader);
+                }),
+            )),
+            None => Err("currently the reader to key event queue is not available"),
         },
-        None => Err("no key event queue reader for this task")
+        None => Err("no key event queue reader for this task"),
     }
 }
 
@@ -245,10 +254,12 @@ fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
             match locked_streams.get(&task_id) {
                 Some(queues) => {
                     core::mem::swap(&mut *queues.key_event_reader.lock(), reader);
-                },
-                None => { error!("no stderr for this task"); }
+                }
+                None => {
+                    error!("no stderr for this task");
+                }
             };
-        },
+        }
         Err(e) => {
             error!("app_io::return_event_queue(): Failed to get task_id to store new event queue. Error: {}", e);
         }
@@ -257,52 +268,52 @@ fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
 
 /// Applications call this function to set the flag which requests the parent shell to
 /// flush stdin immediately upon character input, rather than waiting for enter key strike.
-/// 
+///
 /// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
 /// or it finds no IoControlFlags structure for that task.
 pub fn request_stdin_instant_flush() -> Result<(), &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to request stdin instant flush")?;
+    let task_id = task::get_my_current_task_id()
+        .ok_or("failed to get task_id to request stdin instant flush")?;
     let mut locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get_mut(&task_id) {
         Some(flags) => {
             flags.stdin_instant_flush = true;
             Ok(())
-        },
-        None => Err("no io control flags for this task")
+        }
+        None => Err("no io control flags for this task"),
     }
 }
 
 /// Applications call this function to reset the flag which requests the parent shell to
 /// flush stdin immediately upon character input, but to wait for enter key strike.
-/// 
+///
 /// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
 /// or it finds no IoControlFlags structure for that task.
 pub fn cancel_stdin_instant_flush() -> Result<(), &'static str> {
-    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to cancel stdin instant flush")?;
+    let task_id = task::get_my_current_task_id()
+        .ok_or("failed to get task_id to cancel stdin instant flush")?;
     let mut locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get_mut(&task_id) {
         Some(flags) => {
             flags.stdin_instant_flush = false;
             Ok(())
-        },
-        None => Err("no io control flags for this task")
+        }
+        None => Err("no io control flags for this task"),
     }
 }
 
 /// Shell call this function to check whether a task is requesting instant stdin flush.
-/// 
+///
 /// Error can occur when there is no IoControlFlags structure for that task.
 pub fn is_requesting_instant_flush(task_id: &usize) -> Result<bool, &'static str> {
     let locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get(task_id) {
-        Some(flags) => {
-            Ok(flags.stdin_instant_flush)
-        },
-        None => Err("no io control flags for this task")
+        Some(flags) => Ok(flags.stdin_instant_flush),
+        None => Err("no io control flags for this task"),
     }
 }
 
-/// Calls `print!()` with an extra newline ('\n') appended to the end. 
+/// Calls `print!()` with an extra newline ('\n') appended to the end.
 #[macro_export]
 macro_rules! println {
     ($fmt:expr) => (print!(concat!($fmt, "\n")));
@@ -327,7 +338,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         Some(task_id) => task_id,
         None => {
             // We cannot use log macros here, because when they're mirrored to the vga, they will cause
-            // infinite loops on an error. Instead, we write directly to the logger's output streams. 
+            // infinite loops on an error. Instead, we write directly to the logger's output streams.
             let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
             return;
         }
@@ -337,10 +348,14 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
-            if let Err(_) = queues.stdout.lock().write_all(format!("{}", fmt_args).as_bytes()) {
+            if let Err(_) = queues
+                .stdout
+                .lock()
+                .write_all(format!("{}", fmt_args).as_bytes())
+            {
                 let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
-        },
+        }
         None => {
             let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
             return;

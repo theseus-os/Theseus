@@ -16,17 +16,12 @@ use shapes::Coord;
 /// * `start`: the start coordinate of the line relative to the origin(top-left point) of the framebuffer.
 /// * `end`: the end coordinate of the line relative to the origin(top-left point) of the framebuffer.
 /// * `color`: the color of the line.
-pub fn draw_line<P: Pixel>(
-    framebuffer: &mut Framebuffer<P>,
-    start: Coord,
-    end: Coord,
-    pixel: P,
-) {
+pub fn draw_line<P: Pixel>(framebuffer: &mut Framebuffer<P>, start: Coord, end: Coord, pixel: P) {
     let width: isize = end.x - start.x;
     let height: isize = end.y - start.y;
 
     let mut line_in_buffer = false;
-    
+
     // compare the x distance and y distance. Increase/Decrease the longer one at every step.
     if width.abs() > height.abs() {
         let mut y;
@@ -89,8 +84,8 @@ pub fn draw_rectangle<P: Pixel>(
     let (buffer_width, buffer_height) = framebuffer.get_size();
 
     // return if the rectangle is not within the framebuffer
-    if !framebuffer.overlaps_with(coordinate, width, height){
-        return
+    if !framebuffer.overlaps_with(coordinate, width, height) {
+        return;
     }
 
     // draw the part within the framebuffer
@@ -109,13 +104,13 @@ pub fn draw_rectangle<P: Pixel>(
         if coordinate.y >= 0 {
             framebuffer.draw_pixel(top, pixel);
         }
-        if (coordinate.y + height as isize) < buffer_height as isize { 
+        if (coordinate.y + height as isize) < buffer_height as isize {
             framebuffer.draw_pixel(top + (0, end_y_offset), pixel);
         }
         top.x += 1;
     }
 
-    let mut left = Coord::new(start_x, start_y); 
+    let mut left = Coord::new(start_x, start_y);
     let end_x_offset = end_x - start_x - 1;
     loop {
         if left.y == end_y {
@@ -148,8 +143,8 @@ pub fn fill_rectangle<P: Pixel>(
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
     // return if the rectangle is not within the framebuffer
-    if !framebuffer.overlaps_with(coordinate, width, height){
-        return
+    if !framebuffer.overlaps_with(coordinate, width, height) {
+        return;
     }
 
     // draw the part within the framebuffer

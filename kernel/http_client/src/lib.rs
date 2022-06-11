@@ -1,28 +1,27 @@
 //! Functions for creating and sending HTTP requests and receiving responses.
-//! 
+//!
 
 #![no_std]
 #![feature(slice_concat_ext)]
 
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate alloc;
-extern crate smoltcp;
-extern crate network_manager;
 extern crate hpet;
 extern crate httparse;
-#[macro_use] extern crate smoltcp_helper;
+extern crate network_manager;
+extern crate smoltcp;
+#[macro_use]
+extern crate smoltcp_helper;
 
+use alloc::{string::String, vec::Vec};
 use core::str;
-use alloc::vec::Vec;
-use alloc::string::String;
 use hpet::get_hpet;
-use smoltcp::{
-    socket::{SocketSet, TcpSocket, SocketHandle},
-};
-use network_manager::{NetworkInterfaceRef};
+use network_manager::NetworkInterfaceRef;
+use smoltcp::socket::{SocketHandle, SocketSet, TcpSocket};
 use smoltcp_helper::{millis_since, poll_iface};
 
-/// The states that implement the finite state machine for 
+/// The states that implement the finite state machine for
 /// sending and receiving the HTTP request and response, respectively.
 #[derive(Debug)]
 enum HttpState {
@@ -31,7 +30,7 @@ enum HttpState {
     /// The HTTP request has been sent, but the response has not yet been fully received.
     ReceivingResponse,
     /// The response has been received in full, including the headers and the entire content.
-    Responded
+    Responded,
 }
 
 /// Checks to see if the provided HTTP request can be properly parsed, and returns true if so.
@@ -41,16 +40,14 @@ pub fn check_http_request(request_bytes: &[u8]) -> bool {
     request.parse(request_bytes).is_ok() && request_bytes.ends_with(b"\r\n\r\n")
 }
 
-
 /// TODO: create a proper HttpRequest type with header creation fields and actual verification
 pub type HttpRequest = String;
 
-
 /// An HttpResponse that has been fully received from a remote server.
-/// 
+///
 /// TODO: revamp this structure to not store redundant data
 pub struct HttpResponse {
-    /// The actual array of raw bytes received from the server, 
+    /// The actual array of raw bytes received from the server,
     /// including all of the headers and body.
     pub packet: Vec<u8>,
     /// The length of all headers
@@ -62,14 +59,14 @@ pub struct HttpResponse {
 }
 impl HttpResponse {
     pub fn header_bytes(&self) -> &[u8] {
-        &self.packet[0 .. self.header_length]
+        &self.packet[0..self.header_length]
     }
 
     fn content(&self) -> &[u8] {
-        &self.packet[self.header_length ..]
+        &self.packet[self.header_length..]
     }
 
-    /// Returns the content of this `HttpResponse` as a `Result`, 
+    /// Returns the content of this `HttpResponse` as a `Result`,
     /// in which `Ok(content)` is returned if the status code is 200 (Ok),
     /// and `Err((status_code, reason))` is returned otherwise.
     pub fn as_result(&self) -> Result<&[u8], (u16, &str)> {
@@ -89,34 +86,37 @@ impl HttpResponse {
     }
 }
 
-
 /// A convenience struct that packages together a connected TCP socket
-/// with other elements that are necessary to transceive packets. 
+/// with other elements that are necessary to transceive packets.
 pub struct ConnectedTcpSocket<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> {
-    iface:   &'i NetworkInterfaceRef, 
+    iface: &'i NetworkInterfaceRef,
     sockets: &'s mut SocketSet<'sockset_a, 'sockset_b, 'sockset_c>,
-    handle:  SocketHandle,
+    handle: SocketHandle,
 }
-impl<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> ConnectedTcpSocket<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> {
+impl<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c>
+    ConnectedTcpSocket<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c>
+{
     /// Create a new `ConnectedTcpSocket` with the given necessary items:
     /// # Arguments
-    /// * `iface`: a reference to the `NetworkInterface` that the given TCP socket was created on and uses for transceiving packets. 
+    /// * `iface`: a reference to the `NetworkInterface` that the given TCP socket was created on and uses for transceiving packets.
     /// * `sockets`: the set of sockets that includes the given TCP socket (usually just a set with just that one socket).
     /// * `tcp_socket_handle`: the handle of the TCP socket, which must be in the given `sockets` set and be already connected to the remote endpoint.
-    /// 
+    ///
     /// Returns an `Err` result if the TCP socket isn't connected to the remote endpoint.
-    /// 
+    ///
     pub fn new(
-        iface: &'i NetworkInterfaceRef, 
+        iface: &'i NetworkInterfaceRef,
         sockets: &'s mut SocketSet<'sockset_a, 'sockset_b, 'sockset_c>,
-        tcp_socket_handle: SocketHandle, 
+        tcp_socket_handle: SocketHandle,
     ) -> Result<ConnectedTcpSocket<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c>, &'static str> {
         // ensure the socket actually connected to the remote endpoint (i.e., it should be able to send/recv)
         {
             let socket = sockets.get::<TcpSocket>(tcp_socket_handle);
             let connected = socket.may_send() && socket.may_recv();
             if !connected {
-                return Err("http_client: the given TCP socket wasn't connected to the remote endpoint");
+                return Err(
+                    "http_client: the given TCP socket wasn't connected to the remote endpoint",
+                );
             }
         }
 
@@ -129,41 +129,44 @@ impl<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> ConnectedTcpSocket<'i, 's, 'soc
 }
 
 /// Sends the given HTTP request over the network via the given `socket` on the given `interface`,
-/// waits to receive a full HTTP response from the remote endpoint, 
+/// waits to receive a full HTTP response from the remote endpoint,
 /// and then returns that full response, or an error if the response wasn't fully received properly.
-/// 
+///
 /// # Arguments
 /// * `request`: the HTTP request to be sent via the connected socket.
 /// * `tcp_socket`: the connected TCP socket that will be used to send the HTTP request and receive the response.
-/// * `inactivity_timeout_millis`: the timeout in milliseconds that limits how long this function will wait during periods of inactivity. 
-///    This is not a timeout that bounds the total execution time of this function; the timer is reset when a packet is received. 
+/// * `inactivity_timeout_millis`: the timeout in milliseconds that limits how long this function will wait during periods of inactivity.
+///    This is not a timeout that bounds the total execution time of this function; the timer is reset when a packet is received.
 ///    For example, a value of `5000` means that the function will give up if more than 5 seconds elapses without any packets being received.
-/// 
+///
 pub fn send_request(
-    request: HttpRequest, 
+    request: HttpRequest,
     tcp_socket: &mut ConnectedTcpSocket,
     timeout_millis: Option<u64>,
 ) -> Result<HttpResponse, &'static str> {
-
-    // validate the HTTP request 
+    // validate the HTTP request
     if !check_http_request(request.as_bytes()) {
         return Err("http_client: given HTTP request was improperly formatted or incomplete");
     }
 
-    let ConnectedTcpSocket { iface, sockets, handle } = tcp_socket;
+    let ConnectedTcpSocket {
+        iface,
+        sockets,
+        handle,
+    } = tcp_socket;
 
     let mut _loop_ctr = 0;
     let mut state = HttpState::Requesting;
-    let mut packet_byte_buffer:   Vec<u8> = Vec::new();
+    let mut packet_byte_buffer: Vec<u8> = Vec::new();
     let mut packet_header_length: Option<usize> = None;
     let mut response_status_code: Option<u16> = None;
-    let mut response_reason:      Option<String> = None;
+    let mut response_reason: Option<String> = None;
 
     let startup_time = hpet_ticks!();
     let mut latest_packet_timestamp = startup_time;
 
-    // in the loop below, we do the actual work of sending the request and receiving the response 
-    loop { 
+    // in the loop below, we do the actual work of sending the request and receiving the response
+    loop {
         _loop_ctr += 1;
 
         let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
@@ -171,7 +174,10 @@ pub fn send_request(
         // check if we have timed out
         if let Some(t) = timeout_millis {
             if millis_since(latest_packet_timestamp)? > t {
-                error!("http_client: timed out after {} ms, in state {:?}", t, state);
+                error!(
+                    "http_client: timed out after {} ms, in state {:?}",
+                    t, state
+                );
                 return Err("http_client: timed out");
             }
         }
@@ -181,7 +187,9 @@ pub fn send_request(
         state = match state {
             HttpState::Requesting if socket.can_send() => {
                 debug!("http_client: sending HTTP request: {:?}", request);
-                socket.send_slice(request.as_ref()).expect("http_client: cannot send request");
+                socket
+                    .send_slice(request.as_ref())
+                    .expect("http_client: cannot send request");
                 latest_packet_timestamp = hpet_ticks!();
                 HttpState::ReceivingResponse
             }
@@ -244,7 +252,7 @@ pub fn send_request(
                                                 // we pop off the exact number of bytes that make up the rest of the content,
                                                 // leaving the rest on the recv buffer
                                                 expected_length - orig_packet_length
-                                            } 
+                                            }
 
                                         }
                                         Err(e) => {
@@ -253,7 +261,7 @@ pub fn send_request(
                                             0
                                         }
                                     }
-                                } 
+                                }
                                 else {
                                     if let Some(_connection_close_header) = response.headers.iter().find(|h| h.name == "Connection" && h.value == b"close") {
                                         // Here: the remote endpoint closed the connection, meaning that the entire response is on the recv buffer.
@@ -291,12 +299,16 @@ pub fn send_request(
                 if orig_packet_length != packet_byte_buffer.len() {
                     latest_packet_timestamp = hpet_ticks!();
                 }
-                
+
                 new_state
             }
 
             HttpState::Responded => {
-                debug!("http_client: received full {}-byte HTTP response (_loop_ctr: {}).", packet_byte_buffer.len(), _loop_ctr);
+                debug!(
+                    "http_client: received full {}-byte HTTP response (_loop_ctr: {}).",
+                    packet_byte_buffer.len(),
+                    _loop_ctr
+                );
                 break;
             }
 
@@ -305,7 +317,7 @@ pub fn send_request(
                 return Err("socket was closed prematurely before full reponse was received!");
             }
 
-            _ => { 
+            _ => {
                 // if _loop_ctr % 50000 == 0 {
                 //     warn!("http_client: waiting in state {:?} for socket to send/recv ...", state);
                 // }
@@ -314,14 +326,16 @@ pub fn send_request(
         }
     }
 
-
     // debug!("http_client: exiting HTTP state loop with state: {:?} (_loop_ctr: {})", state, _loop_ctr);
 
     Ok(HttpResponse {
         packet: packet_byte_buffer,
-        header_length: packet_header_length.ok_or("BUG: received full HTTP response but couldn't determine packet header length")?,
-        status_code: response_status_code.ok_or("BUG: received full HTTP response but couldn't determine its status code")?,
-        reason: response_reason.ok_or("BUG: received full HTTP response but couldn't determine its reason phrase")?,
+        header_length: packet_header_length.ok_or(
+            "BUG: received full HTTP response but couldn't determine packet header length",
+        )?,
+        status_code: response_status_code
+            .ok_or("BUG: received full HTTP response but couldn't determine its status code")?,
+        reason: response_reason
+            .ok_or("BUG: received full HTTP response but couldn't determine its reason phrase")?,
     })
-    
 }

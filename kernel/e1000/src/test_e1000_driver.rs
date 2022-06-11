@@ -1,9 +1,12 @@
-use super::{E1000_NIC, NetworkInterfaceCard, TransmitBuffer};
+use super::{NetworkInterfaceCard, TransmitBuffer, E1000_NIC};
 
 pub fn test_e1000_nic_driver(_: Option<u64>) {
     match dhcp_request_packet() {
         Ok(_) => debug!("test_e1000_nic_driver(): sent DHCP request packet successfully!"),
-        Err(e) => error!("test_e1000_nic_driver(): failed to send DHCP request packet: error {:?}", e),
+        Err(e) => error!(
+            "test_e1000_nic_driver(): failed to send DHCP request packet: error {:?}",
+            e
+        ),
     };
 }
 
@@ -70,10 +73,13 @@ pub fn dhcp_request_packet() -> Result<(), &'static str> {
         0x37, 0x04, 0x01, 0x03, 0x06, 0x2a, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
     let mut transmit_buffer = TransmitBuffer::new(packet.len() as u16)?;
-    { 
+    {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, 314)?;
         buffer.copy_from_slice(&packet);
     }
-    let mut e1000_nc = E1000_NIC.get().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
+    let mut e1000_nc = E1000_NIC
+        .get()
+        .ok_or("e1000 NIC hasn't been initialized yet")?
+        .lock();
     e1000_nc.send_packet(transmit_buffer)
 }

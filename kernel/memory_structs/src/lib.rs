@@ -1,4 +1,4 @@
-//! This crate contains common types used for memory mapping. 
+//! This crate contains common types used for memory mapping.
 
 #![no_std]
 #![feature(step_trait)]
@@ -6,27 +6,26 @@
 extern crate kernel_config;
 extern crate multiboot2;
 extern crate xmas_elf;
-#[macro_use] extern crate derive_more;
+#[macro_use]
+extern crate derive_more;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate entryflags_x86_64;
-extern crate zerocopy;
 extern crate paste;
-
+extern crate zerocopy;
 
 use bit_field::BitField;
 use core::{
-    cmp::{min, max},
+    cmp::{max, min},
     fmt,
     iter::Step,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
-use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
 pub use entryflags_x86_64::EntryFlags;
-use zerocopy::FromBytes;
+use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use paste::paste;
-
+use zerocopy::FromBytes;
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.
@@ -36,9 +35,9 @@ macro_rules! implement_address {
 
             #[doc = "A " $desc " memory address, which is a `usize` under the hood."]
             #[derive(
-                Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-                Binary, Octal, LowerHex, UpperHex, 
-                BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+                Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+                Binary, Octal, LowerHex, UpperHex,
+                BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign,
                 Add, Sub, AddAssign, SubAssign,
                 FromBytes,
             )]
@@ -176,8 +175,6 @@ implement_address!(
     frame
 );
 
-
-
 /// A macro for defining `Page` and `Frame` structs
 /// and implementing their common traits, which are generally identical.
 macro_rules! implement_page_frame {
@@ -201,7 +198,7 @@ macro_rules! implement_page_frame {
                 pub const fn number(&self) -> usize {
                     self.number
                 }
-                
+
                 #[doc = "Returns the `" $TypeName "` containing the given `" $address "`."]
                 pub const fn containing_address(addr: $address) -> $TypeName {
                     $TypeName {
@@ -293,14 +290,12 @@ impl Page {
     }
 }
 
-
-
 /// A macro for defining `PageRange` and `FrameRange` structs
 /// and implementing their common traits, which are generally identical.
 macro_rules! implement_page_frame_range {
     ($TypeName:ident, $desc:literal, $short:ident, $chunk:ident, $address:ident) => {
         paste! { // using the paste crate's macro for easy concatenation
-                        
+
             #[doc = "A range of [`" $chunk "`]s that are contiguous in " $desc " memory."]
             #[derive(Clone, PartialEq, Eq)]
             pub struct $TypeName(RangeInclusive<$chunk>);
@@ -430,7 +425,6 @@ macro_rules! implement_page_frame_range {
 implement_page_frame_range!(PageRange, "virtual", virt, Page, VirtualAddress);
 implement_page_frame_range!(FrameRange, "physical", phys, Frame, PhysicalAddress);
 
-
 /// The address bounds and mapping flags of a section's memory region.
 #[derive(Debug)]
 pub struct SectionMemoryBounds {
@@ -442,26 +436,26 @@ pub struct SectionMemoryBounds {
     pub flags: EntryFlags,
 }
 
-/// The address bounds and flags of the initial kernel sections that need mapping. 
-/// 
+/// The address bounds and flags of the initial kernel sections that need mapping.
+///
 /// Individual sections in the kernel's ELF image are combined here according to their flags,
 /// as described below, but some are kept separate for the sake of correctness or ease of use.
-/// 
+///
 /// It contains three main items, in which each item includes all sections that have identical flags:
 /// * The `text` section bounds cover all sections that are executable.
 /// * The `rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
 ///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
 ///     because they can be mapped using the same page table flags.
 /// * The `data` section bounds cover those that are writable (.data, .bss).
-/// 
+///
 /// It also contains:
-/// * The `page_table` section bounds cover the initial page table's top-level (root) P4 frame. 
+/// * The `page_table` section bounds cover the initial page table's top-level (root) P4 frame.
 /// * The `stack` section bounds cover the initial stack, which are maintained separately.
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
-   pub text:        SectionMemoryBounds,
-   pub rodata:      SectionMemoryBounds,
-   pub data:        SectionMemoryBounds,
-   pub page_table:  SectionMemoryBounds,
-   pub stack:       SectionMemoryBounds,
+    pub text: SectionMemoryBounds,
+    pub rodata: SectionMemoryBounds,
+    pub data: SectionMemoryBounds,
+    pub page_table: SectionMemoryBounds,
+    pub stack: SectionMemoryBounds,
 }

@@ -2,30 +2,27 @@
 
 #![no_std]
 
+extern crate acpi_table;
 extern crate memory;
 extern crate sdt;
-extern crate acpi_table;
 extern crate zerocopy;
 
+use acpi_table::{AcpiSignature, AcpiTables};
 use memory::PhysicalAddress;
 use sdt::Sdt;
-use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 
-
 pub const FADT_SIGNATURE: &'static [u8; 4] = b"FACP";
-
 
 /// The handler for parsing the FADT table and adding it to the ACPI tables list.
 pub fn handle(
     acpi_tables: &mut AcpiTables,
     signature: AcpiSignature,
     _length: usize,
-    phys_addr: PhysicalAddress
+    phys_addr: PhysicalAddress,
 ) -> Result<(), &'static str> {
     acpi_tables.add_table_location(signature, phys_addr, None)
 }
-
 
 #[repr(packed)]
 #[derive(Clone, Copy, Debug, FromBytes)]
@@ -34,7 +31,7 @@ pub struct Fadt {
     pub firmware_ctrl: u32,
     /// The physical address of the DSDT table
     pub dsdt: u32,
-    _reserved: u8, 
+    _reserved: u8,
     pub preferred_power_managament: u8,
     pub sci_interrupt: u16,
     pub smi_command_port: u32,

@@ -1,27 +1,30 @@
-//! A basic logger implementation for system-wide logging in Theseus. 
+//! A basic logger implementation for system-wide logging in Theseus.
 //!
 //! This enables Theseus crates to use the `log` crate's macros anywhere,
 //! such as `error!()`, `warn!()`, `info!()`, `debug!()`, and `trace!()`.
 //!
-//! Currently, log statements are written to one or more **writers**, 
+//! Currently, log statements are written to one or more **writers**,
 //! which are objects that implement the [`core::fmt::Write`] trait.
 
 #![no_std]
 #![feature(trait_alias)]
 
-extern crate log;
 extern crate alloc;
-extern crate spin;
 extern crate irq_safety;
+extern crate log;
 extern crate serial_port_basic;
+extern crate spin;
 
-use log::{Record, Level, SetLoggerError, Metadata, Log};
-use core::{borrow::Borrow, fmt::{self, Write}, ops::Deref};
-use spin::Once;
-use irq_safety::MutexIrqSafe;
-use serial_port_basic::SerialPort;
 use alloc::{sync::Arc, vec::Vec};
-
+use core::{
+    borrow::Borrow,
+    fmt::{self, Write},
+    ops::Deref,
+};
+use irq_safety::MutexIrqSafe;
+use log::{Level, Log, Metadata, Record, SetLoggerError};
+use serial_port_basic::SerialPort;
+use spin::Once;
 
 /// By default, Theseus will print all log levels, including `Trace` and above.
 pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
@@ -30,9 +33,8 @@ pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
 pub const LOG_MAX_WRITERS: usize = 2;
 
 /// The early logger used before dynamic heap allocation is available.
-static EARLY_LOGGER: MutexIrqSafe<EarlyLogger<LOG_MAX_WRITERS>> = MutexIrqSafe::new(
-    EarlyLogger([None, None])
-);
+static EARLY_LOGGER: MutexIrqSafe<EarlyLogger<LOG_MAX_WRITERS>> =
+    MutexIrqSafe::new(EarlyLogger([None, None]));
 
 /// The real logger instance where log states are kept.
 ///
@@ -46,7 +48,7 @@ static LOGGER: MutexIrqSafe<Option<Logger>> = MutexIrqSafe::new(None);
 struct EarlyLogger<const N: usize>([Option<SerialPort>; N]);
 
 /// The fully-featured logger that can be dynamically initialized with arbitrary output streams.
-/// 
+///
 /// This is the "backend" for the `log` crate that allows Theseus to use its `log!()` macros.
 struct Logger {
     writers: Vec<Arc<MutexIrqSafe<dyn Write + Send>>>,
@@ -72,7 +74,7 @@ static DUMMY_LOGGER: DummyLogger = DummyLogger;
 /// This exists because the `log` crate only allows a logger implementation
 /// to be initialized once from a singleton static instance.
 /// To get around that limitation, we store the actual logger states
-/// **outside** of the logger struct, such that we can modify them later 
+/// **outside** of the logger struct, such that we can modify them later
 /// after the `log` crate has already been initialized.
 struct DummyLogger;
 
@@ -111,30 +113,30 @@ impl Log for DummyLogger {
 
         let (level_str, color) = match record.level() {
             Level::Error => ("[E] ", LogColor::Red),
-            Level::Warn =>  ("[W] ", LogColor::Yellow),
-            Level::Info =>  ("[I] ", LogColor::Cyan),
+            Level::Warn => ("[W] ", LogColor::Yellow),
+            Level::Info => ("[I] ", LogColor::Cyan),
             Level::Debug => ("[D] ", LogColor::Green),
             Level::Trace => ("[T] ", LogColor::Purple),
         };
         let file_loc = record.file().unwrap_or("??");
         let line_loc = record.line().unwrap_or(0);
-        let _result = self.write_fmt(
-            format_args!("{}{}{}:{}: {}{}",
-                color.as_terminal_string(),
-                level_str,
-                file_loc,
-                line_loc,
-                record.args(),
-                LogColor::Reset.as_terminal_string(),
-            )
-        );
+        let _result = self.write_fmt(format_args!(
+            "{}{}{}:{}: {}{}",
+            color.as_terminal_string(),
+            level_str,
+            file_loc,
+            line_loc,
+            record.args(),
+            LogColor::Reset.as_terminal_string(),
+        ));
         // If there was an error above, there's literally nothing we can do but ignore it,
         // because there is no other lower-level way to log errors than the serial port.
-        
+
         if let Some(func) = MIRROR_VGA_FUNC.get() {
             // Currently printing to the VGA terminal doesn't support ANSI color escape sequences,
             // so we exclude the first and the last elements that set those colors.
-            func(format_args!("{}{}:{}: {}",
+            func(format_args!(
+                "{}{}:{}: {}",
                 level_str,
                 file_loc,
                 line_loc,
@@ -147,7 +149,6 @@ impl Log for DummyLogger {
         // flushing the log is a no-op, since there is no write buffering.
     }
 }
-
 
 /// Initializes Theseus's early system logger, which only supports logging to basic serial ports.
 ///
@@ -166,7 +167,11 @@ pub fn early_init(
     // Populate the fields of the early logger instance
     {
         let mut logger = EARLY_LOGGER.lock();
-        for (sp, logger_writer) in serial_ports.into_iter().take(LOG_MAX_WRITERS).zip(&mut logger.0) {
+        for (sp, logger_writer) in serial_ports
+            .into_iter()
+            .take(LOG_MAX_WRITERS)
+            .zip(&mut logger.0)
+        {
             *logger_writer = Some(sp);
         }
     }
@@ -177,25 +182,26 @@ pub fn early_init(
     Ok(())
 }
 
-
 /// Initialize the fully-featured Theseus system logger.
 ///
 /// # Arguments
 /// * `log_level`: the log level that should be used.
 ///    If `None`, the [`DEFAULT_LOG_LEVEL`] will be used.
-/// * `writers`: an iterator over the backends that the system logger 
+/// * `writers`: an iterator over the backends that the system logger
 ///    will write log messages to.
 ///    Typically this is just a single writer, such as the COM1 serial port.
 pub fn init<I, W>(
     log_level: Option<Level>,
     writers: impl IntoIterator<Item = I>,
 ) -> Result<(), SetLoggerError>
-    where W: Write + Send + 'static,
-          I: Into<Arc<MutexIrqSafe<W>>>,
+where
+    W: Write + Send + 'static,
+    I: Into<Arc<MutexIrqSafe<W>>>,
 {
     // Populate the fields of the real logger instance
     let logger = Logger {
-        writers: writers.into_iter()
+        writers: writers
+            .into_iter()
             .map(|i| i.into() as Arc<MutexIrqSafe<dyn Write + Send>>)
             .collect::<Vec<_>>(),
     };
@@ -209,12 +215,12 @@ pub fn init<I, W>(
     Ok(())
 }
 
-/// Set the log level, which determines whether a given log message is actually logged. 
-/// 
+/// Set the log level, which determines whether a given log message is actually logged.
+///
 /// For example, if `Level::Trace` is set, all log levels will be logged.
-/// 
-/// If `Level::Info` is set, `debug!()` and `trace!()` will not be logged, 
-/// but `info!()`, `warn!()`, and `error!()` will be. 
+///
+/// If `Level::Info` is set, `debug!()` and `trace!()` will not be logged,
+/// but `info!()`, `warn!()`, and `error!()` will be.
 pub fn set_log_level(level: Level) {
     log::set_max_level(level.to_level_filter())
 }
@@ -223,7 +229,7 @@ pub fn set_log_level(level: Level) {
 ///
 /// If the logger has not yet been initialized, no log messages will be emitted
 /// and an `Error` will be returned.
-/// 
+///
 /// Tip: use the `format_args!()` macro from the core library to create
 /// the `Arguments` parameter needed here.
 pub fn write_fmt(args: fmt::Arguments) -> fmt::Result {
@@ -237,7 +243,6 @@ pub fn write_fmt(args: fmt::Arguments) -> fmt::Result {
 pub fn write_str(s: &str) -> fmt::Result {
     crate::write_fmt(format_args!("{}", s))
 }
-
 
 /// ANSI style codes for basic colors.
 #[allow(dead_code)]
@@ -256,19 +261,18 @@ impl LogColor {
     fn as_terminal_string(&self) -> &'static str {
         match *self {
             // \x1b is the ESC character (0x1B)
-			LogColor::Black	  =>  "\x1b[30m",
-			LogColor::Red	  =>  "\x1b[31m",
-			LogColor::Green   =>  "\x1b[32m",
-			LogColor::Yellow  =>  "\x1b[33m",
-			LogColor::Blue	  =>  "\x1b[34m",
-			LogColor::Purple  =>  "\x1b[35m",
-            LogColor::Cyan    =>  "\x1b[36m",
-            LogColor::White   =>  "\x1b[37m",
-            LogColor::Reset   =>  "\x1b[0m\n", 
+            LogColor::Black => "\x1b[30m",
+            LogColor::Red => "\x1b[31m",
+            LogColor::Green => "\x1b[32m",
+            LogColor::Yellow => "\x1b[33m",
+            LogColor::Blue => "\x1b[34m",
+            LogColor::Purple => "\x1b[35m",
+            LogColor::Cyan => "\x1b[36m",
+            LogColor::White => "\x1b[37m",
+            LogColor::Reset => "\x1b[0m\n",
         }
     }
 }
-
 
 /// Call this to enable mirroring logging macros to the screen
 pub fn mirror_to_vga(func: LogOutputFunc) {

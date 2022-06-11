@@ -54,7 +54,7 @@ impl Bitfield for [AtomicU64] {
         base_addr: usize,
         layout: Layout,
         page_size: usize,
-        metadata_size: usize
+        metadata_size: usize,
     ) -> Option<(usize, usize)> {
         for (base_idx, b) in self.iter().enumerate() {
             let bitval = b.load(Ordering::Relaxed);
@@ -169,7 +169,7 @@ pub trait AllocablePage {
 
     const HEAP_ID_OFFSET: usize;
 
-    fn new(mp: MappedPages8k, heap_id: usize) -> Self 
+    fn new(mp: MappedPages8k, heap_id: usize) -> Self
     where
         Self: core::marker::Sized;
     fn retrieve_mapped_pages(&mut self) -> Option<MappedPages8k>;
@@ -189,7 +189,8 @@ pub trait AllocablePage {
     /// Tries to find a free block within `data` that satisfies `alignment` requirement.
     fn first_fit(&self, layout: Layout) -> Option<(usize, usize)> {
         let base_addr = (&*self as *const Self as *const u8) as usize;
-        self.bitfield().first_fit(base_addr, layout, Self::SIZE, Self::METADATA_SIZE)
+        self.bitfield()
+            .first_fit(base_addr, layout, Self::SIZE, Self::METADATA_SIZE)
     }
 
     /// Tries to allocate an object within this page.
@@ -236,7 +237,6 @@ pub trait AllocablePage {
     }
 }
 
-
 /// Holds allocated data within 2 4-KiB pages.
 ///
 /// Has a data-section where objects are allocated from
@@ -252,7 +252,7 @@ pub struct ObjectPage8k<'a> {
     /// Holds memory objects.
     #[allow(dead_code)]
     data: [u8; ObjectPage8k::SIZE - ObjectPage8k::METADATA_SIZE],
-    
+
     /// The MappedPages this memory area belongs to
     pub mp: Option<MappedPages8k>,
 
@@ -267,25 +267,39 @@ pub struct ObjectPage8k<'a> {
     pub(crate) bitfield: [AtomicU64; 8],
 }
 
-
 // These needs some more work to be really safe...
 unsafe impl<'a> Send for ObjectPage8k<'a> {}
 unsafe impl<'a> Sync for ObjectPage8k<'a> {}
 
 impl<'a> AllocablePage for ObjectPage8k<'a> {
     const SIZE: usize = 8192;
-    const METADATA_SIZE: usize = core::mem::size_of::<Option<MappedPages8k>>() + core::mem::size_of::<usize>() + (2*core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>()) + (8*8);
-    const HEAP_ID_OFFSET: usize = Self::SIZE - (core::mem::size_of::<usize>() + (2*core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>()) + (8*8));
+    const METADATA_SIZE: usize = core::mem::size_of::<Option<MappedPages8k>>()
+        + core::mem::size_of::<usize>()
+        + (2 * core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>())
+        + (8 * 8);
+    const HEAP_ID_OFFSET: usize = Self::SIZE
+        - (core::mem::size_of::<usize>()
+            + (2 * core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>())
+            + (8 * 8));
 
     /// Creates a new 8KiB allocable page and stores the MappedPages object in the metadata portion.
     fn new(mp: MappedPages8k, heap_id: usize) -> ObjectPage8k<'a> {
         ObjectPage8k {
-            data: [0; ObjectPage8k::SIZE -ObjectPage8k::METADATA_SIZE],
+            data: [0; ObjectPage8k::SIZE - ObjectPage8k::METADATA_SIZE],
             mp: Some(mp),
             heap_id: heap_id,
             next: Rawlink::default(),
             prev: Rawlink::default(),
-            bitfield: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),AtomicU64::new(0) ],
+            bitfield: [
+                AtomicU64::new(0),
+                AtomicU64::new(0),
+                AtomicU64::new(0),
+                AtomicU64::new(0),
+                AtomicU64::new(0),
+                AtomicU64::new(0),
+                AtomicU64::new(0),
+                AtomicU64::new(0),
+            ],
         }
     }
 
@@ -306,7 +320,7 @@ impl<'a> AllocablePage for ObjectPage8k<'a> {
         }
     }
 
-    fn set_heap_id(&mut self, heap_id: usize){
+    fn set_heap_id(&mut self, heap_id: usize) {
         self.heap_id = heap_id;
     }
 
@@ -346,7 +360,6 @@ impl<'a> fmt::Debug for ObjectPage8k<'a> {
     }
 }
 
-
 /// A wrapper type around MappedPages which ensures that the MappedPages
 /// have a size and alignment of 8 KiB and are writable.
 pub struct MappedPages8k(MappedPages);
@@ -356,26 +369,34 @@ impl MappedPages8k {
     pub const BUFFER_SIZE: usize = ObjectPage8k::SIZE - ObjectPage8k::METADATA_SIZE;
     pub const METADATA_SIZE: usize = ObjectPage8k::METADATA_SIZE;
     pub const HEAP_ID_OFFSET: usize = ObjectPage8k::HEAP_ID_OFFSET;
-    
+
     /// Creates a MappedPages8k object from MappedPages that have a size and alignment of 8 KiB and are writable.
     pub fn new(mp: MappedPages) -> Result<MappedPages8k, &'static str> {
         let vaddr = mp.start_address().value();
-        
+
         // check that the mapped pages are aligned to 8k
         if vaddr % Self::SIZE != 0 {
             error!("Trying to create a MappedPages8k but MappedPages were not aligned at 8k bytes");
-            return Err("Trying to create a MappedPages8k but MappedPages were not aligned at 8k bytes");
+            return Err(
+                "Trying to create a MappedPages8k but MappedPages were not aligned at 8k bytes",
+            );
         }
 
         // check that the mapped pages is writable
         if !mp.flags().is_writable() {
-            error!("Trying to create a MappedPages8k but MappedPages were not writable (flags: {:?})",  mp.flags());
+            error!(
+                "Trying to create a MappedPages8k but MappedPages were not writable (flags: {:?})",
+                mp.flags()
+            );
             return Err("Trying to create a MappedPages8k but MappedPages were not writable");
         }
-        
+
         // check that the mapped pages size is equal in size to the page
         if Self::SIZE != mp.size_in_bytes() {
-            error!("Trying to create a MappedPages8k but MappedPages were not 8 KiB (size: {} bytes)", mp.size_in_bytes());
+            error!(
+                "Trying to create a MappedPages8k but MappedPages were not 8 KiB (size: {} bytes)",
+                mp.size_in_bytes()
+            );
             return Err("Trying to create a MappedPages8k but MappedPages were not 8 KiB");
         }
 
@@ -395,16 +416,13 @@ impl MappedPages8k {
     /// Return the pages represented by the MappedPages8k as a mutable ObjectPage8k reference
     fn as_objectpage8k_mut(&mut self) -> &mut ObjectPage8k {
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
-        unsafe {
-            mem::transmute(self.0.start_address())
-        }
+        unsafe { mem::transmute(self.0.start_address()) }
     }
 
     pub fn start_address(&self) -> VirtualAddress {
         self.0.start_address()
     }
 }
-
 
 /// A list of pages.
 pub(crate) struct PageList<'a, T: AllocablePage> {
@@ -602,4 +620,3 @@ impl<T> Rawlink<T> {
         mem::replace(self, Rawlink::none())
     }
 }
-

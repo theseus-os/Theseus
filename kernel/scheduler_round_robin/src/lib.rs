@@ -1,31 +1,33 @@
 //! This crate picks the next task in round robin fashion.
 //! Each time the task at the front of the queue is picked.
-//! This task is then moved to the back of the queue. 
+//! This task is then moved to the back of the queue.
 
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate task;
+#[macro_use]
+extern crate log;
 extern crate runqueue;
 extern crate runqueue_round_robin;
+extern crate task;
 
-use task::TaskRef;
 use runqueue_round_robin::RunQueue;
-
+use task::TaskRef;
 
 /// This defines the round robin scheduler policy.
 /// Returns None if there is no schedule-able task
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
-
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
-            error!("BUG: select_next_task_round_robin(): couldn't get runqueue for core {}", apic_id); 
+            error!(
+                "BUG: select_next_task_round_robin(): couldn't get runqueue for core {}",
+                apic_id
+            );
             return None;
         }
     };
-    
+
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;
 
@@ -40,7 +42,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
         if !t.is_runnable() {
             continue;
         }
-            
+
         // found a runnable task!
         chosen_task_index = Some(i);
         // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, &*t);

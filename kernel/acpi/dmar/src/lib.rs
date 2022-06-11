@@ -6,20 +6,21 @@
 
 #![no_std]
 
+extern crate acpi_table;
 extern crate memory;
 extern crate sdt;
-extern crate acpi_table;
 extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
+#[macro_use]
+extern crate static_assertions;
 
-use core::mem::size_of;
-use memory::{PhysicalAddress, MappedPages};
-use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
+use core::mem::size_of;
+use memory::{MappedPages, PhysicalAddress};
+use sdt::Sdt;
 use zerocopy::FromBytes;
 
-mod drhd;
 mod device_scope;
+mod drhd;
 
 // TODO: once these sub-tables are complete, uncomment them.
 // mod rmrr;
@@ -28,31 +29,28 @@ mod device_scope;
 // mod andd;
 // mod satc;
 
-pub use drhd::*;
 pub use device_scope::*;
+pub use drhd::*;
 // pub use rmrr::*;
 // pub use atsr::*;
 // pub use rhsa::*;
 // pub use andd::*;
 // pub use satc::*;
 
-
 pub const DMAR_SIGNATURE: &'static [u8; 4] = b"DMAR";
-
 
 /// The handler for parsing the DMAR table and adding it to the ACPI tables list.
 pub fn handle(
     acpi_tables: &mut AcpiTables,
     signature: AcpiSignature,
     _length: usize,
-    phys_addr: PhysicalAddress
+    phys_addr: PhysicalAddress,
 ) -> Result<(), &'static str> {
-    // The DMAR has a variable number of entries, and each entry is of variable size. 
+    // The DMAR has a variable number of entries, and each entry is of variable size.
     // So we can't determine the slice_length (just use 0 instead), but we can determine where it starts.
     let slice_start_paddr = phys_addr + size_of::<DmarReporting>();
     acpi_tables.add_table_location(signature, phys_addr, Some((slice_start_paddr, 0)))
 }
-
 
 /// The top-level DMAR table, a DMA Remapping Reporting Structure
 /// (also called a DMA Remapping Description table).
@@ -70,10 +68,9 @@ struct DmarReporting {
 }
 const_assert_eq!(core::mem::size_of::<DmarReporting>(), 48);
 
-
 /// A wrapper around the DMAR ACPI table ([`DmarReporting`]),
 /// which contains details about IOMMU configuration.
-/// 
+///
 /// You most likely care about the [`Dmar::iter()`]
 /// and [`Dmar::host_address_width()`] methods.
 #[derive(Debug)]
@@ -125,7 +122,7 @@ impl<'t> Dmar<'t> {
         self.table.flags
     }
 
-    /// Returns the maximum DMA physical addressability (in number of bits) 
+    /// Returns the maximum DMA physical addressability (in number of bits)
     /// supported by this machine.
     pub fn host_address_width(&self) -> u8 {
         // The Host Address Width (HAW) of this machine is computed as (N+1),
@@ -134,10 +131,9 @@ impl<'t> Dmar<'t> {
     }
 }
 
-
 /// An [`Iterator`] over the dynamic entries of the [`Dmar`].
 /// Its lifetime is dependent upon the lifetime of its [`Dmar`] instance,
-/// which itself is bound to the lifetime of the underlying [`AcpiTables`]. 
+/// which itself is bound to the lifetime of the underlying [`AcpiTables`].
 #[derive(Clone)]
 pub struct DmarIter<'t> {
     /// The underlying MappedPages that contain all ACPI tables.
@@ -145,7 +141,7 @@ pub struct DmarIter<'t> {
     /// The offset of the next entry, which should point to a [`DmarEntryRecord`]
     /// at the start of each iteration.
     offset: usize,
-    /// The end bound of all DMAR entries. 
+    /// The end bound of all DMAR entries.
     /// This is fixed and should not ever change throughout iteration.
     end_of_entries: usize,
 }
@@ -169,8 +165,7 @@ impl<'t> Iterator for DmarIter<'t> {
     }
 }
 
-
-/// Represents the "header" of each dynamic table entry 
+/// Represents the "header" of each dynamic table entry
 /// in the [`DmarReporting`] table.
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
@@ -181,7 +176,6 @@ pub struct DmarEntryRecord {
     length: u16,
 }
 const_assert_eq!(core::mem::size_of::<DmarEntryRecord>(), 4);
-
 
 /// The set of possible sub-tables that can exist in the top-level DMAR table.
 ///
@@ -197,7 +191,7 @@ pub enum DmarEntry<'t> {
     /// The DMAR table had an entry of an unknown type or mismatched length,
     /// so the table entry was malformed and unusable.
     /// The entry type ID is included.
-    UnknownOrCorrupt(DmarEntryRecord)
+    UnknownOrCorrupt(DmarEntryRecord),
 }
 impl<'t> DmarEntry<'t> {
     fn from_entry(
@@ -206,7 +200,9 @@ impl<'t> DmarEntry<'t> {
         entry: &DmarEntryRecord,
     ) -> Result<DmarEntry<'t>, &'static str> {
         if entry.typ != 0 {
-            log::warn!("Note: non-DRHD remapping structure types (1, 2, 3, 4, or 5) are unimplemented!");
+            log::warn!(
+                "Note: non-DRHD remapping structure types (1, 2, 3, 4, or 5) are unimplemented!"
+            );
         }
         match entry.typ {
             0 => Ok(Self::Drhd(DmarDrhd::from_entry(mp, mp_offset, entry)?)),
@@ -220,8 +216,7 @@ impl<'t> DmarEntry<'t> {
     }
 }
 
-
-/// RMRR: DMAR Reserved Memory Region Reporting Structure. 
+/// RMRR: DMAR Reserved Memory Region Reporting Structure.
 ///
 /// An instance of this struct describes a memory region
 #[derive(Clone, Copy, Debug, FromBytes)]
@@ -231,17 +226,16 @@ pub struct DmarRmrr {
     header: DmarEntryRecord,
     _reserved: u16,
     segment_number: u16,
-    /// The base address of a 4KB-aligned reserved memory region. 
+    /// The base address of a 4KB-aligned reserved memory region.
     base_address: u64,
-    /// The upper limit (last address) of the reserved memory region. 
+    /// The upper limit (last address) of the reserved memory region.
     limit_address: u64,
     // Following this is a variable number of variable-sized DMAR device scope table entries,
     // so we cannot include them here in the static struct definition.
 }
 const_assert_eq!(core::mem::size_of::<DmarRmrr>(), 24);
 
-
-/// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. 
+/// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure.
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
 #[allow(dead_code)]
@@ -255,8 +249,7 @@ pub struct DmarAtsr {
 }
 const_assert_eq!(core::mem::size_of::<DmarAtsr>(), 8);
 
-
-/// RHSA: DMAR Remapping Hardware Static Affinity Structure. 
+/// RHSA: DMAR Remapping Hardware Static Affinity Structure.
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
 #[allow(dead_code)]
@@ -268,8 +261,7 @@ pub struct DmarRhsa {
 }
 const_assert_eq!(core::mem::size_of::<DmarRhsa>(), 20);
 
-
-/// ANDD: DMAR ACPI Name-space Device Declaration Structure. 
+/// ANDD: DMAR ACPI Name-space Device Declaration Structure.
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
 #[allow(dead_code)]
@@ -284,8 +276,7 @@ pub struct DmarAndd {
 }
 const_assert_eq!(core::mem::size_of::<DmarAndd>(), 8);
 
-
-/// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. 
+/// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure.
 #[derive(Clone, Copy, Debug, FromBytes)]
 #[repr(packed)]
 #[allow(dead_code)]

@@ -4,10 +4,10 @@
 //! The coordinate system within a framebuffer is expressed relative to its origin, i.e., the top-left point.
 //!
 //! # Cache
-//! The compositor caches groups of framebuffer rows for better performance. 
+//! The compositor caches groups of framebuffer rows for better performance.
 //!
 //! First, it divides each framebuffer into ranges of rows called "blocks" which are `CACHE_BLOCK_HEIGHT` rows in height,
-//! and deals with these row ranges one by one. 
+//! and deals with these row ranges one by one.
 //! The pixels in each block's row range are a contiguous array of length `CACHE_BLOCK_HEIGHT * framebuffer_width`,
 //! and the cache key is the hash value of that pixel array.
 //!
@@ -29,15 +29,16 @@ extern crate lazy_static;
 extern crate hashbrown;
 extern crate shapes;
 
-use alloc::collections::BTreeMap;
-use alloc::vec::{Vec};
-use core::hash::{Hash, Hasher, BuildHasher};
-use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
+use alloc::{collections::BTreeMap, vec::Vec};
+use compositor::{CompositableRegion, Compositor, FramebufferUpdates};
+use core::{
+    hash::{BuildHasher, Hash, Hasher},
+    ops::Range,
+};
 use framebuffer::{Framebuffer, Pixel};
+use hashbrown::hash_map::DefaultHashBuilder;
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
-use core::ops::Range;
 
 /// The height of a cache block. In every iteration the compositor will deal with groups of 16 rows and cache them.
 pub const CACHE_BLOCK_HEIGHT: usize = 16;
@@ -51,13 +52,13 @@ lazy_static! {
     );
 }
 
-/// A `CacheBlock` represents the cached (previously-composited) content of a range of rows in the source framebuffer. 
+/// A `CacheBlock` represents the cached (previously-composited) content of a range of rows in the source framebuffer.
 /// It specifies the rectangular region in the destination framebuffer and the hash.
 /// Once cached, a `CacheBlock` block is independent of the source framebuffer it came from.
 /// `content_hash` is the hash value of the actual pixel contents in the cached block. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash`, location and width.
 pub struct CacheBlock {
-    /// The rectanglular region in the destination framebuffer occupied by the cached rows in the source framebuffer. 
-    /// We need this information because if an old cache block overlaps with some new framebuffer rows to be updated, 
+    /// The rectanglular region in the destination framebuffer occupied by the cached rows in the source framebuffer.
+    /// We need this information because if an old cache block overlaps with some new framebuffer rows to be updated,
     /// the compositor should remove the old one since part of that region will change.
     block: Rectangle,
     /// The hash value of the actual pixel contents in the cached block.
@@ -75,14 +76,18 @@ impl CacheBlock {
         return coordinate.x >= self.block.top_left.x
             && coordinate.x < self.block.bottom_right.x
             && coordinate.y >= self.block.top_left.y
-            && coordinate.y < self.block.bottom_right.y
+            && coordinate.y < self.block.bottom_right.y;
     }
 
     /// checks if this block contains any of the four corners of another cache block.
     fn contains_corner(&self, cache: &CacheBlock) -> bool {
         self.contains(cache.block.top_left)
-            || self.contains(cache.block.top_left + (cache.block.bottom_right.x - cache.block.top_left.x - 1, 0))
-            || self.contains(cache.block.top_left + (0, cache.block.bottom_right.y - cache.block.top_left.y - 1))
+            || self.contains(
+                cache.block.top_left + (cache.block.bottom_right.x - cache.block.top_left.x - 1, 0),
+            )
+            || self.contains(
+                cache.block.top_left + (0, cache.block.bottom_right.y - cache.block.top_left.y - 1),
+            )
             || self.contains(cache.block.bottom_right - (1, 1))
     }
 }
@@ -106,23 +111,24 @@ impl FrameCompositor {
             Some(cache) => {
                 // The same hash and width means the cache block is identical to the row pixels.
                 // We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
-                return cache.content_hash == hash(row_pixels) && (cache.block.bottom_right.x - cache.block.top_left.x) as usize == width
+                return cache.content_hash == hash(row_pixels)
+                    && (cache.block.bottom_right.x - cache.block.top_left.x) as usize == width;
             }
             None => return false,
         }
     }
 
     /// This function will return true if several continuous rows in the framebuffer are cached.
-    /// If false, i.e. the given `row_range` is not in the cache, this function will remove 
+    /// If false, i.e. the given `row_range` is not in the cache, this function will remove
     /// the old cached blocks that overlap with the rows in the given `src_fb_row_range` and cache those rows as a new cache block.
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
     /// * `dest_coord`: the position of the source framebuffer (its top-left corner) relative to the destination framebuffer's top-left corner.
     /// * `src_fb_row_range`: the range of rows in the source framebuffer to check and cache.
     fn check_and_cache<P: Pixel>(
-        &mut self, 
-        src_fb: &Framebuffer<P>, 
-        dest_coord: Coord, 
+        &mut self,
+        src_fb: &Framebuffer<P>,
+        dest_coord: Coord,
         src_fb_row_range: &Range<usize>,
     ) -> Result<bool, &'static str> {
         let (src_width, src_height) = src_fb.get_size();
@@ -134,9 +140,9 @@ impl FrameCompositor {
 
         // The end pixel of the rows
         let end_index = src_width * src_fb_row_range.end;
-        
+
         let pixel_slice = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
-        
+
         // Skip if the rows are already cached
         if self.is_cached(&pixel_slice, &coordinate_start, src_width) {
             return Ok(true);
@@ -146,7 +152,8 @@ impl FrameCompositor {
         let new_cache = CacheBlock {
             block: Rectangle {
                 top_left: coordinate_start,
-                bottom_right: coordinate_start + (src_width as isize, (pixel_slice.len() / src_width) as isize)
+                bottom_right: coordinate_start
+                    + (src_width as isize, (pixel_slice.len() / src_width) as isize),
             },
             content_hash: hash(pixel_slice),
         };
@@ -159,12 +166,12 @@ impl FrameCompositor {
             };
         }
 
-        self.caches.insert(coordinate_start, new_cache);        
+        self.caches.insert(coordinate_start, new_cache);
         Ok(false)
     }
 
     /// Returns the range of rows in the source framebuffer that were (1) previously cached as cache blocks
-    /// and (2) overlap with the given `dest_bounding_box`. 
+    /// and (2) overlap with the given `dest_bounding_box`.
     /// This methods extends the row range of the given bounding box because the compositor deals with chunks of `CACHE_BLOCK_HEIGHT` rows.
     /// # Arguments
     /// * `dest_coord`: the position in the destination framebuffer (relative to its top-left corner)
@@ -187,15 +194,15 @@ impl FrameCompositor {
         if relative_row_start >= relative_row_end {
             return 0..0;
         }
-        
+
         let cache_row_start = relative_row_start as usize / CACHE_BLOCK_HEIGHT * CACHE_BLOCK_HEIGHT;
-        let mut cache_row_end = ((relative_row_end - 1) as usize / CACHE_BLOCK_HEIGHT + 1) * CACHE_BLOCK_HEIGHT;
+        let mut cache_row_end =
+            ((relative_row_end - 1) as usize / CACHE_BLOCK_HEIGHT + 1) * CACHE_BLOCK_HEIGHT;
 
         cache_row_end = core::cmp::min(cache_row_end, src_fb_height);
 
-        return cache_row_start..cache_row_end
+        return cache_row_start..cache_row_end;
     }
-
 }
 
 impl Compositor for FrameCompositor {
@@ -215,7 +222,7 @@ impl Compositor for FrameCompositor {
                 // let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                 let area = Rectangle {
                     top_left: coordinate,
-                    bottom_right: coordinate + (src_width as isize, src_height as isize)
+                    bottom_right: coordinate + (src_width as isize, src_height as isize),
                 };
                 let mut row_start = 0;
                 loop {
@@ -224,12 +231,7 @@ impl Compositor for FrameCompositor {
                     }
                     let cache_range = row_start..(row_start + CACHE_BLOCK_HEIGHT);
                     if !self.check_and_cache(src_fb, coordinate, &cache_range)? {
-                        area.blend_buffers(
-                            src_fb,
-                            dest_fb,
-                            coordinate,
-                            cache_range,
-                        )?;
+                        area.blend_buffers(src_fb, dest_fb, coordinate, cache_range)?;
                     }
                     row_start += CACHE_BLOCK_HEIGHT;
                 }
@@ -252,18 +254,13 @@ impl Compositor for FrameCompositor {
                         // check cache if the bounding box is not a single pixel
                         if bounding_box.size() > 1 {
                             if self.check_and_cache(src_fb, coordinate, &cache_range)? {
-                                 row_range.start += CACHE_BLOCK_HEIGHT;
-                                 continue;
+                                row_range.start += CACHE_BLOCK_HEIGHT;
+                                continue;
                             }
                         };
-                        bounding_box.blend_buffers(
-                            src_fb,
-                            dest_fb,
-                            coordinate,
-                            cache_range,
-                        )?;
+                        bounding_box.blend_buffers(src_fb, dest_fb, coordinate, cache_range)?;
                         row_range.start += CACHE_BLOCK_HEIGHT;
-                    } 
+                    }
                 }
             }
         }

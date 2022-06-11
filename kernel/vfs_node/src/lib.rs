@@ -1,26 +1,27 @@
 #![no_std]
 
 //! This crate contains a very basic, generic concrete implementation of the Directory
-//! and File traits. 
+//! and File traits.
 //! The VFSDirectory and VFSFile are intended to be used as regular nodes within the filesystem
 //! that require no special functionality as well as for inspiration for creating other concrete implementations
-//!s of the Directory and File traits. 
+//!s of the Directory and File traits.
 
 // #[macro_use] extern crate log;
 extern crate alloc;
-extern crate spin;
 extern crate fs_node;
 extern crate memory;
+extern crate spin;
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{
+    collections::BTreeMap,
+    string::String,
+    sync::{Arc, Weak},
+    vec::Vec,
+};
+use fs_node::{DirRef, Directory, FileOrDir, FsNode, WeakDirRef};
 use spin::Mutex;
-use alloc::sync::{Arc, Weak};
-use alloc::collections::BTreeMap;
-use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, FsNode};
 
-
-/// A struct that represents a node in the VFS 
+/// A struct that represents a node in the VFS
 pub struct VFSDirectory {
     /// The name of the directory
     pub name: String,
@@ -32,7 +33,7 @@ pub struct VFSDirectory {
 
 impl VFSDirectory {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new(name: String, parent: &DirRef)  -> Result<DirRef, &'static str> {
+    pub fn new(name: String, parent: &DirRef) -> Result<DirRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let directory = VFSDirectory {
             name,

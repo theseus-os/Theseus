@@ -1,4 +1,4 @@
-//! When compiling for certain `no_std` targets, the `libm` crate doesn't properly export 
+//! When compiling for certain `no_std` targets, the `libm` crate doesn't properly export
 //! various `no_mangle` symbols from `libm` properly, so we do it manually here.
 
 #[no_mangle]

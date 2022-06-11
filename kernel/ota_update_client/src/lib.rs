@@ -1,59 +1,57 @@
 //! Functions to communicate with a network server that provides over-the-air live update functionality.
-//! 
+//!
 
 #![no_std]
 #![feature(slice_concat_ext)]
 
-#[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
-extern crate smoltcp;
-extern crate network_manager;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate alloc;
 extern crate hpet;
-extern crate owning_ref;
-extern crate spawn;
-extern crate task;
-extern crate sha3;
-extern crate percent_encoding;
-extern crate rand;
 extern crate http_client;
 extern crate itertools;
-#[macro_use] extern crate smoltcp_helper;
+extern crate network_manager;
+extern crate owning_ref;
+extern crate percent_encoding;
+extern crate rand;
+extern crate sha3;
+extern crate smoltcp;
+extern crate spawn;
+extern crate task;
+#[macro_use]
+extern crate smoltcp_helper;
 
-
-use core::str;
 use alloc::{
-    vec::Vec,
     collections::BTreeSet,
     string::{String, ToString},
+    vec::Vec,
 };
-use itertools::Itertools;
+use core::str;
 use hpet::get_hpet;
-use smoltcp::{
-    wire::{Ipv4Address, IpEndpoint},
-    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
-};
+use http_client::{check_http_request, send_request, ConnectedTcpSocket, HttpResponse};
+use itertools::Itertools;
+use network_manager::NetworkInterfaceRef;
+use percent_encoding::{utf8_percent_encode, DEFAULT_ENCODE_SET};
+use rand::{rngs::SmallRng, RngCore, SeedableRng};
 use sha3::{Digest, Sha3_512};
-use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
-use network_manager::{NetworkInterfaceRef};
-use rand::{
-    SeedableRng,
-    RngCore,
-    rngs::SmallRng
+use smoltcp::{
+    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
+    wire::{IpEndpoint, Ipv4Address},
 };
-use http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_request};
-use smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
+use smoltcp_helper::{connect, millis_since, poll_iface, STARTING_FREE_PORT};
 
 /// The IP address of the update server.
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [10, 0, 2, 2]; // the IP of the host machine when running on QEMU.
 
-/// The TCP port on the update server that listens for update requests 
+/// The TCP port on the update server that listens for update requests
 const DEFAULT_DESTINATION_PORT: u16 = 8090;
 
 /// The default remote endpoint, server IP and port, of the update server.
 pub fn default_remote_endpoint() -> IpEndpoint {
     IpEndpoint::new(
-        Ipv4Address::from_bytes(&DEFAULT_DESTINATION_IP_ADDR).into(), 
-        DEFAULT_DESTINATION_PORT
+        Ipv4Address::from_bytes(&DEFAULT_DESTINATION_IP_ADDR).into(),
+        DEFAULT_DESTINATION_PORT,
     )
 }
 
@@ -70,7 +68,7 @@ const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
 const LISTING_FILE_NAME: &'static str = "listing.txt";
 
 /// The name (and relative path) of the diff file inside each update build directory,
-/// which contains the mapping of old crates to new crates, indicating how a swap should take place. 
+/// which contains the mapping of old crates to new crates, indicating how a swap should take place.
 pub const DIFF_FILE_NAME: &'static str = "diff.txt";
 
 /// The name of the directory containing the checksums of each crate object file
@@ -80,15 +78,12 @@ const CHECKSUMS_DIR_NAME: &'static str = "checksums";
 /// The file extension that is appended onto each crate object file's checksum file.
 const CHECKSUM_FILE_EXTENSION: &'static str = ".sha512";
 
-
-
-/// A file that has been downloaded over the network, 
+/// A file that has been downloaded over the network,
 /// including its name and a byte array containing its contents.
 pub struct DownloadedFile {
     pub name: String,
     pub content: HttpResponse,
 }
-
 
 /// An enum used for specifying which crate files to download from an update build's listing.
 /// To download all crates, pass an empty `Exclude` set.
@@ -108,7 +103,6 @@ impl CrateSet {
     }
 }
 
-
 /// Connects to the update server over the given network interface
 /// and downloads the list of available update builds.
 /// An update build is a compiled instance of Theseus that contains all crates' object files.
@@ -119,7 +113,6 @@ pub fn download_available_update_builds(
     download_string_file(iface, remote_endpoint, UPDATE_BUILDS_PATH)
 }
 
-
 /// Connects to the update server over the given network interface
 /// and downloads the list of crates present in the given update build.
 pub fn download_listing(
@@ -127,9 +120,12 @@ pub fn download_listing(
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
-    download_string_file(iface, remote_endpoint, &format!("/{}/{}", update_build, LISTING_FILE_NAME))
+    download_string_file(
+        iface,
+        remote_endpoint,
+        &format!("/{}/{}", update_build, LISTING_FILE_NAME),
+    )
 }
-
 
 /// Connects to the update server over the given network interface
 /// and downloads the diff file in the given update build,
@@ -139,11 +135,14 @@ pub fn download_diff(
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
-    download_string_file(iface, remote_endpoint, &format!("/{}/{}", update_build, DIFF_FILE_NAME))
+    download_string_file(
+        iface,
+        remote_endpoint,
+        &format!("/{}/{}", update_build, DIFF_FILE_NAME),
+    )
 }
 
-
-/// Convenience function for downloading files and returning their contents as Strings per line. 
+/// Convenience function for downloading files and returning their contents as Strings per line.
 fn download_string_file(
     iface: &NetworkInterfaceRef,
     remote_endpoint: IpEndpoint,
@@ -154,7 +153,6 @@ fn download_string_file(
     as_lines(content)
 }
 
-
 /// Convenience function for converting a byte stream
 /// that is delimited by newlines into a list of Strings.
 pub fn as_lines(bytes: &[u8]) -> Result<Vec<String>, &'static str> {
@@ -162,7 +160,6 @@ pub fn as_lines(bytes: &[u8]) -> Result<Vec<String>, &'static str> {
         .map_err(|_e| "couldn't convert file into a UTF8 string")
         .map(|files| files.lines().map(|s| String::from(s)).collect())
 }
-
 
 /// A representation of an diff file used to define an evolutionary crate swapping update.
 pub struct Diff {
@@ -174,12 +171,11 @@ pub struct Diff {
     pub state_transfer_functions: Vec<String>,
 }
 
-
 /// Parses a series of diff lines into a representation of an update diff.
-/// 
+///
 /// # Arguments
 /// * `diffs`: a list of lines, in which each line is a diff entry.
-/// 
+///
 /// # Example diff entry formats
 /// ```
 /// a#ps.o -> a#ps.o
@@ -194,15 +190,21 @@ pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
         // addition of new crate
         if diff.starts_with("+") {
             pairs.push((
-                String::new(), 
-                diff.get(1..).ok_or("error parsing (+) diff line")?.trim().to_string(),
+                String::new(),
+                diff.get(1..)
+                    .ok_or("error parsing (+) diff line")?
+                    .trim()
+                    .to_string(),
             ));
-        } 
+        }
         // removal of old crate
         else if diff.starts_with("-") {
             pairs.push((
-                diff.get(1..).ok_or("error parsing (-) diff line")?.trim().to_string(), 
-                String::new()
+                diff.get(1..)
+                    .ok_or("error parsing (-) diff line")?
+                    .trim()
+                    .to_string(),
+                String::new(),
             ));
         }
         // replacement of old crate with new crate
@@ -212,46 +214,51 @@ pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
         // state transfer function
         else if diff.starts_with("@") {
             state_transfer_functions.push(
-                diff.get(1..).ok_or("error parsing (@state_transfer) diff line")?.trim().to_string(),
+                diff.get(1..)
+                    .ok_or("error parsing (@state_transfer) diff line")?
+                    .trim()
+                    .to_string(),
             )
-        }
-        else {
+        } else {
             error!("parse_diff_lines(): error parsing diff line: {:?}", diff);
             return Err("error parsing diff line");
         }
     }
 
-    Ok(Diff { pairs, state_transfer_functions })
+    Ok(Diff {
+        pairs,
+        state_transfer_functions,
+    })
 }
-
-
 
 /// Connects to the update server over the given network interface
 /// and downloads the object files for the specified `crates`.
-/// 
-/// It also downloads the checksum file for each crate object file 
+///
+/// It also downloads the checksum file for each crate object file
 /// in order to verify that each object file was completely downloaded correctly.
-/// 
+///
 /// A list of available update builds can be obtained by calling `download_available_update_builds()`.
-/// 
+///
 /// # Arguments
 /// * `iface`: a reference to an initialized network interface for sockets to use.
 /// * `update_build`: the string name of the update build that the downloaded crates will belong to.
 /// * `crates`: a set of crate names, e.g., "k#my_crate-3d0cd20d4e1d4ba9.o",
-///    that will be downloaded from the given `update_build` on the server. 
-/// 
+///    that will be downloaded from the given `update_build` on the server.
+///
 /// Returns the list of crate object files (as `DownloadedFile`s) in the given `update_build`.
 pub fn download_crates(
-    iface: &NetworkInterfaceRef, 
+    iface: &NetworkInterfaceRef,
     remote_endpoint: IpEndpoint,
     update_build: &str,
     crates: BTreeSet<String>,
 ) -> Result<Vec<DownloadedFile>, &'static str> {
-
     let mut paths_to_download: Vec<String> = Vec::new();
     for file_name in crates.iter() {
         let path = format!("/{}/{}", update_build, file_name);
-        let path_sha = format!("/{}/{}/{}{}", update_build, CHECKSUMS_DIR_NAME, file_name, CHECKSUM_FILE_EXTENSION);
+        let path_sha = format!(
+            "/{}/{}/{}{}",
+            update_build, CHECKSUMS_DIR_NAME, file_name, CHECKSUM_FILE_EXTENSION
+        );
         paths_to_download.push(path);
         paths_to_download.push(path_sha);
     }
@@ -262,11 +269,11 @@ pub fn download_crates(
     for chunk in crate_object_files.chunks(2) {
         match chunk {
             [file, hash_file] => {
-                let hash_file_str = hash_file.content.as_result_err_str()
-                    .and_then(|content| str::from_utf8(content)
+                let hash_file_str = hash_file.content.as_result_err_str().and_then(|content| {
+                    str::from_utf8(content)
                         .map_err(|_e| "couldn't convert downloaded hash file into a UTF8 string")
-                    )?;
-                    
+                })?;
+
                 if let Some(hash_value) = hash_file_str.split_whitespace().next() {
                     if verify_hash(file.content.as_result_err_str()?, hash_value) {
                         // success! the hash matched, so the file was properly downloaded
@@ -294,32 +301,29 @@ pub fn download_crates(
     Ok(crate_object_files)
 }
 
-
 /// A convenience function for downloading just one file. See `download_files()`.
 fn download_file<S: AsRef<str>>(
     iface: &NetworkInterfaceRef,
-    remote_endpoint: IpEndpoint, 
+    remote_endpoint: IpEndpoint,
     absolute_path: S,
 ) -> Result<DownloadedFile, &'static str> {
-    
     download_files(iface, remote_endpoint, vec![absolute_path])?
         .into_iter()
         .next()
         .ok_or("no file received from the server")
 }
 
-
 /// Connects to the update server over the given network interface
 /// and downloads the given files, each specified with its full absolute path on the update server.
-/// 
-/// Returns an error if any of the given `absolute_paths` didn't exist, 
+///
+/// Returns an error if any of the given `absolute_paths` didn't exist,
 /// or if there was any other error on the remote server.
 fn download_files<S: AsRef<str>>(
     iface: &NetworkInterfaceRef,
     remote_endpoint: IpEndpoint,
     absolute_paths: Vec<S>,
 ) -> Result<Vec<DownloadedFile>, &'static str> {
-    if absolute_paths.is_empty() { 
+    if absolute_paths.is_empty() {
         return Err("no download paths given");
     }
 
@@ -336,7 +340,14 @@ fn download_files<S: AsRef<str>>(
     let mut tcp_handle = sockets.add(tcp_socket);
 
     // first, attempt to connect the socket to the remote server
-    connect(iface, &mut sockets, tcp_handle, remote_endpoint, local_port, startup_time)?;
+    connect(
+        iface,
+        &mut sockets,
+        tcp_handle,
+        remote_endpoint,
+        local_port,
+        startup_time,
+    )?;
     debug!("ota_update_client: socket connected successfully!");
 
     // iterate over the provided list of file paths, and retrieve each one via HTTP
@@ -350,8 +361,13 @@ fn download_files<S: AsRef<str>>(
             let method = "GET";
             let uri = utf8_percent_encode(path, DEFAULT_ENCODE_SET);
             let version = "HTTP/1.1";
-            let connection = if is_last_request { "Connection: close" } else { "Connection: keep-alive" };
-            format!("{} {} {}\r\n{}\r\n{}\r\n\r\n",
+            let connection = if is_last_request {
+                "Connection: close"
+            } else {
+                "Connection: keep-alive"
+            };
+            format!(
+                "{} {} {}\r\n{}\r\n{}\r\n\r\n",
                 method,
                 uri,
                 version,
@@ -360,11 +376,14 @@ fn download_files<S: AsRef<str>>(
             )
         };
         if !check_http_request(http_request.as_bytes()) {
-            error!("ota_update_client: created improper/incomplete HTTP request: {:?}.", http_request);
+            error!(
+                "ota_update_client: created improper/incomplete HTTP request: {:?}.",
+                http_request
+            );
             return Err("ota_update_client: created improper/incomplete HTTP request");
         }
 
-        // Check that the socket is still connected. If not, we need to create a new one and connect it before use. 
+        // Check that the socket is still connected. If not, we need to create a new one and connect it before use.
         // if !is_connected(&mut sockets, tcp_handle) {
         // for now, we just always close the old socket and connect a new one
         {
@@ -372,11 +391,11 @@ fn download_files<S: AsRef<str>>(
             // first, close the existing socket
             {
                 let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-                socket.close(); 
-                socket.abort(); 
+                socket.close();
+                socket.abort();
             }
             let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
-            
+
             // second, create an entirely new socket and connect it
             local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
             tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
@@ -384,17 +403,32 @@ fn download_files<S: AsRef<str>>(
             tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
             sockets = SocketSet::new(Vec::with_capacity(1));
             tcp_handle = sockets.add(tcp_socket);
-            connect(iface, &mut sockets, tcp_handle, remote_endpoint, local_port, startup_time)?;
+            connect(
+                iface,
+                &mut sockets,
+                tcp_handle,
+                remote_endpoint,
+                local_port,
+                startup_time,
+            )?;
         }
 
         // send the HTTP request and obtain a response
         let response = {
-            let mut connected_tcp_socket = ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
-            send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
+            let mut connected_tcp_socket =
+                ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
+            send_request(
+                http_request,
+                &mut connected_tcp_socket,
+                Some(HTTP_REQUEST_TIMEOUT_MILLIS),
+            )?
         };
 
         if response.status_code != 200 {
-            error!("ota_update_client: failed to download {:?}, Error {}: {}", path, response.status_code, response.reason);
+            error!(
+                "ota_update_client: failed to download {:?}, Error {}: {}",
+                path, response.status_code, response.reason
+            );
             break;
         }
 
@@ -403,7 +437,6 @@ fn download_files<S: AsRef<str>>(
             content: response,
         });
     }
-
 
     let mut _loop_ctr = 0;
     let mut issued_close = false;
@@ -420,7 +453,10 @@ fn download_files<S: AsRef<str>>(
 
             debug!("ota_update_client: closing socket...");
             socket.close();
-            debug!("ota_update_client: socket state (after close) is now {:?}", socket.state());
+            debug!(
+                "ota_update_client: socket state (after close) is now {:?}",
+                socket.state()
+            );
             issued_close = true;
         }
 
@@ -429,7 +465,10 @@ fn download_files<S: AsRef<str>>(
         }
 
         if _loop_ctr % 50000 == 0 {
-            debug!("ota_update_client: socket state (looping) is now {:?}", socket.state());
+            debug!(
+                "ota_update_client: socket state (looping) is now {:?}",
+                socket.state()
+            );
         }
 
         // check to make sure we haven't timed out
@@ -438,7 +477,7 @@ fn download_files<S: AsRef<str>>(
             socket.abort();
             // Don't break out of the loop here!  we need to let this socket actually send the close msg
             // to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).
-            // Then, the socket will be in the Closed state, and that conditional above will break out of the loop. 
+            // Then, the socket will be in the Closed state, and that conditional above will break out of the loop.
         }
     }
 
@@ -449,17 +488,15 @@ fn download_files<S: AsRef<str>>(
     Ok(downloaded_files)
 }
 
-
-// /// A convenience function that checks whether a socket is connected, 
+// /// A convenience function that checks whether a socket is connected,
 // /// which is currently true when both `may_send()` and `may_recv()` are true.
 // fn is_connected(sockets: &mut SocketSet, tcp_handle: SocketHandle) -> bool {
 //     let socket = sockets.get::<TcpSocket>(tcp_handle);
 //     socket.may_send() && socket.may_recv()
 // }
 
-
 /// Returns true if the SHA3 512-bit hash of the given `content` matches the given `hash` string.
-/// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. 
+/// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned.
 fn verify_hash(content: &[u8], hash: &str) -> bool {
     let result = Sha3_512::digest(content);
     hash == format!("{:x}", result)

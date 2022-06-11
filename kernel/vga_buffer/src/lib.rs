@@ -1,4 +1,4 @@
-//! Support for basic printing to a simple 80x25 text-mode VGA buffer. 
+//! Support for basic printing to a simple 80x25 text-mode VGA buffer.
 //!
 //! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
 
@@ -10,13 +10,10 @@ extern crate logger;
 extern crate spin;
 extern crate volatile;
 
-
-use core::fmt;
-use core::ptr::Unique;
+use core::{fmt, ptr::Unique};
+use kernel_config::memory::KERNEL_OFFSET;
 use spin::Mutex;
 use volatile::Volatile;
-use kernel_config::memory::KERNEL_OFFSET;
-
 
 /// defined by x86's physical memory maps
 const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
@@ -26,15 +23,12 @@ const BUFFER_HEIGHT: usize = 25;
 /// width of the VGA text window
 const BUFFER_WIDTH: usize = 80;
 
-
 /// The singleton VGA writer instance that writes to the VGA text buffer.
-static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(
-    VgaBuffer {
-        column_position: 0,
-        // SAFE: the assembly boot up code ensures this is mapped into memory.
-        buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_VIRTUAL_ADDR) as *mut _) },
-    }
-);
+static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(VgaBuffer {
+    column_position: 0,
+    // SAFE: the assembly boot up code ensures this is mapped into memory.
+    buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_VIRTUAL_ADDR) as *mut _) },
+});
 
 #[macro_export]
 macro_rules! print_raw {
@@ -55,10 +49,8 @@ pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
     EARLY_VGA_WRITER.lock().write_fmt(args)
 }
 
-
 type VgaTextBufferLine = [Volatile<ScreenChar>; BUFFER_WIDTH];
-type VgaTextBuffer     = [VgaTextBufferLine; BUFFER_HEIGHT];
-
+type VgaTextBuffer = [VgaTextBufferLine; BUFFER_HEIGHT];
 
 struct VgaBuffer {
     column_position: usize,
@@ -75,12 +67,10 @@ impl VgaBuffer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                self.buffer()[row][col].write(
-                    ScreenChar {
-                        ascii_character: byte,
-                        color_code: ColorCode::default(),
-                    }
-                );
+                self.buffer()[row][col].write(ScreenChar {
+                    ascii_character: byte,
+                    color_code: ColorCode::default(),
+                });
                 self.column_position += 1;
             }
         }
@@ -100,7 +90,7 @@ impl VgaBuffer {
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: ColorCode::default()
+            color_code: ColorCode::default(),
         };
         for col in 0..BUFFER_WIDTH {
             self.buffer()[row][col].write(blank);
@@ -114,18 +104,16 @@ impl VgaBuffer {
 }
 impl fmt::Write for VgaBuffer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        
         // mirror DIRECTLY to serial port, do not use the log statements
         // because that can introduce an infinite loop when mirror_to_serial is enabled.
-        let ret = logger::write_str(s); 
-        
+        let ret = logger::write_str(s);
+
         for byte in s.bytes() {
             self.write_byte(byte)
         }
         ret
     }
 }
-
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]

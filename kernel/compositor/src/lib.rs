@@ -8,31 +8,31 @@ extern crate shapes;
 
 use core::iter::IntoIterator;
 
+use core::ops::Range;
 use framebuffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
-use core::ops::Range;
 
-/// A compositor composites (combines or blends) a series of "source" framebuffers onto a single "destination" framebuffer. 
-/// The type parameter `B` allows a compositor to support multiple types of regions or "bounding boxes", 
+/// A compositor composites (combines or blends) a series of "source" framebuffers onto a single "destination" framebuffer.
+/// The type parameter `B` allows a compositor to support multiple types of regions or "bounding boxes",
 /// given by the trait bound `CompositableRegion`.
 pub trait Compositor {
     /// Composites the framebuffers in the list of source framebuffers `src_fbs` onto the destination framebuffer `dest_fb`.
     ///
     /// # Arguments
-    /// * `src_fbs`: an iterator over the source framebuffers to be composited, 
-    ///    along with where in the `dest_fb` they should be composited. 
+    /// * `src_fbs`: an iterator over the source framebuffers to be composited,
+    ///    along with where in the `dest_fb` they should be composited.
     /// * `dest_fb`: the destination framebuffer that will hold the source framebuffers to be composited.
     /// * `dest_bounding_boxes`: an iterator over bounding boxes that specify which regions
-    ///    in the destination framebuffer should be updated. 
+    ///    in the destination framebuffer should be updated.
     ///    For each source framebuffer in `src_fbs`, the compositor will iterate over every bounding box
     ///    and find the corresponding region in that source framebuffer and then blend that region into the destination.
-    /// 
+    ///
     /// For example, if the window manager wants to draw a new partially-transparent window,
     /// it will pass the framebuffers for all existing windows plus the new window (in bottom-to-top order)
-    /// to the compositor, in the argument `src_fbs`. 
+    /// to the compositor, in the argument `src_fbs`.
     /// The `dest_fb` would be the final framebuffer mapped to the display device (screen memory),
     /// and the `bounding_boxes` would be an iterator over just a single region in the final framebuffer
-    /// where that new window will be located. 
+    /// where that new window will be located.
     /// When the source framebuffers are composited from bottom to top, the compositor will redraw the region of every source framebuffer
     /// that intersects with that bounding box.
     ///
@@ -48,45 +48,44 @@ pub trait Compositor {
     ) -> Result<(), &'static str>;
 }
 
-
 /// A source framebuffer to be composited, along with its target position.
 pub struct FramebufferUpdates<'a, P: Pixel> {
     /// The source framebuffer to be composited.
     pub src_framebuffer: &'a Framebuffer<P>,
-    /// The coordinate in the destination framebuffer where the source `framebuffer` 
-    /// should be composited. 
-    /// This coordinate is expressed relative to the top-left corner of the destination framebuffer. 
+    /// The coordinate in the destination framebuffer where the source `framebuffer`
+    /// should be composited.
+    /// This coordinate is expressed relative to the top-left corner of the destination framebuffer.
     pub coordinate_in_dest_framebuffer: Coord,
 }
 
-/// A `CompositableRegion` is an abstract region (i.e., a bounding box) 
+/// A `CompositableRegion` is an abstract region (i.e., a bounding box)
 /// that can optimize the compositing (blending) of one framebuffer into another framebuffer
-/// according to the specifics of the region's shape. 
-/// For example, a single 2-D point (`Coord`) offers no real room for optimization 
+/// according to the specifics of the region's shape.
+/// For example, a single 2-D point (`Coord`) offers no real room for optimization
 /// because only one pixel will be composited,
 /// but a rectangle **does** allow for optimization, as a large chunk of pixels can be composited all at once.
-/// 
+///
 /// In addition, a `CompositableRegion` makes it easier for a compositor to only composite pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait CompositableRegion {
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
 
-    /// Returns the range of rows covered by this region, 
+    /// Returns the range of rows covered by this region,
     /// given as row indices where row `0` is the top row in the region.
     fn row_range(&self) -> Range<isize>;
 
-    /// Blends the pixels in the source framebuffer `src_fb` within the range of rows (`src_fb_row_range`) 
+    /// Blends the pixels in the source framebuffer `src_fb` within the range of rows (`src_fb_row_range`)
     /// into the pixels in the destination framebuffer `dest_fb`.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited (starting at the `src_fb`'s top-left corner).
     /// `src_fb_row_range` is the index range of rows in the source framebuffer to blend.
     fn blend_buffers<P: Pixel>(
-        &self, 
-        src_fb: &Framebuffer<P>, 
-        dest_fb: &mut Framebuffer<P>, 
+        &self,
+        src_fb: &Framebuffer<P>,
+        dest_fb: &mut Framebuffer<P>,
         dest_coord: Coord,
-        src_fb_row_range: Range<usize>       
+        src_fb_row_range: Range<usize>,
     ) -> Result<(), &'static str>;
 }
 
@@ -102,12 +101,12 @@ impl CompositableRegion for Coord {
     }
 
     fn blend_buffers<P: Pixel>(
-        &self, 
+        &self,
         src_fb: &Framebuffer<P>,
-        dest_fb: &mut Framebuffer<P>, 
-        dest_coord: Coord,        
+        dest_fb: &mut Framebuffer<P>,
+        dest_coord: Coord,
         _src_fb_row_range: Range<usize>,
-    ) -> Result<(), &'static str>{
+    ) -> Result<(), &'static str> {
         let relative_coord = self.clone() - dest_coord;
         if let Some(pixel) = src_fb.get_pixel(relative_coord) {
             dest_fb.draw_pixel(self.clone(), pixel);
@@ -124,12 +123,13 @@ impl CompositableRegion for Rectangle {
 
     #[inline]
     fn size(&self) -> usize {
-        (self.bottom_right.x - self.top_left.x) as usize * (self.bottom_right.y - self.top_left.y) as usize
+        (self.bottom_right.x - self.top_left.x) as usize
+            * (self.bottom_right.y - self.top_left.y) as usize
     }
 
     fn blend_buffers<P: Pixel>(
-        &self, 
-        src_fb: &Framebuffer<P>, 
+        &self,
+        src_fb: &Framebuffer<P>,
         dest_fb: &mut Framebuffer<P>,
         dest_coord: Coord,
         src_fb_row_range: Range<usize>,
@@ -137,18 +137,24 @@ impl CompositableRegion for Rectangle {
         let (dest_width, dest_height) = dest_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
 
-        let start_y = core::cmp::max(src_fb_row_range.start as isize + dest_coord.y, self.top_left.y);
-        let end_y = core::cmp::min(src_fb_row_range.end as isize + dest_coord.y, self.bottom_right.y);
+        let start_y = core::cmp::max(
+            src_fb_row_range.start as isize + dest_coord.y,
+            self.top_left.y,
+        );
+        let end_y = core::cmp::min(
+            src_fb_row_range.end as isize + dest_coord.y,
+            self.bottom_right.y,
+        );
 
         // skip if the updated part is not in the dest framebuffer
         let dest_start = Coord::new(
             core::cmp::max(0, self.top_left.x),
-            core::cmp::max(0, start_y)
+            core::cmp::max(0, start_y),
         );
 
         let dest_end = Coord::new(
             core::cmp::min(dest_width as isize, self.bottom_right.x),
-            core::cmp::min(dest_height as isize, end_y)
+            core::cmp::min(dest_height as isize, end_y),
         );
         if dest_end.x < 0
             || dest_start.x > dest_width as isize
@@ -157,7 +163,7 @@ impl CompositableRegion for Rectangle {
         {
             return Ok(());
         }
-                
+
         // skip if the updated part is not in the source framebuffer
         let coordinate_start = dest_start - dest_coord;
         let coordinate_end = dest_end - dest_coord;
@@ -182,15 +188,22 @@ impl CompositableRegion for Rectangle {
             let src_start = Coord::new(src_x_start as isize, (src_y_start + i) as isize);
             let src_start_index = match src_fb.index_of(src_start) {
                 Some(index) => index,
-                None => {continue;}
+                None => {
+                    continue;
+                }
             };
             let src_end_index = src_start_index + width;
             let dest_start = src_start + dest_coord;
-            let dest_start_index =  match dest_fb.index_of(dest_start) {
+            let dest_start_index = match dest_fb.index_of(dest_start) {
                 Some(index) => index,
-                None => {continue;}
+                None => {
+                    continue;
+                }
             };
-            dest_fb.composite_buffer(&(src_buffer[src_start_index..src_end_index]), dest_start_index as usize);
+            dest_fb.composite_buffer(
+                &(src_buffer[src_start_index..src_end_index]),
+                dest_start_index as usize,
+            );
         }
 
         Ok(())

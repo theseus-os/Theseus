@@ -10,14 +10,12 @@ extern crate port_io;
 
 use core::fmt;
 
-
 /// The offset added to the first IRQ: `0x20`.
-/// 
-/// This is needed to shift the start of all IRQ vectors 
+///
+/// This is needed to shift the start of all IRQ vectors
 /// to after the end of the CPU exception vectors,
 /// which occupy the first 32 IRQ vectors.
 pub const IRQ_BASE_OFFSET: u8 = 0x20;
-
 
 /// Command sent to read the Interrupt Request Register.
 const CMD_IRR: u8 = 0x0A;
@@ -34,21 +32,20 @@ const CMD_END_OF_INTERRUPT: u8 = 0x20;
 // The mode in which we want to run our PICs.
 const MODE_8086: u8 = 0x01;
 
-const MASTER_CMD:  u16 = 0x20;
+const MASTER_CMD: u16 = 0x20;
 const MASTER_DATA: u16 = 0x21;
-const SLAVE_CMD:   u16 = 0xA0;
-const SLAVE_DATA:  u16 = 0xA1;
-
+const SLAVE_CMD: u16 = 0xA0;
+const SLAVE_DATA: u16 = 0xA1;
 
 /// The set of status registers for both PIC chips.
 ///
-/// Each PIC chip has two interrupt status registers: 
+/// Each PIC chip has two interrupt status registers:
 ///  * `ISR`: the In-Service Register: specifies which interrupts are currently being serviced,
-///     meaning IRQs sent to the CPU. 
+///     meaning IRQs sent to the CPU.
 ///  * `IRR`: the Interrupt Request Register: specifies which interrupts have been raised
 ///     but not necessarily serviced yet.
 ///
-/// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU, 
+/// Based on the interrupt mask, the PIC will send interrupts from the IRR to the CPU,
 /// at which point they are marked in the ISR.
 ///
 /// For more, [see this explanation](http://wiki.osdev.org/8259_PIC#ISR_and_IRR).
@@ -60,8 +57,11 @@ pub struct IrqStatusRegisters {
 }
 impl fmt::Display for IrqStatusRegisters {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Master ISR: {:#b}, Master IRR:{:#b}, Slave ISR: {:#b}, Slave IRR: {:#b}", 
-                self.master_isr, self.master_irr, self.slave_isr, self.slave_irr)
+        write!(
+            f,
+            "Master ISR: {:#b}, Master IRR:{:#b}, Slave ISR: {:#b}, Slave IRR: {:#b}",
+            self.master_isr, self.master_irr, self.slave_isr, self.slave_irr
+        )
     }
 }
 impl fmt::Debug for IrqStatusRegisters {
@@ -69,7 +69,6 @@ impl fmt::Debug for IrqStatusRegisters {
         fmt::Display::fmt(self, f)
     }
 }
-
 
 /// An individual PIC chip.  This is not exported, because we always access
 /// it through `Pics` below.
@@ -108,7 +107,7 @@ pub struct ChainedPics {
 impl ChainedPics {
     /// Create a new interface for the standard PIC1 and PIC2 controllers,
     /// specifying the desired interrupt offsets.
-    /// Then, it initializes the PICs in a standard chained fashion, 
+    /// Then, it initializes the PICs in a standard chained fashion,
     /// which involved mapping the master PIC to 0x20 and the slave to 0x28 (standard rempaping),
     /// because even if we don't use them (and disable them for APIC instead),
     /// we still need to remap them to avoid a spurious interrupt clashing with an exception.
@@ -125,7 +124,7 @@ impl ChainedPics {
                     command: port_io::Port::new(SLAVE_CMD),
                     data: port_io::Port::new(SLAVE_DATA),
                 },
-            ]
+            ],
         };
         // SAFE: we already checked that we are the only ones to have called this constructor.
         unsafe {
@@ -134,12 +133,10 @@ impl ChainedPics {
         cpic
     }
 
-
     /// Initialize both our PICs.  We initialize them together, at the same
     /// time, because it's traditional to do so, and because I/O operations
     /// might not be instantaneous on older processors.
     unsafe fn configure(&mut self, master_mask: u8, slave_mask: u8) {
-      
         // mask all interrupts during init
         self.mask_irqs(0xFF, 0xFF);
 
@@ -182,10 +179,9 @@ impl ChainedPics {
         io_wait();
         self.pics[1].command.write(CMD_END_OF_INTERRUPT);
         io_wait();
-
     }
 
-    /// Each mask is a bitwise mask for each IRQ line, with the master's IRQ line 2 (0x4) 
+    /// Each mask is a bitwise mask for each IRQ line, with the master's IRQ line 2 (0x4)
     /// affecting the entire slave IRQ mask. So if the master's IRQ line 2 is masked (disabled),
     /// all slave IRQs (0x28 to 0x2F) are masked.
     /// If a bit is set to 1, it is masked (disabled). If set to 0, it is unmasked (enabled).
@@ -198,7 +194,6 @@ impl ChainedPics {
             io_wait();
         }
     }
- 
 
     /// Do we handle this interrupt?
     fn handles_interrupt(&self, interrupt_id: u8) -> bool {
@@ -217,7 +212,6 @@ impl ChainedPics {
         }
     }
 
-
     /// Reads the ISR and IRR registers of both the master and slave PIC.
     pub fn read_isr_irr(&self) -> IrqStatusRegisters {
         // SAFE: just reading PIC registers, no harm can be done.
@@ -225,12 +219,12 @@ impl ChainedPics {
             self.pics[0].command.write(CMD_ISR);
             self.pics[1].command.write(CMD_ISR);
             let master_isr = self.pics[0].command.read();
-            let slave_isr  = self.pics[1].command.read();
+            let slave_isr = self.pics[1].command.read();
 
             self.pics[0].command.write(CMD_IRR);
             self.pics[1].command.write(CMD_IRR);
             let master_irr = self.pics[0].command.read();
-            let slave_irr  = self.pics[1].command.read();
+            let slave_irr = self.pics[1].command.read();
 
             IrqStatusRegisters {
                 master_isr: master_isr,
@@ -242,7 +236,6 @@ impl ChainedPics {
     }
 }
 
-
 #[inline(always)]
 fn io_wait() {
     // We need to add a short delay between writes to our PICs, especially on
@@ -251,5 +244,7 @@ fn io_wait() {
     // older versions of Linux and other PC operating systems have
     // worked around this by writing garbage data to port 0x80, which
     // allegedly takes long enough to make everything work on most hardware.
-    unsafe { port_io::Port::<u8>::new(0x80).write(0); }
+    unsafe {
+        port_io::Port::<u8>::new(0x80).write(0);
+    }
 }

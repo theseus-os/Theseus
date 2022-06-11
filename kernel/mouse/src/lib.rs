@@ -2,14 +2,14 @@
 #[macro_use]
 extern crate log;
 
-extern crate mpmc;
 extern crate event_types;
 extern crate mouse_data;
+extern crate mpmc;
 extern crate ps2;
 extern crate spin;
 
-use mpmc::Queue;
 use event_types::Event;
+use mpmc::Queue;
 use spin::Once;
 
 use mouse_data::{ButtonAction, Displacement, MouseEvent, MouseMovement};
@@ -114,7 +114,9 @@ pub fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.get() {
-        producer.push(event).map_err(|_e| "Fail to enqueue the mouse event")
+        producer
+            .push(event)
+            .map_err(|_e| "Fail to enqueue the mouse event")
     } else {
         warn!("handle_keyboard_input(): MOUSE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
         Err("keyboard event queue not ready")

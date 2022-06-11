@@ -54,7 +54,7 @@ impl Bitfield for [AtomicU64] {
         base_addr: usize,
         layout: Layout,
         page_size: usize,
-        metadata_size: usize
+        metadata_size: usize,
     ) -> Option<(usize, usize)> {
         for (base_idx, b) in self.iter().enumerate() {
             let bitval = b.load(Ordering::Relaxed);
@@ -184,7 +184,8 @@ pub trait AllocablePage {
     /// Tries to find a free block within `data` that satisfies `alignment` requirement.
     fn first_fit(&self, layout: Layout) -> Option<(usize, usize)> {
         let base_addr = (&*self as *const Self as *const u8) as usize;
-        self.bitfield().first_fit(base_addr, layout, Self::SIZE, Self::METADATA_SIZE)
+        self.bitfield()
+            .first_fit(base_addr, layout, Self::SIZE, Self::METADATA_SIZE)
     }
 
     /// Tries to allocate an object within this page.
@@ -231,7 +232,6 @@ pub trait AllocablePage {
     }
 }
 
-
 /// Holds allocated data within 2 4-KiB pages.
 ///
 /// Has a data-section where objects are allocated from
@@ -259,15 +259,19 @@ pub struct ObjectPage8k<'a> {
     pub(crate) bitfield: [AtomicU64; 8],
 }
 
-
 // These needs some more work to be really safe...
 unsafe impl<'a> Send for ObjectPage8k<'a> {}
 unsafe impl<'a> Sync for ObjectPage8k<'a> {}
 
 impl<'a> AllocablePage for ObjectPage8k<'a> {
     const SIZE: usize = 8192;
-    const METADATA_SIZE: usize = core::mem::size_of::<usize>() + (2*core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>()) + (8*8);
-    const HEAP_ID_OFFSET: usize = Self::SIZE - (core::mem::size_of::<usize>() + (2*core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>()) + (8*8));
+    const METADATA_SIZE: usize = core::mem::size_of::<usize>()
+        + (2 * core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>())
+        + (8 * 8);
+    const HEAP_ID_OFFSET: usize = Self::SIZE
+        - (core::mem::size_of::<usize>()
+            + (2 * core::mem::size_of::<Rawlink<ObjectPage8k<'a>>>())
+            + (8 * 8));
 
     /// clears the metadata section of the page
     fn clear_metadata(&mut self) {
@@ -279,7 +283,7 @@ impl<'a> AllocablePage for ObjectPage8k<'a> {
         }
     }
 
-    fn set_heap_id(&mut self, heap_id: usize){
+    fn set_heap_id(&mut self, heap_id: usize) {
         self.heap_id = heap_id;
     }
 
@@ -318,7 +322,6 @@ impl<'a> fmt::Debug for ObjectPage8k<'a> {
         write!(f, "ObjectPage8k")
     }
 }
-
 
 /// A list of pages.
 pub(crate) struct PageList<'a, T: AllocablePage> {
@@ -516,4 +519,3 @@ impl<T> Rawlink<T> {
         mem::replace(self, Rawlink::none())
     }
 }
-

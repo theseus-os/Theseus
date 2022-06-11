@@ -10,12 +10,12 @@
 //! They do so by writing them as three distinct values (with proper busy waiting in between):
 //! 1. `0x08`
 //! 2. `0x20` (an ascii space character)
-//! 3. `0x08` again. 
+//! 3. `0x08` again.
 //!
 //! This isn't necessarily a bad idea, as it "clears out" whatever character was there before,
-//! presumably to prevent rendering/display issues for a deleted character. 
+//! presumably to prevent rendering/display issues for a deleted character.
 //! But, this isn't required, and I personally believe it should be handled by a higher layer,
-//! such as a shell or TTY program. 
+//! such as a shell or TTY program.
 //! We don't do anything like that here, in case a user of this crate wants to send binary data
 //! across the serial port, rather than "smartly-interpreted" ASCII characters.
 //!
@@ -27,13 +27,13 @@
 
 #![no_std]
 
-extern crate spin;
-extern crate port_io;
 extern crate irq_safety;
+extern crate port_io;
+extern crate spin;
 
 use core::{convert::TryFrom, fmt, str::FromStr};
-use port_io::Port;
 use irq_safety::MutexIrqSafe;
+use port_io::Port;
 
 /// The base port I/O addresses for COM serial ports.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -91,7 +91,7 @@ impl TryFrom<u16> for SerialPortAddress {
 }
 
 /// This type is used to ensure that an object of type `T` is only initialized once,
-/// but still allows for a caller to take ownership of the object `T`. 
+/// but still allows for a caller to take ownership of the object `T`.
 enum TriState<T> {
     Uninited,
     Inited(T),
@@ -115,7 +115,6 @@ static COM2_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(
 static COM3_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
 static COM4_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
 
-
 /// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
 ///
 /// This function initializes the given serial port if it has not yet been initialized.
@@ -123,9 +122,7 @@ static COM4_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(
 /// this returns `None`.
 ///
 /// The returned [`SerialPort`] will be restored to this crate upon being dropped.
-pub fn take_serial_port(
-    serial_port_address: SerialPortAddress
-) -> Option<SerialPort> {
+pub fn take_serial_port(serial_port_address: SerialPortAddress) -> Option<SerialPort> {
     let sp = serial_port_address.to_static_port();
     let mut locked = sp.lock();
     if let TriState::Uninited = &*locked {
@@ -138,36 +135,37 @@ pub fn take_serial_port(
 // const PORT_E9: u16 = 0xE9; // for use with bochs
 // static E9: Port<u8> = Port::new(PORT_E9); // see Bochs's port E9 hack
 
-
 /// A serial port and its various data and control registers.
 ///
 /// TODO: use PortReadOnly and PortWriteOnly to set permissions for each register.
 pub struct SerialPort {
     /// The data port, for receiving and transmitting data.
-    data:                       Port<u8>,
-    interrupt_enable:           Port<u8>,
-    interrupt_id_fifo_control:  Port<u8>,
-    line_control:               Port<u8>,
-    modem_control:              Port<u8>,
-    line_status:                Port<u8>,
-    _modem_status:              Port<u8>,
-    _scratch:                   Port<u8>,
+    data: Port<u8>,
+    interrupt_enable: Port<u8>,
+    interrupt_id_fifo_control: Port<u8>,
+    line_control: Port<u8>,
+    modem_control: Port<u8>,
+    line_status: Port<u8>,
+    _modem_status: Port<u8>,
+    _scratch: Port<u8>,
 }
 
 impl Drop for SerialPort {
     fn drop(&mut self) {
-        if let Ok(sp) = SerialPortAddress::try_from(self.data.port_address()).map(|spa| spa.to_static_port()) {
+        if let Ok(sp) =
+            SerialPortAddress::try_from(self.data.port_address()).map(|spa| spa.to_static_port())
+        {
             let mut sp_locked = sp.lock();
             if let TriState::Taken = &*sp_locked {
-                let dummy = SerialPort { 
-                    data:                       Port::new(0),
-                    interrupt_enable:           Port::new(0),
-                    interrupt_id_fifo_control:  Port::new(0),
-                    line_control:               Port::new(0),
-                    modem_control:              Port::new(0),
-                    line_status:                Port::new(0),
-                    _modem_status:              Port::new(0),
-                    _scratch:                   Port::new(0),
+                let dummy = SerialPort {
+                    data: Port::new(0),
+                    interrupt_enable: Port::new(0),
+                    interrupt_id_fifo_control: Port::new(0),
+                    line_control: Port::new(0),
+                    modem_control: Port::new(0),
+                    line_status: Port::new(0),
+                    _modem_status: Port::new(0),
+                    _scratch: Port::new(0),
                 };
                 let dropped = core::mem::replace(self, dummy);
                 *sp_locked = TriState::Inited(dropped);
@@ -177,9 +175,9 @@ impl Drop for SerialPort {
 }
 
 impl SerialPort {
-    /// Creates and returns a new serial port structure, 
-    /// and initializes that port using standard configuration parameters. 
-    /// 
+    /// Creates and returns a new serial port structure,
+    /// and initializes that port using standard configuration parameters.
+    ///
     /// The configuration parameters used in this function are:
     /// * A baud rate of 38400.
     /// * "8N1" mode: data word length of 8 bits, with no parity and one stop bit.
@@ -187,22 +185,22 @@ impl SerialPort {
     /// * Interrupts enabled for receiving bytes only (not transmitting).
     ///
     /// # Arguments
-    /// * `base_port`: the port number (port I/O address) of the serial port. 
-    ///    This should generally be one of the known serial ports, e.g., on x86, 
+    /// * `base_port`: the port number (port I/O address) of the serial port.
+    ///    This should generally be one of the known serial ports, e.g., on x86,
     ///    [`SerialPortAddress::COM1`] through [`SerialPortAddress::COM4`].
     ///
     /// Note: if you are experiencing problems with serial port behavior,
     /// try enabling the loopback test part of this function to see if that passes.
     pub fn new(base_port: u16) -> SerialPort {
         let serial = SerialPort {
-            data:                       Port::new(base_port + 0),
-            interrupt_enable:           Port::new(base_port + 1),
-            interrupt_id_fifo_control:  Port::new(base_port + 2),
-            line_control:               Port::new(base_port + 3),
-            modem_control:              Port::new(base_port + 4),
-            line_status:                Port::new(base_port + 5),
-            _modem_status:              Port::new(base_port + 6),
-            _scratch:                   Port::new(base_port + 7),
+            data: Port::new(base_port + 0),
+            interrupt_enable: Port::new(base_port + 1),
+            interrupt_id_fifo_control: Port::new(base_port + 2),
+            line_control: Port::new(base_port + 3),
+            modem_control: Port::new(base_port + 4),
+            line_status: Port::new(base_port + 5),
+            _modem_status: Port::new(base_port + 6),
+            _scratch: Port::new(base_port + 7),
         };
 
         // SAFE: we are just accessing this serial port's registers.
@@ -212,7 +210,7 @@ impl SerialPort {
 
             // Enter DLAB mode so we can set the baud rate divisor
             serial.line_control.write(0x80);
-            // Set baud rate to 38400, which requires a divisor value of `3`. 
+            // Set baud rate to 38400, which requires a divisor value of `3`.
             // To do this, we enter DLAB mode (to se the baud rate divisor),
             // the write the low byte of the divisor to the data register (DLL)
             // and the high byte to the interrupt enable register (DLH).
@@ -233,7 +231,7 @@ impl SerialPort {
             // and enable auxilliary output #2 (used as interrupt line for CPU)
             serial.modem_control.write(0x0B);
 
-            // Below, we can optionally test the serial port to see if the chip is working. 
+            // Below, we can optionally test the serial port to see if the chip is working.
             let _test_passed = if false {
                 const TEST_BYTE: u8 = 0xAE;
                 // Enable "loopback" mode (set bit 4), write a byte to the data port and try to read it back.
@@ -244,20 +242,19 @@ impl SerialPort {
             } else {
                 true
             };
-            
+
             // Note: even if the above loopback test failed, we go ahead and ensure the serial port
-            // remains in a working state, because some hardware doesn't support loopback mode. 
-            
+            // remains in a working state, because some hardware doesn't support loopback mode.
+
             // Set the serial prot to regular mode (non-loopback) and enable standard config bits:
             // Auxiliary Output 1 and 2, Request to Send (RTS), and Data Terminal Ready (DTR).
             serial.modem_control.write(0x0F);
-            
+
             // Finally, enable interrupts for this serial port, for received data only.
             serial.interrupt_enable.write(0x01);
         }
 
         serial
-
     }
 
     /// Enable or disable interrupts on this serial port for various events.
@@ -293,11 +290,11 @@ impl SerialPort {
     ///
     /// This writes the byte directly with no special cases, e.g., new lines.
     pub fn out_byte(&mut self, byte: u8) {
-        while !self.ready_to_transmit() { }
+        while !self.ready_to_transmit() {}
 
         // SAFE: we're just writing to the serial port, which has already been initialized.
-        unsafe { 
-            self.data.write(byte); 
+        unsafe {
+            self.data.write(byte);
             // E9.write(byte); // for Bochs debugging
         }
     }
@@ -313,14 +310,14 @@ impl SerialPort {
 
     /// Read one byte from the serial port, blocking until data is available.
     pub fn in_byte(&mut self) -> u8 {
-        while !self.data_available() { }
-        self.data.read() 
+        while !self.data_available() {}
+        self.data.read()
     }
 
     /// Reads multiple bytes from the serial port into the given `buffer`, non-blocking.
     ///
     /// The buffer will be filled with as many bytes as are available in the serial port.
-    /// Once data is no longer available to be read, the read operation will stop. 
+    /// Once data is no longer available to be read, the read operation will stop.
     ///
     /// If no data is immediately available on the serial port, this will read nothing and return `0`.
     ///
@@ -352,12 +349,11 @@ impl SerialPort {
     pub fn base_port_address(&self) -> u16 {
         self.data.port_address()
     }
-
 }
 
 impl fmt::Write for SerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.out_str(s); 
+        self.out_str(s);
         Ok(())
     }
 }
@@ -366,8 +362,8 @@ impl fmt::Write for SerialPort {
 #[derive(Debug)]
 #[repr(u8)]
 pub enum SerialPortInterruptEvent {
-    DataReceived     = 1 << 0,
+    DataReceived = 1 << 0,
     TransmitterEmpty = 1 << 1,
-    ErrorOrBreak     = 1 << 2,
-    StatusChange     = 1 << 3,
+    ErrorOrBreak = 1 << 2,
+    StatusChange = 1 << 3,
 }

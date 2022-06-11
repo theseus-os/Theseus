@@ -23,10 +23,14 @@ impl BootloaderModule {
     pub fn new(
         start_paddr: PhysicalAddress,
         end_paddr: PhysicalAddress,
-        name: String
+        name: String,
     ) -> BootloaderModule {
-        BootloaderModule { start_paddr, end_paddr, name }
-    } 
+        BootloaderModule {
+            start_paddr,
+            end_paddr,
+            name,
+        }
+    }
 
     pub fn start_address(&self) -> PhysicalAddress {
         self.start_paddr

@@ -7,19 +7,20 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use paging::{PageTable, MappedPages};
-use super::table::{Table, Level1};
-use super::{AllocatedPages, AllocatedFrames, VirtualAddress};
-use kernel_config::memory::{TEMPORARY_PAGE_VIRT_ADDR, PAGE_SIZE};
-
+use super::{
+    table::{Level1, Table},
+    AllocatedFrames, AllocatedPages, VirtualAddress,
+};
+use kernel_config::memory::{PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
+use paging::{MappedPages, PageTable};
 
 /// A page that can be temporarily mapped to the recursive page table frame,
 /// used for purposes of editing a top-level (P4) page table itself.
-/// 
+///
 /// See how recursive paging works: <https://wiki.osdev.org/Page_Tables#Recursive_mapping>
 ///
-/// # Note 
-/// Instead of just dropping a `TemporaryPage` object, 
+/// # Note
+/// Instead of just dropping a `TemporaryPage` object,
 /// it should be cleaned up (reclaimed) using [`TemporaryPage::unmap_into_parts()`].
 
 pub struct TemporaryPage {
@@ -27,22 +28,24 @@ pub struct TemporaryPage {
 }
 
 impl TemporaryPage {
-    /// Creates a new [`TemporaryPage`] but does not yet map it to the recursive paging entry. 
-    /// You must call [`map_table_frame()`](#method.map_table_frame) to do that. 
+    /// Creates a new [`TemporaryPage`] but does not yet map it to the recursive paging entry.
+    /// You must call [`map_table_frame()`](#method.map_table_frame) to do that.
     pub fn new() -> TemporaryPage {
-        TemporaryPage {
-            mapped_page: None,
-        }
+        TemporaryPage { mapped_page: None }
     }
 
     /// Maps the temporary page to the given page table frame in the active table.
     /// Returns a reference to the now mapped table.
-    /// 
+    ///
     /// # Arguments
     /// * `frame`: the single frame containing the page table that we want to modify, which will be mapped to this [`TemporaryPage`].
-    /// * `page_table`: the currently active [`PageTable`]. 
-    /// 
-    pub fn map_table_frame(&mut self, frame: AllocatedFrames, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str> {
+    /// * `page_table`: the currently active [`PageTable`].
+    ///
+    pub fn map_table_frame(
+        &mut self,
+        frame: AllocatedFrames,
+        page_table: &mut PageTable,
+    ) -> Result<&mut Table<Level1>, &'static str> {
         if self.mapped_page.is_none() {
             let mut vaddr = VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR);
             let mut page = None;
@@ -64,7 +67,10 @@ impl TemporaryPage {
     ///
     /// This is useful for unmapping pages but still maintaining ownership of the previously-mapped pages and frames
     /// without having them be auto-dropped as normal.
-    pub fn unmap_into_parts(mut self, page_table: &mut PageTable) -> Result<(AllocatedPages, Option<AllocatedFrames>), &'static str> {
+    pub fn unmap_into_parts(
+        mut self,
+        page_table: &mut PageTable,
+    ) -> Result<(AllocatedPages, Option<AllocatedFrames>), &'static str> {
         if let Some(mp) = self.mapped_page.take() {
             mp.unmap_into_parts(page_table).map_err(|e_mp| {
                 error!("TemporaryPage::unmap_into_parts(): failed to unmap internal {:?}", e_mp);
@@ -81,5 +87,5 @@ impl Drop for TemporaryPage {
         if let Some(_mp) = self.mapped_page.take() {
             error!("LIKELY BUG: TemporaryPage was dropped, should use `unmap_into_parts()` instead. Contained {:?}", _mp);
         }
-    }    
+    }
 }

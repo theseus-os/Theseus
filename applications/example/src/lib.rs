@@ -3,13 +3,12 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate terminal_print;
+#[macro_use]
+extern crate terminal_print;
 extern crate getopts;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use getopts::Options;
-
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -20,7 +19,7 @@ pub fn main(args: Vec<String>) -> isize {
         Err(_f) => {
             println!("{}", _f);
             print_usage(opts);
-            return -1; 
+            return -1;
         }
     };
 
@@ -34,12 +33,9 @@ pub fn main(args: Vec<String>) -> isize {
     0
 }
 
-
-
 fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
-
 
 const USAGE: &'static str = "Usage: example [ARGS]
 An example application that just echoes its arguments.";

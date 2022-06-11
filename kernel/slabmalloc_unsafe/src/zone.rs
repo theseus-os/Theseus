@@ -2,8 +2,7 @@
 //!
 //! The ZoneAllocator achieves this by having many `SCAllocator`s
 
-use crate::*;
-use crate::sc::*;
+use crate::{sc::*, *};
 
 /// Creates an instance of a zone, we do this in a macro because we
 /// re-use the code in const and non-const functions
@@ -25,7 +24,7 @@ macro_rules! new_zone {
                 SCAllocator::new(1 << 9),  // 512
                 SCAllocator::new(1 << 10), // 1024 (TODO: maybe get rid of this class?)
                 SCAllocator::new(1 << 11), // 2048 (TODO: maybe get rid of this class?)
-                SCAllocator::new(1 << 12), // 4096 
+                SCAllocator::new(1 << 12), // 4096
                 SCAllocator::new(ZoneAllocator::MAX_ALLOC_SIZE),    // (can't do 8192 because of metadata in ObjectPage)
             ]
         }
@@ -58,7 +57,6 @@ enum Slab {
     Unsupported,
 }
 
-
 impl<'a> ZoneAllocator<'a> {
     /// Maximum size that allocated within 2 pages. (8 KiB - metadata)
     /// This is also the maximum object size that this allocator can handle.
@@ -73,7 +71,19 @@ impl<'a> ZoneAllocator<'a> {
     pub const MAX_BASE_SIZE_CLASSES: usize = 11;
 
     /// The set of sizes the allocator has lists for.
-    pub const BASE_ALLOC_SIZES: [usize; ZoneAllocator::MAX_BASE_SIZE_CLASSES] = [8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, ZoneAllocator::MAX_BASE_ALLOC_SIZE];
+    pub const BASE_ALLOC_SIZES: [usize; ZoneAllocator::MAX_BASE_SIZE_CLASSES] = [
+        8,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096,
+        ZoneAllocator::MAX_BASE_ALLOC_SIZE,
+    ];
 
     /// A slab must have greater than this number of empty pages to return one.
     const SLAB_EMPTY_PAGES_THRESHOLD: usize = 0;
@@ -87,7 +97,6 @@ impl<'a> ZoneAllocator<'a> {
     pub fn new(heap_id: usize) -> ZoneAllocator<'a> {
         new_zone!(heap_id)
     }
-
 
     /// Return maximum size an object of size `current_size` can use.
     ///
@@ -133,16 +142,15 @@ impl<'a> ZoneAllocator<'a> {
     /// if there are more empty pages than the threshold.
     pub fn retrieve_empty_page(
         &mut self,
-        heap_empty_page_threshold: usize
+        heap_empty_page_threshold: usize,
     ) -> Option<&'a mut ObjectPage8k<'a>> {
         if self.empty_pages() <= heap_empty_page_threshold {
             return None;
-        }
-        else {
+        } else {
             for slab in self.small_slabs.iter_mut() {
                 let empty_pages = slab.empty_slabs.elements;
                 if empty_pages > ZoneAllocator::SLAB_EMPTY_PAGES_THRESHOLD {
-                    return slab.retrieve_empty_page()
+                    return slab.retrieve_empty_page();
                 }
             }
         }
@@ -150,9 +158,11 @@ impl<'a> ZoneAllocator<'a> {
     }
 
     pub fn exchange_pages_within_heap(&mut self, layout: Layout) -> Result<(), &'static str> {
-        let mp = self.retrieve_empty_page(0).ok_or("Couldn't find an empty page to exchange within the heap")?;
+        let mp = self
+            .retrieve_empty_page(0)
+            .ok_or("Couldn't find an empty page to exchange within the heap")?;
         self.refill(layout, mp)
-    }  
+    }
 
     /// The total number of empty pages in this zone allocator
     pub fn empty_pages(&self) -> usize {
@@ -166,15 +176,13 @@ impl<'a> ZoneAllocator<'a> {
     /// Allocate a pointer to a block of memory described by `layout`.
     pub fn allocate(&mut self, layout: Layout) -> Result<NonNull<u8>, &'static str> {
         match ZoneAllocator::get_slab(layout.size()) {
-            Slab::Base(idx) => {
-                match self.small_slabs[idx].allocate(layout) {
-                    Ok(ptr) => Ok(ptr),
-                    Err(_e) => {
-                        self.exchange_pages_within_heap(layout)?;
-                        self.small_slabs[idx].allocate(layout)
-                    }
+            Slab::Base(idx) => match self.small_slabs[idx].allocate(layout) {
+                Ok(ptr) => Ok(ptr),
+                Err(_e) => {
+                    self.exchange_pages_within_heap(layout)?;
+                    self.small_slabs[idx].allocate(layout)
                 }
-            }
+            },
             Slab::Large(_idx) => Err("AllocationError::InvalidLayout"),
             Slab::Unsupported => Err("AllocationError::InvalidLayout"),
         }
@@ -190,7 +198,11 @@ impl<'a> ZoneAllocator<'a> {
     /// # Safety
     /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
     /// and `layout` argument is correct.
-    pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
+    pub unsafe fn deallocate(
+        &mut self,
+        ptr: NonNull<u8>,
+        layout: Layout,
+    ) -> Result<(), &'static str> {
         match ZoneAllocator::get_slab(layout.size()) {
             Slab::Base(idx) => self.small_slabs[idx].deallocate(ptr, layout),
             Slab::Large(_idx) => Err("AllocationError::InvalidLayout"),
@@ -217,4 +229,3 @@ impl<'a> ZoneAllocator<'a> {
         }
     }
 }
-

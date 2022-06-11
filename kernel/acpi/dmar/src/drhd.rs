@@ -18,7 +18,6 @@ pub(crate) struct Drhd {
 }
 const_assert_eq!(core::mem::size_of::<Drhd>(), 16);
 
-
 /// DRHD: DMAR Hardware Unit Definition Structure.
 ///
 /// This table is described in Section 8.3 of the VT Directed I/O Spec.
@@ -28,7 +27,7 @@ pub struct DmarDrhd<'t> {
     table: &'t Drhd,
     /// The underlying MappedPages that cover this table.
     mapped_pages: &'t MappedPages,
-    /// The offset into the above `mapped_pages` at which the dynamic part 
+    /// The offset into the above `mapped_pages` at which the dynamic part
     /// (the [`DmarDeviceScope`] structures) of the DRHD table begins.
     dynamic_entries_starting_offset: usize,
     /// The total size in bytes of all dynamic [`DmarDeviceScope`] entries.
@@ -45,12 +44,11 @@ impl<'t> DmarDrhd<'t> {
         Ok(DmarDrhd {
             table: mp.as_type(mp_offset)?,
             mapped_pages: mp,
-            dynamic_entries_starting_offset: mp_offset + size_of::<Drhd>(), 
+            dynamic_entries_starting_offset: mp_offset + size_of::<Drhd>(),
             dynamic_entries_total_size: entry.length as usize - size_of::<Drhd>(),
         })
     }
 }
-
 
 impl<'t> DmarDrhd<'t> {
     /// Returns an [`Iterator`] over the [`DmarDeviceScope`] entries in this DRHD,
@@ -72,11 +70,11 @@ impl<'t> DmarDrhd<'t> {
     /// the Device Scope field. The device can be of any type as described by
     /// the Type field in the Device Scope Structure including (but not limited to)
     /// IOAPIC and HPET.
-    /// 
+    ///
     /// If `true`, this remapping hardware unit has under its scope all PCI
     /// compatible devices in the specified segment, except devices reported
-    /// under the scope of other remapping hardware units for the same segment. 
-    /// As such, one can use the Device Scope structures to enumerate 
+    /// under the scope of other remapping hardware units for the same segment.
+    /// As such, one can use the Device Scope structures to enumerate
     /// IOAPIC and HPET devices under its scope.
     pub fn include_pci_all(&self) -> bool {
         self.table.flags & 0x01 == 0x01
@@ -93,10 +91,9 @@ impl<'t> DmarDrhd<'t> {
     }
 }
 
-
 /// An [`Iterator`] over the dynamic entries ([`DmarDeviceScope`]s) of the [`DmarDrhd`].
 /// Its lifetime is dependent upon the lifetime of its [`DmarDrhd`] instance,
-/// which itself is bound to the lifetime of the underlying [`AcpiTables`]. 
+/// which itself is bound to the lifetime of the underlying [`AcpiTables`].
 #[derive(Clone)]
 pub struct DrhdIter<'t> {
     /// The underlying MappedPages that contain all ACPI tables.
@@ -104,7 +101,7 @@ pub struct DrhdIter<'t> {
     /// The offset of the next entry, which should point to a [`DmarDeviceScope`]
     /// at the start of each iteration.
     offset: usize,
-    /// The end bound of all DRHD entries. 
+    /// The end bound of all DRHD entries.
     /// This is fixed and should not ever change throughout iteration.
     end_of_entries: usize,
 }

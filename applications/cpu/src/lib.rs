@@ -1,29 +1,32 @@
 #![no_std]
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+#[macro_use]
+extern crate alloc;
+#[macro_use]
+extern crate terminal_print;
 
 extern crate apic;
 extern crate getopts;
-extern crate task;
 extern crate runqueue;
+extern crate task;
 
-use getopts::Options;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use apic::get_lapics;
+use getopts::Options;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
 
     let matches = match opts.parse(&args) {
-        Ok(m) => { m }
-        Err(_f) => { println!("{} \n", _f);
-                    return -1; }
+        Ok(m) => m,
+        Err(_f) => {
+            println!("{} \n", _f);
+            return -1;
+        }
     };
 
     if matches.opt_present("h") {
-        return print_usage(opts)
+        return print_usage(opts);
     }
 
     let all_lapics = get_lapics();
@@ -32,29 +35,27 @@ pub fn main(args: Vec<String>) -> isize {
         let apic_id = lapic.read().apic_id;
         let processor = lapic.read().processor;
         let is_bsp = lapic.read().is_bsp;
-        let core_type = if is_bsp {"BSP Core"}
-                        else {"AP Core"};
+        let core_type = if is_bsp { "BSP Core" } else { "AP Core" };
 
-        println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
-        
+        println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor);
+
         if let Some(runqueue) = runqueue::get_runqueue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
             for task in runqueue.iter() {
-                runqueue_contents.push_str(&format!("{} ({}) {}\n", 
-                    task.name, 
+                runqueue_contents.push_str(&format!(
+                    "{} ({}) {}\n",
+                    task.name,
                     task.id,
                     if task.is_running() { "*" } else { "" },
                 ));
             }
             println!("RunQueue:\n{}", runqueue_contents);
-        }
-        
-        else {
+        } else {
             println!("Can't retrieve runqueue for core {}", apic_id);
             return -1;
         }
     }
-    
+
     0
 }
 

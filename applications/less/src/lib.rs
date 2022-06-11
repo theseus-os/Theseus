@@ -2,41 +2,43 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
-extern crate task;
-extern crate getopts;
-extern crate path;
+#[macro_use]
+extern crate alloc;
+extern crate app_io;
+extern crate core2;
 extern crate fs_node;
+extern crate getopts;
 extern crate keycodes_ascii;
 extern crate libterm;
+extern crate path;
 extern crate spin;
-extern crate app_io;
 extern crate stdio;
-extern crate core2;
-#[macro_use] extern crate log;
+extern crate task;
+#[macro_use]
+extern crate log;
 
-use keycodes_ascii::{Keycode, KeyAction};
-use core::str;
 use alloc::{
-    vec::Vec,
+    collections::BTreeMap,
     string::{String, ToString},
     sync::Arc,
+    vec::Vec,
 };
-use getopts::Options;
-use path::Path;
-use fs_node::FileOrDir;
-use alloc::collections::BTreeMap;
-use libterm::Terminal;
-use spin::Mutex;
-use stdio::{StdioWriter, KeyEventQueueReader};
+use core::str;
 use core2::io::Write;
+use fs_node::FileOrDir;
+use getopts::Options;
+use keycodes_ascii::{KeyAction, Keycode};
+use libterm::Terminal;
+use path::Path;
+use spin::Mutex;
+use stdio::{KeyEventQueueReader, StdioWriter};
 
 /// The metadata for each line in the file.
 struct LineSlice {
     /// The starting index in the String for a line. (inclusive)
     start: usize,
     /// The ending index in the String for a line. (exclusive)
-    end: usize
+    end: usize,
 }
 
 /// Read the whole file to a String.
@@ -51,40 +53,45 @@ fn get_content_string(file_path: String) -> Result<String, String> {
     // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
     let curr_wr = Arc::clone(&taskref.get_env().lock().working_dir);
     let path = Path::new(file_path);
-    
+
     // navigate to the filepath specified by first argument
     match path.get(&curr_wr) {
-        Some(file_dir_enum) => { 
-            match file_dir_enum {
-                FileOrDir::Dir(directory) => {
-                    Err(format!("{:?} is a directory, cannot 'less' non-files.", directory.lock().get_name()))
-                }
-                FileOrDir::File(file) => {
-                    let mut file_locked = file.lock();
-                    let file_size = file_locked.len();
-                    let mut string_slice_as_bytes = vec![0; file_size];
-                    
-                    let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes, 0) {
-                        Ok(num) => num,
-                        Err(e) => {
-                            return Err(format!("Failed to read {:?}, error {:?}",
-                                               file_locked.get_name(), e).to_string())
-                        }
-                    };
-                    let read_string = match str::from_utf8(&string_slice_as_bytes) {
-                        Ok(string_slice) => string_slice,
-                        Err(utf8_err) => {
-                            return Err(format!("File {:?} was not a printable UTF-8 text file: {}",
-                                               file_locked.get_name(), utf8_err).to_string())
-                        }
-                    };
-                    Ok(read_string.to_string())
-                }
+        Some(file_dir_enum) => match file_dir_enum {
+            FileOrDir::Dir(directory) => Err(format!(
+                "{:?} is a directory, cannot 'less' non-files.",
+                directory.lock().get_name()
+            )),
+            FileOrDir::File(file) => {
+                let mut file_locked = file.lock();
+                let file_size = file_locked.len();
+                let mut string_slice_as_bytes = vec![0; file_size];
+
+                let _num_bytes_read = match file_locked.read_at(&mut string_slice_as_bytes, 0) {
+                    Ok(num) => num,
+                    Err(e) => {
+                        return Err(format!(
+                            "Failed to read {:?}, error {:?}",
+                            file_locked.get_name(),
+                            e
+                        )
+                        .to_string())
+                    }
+                };
+                let read_string = match str::from_utf8(&string_slice_as_bytes) {
+                    Ok(string_slice) => string_slice,
+                    Err(utf8_err) => {
+                        return Err(format!(
+                            "File {:?} was not a printable UTF-8 text file: {}",
+                            file_locked.get_name(),
+                            utf8_err
+                        )
+                        .to_string())
+                    }
+                };
+                Ok(read_string.to_string())
             }
         },
-        _ => {
-            Err(format!("Couldn't find file at path {}", path).to_string())
-        }
+        _ => Err(format!("Couldn't find file at path {}", path).to_string()),
     }
 }
 
@@ -94,7 +101,8 @@ fn get_content_string(file_path: String) -> Result<String, String> {
 /// not to cause panic.
 fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'static str> {
     // Get the width and height of the terminal screen.
-    let (width, _height) = app_io::get_my_terminal().ok_or("couldn't get terminal for `less` app")?
+    let (width, _height) = app_io::get_my_terminal()
+        .ok_or("couldn't get terminal for `less` app")?
         .lock()
         .get_text_dimensions();
 
@@ -115,7 +123,13 @@ fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'stati
     for (str_idx, c) in content.char_indices() {
         // When we need to begin a new line, record the previous line in the map.
         if char_num_in_line == width || previous_char == '\n' {
-            map.insert(cur_line_num, LineSlice{ start: line_start_idx, end: str_idx });
+            map.insert(
+                cur_line_num,
+                LineSlice {
+                    start: line_start_idx,
+                    end: str_idx,
+                },
+            );
             char_num_in_line = 0;
             line_start_idx = str_idx;
             cur_line_num += 1;
@@ -123,16 +137,25 @@ fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'stati
         char_num_in_line += 1;
         previous_char = c;
     }
-    map.insert(cur_line_num, LineSlice{ start: line_start_idx, end: content.len() });
+    map.insert(
+        cur_line_num,
+        LineSlice {
+            start: line_start_idx,
+            end: content.len(),
+        },
+    );
 
     Ok(map)
 }
 
 /// Display part of the file (may be whole file if the file is short) to the terminal, starting
 /// at line number `line_start`.
-fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
-                   line_start: usize, terminal: &Arc<Mutex<Terminal>>)
-                   -> Result<(), &'static str> {
+fn display_content(
+    content: &String,
+    map: &BTreeMap<usize, LineSlice>,
+    line_start: usize,
+    terminal: &Arc<Mutex<Terminal>>,
+) -> Result<(), &'static str> {
     // Get exclusive control of the terminal. It is locked through the whole function to
     // avoid the overhead of locking it multiple times.
     let mut locked_terminal = terminal.lock();
@@ -147,24 +170,23 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
     // Refresh the terminal with the lines we've selected.
     let start_indices = match map.get(&line_start) {
         Some(indices) => indices,
-        None => return Err("failed to get the byte indices of the first line")
+        None => return Err("failed to get the byte indices of the first line"),
     };
     let end_indices = match map.get(&(line_end - 1)) {
         Some(indices) => indices,
-        None => return Err("failed to get the byte indices of the last line")
+        None => return Err("failed to get the byte indices of the last line"),
     };
     locked_terminal.clear();
-    locked_terminal.print_to_terminal(
-        content[start_indices.start..end_indices.end].to_string()
-    );
+    locked_terminal.print_to_terminal(content[start_indices.start..end_indices.end].to_string());
     locked_terminal.refresh_display()
 }
 
 /// Handle user keyboard strikes and perform corresponding operations.
-fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
-                      key_event_queue: &KeyEventQueueReader)
-                      -> Result<(), &'static str> {
-
+fn event_handler_loop(
+    content: &String,
+    map: &BTreeMap<usize, LineSlice>,
+    key_event_queue: &KeyEventQueueReader,
+) -> Result<(), &'static str> {
     // Get a reference to this task's terminal. The terminal is *not* locked here.
     let terminal = app_io::get_my_terminal().ok_or("couldn't get terminal for `less` app")?;
 
@@ -176,21 +198,23 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
     loop {
         match key_event_queue.read_one() {
             Some(keyevent) => {
-                if keyevent.action != KeyAction::Pressed { continue; }
+                if keyevent.action != KeyAction::Pressed {
+                    continue;
+                }
                 match keyevent.keycode {
                     // Quit the program on "Q".
                     Keycode::Q => {
                         let mut locked_terminal = terminal.lock();
                         locked_terminal.clear();
-                        return locked_terminal.refresh_display()
-                    },
+                        return locked_terminal.refresh_display();
+                    }
                     // Scroll down a line on "Down".
                     Keycode::Down => {
                         if line_start + 1 < map.len() {
                             line_start += 1;
                         }
                         display_content(content, map, line_start, &terminal)?;
-                    },
+                    }
                     // Scroll up a line on "Up".
                     Keycode::Up => {
                         if line_start > 0 {
@@ -200,15 +224,13 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
                     }
                     _ => {}
                 }
-            },
+            }
             _ => {}
         }
     }
 }
 
-
 pub fn main(args: Vec<String>) -> isize {
-
     // Get stdout.
     let stdout = match app_io::stdout() {
         Ok(stdout) => stdout,
@@ -247,11 +269,11 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn run(filename: String) -> Result<(), String> {
-
     // Acquire key event queue.
     let key_event_queue = app_io::take_key_event_queue()?;
-    let key_event_queue = (*key_event_queue).as_ref()
-                          .ok_or("failed to take key event reader")?;
+    let key_event_queue = (*key_event_queue)
+        .as_ref()
+        .ok_or("failed to take key event reader")?;
 
     // Read the whole file to a String.
     let content = get_content_string(filename)?;
@@ -263,7 +285,9 @@ fn run(filename: String) -> Result<(), String> {
 }
 
 fn print_usage(opts: Options, stdout: StdioWriter) {
-    let _ = stdout.lock().write_all(format!("{}\n", opts.usage(USAGE)).as_bytes());
+    let _ = stdout
+        .lock()
+        .write_all(format!("{}\n", opts.usage(USAGE)).as_bytes());
 }
 
 const USAGE: &'static str = "Usage: less file

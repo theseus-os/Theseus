@@ -20,7 +20,6 @@ pub(crate) struct DeviceScope {
 }
 const_assert_eq!(core::mem::size_of::<DeviceScope>(), 6);
 
-
 /// DMAR Device Scope Structure.
 ///
 /// This structure is described in Section 8.3.1 of the VT Directed I/O Spec.
@@ -30,7 +29,7 @@ pub struct DmarDeviceScope<'t> {
     table: &'t DeviceScope,
     /// The underlying MappedPages that cover this structure.
     mapped_pages: &'t MappedPages,
-    /// The offset into the above `mapped_pages` at which 
+    /// The offset into the above `mapped_pages` at which
     /// the dynamic part (the Path) of the [`DeviceScope`] structure begins.
     path_starting_offset: usize,
     /// The total size in bytes of all dynamic Path entries.
@@ -48,13 +47,13 @@ impl<'t> DmarDeviceScope<'t> {
         Ok(DmarDeviceScope {
             table: dev_scope,
             mapped_pages: mp,
-            path_starting_offset: mp_offset + size_of::<DeviceScope>(), 
+            path_starting_offset: mp_offset + size_of::<DeviceScope>(),
             path_total_size: dev_scope.length as usize - size_of::<DeviceScope>(),
         })
     }
 
     /// Returns the type of this device scope structure.
-    /// 
+    ///
     /// TODO: use an enum to represent possible device types.
     ///
     /// * `1`: PCI Endpoint Device - The device identified by the ‘Path’ field is
@@ -76,7 +75,9 @@ impl<'t> DmarDeviceScope<'t> {
         self.table.typ
     }
 
-    pub(crate) fn length(&self) -> u8 { self.table.length }
+    pub(crate) fn length(&self) -> u8 {
+        self.table.length
+    }
 
     /// Returns the Enumeration ID, which differs in meaning based on the type
     /// of this [`DmarDeviceScope`] structure.
@@ -92,17 +93,19 @@ impl<'t> DmarDeviceScope<'t> {
 
     /// Calculates and returns the hierarchical path (along the PCI bus)
     /// to the device specified by this [`DmarDeviceScope`] structure.
-    /// 
+    ///
     /// # Warning -- incomplete!
-    /// TODO: finish this function, it is not yet complete. It only returns the first path. 
+    /// TODO: finish this function, it is not yet complete. It only returns the first path.
     pub fn path(&self) -> Result<&'t DeviceScopePath, &'static str> {
-        log::warn!("The DmarDeviceScope::path() function is incomplete! Its value may be incorrect.");
+        log::warn!(
+            "The DmarDeviceScope::path() function is incomplete! Its value may be incorrect."
+        );
         let /* mut */ offset = self.path_starting_offset;
         let starting_path: &DeviceScopePath = self.mapped_pages.as_type(offset)?;
 
         // TODO: complete the path iteration algorithm described in Section 8.3.1
         Ok(starting_path)
-    }   
+    }
 }
 
 #[derive(Debug, Clone, Copy, FromBytes)]

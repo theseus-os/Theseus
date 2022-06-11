@@ -4,27 +4,26 @@
 #![no_std]
 
 extern crate alloc;
+extern crate color;
 extern crate displayable;
 extern crate font;
 extern crate framebuffer;
 extern crate framebuffer_printer;
 extern crate shapes;
-extern crate color;
 
 use alloc::string::String;
-use displayable::{Displayable};
-use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use framebuffer::{Pixel, Framebuffer};
 use color::Color;
+use displayable::Displayable;
+use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
+use framebuffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
-
 
 /// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 #[derive(Debug)]
 pub struct TextDisplay {
     width: usize,
     height: usize,
-    /// The position where the next character will be displayed. 
+    /// The position where the next character will be displayed.
     /// This is updated after each `display()` invocation, and is useful for optimization.
     next_col: usize,
     next_line: usize,
@@ -36,20 +35,21 @@ pub struct TextDisplay {
 }
 
 impl Displayable for TextDisplay {
-    fn display<P: Pixel+ From<Color>> (
+    fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut Framebuffer<P>,
     ) -> Result<Rectangle, &'static str> {
-        let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
-            (
-                &self.text.as_str()[self.cache.len()..self.text.len()],
-                self.next_col,
-                self.next_line,
-            )
-        } else {
-            (self.text.as_str(), 0, 0)
-        };
+        let (string, col, line) =
+            if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
+                (
+                    &self.text.as_str()[self.cache.len()..self.text.len()],
+                    self.next_col,
+                    self.next_line,
+                )
+            } else {
+                (self.text.as_str(), 0, 0)
+            };
 
         let (next_col, next_line, mut bounding_box) = framebuffer_printer::print_string(
             framebuffer,
@@ -64,7 +64,7 @@ impl Displayable for TextDisplay {
         );
 
         if next_line < self.next_line {
-            bounding_box.bottom_right.y = ((self.next_line + 1 ) * CHARACTER_HEIGHT) as isize
+            bounding_box.bottom_right.y = ((self.next_line + 1) * CHARACTER_HEIGHT) as isize
         }
 
         self.next_col = next_col;
@@ -111,7 +111,7 @@ impl TextDisplay {
     pub fn get_bg_color(&self) -> Color {
         self.bg_color
     }
-    
+
     /// Clear the cache of the text displayable.
     pub fn reset_cache(&mut self) {
         self.cache = String::new();

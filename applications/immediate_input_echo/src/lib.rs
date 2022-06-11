@@ -1,14 +1,15 @@
 //! An application to test instant stdin flush.
 #![no_std]
 
-#[macro_use] extern crate alloc;
+#[macro_use]
+extern crate alloc;
+extern crate app_io;
 extern crate core2;
 extern crate stdio;
-extern crate app_io;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core2::io::{Read, Write};
 
 pub fn main(_args: Vec<String>) -> isize {
@@ -29,19 +30,29 @@ fn run() -> Result<(), &'static str> {
     let mut stdin_locked = stdin.lock();
     let mut stdout_locked = stdout.lock();
 
-    stdout_locked.write_all(
-            format!("{}\n{}\n\n",
-                "Echo upon receiving a character input.",
-                "Press `ctrl-D` to exit cleanly."
-            ).as_bytes()
+    stdout_locked
+        .write_all(
+            format!(
+                "{}\n{}\n\n",
+                "Echo upon receiving a character input.", "Press `ctrl-D` to exit cleanly."
+            )
+            .as_bytes(),
         )
         .or(Err("failed to perform write_all"))?;
 
     loop {
-        let byte_num = stdin_locked.read(&mut buf).or(Err("failed to invoke read"))?;
-        if byte_num == 0 { break; }
-        stdout_locked.write_all(&buf).or(Err("failed to invoke write_all"))?;
+        let byte_num = stdin_locked
+            .read(&mut buf)
+            .or(Err("failed to invoke read"))?;
+        if byte_num == 0 {
+            break;
+        }
+        stdout_locked
+            .write_all(&buf)
+            .or(Err("failed to invoke write_all"))?;
     }
-    stdout_locked.write_all(&['\n' as u8]).or(Err("failed to invoke write_all"))?;
+    stdout_locked
+        .write_all(&['\n' as u8])
+        .or(Err("failed to invoke write_all"))?;
     Ok(())
 }

@@ -2,16 +2,17 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
-extern crate core2;
-extern crate scheduler;
+#[macro_use]
+extern crate alloc;
 extern crate app_io;
+extern crate core2;
 extern crate keycodes_ascii;
-#[macro_use] extern crate log;
+extern crate scheduler;
+#[macro_use]
+extern crate log;
 
+use alloc::{string::String, vec::Vec};
 use core2::io::Write;
-use alloc::vec::Vec;
-use alloc::string::String;
 use keycodes_ascii::Keycode;
 
 pub fn main(_args: Vec<String>) -> isize {
@@ -43,8 +44,12 @@ fn run() -> Result<(), &'static str> {
     // one pressing event and one releasing event.
     loop {
         if let Some(key_event) = queue.read_one() {
-            stdout_locked.write_all(&ack).or(Err("failed to perform write_all"))?;
-            if key_event.keycode == Keycode::Q { break; }
+            stdout_locked
+                .write_all(&ack)
+                .or(Err("failed to perform write_all"))?;
+            if key_event.keycode == Keycode::Q {
+                break;
+            }
         }
         scheduler::schedule();
     }

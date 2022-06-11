@@ -1,42 +1,42 @@
-//! Provides a `thread_local!()` macro, a helper to instantiate lazily-initialized 
+//! Provides a `thread_local!()` macro, a helper to instantiate lazily-initialized
 //! thread-local storage (TLS) variables.
-//! 
+//!
 //! The primary difference between using this crate's `thread_local!()` macro
 //! and directly using the `#[thread_local]` attribute is that `static` items
 //! tagged with the `#[thread_local]` attribute will *never* be dropped,
 //! just like all other `static`s.
-//! 
+//!
 //! However, static items defined in a `thread_local!()` macro block will be
 //! destructed (e.g., dropped, destroyed) when that task exits.
-//! 
+//!
 //! # Rust std-based implementation notes
 //! The code in this crate is adapted from [this version of the `thread_local!()` macro]
 //! from the Rust standard library.
 //! The main design has been left unchanged, but we have removed most of the configuration blocks
 //! for complex platform-specific or OS-specific behavior.
-//! Because Theseus supports the `#[thread_local]` attribute, we can directly use the 
+//! Because Theseus supports the `#[thread_local]` attribute, we can directly use the
 //! TLS "fast path", which the Rust standard library refers to as the "FastLocalInnerKey".
-//! 
+//!
 //! ## Unsafety
 //! We could probably could remove most of the unsafe code from this implementation,
-//! because we don't have to account for the various raw platform-specific interfaces 
+//! because we don't have to account for the various raw platform-specific interfaces
 //! or using raw libc types like the original Rust std implementation does.
-//! However, I have chosen to leave the code as close as possible to the original 
+//! However, I have chosen to leave the code as close as possible to the original
 //! Rust std implementation in order to make updates as easy as possible,
 //! for if and when the Rust std version changes and we wish to track/merge in those changes.
-//! 
+//!
 //! [this version of the `thread_local!()` macro]: https://github.com/rust-lang/rust/blob/3f14f4b3cec811017079564e16a92a1dc9870f41/library/std/src/thread/local.rs
 
 #![no_std]
 #![feature(thread_local)]
 #![feature(allow_internal_unstable)]
-
 // The code from Rust std uses unsafe blocks within unsafe functions,
 // so we preserve that here (for now).
 #![allow(unused_unsafe)]
 
 extern crate alloc;
-#[macro_use] extern crate static_assertions;
+#[macro_use]
+extern crate static_assertions;
 
 use core::cell::RefCell;
 
@@ -51,8 +51,8 @@ use core::cell::RefCell;
 /// 2. The actual `Vec` is drained upon task exit by the task cleanup functions
 ///    in the `spawn` crate`, ensuring that there is no `Vec` memory itself
 ///    to actually be deallocated, as the contents of this `Vec` have been cleared.
-/// 
-/// Note that this will always be safe even if the two conditions **aren't** met, 
+///
+/// Note that this will always be safe even if the two conditions **aren't** met,
 /// because the only thing that will happen there is a memory leak.
 #[thread_local]
 static TLS_DESTRUCTORS: RefCell<Vec<TlsObjectDestructor>> = RefCell::new(Vec::new());
@@ -72,7 +72,7 @@ const_assert!(!core::mem::needs_drop::<TlsObjectDestructor>());
 
 /// Takes ownership of the list of [`TlsObjectDestructor`]s
 /// for TLS objects that have been initialized in this current task's TLS area.
-/// 
+///
 /// This is only intended to be used by the task cleanup functions
 /// after the current task has exited.
 #[doc(hidden)]
@@ -82,35 +82,36 @@ pub fn take_current_tls_destructors() -> Vec<TlsObjectDestructor> {
 
 /// Adds the given destructor callback to the current task's list of
 /// TLS destructors that should be run when that task exits.
-/// 
+///
 /// # Arguments
 /// * `a`: the pointer to the object that will be destructed.
 /// * `dtor`: the function that should be invoked to destruct the object pointed to by `a`.
 ///   When the current task exits, this function will be invoked with `a`
 ///   as its only argument, at which point the `dtor` function should drop `a`.
-/// 
+///
 /// Currently the only value of `dtor` that is used is a type-specific monomorphized
 /// version of the above [`fast::destroy_value()`] function.
 fn register_dtor(object_ptr: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
-    TLS_DESTRUCTORS.borrow_mut().push(TlsObjectDestructor { object_ptr, dtor });
+    TLS_DESTRUCTORS
+        .borrow_mut()
+        .push(TlsObjectDestructor { object_ptr, dtor });
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////
 //// Everything below here is a modified version of thread_local!() from Rust std ////
 //////////////////////////////////////////////////////////////////////////////////////
 
-use core::cell::{Cell, UnsafeCell};
-use core::fmt;
+use alloc::vec::Vec;
 #[doc(hidden)]
 pub use core::option;
-use core::mem;
-use core::hint;
-use alloc::vec::Vec;
+use core::{
+    cell::{Cell, UnsafeCell},
+    fmt, hint, mem,
+};
 
 /// A thread-local storage key which owns its contents.
 ///
-/// This TLS object is instantiated the [`thread_local!`] macro and offers 
+/// This TLS object is instantiated the [`thread_local!`] macro and offers
 /// one primary method to access it: the [`with`] method.
 ///
 /// The [`with`] method yields a reference to the contained value which cannot be
@@ -398,9 +399,7 @@ impl<T: 'static> LocalKey<T> {
 }
 
 mod lazy {
-    use crate::UnsafeCell;
-    use crate::hint;
-    use crate::mem;
+    use crate::{hint, mem, UnsafeCell};
 
     pub struct LazyKeyInner<T> {
         inner: UnsafeCell<Option<T>>,
@@ -408,7 +407,9 @@ mod lazy {
 
     impl<T> LazyKeyInner<T> {
         pub const fn new() -> LazyKeyInner<T> {
-            LazyKeyInner { inner: UnsafeCell::new(None) }
+            LazyKeyInner {
+                inner: UnsafeCell::new(None),
+            }
         }
 
         pub unsafe fn get(&self) -> Option<&'static T> {
@@ -477,11 +478,8 @@ mod lazy {
 
 #[doc(hidden)]
 pub mod fast {
-    use super::lazy::LazyKeyInner;
-    use crate::Cell;
-    use crate::fmt;
-    use crate::mem;
-    use super::register_dtor;
+    use super::{lazy::LazyKeyInner, register_dtor};
+    use crate::{fmt, mem, Cell};
 
     #[derive(Copy, Clone)]
     enum DtorState {
@@ -519,7 +517,10 @@ pub mod fast {
 
     impl<T> Key<T> {
         pub const fn new() -> Key<T> {
-            Key { inner: LazyKeyInner::new(), dtor_state: Cell::new(DtorState::Unregistered) }
+            Key {
+                inner: LazyKeyInner::new(),
+                dtor_state: Cell::new(DtorState::Unregistered),
+            }
         }
 
         /*

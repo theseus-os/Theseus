@@ -15,11 +15,12 @@
 //! <https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/extrinsics/wasi.rs>
 //!
 
-use crate::posix_file_system::{PosixNode, PosixNodeOrStdio};
-use crate::wasi_definitions::SystemCall;
-use crate::HostExternals;
-use alloc::string::String;
-use alloc::vec::Vec;
+use crate::{
+    posix_file_system::{PosixNode, PosixNodeOrStdio},
+    wasi_definitions::SystemCall,
+    HostExternals,
+};
+use alloc::{string::String, vec::Vec};
 use core::convert::TryFrom as _;
 use fs_node::{DirRef, FileOrDir};
 use wasmi::{MemoryRef, RuntimeArgs, RuntimeValue, Trap};

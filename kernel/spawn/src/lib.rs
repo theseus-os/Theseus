@@ -1,78 +1,71 @@
 //! This crate offers routines for spawning new tasks
-//! and convenient builder patterns for customizing new tasks. 
-//! 
+//! and convenient builder patterns for customizing new tasks.
+//!
 //! The two functions of interest to create a `TaskBuilder` are:
 //! * [`new_task_builder()`][tb]:  creates a new task for a known, existing function.
 //! * [`new_application_task_builder()`][atb]: loads a new application crate and creates a new task
 //!    for that crate's entry point (main) function.
-//! 
+//!
 //! [tb]:  fn.new_task_builder.html
 //! [atb]: fn.new_application_task_builder.html
 
 #![no_std]
 #![feature(stmt_expr_attributes)]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
-#[macro_use] extern crate debugit;
+#[macro_use]
+extern crate alloc;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate debugit;
+extern crate apic;
+extern crate catch_unwind;
+extern crate context_switch;
+extern crate fault_crate_swap;
+extern crate fs_node;
 extern crate irq_safety;
 extern crate memory;
-extern crate stack;
-extern crate task;
+extern crate mod_mgmt;
+extern crate path;
+extern crate pause;
 extern crate runqueue;
 extern crate scheduler;
-extern crate mod_mgmt;
-extern crate apic;
-extern crate context_switch;
-extern crate path;
-extern crate fs_node;
-extern crate catch_unwind;
-extern crate fault_crate_swap;
-extern crate pause;
+extern crate stack;
+extern crate task;
 extern crate thread_local_macro;
 
-
+use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use apic::get_my_apic_id;
 use core::{marker::PhantomData, mem, ops::Deref};
-use alloc::{
-    vec::Vec,
-    string::String,
-    sync::Arc,
-    boxed::Box,
-};
-use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
+use fs_node::FileOrDir;
+use irq_safety::{enable_interrupts, hold_interrupts, MutexIrqSafe};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
-use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
-use apic::get_my_apic_id;
-use fs_node::FileOrDir;
+use stack::Stack;
+use task::{get_my_current_task, RestartInfo, Task, TaskRef, TASKLIST};
 
 #[cfg(simd_personality)]
 use task::SimdExt;
 
-
 /// Initializes tasking for the given AP core, including creating a runqueue for it
-/// and creating its initial task bootstrapped from the current execution context for that core. 
+/// and creating its initial task bootstrapped from the current execution context for that core.
 pub fn init(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     apic_id: u8,
     stack: Stack,
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
-    
+
     let task_ref = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
-    Ok(BootstrapTaskRef {
-        apic_id, 
-        task_ref,
-    })
+    Ok(BootstrapTaskRef { apic_id, task_ref })
 }
 
-/// A wrapper around a `TaskRef` that is for bootstrapped tasks. 
-/// 
+/// A wrapper around a `TaskRef` that is for bootstrapped tasks.
+///
 /// See `spawn::init()` and `task::bootstrap_task()`.
-/// 
+///
 /// This exists such that a bootstrapped task can be marked as exited and removed
 /// when being dropped.
 #[derive(Debug)]
@@ -96,99 +89,105 @@ impl Drop for BootstrapTaskRef {
     }
 }
 
-
 /// Creates a builder for a new `Task` that starts at the given entry point function `func`
 /// and will be passed the given `argument`.
-/// 
-/// # Note 
-/// The new task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked. 
-/// See the `TaskBuilder` documentation for more details. 
-/// 
-pub fn new_task_builder<F, A, R>(
-    func: F,
-    argument: A
-) -> TaskBuilder<F, A, R>
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R,
+///
+/// # Note
+/// The new task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked.
+/// See the `TaskBuilder` documentation for more details.
+///
+pub fn new_task_builder<F, A, R>(func: F, argument: A) -> TaskBuilder<F, A, R>
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
     TaskBuilder::new(func, argument)
 }
 
-
-/// Creates a builder for a new application `Task`. 
-/// 
+/// Creates a builder for a new application `Task`.
+///
 /// The new task will start at the application crate's entry point `main` function.
-/// 
+///
 /// Note that the application crate will be loaded and linked during this function,
 /// but the actual new application task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked.
-/// 
+///
 /// # Arguments
 /// * `crate_object_file`: the object file that the application crate will be loaded from.
 /// * `new_namespace`: if provided, the new application task will be spawned within the new `CrateNamespace`,
-///    meaning that the new application crate will be linked against the crates within that new namespace. 
+///    meaning that the new application crate will be linked against the crates within that new namespace.
 ///    If not provided, the new Task will be spawned within the same namespace as the current task.
-/// 
+///
 pub fn new_application_task_builder(
     crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
-    
     let namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
         .ok_or("spawn::new_application_task_builder(): couldn't get current task to use its CrateNamespace")?;
-    
+
     let crate_object_file = match crate_object_file.get(namespace.dir())
         .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
     {
         Some(FileOrDir::File(f)) => f,
         _ => return Err("Couldn't find specified file path for new application crate"),
     };
-    
+
     // Load the new application crate
     let app_crate_ref = {
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
-        CrateNamespace::load_crate_as_application(&namespace, &crate_object_file, &kernel_mmi_ref, false)?
+        CrateNamespace::load_crate_as_application(
+            &namespace,
+            &crate_object_file,
+            &kernel_mmi_ref,
+            false,
+        )?
     };
 
     // Find the "main" entry point function in the new app crate
-    let main_func_sec_opt = { 
+    let main_func_sec_opt = {
         let app_crate = app_crate_ref.lock_as_ref();
-        let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
-        app_crate.find_section(|sec| 
-            sec.get_type() == SectionType::Text && sec.name_without_hash() == &expected_main_section_name
-        ).cloned()
+        let expected_main_section_name = format!(
+            "{}{}{}",
+            app_crate.crate_name_as_prefix(),
+            ENTRY_POINT_SECTION_NAME,
+            SECTION_HASH_DELIMITER
+        );
+        app_crate
+            .find_section(|sec| {
+                sec.get_type() == SectionType::Text
+                    && sec.name_without_hash() == &expected_main_section_name
+            })
+            .cloned()
     };
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
         --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)")?;
     let main_func = main_func_sec.as_func::<MainFunc>()?;
 
-    // Create the underlying task builder. 
-    // Give it a default name based on the app crate's name, but that can be changed later. 
+    // Create the underlying task builder.
+    // Give it a default name based on the app crate's name, but that can be changed later.
     let mut tb = TaskBuilder::new(*main_func, MainFuncArg::default())
-        .name(app_crate_ref.lock_as_ref().crate_name.clone()); 
+        .name(app_crate_ref.lock_as_ref().crate_name.clone());
 
     // Once the new application task is created (but before its scheduled in),
     // ensure it has the relevant app-specific fields set properly.
-    tb.post_build_function = Some(Box::new(
-        move |new_task| {
-            new_task.app_crate = Some(Arc::new(app_crate_ref));
-            new_task.namespace = namespace;
-            Ok(())
-        }
-    ));
-    
+    tb.post_build_function = Some(Box::new(move |new_task| {
+        new_task.app_crate = Some(Arc::new(app_crate_ref));
+        new_task.namespace = namespace;
+        Ok(())
+    }));
+
     Ok(tb)
 }
 
 /// A struct that offers a builder pattern to create and customize new `Task`s.
-/// 
+///
 /// Note that the new `Task` will not actually be created until [`spawn()`](struct.TaskBuilder.html#method.spawn) is invoked.
-/// 
+///
 /// To create a `TaskBuilder`, use these functions:
 /// * [`new_task_builder()`][tb]:  creates a new task for a known, existing function.
 /// * [`new_application_task_builder()`][atb]: loads a new application crate and creates a new task
 ///    for that crate's entry point (main) function.
-/// 
+///
 /// [tb]:  fn.new_task_builder.html
 /// [atb]: fn.new_application_task_builder.html
 pub struct TaskBuilder<F, A, R> {
@@ -199,19 +198,20 @@ pub struct TaskBuilder<F, A, R> {
     pin_on_core: Option<u8>,
     blocked: bool,
     idle: bool,
-    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
+    post_build_function: Option<Box<dyn FnOnce(&mut Task) -> Result<(), &'static str>>>,
 
     #[cfg(simd_personality)]
     simd: SimdExt,
 }
 
-impl<F, A, R> TaskBuilder<F, A, R> 
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R,
+impl<F, A, R> TaskBuilder<F, A, R>
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
     /// Creates a new `Task` from the given function `func`
-    /// that will be passed the argument `arg` when spawned. 
+    /// that will be passed the argument `arg` when spawned.
     fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
         TaskBuilder {
             argument: argument,
@@ -246,7 +246,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self
     }
 
-    /// Mark this new Task as a SIMD-enabled Task 
+    /// Mark this new Task as a SIMD-enabled Task
     /// that can run SIMD instructions and use SIMD registers.
     #[cfg(simd_personality)]
     pub fn simd(mut self, extension: SimdExt) -> TaskBuilder<F, A, R> {
@@ -255,9 +255,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
     }
 
     /// Set the new Task's `RunState` to be `Blocked` instead of `Runnable` when it is first spawned.
-    /// This allows another task to delay the new task's execution arbitrarily, 
-    /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
-    /// 
+    /// This allows another task to delay the new task's execution arbitrarily,
+    /// e.g., to set up other things for the newly-spawned (but not yet running) task.
+    ///
     /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
     pub fn block(mut self) -> TaskBuilder<F, A, R> {
         self.blocked = true;
@@ -265,29 +265,29 @@ impl<F, A, R> TaskBuilder<F, A, R>
     }
 
     /// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
-    /// 
+    ///
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> {
-        let mut new_task = Task::new(
-            None,
-            task_cleanup_failure::<F, A, R>,
-        )?;
+        let mut new_task = Task::new(None, task_cleanup_failure::<F, A, R>)?;
         // If a Task name wasn't provided, then just use the function's name.
-        new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
-    
-        #[cfg(simd_personality)] {  
+        new_task.name = self
+            .name
+            .unwrap_or_else(|| String::from(core::any::type_name::<F>()));
+
+        #[cfg(simd_personality)]
+        {
             new_task.simd = self.simd;
         }
 
         setup_context_trampoline(&mut new_task, task_wrapper::<F, A, R>)?;
 
-        // Currently we're using the very bottom of the kstack for kthread arguments. 
+        // Currently we're using the very bottom of the kstack for kthread arguments.
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
         // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
         let bottom_of_stack: &mut usize = new_task.inner_mut().kstack.as_type_mut(0)?;
         let box_ptr = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
-            arg:  self.argument,
+            arg: self.argument,
             func: self.func,
             _rettype: PhantomData,
         }));
@@ -313,50 +313,49 @@ impl<F, A, R> TaskBuilder<F, A, R>
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
         let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
-        // insert should return None, because that means there was no existing task with the same ID 
+        // insert should return None, because that means there was no existing task with the same ID
         if old_task.is_some() {
             error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
-        
+
         if let Some(core) = self.pin_on_core {
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
-        }
-        else {
+        } else {
             runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
 
         Ok(task_ref)
     }
-
 }
 
-/// Additional implementation of `TaskBuilder` to be used for 
-/// restartable functions. Further restricts the function (F) 
+/// Additional implementation of `TaskBuilder` to be used for
+/// restartable functions. Further restricts the function (F)
 /// and argument (A) to implement `Clone` trait.
-impl<F, A, R> TaskBuilder<F, A, R> 
-    where A: Send + Clone + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone +'static,
+impl<F, A, R> TaskBuilder<F, A, R>
+where
+    A: Send + Clone + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R + Send + Clone + 'static,
 {
-    /// Sets this new Task to be the idle task for the given core. 
-    /// 
-    /// Idle tasks will not be scheduled unless there are no other tasks for the scheduler to choose. 
-    /// 
+    /// Sets this new Task to be the idle task for the given core.
+    ///
+    /// Idle tasks will not be scheduled unless there are no other tasks for the scheduler to choose.
+    ///
     /// Idle tasks must be restartable, so it is only a possible option when spawning a restartable task.
     /// Marking a task as idle is only needed to set up one for each core when that core is initialized,
     /// but or to restart an idle task that has exited or failed.
-    /// 
-    /// There is no harm spawning multiple idle tasks on each core, but it's a waste of space. 
+    ///
+    /// There is no harm spawning multiple idle tasks on each core, but it's a waste of space.
     pub fn idle(mut self, core_id: u8) -> TaskBuilder<F, A, R> {
         self.idle = true;
         self.pin_on_core(core_id)
     }
 
-    /// Like `spawn()`, this finishes this `TaskBuilder` and spawns the new task. 
+    /// Like `spawn()`, this finishes this `TaskBuilder` and spawns the new task.
     /// It additionally stores the new Task's function and argument within the Task,
     /// enabling it to be restarted upon exit.
-    /// 
+    ///
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn_restartable(mut self) -> Result<TaskRef, &'static str> {
@@ -367,14 +366,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         // Once the new task is created, we set its restart info (func and arg),
         // and tell it to use the restartable version of the final task cleanup function.
-        self.post_build_function = Some(Box::new(
-            move |new_task| {
-                new_task.inner_mut().restart_info = Some(restart_info);
-                new_task.failure_cleanup_function = task_restartable_cleanup_failure::<F, A, R>;
-                setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
-                Ok(())
-            }
-        ));
+        self.post_build_function = Some(Box::new(move |new_task| {
+            new_task.inner_mut().restart_info = Some(restart_info);
+            new_task.failure_cleanup_function = task_restartable_cleanup_failure::<F, A, R>;
+            setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
+            Ok(())
+        }));
 
         // Code path is shared between `spawn` and `spawn_restartable` from this point
         self.spawn()
@@ -398,30 +395,31 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 #[derive(Debug)]
 struct TaskFuncArg<F, A, R> {
     func: F,
-    arg:  A,
+    arg: A,
     // not necessary, just for consistency in "<F, A, R>" signatures.
     _rettype: PhantomData<*const R>,
 }
 
-
 /// This function sets up the given new `Task`'s kernel stack pointer to properly jump
-/// to the given entry point function when the new `Task` is first scheduled in. 
-/// 
+/// to the given entry point function when the new `Task` is first scheduled in.
+///
 /// When a new task is first scheduled in, a `Context` struct will be popped off the stack,
-/// and at the end of that struct is the address of the next instruction that will be popped off as part of the "ret" instruction, 
-/// i.e., the entry point into the new task. 
-/// 
+/// and at the end of that struct is the address of the next instruction that will be popped off as part of the "ret" instruction,
+/// i.e., the entry point into the new task.
+///
 /// So, this function allocates space for the saved context registers to be popped off when this task is first switched to.
 /// It also sets the given `new_task`'s `saved_sp` (its saved stack pointer, which holds the Context for task switching).
-/// 
-fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !) -> Result<(), &'static str> {
-    
+///
+fn setup_context_trampoline(
+    new_task: &mut Task,
+    entry_point_function: fn() -> !,
+) -> Result<(), &'static str> {
     /// A private macro that actually creates the Context and sets it up in the `new_task`.
-    /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
+    /// We use a macro here so we can pass in the proper `ContextType` at runtime,
     /// which is useful for both the simd_personality config and regular/SSE configs.
     macro_rules! set_context {
         ($ContextType:ty) => (
-            // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages. 
+            // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages.
             // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
             let mp_offset = new_task.inner_mut().kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
             let new_context_destination: &mut $ContextType = new_task.inner_mut().kstack.as_type_mut(mp_offset)?;
@@ -432,7 +430,8 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
 
     // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
     // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
-    #[cfg(simd_personality)] {
+    #[cfg(simd_personality)]
+    {
         match new_task.simd {
             SimdExt::AVX => {
                 // warn!("USING AVX CONTEXT for Task {:?}", new_task);
@@ -449,8 +448,9 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
         }
     }
 
-    // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
-    #[cfg(not(simd_personality))] {
+    // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target.
+    #[cfg(not(simd_personality))]
+    {
         // The context_switch crate exposes the proper TARGET-specific `Context` type here.
         set_context!(context_switch::Context);
     }
@@ -458,32 +458,43 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
     Ok(())
 }
 
-/// Internal code of `task_wrapper` shared by `task_wrapper` and 
-/// `task_wrapper_restartable`. 
+/// Internal code of `task_wrapper` shared by `task_wrapper` and
+/// `task_wrapper_restartable`.
 fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
     // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
     let (func, arg) = {
-        let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
+        let curr_task = get_my_current_task()
+            .expect("BUG: task_wrapper: couldn't get current task (before task func).");
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
-        let task_func_arg = curr_task.with_kstack(|kstack| {
-            kstack.as_type(0).map(|tfa_box_raw_ptr: &usize| {
-                // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
-                let tfa_boxed = unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
-                *tfa_boxed // un-box it
+        let task_func_arg = curr_task
+            .with_kstack(|kstack| {
+                kstack.as_type(0).map(|tfa_box_raw_ptr: &usize| {
+                    // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
+                    let tfa_boxed =
+                        unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
+                    *tfa_boxed // un-box it
+                })
             })
-        }).expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
+            .expect(
+                "BUG: task_wrapper: couldn't access task's function/argument at bottom of stack",
+            );
         let (func, arg) = (task_func_arg.func, task_func_arg.arg);
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
-        debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task.name.clone(), debugit!(func), core::any::type_name::<F>(), debugit!(arg)
+        debug!(
+            "task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
+            curr_task.name.clone(),
+            debugit!(func),
+            core::any::type_name::<F>(),
+            debugit!(arg)
         );
 
         (func, arg)
@@ -495,12 +506,13 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     catch_unwind::catch_unwind_with_arg(func, arg)
 }
 
-/// The entry point for all new `Task`s except restartable tasks. 
+/// The entry point for all new `Task`s except restartable tasks.
 /// This does not return, because it doesn't really have anywhere to return.
 fn task_wrapper<F, A, R>() -> !
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
     let result = task_wrapper_internal::<F, A, R>();
 
@@ -513,46 +525,57 @@ fn task_wrapper<F, A, R>() -> !
     // Otherwise, this task could be marked as `Exited`, and then a context switch could occur to another task,
     // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
     //
-    // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
+    // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`,
     // while operations 2 and 3 then happen in `task_cleanup_final`.
-    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    let curr_task = get_my_current_task()
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
+        .clone();
     match result {
-        Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
+        Ok(exit_value) => task_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
     }
 }
 
-/// Similar to `task_wrapper` in functionality but used as entry point only for 
-/// restartable tasks. Further restricts `argument` to implement `Clone` trait. 
+/// Similar to `task_wrapper` in functionality but used as entry point only for
+/// restartable tasks. Further restricts `argument` to implement `Clone` trait.
 /// // We cannot use `task_wrapper` as it is not bounded by `Clone` trait.
 fn task_wrapper_restartable<F, A, R>() -> !
-    where A: Send + Clone + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone + 'static,
+where
+    A: Send + Clone + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R + Send + Clone + 'static,
 {
     let result = task_wrapper_internal::<F, A, R>();
 
     // See `task_wrapper` for an explanation of how the below functions work.
-    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    let curr_task = get_my_current_task()
+        .expect("BUG: task_wrapper: couldn't get current task (after task func).")
+        .clone();
     match result {
-        Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
+        Ok(exit_value) => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),
     }
 }
 
-
-
-/// Internal function cleans up a task that exited properly. 
+/// Internal function cleans up a task that exited properly.
 /// Contains the shared code between `task_cleanup_success` and `task_cleanup_success_restartable`
 #[inline(always)]
-fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (irq_safety::HeldInterrupts, TaskRef)
-    where R: Send + 'static,
-{ 
+fn task_cleanup_success_internal<R>(
+    current_task: TaskRef,
+    exit_value: R,
+) -> (irq_safety::HeldInterrupts, TaskRef)
+where
+    R: Send + 'static,
+{
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
 
     #[cfg(not(rq_eval))]
-    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.name, debugit!(exit_value));
+    debug!(
+        "task_cleanup_success: {:?} successfully exited with return value {:?}",
+        current_task.name,
+        debugit!(exit_value)
+    );
     if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
         error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.name);
     }
@@ -562,68 +585,78 @@ fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (ir
 
 /// This function cleans up a task that exited properly.
 fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
-{   
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
+{
     let (held_interrupts, current_task) = task_cleanup_success_internal(current_task, exit_value);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
 /// Similar to `task_cleanup_success` but used on restartable_tasks
 fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
-    where A: Send + Clone + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone +'static,
+where
+    A: Send + Clone + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R + Send + Clone + 'static,
 {
     let (held_interrupts, current_task) = task_cleanup_success_internal(current_task, exit_value);
     task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
-
-
 /// Internal function that cleans up a task that did not exit properly.
 #[inline(always)]
-fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillReason) -> (irq_safety::HeldInterrupts, TaskRef) {
+fn task_cleanup_failure_internal(
+    current_task: TaskRef,
+    kill_reason: task::KillReason,
+) -> (irq_safety::HeldInterrupts, TaskRef) {
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
 
     #[cfg(not(downtime_eval))]
-    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name, kill_reason);
+    debug!(
+        "task_cleanup_failure: {:?} panicked with {:?}",
+        current_task.name, kill_reason
+    );
 
     if current_task.mark_as_killed(kill_reason).is_err() {
         error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.name);
     }
 
     (held_interrupts, current_task)
-}     
+}
 
 /// This function cleans up a task that did not exit properly,
-/// e.g., it panicked, hit an exception, etc. 
-/// 
+/// e.g., it panicked, hit an exception, etc.
+///
 /// A failure that occurs while unwinding a task will also jump here.
-/// 
+///
 /// The generic type parameters are derived from the original `task_wrapper` invocation,
 /// and are here to provide type information needed when cleaning up a failed task.
 fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
     let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
 /// Similar to `task_cleanup_failure` but used on restartable_tasks
-fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
-    where A: Send + Clone + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone + 'static, 
+fn task_restartable_cleanup_failure<F, A, R>(
+    current_task: TaskRef,
+    kill_reason: task::KillReason,
+) -> !
+where
+    A: Send + Clone + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R + Send + Clone + 'static,
 {
     let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
     task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
-
 
 /// Internal function that performs final cleanup actions for an exited task.
 #[inline(always)]
@@ -640,13 +673,16 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
     }
 }
 
-
 /// The final piece of the task cleanup logic,
-/// which removes the task from its runqueue and permanently deschedules it. 
-fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
+/// which removes the task from its runqueue and permanently deschedules it.
+fn task_cleanup_final<F, A, R>(
+    held_interrupts: irq_safety::HeldInterrupts,
+    current_task: TaskRef,
+) -> !
+where
+    A: Send + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R,
 {
     task_cleanup_final_internal(&current_task);
     drop(current_task);
@@ -657,16 +693,20 @@ fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, curr
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop {}
 }
 
 /// The final piece of the task cleanup logic for restartable tasks.
-/// which removes the task from its runqueue and spawns it again with 
-/// same entry function (F) and argument (A). 
-fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
-   where A: Send + Clone + 'static, 
-         R: Send + 'static,
-         F: FnOnce(A) -> R + Send + Clone + 'static, 
+/// which removes the task from its runqueue and spawns it again with
+/// same entry function (F) and argument (A).
+fn task_restartable_cleanup_final<F, A, R>(
+    held_interrupts: irq_safety::HeldInterrupts,
+    current_task: TaskRef,
+) -> !
+where
+    A: Send + Clone + 'static,
+    R: Send + 'static,
+    F: FnOnce(A) -> R + Send + Clone + 'static,
 {
     task_cleanup_final_internal(&current_task);
 
@@ -675,14 +715,13 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
         let mut se = fault_crate_swap::SwapRanges::default();
 
         // Get the crate we should swap. Will be None if nothing is picked
-        #[cfg(use_crate_replacement)] {
+        #[cfg(use_crate_replacement)]
+        {
             if let Some(crate_to_swap) = fault_crate_swap::get_crate_to_swap() {
                 // Call the handler to swap the crates
                 let version = fault_crate_swap::self_swap_handler(&crate_to_swap);
                 match version {
-                    Ok(v) => {
-                        se = v
-                    }
+                    Ok(v) => se = v,
                     Err(err) => {
                         debug!(" Crate swapping failed {:?}", err)
                     }
@@ -690,41 +729,51 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
             }
         }
 
-        // Re-spawn a new instance of the task if it was spawned as a restartable task. 
+        // Re-spawn a new instance of the task if it was spawned as a restartable task.
         // We must not hold the current task's lock when calling spawn().
         let restartable_info = current_task.with_restart_info(|restart_info_opt| {
             restart_info_opt.map(|restart_info| {
-                #[cfg(use_crate_replacement)] {
+                #[cfg(use_crate_replacement)]
+                {
                     let func_ptr = &(restart_info.func) as *const _ as usize;
                     let arg_ptr = &(restart_info.argument) as *const _ as usize;
 
-                    #[cfg(not(downtime_eval))] {
+                    #[cfg(not(downtime_eval))]
+                    {
                         debug!("func_ptr {:#X}", func_ptr);
                         debug!("arg_ptr {:#X} , {}", arg_ptr, mem::size_of::<A>());
                     }
 
                     // func_ptr is of size 16. Argument is of the argument_size + 8.
-                    // This extra size comes due to argument and function both stored in +8 location pointed by the pointer. 
-                    // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?). 
-                    if fault_crate_swap::constant_offset_fix(&se, func_ptr, func_ptr + 16).is_ok() &&  fault_crate_swap::constant_offset_fix(&se, arg_ptr, arg_ptr + 8).is_ok() {
+                    // This extra size comes due to argument and function both stored in +8 location pointed by the pointer.
+                    // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?).
+                    if fault_crate_swap::constant_offset_fix(&se, func_ptr, func_ptr + 16).is_ok()
+                        && fault_crate_swap::constant_offset_fix(&se, arg_ptr, arg_ptr + 8).is_ok()
+                    {
                         #[cfg(not(downtime_eval))]
                         debug!("Function and argument addresses corrected");
                     }
                 }
 
-                let func: &F = restart_info.func.downcast_ref().expect("BUG: failed to downcast restartable task's function");
-                let arg : &A = restart_info.argument.downcast_ref().expect("BUG: failed to downcast restartable task's argument");
+                let func: &F = restart_info
+                    .func
+                    .downcast_ref()
+                    .expect("BUG: failed to downcast restartable task's function");
+                let arg: &A = restart_info
+                    .argument
+                    .downcast_ref()
+                    .expect("BUG: failed to downcast restartable task's argument");
                 (func.clone(), arg.clone())
             })
         });
 
         if let Some((func, arg)) = restartable_info {
-            let mut new_task = new_task_builder(func, arg)
-                .name(current_task.name.clone());
+            let mut new_task = new_task_builder(func, arg).name(current_task.name.clone());
             if let Some(core) = current_task.pinned_core() {
                 new_task = new_task.pin_on_core(core);
             }
-            new_task.spawn_restartable()
+            new_task
+                .spawn_restartable()
                 .expect("Failed to respawn the restartable task");
         } else {
             error!("BUG: Restartable task has no restart information available");
@@ -739,36 +788,40 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop {}
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     // Special behavior when evaluating runqueues
-    #[cfg(rq_eval)] {
+    #[cfg(rq_eval)]
+    {
         // The special spillful version does nothing here, since it was already done in `internal_exit()`
-        #[cfg(runqueue_spillful)] {
+        #[cfg(runqueue_spillful)]
+        {
             // do nothing
         }
         // The regular spill-free version does brute-force removal of the task from ALL runqueues.
-        #[cfg(not(runqueue_spillful))] {
+        #[cfg(not(runqueue_spillful))]
+        {
             runqueue::remove_task_from_all(current_task).unwrap();
         }
     }
 
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
-    #[cfg(not(rq_eval))] {
+    #[cfg(not(rq_eval))]
+    {
         if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(current_task)) 
+            .and_then(|rq| rq.write().remove_task(current_task))
         {
             error!("BUG: couldn't remove exited task from runqueue: {}", e);
         }
     }
 }
 
-/// Spawns an idle task on the given `core` if specified, otherwise on the current core. 
+/// Spawns an idle task on the given `core` if specified, otherwise on the current core.
 /// Then, it adds adds the new idle task to that core's runqueue.
 pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
     let apic_id = core.unwrap_or_else(|| get_my_apic_id());
@@ -781,15 +834,18 @@ pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
 }
 
 /// Dummy `idle_task` to be used if original `idle_task` crashes.
-/// 
+///
 /// Note: the current spawn API does not support spawning a task with the return type `!`,
-/// so we use `()` here instead. 
+/// so we use `()` here instead.
 #[inline(never)]
 fn dummy_idle_task(_apic_id: u8) {
-    info!("Entered idle task loop on core {}: {:?}", _apic_id, task::get_my_current_task());
+    info!(
+        "Entered idle task loop on core {}: {:?}",
+        _apic_id,
+        task::get_my_current_task()
+    );
     loop {
         // TODO: put this core into a low-power state
         pause::spin_loop_hint();
     }
 }
-

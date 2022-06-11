@@ -1,21 +1,25 @@
 #![no_std]
-//! This crate contains the implementation of the special root directory. The only way that this 
-//! directory implementation differs from VFSDirectory is that there is no parent field (becuase the 
+//! This crate contains the implementation of the special root directory. The only way that this
+//! directory implementation differs from VFSDirectory is that there is no parent field (becuase the
 //! root has no parent directory), and that internal calls to parent will return some type of error value
 
-#[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate lazy_static;
-extern crate spin;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate alloc;
+#[macro_use]
+extern crate lazy_static;
 extern crate fs_node;
+extern crate spin;
 
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use spin::Mutex;
-use alloc::sync::{Arc, Weak};
-use alloc::collections::BTreeMap;
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::{Arc, Weak},
+    vec::Vec,
+};
 use fs_node::{DirRef, Directory, FileOrDir, FsNode, WeakDirRef};
-
+use spin::Mutex;
 
 pub const ROOT_DIRECTORY_NAME: &'static str = "";
 
@@ -24,7 +28,7 @@ lazy_static! {
     /// Returns a tuple for easy access to the name of the root so we don't have to lock it
     pub static ref ROOT: (String, DirRef) = {
         let root_dir = RootDirectory {
-            children: BTreeMap::new() 
+            children: BTreeMap::new()
         };
         let strong_root = Arc::new(Mutex::new(root_dir)) as DirRef;
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
@@ -36,7 +40,7 @@ pub fn get_root() -> &'static DirRef {
     &ROOT.1
 }
 
-/// A struct that represents a node in the VFS 
+/// A struct that represents a node in the VFS
 pub struct RootDirectory {
     /// A list of DirRefs or pointers to the child directories   
     children: BTreeMap<String, FileOrDir>,
@@ -69,10 +73,10 @@ impl Directory for RootDirectory {
                     error!("Ignoring attempt to remove the root directory.");
                     return None;
                 }
-            },
+            }
             _ => {}
         }
-        
+
         if let Some(mut old_node) = self.children.remove(&node.get_name()) {
             old_node.set_parent_dir(Weak::<Mutex<RootDirectory>>::new());
             Some(old_node)

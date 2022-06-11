@@ -7,26 +7,29 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::PageTableEntry;
-use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, EntryFlags};
-use core::ops::{Index, IndexMut};
-use core::marker::PhantomData;
+use super::{
+    super::{EntryFlags, VirtualAddress},
+    PageTableEntry,
+};
+use core::{
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+};
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SHIFT};
 use zerocopy::FromBytes;
 
-
-/// Theseus uses the 511th entry of the P4 table for mapping the higher-half kernel, 
+/// Theseus uses the 511th entry of the P4 table for mapping the higher-half kernel,
 /// so it uses the 510th entry of P4 for the recursive mapping.
-/// 
+///
 /// NOTE: this must be kept in sync with the recursive index in `kernel_config/memory.rs`
 ///       and `nano_core/<arch>/boot.asm`.
 ///
-/// See these links for more: 
+/// See these links for more:
 /// * <http://forum.osdev.org/viewtopic.php?f=1&p=176913>
 /// * <http://forum.osdev.org/viewtopic.php?f=15&t=25545>
-pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
-                                         // ^p4 ^p3 ^p2 ^p1 ^offset  
-                                         // ^ 0o776 means that we're always looking at the 510th entry recursively
+pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _;
+// ^p4 ^p3 ^p2 ^p1 ^offset
+// ^ 0o776 means that we're always looking at the 510th entry recursively
 
 #[derive(FromBytes)]
 pub struct Table<L: TableLevel> {
@@ -35,7 +38,7 @@ pub struct Table<L: TableLevel> {
 }
 
 impl<L: TableLevel> Table<L> {
-    /// Zero out (clear) all entries in this page table frame. 
+    /// Zero out (clear) all entries in this page table frame.
     pub fn zero(&mut self) {
         for entry in self.entries.iter_mut() {
             entry.zero();
@@ -61,23 +64,25 @@ impl<L: HierarchicalLevel> Table<L> {
     }
 
     /// Returns a reference to the next lowest-level page table.
-    /// 
+    ///
     /// A convenience wrapper around `next_table_address()`; see that method for more.
     pub fn next_table(&self, index: usize) -> Option<&Table<L::NextLevel>> {
         // convert the next table address from a raw pointer back to a Table type
-        self.next_table_address(index).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
+        self.next_table_address(index)
+            .map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
     }
 
     /// Returns a mutable reference to the next lowest-level page table.
-    /// 
+    ///
     /// A convenience wrapper around `next_table_address()`; see that method for more.
     pub fn next_table_mut(&mut self, index: usize) -> Option<&mut Table<L::NextLevel>> {
-        self.next_table_address(index).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
+        self.next_table_address(index)
+            .map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
     }
 
-    /// Returns a mutable reference to the next lowest-level page table, 
+    /// Returns a mutable reference to the next lowest-level page table,
     /// creating and initializing a new one if it doesn't already exist.
-    /// 
+    ///
     /// A convenience wrapper around `next_table_address()`; see that method for more.
     ///
     /// TODO: return a `Result` here instead of panicking.
@@ -87,12 +92,19 @@ impl<L: HierarchicalLevel> Table<L> {
         flags: EntryFlags,
     ) -> &mut Table<L::NextLevel> {
         if self.next_table(index).is_none() {
-            assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
-            let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
+            assert!(
+                !self[index].flags().is_huge(),
+                "mapping code does not support huge pages"
+            );
+            let af = frame_allocator::allocate_frames(1)
+                .expect("next_table_create(): no frames available");
             let new_page_table_frame = *af.start();
             core::mem::forget(af); // we currently forget frames allocated as page table frames since we don't yet have a way to track them.
 
-            self[index].set_entry(new_page_table_frame, flags.into_writable() | EntryFlags::PRESENT); // must be PRESENT | WRITABLE for x86_64
+            self[index].set_entry(
+                new_page_table_frame,
+                flags.into_writable() | EntryFlags::PRESENT,
+            ); // must be PRESENT | WRITABLE for x86_64
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()

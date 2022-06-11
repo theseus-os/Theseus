@@ -36,7 +36,7 @@ pub fn create_dhcp_test_packet() -> Result<TransmitBuffer, &'static str> {
         0x37, 0x04, 0x01, 0x03, 0x06, 0x2a, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
     let mut transmit_buffer = TransmitBuffer::new(packet.len() as u16)?;
-    { 
+    {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, 314)?;
         buffer.copy_from_slice(&packet);
     }
@@ -45,11 +45,10 @@ pub fn create_dhcp_test_packet() -> Result<TransmitBuffer, &'static str> {
 
 /// Creates a `TransmitBuffer` that contains a packet with only the ethernet header.
 pub fn create_raw_packet(
-    dest_mac_address: &[u8], 
-    source_mac_address: &[u8], 
-    message: &[u8]
+    dest_mac_address: &[u8],
+    source_mac_address: &[u8],
+    message: &[u8],
 ) -> Result<TransmitBuffer, &'static str> {
-    
     const ETHER_TYPE_LEN: usize = 2;
     const MAC_ADDR_LEN: usize = 6;
     const ETHERNET_HEADER_LEN: usize = MAC_ADDR_LEN * 2 + ETHER_TYPE_LEN;
@@ -66,19 +65,19 @@ pub fn create_raw_packet(
     let ether_type: [u8; ETHER_TYPE_LEN] = [(len >> 8) as u8, len as u8];
 
     let mut transmit_buffer = TransmitBuffer::new(ETHERNET_HEADER_LEN as u16 + len)?;
-    { 
+    {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, MAC_ADDR_LEN)?;
         buffer.copy_from_slice(&dest_mac_address);
     }
-    { 
+    {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(6, MAC_ADDR_LEN)?;
         buffer.copy_from_slice(&source_mac_address);
     }
-    { 
+    {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(12, ETHER_TYPE_LEN)?;
         buffer.copy_from_slice(&ether_type);
     }
-    { 
+    {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(14, message.len())?;
         buffer.copy_from_slice(&message);
     }

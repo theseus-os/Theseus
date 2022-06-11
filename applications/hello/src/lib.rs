@@ -2,14 +2,12 @@
 // #![feature(plugin)]
 // #![plugin(application_main_fn)]
 
-
 extern crate alloc;
 // #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use]
+extern crate terminal_print;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-
+use alloc::{string::String, vec::Vec};
 
 pub fn main(_args: Vec<String>) -> isize {
     // info!("Hello, world! (from hello application)");

@@ -102,7 +102,6 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         self.empty_slabs.pop()
     }
 
-    
     // /// Since `dealloc` can not reassign pages without requiring a lock
     // /// we check slabs and full slabs periodically as part of `alloc`
     // /// and move them to the empty or partially allocated slab lists.
@@ -204,11 +203,11 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         ptr::null_mut()
     }
 
-
     /// Refill the SCAllocator
     pub fn refill(&mut self, page: &'a mut P, heap_id: usize) {
         page.set_heap_id(heap_id);
-        page.bitfield_mut().initialize(self.size, P::SIZE - P::METADATA_SIZE);
+        page.bitfield_mut()
+            .initialize(self.size, P::SIZE - P::METADATA_SIZE);
         *page.prev() = Rawlink::none();
         *page.next() = Rawlink::none();
         // trace!("adding page to SCAllocator {:p}", page);
@@ -231,7 +230,7 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         // trace!(
         //     "SCAllocator({}) is trying to allocate {:?}, {}",
         //     self.size,
-        //     layout, 
+        //     layout,
         //     P::SIZE - CACHE_LINE_SIZE
         // );
         assert!(layout.size() <= self.size);
@@ -286,7 +285,11 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
     /// # Safety
     /// The caller must ensure that `ptr` argument is returned from [`Self::allocate()`]
     /// and `layout` argument is correct.
-    pub unsafe fn deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> Result<(), &'static str> {
+    pub unsafe fn deallocate(
+        &mut self,
+        ptr: NonNull<u8>,
+        layout: Layout,
+    ) -> Result<(), &'static str> {
         assert!(layout.size() <= self.size);
         assert!(self.size <= (P::SIZE - CACHE_LINE_SIZE));
         // trace!(

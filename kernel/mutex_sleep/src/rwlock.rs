@@ -1,17 +1,19 @@
-use core::fmt;
-use core::ops::{Deref, DerefMut};
-use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use core::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
+use lockable::{Lockable, LockableSized};
 use owning_ref::{OwningRef, OwningRefMut};
+use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use stable_deref_trait::StableDeref;
 use wait_queue::WaitQueue;
-use lockable::{Lockable, LockableSized};
 
 /// A multi-reader, single-writer mutual exclusion wrapper that puts a `Task` to sleep
-/// while waiting for the lock to become available. 
-/// 
+/// while waiting for the lock to become available.
+///
 /// The behavior of this read-write lock is defined by the underlying [`spin::RwLock`];
-/// 
-/// A sleeping `Task` has a "blocked" runstate, meaning that it will not be scheduled in. 
+///
+/// A sleeping `Task` has a "blocked" runstate, meaning that it will not be scheduled in.
 /// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock
 /// will be notified (woken up) so they can attempt to acquire the lock again.
 pub struct RwLockSleep<T: ?Sized> {
@@ -47,7 +49,7 @@ impl<T> RwLockSleep<T> {
     /// Creates a new lock wrapping the supplied data.
     ///
     // NOTE: const fn is currently disabled because the inner WaitQueue
-    // is a VecDeque, which isn't statically initializable. 
+    // is a VecDeque, which isn't statically initializable.
     // When we switch to a different type, we can offer this as a const fn again.
     // pub const fn new (data: T) -> RwLockSleep<T> {
     pub fn new(data: T) -> RwLockSleep<T> {
@@ -76,13 +78,13 @@ impl<T: ?Sized> RwLockSleep<T> {
     }
 
     /// Locks this `RwLockSleep` with shared read (immutable) access.
-    /// 
+    ///
     /// If a writer has already acquired this lock, this function will put the current `Task`
-    /// to sleep until the writer `Task` releases the lock, at which point this `Task` 
+    /// to sleep until the writer `Task` releases the lock, at which point this `Task`
     /// will be woken up and attempt to acquire the read-only lock again.
     ///
     /// There may be other readers currently inside the lock when this function returns.
-    /// This does not provide any guarantees with respect to the ordering 
+    /// This does not provide any guarantees with respect to the ordering
     /// of whether contentious readers or writers will acquire the lock first.
     ///
     /// Returns an RAII guard which will release this task's shared access upon being dropped.
@@ -126,12 +128,12 @@ impl<T: ?Sized> RwLockSleep<T> {
     /// }
     /// ```
     pub fn try_read(&self) -> Option<RwLockSleepReadGuard<T>> {
-        self.rwlock.try_read().map(|spinlock_guard| 
-            RwLockSleepReadGuard {
+        self.rwlock
+            .try_read()
+            .map(|spinlock_guard| RwLockSleepReadGuard {
                 guard: spinlock_guard,
-                queue: &self.queue
-            }
-        )
+                queue: &self.queue,
+            })
     }
 
     /// Return the number of readers that currently hold the lock (including upgradable readers).
@@ -176,13 +178,13 @@ impl<T: ?Sized> RwLockSleep<T> {
     }
 
     /// Locks this `RwLockSleep` with exclusive write (mutable) access.
-    /// 
+    ///
     /// If another writer or reader has already acquired this lock, this function will
     /// put the current `Task` to sleep until all other readers and the other writer `Task`
     /// release their locks, at which point this `Task` will be woken up and
     /// attempt to acquire the write lock again.
     ///
-    /// This does not provide any guarantees with respect to the ordering 
+    /// This does not provide any guarantees with respect to the ordering
     /// of whether contentious readers or writers will acquire the lock first.
     ///
     /// Returns an RAII guard which will release this task's exclusive access upon being dropped.
@@ -226,12 +228,12 @@ impl<T: ?Sized> RwLockSleep<T> {
     /// }
     /// ```
     pub fn try_write(&self) -> Option<RwLockSleepWriteGuard<T>> {
-        self.rwlock.try_write().map(|spinlock_guard|
-            RwLockSleepWriteGuard {
+        self.rwlock
+            .try_write()
+            .map(|spinlock_guard| RwLockSleepWriteGuard {
                 guard: spinlock_guard,
                 queue: &self.queue,
-            }
-        )
+            })
     }
 
     /// Returns a mutable reference to the underlying data.
@@ -270,25 +272,24 @@ impl<T: ?Sized + Default> Default for RwLockSleep<T> {
 impl<'rwlock, T: ?Sized> Deref for RwLockSleepReadGuard<'rwlock, T> {
     type Target = T;
 
-    fn deref(&self) -> &T { 
-       & *(self.guard) 
+    fn deref(&self) -> &T {
+        &*(self.guard)
     }
 }
 
 impl<'rwlock, T: ?Sized> Deref for RwLockSleepWriteGuard<'rwlock, T> {
     type Target = T;
 
-    fn deref(&self) -> &T { 
-        & *(self.guard)
+    fn deref(&self) -> &T {
+        &*(self.guard)
     }
 }
 
 impl<'rwlock, T: ?Sized> DerefMut for RwLockSleepWriteGuard<'rwlock, T> {
-    fn deref_mut(&mut self) -> &mut T { 
+    fn deref_mut(&mut self) -> &mut T {
         &mut *(self.guard)
     }
 }
-
 
 impl<'rwlock, T: ?Sized> Drop for RwLockSleepReadGuard<'rwlock, T> {
     fn drop(&mut self) {
@@ -318,18 +319,38 @@ pub type RwLockSleepWriteGuardRefMut<'a, T, U = T> = OwningRefMut<RwLockSleepWri
 /// Implement `Lockable` for [`RwLockSleep`].
 /// Because [`RwLockSleep::read()`] and [`RwLockSleep::write()`] return `Result`s and may fail,
 /// the [`Lockable::lock()`] and `lock_mut()` functions internally `unwrap` those `Result`s.
-impl<'t, T> Lockable<'t, T> for RwLockSleep<T> where T: 't + ?Sized {
+impl<'t, T> Lockable<'t, T> for RwLockSleep<T>
+where
+    T: 't + ?Sized,
+{
     type Guard = RwLockSleepReadGuard<'t, T>;
     type GuardMut = RwLockSleepWriteGuard<'t, T>;
 
-    fn lock(&'t self) -> Self::Guard { self.read().unwrap() }
-    fn try_lock(&'t self) -> Option<Self::Guard> { self.try_read() }
-    fn lock_mut(&'t self) -> Self::GuardMut { self.write().unwrap() }
-    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_write() }
-    fn is_locked(&self) -> bool { self.is_locked() }
-    fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+    fn lock(&'t self) -> Self::Guard {
+        self.read().unwrap()
+    }
+    fn try_lock(&'t self) -> Option<Self::Guard> {
+        self.try_read()
+    }
+    fn lock_mut(&'t self) -> Self::GuardMut {
+        self.write().unwrap()
+    }
+    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> {
+        self.try_write()
+    }
+    fn is_locked(&self) -> bool {
+        self.is_locked()
+    }
+    fn get_mut(&'t mut self) -> &mut T {
+        self.get_mut()
+    }
 }
 /// Implement `LockableSized` for [`RwLockSleep`].
-impl<'t, T> LockableSized<'t, T> for RwLockSleep<T> where T: 't + Sized {
-    fn into_inner(self) -> T { self.into_inner() }
+impl<'t, T> LockableSized<'t, T> for RwLockSleep<T>
+where
+    T: 't + Sized,
+{
+    fn into_inner(self) -> T {
+        self.into_inner()
+    }
 }

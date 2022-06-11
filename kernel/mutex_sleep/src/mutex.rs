@@ -1,14 +1,16 @@
-use core::fmt;
-use core::ops::{Deref, DerefMut};
-use spin::{Mutex, MutexGuard};
+use core::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
+use lockable::{Lockable, LockableSized};
 use owning_ref::{OwningRef, OwningRefMut};
+use spin::{Mutex, MutexGuard};
 use stable_deref_trait::StableDeref;
 use wait_queue::WaitQueue;
-use lockable::{Lockable, LockableSized};
 
-/// A mutual exclusion wrapper that puts a `Task` to sleep while waiting for the lock to become available. 
-/// 
-/// A sleeping `Task` has a "blocked" runstate, meaning that it will not be scheduled in. 
+/// A mutual exclusion wrapper that puts a `Task` to sleep while waiting for the lock to become available.
+///
+/// A sleeping `Task` has a "blocked" runstate, meaning that it will not be scheduled in.
 /// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock
 /// will be notified (woken up) so they can attempt to acquire the lock again.
 pub struct MutexSleep<T: ?Sized> {
@@ -33,7 +35,7 @@ impl<T> MutexSleep<T> {
     /// Creates a new lock wrapping the supplied data.
     ///
     // NOTE: const fn is currently disabled because the inner WaitQueue
-    // is a VecDeque, which isn't statically initializable. 
+    // is a VecDeque, which isn't statically initializable.
     // When we switch to a different type, we can offer this as a const fn again.
     // pub const fn new (data: T) -> MutexSleep<T> {
     pub fn new(data: T) -> MutexSleep<T> {
@@ -61,8 +63,8 @@ impl<T: ?Sized> MutexSleep<T> {
         self.lock.is_locked()
     }
 
-    /// Blocks until the lock is acquired by putting this `Task` to sleep 
-    /// until another `Task` that has the lock releases it. 
+    /// Blocks until the lock is acquired by putting this `Task` to sleep
+    /// until another `Task` that has the lock releases it.
     ///
     /// The returned guard may be dereferenced to access the protected data;
     /// the lock will be released when the returned guard falls out of scope and is dropped.
@@ -80,11 +82,9 @@ impl<T: ?Sized> MutexSleep<T> {
     /// Tries to lock the MutexSleep. If it is already locked, it will return `None`.
     /// Otherwise it returns a guard within `Some`.
     pub fn try_lock(&self) -> Option<MutexSleepGuard<T>> {
-        self.lock.try_lock().map(|spinlock_guard| {
-            MutexSleepGuard {
-                guard: spinlock_guard,
-                queue: &self.queue,
-            }
+        self.lock.try_lock().map(|spinlock_guard| MutexSleepGuard {
+            guard: spinlock_guard,
+            queue: &self.queue,
         })
     }
 
@@ -125,17 +125,16 @@ impl<T: ?Sized + Default> Default for MutexSleep<T> {
 impl<'a, T: ?Sized> Deref for MutexSleepGuard<'a, T> {
     type Target = T;
 
-    fn deref<'b>(&'b self) -> &'b T { 
-        &*(self.guard) 
+    fn deref<'b>(&'b self) -> &'b T {
+        &*(self.guard)
     }
 }
 
 impl<'a, T: ?Sized> DerefMut for MutexSleepGuard<'a, T> {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { 
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T {
         &mut *(self.guard)
     }
 }
-
 
 impl<'a, T: ?Sized> Drop for MutexSleepGuard<'a, T> {
     fn drop(&mut self) {
@@ -156,18 +155,38 @@ pub type MutexSleepGuardRefMut<'a, T, U = T> = OwningRefMut<MutexSleepGuard<'a, 
 /// Implement `Lockable` for [`MutexSleep`].
 /// Because [`MutexSleep::lock()`] returns a `Result` and may fail,
 /// the [`Lockable::lock()`] function internally `unwrap`s that `Result`.
-impl<'t, T> Lockable<'t, T> for MutexSleep<T> where T: 't + ?Sized {
+impl<'t, T> Lockable<'t, T> for MutexSleep<T>
+where
+    T: 't + ?Sized,
+{
     type Guard = MutexSleepGuard<'t, T>;
     type GuardMut = Self::Guard;
 
-    fn lock(&'t self) -> Self::Guard { self.lock().unwrap() }
-    fn try_lock(&'t self) -> Option<Self::Guard> { self.try_lock() }
-    fn lock_mut(&'t self) -> Self::GuardMut { self.lock().unwrap() }
-    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> { self.try_lock() }
-    fn is_locked(&self) -> bool { self.is_locked() }
-    fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
+    fn lock(&'t self) -> Self::Guard {
+        self.lock().unwrap()
+    }
+    fn try_lock(&'t self) -> Option<Self::Guard> {
+        self.try_lock()
+    }
+    fn lock_mut(&'t self) -> Self::GuardMut {
+        self.lock().unwrap()
+    }
+    fn try_lock_mut(&'t self) -> Option<Self::GuardMut> {
+        self.try_lock()
+    }
+    fn is_locked(&self) -> bool {
+        self.is_locked()
+    }
+    fn get_mut(&'t mut self) -> &mut T {
+        self.get_mut()
+    }
 }
 /// Implement `LockableSized` for [`MutexSleep`].
-impl<'t, T> LockableSized<'t, T> for MutexSleep<T> where T: 't + Sized {
-    fn into_inner(self) -> T { self.into_inner() }
+impl<'t, T> LockableSized<'t, T> for MutexSleep<T>
+where
+    T: 't + Sized,
+{
+    fn into_inner(self) -> T {
+        self.into_inner()
+    }
 }

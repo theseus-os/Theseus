@@ -1,43 +1,52 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
 // #[macro_use] extern crate lazy_static;
-extern crate irq_safety;
 extern crate atomic_linked_list;
-extern crate task;
 extern crate hpet;
+extern crate irq_safety;
+extern crate task;
 
-extern crate runqueue_round_robin;
 extern crate runqueue_priority;
+extern crate runqueue_round_robin;
 
-use core::ops::Deref;
 use alloc::sync::Arc;
+use core::ops::Deref;
 use mod_mgmt::CrateNamespace;
 // use lazy_static::lazy::Lazy;
-use irq_safety::RwLockIrqSafe;
 use atomic_linked_list::atomic_map::AtomicMap;
+use irq_safety::RwLockIrqSafe;
 // use task::TaskRef;
 
-
-/// This function is used for live evolution from a round robin scheduler to a priority scheduler. 
+/// This function is used for live evolution from a round robin scheduler to a priority scheduler.
 /// It first extracts the taskrefs from the round robin Runqueue,
 /// then converts them into priority taskrefs and places them on the priority Runqueue.
-pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNamespace) -> Result<(), &'static str> {
-
+pub fn prio_sched(
+    _old_namespace: &Arc<CrateNamespace>,
+    _new_namespace: &CrateNamespace,
+) -> Result<(), &'static str> {
     // just debugging info
     #[cfg(not(loscd_eval))]
     {
         warn!("prio_sched(): at the top.");
-        let rq_rr_crate = CrateNamespace::get_crate_starting_with(_old_namespace, "runqueue_round_robin")
-            .map(|(_crate_name, crate_ref, _ns)| crate_ref)
-            .ok_or("Couldn't get runqueue_round_robin crate from old namespace")?;
+        let rq_rr_crate =
+            CrateNamespace::get_crate_starting_with(_old_namespace, "runqueue_round_robin")
+                .map(|(_crate_name, crate_ref, _ns)| crate_ref)
+                .ok_or("Couldn't get runqueue_round_robin crate from old namespace")?;
         let krate = rq_rr_crate.lock_as_ref();
         for sec in krate.sections.values() {
             if sec.name.contains("RUNQUEUES") {
-                debug!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.start_address(), sec.size());
+                debug!(
+                    "Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n",
+                    sec.name,
+                    sec.typ,
+                    sec.start_address(),
+                    sec.size()
+                );
             }
         }
         warn!("REPLACING LAZY_STATIC RUNQUEUES...");
@@ -52,8 +61,10 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
     // lazy_static! { static ref RQEMPTY: AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>> = AtomicMap::new(); }
     let rq_ptr = runqueue_round_robin::RUNQUEUES.deref() as *const _ as usize;
     let once_rq = core::mem::replace(
-        unsafe { &mut *(rq_ptr as *mut AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>>) }, 
-        AtomicMap::new()
+        unsafe {
+            &mut *(rq_ptr as *mut AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>>)
+        },
+        AtomicMap::new(),
     );
 
     #[cfg(not(loscd_eval))]
@@ -67,9 +78,11 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
         }
     }
 
-    #[cfg(loscd_eval)] {
+    #[cfg(loscd_eval)]
+    {
         let hpet_end_state_transfer = hpet.get_counter();
-        warn!("Measured time in units of HPET ticks:
+        warn!(
+            "Measured time in units of HPET ticks:
             state transfer, {}
             ",
             hpet_end_state_transfer - hpet_start_state_transfer,
@@ -81,11 +94,8 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
     #[cfg(not(loscd_eval))]
     warn!("REPLACED LAZY_STATIC RUNQUEUES...");
 
-
     Ok(())
 }
-
-
 
 //////////////////////////////////////////////////////////
 ///////////// Generic trait redefinitions ////////////////
@@ -101,7 +111,10 @@ trait MyInto<T>: Sized {
     fn into(self) -> T;
 }
 
-impl<T, U> MyInto<U> for T where U: MyFrom<T> {
+impl<T, U> MyInto<U> for T
+where
+    U: MyFrom<T>,
+{
     fn into(self) -> U {
         U::from(self)
     }

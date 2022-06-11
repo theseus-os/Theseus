@@ -4,12 +4,12 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate print;
+#[macro_use]
+extern crate print;
 extern crate getopts;
 extern crate pmu_x86;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 
 pub fn main(_args: Vec<String>) -> isize {
     let sampler = pmu_x86::retrieve_samples();
@@ -18,12 +18,10 @@ pub fn main(_args: Vec<String>) -> isize {
         if let Err(e) = pmu_x86::find_function_names_from_samples(&my_sampler) {
             println!("Error finding function names from samples: {:?}", e);
         }
-    } 
-    else {
+    } else {
         println!("Could not retrieve samples");
         return -1;
     }
 
     0
 }
-

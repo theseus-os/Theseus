@@ -3,7 +3,8 @@
 #![no_std]
 
 extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
+#[macro_use]
+extern crate static_assertions;
 
 use zerocopy::FromBytes;
 
@@ -15,15 +16,15 @@ pub const SDT_SIZE_IN_BYTES: usize = core::mem::size_of::<Sdt>();
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
 pub struct Sdt {
-  pub signature: [u8; 4],
-  pub length: u32,
-  pub revision: u8,
-  pub checksum: u8,
-  pub oem_id: [u8; 6],
-  pub oem_table_id: [u8; 8],
-  pub oem_revision: u32,
-  pub creator_id: u32,
-  pub creator_revision: u32
+    pub signature: [u8; 4],
+    pub length: u32,
+    pub revision: u8,
+    pub checksum: u8,
+    pub oem_id: [u8; 6],
+    pub oem_table_id: [u8; 8],
+    pub oem_revision: u32,
+    pub creator_id: u32,
+    pub creator_revision: u32,
 }
 const_assert_eq!(core::mem::size_of::<Sdt>(), 36);
 

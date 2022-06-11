@@ -1,30 +1,32 @@
 #![no_std]
 /// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
-/// directories via the Path struct 
+/// directories via the Path struct
 // #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
-extern crate spin;
+#[macro_use]
+extern crate alloc;
 extern crate fs_node;
 extern crate root;
+extern crate spin;
 
-use core::fmt;
-use core::ops::{Deref, DerefMut};
 use alloc::{
     string::{String, ToString},
-    vec::Vec,
     sync::Arc,
+    vec::Vec,
 };
-use fs_node::{FileOrDir, FileRef, DirRef};
+use core::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
+use fs_node::{DirRef, FileOrDir, FileRef};
 
 pub const PATH_DELIMITER: &str = "/";
 pub const EXTENSION_DELIMITER: &str = ".";
-
 
 /// A structure that represents a relative or absolute path
 /// to a file or directory.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Path {
-    path: String
+    path: String,
 }
 
 impl Deref for Path {
@@ -49,7 +51,7 @@ impl fmt::Display for Path {
 impl From<String> for Path {
     #[inline]
     fn from(path: String) -> Self {
-        Path {path: path}
+        Path { path: path }
     }
 }
 
@@ -65,19 +67,17 @@ impl Path {
     pub fn new(path: String) -> Self {
         Path { path }
     }
-    
+
     /// Returns an iterator over the components of this `Path`,
     /// split by the path delimiter `"/"`.
     pub fn components<'a>(&'a self) -> impl Iterator<Item = &'a str> {
-        self.path.split(PATH_DELIMITER)
-            .filter(|&x| x != "")
+        self.path.split(PATH_DELIMITER).filter(|&x| x != "")
     }
 
     /// Returns a reverse iterator over the components of this `Path`,
     /// split by the path delimiter `"/"`.
     pub fn rcomponents<'a>(&'a self) -> impl Iterator<Item = &'a str> {
-        self.path.rsplit(PATH_DELIMITER)
-            .filter(|&x| x != "")
+        self.path.rsplit(PATH_DELIMITER).filter(|&x| x != "")
     }
 
     /// Returns just the file name, i.e., the trailling component of the path.
@@ -86,9 +86,7 @@ impl Path {
     /// `"my/file.a"` -> "file.a"
     /// `"file.a"` -> "file.a"
     pub fn basename<'a>(&'a self) -> &'a str {
-        self.rcomponents()
-            .next()
-            .unwrap_or_else(|| &self.path)
+        self.rcomponents().next().unwrap_or_else(|| &self.path)
     }
 
     /// Like [`basename()`](#method.basename), but excludes the file extension, if present.
@@ -100,9 +98,9 @@ impl Path {
             .unwrap_or_else(|| &self.path)
     }
 
-    /// Returns the file extension, if present. 
+    /// Returns the file extension, if present.
     /// If there are multiple extensions as defined by the extension delimiter, `'.'`,
-    /// then the last one will be treated as the extension. 
+    /// then the last one will be treated as the extension.
     pub fn extension<'a>(&'a self) -> Option<&'a str> {
         self.basename()
             .rsplit(EXTENSION_DELIMITER)
@@ -127,21 +125,20 @@ impl Path {
                 new_components.push(component);
             }
         }
-        // Create the new path from its components 
+        // Create the new path from its components
         let mut new_path = String::new();
-        let mut first_cmpnt = true; 
+        let mut first_cmpnt = true;
         for component in new_components {
             if first_cmpnt {
-                new_path.push_str(&format!("{}",  component));
+                new_path.push_str(&format!("{}", component));
                 first_cmpnt = false;
-            } 
-            else {
-                new_path.push_str(&format!("/{}",  component));
+            } else {
+                new_path.push_str(&format!("/{}", component));
             }
         }
         Path::new(new_path)
     }
-    
+
     /// Returns a `Path` that expresses a relative path from this `Path` (`self`)
     /// to the given `other` `Path`.
     // An example algorithm: https://docs.rs/pathdiff/0.1.0/src/pathdiff/lib.rs.html#32-74
@@ -161,7 +158,9 @@ impl Path {
                 }
                 (None, _) => comps.push("..".to_string()),
                 (Some(ref a), Some(ref b)) if comps.is_empty() && a == b => continue,
-                (Some(ref _a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
+                (Some(ref _a), Some(ref b)) if b == &".".to_string() => {
+                    comps.push("..".to_string())
+                }
                 (Some(_), Some(ref b)) if b == &"..".to_string() => return None,
                 (Some(a), Some(_)) => {
                     comps.push("..".to_string());
@@ -176,39 +175,38 @@ impl Path {
                 }
             }
         }
-        // Create the new path from its components 
+        // Create the new path from its components
         let mut new_path = String::new();
         for component in comps.iter() {
-                new_path.push_str(&format!("{}/",  component));
+            new_path.push_str(&format!("{}/", component));
         }
         // Remove the trailing slash after the final path component
         new_path.pop();
         Some(Path::new(new_path))
     }
-    
+
     /// Returns a boolean indicating whether this Path is absolute,
     /// i.e., whether it starts with the root directory.
     pub fn is_absolute(&self) -> bool {
         self.path.starts_with(PATH_DELIMITER)
     }
 
-    /// Returns the file or directory specified by the given path, 
+    /// Returns the file or directory specified by the given path,
     /// which can either be absolute or relative from the given starting directory.
     pub fn get(&self, starting_dir: &DirRef) -> Option<FileOrDir> {
         // let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
         let mut curr_dir = {
             if self.is_absolute() {
                 Arc::clone(root::get_root())
-            }
-            else {
+            } else {
                 Arc::clone(&starting_dir)
             }
         };
 
         for component in self.components() {
             match component {
-                "." => { 
-                    // stay in the current directory, do nothing. 
+                "." => {
+                    // stay in the current directory, do nothing.
                 }
                 ".." => {
                     // navigate to parent directory
@@ -230,9 +228,9 @@ impl Path {
     }
 
     /// Returns the file specified by the given path, which can be either absolute,
-    /// or relative from the given starting directory. 
+    /// or relative from the given starting directory.
     ///
-    /// If the path is invalid or points to a directory, then `None` is returned. 
+    /// If the path is invalid or points to a directory, then `None` is returned.
     pub fn get_file(&self, starting_dir: &DirRef) -> Option<FileRef> {
         match self.get(starting_dir) {
             Some(FileOrDir::File(file)) => Some(file),
@@ -241,9 +239,9 @@ impl Path {
     }
 
     /// Returns the file specified by the given path, which can be either absolute,
-    /// or relative from the given starting directory. 
+    /// or relative from the given starting directory.
     ///
-    /// If the path is invalid or points to a directory, then `None` is returned. 
+    /// If the path is invalid or points to a directory, then `None` is returned.
     pub fn get_dir(&self, starting_dir: &DirRef) -> Option<DirRef> {
         match self.get(starting_dir) {
             Some(FileOrDir::Dir(dir)) => Some(dir),
@@ -264,7 +262,7 @@ impl Path {
 pub enum PathComponent {
     RootDir,
     ParentDir,
-    CurrentDir, 
+    CurrentDir,
 }
 
 impl PathComponent {

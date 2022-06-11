@@ -2,7 +2,8 @@
 #![feature(portable_simd)]
 
 // The entire crate is only built if both `simd_personality` and `sse2` are enabled.
-#[macro_use] extern crate cfg_if;
+#[macro_use]
+extern crate cfg_if;
 cfg_if! { if #[cfg(all(simd_personality, target_feature = "sse2"))] {
 
 #[macro_use] extern crate log;
@@ -12,7 +13,7 @@ extern crate core_simd;
 use core_simd::f64x4;
 
 pub fn test1(_: ()) {
-    warn!("at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}", 
+    warn!("at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}",
         cfg!(simd_personality),
         cfg!(target_feature = "sse2"),
         cfg!(target_feature = "avx")
@@ -35,7 +36,7 @@ pub fn test1(_: ()) {
 }
 
 pub fn test2(_: ()) {
-    warn!("at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}", 
+    warn!("at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}",
         cfg!(simd_personality),
         cfg!(target_feature = "sse2"),
         cfg!(target_feature = "avx")
@@ -58,7 +59,7 @@ pub fn test2(_: ()) {
 
 
 pub fn test_short(_: ()) {
-    warn!("at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}", 
+    warn!("at the top of simd_test::test1! simd_personality: {}, sse2: {}, avx: {}",
         cfg!(simd_personality),
         cfg!(target_feature = "sse2"),
         cfg!(target_feature = "avx")

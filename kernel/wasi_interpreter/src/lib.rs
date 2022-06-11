@@ -31,11 +31,8 @@ extern crate root;
 extern crate task;
 extern crate wasmi;
 
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use core::convert::TryFrom;
-use core::str::FromStr;
+use alloc::{string::String, sync::Arc, vec::Vec};
+use core::{convert::TryFrom, str::FromStr};
 use posix_file_system::FileDescriptorTable;
 use wasi_definitions::SystemCall;
 use wasmi::{Externals, MemoryRef, Module, RuntimeArgs, RuntimeValue, Signature, Trap, ValueType};

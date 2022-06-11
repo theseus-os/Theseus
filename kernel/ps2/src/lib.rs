@@ -357,7 +357,10 @@ pub fn check_mouse_id() -> Result<u8, &'static str> {
     let result = mouse_packet_streaming(false);
     match result {
         Err(e) => {
-            warn!("check_mouse_id(): please try read the mouse id later, error: {}", e);
+            warn!(
+                "check_mouse_id(): please try read the mouse id later, error: {}",
+                e
+            );
             return Err(e);
         }
         Ok(_buffer_data) => {
@@ -417,8 +420,7 @@ pub fn mouse_packet_streaming(enable: bool) -> Result<Vec<u8>, &'static str> {
             // info!("enable streaming succeeded!!");
             Ok(Vec::new())
         }
-    }
-    else {
+    } else {
         let mut buffer_data = Vec::new();
         if data_to_port2(0xf5) != 0xfa {
             for x in 0..15 {
@@ -436,7 +438,7 @@ pub fn mouse_packet_streaming(enable: bool) -> Result<Vec<u8>, &'static str> {
             }
         }
         Ok(buffer_data)
-    } 
+    }
 }
 
 /// set the resolution of the mouse

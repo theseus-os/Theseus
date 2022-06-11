@@ -4,21 +4,22 @@
 #![feature(fn_traits)]
 
 // extern crate alloc;
-#[macro_use] extern crate lazy_static;
-extern crate port_io;
+#[macro_use]
+extern crate lazy_static;
 extern crate irq_safety;
+extern crate port_io;
 extern crate spin;
 extern crate state_store;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate x86_64;
 
-use port_io::Port;
-use irq_safety::hold_interrupts;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use irq_safety::hold_interrupts;
+use port_io::Port;
 use spin::Mutex;
 // use spin::Once;
 use state_store::{get_state, insert_state, SSCached};
-
 
 //standard port to write to on CMOS to select registers
 const CMOS_WRITE_PORT: u16 = 0x70;
@@ -26,12 +27,11 @@ const CMOS_WRITE_PORT: u16 = 0x70;
 const CMOS_READ_PORT: u16 = 0x71;
 
 //used to select register
-static CMOS_WRITE: Mutex<Port<u8>> = Mutex::new( Port::new(CMOS_WRITE_PORT));
+static CMOS_WRITE: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_WRITE_PORT));
 //used to change cmos settings
 static CMOS_WRITE_SETTINGS: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_READ_PORT));
 //used to read from cmos register
-static CMOS_READ: Mutex<Port<u8>> = Mutex::new( Port::new(CMOS_READ_PORT));
-
+static CMOS_READ: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_READ_PORT));
 
 type RtcTicks = AtomicUsize;
 lazy_static! {
@@ -56,42 +56,34 @@ pub type RtcInterruptFunction = fn(Option<usize>);
 //     res.map( |_| rtc_interrupt_handler as HandlerFunc )
 // }
 
-
 //write a u8 to the CMOS port (0x70)
 fn write_cmos(value: u8) {
-    unsafe{
-        CMOS_WRITE.lock().write(value)
-    }
+    unsafe { CMOS_WRITE.lock().write(value) }
 }
 
-
 //read a u8 from CMOS port 0x71
-fn read_cmos() -> u8{
+fn read_cmos() -> u8 {
     CMOS_READ.lock().read()
 }
 
-
-
 //returns true if update in progress, false otherwise
-fn is_update_in_progress() -> bool{
-    //writing to this register causes cmos to output 1 if rtc update in progress 
+fn is_update_in_progress() -> bool {
+    //writing to this register causes cmos to output 1 if rtc update in progress
     write_cmos(0x0A);
     let is_in_progress: bool = read_cmos() == 1;
     is_in_progress
 }
 
-
 //register value is entered, rtc's associated value is output, waits for update in progress signal to end
-fn read_register(register: u8) -> u8{
-    
+fn read_register(register: u8) -> u8 {
     //waits for "update in progress" signal to finish in order to read correct values
     while is_update_in_progress() {}
     write_cmos(register);
 
-    //converts bcd value to binary value which is what is used for printing 
+    //converts bcd value to binary value which is what is used for printing
     let bcd = read_cmos();
-    
-    (bcd/16)*10 + (bcd & 0xf)
+
+    (bcd / 16) * 10 + (bcd & 0xf)
 }
 
 /// A timestamp obtained from the real-time clock.
@@ -107,14 +99,16 @@ pub struct RtcTime {
 use core::fmt;
 impl fmt::Display for RtcTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "RTC Time: {}/{}/{} {}:{}:{}", 
-            self.years, self.months, self.days, self.hours, self.minutes, self.seconds)
+        write!(
+            f,
+            "RTC Time: {}/{}/{} {}:{}:{}",
+            self.years, self.months, self.days, self.hours, self.minutes, self.seconds
+        )
     }
 }
 
 //call this function to print RTC's date and time
 pub fn read_rtc() -> RtcTime {
-
     //calls read register function which writes to port 0x70 to set RTC then reads from 0x71 which outputs correct value
     let second = read_register(0x00);
     let minute = read_register(0x02);
@@ -124,28 +118,25 @@ pub fn read_rtc() -> RtcTime {
     let year = read_register(0x09);
 
     RtcTime {
-        seconds: second, 
-        minutes: minute, 
-        hours: hour, 
-        days: day, 
-        months: month, 
-        years: year
+        seconds: second,
+        minutes: minute,
+        hours: hour,
+        days: day,
+        months: month,
+        years: year,
     }
 }
 
 pub fn get_rtc_ticks() -> Result<usize, ()> {
-     if let Some(ticks) = RTC_TICKS.get() {
-         Ok(ticks.load(Ordering::Acquire))
-     }
-     else {
+    if let Some(ticks) = RTC_TICKS.get() {
+        Ok(ticks.load(Ordering::Acquire))
+    } else {
         Err(())
-     }
+    }
 }
 
-
-/// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
-pub fn enable_rtc_interrupt()
-{
+/// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts
+pub fn enable_rtc_interrupt() {
     let _held_interrupts = hold_interrupts();
 
     write_cmos(0x0C);
@@ -161,14 +152,13 @@ pub fn enable_rtc_interrupt()
 
     //here we don't use the cmos_write function because that only writes to port 0x70, in this case we need to write to 0x71
     //writing to 0x71 because not selecting register, setting rtc
-    unsafe{
-        CMOS_WRITE_SETTINGS.lock().write(prev | 0x40); 
+    unsafe {
+        CMOS_WRITE_SETTINGS.lock().write(prev | 0x40);
     }
 
     trace!("RTC Enabled!");
     // here: _held_interrupts falls out of scope, re-enabling interrupts if they were previously enabled.
 }
-
 
 /// the log base 2 of an integer value
 fn log2(value: usize) -> usize {
@@ -183,30 +173,33 @@ fn log2(value: usize) -> usize {
     result
 }
 
-/// sets the period of the RTC interrupt. 
+/// sets the period of the RTC interrupt.
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
 pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
     if !(rate.is_power_of_two() && rate >= 2 && rate <= 8192) {
-        error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
+        error!(
+            "RTC rate was {}, must be a power of two between [2: 8192] inclusive!",
+            rate
+        );
         return Err(());
     }
 
     // formula is "rate = 32768 Hz >> (dividor - 1)"
-    let dividor: u8 = log2(rate) as u8 + 2; 
+    let dividor: u8 = log2(rate) as u8 + 2;
 
     let _held_interrupts = hold_interrupts();
 
     // bottom 4 bits of register A are the "rate dividor", setting them to rate we want without altering top 4 bits
     write_cmos(0x8A);
     let prev = read_cmos();
-    write_cmos(0x8A); 
+    write_cmos(0x8A);
 
-    unsafe{
+    unsafe {
         CMOS_WRITE_SETTINGS.lock().write((prev & 0xF0) | dividor);
     }
 
     trace!("RTC frequency changed to {} Hz!", rate);
     Ok(())
-    
+
     // here: _held_interrupts falls out of scope, re-enabling interrupts if they were previously enabled.
 }
