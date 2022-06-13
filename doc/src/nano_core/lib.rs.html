@@ -251,6 +251,18 @@
 <span id="246">246</span>
 <span id="247">247</span>
 <span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The `nano_core` is very simple, and only does the following things:</span>
@@ -294,6 +306,10 @@
 <span class="kw">use</span> <span class="ident">kernel_config::memory::KERNEL_OFFSET</span>;
 <span class="kw">use</span> <span class="ident">serial_port_basic</span>::{<span class="ident">take_serial_port</span>, <span class="ident">SerialPortAddress</span>};
 
+<span class="doccomment">/// Used to obtain information about this build of Theseus.</span>
+<span class="kw">mod</span> <span class="ident">build_info</span> {
+    <span class="macro">include!</span>(<span class="macro">concat!</span>(<span class="macro">env!</span>(<span class="string">&quot;OUT_DIR&quot;</span>), <span class="string">&quot;/built.rs&quot;</span>));
+}
 
 <span class="doccomment">/// Just like Rust&#39;s `try!()` macro, but instead of performing an early return upon an error,</span>
 <span class="doccomment">/// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.</span>
@@ -353,6 +369,14 @@
     <span class="macro">try_exit!</span>(<span class="ident">logger::early_init</span>(<span class="prelude-val">None</span>, <span class="ident">IntoIterator::into_iter</span>(<span class="ident">logger_ports</span>).<span class="ident">flatten</span>()).<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">_a</span><span class="op">|</span> <span class="string">&quot;logger::early_init() failed.&quot;</span>));
     <span class="macro">info!</span>(<span class="string">&quot;Logger initialized.&quot;</span>);
     <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): initialized logger.&quot;</span>); 
+
+    <span class="comment">// Dump basic information about this build of Theseus.</span>
+    <span class="macro">info!</span>(<span class="string">&quot;\n    \
+        ===================== Theseus build info: =====================\n    \
+        CUSTOM CFGs: {} \n    \
+        ===============================================================&quot;</span>,
+        <span class="ident">build_info::CUSTOM_CFG_STR</span>,
+    );
 
     <span class="comment">// initialize basic exception handlers</span>
     <span class="ident">exceptions_early::init</span>(<span class="prelude-val">Some</span>(<span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">early_double_fault_stack_top</span>)));

@@ -191,10 +191,10 @@
             <span class="macro">error!</span>(<span class="string">&quot;------------------ Stack Trace (frame pointers) ------------------&quot;</span>);
             <span class="kw">let</span> <span class="ident">namespace</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>()
                 .<span class="ident">map</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">get_namespace</span>())
-                .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>().<span class="ident">cloned</span>())
+                .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">mod_mgmt::get_initial_kernel_namespace</span>())
                 .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get current task&#39;s or default namespace&quot;</span>)<span class="question-mark">?</span>;
             <span class="kw">let</span> <span class="ident">mmi_ref</span> <span class="op">=</span> <span class="ident">task::get_my_current_task</span>()
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">lock</span>().<span class="ident">mmi</span>.<span class="ident">clone</span>())
+                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">mmi</span>.<span class="ident">clone</span>())
                 .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">memory::get_kernel_mmi_ref</span>())
                 .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get current task&#39;s or default kernel MMI&quot;</span>)<span class="question-mark">?</span>;
             <span class="kw">let</span> <span class="ident">mmi</span> <span class="op">=</span> <span class="ident">mmi_ref</span>.<span class="ident">lock</span>();

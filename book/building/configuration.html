@@ -201,22 +201,17 @@ fn foo() {
 <li><a href="https://doc.rust-lang.org/std/macro.cfg.html">Rust's cfg!() macro</a></li>
 </ul>
 <h2 id="how-theseus_config-and-cfg-work-together"><a class="header" href="#how-theseus_config-and-cfg-work-together">How <code>THESEUS_CONFIG</code> and <code>cfg</code> work together</a></h2>
-<p>Theseus provides a single top-level <a href="https://github.com/theseus-os/Theseus/blob/theseus_main/build.rs"><code>build.rs</code></a> file that converts the cfg options specified by <code>THESEUS_CONFIG</code> into Rust-known <code>cfg</code> values that can be used with the standard Rust cfg attributes. 
-This is a standard approach that uses <a href="https://doc.rust-lang.org/cargo/reference/build-scripts.html">Rust's build script functionality</a>.</p>
-<p>If you want the Rust source code in a given crate to depend on any cfg values specified via <code>THESEUS_CONFIG</code>, you must include this <code>build.rs</code> file in that crate's <code>Cargo.toml</code> file. 
-This typically looks like so:</p>
-<pre><code class="language-toml">[package]
-authors = [&quot;Kevin Boos &lt;kevinaboos@gmail.com&gt;&quot;]
-name = &quot;my_crate&quot;
-description = &quot;brief description of my_crate here&quot;
-version = &quot;0.1.0&quot;
-build = &quot;../../build.rs&quot;
+<p>A single line in the top-level <code>Makefile</code> converts the cfg options specified by <code>THESEUS_CONFIG</code> into Rust-known <code>--cfg</code> values that can be used with the standard Rust cfg attributes. 
+That line, shown below, simply adds the &quot;--cfg&quot; prefix onto each whitespace-separated value in <code>THESEUS_CONFIG</code> and appends them all to the <code>RUSTFLAGS</code> environment variable.</p>
+<pre><code class="language-mk">cargo : export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 </code></pre>
-<p>The last line in the above TOML snippet is what informs cargo that it should run Theseus's top-level <code>build.rs</code> script before compiling <code>your_crate</code>, which ensures the cfg values specified in <code>THESEUS_CONFIG</code> will actually be activated.</p>
 <blockquote>
-<p><strong>Warning:</strong> if you do not include the <code>build = &quot;../../build.rs&quot;</code> line in a crate's <code>Cargo.toml</code> manifest file, then the source code of that crate <em>will not see</em> cfg values set by the <code>THESEUS_CONFIG</code> environment variable.</p>
+<p>Note: you can also add <code>--cfg XYZ</code> directly to <code>RUSTFLAGS</code> rather than use <code>THESEUS_CONFIG</code>.</p>
 </blockquote>
+<p>This is a standard approach that avoids the overhead of our prior approach based on a global build script. 
+<a href="https://doc.rust-lang.org/rustc/command-line-arguments.html#--cfg-configure-the-compilation-environment">Read more here</a>.</p>
 <h1 id="other-configuration-options"><a class="header" href="#other-configuration-options">Other Configuration Options</a></h1>
+<p>TODO: describe the new <code>theseus_features</code> crate and how it allows one to include optional crates in a Theseus build.</p>
 <h2 id="debug-vs-release-mode"><a class="header" href="#debug-vs-release-mode">Debug vs. Release Mode</a></h2>
 <p>Theseus can be built in a variety of modes, but offers two presets: <strong>debug</strong> and <strong>release</strong> build modes.
 By default, Theseus is built in release mode for usable performance within an emulator like QEMU.
