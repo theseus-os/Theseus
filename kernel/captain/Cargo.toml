@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "captain"
 description = "The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 

@@ -3,7 +3,6 @@ name = "nic_buffers"
 description = "Structs for network transmit and receive buffers"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }

@@ -2,7 +2,6 @@
 name = "ps"
 version = "0.1.0"
 authors = ["Christine Wang <chrissywang54@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

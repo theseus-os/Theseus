@@ -3,7 +3,6 @@ name = "upd"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Front-end application to communicate with Theseus update server"
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

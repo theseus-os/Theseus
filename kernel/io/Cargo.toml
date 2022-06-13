@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "io"
 description = "Traits and types for reading and writing IO streams, of both block-wise and byte-wise granularity."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }

@@ -219,14 +219,17 @@ endif
 
 
 
-## This target invokes the actual Rust build process
+## This target invokes the actual Rust build process via `cargo`.
+##
+## The below line converts `THESEUS_CONFIG` values into `RUSTFLAGS` by prepending "--cfg " to each one.
+cargo : export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 cargo: check-rustc 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --target $(TARGET)
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(BUILD_STD_CARGOFLAGS) $(RUST_FEATURES) --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -235,7 +238,7 @@ cargo: check-rustc
 # 	for kd in $(KERNEL_CRATE_NAMES) ; do  \
 # 		cd $${kd} ; \
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
-# 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 		RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 # 			cargo rustc \
 # 			$(CARGOFLAGS) \
 # 			$(RUST_FEATURES) \
@@ -244,7 +247,7 @@ cargo: check-rustc
 # 	done
 # for app in $(APP_CRATE_NAMES) ; do  \
 # 	cd $${app} ; \
-# 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
+# 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 # 		cargo rustc \
 # 		$(CARGOFLAGS) \
 # 		--target $(TARGET) \
@@ -494,7 +497,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
-doc: export override RUSTDOCFLAGS += -A private_intra_doc_links
+doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
 doc: check-rustc
 ## Build the docs for select library crates, namely those not hosted online.
 ## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.

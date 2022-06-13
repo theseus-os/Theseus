@@ -3,7 +3,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "panic_wrapper"
 description = "Wrapper functions for handling and propagating panics"
 version = "0.1.0"
-build = "../../build.rs"
+## Currently, this crate only needs the build script for frame_pointers.
+build = "../stack_trace_frame_pointers/build.rs"
 
 [dependencies]
 

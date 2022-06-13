@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "page_allocator"
 description = "The allocator for virtual memory pages."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

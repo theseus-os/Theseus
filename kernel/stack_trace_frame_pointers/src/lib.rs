@@ -55,20 +55,20 @@ pub fn stack_trace_using_frame_pointers(
     let mut rbp: usize;
     // SAFE: just reading current register value
     unsafe {
-        asm!("mov {}, rbp", out(reg) rbp);
+        core::arch::asm!("mov {}, rbp", out(reg) rbp);
     }
 
     for _i in 0 .. max_recursion.unwrap_or(64) {
         // the stack contains the return address (of the caller) right before the current frame pointer
         if let Some(rip_ptr) = rbp.checked_add(core::mem::size_of::<usize>()) {
-            if let (Ok(rbp_vaddr), Ok(rip_ptr)) = (VirtualAddress::new(rbp), VirtualAddress::new(rip_ptr)) {
+            if let (Some(rbp_vaddr), Some(rip_ptr)) = (VirtualAddress::new(rbp), VirtualAddress::new(rip_ptr)) {
                 if current_page_table.translate(rbp_vaddr).is_some() && current_page_table.translate(rip_ptr).is_some() {
                     // SAFE: the address was checked above using page table walks
                     let rip = unsafe { *(rip_ptr.value() as *const usize) };
                     if rip == 0 {
                         return Ok(());
                     }
-                    let rip = VirtualAddress::new(rip).map_err(|_| "instruction pointer value was an invalid virtual address")?;
+                    let rip = VirtualAddress::new(rip).ok_or("instruction pointer value was an invalid virtual address")?;
                     let keep_going = on_each_stack_frame(rbp, rip);
                     if !keep_going { 
                         return Ok(());

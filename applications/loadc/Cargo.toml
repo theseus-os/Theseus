@@ -3,7 +3,6 @@ name = "loadc"
 version = "0.1.0"
 description = "A convenience application for loading C language ELF executables."
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

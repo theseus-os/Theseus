@@ -3,5 +3,4 @@ name = "pause"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Exposes the x86 'pause' instruction that rustc used before March 15, 2019"
-build = "../../build.rs"
 

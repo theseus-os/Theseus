@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "tlb_shootdown"
 description = "Routines for handling TLB shootdowns"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 x86_64 = "0.14.8"

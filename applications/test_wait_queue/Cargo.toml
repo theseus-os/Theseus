@@ -3,7 +3,6 @@ name = "test_wait_queue"
 version = "0.1.0"
 description = "Tests the wait queue functionality of Theseus with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

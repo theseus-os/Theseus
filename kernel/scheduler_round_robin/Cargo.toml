@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "scheduler_round_robin"
 description = "Provides Round robin scheduling functionality and picks the next task"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

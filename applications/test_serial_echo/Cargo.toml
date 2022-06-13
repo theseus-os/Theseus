@@ -3,7 +3,6 @@ name = "test_serial_echo"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "a simple app for testing serial port I/O using higher-level I/O traits"
-build = "../../build.rs"
 
 [dependencies]
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }

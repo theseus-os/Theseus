@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "scheduler"
 description = "Provides scheduling functionality for selecting the next task and causing a task switch"
 version = "0.1.0"
-build = "../../build.rs"
 
 
 [dependencies]

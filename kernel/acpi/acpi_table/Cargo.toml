@@ -3,7 +3,6 @@ name = "acpi_table"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Definitions for ACPI tables bookkeeping"
-build = "../../../build.rs"
 
 [dependencies]
 zerocopy = "0.5.0"

@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "panic_entry"
 description = "Contains the lang items and entry points for panics and other errors/exceptions, as required by the Rust compiler."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 

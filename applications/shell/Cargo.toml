@@ -3,7 +3,6 @@ name = "shell"
 version = "0.1.0"
 description = "Shell that can run commands in application directory"
 authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
-build = "../../build.rs"
 
 
 [dependencies]

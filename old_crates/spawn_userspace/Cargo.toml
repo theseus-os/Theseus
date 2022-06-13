@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "spawn"
 description = "This crate contains code for creating userspace tasks, which was previously in the `spawn`."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }

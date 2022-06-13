@@ -3,7 +3,6 @@ name = "deps"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Allows a developer to explore dependencies in Theseus's crate management"
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

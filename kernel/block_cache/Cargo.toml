@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "block_cache"
 description = "A generic layer for caching block-based streams."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 

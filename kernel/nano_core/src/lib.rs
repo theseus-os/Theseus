@@ -41,6 +41,10 @@ use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use serial_port_basic::{take_serial_port, SerialPortAddress};
 
+/// Used to obtain information about this build of Theseus.
+mod build_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
 /// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
@@ -100,6 +104,14 @@ pub extern "C" fn nano_core_start(
     try_exit!(logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten()).map_err(|_a| "logger::early_init() failed."));
     info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
+
+    // Dump basic information about this build of Theseus.
+    info!("\n    \
+        ===================== Theseus build info: =====================\n    \
+        CUSTOM CFGs: {} \n    \
+        ===============================================================",
+        build_info::CUSTOM_CFG_STR,
+    );
 
     // initialize basic exception handlers
     exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));

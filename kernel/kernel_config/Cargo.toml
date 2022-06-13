@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "kernel_config"
 description = "configuration values and settings used in the Theseus kernel, e.g., timeslices, memory layouts, etc"
 version = "0.1.0"
-build = "../../build.rs"
 
 [lib]
 crate-type = ["rlib"]

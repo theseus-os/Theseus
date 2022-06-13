@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "spawn"
 description = "Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes."
 version = "0.1.0"
-build = "../../build.rs"
 
 
 [dependencies.log]

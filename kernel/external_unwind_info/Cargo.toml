@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "external_unwind_info"
 description = "Registers and stores unwind info from external or legacy components, à la libunwind"
 version = "0.1.0"
-build = "../../build.rs"
 edition = "2018"
 
 [dependencies]

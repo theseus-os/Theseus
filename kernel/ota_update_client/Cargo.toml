@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "ota_update_client"
 description = "Implements network communication with a build server to acquire live updates over the air"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/theseus-os/owning-ref-rs" }

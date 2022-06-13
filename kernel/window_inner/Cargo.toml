@@ -3,7 +3,6 @@ name = "window_inner"
 version = "0.1.0"
 authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "allocate new windows and manage a list of existing windows"
-build = "../../build.rs"
 
 [dependencies]
 mpmc = "0.1.6"

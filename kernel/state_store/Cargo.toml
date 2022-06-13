@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "state_store"
 description = "Database-like storage for static, system-wide states, which allows other crates to remain stateless"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 # typemap = "0.3.3"

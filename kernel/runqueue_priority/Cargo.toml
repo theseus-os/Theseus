@@ -3,7 +3,6 @@ authors = ["Namitha Liyanage <Namithaliyanage@gmail.com>"]
 name = "runqueue_priority"
 description = "Functions and types for handling runqueues when priority scheduler is in use, i.e., lists of tasks for scheduling purposes"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 

@@ -2,7 +2,6 @@
 name = "immediate_input_echo"
 version = "0.1.0"
 authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
-build = "../../build.rs"
 
 [dependencies]
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }

@@ -3,7 +3,6 @@ name = "test_realtime"
 version = "0.1.0"
 description = "Application to test scheduling of periodic tasks."
 authors = ["Jacob Earle <earlejacobt@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 log = "0.4.8"

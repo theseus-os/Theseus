@@ -3,7 +3,6 @@ name = "terminal_print"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>"]
 description = "Offers applications the ability to print to the terminal via the print! and println! macros"
-build = "../../build.rs"
 
 
 [dependencies]
