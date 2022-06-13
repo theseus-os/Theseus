@@ -1,6 +1,6 @@
 use std::io::Write;
 
-/// Whether or not to emit the default `built.rs` file.
+/// Whether or not to use the `built` crate to emit the default `built.rs` file.
 const EMIT_BUILT_RS_FILE: bool = false;
 
 /// The prefix that all custom rustc-known cfg keys are given by cargo
@@ -29,10 +29,10 @@ fn main() {
 }
 
 fn emit_built_rs_file() {
-    // Note: we don't actually currently care about anything in the default `built.rs` file.
-    if EMIT_BUILT_RS_FILE {
-        built::write_built_file().expect("The `built` crate failed to acquire build-time information");
-    }
+    // Note: we currently don't care about anything in the default `built.rs` file.
+    // if EMIT_BUILT_RS_FILE {
+    //     built::write_built_file().expect("The `built` crate failed to acquire build-time information");
+    // }
     
     // Append our custom content to the initial `built.rs` file, if one exists.
     let built_rs_path = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("built.rs");

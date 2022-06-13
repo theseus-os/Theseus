@@ -42,7 +42,7 @@ use kernel_config::memory::KERNEL_OFFSET;
 use serial_port_basic::{take_serial_port, SerialPortAddress};
 
 /// Used to obtain information about this build of Theseus.
-mod built_info {
+mod build_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
@@ -110,7 +110,7 @@ pub extern "C" fn nano_core_start(
         ===================== Theseus build info: =====================\n    \
         CUSTOM CFGs: {} \n    \
         ===============================================================",
-        built_info::CUSTOM_CFG_STR,
+        build_info::CUSTOM_CFG_STR,
     );
 
     // initialize basic exception handlers

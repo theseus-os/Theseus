@@ -64,5 +64,7 @@ path = "../memory_initialization"
 # that we can jump to from the bootloader.
 crate-type = ["staticlib"]  
 
-[build-dependencies]
-built = "0.5"
+
+## Currently not used; see the `build.rs` script.
+# [build-dependencies]
+# built = "0.5"
