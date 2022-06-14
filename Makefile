@@ -4,6 +4,11 @@
 .DEFAULT_GOAL := all
 SHELL := /bin/bash
 
+## Disable parallelism for this Makefile since it breaks the build,
+## as our dependencies aren't perfectly specified for each target.
+## Cargo already handles build parallelism for us anyway.
+.NOTPARALLEL:
+
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
