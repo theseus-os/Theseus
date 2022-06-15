@@ -1143,6 +1143,7 @@
 <span id="1138">1138</span>
 <span id="1139">1139</span>
 <span id="1140">1140</span>
+<span id="1141">1141</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
 <span class="doccomment">//! </span>
@@ -1958,10 +1959,12 @@
 
         <span class="comment">// Now, as a final action, we drop any data that the original previous task </span>
         <span class="comment">// prepared for droppage before the context switch occurred.</span>
-        <span class="kw">let</span> <span class="ident">_prev_task_data_to_drop</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>(); <span class="comment">// ensure the lock is released</span>
-            <span class="ident">inner</span>.<span class="ident">drop_after_task_switch</span>.<span class="ident">take</span>()
-        };
+        {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();
+            <span class="kw">let</span> <span class="ident">prev_task_data_to_drop</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">drop_after_task_switch</span>.<span class="ident">take</span>();
+            <span class="ident">drop</span>(<span class="ident">inner</span>); <span class="comment">// release the lock as soon as possible</span>
+            <span class="ident">drop</span>(<span class="ident">prev_task_data_to_drop</span>);
+        }
     }
 }
 
@@ -1974,11 +1977,10 @@
         <span class="comment">// This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,</span>
         <span class="comment">// then after the app crate is released, the kill handler will be dropped AFTER the app crate has been freed.</span>
         <span class="comment">// When it tries to drop the task&#39;s kill handler, a page fault will occur because the text section of the app crate has been unmapped.</span>
-        {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_kill_handler</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">take_kill_handler</span>() {
-                <span class="macro">warn!</span>(<span class="string">&quot;While dropping task {:?}, its kill handler callback was still present. Removing it now.&quot;</span>, <span class="self">self</span>);
-            }
-        } <span class="comment">// Scoping rules ensure the kill handler is dropped now, before this Task&#39;s app_crate could possibly be dropped.</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">kill_handler</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">take_kill_handler</span>() {
+            <span class="macro">warn!</span>(<span class="string">&quot;While dropping task {:?}, its kill handler callback was still present. Removing it now.&quot;</span>, <span class="self">self</span>);
+            <span class="ident">drop</span>(<span class="ident">kill_handler</span>);
+        }
     }
 }
 
@@ -2146,7 +2148,7 @@
             <span class="comment">// we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.</span>
             <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_running</span>() {
                 <span class="macro">trace!</span>(<span class="string">&quot;internal_exit(): dropping TaskLocalData for non-running task {}&quot;</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="number">0</span>);
-                <span class="kw">let</span> <span class="ident">_tld</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">task_local_data</span>.<span class="ident">take</span>();
+                <span class="ident">drop</span>(<span class="ident">inner</span>.<span class="ident">task_local_data</span>.<span class="ident">take</span>());
             }
         }
 
