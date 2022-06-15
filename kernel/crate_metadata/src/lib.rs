@@ -10,8 +10,8 @@
 //! and `B` has a `WeakDependent` pointing back to `A`. 
 //! 
 //! Assuming `A` and `B` are both `LoadedSection` objects,
-//! then `B.sections_i_depend_on` includes a `StrongDependency(A)`
-//! and `A.sections_dependent_on_me` includes a `WeakDependent(B)`.
+//! then `A.sections_i_depend_on` includes a `StrongDependency(B)`
+//! and `B.sections_dependent_on_me` includes a `WeakDependent(A)`.
 //!  
 //! In this way, the dependency graphs are fully associative,
 //! allowing a given `LoadedSection` to easily find 
