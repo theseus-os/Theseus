@@ -813,10 +813,12 @@ impl Task {
 
         // Now, as a final action, we drop any data that the original previous task 
         // prepared for droppage before the context switch occurred.
-        let _prev_task_data_to_drop = {
-            let mut inner = self.inner.lock(); // ensure the lock is released
-            inner.drop_after_task_switch.take()
-        };
+        {
+            let mut inner = self.inner.lock();
+            let prev_task_data_to_drop = inner.drop_after_task_switch.take();
+            drop(inner); // release the lock as soon as possible
+            drop(prev_task_data_to_drop);
+        }
     }
 }
 
@@ -829,11 +831,10 @@ impl Drop for Task {
         // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
         // then after the app crate is released, the kill handler will be dropped AFTER the app crate has been freed.
         // When it tries to drop the task's kill handler, a page fault will occur because the text section of the app crate has been unmapped.
-        {
-            if let Some(_kill_handler) = self.take_kill_handler() {
-                warn!("While dropping task {:?}, its kill handler callback was still present. Removing it now.", self);
-            }
-        } // Scoping rules ensure the kill handler is dropped now, before this Task's app_crate could possibly be dropped.
+        if let Some(kill_handler) = self.take_kill_handler() {
+            warn!("While dropping task {:?}, its kill handler callback was still present. Removing it now.", self);
+            drop(kill_handler);
+        }
     }
 }
 
@@ -1001,7 +1002,7 @@ impl TaskRef {
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.0.is_running() {
                 trace!("internal_exit(): dropping TaskLocalData for non-running task {}", &*self.0);
-                let _tld = inner.task_local_data.take();
+                drop(inner.task_local_data.take());
             }
         }
 
