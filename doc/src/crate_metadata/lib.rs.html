@@ -1057,8 +1057,8 @@
 <span class="doccomment">//! and `B` has a `WeakDependent` pointing back to `A`. </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Assuming `A` and `B` are both `LoadedSection` objects,</span>
-<span class="doccomment">//! then `B.sections_i_depend_on` includes a `StrongDependency(A)`</span>
-<span class="doccomment">//! and `A.sections_dependent_on_me` includes a `WeakDependent(B)`.</span>
+<span class="doccomment">//! then `A.sections_i_depend_on` includes a `StrongDependency(B)`</span>
+<span class="doccomment">//! and `B.sections_dependent_on_me` includes a `WeakDependent(A)`.</span>
 <span class="doccomment">//!  </span>
 <span class="doccomment">//! In this way, the dependency graphs are fully associative,</span>
 <span class="doccomment">//! allowing a given `LoadedSection` to easily find </span>
@@ -2086,6 +2086,7 @@
     }
 
     <span class="prelude-val">Ok</span>(())
-}</code></pre></div>
+}
+</code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="crate_metadata" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
 </body></html>

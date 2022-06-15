@@ -12,8 +12,8 @@ then we colloquially say that <em><code>A</code> depends on <code>B</code></em>.
 <p>In this scenario, <code>A</code> has a <code>StrongDependency</code> on <code>B</code>,
 and <code>B</code> has a <code>WeakDependent</code> pointing back to <code>A</code>. </p>
 <p>Assuming <code>A</code> and <code>B</code> are both <code>LoadedSection</code> objects,
-then <code>B.sections_i_depend_on</code> includes a <code>StrongDependency(A)</code>
-and <code>A.sections_dependent_on_me</code> includes a <code>WeakDependent(B)</code>.</p>
+then <code>A.sections_i_depend_on</code> includes a <code>StrongDependency(B)</code>
+and <code>B.sections_dependent_on_me</code> includes a <code>WeakDependent(A)</code>.</p>
 <p>In this way, the dependency graphs are fully associative,
 allowing a given <code>LoadedSection</code> to easily find 
 both its dependencies and its dependents instantly.</p>
