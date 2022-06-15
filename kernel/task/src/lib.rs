@@ -813,10 +813,12 @@ impl Task {
 
         // Now, as a final action, we drop any data that the original previous task 
         // prepared for droppage before the context switch occurred.
-        let mut inner = self.inner.lock();
-        let prev_task_data_to_drop = inner.drop_after_task_switch.take();
-        drop(inner); // release the spinlock as soon as possible
-        drop(prev_task_data_to_drop);
+        {
+            let mut inner = self.inner.lock();
+            let prev_task_data_to_drop = inner.drop_after_task_switch.take();
+            drop(inner); // release the lock as soon as possible
+            drop(prev_task_data_to_drop);
+        }
     }
 }
 
