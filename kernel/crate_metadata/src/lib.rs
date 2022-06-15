@@ -1,20 +1,18 @@
 //! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
-//! #Representing dependencies between sections
-//! Dependencies work as follows:
-//!  
+//! ## Representing dependencies between sections
 //! If one section `A` references or uses another section `B`, 
 //! then we colloquially say that *`A` depends on `B`*. 
 //! 
-//! In this scenario, `A` has a `StrongDependency` on `B`,
-//! and `B` has a `WeakDependent` pointing back to `A`. 
+//! In this scenario, `A` has a [`StrongDependency`] on `B`,
+//! and `B` has a [`WeakDependent`] pointing back to `A`. 
 //! 
-//! Assuming `A` and `B` are both `LoadedSection` objects,
-//! then `A.sections_i_depend_on` includes a `StrongDependency(B)`
-//! and `B.sections_dependent_on_me` includes a `WeakDependent(A)`.
+//! Assuming `A` and `B` are both [`LoadedSection`] objects,
+//! then [`A.sections_i_depend_on`] includes a `StrongDependency(B)`
+//! and [`B.sections_dependent_on_me`] includes a `WeakDependent(A)`.
 //!  
 //! In this way, the dependency graphs are fully associative,
-//! allowing a given `LoadedSection` to easily find 
+//! allowing a given [`LoadedSection`] to easily find 
 //! both its dependencies and its dependents instantly.
 //! 
 //! More importantly, it allows `A` to be dropped before `B`, 
@@ -22,7 +20,7 @@
 //! This correctly avoids dependency violations by ensuring that a section `B`
 //! is never dropped while any other section `A` relies on it.
 //! 
-//! When swapping crates, the `WeakDependent`s are actually more useful. 
+//! When swapping crates, the [`WeakDependent`]s are actually more useful. 
 //! For example, if we want to swap the crate that contains section `B1` with a new one `B2`, 
 //! then we can immediately find all of the section `A`s that depend on `B1` 
 //! by iterating over `B1.sections_dependent_on_me`. 
@@ -37,6 +35,9 @@
 //!     remove WeakDependent(secA) from B1.sections_dependent_on_me (current iterator)     
 //! }
 //! ```
+//! 
+//! [`A.sections_i_depend_on`]: LoadedSectionInner::sections_i_depend_on
+//! [`B.sections_dependent_on_me`]: LoadedSectionInner::sections_dependent_on_me
 //! 
 
 #![no_std]
@@ -69,13 +70,13 @@ use hashbrown::HashMap;
 use goblin::elf::reloc::*;
 
 
-/// A Strong reference to a `LoadedCrate`.
+/// A Strong reference to a [`LoadedCrate`].
 pub type StrongCrateRef  = CowArc<LoadedCrate>;
-/// A Weak reference to a `LoadedCrate`.
+/// A Weak reference to a [`LoadedCrate`].
 pub type WeakCrateRef = CowWeak<LoadedCrate>;
-/// A Strong reference (`Arc`) to a `LoadedSection`.
+/// A Strong reference ([`Arc`]) to a [`LoadedSection`].
 pub type StrongSectionRef  = Arc<LoadedSection>;
-/// A Weak reference (`Weak`) to a `LoadedSection`.
+/// A Weak reference ([`Weak`]) to a [`LoadedSection`].
 pub type WeakSectionRef = Weak<LoadedSection>;
 /// A Section Header iNDeX (SHNDX), as specified by the ELF format. 
 /// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.
