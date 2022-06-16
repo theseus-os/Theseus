@@ -37,8 +37,14 @@ else
 	UNMOUNT = umount
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
-GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 
+ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
+	GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
+else ifneq (,$(shell command -v $(GRUB_CROSS)grub2-mkrescue))
+	GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
+else
+	$(error grub-mkrescue not found)
+endif
 
 
 ###################################################################################################
