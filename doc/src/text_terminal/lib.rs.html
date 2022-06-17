@@ -2334,6 +2334,12 @@
 <span id="2329">2329</span>
 <span id="2330">2330</span>
 <span id="2331">2331</span>
+<span id="2332">2332</span>
+<span id="2333">2333</span>
+<span id="2334">2334</span>
+<span id="2335">2335</span>
+<span id="2336">2336</span>
+<span id="2337">2337</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A text-mode terminal emulator. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This provides basic support for various standards of control codes and escape sequences:</span>
@@ -3707,21 +3713,24 @@
 <span class="doccomment">/// in which `(0, 0)` represents the top-left corner.</span>
 <span class="doccomment">/// Thus, a valid `ScreenPoint` must fit be the bounds of </span>
 <span class="doccomment">/// the current [`ScreenSize`].</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Ord</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Add</span>, <span class="ident">AddAssign</span>, <span class="ident">Sub</span>, <span class="ident">SubAssign</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ScreenPoint</span> {
     <span class="ident">column</span>: <span class="ident">Column</span>,
     <span class="ident">row</span>: <span class="ident">Row</span>,
 } 
-<span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">ScreenPoint</span> {
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">core::cmp::Ordering</span><span class="op">&gt;</span> {
+<span class="kw">impl</span> <span class="ident">Ord</span> <span class="kw">for</span> <span class="ident">ScreenPoint</span> {
+    <span class="kw">fn</span> <span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">Ordering</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">row</span> <span class="op">==</span> <span class="ident">other</span>.<span class="ident">row</span> {
-            <span class="self">self</span>.<span class="ident">column</span>.<span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">column</span>)
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">row</span> <span class="op">&lt;</span> <span class="ident">other</span>.<span class="ident">row</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::Less</span>)
+            <span class="self">self</span>.<span class="ident">column</span>.<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">column</span>)
         } <span class="kw">else</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::Greater</span>)
+            <span class="self">self</span>.<span class="ident">row</span>.<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">row</span>)
         }
+    }
+}
+<span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">ScreenPoint</span> {
+    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
+        <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">cmp</span>(<span class="ident">other</span>))
     }
 }
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ScreenPoint</span> {
@@ -3819,21 +3828,24 @@
 
 <span class="doccomment">/// A 2D position value that represents a point in the scrollback buffer,</span>
 <span class="doccomment">/// in which `(0, 0)` represents the `Unit` at the first column of the first line.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Ord</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Default</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Add</span>, <span class="ident">AddAssign</span>, <span class="ident">Sub</span>, <span class="ident">SubAssign</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ScrollbackBufferPoint</span> {
     <span class="ident">unit_idx</span>: <span class="ident">UnitIndex</span>,
     <span class="ident">line_idx</span>: <span class="ident">LineIndex</span>,
 }
-<span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">ScrollbackBufferPoint</span> {
-    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">core::cmp::Ordering</span><span class="op">&gt;</span> {
+<span class="kw">impl</span> <span class="ident">Ord</span> <span class="kw">for</span> <span class="ident">ScrollbackBufferPoint</span> {
+    <span class="kw">fn</span> <span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="ident">Ordering</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">line_idx</span> <span class="op">==</span> <span class="ident">other</span>.<span class="ident">line_idx</span> {
-            <span class="self">self</span>.<span class="ident">unit_idx</span>.<span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">unit_idx</span>)
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">line_idx</span> <span class="op">&lt;</span> <span class="ident">other</span>.<span class="ident">line_idx</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::Less</span>)
+            <span class="self">self</span>.<span class="ident">unit_idx</span>.<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">unit_idx</span>)
         } <span class="kw">else</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::Greater</span>)
+            <span class="self">self</span>.<span class="ident">line_idx</span>.<span class="ident">cmp</span>(<span class="kw-2">&amp;</span><span class="ident">other</span>.<span class="ident">line_idx</span>)
         }
+    }
+}
+<span class="kw">impl</span> <span class="ident">PartialOrd</span> <span class="kw">for</span> <span class="ident">ScrollbackBufferPoint</span> {
+    <span class="kw">fn</span> <span class="ident">partial_cmp</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span> {
+        <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">cmp</span>(<span class="ident">other</span>))
     }
 }
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">ScrollbackBufferPoint</span> {

@@ -896,6 +896,13 @@
 <span id="891">891</span>
 <span id="892">892</span>
 <span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
+<span id="896">896</span>
+<span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit </span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.</span>
@@ -1588,7 +1595,14 @@
 
     <span class="ident">sampled_events</span>.<span class="ident">sample_count</span> <span class="op">=</span> <span class="ident">sample_count</span>;
 
-    <span class="kw">if</span> <span class="ident">event_per_sample</span> <span class="op">&gt;</span> <span class="ident">core::u32::MAX</span> <span class="op">|</span><span class="op">|</span> <span class="ident">event_per_sample</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">core::u32::MIN</span> {
+    <span class="kw">if</span> <span class="ident">event_per_sample</span> <span class="op">==</span> <span class="number">0</span> {
+        <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Number of events per sample invalid: must be nonzero&quot;</span>);
+    }
+    <span class="comment">// This check can never trigger since `event_per_sample` is a `u32`</span>
+    <span class="comment">// and is therefore by definition in the range `u32::MIN..=u32::MAX`.</span>
+    <span class="comment">// We&#39;ll check anyways, just in case `event_per_sample`&#39;s type is changed.</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::absurd_extreme_comparisons</span>)]</span>
+    <span class="kw">if</span> <span class="ident">event_per_sample</span> <span class="op">&gt;</span> <span class="ident">core::u32::MAX</span> <span class="op">|</span><span class="op">|</span> <span class="ident">event_per_sample</span> <span class="op">&lt;</span> <span class="ident">core::u32::MIN</span> {
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Number of events per sample invalid: must be within unsigned 32 bit&quot;</span>);
     }
 

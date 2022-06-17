@@ -208,6 +208,7 @@
 <span id="203">203</span>
 <span id="204">204</span>
 <span id="205">205</span>
+<span id="206">206</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Structures needed for interacting with the IOMMU.</span>
 
 <span class="kw">use</span> <span class="ident">zerocopy::FromBytes</span>;
@@ -366,6 +367,7 @@
 }
 
 <span class="doccomment">/// Bits corresponding to commands in the Global Command register.</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">u32</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">GlobalCommand</span> {
     <span class="doccomment">/// Compatibility Format Interrupt</span>
     <span class="ident">CFI</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">23</span>,
