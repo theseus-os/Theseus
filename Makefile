@@ -38,12 +38,13 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 
+## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
 ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
 	GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 else ifneq (,$(shell command -v $(GRUB_CROSS)grub2-mkrescue))
 	GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
 else
-	$(error grub-mkrescue not found)
+	$(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
 endif
 
 
