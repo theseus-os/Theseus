@@ -1371,21 +1371,24 @@ impl ScreenSize {
 /// in which `(0, 0)` represents the top-left corner.
 /// Thus, a valid `ScreenPoint` must fit be the bounds of 
 /// the current [`ScreenSize`].
-#[derive(Copy, Clone, Default, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
 #[derive(Add, AddAssign, Sub, SubAssign)]
 pub struct ScreenPoint {
     column: Column,
     row: Row,
 } 
-impl PartialOrd for ScreenPoint {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+impl Ord for ScreenPoint {
+    fn cmp(&self, other: &Self) -> Ordering {
         if self.row == other.row {
-            self.column.partial_cmp(&other.column)
-        } else if self.row < other.row {
-            Some(Ordering::Less)
+            self.column.cmp(&other.column)
         } else {
-            Some(Ordering::Greater)
+            self.row.cmp(&other.row)
         }
+    }
+}
+impl PartialOrd for ScreenPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 impl fmt::Debug for ScreenPoint {
@@ -1483,21 +1486,24 @@ pub struct Column(u16);
 
 /// A 2D position value that represents a point in the scrollback buffer,
 /// in which `(0, 0)` represents the `Unit` at the first column of the first line.
-#[derive(Copy, Clone, Default, PartialEq, Eq, Ord)]
+#[derive(Copy, Clone, Default, PartialEq, Eq)]
 #[derive(Add, AddAssign, Sub, SubAssign)]
 pub struct ScrollbackBufferPoint {
     unit_idx: UnitIndex,
     line_idx: LineIndex,
 }
-impl PartialOrd for ScrollbackBufferPoint {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+impl Ord for ScrollbackBufferPoint {
+    fn cmp(&self, other: &Self) -> Ordering {
         if self.line_idx == other.line_idx {
-            self.unit_idx.partial_cmp(&other.unit_idx)
-        } else if self.line_idx < other.line_idx {
-            Some(Ordering::Less)
+            self.unit_idx.cmp(&other.unit_idx)
         } else {
-            Some(Ordering::Greater)
+            self.line_idx.cmp(&other.line_idx)
         }
+    }
+}
+impl PartialOrd for ScrollbackBufferPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 impl fmt::Debug for ScrollbackBufferPoint {
