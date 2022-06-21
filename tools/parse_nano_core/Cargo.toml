@@ -1,0 +1,17 @@
+[package]
+name = "parse_nano_core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+
+[dependencies]
+crate_metadata = { path = "../../kernel/crate_metadata" }
+mod_mgmt = { path = "../../kernel/mod_mgmt" }
+memory = { path = "../../kernel/memory" }
+hashbrown = "*"
+log = "*"
+serde = { version = "*", features = ["derive"] }
+
+[dependencies.bincode]
+git = "https://github.com/bincode-org/bincode"
+features = ["serde"]

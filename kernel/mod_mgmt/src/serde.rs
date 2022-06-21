@@ -1,0 +1,173 @@
+use crate::CrateNamespace;
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::String,
+    sync::Arc,
+};
+use core::ops::Range;
+use cow_arc::CowArc;
+use crate_metadata::{
+    LoadedCrate, LoadedSection, SectionType, Shndx, StrongCrateRef, WeakCrateRef,
+};
+use fs_node::FileRef;
+use hashbrown::HashMap;
+use memory::{MappedPages, VirtualAddress};
+use serde::{Deserialize, Serialize};
+use spin::Mutex;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SerializedCrate {
+    pub crate_name: String,
+    pub sections: HashMap<Shndx, SerializedSection>,
+    pub global_sections: BTreeSet<Shndx>,
+    pub tls_sections: BTreeSet<Shndx>,
+    pub data_sections: BTreeSet<Shndx>,
+    pub init_symbols: BTreeMap<String, usize>,
+    pub reexported_symbols: BTreeSet<String>,
+}
+
+impl SerializedCrate {
+    pub fn load(
+        self,
+        object_file: FileRef,
+        namespace: &Arc<CrateNamespace>,
+        text_pages: &Arc<Mutex<MappedPages>>,
+        rodata_pages: &Arc<Mutex<MappedPages>>,
+        data_pages: &Arc<Mutex<MappedPages>>,
+        verbose_log: bool,
+    ) -> Result<(StrongCrateRef, BTreeMap<String, usize>, usize), &'static str> {
+        let loaded_crate = CowArc::new(LoadedCrate {
+            crate_name: self.crate_name.clone(),
+            debug_symbols_file: Arc::downgrade(&object_file),
+            object_file,
+            // The sections need a weak reference back to the loaded_crate, and so we first create
+            // the loaded_crate so we have something to reference when loading the sections.
+            sections: HashMap::new(),
+            text_pages: Some((Arc::clone(text_pages), mp_range(text_pages))),
+            rodata_pages: Some((Arc::clone(rodata_pages), mp_range(rodata_pages))),
+            data_pages: Some((Arc::clone(data_pages), mp_range(data_pages))),
+            global_sections: self.global_sections,
+            tls_sections: self.tls_sections,
+            data_sections: self.data_sections,
+            reexported_symbols: self.reexported_symbols,
+        });
+
+        let mut sections = HashMap::with_capacity(self.sections.len());
+        for (shndx, section) in self.sections {
+            sections.insert(
+                shndx,
+                section.load(
+                    CowArc::downgrade(&loaded_crate),
+                    namespace,
+                    text_pages,
+                    rodata_pages,
+                    data_pages,
+                )?,
+            );
+        }
+
+        trace!(
+            "SerializedCrate::load(): adding symbols to namespace {:?}...",
+            namespace.name
+        );
+        let num_new_syms = namespace.add_symbols(sections.values(), verbose_log);
+        trace!("SerializedCrate::load(): finished adding symbols.");
+
+        let mut loaded_crate_mut = loaded_crate.lock_as_mut().ok_or_else(|| {
+            "BUG: SerializedCrate::load(): couldn't get exclusive mutable access to loaded_crate"
+        })?;
+        loaded_crate_mut.sections = sections;
+        drop(loaded_crate_mut);
+
+        // Add the newly-parsed nano_core crate to the kernel namespace.
+        namespace
+            .crate_tree
+            .lock()
+            .insert(self.crate_name.into(), loaded_crate.clone_shallow());
+        info!(
+            "Finished parsing nano_core crate, {} new symbols.",
+            num_new_syms
+        );
+
+        Ok((loaded_crate, self.init_symbols, num_new_syms))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SerializedSection {
+    pub name: String,
+    pub ty: SectionType,
+    pub global: bool,
+    pub virtual_address: usize,
+    pub offset: usize,
+    pub size: usize,
+}
+
+impl SerializedSection {
+    pub fn load(
+        self,
+        parent_crate: WeakCrateRef,
+        namespace: &Arc<CrateNamespace>,
+        text_pages: &Arc<Mutex<MappedPages>>,
+        rodata_pages: &Arc<Mutex<MappedPages>>,
+        data_pages: &Arc<Mutex<MappedPages>>,
+    ) -> Result<Arc<LoadedSection>, &'static str> {
+        let mapped_pages = match self.ty {
+            SectionType::Text => Arc::clone(text_pages),
+            SectionType::Rodata
+            | SectionType::TlsData
+            | SectionType::TlsBss
+            | SectionType::GccExceptTable
+            | SectionType::EhFrame => Arc::clone(rodata_pages),
+            SectionType::Data | SectionType::Bss => Arc::clone(data_pages),
+        };
+        let virtual_address = VirtualAddress::new(self.virtual_address)
+            .ok_or("SerializedSection::load(): invalid virtual address")?;
+
+        let loaded_section = Arc::new(LoadedSection {
+            name: self.name,
+            typ: self.ty,
+            global: self.global,
+            // TLS BSS sections (.tbss) do not have any real loaded data in the ELF file,
+            // since they are read-only initializer sections that would hold all zeroes.
+            // Thus, we just use a max-value mapped pages offset as a canary value here,
+            // as that value should never be used anyway.
+            mapped_pages_offset: match self.ty {
+                SectionType::TlsBss => usize::MAX,
+                _ => mapped_pages
+                    .lock()
+                    .offset_of_address(
+                        VirtualAddress::new(self.offset)
+                            .ok_or("SerializedSection::load(): invalid offset")?,
+                    )
+                    .ok_or("nano_core section wasn't covered by its mapped pages")?,
+            },
+            mapped_pages,
+            address_range: virtual_address..(virtual_address + self.size),
+            parent_crate,
+            inner: Default::default(),
+        });
+
+        if let SectionType::TlsData | SectionType::TlsBss = self.ty {
+            error!("ADDING TLS SECTION: {:#?}", loaded_section);
+            namespace
+                .tls_initializer
+                .lock()
+                .add_existing_static_tls_section(
+                    // TLS sections encode their TLS offset in the virtual address field,
+                    // which is necessary to properly calculate relocation entries that depend upon them.
+                    self.virtual_address.into(),
+                    Arc::clone(&loaded_section),
+                )
+                .unwrap();
+        }
+
+        Ok(loaded_section)
+    }
+}
+
+/// Convenience function for calculating the address range of a MappedPages object.
+fn mp_range(mp_ref: &Arc<Mutex<MappedPages>>) -> Range<VirtualAddress> {
+    let mp = mp_ref.lock();
+    mp.start_address()..(mp.start_address() + mp.size_in_bytes())
+}

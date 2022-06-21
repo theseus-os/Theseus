@@ -14,6 +14,8 @@ cstr_core = "0.2.3"
 rangemap = "0.1.13"
 const_format = "0.2.2"
 
+vga_buffer = { path = "../vga_buffer" }
+
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "1.4.0"
@@ -50,7 +52,7 @@ path = "../fs_node"
 
 [dependencies.hashbrown]
 version = "0.11.2"
-features = ["nightly"]
+features = ["nightly", "serde"]
 
 [dependencies.vfs_node]
 path = "../vfs_node"
@@ -60,6 +62,16 @@ path = "../path"
 
 [dependencies.memfs]
 path = "../memfs"
+
+[dependencies.serde]
+version = "1.0.137"
+default-features = false
+features = ["derive", "alloc"]
+
+[dependencies.bincode]
+git = "https://github.com/bincode-org/bincode"
+default-features = false
+features = ["serde", "alloc"]
 
 [lib]
 crate-type = ["rlib"]
