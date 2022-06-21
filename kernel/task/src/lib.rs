@@ -861,7 +861,7 @@ impl fmt::Display for Task {
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
 /// 
 /// `TaskRef` also auto-derefs into an immutable `Task` reference.
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone)]
 pub struct TaskRef(Arc<Task>);
 
 impl TaskRef {
@@ -1024,6 +1024,12 @@ impl PartialEq for TaskRef {
     }
 }
 impl Eq for TaskRef { }
+
+impl Hash for TaskRef {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.0).hash(state);
+    }
+}
 
 impl Deref for TaskRef {
     type Target = Task;

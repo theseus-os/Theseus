@@ -156,6 +156,7 @@ impl fmt::Debug for ExtendedCapability {
 }
 
 /// Bits corresponding to commands in the Global Command register.
+#[repr(u32)]
 pub enum GlobalCommand {
     /// Compatibility Format Interrupt
     CFI   = 1 << 23,

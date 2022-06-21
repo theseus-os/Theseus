@@ -15,6 +15,7 @@ use memory::{MappedPages, VirtualAddress};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
+/// A serialized representation of a crate.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SerializedCrate {
     pub crate_name: String,
@@ -27,6 +28,7 @@ pub struct SerializedCrate {
 }
 
 impl SerializedCrate {
+    /// Load the crate and its sections.
     pub fn load(
         self,
         object_file: FileRef,
@@ -73,9 +75,9 @@ impl SerializedCrate {
         let num_new_syms = namespace.add_symbols(sections.values(), verbose_log);
         trace!("SerializedCrate::load(): finished adding symbols.");
 
-        let mut loaded_crate_mut = loaded_crate.lock_as_mut().ok_or_else(|| {
-            "BUG: SerializedCrate::load(): couldn't get exclusive mutable access to loaded_crate"
-        })?;
+        let mut loaded_crate_mut = loaded_crate.lock_as_mut().ok_or(
+            "BUG: SerializedCrate::load(): couldn't get exclusive mutable access to loaded_crate",
+        )?;
         loaded_crate_mut.sections = sections;
         drop(loaded_crate_mut);
 
@@ -93,12 +95,14 @@ impl SerializedCrate {
     }
 }
 
+/// A serialized representation of a section.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SerializedSection {
     pub name: String,
     pub ty: SectionType,
     pub global: bool,
     pub virtual_address: usize,
+    /// This field is identical to `self.virtual_address` unless `self.ty == SectionType::TlsData`.
     pub offset: usize,
     pub size: usize,
 }
@@ -149,14 +153,13 @@ impl SerializedSection {
         });
 
         if let SectionType::TlsData | SectionType::TlsBss = self.ty {
-            error!("ADDING TLS SECTION: {:#?}", loaded_section);
             namespace
                 .tls_initializer
                 .lock()
                 .add_existing_static_tls_section(
                     // TLS sections encode their TLS offset in the virtual address field,
                     // which is necessary to properly calculate relocation entries that depend upon them.
-                    self.virtual_address.into(),
+                    self.virtual_address,
                     Arc::clone(&loaded_section),
                 )
                 .unwrap();

@@ -380,16 +380,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "logger"
-version = "0.1.0"
-dependencies = [
- "irq_safety",
- "log",
- "serial_port_basic",
- "spin 0.9.3",
-]
-
-[[package]]
 name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -492,7 +482,6 @@ dependencies = [
  "spin 0.9.3",
  "util",
  "vfs_node",
- "vga_buffer",
  "xmas-elf",
 ]
 
@@ -599,10 +588,6 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
-
-[[package]]
-name = "port_io"
-version = "0.2.1"
 
 [[package]]
 name = "proc-macro2"
@@ -735,15 +720,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serial_port_basic"
-version = "0.1.0"
-dependencies = [
- "irq_safety",
- "port_io",
- "spin 0.9.3",
-]
-
-[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -843,16 +819,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vga_buffer"
-version = "0.1.0"
-dependencies = [
- "kernel_config",
- "logger",
- "spin 0.9.3",
- "volatile 0.2.7",
-]
-
-[[package]]
 name = "virtue"
 version = "0.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -863,12 +829,6 @@ name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-
-[[package]]
-name = "volatile"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6b06ad3ed06fef1713569d547cdbdb439eafed76341820fb0e0344f29a41945"
 
 [[package]]
 name = "volatile"
@@ -900,7 +860,7 @@ dependencies = [
  "bit_field 0.10.1",
  "bitflags",
  "rustversion",
- "volatile 0.4.5",
+ "volatile",
 ]
 
 [[package]]

@@ -14,8 +14,6 @@ cstr_core = "0.2.3"
 rangemap = "0.1.13"
 const_format = "0.2.2"
 
-vga_buffer = { path = "../vga_buffer" }
-
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "1.4.0"

@@ -43,9 +43,13 @@ pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_n
 pub use crate_metadata::*;
 
 
-pub mod parse_nano_core;
-pub mod replace_nano_core_crates;
+mod deserialize_nano_core;
+mod replace_nano_core_crates;
+pub use deserialize_nano_core::deserialize_nano_core;
+pub use replace_nano_core_crates::replace_nano_core_crates;
+
 pub mod serde;
+
 
 /// The name of the directory that contains all of the CrateNamespace files.
 pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
@@ -2530,7 +2534,6 @@ impl TlsInitializer {
         tls_section: StrongSectionRef,
     ) -> Result<(), ()> {
         let range = offset .. (offset + tls_section.size());
-        error!("RANGE : {range:#?}");
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
         {
@@ -2578,7 +2581,7 @@ impl TlsInitializer {
         }
 
         if let Some(start) = start_index {
-           let range = start .. (start + sec_size);
+            let range = start .. (start + sec_size);
             section.address_range = 
                 VirtualAddress::new_canonical(range.start) .. VirtualAddress::new_canonical(range.end);
             let section_ref = Arc::new(section);
@@ -2605,15 +2608,11 @@ impl TlsInitializer {
     /// 
     /// This function lazily generates the TLS image data on demand, if needed.
     pub(crate) fn get_data(&mut self) -> TlsDataImage {
-        error!("f1 static_end: {}, dynamic_end: {}", self.end_of_static_sections, self.end_of_dynamic_sections);
         let total_section_size = self.end_of_static_sections + self.end_of_dynamic_sections;
-        error!("f2, section_size: {total_section_size}, pointer_size: {POINTER_SIZE}");
         let required_capacity = if total_section_size > 0 { total_section_size + POINTER_SIZE } else { 0 };
-        error!("f3");
         if required_capacity == 0 {
             return TlsDataImage { _data: None, ptr: 0 };
         }
-        error!("f4");
 
         // An internal function that iterates over all TLS sections and copies their data into the new data image.
         fn copy_tls_section_data(
@@ -2622,27 +2621,18 @@ impl TlsInitializer {
             end_of_previous_range: &mut usize,
         ) {
             for (range, sec) in section_offsets.iter() {
-        error!("f5");
                 // Insert padding bytes into the data vec to ensure the section data is inserted at the correct index.
                 let num_padding_bytes = range.start.saturating_sub(*end_of_previous_range);
-        error!("f6");
                 new_data.extend(core::iter::repeat(0).take(num_padding_bytes));
-        error!("f7");
 
                 // Insert the section data into the new data vec.
                 if sec.get_type() == SectionType::TlsData {
-        error!("f8");
                     let sec_mp = sec.mapped_pages.lock();
-        error!("f9");
                     let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size()).unwrap();
-        error!("f10");
                     new_data.extend_from_slice(sec_data);
-        error!("f11");
                 } else {
-        error!("f12");
                     // For TLS BSS sections (.tbss), fill the section size with all zeroes.
                     new_data.extend(core::iter::repeat(0).take(sec.size()));
-        error!("f13");
                 }
                 *end_of_previous_range = range.end;
             }
@@ -2659,23 +2649,19 @@ impl TlsInitializer {
             // to the `new_data` vector after we insert the static TLS data sections.
             // The location of the new pointer value is the conceptual "start" of the TLS image,
             // and that's what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).
-        error!("f14");
             let mut new_data: Vec<u8> = Vec::with_capacity(required_capacity);
             
             // Iterate through all static TLS sections and copy their data into the new data image.
-        error!("f15");
             let mut end_of_previous_range: usize = 0;
             copy_tls_section_data(&mut new_data, &self.static_section_offsets, &mut end_of_previous_range);
             assert_eq!(end_of_previous_range, self.end_of_static_sections);
 
             // Append space for the TLS self pointer immediately after the end of the last static TLS data section;
             // its actual value will be filled in later (in `get_data()`) after a new copy of the TLS data image is made.
-        error!("f16");
             new_data.extend_from_slice(&[0u8; POINTER_SIZE]);
 
             // Iterate through all dynamic TLS sections and copy their data into the new data image.
             end_of_previous_range = POINTER_SIZE; // we already pushed room for the TLS self pointer above.
-        error!("f17");
             copy_tls_section_data(&mut new_data, &self.dynamic_section_offsets, &mut end_of_previous_range);
             if self.end_of_dynamic_sections != 0 {
                 // this assertion only makes sense if there are any dynamic sections
@@ -2687,7 +2673,6 @@ impl TlsInitializer {
         }
 
         // Here, the `data_cache` is guaranteed to be fresh and ready to use.
-        error!("f18");
         let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
         // Every time we create a new copy of the TLS data image, we have to re-calculate
         // and re-assign the TLS self pointer value (located after the static TLS section data),
@@ -2762,3 +2747,4 @@ impl PartialEq for StrongSectionRefWrapper {
     }
 }
 impl Eq for StrongSectionRefWrapper { }
+

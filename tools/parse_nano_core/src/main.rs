@@ -1,17 +1,10 @@
 mod parse;
 
-use crate_metadata::CrateType;
-use mod_mgmt::{serde::SerializedCrate, CrateNamespace};
+use mod_mgmt::serde::SerializedCrate;
 use std::{collections::BTreeSet, io::Write};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arg = &std::env::args().collect::<Vec<String>>()[1];
-    // let namespace_dir = CrateType::Kernel.default_namespace_name();
-    // let name = namespace_dir.get_name();
-    // let namespace = CrateNamespace::new(name, namespace_dir, None);
-
-    // let (_, _, obj_file_name) = CrateType::from_module_name("nano_core")?;
-
     let str = std::fs::read_to_string(arg)?;
     let crate_items = parse::parse_nano_core_symbol_file(str)?;
 
@@ -19,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         crate_name: "nano_core".to_string(),
         sections: crate_items.sections,
         global_sections: crate_items.global_sections,
-        tls_sections: BTreeSet::new(),
+        tls_sections: crate_items.tls_sections,
         data_sections: crate_items.data_sections,
         init_symbols: crate_items.init_symbols,
         reexported_symbols: BTreeSet::new(),
@@ -31,6 +24,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut stdout,
         bincode::config::standard(),
     )?;
-    stdout.flush();
+    stdout.flush()?;
     Ok(())
 }

@@ -1,13 +1,8 @@
-use crate_metadata::{LoadedCrate, SectionType, Shndx};
+use crate_metadata::{SectionType, Shndx};
 use hashbrown::HashMap;
 use log::{error, trace};
-use memory::VirtualAddress;
-use mod_mgmt::serde::{SerializedCrate, SerializedSection};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    io::BufRead,
-    sync::Arc,
-};
+use mod_mgmt::serde::SerializedSection;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Parses the nano_core symbol file that represents the already loaded (and currently running) nano_core code.
 /// Basically, just searches the section list for offsets, size, and flag data,
@@ -23,8 +18,8 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
     /// An internal function that parses a section header's index (e.g., "[7]") out of the given str.
     /// Returns a tuple of the parsed `Shndx` and the rest of the unparsed str after the shndx.
     fn parse_section_ndx(str_ref: &str) -> Option<(Shndx, &str)> {
-        let open = str_ref.find("[");
-        let close = str_ref.find("]");
+        let open = str_ref.find('[');
+        let close = str_ref.find(']');
         open.and_then(|start| {
             close.and_then(|end| {
                 str_ref
@@ -56,7 +51,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
     }
 
     // We will fill in these crate items while parsing the symbol file.
-    let mut crate_items = ParsedCrateItems::empty();
+    let mut crate_items = ParsedCrateItems::default();
     // As the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter
     let mut section_counter = 0;
 
@@ -222,7 +217,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                 "parse_nano_core_symbol_file(): couldn't parse virtual address (value column)"
             })?;
-            let sec_size = usize::from_str_radix(sec_size, 10).or_else(|e| {
+            let sec_size = sec_size.parse::<usize>().or_else(|e| {
                 sec_size.get(2 ..).ok_or(e).and_then(|sec_size_hex| usize::from_str_radix(sec_size_hex, 16))
             }).map_err(|e| {
                 error!("parse_nano_core_symbol_file(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
@@ -230,7 +225,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
             })?;
 
             // while vaddr and size are required, ndx could be valid or not.
-            let sec_ndx = match usize::from_str_radix(sec_ndx, 10) {
+            let sec_ndx = match sec_ndx.parse::<usize>() {
                 // If ndx is a valid number, proceed on.
                 Ok(ndx) => ndx,
                 // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line).
@@ -250,11 +245,13 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 &shndxs,
                 &mut crate_items,
                 &mut section_counter,
-                sec_ndx,
-                String::from(name),
-                sec_size,
-                sec_vaddr,
-                global,
+                IndexMeta {
+                    ndx: sec_ndx,
+                    name: name.to_string(),
+                    size: sec_size,
+                    virtual_address: sec_vaddr,
+                    global,
+                },
             )?;
         } // end of loop over all lines
     }
@@ -264,23 +261,14 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
 }
 
 /// The collection of sections and symbols obtained while parsing the nano_core crate.
+#[derive(Default)]
 pub struct ParsedCrateItems {
     pub sections: HashMap<Shndx, SerializedSection>,
     pub global_sections: BTreeSet<Shndx>,
+    pub tls_sections: BTreeSet<Shndx>,
     pub data_sections: BTreeSet<Shndx>,
     /// The set of other non-section symbols too, such as constants defined in assembly code.
     pub init_symbols: BTreeMap<String, usize>,
-}
-
-impl ParsedCrateItems {
-    fn empty() -> ParsedCrateItems {
-        ParsedCrateItems {
-            sections: HashMap::new(),
-            global_sections: BTreeSet::new(),
-            data_sections: BTreeSet::new(),
-            init_symbols: BTreeMap::new(),
-        }
-    }
 }
 
 /// The section header indices (shndx) for the main sections:
@@ -297,6 +285,14 @@ struct MainShndx {
     tls_bss_shndx: Option<(Shndx, usize)>,
 }
 
+struct IndexMeta {
+    ndx: Shndx,
+    name: String,
+    size: usize,
+    virtual_address: usize,
+    global: bool,
+}
+
 /// A convenience function that separates out the logic
 /// of actually creating and adding a new LoadedSection instance
 /// after it has been parsed.
@@ -304,17 +300,17 @@ fn add_new_section(
     shndxs: &MainShndx,
     crate_items: &mut ParsedCrateItems,
     section_counter: &mut Shndx,
-    // crate-wide args above, section-specific stuff below
-    sec_ndx: Shndx,
-    name: String,
-    size: usize,
-    virtual_address: usize,
-    global: bool,
+    meta: IndexMeta,
 ) -> Result<(), &'static str> {
-    let new_section = if sec_ndx == shndxs.text_shndx {
-        // let virtual_address = VirtualAddress::new(virtual_address)
-        //     .ok_or("new text section had invalid virtual address")?;
+    let IndexMeta {
+        ndx: sec_ndx,
+        name,
+        size,
+        virtual_address,
+        global,
+    } = meta;
 
+    let new_section = if sec_ndx == shndxs.text_shndx {
         Some(SerializedSection {
             name,
             ty: SectionType::Text,
@@ -324,9 +320,6 @@ fn add_new_section(
             size,
         })
     } else if sec_ndx == shndxs.rodata_shndx {
-        // let virtual_address = VirtualAddress::new(virtual_address)
-        //     .ok_or("new rodata section had invalid virtual address")?;
-
         Some(SerializedSection {
             name,
             ty: SectionType::Rodata,
@@ -336,9 +329,6 @@ fn add_new_section(
             size,
         })
     } else if sec_ndx == shndxs.data_shndx {
-        // let virtual_address = VirtualAddress::new(virtual_address)
-        //     .ok_or("new data section had invalid virtual address")?;
-
         Some(SerializedSection {
             name,
             ty: SectionType::Data,
@@ -348,9 +338,6 @@ fn add_new_section(
             size,
         })
     } else if sec_ndx == shndxs.bss_shndx {
-        // let virtual_address = VirtualAddress::new(virtual_address)
-        //     .ok_or("new bss section had invalid virtual address")?;
-
         Some(SerializedSection {
             name,
             ty: SectionType::Bss,
@@ -371,15 +358,6 @@ fn add_new_section(
         // so we can use that to calculate the real virtual address where it's loaded.
         let tls_sec_data_vaddr = shndxs.tls_data_shndx.unwrap().1 + tls_offset;
 
-        dbg!(
-            "tls data",
-            &name,
-            global,
-            tls_sec_data_vaddr,
-            size,
-            virtual_address
-        );
-
         Some(SerializedSection {
             name,
             ty: SectionType::TlsData,
@@ -392,13 +370,10 @@ fn add_new_section(
         .tls_bss_shndx
         .map_or(false, |(shndx, _)| sec_ndx == shndx)
     {
-        dbg!("tls bss", &name, global, virtual_address, size);
         Some(SerializedSection {
             name,
             ty: SectionType::TlsBss,
             global,
-            // virtual_address: VirtualAddress::new(virtual_address)
-            //     .ok_or("new TLS .tbss section had invalid virtual address (TLS offset)")?,
             virtual_address,
             offset: virtual_address,
             size,
@@ -409,12 +384,14 @@ fn add_new_section(
     };
 
     if let Some(sec) = new_section {
-        // debug!("parse_nano_core: new section: {:?}", sec);
         if sec.global {
             crate_items.global_sections.insert(*section_counter);
         }
         if sec.ty.is_data_or_bss() {
             crate_items.data_sections.insert(*section_counter);
+        }
+        if let SectionType::TlsData | SectionType::TlsBss = sec.ty {
+            crate_items.tls_sections.insert(*section_counter);
         }
         crate_items.sections.insert(*section_counter, sec);
         *section_counter += 1;

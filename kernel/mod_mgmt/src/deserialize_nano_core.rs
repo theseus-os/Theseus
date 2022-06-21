@@ -27,7 +27,8 @@ macro_rules! try_mp {
     };
 }
 
-/// Parses the nano_core object file that represents the already loaded (and currently running) nano_core code.
+/// Deserializes the file containing the [`SerializedCrate`] representation of the already loaded
+/// (and currently running) `nano_core` code.
 ///
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// We consider both `GLOBAL` and `WEAK` symbols to be global public symbols; this is necessary because symbols that are
@@ -41,7 +42,7 @@ macro_rules! try_mp {
 ///
 /// If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`
 /// because those cannot be dropped, as they hold the currently-running code, and dropping them would cause endless exceptions.
-pub fn parse_nano_core(
+pub fn deserialize_nano_core(
     namespace: &Arc<CrateNamespace>,
     text_pages: MappedPages,
     rodata_pages: MappedPages,
@@ -64,7 +65,7 @@ pub fn parse_nano_core(
     );
     let nano_core_file_path = Path::new(nano_core_file.lock().get_absolute_path());
     debug!(
-        "parse_nano_core(): trying to load and parse the nano_core file: {:?}",
+        "deserialize_nano_core(): trying to load and parse the nano_core file: {:?}",
         nano_core_file_path
     );
 
@@ -89,16 +90,14 @@ pub fn parse_nano_core(
 
     let (deserialized, _): (SerializedCrate, _) = try_mp!(
         bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(|e| {
-            error!("ERROR: {e}");
-            "parse_nano_core(): error deserializing nano_core"
+            error!("deserialize_nano_core(): error deserializing nano_core: {e}");
+            "deserialize_nano_core(): error deserializing nano_core"
         }),
         text_pages,
         rodata_pages,
         data_pages
     );
     drop(nano_core_file_locked);
-
-    // vga_buffer::print_raw!("{:#?}\n", deserialized);
 
     Ok(try_mp!(
         deserialized.load(

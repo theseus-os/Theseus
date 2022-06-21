@@ -1830,7 +1830,6 @@ dependencies = [
  "spin 0.9.0",
  "util",
  "vfs_node",
- "vga_buffer",
  "xmas-elf",
 ]
 
