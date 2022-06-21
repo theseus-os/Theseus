@@ -150,7 +150,6 @@ impl PosixNode {
         let absolute_path = Path::new(self.theseus_file_or_dir.get_absolute_path());
         let wd_path = Path::new(
             task::get_my_current_task()
-                .unwrap()
                 .get_env()
                 .lock()
                 .get_wd_path(),

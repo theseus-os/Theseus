@@ -108,9 +108,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     loop {
         // block this task, because it never needs to actually run again
-        if let Some(my_task) = task::get_my_current_task() {
-            my_task.block();
-        }
+        task::get_my_current_task().block();
     }
 
     // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.
@@ -129,8 +127,6 @@ enum AppErr {
     /// The command does not match the name of any existing application in the 
     /// application namespace directory. 
     NotFound(String),
-    /// The terminal could not find the application namespace due to a filesystem error. 
-    NamespaceErr,
     /// The terminal could not spawn a new task to run the new application.
     /// Includes the String error returned from the task spawn function.
     SpawnErr(String)
@@ -662,9 +658,7 @@ impl Shell {
     fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<TaskRef, AppErr> {
 
         // Check that the application actually exists
-        let namespace_dir = task::get_my_current_task()
-            .map(|t| t.get_namespace().dir().clone())
-            .ok_or(AppErr::NamespaceErr)?;
+        let namespace_dir = task::get_my_current_task().get_namespace().dir().clone();
         let cmd_crate_name = format!("{}-", cmd);
         let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
         let app_file = matching_apps.next();
@@ -802,7 +796,6 @@ impl Shell {
             Err(err) => {
                 let err_msg = match err {
                     AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
-                    AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
                 self.terminal.lock().print_to_terminal(err_msg);
@@ -831,14 +824,7 @@ impl Shell {
     /// Try to match the incomplete command against all applications in the same namespace.
     /// Returns a vector that contains all matching results.
     fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
-        let namespace_dir = match task::get_my_current_task()
-            .map(|t| t.get_namespace().dir().clone())
-            .ok_or(AppErr::NamespaceErr) {
-            Ok(dir) => dir,
-            Err(_) => {
-                return Err("Failed to get namespace_dir while completing cmdline.");
-            }
-        };
+        let namespace_dir = task::get_my_current_task().get_namespace().dir().clone();
         let mut names = namespace_dir.get_file_and_dir_names_starting_with(&incomplete_cmd);
 
         // Drop the extension name and hash value.
@@ -865,13 +851,8 @@ impl Shell {
         // Stores all possible matches.
         let mut match_list = Vec::new();
 
-        let taskref = match task::get_my_current_task() {
-            Some(t) => t,
-            None => return Err("Failed to get task reference while completing cmdline.")
-        };
-
         // Get current working dir.
-        let mut curr_wd = Arc::clone(&taskref.get_env().lock().working_dir);
+        let mut curr_wd = Arc::clone(&task::get_my_current_task().get_env().lock().working_dir);
 
         // Check if the last character is a slash.
         let slash_ending = match incomplete_cmd.chars().last() {

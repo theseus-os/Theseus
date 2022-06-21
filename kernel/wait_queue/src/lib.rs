@@ -108,7 +108,7 @@ impl WaitQueue {
     // /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
     // /// to allow the closure to examine the condition of the waitqueue if necessary. 
     pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
+        let curr_task = task::try_get_my_current_task().or(Err(WaitError::NoCurrentTask))?;
 
         // Do the following atomically:
         // (1) Obtain the waitqueue lock
@@ -140,7 +140,7 @@ impl WaitQueue {
     /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
     /// that can mutate its environment (a `FnMut`).
     pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
+        let curr_task = task::try_get_my_current_task().or(Err(WaitError::NoCurrentTask))?;
 
         // Do the following atomically:
         // (1) Obtain the waitqueue lock

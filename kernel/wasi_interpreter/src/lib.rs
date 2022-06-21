@@ -104,7 +104,6 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
 
     // Populate environment variables.
     let pwd: String = task::get_my_current_task()
-        .unwrap()
         .get_env()
         .lock()
         .get_wd_path();
@@ -131,7 +130,6 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
                 &preopen_dir,
                 Arc::clone(
                     &task::get_my_current_task()
-                        .unwrap()
                         .get_env()
                         .lock()
                         .working_dir,

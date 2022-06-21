@@ -31,13 +31,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            println!("failed to get current task");
-            return -1;
-        }
-    };
+    let taskref = task::get_my_current_task();
     let curr_env = taskref.get_env();
     let curr_wr = Arc::clone(&curr_env.lock().working_dir);
 

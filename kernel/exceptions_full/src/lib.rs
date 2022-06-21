@@ -2,6 +2,7 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
+#![feature(let_else)]
 
 use log::{warn, debug, trace};
 use memory::{VirtualAddress, Page};
@@ -116,7 +117,7 @@ fn kill_and_halt(
     // Dump some info about the this loaded app crate
     // and test out using debug info for recovery
     if false {
-        let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
+        let curr_task = task::get_my_current_task();
         let app_crate = curr_task.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow();
         let debug_symbols_file = {
             let krate = app_crate.lock_as_ref();
@@ -168,7 +169,7 @@ fn kill_and_halt(
 
     // Call this task's kill handler, if it has one.
     {
-        let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
+        let kill_handler = task::get_my_current_task().take_kill_handler();
         if let Some(ref kh_func) = kill_handler {
 
             #[cfg(not(downtime_eval))]
@@ -219,7 +220,7 @@ fn kill_and_halt(
         }
     }
     #[cfg(not(unwind_exceptions))] {
-        let res = task::get_my_current_task().ok_or("couldn't get current task").and_then(|taskref| taskref.kill(cause));
+        let res = task::get_my_current_task().kill(cause);
         match res {
             Ok(()) => { println_both!("Task {:?} killed itself successfully", task::get_my_current_task()); }
             Err(e) => { println_both!("Task {:?} was unable to kill itself. Error: {:?}", task::get_my_current_task(), e); }
@@ -238,9 +239,10 @@ fn kill_and_halt(
 /// Checks whether the given `vaddr` falls within a stack guard page, indicating stack overflow. 
 fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
     let page = Page::containing_address(vaddr);
-    task::get_my_current_task()
-        .map(|curr_task| curr_task.with_kstack(|kstack| kstack.guard_page().contains(&page)))
-        .unwrap_or(false)
+    let Ok(curr_task) = task::try_get_my_current_task() else {
+        return false;
+    };
+    curr_task.with_kstack(|kstack| kstack.guard_page().contains(&page))
 }
 
 /// Converts the given `exception_number` into a [`Signal`] category, if relevant.

@@ -5,6 +5,7 @@
 
 #![no_std]
 #![feature(drain_filter)]
+#![feature(let_else)]
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
@@ -149,12 +150,9 @@ fn update_and_insert_fault_entry_internal(
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
-    let curr_task = match task::get_my_current_task() {
-        Some(x) => x,
-        _ => {
-            FAULT_LIST.lock().push(fe);
-            return
-        },
+    let Ok(curr_task) = task::try_get_my_current_task() else {
+        FAULT_LIST.lock().push(fe);
+        return;
     };
 
     let namespace = curr_task.get_namespace();

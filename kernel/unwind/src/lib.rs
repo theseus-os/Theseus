@@ -737,7 +737,7 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
-        let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
+        let curr_task = task::try_get_my_current_task()?;
         let namespace = curr_task.get_namespace();
 
         Box::into_raw(Box::new(

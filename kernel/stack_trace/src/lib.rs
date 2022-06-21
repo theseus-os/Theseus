@@ -66,8 +66,9 @@ pub fn stack_trace(
     let max_recursion = max_recursion.unwrap_or(usize::MAX);
 
     unwind::invoke_with_current_registers(&mut |registers| {
-        let namespace = task::get_my_current_task()
+        let namespace = task::try_get_my_current_task()
             .map(|t| t.get_namespace())
+            .ok()
             .or_else(|| mod_mgmt::get_initial_kernel_namespace())
             .ok_or("couldn't get current task's or default namespace")?;
         let mut stack_frame_iter = StackFrameIter::new(namespace.clone(), registers);

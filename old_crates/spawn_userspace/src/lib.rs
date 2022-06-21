@@ -217,7 +217,7 @@ fn userspace_wrapper() -> ! {
     let entry_func: usize; 
 
     { // scoped to release current task's lock before calling jump_to_userspace
-        let currtask = get_my_current_task().expect("userspace_wrapper(): get_my_current_task() failed").lock();
+        let currtask = get_my_current_task().lock();
         ustack_top = currtask.ustack.as_ref().expect("userspace_wrapper(): ustack was None!").top_usable().value();
         entry_func = currtask.new_userspace_entry_addr.expect("userspace_wrapper(): new_userspace_entry_addr was None!").value();
     }

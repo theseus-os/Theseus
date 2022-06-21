@@ -59,7 +59,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<(), String> {
-    let curr_task = task::get_my_current_task().ok_or_else(|| format!("unable to get current task"))?;
+    let curr_task = task::get_my_current_task();
     let namespace = curr_task.get_namespace();
     let env = curr_task.get_env();
     let curr_wd = env.lock().working_dir.clone();

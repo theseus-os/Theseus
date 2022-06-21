@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(let_else)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -20,7 +21,7 @@ cfg_if! {
 use core::ops::Deref;
 use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
-use task::{get_my_current_task, TaskRef};
+use task::{try_get_my_current_task, TaskRef};
 
 /// Yields the current CPU by selecting a new `Task` to run 
 /// and then performs a task switch to that new `Task`.
@@ -30,9 +31,7 @@ pub fn schedule() -> bool {
     let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
     let apic_id = get_my_apic_id();
 
-    let curr_task = if let Some(curr) = get_my_current_task() {
-        curr
-    } else {
+    let Ok(curr_task) = try_get_my_current_task() else {
         error!("BUG: schedule(): could not get current task.");
         return false; // keep running the same current task
     };

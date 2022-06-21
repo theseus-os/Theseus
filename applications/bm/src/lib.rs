@@ -245,7 +245,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static
 
 	start_hpet = hpet.get_counter();
 	for _ in 0..tmp_iterations {
-		mypid = task::get_my_current_task_id().unwrap();
+		mypid = task::get_my_current_task_id();
 	}
 	end_hpet = hpet.get_counter();
 
@@ -321,12 +321,8 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// Get path to application "hello" that we're going to spawn
-	let namespace = task::get_my_current_task()
-		.map(|t| t.get_namespace().clone())
-		.ok_or("could not find the application namespace")?;
-	let namespace_dir = task::get_my_current_task()
-		.map(|t| t.get_namespace().dir().clone())
-		.ok_or("could not find the application namespace")?;
+	let namespace = task::get_my_current_task().get_namespace().clone();
+	let namespace_dir = task::get_my_current_task().get_namespace().dir().clone();
 	let app_path = namespace_dir.get_file_starting_with("hello-")
 		.map(|f| Path::new(f.lock().get_absolute_path()))
 		.ok_or("Could not find the application 'hello'")?;
@@ -1547,28 +1543,12 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 
 /// Helper function to get the name of current task
 fn get_prog_name() -> String {
-	let taskref = match task::get_my_current_task() {
-	   Some(t) => t,
-        None => {
-            printlninfo!("failed to get current task");
-            return "Unknown".to_string();
-        }
-    };
-
-    taskref.name.clone()
+    task::get_my_current_task().name.clone()
 }
 
 /// Helper function to get the PID of current task
 fn getpid() -> usize {
-	let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            printlninfo!("failed to get current task");
-            return 0;
-        }
-    };
-
-    taskref.id
+    task::get_my_current_task().id
 }
 
 
@@ -1587,9 +1567,7 @@ fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
 
 /// Helper function to get current working directory
 fn get_cwd() -> Option<DirRef> {
-	task::get_my_current_task().map(|t| 
-		Arc::clone(&t.get_env().lock().working_dir)
-	)
+	Arc::clone(&task::get_my_current_task().get_env().lock().working_dir)
 }
 
 /// Helper function to make a temporary file to be used to measure read open latencies

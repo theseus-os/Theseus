@@ -63,7 +63,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<c_int, String> {
-    let curr_task = task::get_my_current_task().unwrap();
+    let curr_task = task::get_my_current_task();
     let curr_wd   = Arc::clone(&curr_task.get_env().lock().working_dir);
     let namespace = curr_task.get_namespace();
     let mmi       = &curr_task.mmi;
@@ -274,7 +274,7 @@ fn parse_and_load_elf_executable<'f>(
         // debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, memory_size_in_bytes, this_ap.start_address());
 
         let initial_flags = EntryFlags::from_elf_program_flags(prog_hdr.flags());
-        let mmi = &task::get_my_current_task().unwrap().mmi;
+        let mmi = &task::get_my_current_task().mmi;
         // Must initially map the memory as writable so we can copy the segment data to it later. 
         let mut mp = mmi.lock().page_table
             .map_allocated_pages(this_ap, initial_flags | EntryFlags::WRITABLE)

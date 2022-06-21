@@ -13,6 +13,7 @@
 //! If an application itself spawns child tasks, those will not be able to properly print through these interfaces.
 
 #![no_std]
+#![feature(let_else)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -69,14 +70,11 @@ pub fn remove_child(child_task_id: usize) -> Result<(), &'static str> {
 use core::fmt;
 /// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct terminal print-producer
 pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
-    let task_id = match task::get_my_current_task_id() {
-        Some(task_id) => {task_id},
-        None => {
-            // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
-            // Instead, we write direclty to the serial port. 
-            let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
-            return;
-        }
+    let Ok(task_id) = task::try_get_my_current_task_id() else {
+        // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
+        // Instead, we write direclty to the serial port.
+        let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
+        return;
     };
     
     // Obtains the correct terminal print producer and enqueues the print event, which will later be popped off

@@ -134,8 +134,7 @@ pub fn new_application_task_builder(
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
-    let namespace = new_namespace.or_else(|| task::get_my_current_task().map(|t| t.get_namespace().clone()))
-        .ok_or("spawn::new_application_task_builder(): couldn't get current task to use its CrateNamespace")?;
+    let namespace = new_namespace.unwrap_or_else(|| task::get_my_current_task().get_namespace().clone());
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
         .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
@@ -469,7 +468,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
     // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
     let (func, arg) = {
-        let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
+        let curr_task = get_my_current_task();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = curr_task.with_kstack(|kstack| {
@@ -515,7 +514,7 @@ fn task_wrapper<F, A, R>() -> !
     //
     // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
     // while operations 2 and 3 then happen in `task_cleanup_final`.
-    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    let curr_task = get_my_current_task().clone();
     match result {
         Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
@@ -533,7 +532,7 @@ fn task_wrapper_restartable<F, A, R>() -> !
     let result = task_wrapper_internal::<F, A, R>();
 
     // See `task_wrapper` for an explanation of how the below functions work.
-    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    let curr_task = get_my_current_task().clone();
     match result {
         Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),

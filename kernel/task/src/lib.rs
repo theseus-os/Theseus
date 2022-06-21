@@ -114,14 +114,6 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
 }
 
 
-/// Sets the kill handler function for the current `Task`
-pub fn set_my_kill_handler(handler: KillHandler) -> Result<(), &'static str> {
-    get_my_current_task()
-        .ok_or("couldn't get_my_current_task")
-        .map(|taskref| taskref.set_kill_handler(handler))
-}
-
-
 /// The list of possible reasons that a given `Task` was killed prematurely.
 #[derive(Debug)]
 pub enum KillReason {
@@ -378,7 +370,7 @@ impl Task {
         kstack: Option<Stack>,
         failure_cleanup_function: FailureCleanupFunction
     ) -> Result<Task, &'static str> {
-        let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
+        let curr_task = get_my_current_task();
         let (mmi, namespace, env, app_crate) = (
             Arc::clone(&curr_task.mmi),
             Arc::clone(&curr_task.namespace),
@@ -891,7 +883,7 @@ impl TaskRef {
     /// * You cannot call `join()` with interrupts disabled, because it will result in permanent deadlock
     ///   (well, this is only true if the requested `task` is running on the same cpu...  but good enough for now).
     pub fn join(&self) -> Result<(), &'static str> {
-        let curr_task = get_my_current_task().ok_or("join(): failed to check what current task is")?;
+        let curr_task = get_my_current_task();
         if Arc::ptr_eq(&self.0, &curr_task.0) {
             return Err("BUG: cannot call join() on yourself (the current task).");
         }
@@ -952,12 +944,10 @@ impl TaskRef {
     /// it will finish running its current timeslice, and then never be run again.
     #[doc(hidden)]
     pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
-        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check the current task")?;
-        if curr_task == self {
-            self.internal_exit(ExitValue::Killed(reason))
-        } else {
-            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
+        if try_get_my_current_task()? != self {
+            return Err("`mark_as_exited()` can only be invoked on the current task, not on another task.");
         }
+        self.internal_exit(ExitValue::Killed(reason))
     }
 
     /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
@@ -1077,7 +1067,7 @@ pub fn bootstrap_task(
 
     // set this as this core's current task, since it's obviously running
     task_ref.set_as_current_task();
-    if get_my_current_task().is_none() {
+    if try_get_my_current_task().is_err() {
         error!("BUG: bootstrap_task(): failed to properly set the new idle task as the current task on AP {}", apic_id);
         return Err("BUG: bootstrap_task(): failed to properly set the new idle task as the current task");
     }
@@ -1123,25 +1113,43 @@ struct TaskLocalData {
 
 /// Returns a reference to the current task's `TaskLocalData` 
 /// by using the `TaskLocalData` pointer stored in the `GS_BASE` register.
-fn get_task_local_data() -> Option<&'static TaskLocalData> {
+fn try_get_task_local_data() -> Result<&'static TaskLocalData, &'static str> {
     let tld: &'static TaskLocalData = {
         let tld_ptr = GsBase::read().as_u64() as *const TaskLocalData;
         if tld_ptr.is_null() {
-            return None;
+            return Err("no tasks created yet");
         }
         // SAFE: it's safe to cast this as a static reference
         // because it will always be valid for the life of a given Task's execution.
         unsafe { &*tld_ptr }
     };
-    Some(tld)
+    Ok(tld)
 }
 
 /// Returns a reference to the current task.
-pub fn get_my_current_task() -> Option<&'static TaskRef> {
-    get_task_local_data().map(|tld| &tld.current_taskref)
+pub fn try_get_my_current_task() -> Result<&'static TaskRef, &'static str> {
+    try_get_task_local_data().map(|tld| &tld.current_taskref)
+}
+
+/// Returns a reference to the current task.
+///
+/// # Panics
+///
+/// Panics if called during early startup before any tasks have been created.
+pub fn get_my_current_task() -> &'static TaskRef {
+    try_get_my_current_task().unwrap_or_else(|err| panic!("{}", err))
 }
 
 /// Returns the current task's ID.
-pub fn get_my_current_task_id() -> Option<usize> {
-    get_task_local_data().map(|tld| tld.current_task_id)
+pub fn try_get_my_current_task_id() -> Result<usize, &'static str> {
+    try_get_task_local_data().map(|tld| tld.current_task_id)
+}
+
+/// Returns the current task's ID.
+///
+/// # Panics
+///
+/// Panics if called during early startup before any tasks have been created.
+pub fn get_my_current_task_id() -> usize {
+    try_get_my_current_task_id().unwrap_or_else(|err| panic!("{}", err))
 }

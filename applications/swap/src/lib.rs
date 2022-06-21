@@ -68,10 +68,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<(), String> {
-
-    let taskref = task::get_my_current_task()
-        .ok_or_else(|| format!("failed to get current task"))?;
-
+    let taskref = task::get_my_current_task();
     let curr_dir = Arc::clone(&taskref.get_env().lock().working_dir);
 
     let override_namespace_crate_dir = if let Some(path) = matches.opt_str("d") {
@@ -161,7 +158,7 @@ fn do_swap(
     cache_old_crates: bool
 ) -> Result<(), String> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
-    let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();
+    let namespace = task::try_get_my_current_task()?.get_namespace();
 
     let swap_requests = {
         let mut requests: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
