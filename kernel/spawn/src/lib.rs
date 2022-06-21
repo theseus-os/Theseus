@@ -42,10 +42,10 @@ use alloc::{
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST};
+use task::{Task, TaskRef, current_task, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
-use apic::get_my_apic_id;
+use apic::current_apic_id;
 use fs_node::FileOrDir;
 
 #[cfg(simd_personality)]
@@ -134,7 +134,7 @@ pub fn new_application_task_builder(
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
-    let namespace = new_namespace.unwrap_or_else(|| task::get_my_current_task().get_namespace().clone());
+    let namespace = new_namespace.unwrap_or_else(|| task::current_task().get_namespace().clone());
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
         .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
@@ -468,7 +468,7 @@ fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
     // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
     let (func, arg) = {
-        let curr_task = get_my_current_task();
+        let curr_task = current_task();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = curr_task.with_kstack(|kstack| {
@@ -514,7 +514,7 @@ fn task_wrapper<F, A, R>() -> !
     //
     // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
     // while operations 2 and 3 then happen in `task_cleanup_final`.
-    let curr_task = get_my_current_task().clone();
+    let curr_task = current_task().clone();
     match result {
         Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
@@ -532,7 +532,7 @@ fn task_wrapper_restartable<F, A, R>() -> !
     let result = task_wrapper_internal::<F, A, R>();
 
     // See `task_wrapper` for an explanation of how the below functions work.
-    let curr_task = get_my_current_task().clone();
+    let curr_task = current_task().clone();
     match result {
         Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
         Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),
@@ -758,7 +758,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
+        if let Err(e) = runqueue::get_runqueue(apic::current_apic_id())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
@@ -770,7 +770,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
 /// Spawns an idle task on the given `core` if specified, otherwise on the current core. 
 /// Then, it adds adds the new idle task to that core's runqueue.
 pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
-    let apic_id = core.unwrap_or_else(|| get_my_apic_id());
+    let apic_id = core.unwrap_or_else(|| current_apic_id());
     debug!("Spawning a new idle task on core {}", apic_id);
 
     new_task_builder(dummy_idle_task, apic_id)
@@ -785,7 +785,7 @@ pub fn create_idle_task(core: Option<u8>) -> Result<TaskRef, &'static str> {
 /// so we use `()` here instead. 
 #[inline(never)]
 fn dummy_idle_task(_apic_id: u8) {
-    info!("Entered idle task loop on core {}: {:?}", _apic_id, task::get_my_current_task());
+    info!("Entered idle task loop on core {}: {:?}", _apic_id, task::current_task());
     loop {
         // TODO: put this core into a low-power state
         pause::spin_loop_hint();

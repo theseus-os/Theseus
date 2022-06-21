@@ -35,7 +35,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 /// A simple test that spawns 3 tasks that all contend to increment a shared usize
 fn test_contention() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = apic::current_apic_id();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
@@ -71,7 +71,7 @@ fn test_contention() -> Result<(), &'static str> {
 
 
 fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
-    let curr_task = task::try_get_my_current_task()?;
+    let curr_task = task::try_current_task()?;
     let curr_task = format!("{}", curr_task.deref());
     warn!("ENTERED TASK {}", curr_task);
 
@@ -91,7 +91,7 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
 
 /// A test for running multiple tasks that are synchronized in lockstep
 fn test_lockstep() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = apic::current_apic_id();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
@@ -128,7 +128,7 @@ fn test_lockstep() -> Result<(), &'static str> {
 
 fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(), &'static str> {
     let curr_task = {
-        let t = task::try_get_my_current_task()?;
+        let t = task::try_current_task()?;
         format!("{}", t.deref())
     };
     warn!("ENTERED TASK {}", curr_task);

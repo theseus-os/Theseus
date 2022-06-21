@@ -219,7 +219,7 @@ impl <T: Send> Sender<T> {
             let value = hpet::get_hpet().as_ref().unwrap().get_counter();
             // debug!("Value {} {}", value, value % 1024);
 
-            match task::get_my_current_task() {
+            match task::current_task() {
                 Some(curr_task) => {
 
                     // We restrict the fault to a specific task to make measurements consistent

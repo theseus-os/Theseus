@@ -22,7 +22,7 @@ impl Drop for MyStruct {
 
 #[inline(never)]
 fn foo(cause_page_fault: bool) {
-    task::get_my_current_task().set_kill_handler(Box::new(|kill_reason| {
+    task::current_task().set_kill_handler(Box::new(|kill_reason| {
         info!("unwind_test: caught kill action at {}", kill_reason);
     }));
     
@@ -41,7 +41,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     // // dump some info about the this loaded app crate
     // {
-    //     let curr_task = task::get_my_current_task();
+    //     let curr_task = task::current_task();
     //     let t = curr_task.lock();
     //     let app_crate = t.app_crate.as_ref().unwrap();
     //     let krate = app_crate.lock_as_ref();

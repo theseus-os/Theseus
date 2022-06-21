@@ -112,6 +112,6 @@ pub fn resume_unwind(caught_panic_reason: KillReason) -> ! {
     // `start_unwinding` should not return
     panic!("BUG: start_unwinding() returned {:?}. This is an unexpected failure, as no unwinding occurred. Task: {:?}.",
         result,
-        task::get_my_current_task()
+        task::current_task()
     );
 }

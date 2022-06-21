@@ -34,7 +34,7 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
-    let curr_wd = Arc::clone(&task::get_my_current_task().get_env().lock().working_dir);
+    let curr_wd = Arc::clone(&task::current_task().get_env().lock().working_dir);
     
     // print children of working directory if no child is specified
     if matches.free.is_empty() {

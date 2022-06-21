@@ -108,16 +108,16 @@ fn kill_and_halt(
 
 
     #[cfg(all(unwind_exceptions, not(downtime_eval)))] {
-        println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
+        println_both!("Unwinding {:?} due to exception {}.", task::current_task(), exception_number);
     }
     #[cfg(not(unwind_exceptions))] {
-        println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
+        println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::current_task(), exception_number);
     }
     
     // Dump some info about the this loaded app crate
     // and test out using debug info for recovery
     if false {
-        let curr_task = task::get_my_current_task();
+        let curr_task = task::current_task();
         let app_crate = curr_task.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow();
         let debug_symbols_file = {
             let krate = app_crate.lock_as_ref();
@@ -169,17 +169,17 @@ fn kill_and_halt(
 
     // Call this task's kill handler, if it has one.
     {
-        let kill_handler = task::get_my_current_task().take_kill_handler();
+        let kill_handler = task::current_task().take_kill_handler();
         if let Some(ref kh_func) = kill_handler {
 
             #[cfg(not(downtime_eval))]
-            debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+            debug!("Found kill handler callback to invoke in Task {:?}", task::current_task());
 
             kh_func(&cause);
         }
         else {
             #[cfg(not(downtime_eval))]
-            debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
+            debug!("No kill handler callback in Task {:?}", task::current_task());
         }
     }
 
@@ -209,21 +209,21 @@ fn kill_and_halt(
                 println_both!("BUG: when handling exception {}, start_unwinding() returned an Ok() value, \
                     which is unexpected because it means no unwinding actually occurred. Task: {:?}.", 
                     exception_number,
-                    task::get_my_current_task()
+                    task::current_task()
                 );
             }
             Err(e) => {
                 println_both!("Task {:?} was unable to start unwinding procedure after exception {}, error: {}.",
-                    task::get_my_current_task(), exception_number, e
+                    task::current_task(), exception_number, e
                 );
             }
         }
     }
     #[cfg(not(unwind_exceptions))] {
-        let res = task::get_my_current_task().kill(cause);
+        let res = task::current_task().kill(cause);
         match res {
-            Ok(()) => { println_both!("Task {:?} killed itself successfully", task::get_my_current_task()); }
-            Err(e) => { println_both!("Task {:?} was unable to kill itself. Error: {:?}", task::get_my_current_task(), e); }
+            Ok(()) => { println_both!("Task {:?} killed itself successfully", task::current_task()); }
+            Err(e) => { println_both!("Task {:?} was unable to kill itself. Error: {:?}", task::current_task(), e); }
         }
     }
 
@@ -239,7 +239,7 @@ fn kill_and_halt(
 /// Checks whether the given `vaddr` falls within a stack guard page, indicating stack overflow. 
 fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
     let page = Page::containing_address(vaddr);
-    let Ok(curr_task) = task::try_get_my_current_task() else {
+    let Ok(curr_task) = task::try_current_task() else {
         return false;
     };
     curr_task.with_kstack(|kstack| kstack.guard_page().contains(&page))
@@ -283,7 +283,7 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: InterruptStackFrame) {
     {
         let pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
         if let Some(pages) = pages_to_invalidate {
-            // trace!("nmi_handler (AP {})", apic::get_my_apic_id());
+            // trace!("nmi_handler (AP {})", apic::current_apic_id());
             tlb_shootdown::handle_tlb_shootdown_ipi(pages);
             expected_nmi = true;
         }

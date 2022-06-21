@@ -163,7 +163,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = hpet.get_counter();
     
     for _i in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
+        runqueue::add_task_to_specific_runqueue(apic::current_apic_id(), taskref.clone())?;
 
         #[cfg(runqueue_spillful)] {   
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {

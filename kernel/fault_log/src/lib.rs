@@ -22,7 +22,7 @@ use alloc::{
     vec::Vec,
 };
 use memory::VirtualAddress;
-use apic::get_my_apic_id;
+use apic::current_apic_id;
 use irq_safety::MutexIrqSafe;
 use core::panic::PanicInfo;
 
@@ -146,11 +146,11 @@ fn update_and_insert_fault_entry_internal(
 ) {
 
     // Add the core the fault was detected
-    fe.core = Some(get_my_apic_id());
+    fe.core = Some(current_apic_id());
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
-    let Ok(curr_task) = task::try_get_my_current_task() else {
+    let Ok(curr_task) = task::try_current_task() else {
         FAULT_LIST.lock().push(fe);
         return;
     };

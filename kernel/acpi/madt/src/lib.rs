@@ -16,7 +16,7 @@ extern crate zerocopy;
 
 use core::mem::size_of;
 use memory::{MappedPages, PageTable, PhysicalAddress}; 
-use apic::{LocalApic, get_my_apic_id, get_lapics, get_bsp_id};
+use apic::{LocalApic, current_apic_id, get_lapics, get_bsp_id};
 use irq_safety::RwLockIrqSafe;
 use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
@@ -305,7 +305,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
     use pic::IRQ_BASE_OFFSET;
 
     let all_lapics = get_lapics();
-    let me = get_my_apic_id();
+    let me = current_apic_id();
 
     for madt_entry in madt_iter.clone() {
         if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 

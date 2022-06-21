@@ -33,7 +33,7 @@ use zerocopy::FromBytes;
 use irq_safety::MutexIrqSafe;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, MemoryManagementInfo};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
-use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
+use apic::{LocalApic, get_lapics, current_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 use pause::spin_loop_hint;
@@ -123,7 +123,7 @@ pub fn handle_ap_cores(
     }
 
     let all_lapics = get_lapics();
-    let me = get_my_apic_id();
+    let me = current_apic_id();
 
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {

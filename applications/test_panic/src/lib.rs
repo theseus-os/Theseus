@@ -15,7 +15,7 @@ use alloc::boxed::Box;
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_panic::main(): at top");
 
-    task::get_my_current_task().set_kill_handler(Box::new(|kill_reason| {
+    task::current_task().set_kill_handler(Box::new(|kill_reason| {
         println!("test_panic: caught a kill action: {}", kill_reason);
     }));
 

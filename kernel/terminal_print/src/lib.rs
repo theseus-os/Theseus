@@ -70,7 +70,7 @@ pub fn remove_child(child_task_id: usize) -> Result<(), &'static str> {
 use core::fmt;
 /// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct terminal print-producer
 pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
-    let Ok(task_id) = task::try_get_my_current_task_id() else {
+    let Ok(task_id) = task::try_current_task_id() else {
         // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
         // Instead, we write direclty to the serial port.
         let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");

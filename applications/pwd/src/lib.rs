@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 
 pub fn main(_args: Vec<String>) -> isize {
-    let curr_env = task::get_my_current_task().get_env();
+    let curr_env = task::current_task().get_env();
     println!("{} \n", curr_env.lock().get_wd_path());
     0
 }

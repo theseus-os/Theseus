@@ -46,7 +46,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
-    let curr_wr = Arc::clone(&task::get_my_current_task().get_env().lock().working_dir);
+    let curr_wr = Arc::clone(&task::current_task().get_env().lock().working_dir);
     let path = Path::new(matches.free[0].to_string());
     
     // navigate to the filepath specified by first argument

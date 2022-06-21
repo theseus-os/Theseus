@@ -56,7 +56,7 @@ extern crate scheduler;
 extern crate interrupts;
 
 use alloc::string::String;
-use task::{TaskRef, get_my_current_task};
+use task::{TaskRef, current_task};
 
 pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 
@@ -154,7 +154,7 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
     where DIA: Fn(&Arg) -> Result<Success, Failure>,
           Arg: Send + 'static,
 {
-    let curr_task = get_my_current_task();
+    let curr_task = current_task();
     // trace!("Entered {:?}:\n\t action: {:?}\n\t arg:    {:?}", 
     //     curr_task.name, debugit!(deferred_interrupt_action), debugit!(deferred_action_argument)
     // );

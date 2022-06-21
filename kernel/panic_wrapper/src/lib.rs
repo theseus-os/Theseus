@@ -56,12 +56,12 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         }
         #[cfg(frame_pointers)] {
             error!("------------------ Stack Trace (frame pointers) ------------------");
-            let namespace = task::try_get_my_current_task()
+            let namespace = task::try_current_task()
                 .map(|t| t.get_namespace())
                 .ok()
                 .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                 .ok_or("couldn't get current task's or default namespace")?;
-            let mmi_ref = task::try_get_my_current_task()
+            let mmi_ref = task::try_current_task()
                 .map(|t| t.mmi.clone())
                 .ok()
                 .or_else(|| memory::get_kernel_mmi_ref())
@@ -92,13 +92,13 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
 
     // Call this task's kill handler, if it has one.
     {
-        let kill_handler = task::try_get_my_current_task().ok().and_then(|t| t.take_kill_handler());
+        let kill_handler = task::try_current_task().ok().and_then(|t| t.take_kill_handler());
         if let Some(ref kh_func) = kill_handler {
-            debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+            debug!("Found kill handler callback to invoke in Task {:?}", task::current_task());
             kh_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
         }
         else {
-            debug!("No kill handler callback in Task {:?}", task::try_get_my_current_task());
+            debug!("No kill handler callback in Task {:?}", task::try_current_task());
         }
     }
 
@@ -107,11 +107,11 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         let cause = KillReason::Panic(PanicInfoOwned::from(panic_info));
         match unwind::start_unwinding(cause, 5) {
             Ok(_) => {
-                warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", task::get_my_current_task());
+                warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", task::current_task());
                 Ok(())
             }
             Err(e) => {
-                error!("Task {:?} was unable to start unwinding procedure, error: {}.", task::get_my_current_task(), e);
+                error!("Task {:?} was unable to start unwinding procedure, error: {}.", task::current_task(), e);
                 Err(e)
             }
         }

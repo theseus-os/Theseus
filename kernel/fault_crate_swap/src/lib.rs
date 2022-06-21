@@ -305,7 +305,7 @@ pub fn constant_offset_fix(
 /// This function handles 1 and 2 operations and 3 is handled in the call site depending on necessity
 pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 
-    let taskref = task::try_get_my_current_task()?;
+    let taskref = task::try_current_task()?;
 
     #[cfg(not(downtime_eval))]
     debug!("The taskref is {:?}",taskref);

@@ -60,7 +60,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     // Get current working directory.
     let curr_wr = Arc::clone(
-        &task::get_my_current_task()
+        &task::current_task()
             .get_env()
             .lock()
             .working_dir,

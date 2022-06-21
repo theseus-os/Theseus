@@ -265,7 +265,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 pub fn eoi(irq: Option<u8>) {
     match INTERRUPT_CHIP.load() {
         InterruptChip::APIC | InterruptChip::X2APIC => {
-            if let Some(my_apic) = apic::get_my_apic() {
+            if let Some(my_apic) = apic::current_apic() {
                 my_apic.write().eoi();
             } else {
                 error!("BUG: couldn't get my LocalApic instance to send EOI!");
@@ -371,7 +371,7 @@ pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
-    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id(), _ticks);
+    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::current_apic_id(), _ticks);
 
     // Callback to the sleep API to unblock tasks whose waiting time is over
     // and alert to update the number of ticks elapsed
@@ -398,7 +398,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: Interrup
             println_raw!("PIC IRQ Registers: {:?}", irq_regs);
         }
         apic::InterruptChip::APIC | apic::InterruptChip::X2APIC => {
-            if let Some(lapic_ref) = apic::get_my_apic() {
+            if let Some(lapic_ref) = apic::current_apic() {
                 let lapic = lapic_ref.read();
                 let isr = lapic.get_isr(); 
                 let irr = lapic.get_irr();

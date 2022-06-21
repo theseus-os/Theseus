@@ -13,7 +13,7 @@ extern crate pause;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::PageRange;
-use apic::{LocalApic, get_my_apic, core_count, LapicIpiDestination};
+use apic::{LocalApic, current_apic, core_count, LapicIpiDestination};
 use pause::spin_loop_hint;
 
 
@@ -38,7 +38,7 @@ pub fn init() {
 /// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
 /// which will invoke it as needed (on remap/unmap operations).
 fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
-    if let Some(my_lapic) = get_my_apic() {
+    if let Some(my_lapic) = current_apic() {
         // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
         send_tlb_shootdown_ipi(&mut my_lapic.write(), pages_to_invalidate);
     }
@@ -50,7 +50,7 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 /// 
 /// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
-    // trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::get_my_apic_id(), pages_to_invalidate);
+    // trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::current_apic_id(), pages_to_invalidate);
 
     for page in pages_to_invalidate {
         x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(page.start_address().value() as u64));

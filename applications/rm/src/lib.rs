@@ -47,7 +47,7 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
     }
 
 
-    let taskref = task::get_my_current_task();
+    let taskref = task::current_task();
     let working_dir = Arc::clone(&taskref.get_env().lock().working_dir);
 
     if matches.free.is_empty() {

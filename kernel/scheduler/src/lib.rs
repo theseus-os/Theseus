@@ -20,8 +20,8 @@ cfg_if! {
 
 use core::ops::Deref;
 use irq_safety::hold_interrupts;
-use apic::get_my_apic_id;
-use task::{try_get_my_current_task, TaskRef};
+use apic::current_apic_id;
+use task::{try_current_task, TaskRef};
 
 /// Yields the current CPU by selecting a new `Task` to run 
 /// and then performs a task switch to that new `Task`.
@@ -29,9 +29,9 @@ use task::{try_get_my_current_task, TaskRef};
 /// Interrupts will be disabled while this function runs.
 pub fn schedule() -> bool {
     let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
-    let apic_id = get_my_apic_id();
+    let apic_id = current_apic_id();
 
-    let Ok(curr_task) = try_get_my_current_task() else {
+    let Ok(curr_task) = try_current_task() else {
         error!("BUG: schedule(): could not get current task.");
         return false; // keep running the same current task
     };
@@ -51,7 +51,7 @@ pub fn schedule() -> bool {
 
     curr_task.task_switch(next_task.deref(), apic_id); 
 
-    // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
+    // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, current_task(), irq_safety::interrupts_enabled());
  
     true
 }

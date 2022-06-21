@@ -224,7 +224,7 @@ impl <T: Send> Sender<T> {
         let value = hpet::get_hpet().as_ref().unwrap().get_counter();
         // debug!("Value {} {}", value, value % 1024);
 
-        let curr_task = task::try_get_my_current_task()?;
+        let curr_task = task::try_current_task()?;
 
         // Fault mimicing a memory write. Function could panic when getting task
         #[cfg(downtime_eval)]
@@ -382,7 +382,7 @@ impl <T: Send> Receiver<T> {
     /// otherwise returns an error.
     pub fn receive(&self) -> Result<T, &'static str> {
         // trace!("rendezvous: receive() entry");
-        let curr_task = task::try_get_my_current_task()?;
+        let curr_task = task::try_current_task()?;
         
         // obtain a receiver-side exchange slot, blocking if necessary
         let receiver_slot = self.channel.take_receiver_slot().map_err(|_| "failed to take_receiver_slot")?;

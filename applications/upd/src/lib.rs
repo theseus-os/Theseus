@@ -189,7 +189,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     };
     
     // save each new crate to a file 
-    let curr_dir = task::get_my_current_task().get_env().lock().working_dir.clone();
+    let curr_dir = task::current_task().get_env().lock().working_dir.clone();
     let new_namespace_dir = NamespaceDir::new(make_unique_directory(update_build, &curr_dir)?);
     for df in crates.into_iter() {
         let content = df.content.as_result_err_str()?;
@@ -219,7 +219,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     }
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
-    let curr_dir = task::get_my_current_task().get_env().lock().working_dir.clone();
+    let curr_dir = task::current_task().get_env().lock().working_dir.clone();
     let new_namespace_dir = match base_dir_path.get(&curr_dir) {
         Some(FileOrDir::Dir(d)) => NamespaceDir::new(d),
         _ => return Err(format!("cannot find an update base directory at path {}", base_dir_path)),
@@ -291,7 +291,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
-    task::try_get_my_current_task()
+    task::try_current_task()
         .map(|t| t.get_namespace().clone())
         .ok()
         .or_else(|| mod_mgmt::get_initial_kernel_namespace().cloned())

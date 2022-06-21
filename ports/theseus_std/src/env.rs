@@ -6,7 +6,7 @@ use theseus_fs_node::{FileOrDir, DirRef};
 
 /// Returns a Theseus-specific reference to the current working directory.
 pub fn current_dir() -> io::Result<DirRef> {
-    let task = theseus_task::get_my_current_task();
+    let task = theseus_task::current_task();
 
     match theseus_path::Path::get_absolute(
         &task.get_env().lock().get_wd_path().into()
@@ -22,5 +22,5 @@ pub fn current_dir() -> io::Result<DirRef> {
 
 /// Returns the path of the current working directory.
 pub fn current_dir_path() -> io::Result<PathBuf> {
-    Ok(theseus_task::get_my_current_task().get_env().lock().get_wd_path().into())
+    Ok(theseus_task::current_task().get_env().lock().get_wd_path().into())
 }

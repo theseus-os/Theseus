@@ -18,7 +18,7 @@ extern crate scheduler;
 use core::sync::atomic::{Ordering, AtomicUsize};
 use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
-use task::{get_my_current_task, TaskRef};
+use task::{current_task, TaskRef};
 
 /// Contains the `TaskRef` and the associated wakeup time for an entry in DELAYED_TASKLIST.
 #[derive(Clone, Eq, PartialEq)]
@@ -112,7 +112,7 @@ pub fn sleep(duration: usize) {
     let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
     let resume_time = current_tick_count + duration;
 
-    let current_task = get_my_current_task().clone();
+    let current_task = current_task().clone();
     // Add the current task to the delayed tasklist and then block it.
     add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
     current_task.block();

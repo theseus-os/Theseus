@@ -25,7 +25,7 @@ extern crate unwind;
 extern crate fallible_iterator;
 
 pub use mod_mgmt::{CrateNamespace, StrongSectionRef};
-pub use task::get_my_current_task;
+pub use task::current_task;
 
 use unwind::{StackFrame, StackFrameIter};
 use fallible_iterator::FallibleIterator;
@@ -66,7 +66,7 @@ pub fn stack_trace(
     let max_recursion = max_recursion.unwrap_or(usize::MAX);
 
     unwind::invoke_with_current_registers(&mut |registers| {
-        let namespace = task::try_get_my_current_task()
+        let namespace = task::try_current_task()
             .map(|t| t.get_namespace())
             .ok()
             .or_else(|| mod_mgmt::get_initial_kernel_namespace())

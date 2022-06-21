@@ -31,7 +31,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    let taskref = task::get_my_current_task();
+    let taskref = task::current_task();
     let curr_env = taskref.get_env();
     let curr_wr = Arc::clone(&curr_env.lock().working_dir);
 

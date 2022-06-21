@@ -44,7 +44,7 @@ pub struct PassStruct {
 }
 
 macro_rules! CPU_ID {
-	() => (apic::get_my_apic_id())
+	() => (apic::current_apic_id())
 }
 
 // ------------------------- Window fault injection section -------------------------------------------

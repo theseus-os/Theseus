@@ -62,7 +62,7 @@ impl Complex {
 }
 
 pub fn test_tls(_x: usize) {
-    let curr_task = task::get_my_current_task();
+    let curr_task = task::current_task();
     let local_zero = LOCAL_ZERO.get();
     debug!("Task {:?}, LOCAL_ZERO: {:#X?}", curr_task, local_zero);
 
