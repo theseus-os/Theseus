@@ -321,8 +321,8 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// Get path to application "hello" that we're going to spawn
-	let namespace = task::current_task().get_namespace().clone();
-	let namespace_dir = task::current_task().get_namespace().dir().clone();
+	let namespace = task::current_task().namespace.clone();
+	let namespace_dir = task::current_task().namespace.dir().clone();
 	let app_path = namespace_dir.get_file_starting_with("hello-")
 		.map(|f| Path::new(f.lock().get_absolute_path()))
 		.ok_or("Could not find the application 'hello'")?;

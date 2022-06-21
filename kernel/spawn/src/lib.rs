@@ -134,7 +134,7 @@ pub fn new_application_task_builder(
     new_namespace: Option<Arc<CrateNamespace>>,
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
-    let namespace = new_namespace.unwrap_or_else(|| task::current_task().get_namespace().clone());
+    let namespace = new_namespace.unwrap_or_else(|| Arc::clone(&task::current_task().namespace));
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
         .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension

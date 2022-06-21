@@ -781,7 +781,7 @@ pub fn print_samples(sample_results: &SampleResults) {
 
 /// Finds the corresponding function for each instruction pointer and calculates the percentage amount each function occured in the samples
 pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Result<(), &'static str> {
-    let namespace = task::current_task().get_namespace();
+    let namespace = &task::current_task().namespace;
     debug!("Analyze Samples:");
 
     let mut sections: BTreeMap<String, usize> = BTreeMap::new();

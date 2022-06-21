@@ -57,7 +57,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         #[cfg(frame_pointers)] {
             error!("------------------ Stack Trace (frame pointers) ------------------");
             let namespace = task::try_current_task()
-                .map(|t| t.get_namespace())
+                .map(|t| &t.namespace)
                 .ok()
                 .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                 .ok_or("couldn't get current task's or default namespace")?;

@@ -60,7 +60,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn rmain(matches: Matches) -> Result<(), String> {
     let curr_task = task::current_task();
-    let namespace = curr_task.get_namespace();
+    let namespace = &curr_task.namespace;
     let env = curr_task.get_env();
     let curr_wd = env.lock().working_dir.clone();
 
@@ -72,12 +72,12 @@ fn rmain(matches: Matches) -> Result<(), String> {
         let file = path.get_file(&curr_wd).ok_or_else(||
             format!("Couldn't resolve path to crate object file at {:?}", path)
         )?;
-        load_crate(&mut output, file, &namespace)?;
+        load_crate(&mut output, file, namespace)?;
     } else if matches.opt_present("f") {
-        print_files(&mut output, 0, namespace.deref(), recursive)
+        print_files(&mut output, 0, namespace, recursive)
             .map_err(|_e| String::from("String formatting error"))?;
     } else {
-        print_crates(&mut output, 0, namespace.deref(), recursive)
+        print_crates(&mut output, 0, namespace, recursive)
             .map_err(|_e| String::from("String formatting error"))?;
     }
 

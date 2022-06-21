@@ -658,7 +658,7 @@ impl Shell {
     fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<TaskRef, AppErr> {
 
         // Check that the application actually exists
-        let namespace_dir = task::current_task().get_namespace().dir().clone();
+        let namespace_dir = task::current_task().namespace.dir().clone();
         let cmd_crate_name = format!("{}-", cmd);
         let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
         let app_file = matching_apps.next();
@@ -824,7 +824,7 @@ impl Shell {
     /// Try to match the incomplete command against all applications in the same namespace.
     /// Returns a vector that contains all matching results.
     fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
-        let namespace_dir = task::current_task().get_namespace().dir().clone();
+        let namespace_dir = task::current_task().namespace.dir().clone();
         let mut names = namespace_dir.get_file_and_dir_names_starting_with(&incomplete_cmd);
 
         // Drop the extension name and hash value.

@@ -67,7 +67,7 @@ pub fn stack_trace(
 
     unwind::invoke_with_current_registers(&mut |registers| {
         let namespace = task::try_current_task()
-            .map(|t| t.get_namespace())
+            .map(|t| &t.namespace)
             .ok()
             .or_else(|| mod_mgmt::get_initial_kernel_namespace())
             .ok_or("couldn't get current task's or default namespace")?;

@@ -158,7 +158,7 @@ fn do_swap(
     cache_old_crates: bool
 ) -> Result<(), String> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
-    let namespace = task::try_current_task()?.get_namespace();
+    let namespace = &task::try_current_task()?.namespace;
 
     let swap_requests = {
         let mut requests: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
@@ -179,7 +179,7 @@ fn do_swap(
             
             let swap_req = SwapRequest::new(
                 Some(old_crate_name),
-                Arc::clone(&namespace),
+                Arc::clone(namespace),
                 into_new_crate_file,
                 new_namespace,
                 reexport
@@ -192,7 +192,7 @@ fn do_swap(
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
     let swap_result = crate_swap::swap_crates(
-        &namespace,
+        namespace,
         swap_requests, 
         override_namespace_crate_dir,
         state_transfer_functions,

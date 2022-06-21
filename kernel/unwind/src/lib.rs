@@ -738,12 +738,10 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
         let curr_task = task::try_current_task()?;
-        let namespace = curr_task.get_namespace();
-
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    Arc::clone(&namespace),
+                    Arc::clone(&curr_task.namespace),
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 

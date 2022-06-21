@@ -292,7 +292,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
     task::try_current_task()
-        .map(|t| t.get_namespace().clone())
+        .map(|t| Arc::clone(&t.namespace))
         .ok()
         .or_else(|| mod_mgmt::get_initial_kernel_namespace().cloned())
         .expect("BUG: initial kernel namespace wasn't initialized")

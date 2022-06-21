@@ -482,11 +482,6 @@ impl Task {
         self.runstate() == RunState::Runnable
     }
 
-    /// Returns the namespace in which this `Task` is loaded/linked into and runs within.
-    pub fn get_namespace(&self) -> &Arc<CrateNamespace> {
-        &self.namespace
-    }
-
     /// Exposes read-only access to this `Task`'s [`Stack`] by invoking
     /// the given `func` with a reference to its kernel stack.
     ///
