@@ -1,6 +1,5 @@
 use crate::{Address, MemoryType, Virtual};
 use core::{
-    cmp::min,
     fmt,
     iter::Step,
     marker::PhantomData,
@@ -23,7 +22,7 @@ where
     T: MemoryType,
 {
     #[inline]
-    pub fn new(number: usize) -> Self {
+    pub const fn new(number: usize) -> Self {
         Self {
             number,
             phantom_data: PhantomData,
@@ -32,19 +31,22 @@ where
 
     /// Returns the address at the start of this chunk.
     #[inline]
-    pub fn start_address(&self) -> Address<T> {
+    pub const fn start_address(&self) -> Address<T>
+    where
+        T: ~const MemoryType,
+    {
         Address::<T>::new_canonical(self.number() * PAGE_SIZE)
     }
 
     /// Returns the number of this chunk.
     #[inline]
-    pub fn number(&self) -> usize {
+    pub const fn number(&self) -> usize {
         self.number
     }
 
     /// Returns the chunk containing the given address.
     #[inline]
-    pub fn containing_address(address: Address<T>) -> Self {
+    pub const fn containing_address(address: Address<T>) -> Self {
         Self::new(address.value() / PAGE_SIZE)
     }
 }
@@ -59,16 +61,27 @@ where
     }
 }
 
-impl<T> Add<usize> for Chunk<T>
+impl<T> const Add<usize> for Chunk<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
     #[inline]
-    fn add(self, rhs: usize) -> Self {
+    fn add(self, rhs: usize) -> Self
+    where
+        T: ~const MemoryType,
+    {
         // Cannot exceed max page number (which is also max frame number)
-        Self::new(min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)))
+
+        // https://github.com/rust-lang/rfcs/pull/2632 (core::cmp::min isn't const)
+        let temp = self.number.saturating_add(rhs);
+
+        Self::new(if MAX_PAGE_NUMBER <= temp {
+            MAX_PAGE_NUMBER
+        } else {
+            temp
+        })
     }
 }
 
@@ -78,18 +91,30 @@ where
 {
     #[inline]
     fn add_assign(&mut self, rhs: usize) {
-        *self = Self::new(min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)));
+        // Cannot exceed max page number (which is also max frame number)
+
+        // https://github.com/rust-lang/rfcs/pull/2632 (core::cmp::min isn't const)
+        let temp = self.number.saturating_add(rhs);
+
+        *self = Self::new(if MAX_PAGE_NUMBER <= temp {
+            MAX_PAGE_NUMBER
+        } else {
+            temp
+        });
     }
 }
 
-impl<T> Sub<usize> for Chunk<T>
+impl<T> const Sub<usize> for Chunk<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
     #[inline]
-    fn sub(self, rhs: usize) -> Self {
+    fn sub(self, rhs: usize) -> Self
+    where
+        T: ~const MemoryType,
+    {
         Self::new(self.number.saturating_sub(rhs))
     }
 }

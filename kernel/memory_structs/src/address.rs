@@ -32,7 +32,10 @@ where
     /// x86_64, virtual addresses are canonical if their upper bits `(64:68]` are sign-extended
     /// from bit 47, and physical addresses are canonical if their upper bits `(64:52]` are 0.
     #[inline]
-    pub fn new(address: usize) -> Option<Self> {
+    pub const fn new(address: usize) -> Option<Self>
+    where
+        T: ~const MemoryType,
+    {
         if T::is_canonical_address(address) {
             Some(Self {
                 address,
@@ -44,7 +47,10 @@ where
     }
 
     /// Creates a new address that is guaranteed to be canonical.
-    pub fn new_canonical(address: usize) -> Self {
+    pub const fn new_canonical(address: usize) -> Self
+    where
+        T: ~const MemoryType,
+    {
         Self {
             address: T::canonicalize_address(address),
             phantom_data: PhantomData,
@@ -53,7 +59,7 @@ where
 
     /// Creates a new address with a value of zero.
     #[inline]
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Self {
             address: 0,
             phantom_data: PhantomData,
@@ -62,7 +68,7 @@ where
 
     /// Returns the underlying usize value.
     #[inline]
-    pub fn value(&self) -> usize {
+    pub const fn value(&self) -> usize {
         self.address
     }
 
@@ -71,7 +77,7 @@ where
     /// For example if the [`PAGE_SIZE`] is 4096 (4KiB) then this will return the least significant
     /// 12 bits `(12:0]` of the address.
     #[inline]
-    pub fn chunk_offset(&self) -> usize {
+    pub const fn chunk_offset(&self) -> usize {
         self.value() & (PAGE_SIZE - 1)
     }
 }
@@ -111,13 +117,16 @@ format_impl!(UpperHex, X);
 
 // Bit Traits
 
-impl<T> BitAnd<Address<T>> for Address<T>
+impl<T> const BitAnd<Address<T>> for Address<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
-    fn bitand(self, rhs: Self) -> Self::Output {
+    fn bitand(self, rhs: Self) -> Self::Output
+    where
+        T: ~const MemoryType,
+    {
         // TODO: new_canonical or raw?
         Self::new_canonical(self.address & rhs.address)
     }
@@ -133,13 +142,16 @@ where
     }
 }
 
-impl<T> BitOr<Address<T>> for Address<T>
+impl<T> const BitOr<Address<T>> for Address<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
-    fn bitor(self, rhs: Self) -> Self::Output {
+    fn bitor(self, rhs: Self) -> Self::Output
+    where
+        T: ~const MemoryType,
+    {
         // TODO: new_canonical or raw?
         Self::new_canonical(self.address | rhs.address)
     }
@@ -155,13 +167,16 @@ where
     }
 }
 
-impl<T> BitXor<Address<T>> for Address<T>
+impl<T> const BitXor<Address<T>> for Address<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
-    fn bitxor(self, rhs: Self) -> Self::Output {
+    fn bitxor(self, rhs: Self) -> Self::Output
+    where
+        T: ~const MemoryType,
+    {
         // TODO: new_canonical or raw?
         Self::new_canonical(self.address ^ rhs.address)
     }
@@ -179,14 +194,17 @@ where
 
 // Computation Traits (self)
 
-impl<T> Add<Address<T>> for Address<T>
+impl<T> const Add<Address<T>> for Address<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
     #[inline]
-    fn add(self, rhs: Self) -> Self::Output {
+    fn add(self, rhs: Self) -> Self::Output
+    where
+        T: ~const MemoryType,
+    {
         // TODO: new_canonical or raw?
         Self::new_canonical(self.address + rhs.address)
     }
@@ -203,14 +221,17 @@ where
     }
 }
 
-impl<T> Sub<Address<T>> for Address<T>
+impl<T> const Sub<Address<T>> for Address<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
     #[inline]
-    fn sub(self, rhs: Self) -> Self {
+    fn sub(self, rhs: Self) -> Self
+    where
+        T: ~const MemoryType,
+    {
         // TODO: new_canonical or raw?
         Self::new_canonical(self.address.saturating_sub(rhs.address))
     }
@@ -229,14 +250,17 @@ where
 
 // Computation Traits (usize)
 
-impl<T> Add<usize> for Address<T>
+impl<T> const Add<usize> for Address<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
     #[inline]
-    fn add(self, rhs: usize) -> Self {
+    fn add(self, rhs: usize) -> Self
+    where
+        T: ~const MemoryType,
+    {
         Self::new_canonical(self.address.saturating_add(rhs))
     }
 }
@@ -251,14 +275,17 @@ where
     }
 }
 
-impl<T> Sub<usize> for Address<T>
+impl<T> const Sub<usize> for Address<T>
 where
     T: MemoryType,
 {
     type Output = Self;
 
     #[inline]
-    fn sub(self, rhs: usize) -> Self {
+    fn sub(self, rhs: usize) -> Self
+    where
+        T: ~const MemoryType,
+    {
         Self::new_canonical(self.address.saturating_sub(rhs))
     }
 }
@@ -275,7 +302,7 @@ where
 
 // Conversion Traits
 
-impl<T> From<Address<T>> for usize
+impl<T> const From<Address<T>> for usize
 where
     T: MemoryType,
 {

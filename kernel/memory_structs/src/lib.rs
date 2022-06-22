@@ -1,9 +1,7 @@
 //! This crate contains common types used for memory mapping.
 
 #![no_std]
-#![feature(step_trait)]
-
-use bit_field::BitField;
+#![feature(step_trait, const_trait_impl)]
 
 #[cfg(target_arch = "x86_64")]
 pub use entryflags_x86_64::EntryFlags;
@@ -39,11 +37,11 @@ pub trait MemoryType:
     fn canonicalize_address(address: usize) -> usize;
 }
 
-impl MemoryType for Virtual {
+impl const MemoryType for Virtual {
     const PREFIX: &'static str = "v";
 
     fn is_canonical_address(address: usize) -> bool {
-        matches!(address.get_bits(47..64), 0 | 0b1_1111_1111_1111_1111)
+        matches!(get_bits(address, 47..64), 0 | 0b1_1111_1111_1111_1111)
     }
 
     fn canonicalize_address(address: usize) -> usize {
@@ -57,16 +55,31 @@ impl MemoryType for Virtual {
     }
 }
 
-impl MemoryType for Physical {
+impl const MemoryType for Physical {
     const PREFIX: &'static str = "p";
 
     fn is_canonical_address(address: usize) -> bool {
-        address.get_bits(52..64) == 0
+        get_bits(address, 52..64) == 0
     }
 
     fn canonicalize_address(address: usize) -> usize {
         address & 0x000F_FFFF_FFFF_FFFF
     }
+}
+
+#[inline]
+const fn get_bits(value: usize, range: core::ops::Range<usize>) -> usize {
+    const BIT_LENGTH: usize = ::core::mem::size_of::<usize>() * 8;
+
+    assert!(range.start < BIT_LENGTH);
+    assert!(range.end <= BIT_LENGTH);
+    assert!(range.start < range.end);
+
+    // shift away high bits
+    let bits = value << (BIT_LENGTH - range.end) >> (BIT_LENGTH - range.end);
+
+    // shift away low bits
+    bits >> range.start
 }
 
 /// The address bounds and mapping flags of a section's memory region.

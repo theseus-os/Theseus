@@ -21,7 +21,7 @@ where
 {
     /// Creates a new chunk that spans from `start` to `end`, both inclusize bounds.
     #[inline]
-    pub fn new(start: Chunk<T>, end: Chunk<T>) -> Self {
+    pub const fn new(start: Chunk<T>, end: Chunk<T>) -> Self {
         Self {
             inner: RangeInclusive::new(start, end),
             phantom_data: PhantomData,
@@ -30,14 +30,14 @@ where
 
     /// Creates a chunk range that will always yield [`Option::None`] when iterated.
     #[inline]
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self::new(Chunk::new(1), Chunk::new(0))
     }
 
     /// A convenience method for creating a new chunk range that spans all chunks from the given
     /// address to an end bound based on the given size.
     #[inline]
-    pub fn from_address(starting_addr: Address<T>, size_in_bytes: usize) -> Self {
+    pub const fn from_address(starting_addr: Address<T>, size_in_bytes: usize) -> Self {
         assert!(size_in_bytes > 0);
         let start = Chunk::containing_address(starting_addr);
         // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
@@ -47,7 +47,10 @@ where
 
     /// Returns the address of the starting chunk in this range.
     #[inline]
-    pub fn start_address(&self) -> Address<T> {
+    pub const fn start_address(&self) -> Address<T>
+    where
+        T: ~const MemoryType,
+    {
         self.start().start_address()
     }
 
@@ -56,14 +59,14 @@ where
     /// Use this instead of the [`Iterator::count()`] method. This is instant, because it doesn't
     /// need to iterate over each entry, unlike [`Iterator::count()`].
     #[inline]
-    pub fn size_in_chunks(&self) -> usize {
+    pub const fn size_in_chunks(&self) -> usize {
         // Add 1 because it's an inclusive range.
         (self.end().number() + 1).saturating_sub(self.start().number())
     }
 
     /// Returns the size of this range in number of bytes.
     #[inline]
-    pub fn size_in_bytes(&self) -> usize {
+    pub const fn size_in_bytes(&self) -> usize {
         self.size_in_chunks() * PAGE_SIZE
     }
 
@@ -99,7 +102,10 @@ where
     /// If the range covers addresses `0x2000` to `0x4000` then `address_at_offset(0x1500)` would
     /// return `Some(0x3500)`.
     #[inline]
-    pub fn address_at_offset(&self, offset: usize) -> Option<Address<T>> {
+    pub const fn address_at_offset(&self, offset: usize) -> Option<Address<T>>
+    where
+        T: ~const MemoryType,
+    {
         if offset <= self.size_in_bytes() {
             Some(self.start_address() + offset)
         } else {
@@ -125,6 +131,8 @@ where
     /// If there is no overlap between the two ranges, [`Option::None`] is returned.
     #[inline]
     pub fn overlap(&self, other: &Self) -> Option<Self> {
+        // TODO: This function could be constified but it would require inlining `min` and `max`,
+        // and manually implementing `const Ord` for `Chunk`. I don't think it's worth the hassle.
         let starts = max(*self.start(), *other.start());
         let ends = min(*self.end(), *other.end());
         if starts <= ends {
@@ -135,7 +143,7 @@ where
     }
 }
 
-impl<T> Deref for ChunkRange<T>
+impl<T> const Deref for ChunkRange<T>
 where
     T: MemoryType,
 {
@@ -157,7 +165,7 @@ where
     }
 }
 
-impl<T> IntoIterator for ChunkRange<T>
+impl<T> const IntoIterator for ChunkRange<T>
 where
     T: MemoryType,
 {
