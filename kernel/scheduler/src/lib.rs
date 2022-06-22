@@ -18,7 +18,6 @@ cfg_if! {
     }
 }
 
-use core::ops::Deref;
 use irq_safety::hold_interrupts;
 use apic::current_apic_id;
 use task::{try_current_task, TaskRef};
@@ -27,33 +26,27 @@ use task::{try_current_task, TaskRef};
 /// and then performs a task switch to that new `Task`.
 ///
 /// Interrupts will be disabled while this function runs.
-pub fn schedule() -> bool {
+pub fn schedule() {
     let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
     let apic_id = current_apic_id();
 
     let Ok(curr_task) = try_current_task() else {
         error!("BUG: schedule(): could not get current task.");
-        return false; // keep running the same current task
+        return; // keep running the same current task
     };
 
-    let next_task = if let Some(next) = scheduler::select_next_task(apic_id) {
-        next
-    } else {
-        return false; // keep running the same current task
+    let Some(next_task) = scheduler::select_next_task(apic_id) else {
+        return; // keep running the same current task
     };
 
     // No need to task switch if the chosen task is the same as the current task.
-    if curr_task == &next_task {
-        return false;
+    if &next_task == curr_task {
+        return;
     }
 
     // trace!("BEFORE TASK_SWITCH CALL (AP {}), current: {:?}, next: {:?}, interrupts are {}", apic_id, curr_task, next_task, irq_safety::interrupts_enabled());
-
-    curr_task.task_switch(next_task.deref(), apic_id); 
-
+    curr_task.task_switch(&next_task, apic_id); 
     // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, current_task(), irq_safety::interrupts_enabled());
- 
-    true
 }
 
 /// Changes the priority of the given task with the given priority level.
