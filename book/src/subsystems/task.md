@@ -124,7 +124,7 @@ Currently, this timer interrupt is set up in the [`LocalApic`] initialization ro
 The interrupt handler itself is very simple, and is currently found in a function called [`lapic_timer_handler()`] in `kernel/interrupts/src/lib.rs`.
 
 Cooperative multitasking is also possible, but at the moment Theseus does not offer an easy way to disable preemption to use *only* cooperative multitasking; however, it wouldn't be difficult to add.
-Currently, tasks can choose to yield the processor to other tasks by invoking [`schedule()`], which will select another task to run next and then switch to it.
+Currently, tasks can choose to yield the processor to other tasks by invoking [`yield_now()`], which will select another task to run next and then switch to it.
 This scheduling function is the same function that is invoked by the aforementioned timer interrupt handlers to preempt the current task every few milliseconds.
 
 
@@ -187,7 +187,7 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [`TaskRef`]: https://theseus-os.github.io/Theseus/doc/task/struct.TaskRef.html
 [`TASKLIST`]: https://theseus-os.github.io/Theseus/doc/task/struct.TASKLIST.html
 [environment]: https://theseus-os.github.io/Theseus/doc/environment/struct.Environment.html
-[`schedule()`]: https://theseus-os.github.io/Theseus/doc/scheduler/fn.schedule.html
+[`yield_now()`]: https://theseus-os.github.io/Theseus/doc/scheduler/fn.yield_now.html
 [`LocalApic`]: https://theseus-os.github.io/Theseus/doc/apic/struct.LocalApic.html
 [`lapic_timer_handler()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/interrupts/src/lib.rs#L380
 [`Context`]: https://theseus-os.github.io/Theseus/doc/context_switch/struct.Context.html

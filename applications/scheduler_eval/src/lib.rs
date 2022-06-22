@@ -67,7 +67,7 @@ fn test1(_a: u32) -> u32 {
     //loop{
     for i in 0..1000 {
        debug!("Task_ID : {} , Instance : {}", task::current_task_id(), i);
-       scheduler::schedule();
+       scheduler::yield_now();
        //i = i + 1; 
     }
     _a
@@ -78,7 +78,7 @@ fn test2(_a: u32) -> u32 {
     //loop{
     for i in 0..1000 {
        debug!("Task_ID : {} , Instance : {}", task::current_task_id(), i);
-       scheduler::schedule();
+       scheduler::yield_now();
        //i = i + 1; 
     }
     _a
@@ -89,7 +89,7 @@ fn test3(_a: u32) -> u32 {
     //loop{
     for i in 0..1000 {
        debug!("Task_ID : {} , Instance : {}", task::current_task_id(), i);
-       scheduler::schedule();
+       scheduler::yield_now();
        //i = i + 1; 
     }
     _a

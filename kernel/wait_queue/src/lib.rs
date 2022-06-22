@@ -130,7 +130,7 @@ impl WaitQueue {
                 // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
                 curr_task.block();
             }
-            scheduler::schedule();
+            scheduler::yield_now();
 
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
@@ -162,7 +162,7 @@ impl WaitQueue {
                 // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
                 curr_task.block();
             }
-            scheduler::schedule();
+            scheduler::yield_now();
 
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");

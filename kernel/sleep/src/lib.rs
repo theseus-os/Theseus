@@ -116,7 +116,7 @@ pub fn sleep(duration: usize) {
     // Add the current task to the delayed tasklist and then block it.
     add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
     current_task.block();
-    scheduler::schedule();
+    scheduler::yield_now();
 }
 
 /// Blocks the current task by putting it to sleep until a specific tick count is reached,

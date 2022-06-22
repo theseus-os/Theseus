@@ -172,6 +172,6 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
         }
 
         curr_task.block();
-        scheduler::schedule();
+        scheduler::yield_now();
     }
 }

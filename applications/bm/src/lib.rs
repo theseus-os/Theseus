@@ -1706,7 +1706,7 @@ fn print_header(tries: usize, iterations: usize) {
 fn yield_task(_a: u32) -> u32 {
 	let times = ITERATIONS*1000;
     for _i in 0..times {
-       scheduler::schedule();
+       scheduler::yield_now();
     }
     _a
 }

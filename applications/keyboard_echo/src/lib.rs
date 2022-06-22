@@ -46,7 +46,7 @@ fn run() -> Result<(), &'static str> {
             stdout_locked.write_all(&ack).or(Err("failed to perform write_all"))?;
             if key_event.keycode == Keycode::Q { break; }
         }
-        scheduler::schedule();
+        scheduler::yield_now();
     }
 
     Ok(())

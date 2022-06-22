@@ -26,12 +26,12 @@ use task::{try_current_task, TaskRef};
 /// and then performs a task switch to that new `Task`.
 ///
 /// Interrupts will be disabled while this function runs.
-pub fn schedule() {
+pub fn yield_now() {
     let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
     let apic_id = current_apic_id();
 
     let Ok(curr_task) = try_current_task() else {
-        error!("BUG: schedule(): could not get current task.");
+        error!("BUG: yield_now(): could not get current task.");
         return; // keep running the same current task
     };
 

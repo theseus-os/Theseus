@@ -76,7 +76,7 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..1000 {
-        scheduler::schedule(); // give other tasks a chance to acquire the lock
+        scheduler::yield_now(); // give other tasks a chance to acquire the lock
         warn!("{} trying to acquire lock...", curr_task);
         let mut locked = lock.lock()?;
         warn!("{} acquired lock!", curr_task);
@@ -136,18 +136,18 @@ fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(
     for _i in 0..20 {
         loop { 
             warn!("{} top of loop, remainder {}", curr_task, remainder);
-            scheduler::schedule(); // give other tasks a chance to acquire the lock
+            scheduler::yield_now(); // give other tasks a chance to acquire the lock
             let mut locked = lock.lock()?;
-            scheduler::schedule();
+            scheduler::yield_now();
             if *locked % 3 == remainder {
                 warn!("Task {} Time to shine, value is {}!", curr_task, *locked);
                 *locked += 1;
                 break;
             } else {
-                scheduler::schedule();
+                scheduler::yield_now();
                 warn!("Task {} going back to sleep, value {}, remainder {}!", curr_task, *locked, remainder);
             }
-            scheduler::schedule();
+            scheduler::yield_now();
         }
     }
     warn!("{} finished loop.", curr_task);

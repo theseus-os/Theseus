@@ -672,7 +672,7 @@ fn window_manager_loop(
         let event_opt = key_consumer.pop()
             .or_else(||mouse_consumer.pop())
             .or_else(||{
-                scheduler::schedule();
+                scheduler::yield_now();
                 None
             });
 

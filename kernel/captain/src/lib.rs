@@ -172,7 +172,7 @@ pub fn init(
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    scheduler::yield_now();
     loop { 
         error!("BUG: captain::init(): captain's bootstrap task was rescheduled after being dead!");
     }

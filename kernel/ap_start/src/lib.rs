@@ -102,7 +102,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    scheduler::yield_now();
     loop { 
         error!("BUG: ap_start::kstart_ap(): AP's bootstrap task was rescheduled after being dead!");
     }

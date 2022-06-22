@@ -283,7 +283,7 @@ impl <T: Send> Sender<T> {
                 return Err(e);
             }
             None => {
-                scheduler::schedule();
+                scheduler::yield_now();
             }
         }
 
@@ -301,7 +301,7 @@ impl <T: Send> Sender<T> {
                     _ => break,
                 }
             }
-            scheduler::schedule();
+            scheduler::yield_now();
         }
 
         // Here, we are at the rendezvous point
@@ -433,7 +433,7 @@ impl <T: Send> Receiver<T> {
                 return Err(e);
             }
             None => {
-                scheduler::schedule();
+                scheduler::yield_now();
             }
         }
 
@@ -452,7 +452,7 @@ impl <T: Send> Receiver<T> {
                     _ => break,
                 }
             }
-            scheduler::schedule();
+            scheduler::yield_now();
         }
 
 

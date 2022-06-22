@@ -428,7 +428,7 @@ impl Shell {
                         // lock. We wait for the application to finish its last time slice. It will then be
                         // removed from the run queue. We can thereafter release the lock.
                         loop {
-                            scheduler::schedule(); // yield the CPU
+                            scheduler::yield_now(); // yield the CPU
                             if !task_ref.is_running() {
                                 break;
                             }
@@ -473,7 +473,7 @@ impl Shell {
                         // lock. We wait for the application to finish its last time slice. It will then be
                         // truly blocked. We can thereafter release the lock.
                         loop {
-                            scheduler::schedule(); // yield the CPU
+                            scheduler::yield_now(); // yield the CPU
                             if !task_ref.is_running() {
                                 break;
                             }
@@ -1347,7 +1347,7 @@ impl Shell {
                 // update if there are inputs
                 self.terminal.lock().refresh_display()?;
             } else {
-                scheduler::schedule(); // yield the CPU if nothing to do
+                scheduler::yield_now(); // yield the CPU if nothing to do
             }
         }
     }

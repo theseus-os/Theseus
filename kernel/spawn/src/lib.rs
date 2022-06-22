@@ -654,7 +654,7 @@ fn task_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInterrupts, curr
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    scheduler::yield_now();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { }
 }
@@ -736,7 +736,7 @@ fn task_restartable_cleanup_final<F, A, R>(held_interrupts: irq_safety::HeldInte
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    scheduler::yield_now();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { }
 }
