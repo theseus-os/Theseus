@@ -3,16 +3,17 @@
 #![no_std]
 #![feature(step_trait, const_trait_impl)]
 
-#[cfg(target_arch = "x86_64")]
-pub use entryflags_x86_64::EntryFlags;
-
-mod address;
+mod allocator;
 mod chunk;
 mod chunk_range;
+
+pub mod address;
 
 pub use address::Address;
 pub use chunk::Chunk;
 pub use chunk_range::ChunkRange;
+#[cfg(target_arch = "x86_64")]
+pub use entryflags_x86_64::EntryFlags;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Debug)]
 pub struct Virtual;
@@ -39,6 +40,10 @@ pub trait MemoryType:
     fn is_canonical_address(address: usize) -> bool;
 
     fn canonicalize_address(address: usize) -> usize;
+
+    type AllocatedChunksInner: ~const allocator::allocated::AllocatedChunksInner<MemoryType = Self>;
+
+    type ChunkRangeWrapperInner: ~const allocator::chunk_range_wrapper::ChunkRangeWrapperInner;
 }
 
 impl const MemoryType for Virtual {
@@ -64,6 +69,10 @@ impl const MemoryType for Virtual {
         // The below code is semantically equivalent to the above, but it works in const functions.
         ((address << 16) as isize >> 16) as usize
     }
+
+    type AllocatedChunksInner = allocator::allocated::AllocatedChunksVirtual;
+
+    type ChunkRangeWrapperInner = allocator::chunk_range_wrapper::ChunkRangeWrapperVirtual;
 }
 
 impl const MemoryType for Physical {
@@ -82,6 +91,10 @@ impl const MemoryType for Physical {
     fn canonicalize_address(address: usize) -> usize {
         address & 0x000F_FFFF_FFFF_FFFF
     }
+
+    type AllocatedChunksInner = allocator::allocated::AllocatedChunksPhysical;
+
+    type ChunkRangeWrapperInner = allocator::chunk_range_wrapper::ChunkRangeWrapperPhysical;
 }
 
 /// Taken from the `bit_field` crate, but specialised to [`core::ops::Range`] to allow for the
