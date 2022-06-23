@@ -14,10 +14,10 @@ pub use address::Address;
 pub use chunk::Chunk;
 pub use chunk_range::ChunkRange;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Debug)]
 pub struct Virtual;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Debug)]
 pub struct Physical;
 
 mod private {
@@ -32,6 +32,10 @@ pub trait MemoryType:
 {
     const PREFIX: &'static str;
 
+    const MIN_ADDRESS: usize;
+
+    const MAX_ADDRESS: usize;
+
     fn is_canonical_address(address: usize) -> bool;
 
     fn canonicalize_address(address: usize) -> usize;
@@ -40,10 +44,17 @@ pub trait MemoryType:
 impl const MemoryType for Virtual {
     const PREFIX: &'static str = "v";
 
+    const MIN_ADDRESS: usize = usize::MIN;
+
+    const MAX_ADDRESS: usize =
+        Self::canonicalize_address(kernel_config::memory::MAX_VIRTUAL_ADDRESS);
+
+    #[inline]
     fn is_canonical_address(address: usize) -> bool {
         matches!(get_bits(address, 47..64), 0 | 0b1_1111_1111_1111_1111)
     }
 
+    #[inline]
     fn canonicalize_address(address: usize) -> usize {
         // match virt_addr.get_bit(47) {
         //     false => virt_addr.set_bits(48..64, 0),
@@ -58,15 +69,23 @@ impl const MemoryType for Virtual {
 impl const MemoryType for Physical {
     const PREFIX: &'static str = "p";
 
+    const MIN_ADDRESS: usize = usize::MIN;
+
+    const MAX_ADDRESS: usize = Self::canonicalize_address(usize::MAX);
+
+    #[inline]
     fn is_canonical_address(address: usize) -> bool {
         get_bits(address, 52..64) == 0
     }
 
+    #[inline]
     fn canonicalize_address(address: usize) -> usize {
         address & 0x000F_FFFF_FFFF_FFFF
     }
 }
 
+/// Taken from the `bit_field` crate, but specialised to [`core::ops::Range`] to allow for the
+/// function to be used in a const context.
 #[inline]
 const fn get_bits(value: usize, range: core::ops::Range<usize>) -> usize {
     const BIT_LENGTH: usize = ::core::mem::size_of::<usize>() * 8;

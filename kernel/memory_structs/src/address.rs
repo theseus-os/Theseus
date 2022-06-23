@@ -26,6 +26,16 @@ impl<T> Address<T>
 where
     T: MemoryType,
 {
+    pub const MIN: Self = Self {
+        address: T::MIN_ADDRESS,
+        phantom_data: PhantomData,
+    };
+
+    pub const MAX: Self = Self {
+        address: T::MAX_ADDRESS,
+        phantom_data: PhantomData,
+    };
+
     /// Creates a new address, returning an error if the address is not canonical.
     ///
     /// This is useful for checking whether an address is valid before using it. For example on

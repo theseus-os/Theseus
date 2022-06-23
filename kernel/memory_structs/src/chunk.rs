@@ -21,6 +21,10 @@ impl<T> Chunk<T>
 where
     T: MemoryType,
 {
+    pub const MIN: Self = Self::containing_address(Address::<T>::MIN);
+
+    pub const MAX: Self = Self::containing_address(Address::<T>::MAX);
+
     #[inline]
     pub const fn new(number: usize) -> Self {
         Self {
