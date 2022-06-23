@@ -35,7 +35,7 @@ pub fn main(_args: Vec<String>) -> isize {
         println!("Testing periodic task(s) with the realtime scheduler!");
         // Build and spawn two real time periodic task(s).
         // Start them as blocked in order to set the periods before they run
-        let periodic_tb1 = spawn::new_task_builder(_task_delay_tester, 1).block();
+        let periodic_tb1 = spawn::new_task_builder(task_delay_tester, 1).block();
         let periodic_task_1 = periodic_tb1.spawn().unwrap();
         
         // Set the periods of the task
@@ -49,14 +49,14 @@ pub fn main(_args: Vec<String>) -> isize {
 }    
 
 /// A simple task that periodically sleeps and prints a log statement at regular intervals.
-fn _task_delay_tester(_arg: usize) {
-    let start_time : AtomicUsize = AtomicUsize::new(sleep::get_current_time_in_ticks());
+fn task_delay_tester(_: usize) {
+    let timer = sleep::regular_timer();
     let mut iter = 0;
     loop {
         info!("I run periodically (iter {}).", iter);
         iter += 1;
 
         // This desk will sleep periodically for 1000 systicks
-        sleep::sleep_periodic(&start_time, 1000);
+        timer.sleep(1000).await;
     }
 }
