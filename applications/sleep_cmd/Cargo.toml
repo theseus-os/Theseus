@@ -1,0 +1,12 @@
+# This crate is named `sleep_cmd` because the name `sleep` is already taken by the kernel crate.
+
+[package]
+name = "sleep_cmd"
+version = "0.1.0"
+edition = "2021"
+description = "A shell command to sleep for a given number of seconds."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies.sleep]
+path = "../../kernel/sleep"

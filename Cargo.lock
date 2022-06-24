@@ -2835,6 +2835,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sleep_cmd"
+version = "0.1.0"
+dependencies = [
+ "sleep",
+]
+
+[[package]]
 name = "smoltcp"
 version = "0.5.0"
 source = "git+https://github.com/m-labs/smoltcp#0fedb1db9aa26712830822dd61f065deaa34d611"
