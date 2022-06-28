@@ -16,17 +16,6 @@ use spin::Mutex;
 /// The trailing period '.' is there to avoid matching the "nano_core-<hash>.o" object file.
 const NANO_CORE_FILENAME_PREFIX: &str = "nano_core.";
 
-/// Just like Rust's `try!()` macro, but packages up the given error message in a tuple
-/// with the array of 3 MappedPages that must also be returned.
-macro_rules! try_mp {
-    ($expr:expr, $tp:expr, $rp:expr, $dp:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(err_msg) => return Err((err_msg, [$tp, $rp, $dp])),
-        }
-    };
-}
-
 /// Deserializes the file containing the [`SerializedCrate`] representation of the already loaded
 /// (and currently running) `nano_core` code.
 ///
@@ -56,12 +45,20 @@ pub fn deserialize_nano_core(
     let rodata_pages = Arc::new(Mutex::new(rodata_pages));
     let data_pages = Arc::new(Mutex::new(data_pages));
 
+    /// Just like Rust's `try!()` macro, but packages up the given error message in a tuple
+    /// with an array of the above 3 MappedPages objected.
+    macro_rules! try_mp {
+        ($expr:expr) => {
+            match $expr {
+                Ok(val) => val,
+                Err(err_msg) => return Err((err_msg, [text_pages, rodata_pages, data_pages])),
+            }
+        };
+    }
+
     let (nano_core_file, real_namespace) = try_mp!(
         CrateNamespace::get_crate_object_file_starting_with(namespace, NANO_CORE_FILENAME_PREFIX)
-            .ok_or("couldn't find the expected \"nano_core\" kernel file"),
-        text_pages,
-        rodata_pages,
-        data_pages
+            .ok_or("couldn't find the expected \"nano_core\" kernel file")
     );
     let nano_core_file_path = Path::new(nano_core_file.lock().get_absolute_path());
     debug!(
@@ -71,31 +68,18 @@ pub fn deserialize_nano_core(
 
     let nano_core_file_locked = nano_core_file.lock();
     let size = nano_core_file_locked.len();
-    let mapped_pages = try_mp!(
-        nano_core_file_locked.as_mapping(),
-        text_pages,
-        rodata_pages,
-        data_pages
-    );
+    let mapped_pages = try_mp!(nano_core_file_locked.as_mapping());
 
     debug!("Parsing nano_core symbol file: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
 
-    let bytes: &[u8] = try_mp!(
-        mapped_pages.as_slice(0, size),
-        text_pages,
-        rodata_pages,
-        data_pages
-    );
+    let bytes: &[u8] = try_mp!(mapped_pages.as_slice(0, size));
 
     let (deserialized, _): (SerializedCrate, _) = try_mp!(
         bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(|e| {
             error!("deserialize_nano_core(): error deserializing nano_core: {e}");
             "deserialize_nano_core(): error deserializing nano_core"
-        }),
-        text_pages,
-        rodata_pages,
-        data_pages
+        })
     );
     drop(nano_core_file_locked);
 
@@ -107,9 +91,6 @@ pub fn deserialize_nano_core(
             &rodata_pages,
             &data_pages,
             verbose_log,
-        ),
-        text_pages,
-        rodata_pages,
-        data_pages
+        )
     ))
 }

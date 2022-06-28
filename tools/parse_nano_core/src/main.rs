@@ -15,7 +15,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tls_sections: crate_items.tls_sections,
         data_sections: crate_items.data_sections,
         init_symbols: crate_items.init_symbols,
-        reexported_symbols: BTreeSet::new(),
     };
 
     let mut stdout = std::io::stdout();

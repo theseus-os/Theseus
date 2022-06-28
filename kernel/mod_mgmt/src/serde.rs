@@ -24,7 +24,6 @@ pub struct SerializedCrate {
     pub tls_sections: BTreeSet<Shndx>,
     pub data_sections: BTreeSet<Shndx>,
     pub init_symbols: BTreeMap<String, usize>,
-    pub reexported_symbols: BTreeSet<String>,
 }
 
 impl SerializedCrate {
@@ -38,20 +37,21 @@ impl SerializedCrate {
         data_pages: &Arc<Mutex<MappedPages>>,
         verbose_log: bool,
     ) -> Result<(StrongCrateRef, BTreeMap<String, usize>, usize), &'static str> {
+        
+        // The sections need a weak reference back to the loaded_crate, and so we first create
+        // the loaded_crate so we have something to reference when loading the sections.
         let loaded_crate = CowArc::new(LoadedCrate {
-            crate_name: self.crate_name.clone(),
-            debug_symbols_file: Arc::downgrade(&object_file),
+            crate_name:          self.crate_name.clone(),
+            debug_symbols_file:  Arc::downgrade(&object_file),
             object_file,
-            // The sections need a weak reference back to the loaded_crate, and so we first create
-            // the loaded_crate so we have something to reference when loading the sections.
-            sections: HashMap::new(),
-            text_pages: Some((Arc::clone(text_pages), mp_range(text_pages))),
-            rodata_pages: Some((Arc::clone(rodata_pages), mp_range(rodata_pages))),
-            data_pages: Some((Arc::clone(data_pages), mp_range(data_pages))),
-            global_sections: self.global_sections,
-            tls_sections: self.tls_sections,
-            data_sections: self.data_sections,
-            reexported_symbols: self.reexported_symbols,
+            sections:            HashMap::new(), // placeholder
+            text_pages:          Some((Arc::clone(text_pages), mp_range(text_pages))),
+            rodata_pages:        Some((Arc::clone(rodata_pages), mp_range(rodata_pages))),
+            data_pages:          Some((Arc::clone(data_pages), mp_range(data_pages))),
+            global_sections:     self.global_sections,
+            tls_sections:        self.tls_sections,
+            data_sections:       self.data_sections,
+            reexported_symbols:  BTreeSet::new(),
         });
 
         let mut sections = HashMap::with_capacity(self.sections.len());
