@@ -43,9 +43,9 @@ pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_n
 pub use crate_metadata::*;
 
 
-mod deserialize_nano_core;
+mod parse_nano_core;
 mod replace_nano_core_crates;
-pub use deserialize_nano_core::deserialize_nano_core;
+pub use parse_nano_core::parse_nano_core;
 pub use replace_nano_core_crates::replace_nano_core_crates;
 
 pub mod serde;

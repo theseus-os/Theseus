@@ -553,19 +553,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "parse_nano_core"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "crate_metadata",
- "hashbrown",
- "log",
- "memory",
- "mod_mgmt",
- "serde",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -717,6 +704,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serialize_nano_core"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "crate_metadata",
+ "hashbrown",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "serde",
 ]
 
 [[package]]

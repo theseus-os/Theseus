@@ -1,3 +1,8 @@
+//! Module containing structs necessary for serializing and deserializing crates.
+//!
+//! This is currently only used to parse the `nano_core` object file at compile time. After being
+//! parsed, it is serialized into an instance of [`SerializedCrate`] and included as a boot module.
+
 use crate::CrateNamespace;
 use alloc::{
     collections::{BTreeMap, BTreeSet},
@@ -16,13 +21,22 @@ use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
 /// A serialized representation of a crate.
+///
+/// See [`LoadedCrate`] for more detail on the fields of this struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SerializedCrate {
+    /// The name of the crate.
     pub crate_name: String,
+    /// A map containing all the sections of the crate.
     pub sections: HashMap<Shndx, SerializedSection>,
+    /// A set containing the global sectinos of the crate.
     pub global_sections: BTreeSet<Shndx>,
+    /// A set containing the thread-local storage (TLS) sections of the crate.
     pub tls_sections: BTreeSet<Shndx>,
+    /// A set containing the `.data` and `.bss` sections of the crate.
     pub data_sections: BTreeSet<Shndx>,
+    /// A map of symbol names to their constant values, which contain assembler and linker
+    /// constants.
     pub init_symbols: BTreeMap<String, usize>,
 }
 
@@ -96,14 +110,21 @@ impl SerializedCrate {
 }
 
 /// A serialized representation of a section.
+///
+/// See [`LoadedSection`] for more detail on the fields of this struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SerializedSection {
+    /// The full name of the section.
     pub name: String,
+    /// The type of the scetion.
     pub ty: SectionType,
+    /// Whether or not the section is global.
     pub global: bool,
+    /// The starting [`VirtualAddress`] of the range covered by this section.
     pub virtual_address: usize,
     /// This field is identical to `self.virtual_address` unless `self.ty == SectionType::TlsData`.
     pub offset: usize,
+    /// The size of the section.
     pub size: usize,
 }
 

@@ -90,7 +90,7 @@ pub fn replace_nano_core_crates(
 ///    the corresponding data section in the nano_core.
 /// 3. Remove (take) and drop the new crate's `data_pages`, just to ensure they're not actually being used. 
 /// 4. Add the new crate's global sections to the symbol map, as usual. 
-///    We can skip adding data/bss sections to the symbol map since they were already added in `deserialize_nano_core()`.
+///    We can skip adding data/bss sections to the symbol map since they were already added in `parse_nano_core()`.
 /// 5. Call `perform_relocations()` as usual, which will use the changed data/bss sections above,
 ///    resulting in future crates depending on the nano_core's data sections as needed.
 /// 6. Add the new crate into the `namespace`'s new crate tree, as usual.

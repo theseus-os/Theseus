@@ -1,7 +1,7 @@
 mod parse;
 
 use mod_mgmt::serde::SerializedCrate;
-use std::{collections::BTreeSet, io::Write};
+use std::io::Write;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arg = &std::env::args().collect::<Vec<String>>()[1];

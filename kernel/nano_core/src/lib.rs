@@ -137,7 +137,7 @@ pub extern "C" fn nano_core_start(
     println_raw!("nano_core_start(): initialized memory subsystem."); 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped upon a returned error, causing all execution to stop. 
-    // (at least until we transfer ownership of them to the `deserialize_nano_core` function below.)
+    // (at least until we transfer ownership of them to the `parse_nano_core` function below.)
 
 
     state_store::init();
@@ -158,9 +158,9 @@ pub extern "C" fn nano_core_start(
     };
     println_raw!("nano_core_start(): initialized crate namespace subsystem."); 
 
-    // Deserialize the nano_core crate (the code we're already running) since we need it to load and run applications.
+    // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core_start(): deserializing nano_core crate, please wait ..."); 
-    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::deserialize_nano_core(
+    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::parse_nano_core(
         default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false
     ) {
         Ok((nano_core_crate_ref, init_symbols, _num_new_syms)) => {

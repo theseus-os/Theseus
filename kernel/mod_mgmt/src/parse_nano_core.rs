@@ -26,12 +26,12 @@ const NANO_CORE_FILENAME_PREFIX: &str = "nano_core.";
 /// # Return
 /// If successful, this returns a tuple of the following:
 /// * `nano_core_crate_ref`: A reference to the newly-created nano_core crate.
-/// * `init_symbols`: a map of symbol name to its constant value, which contains assembler and linker constances.
+/// * `init_symbols`: a map of symbol name to its constant value, which contains assembler and linker constants.
 /// * The number of new symbols added to the symbol map (a `usize`).
 ///
 /// If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`
 /// because those cannot be dropped, as they hold the currently-running code, and dropping them would cause endless exceptions.
-pub fn deserialize_nano_core(
+pub fn parse_nano_core(
     namespace: &Arc<CrateNamespace>,
     text_pages: MappedPages,
     rodata_pages: MappedPages,
@@ -62,7 +62,7 @@ pub fn deserialize_nano_core(
     );
     let nano_core_file_path = Path::new(nano_core_file.lock().get_absolute_path());
     debug!(
-        "deserialize_nano_core(): trying to load and parse the nano_core file: {:?}",
+        "parse_nano_core(): trying to load and parse the nano_core file: {:?}",
         nano_core_file_path
     );
 
@@ -77,8 +77,8 @@ pub fn deserialize_nano_core(
 
     let (deserialized, _): (SerializedCrate, _) = try_mp!(
         bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(|e| {
-            error!("deserialize_nano_core(): error deserializing nano_core: {e}");
-            "deserialize_nano_core(): error deserializing nano_core"
+            error!("parse_nano_core(): error parsing nano_core: {e}");
+            "parse_nano_core(): error parsing nano_core"
         })
     );
     drop(nano_core_file_locked);
