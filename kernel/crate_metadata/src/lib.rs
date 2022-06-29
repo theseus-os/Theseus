@@ -1041,9 +1041,3 @@ pub fn write_relocation(
 
     Ok(())
 }
-
-
-/// A wrapper around an `Arc<str>`: an immutable shared reference to a string.
-#[derive(Debug)]
-pub struct BStrRef(Arc<str>);
-
