@@ -533,7 +533,7 @@ pub fn swap_crates(
             _ => continue,
         };
         // Remove the old crate from the namespace that it was previously in, and remove its sections' symbols too.
-        if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove_str(old_crate_name) {
+        if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove(old_crate_name.as_bytes()) {
             {
                 let old_crate = old_crate_ref.lock_as_ref();
 
@@ -596,7 +596,7 @@ pub fn swap_crates(
             
             if cache_old_crates {
                 #[cfg(not(loscd_eval))]
-                cached_crates.crate_tree().lock().insert_str(old_crate_name, old_crate_ref);
+                cached_crates.crate_tree().lock().insert(old_crate_name.as_str().into(), old_crate_ref);
             }
 
             #[cfg(loscd_eval)]
@@ -615,14 +615,14 @@ pub fn swap_crates(
     for ((req, new_crate_name), is_old_crate_loaded) in swap_requests.iter().zip(new_crate_names.iter()).zip(old_crates_are_loaded.iter()) {
         // We only expect the new crate to have been loaded into the temp namespace if the old crate was actually loaded in the old namespace
         if !is_old_crate_loaded { continue; }
-        let new_crate_ref = namespace_of_new_crates.crate_tree().lock().remove_str(new_crate_name)
+        let new_crate_ref = namespace_of_new_crates.crate_tree().lock().remove(new_crate_name.as_bytes())
             .ok_or("BUG: swap_crates(): new crate specified by swap request was not found in the new namespace")?;
         
         #[cfg(not(loscd_eval))]
         debug!("swap_crates(): adding new crate {:?} to namespace {}", new_crate_ref, req.new_namespace.name());
 
         req.new_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
-        req.new_namespace.crate_tree().lock().insert_str(new_crate_name, new_crate_ref.clone());
+        req.new_namespace.crate_tree().lock().insert(new_crate_name.as_str().into(), new_crate_ref.clone());
     }
     
     // Other crates may have been loaded from their object files into the `namespace_of_new_crates` as dependendencies (required by the new crates specified by swap requests).
@@ -667,7 +667,7 @@ pub fn swap_crates(
             // #[cfg(not(loscd_eval))]
             // warn!("swap_crates(): untested scenario of adding new non-requested (dependency) crate {:?} to namespace {}", new_crate_ref, target_ns.name());
             target_ns.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
-            target_ns.crate_tree().lock().insert_str(new_crate_name, new_crate_ref.clone());
+            target_ns.crate_tree().lock().insert(new_crate_name.into(), new_crate_ref.clone());
         }
         else {
             #[cfg(not(loscd_eval))] {
@@ -954,7 +954,7 @@ impl SwapRequest {
                 let mut matching_crates = CrateNamespace::get_crates_starting_with(&old_namespace, ocn);
                 if matching_crates.len() == 1 {
                     let (old_crate_full_name, _ocr, real_old_namespace) = matching_crates.remove(0);
-                    (Some(old_crate_full_name), real_old_namespace)
+                    (Some(old_crate_full_name.to_string()), real_old_namespace)
                 } else {
                     // If we couldn't find a single loaded crate, then the old crate may not be loaded yet. 
                     // Thus, we should instead look for a single crate **object file** that matches the `old_crate_name` prefix.
@@ -967,7 +967,7 @@ impl SwapRequest {
                     } else {
                         // Here, we couldn't find a single matching loaded crate or crate object file, so we return an error. 
                         let matches_vec = if !matching_crates.is_empty() {
-                            matching_crates.into_iter().map(|(c_name, _c_ref, ns)| (c_name, Arc::clone(ns))).collect::<Vec<_>>()
+                            matching_crates.into_iter().map(|(c_name, _c_ref, ns)| (c_name.to_string(), Arc::clone(ns))).collect::<Vec<_>>()
                         } else if !matching_files.is_empty() {
                             matching_files.into_iter()
                                 .map(|(file, ns)| (

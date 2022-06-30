@@ -78,7 +78,7 @@ pub fn parse_nano_core(
     let nano_core_file_path = Path::new(nano_core_file.lock().get_absolute_path());
     debug!("parse_nano_core: trying to load and parse the nano_core file: {:?}", nano_core_file_path);
 
-    let crate_name = String::from(NANO_CORE_CRATE_NAME);
+    let crate_name = StrRef::from(NANO_CORE_CRATE_NAME);
 
     // Create the LoadedCrate instance to represent the nano_core. 
     // It will be properly populated in one of the parse_nano_core_* functions below
@@ -124,7 +124,7 @@ pub fn parse_nano_core(
     }
 
     // Add the newly-parsed nano_core crate to the kernel namespace.
-    real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
+    real_namespace.crate_tree.lock().insert(crate_name, nano_core_crate_ref.clone_shallow());
     info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
     // trace!("TlsInitializer after parse_nano_core(): {:#?}", &*real_namespace.tls_initializer.lock());
     // trace!("TlsInitializer data after parse_nano_core(): {:02X?}", real_namespace.tls_initializer.lock().get_data());
@@ -575,7 +575,7 @@ fn parse_nano_core_binary(
                         &new_crate_weak_ref,
                         &mut section_counter,
                         entry.shndx() as usize,
-                        demangled.into(),
+                        demangled.as_str().into(),
                         sec_size,
                         sec_vaddr_value,
                         global

@@ -11,16 +11,13 @@ use core::{
     ops::Deref,
     str,
 };
-use alloc::{
-    sync::Arc,
-    string::String,
-};
+use alloc::sync::Arc;
 
-/// A wrapper around an `Arc<str>`: an immutable shared reference to a string.
+/// A wrapper around an `Arc<str>`: an immutable shared reference to a string slice.
 /// 
 /// This can be borrowed and hashed as a slice of bytes because it implements `Borrow<[u8]>`, 
 /// which is useful for compatibility with crates like `qp_trie`.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct StrRef(Arc<str>);
 
 impl Deref for StrRef {
@@ -36,15 +33,15 @@ impl Clone for StrRef {
     }
 }
 
-impl core::fmt::Display for StrRef {
+impl fmt::Debug for StrRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
+        write!(f, "{:?}", self.as_str())
     }
 }
 
-impl From<String> for StrRef {
-    fn from(s: String) -> Self {
-        StrRef(s.into())
+impl fmt::Display for StrRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
