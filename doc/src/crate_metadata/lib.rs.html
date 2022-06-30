@@ -1247,7 +1247,7 @@
 <span class="doccomment">/// loaded and linked into at least one `CrateNamespace`.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LoadedCrate</span> {
     <span class="doccomment">/// The name of this crate.</span>
-    <span class="kw">pub</span> <span class="ident">crate_name</span>: <span class="ident">String</span>,
+    <span class="kw">pub</span> <span class="ident">crate_name</span>: <span class="ident">StrRef</span>,
     <span class="doccomment">/// The object file that this crate was loaded from.</span>
     <span class="kw">pub</span> <span class="ident">object_file</span>: <span class="ident">FileRef</span>,
     <span class="doccomment">/// The file that contains debug symbols for this crate. </span>

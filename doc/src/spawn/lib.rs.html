@@ -835,7 +835,7 @@
 <span class="kw">use</span> <span class="ident">core</span>::{<span class="ident">marker::PhantomData</span>, <span class="ident">mem</span>, <span class="ident">ops::Deref</span>};
 <span class="kw">use</span> <span class="ident">alloc</span>::{
     <span class="ident">vec::Vec</span>,
-    <span class="ident">string::String</span>,
+    <span class="ident">string</span>::{<span class="ident">String</span>, <span class="ident">ToString</span>},
     <span class="ident">sync::Arc</span>,
     <span class="ident">boxed::Box</span>,
 };
@@ -965,7 +965,7 @@
     <span class="comment">// Create the underlying task builder. </span>
     <span class="comment">// Give it a default name based on the app crate&#39;s name, but that can be changed later. </span>
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tb</span> <span class="op">=</span> <span class="ident">TaskBuilder::new</span>(<span class="kw-2">*</span><span class="ident">main_func</span>, <span class="ident">MainFuncArg::default</span>())
-        .<span class="ident">name</span>(<span class="ident">app_crate_ref</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">clone</span>()); 
+        .<span class="ident">name</span>(<span class="ident">app_crate_ref</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">to_string</span>()); 
 
     <span class="comment">// Once the new application task is created (but before its scheduled in),</span>
     <span class="comment">// ensure it has the relevant app-specific fields set properly.</span>

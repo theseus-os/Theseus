@@ -447,14 +447,14 @@
 
     <span class="comment">// If task is from an application add application crate name. `None` if not </span>
     <span class="ident">fe</span>.<span class="ident">running_app_crate</span> <span class="op">=</span> {
-        <span class="ident">curr_task</span>.<span class="ident">app_crate</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">clone</span>())
+        <span class="ident">curr_task</span>.<span class="ident">app_crate</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">to_string</span>())
     };
 
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">instruction_pointer</span>) <span class="op">=</span> <span class="ident">instruction_pointer</span> {
         <span class="kw">let</span> <span class="ident">instruction_pointer</span> <span class="op">=</span> <span class="ident">VirtualAddress::new_canonical</span>(<span class="ident">instruction_pointer</span>);
         <span class="ident">fe</span>.<span class="ident">instruction_pointer</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">instruction_pointer</span>);
         <span class="ident">fe</span>.<span class="ident">crate_error_occured</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">get_crate_containing_address</span>(<span class="ident">instruction_pointer</span>.<span class="ident">clone</span>(), <span class="bool-val">false</span>)
-                                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">clone</span>());
+                                        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span>.<span class="ident">lock_as_ref</span>().<span class="ident">crate_name</span>.<span class="ident">to_string</span>());
     };
 
     <span class="comment">// Push the fault entry.</span>

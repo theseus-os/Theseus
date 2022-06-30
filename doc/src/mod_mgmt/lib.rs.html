@@ -2789,7 +2789,7 @@
 <span class="kw">use</span> <span class="ident">bootloader_modules::BootloaderModule</span>;
 <span class="kw">use</span> <span class="ident">cow_arc::CowArc</span>;
 <span class="kw">use</span> <span class="ident">rustc_demangle::demangle</span>;
-<span class="kw">use</span> <span class="ident">qp_trie</span>::{<span class="ident">Trie</span>, <span class="ident">wrapper::BString</span>};
+<span class="kw">use</span> <span class="ident">qp_trie::Trie</span>;
 <span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">FileOrDir</span>, <span class="ident">File</span>, <span class="ident">FileRef</span>, <span class="ident">DirRef</span>};
 <span class="kw">use</span> <span class="ident">vfs_node::VFSDirectory</span>;
 <span class="kw">use</span> <span class="ident">path::Path</span>;
@@ -3153,13 +3153,13 @@
         <span class="comment">// trace!(&quot;### Dropping AppCrateRef {:?} from namespace {:?}&quot;, self.crate_ref, self.namespace.name());</span>
         <span class="kw">let</span> <span class="ident">crate_locked</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">crate_ref</span>.<span class="ident">lock_as_ref</span>();
         <span class="comment">// First, remove the actual crate from the namespace.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_removed_app_crate</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">remove_str</span>(<span class="kw-2">&amp;</span><span class="ident">crate_locked</span>.<span class="ident">crate_name</span>) {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">_removed_app_crate</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">crate_locked</span>.<span class="ident">crate_name</span>) {
             <span class="comment">// Second, remove all of the crate&#39;s global symbols from the namespace&#39;s symbol map.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">symbol_map</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">symbol_map</span>().<span class="ident">lock</span>();
             <span class="kw">for</span> <span class="ident">sec_to_remove</span> <span class="kw">in</span> <span class="ident">crate_locked</span>.<span class="ident">global_sections_iter</span>() {
                 <span class="kw">match</span> <span class="ident">symbol_map</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">sec_to_remove</span>.<span class="ident">name</span>) {
                     <span class="prelude-val">Some</span>(<span class="ident">_removed</span>) =&gt; {
-                        <span class="macro">trace!</span>(<span class="string">&quot;Removed symbol {}: {:?}&quot;</span>, <span class="ident">sec_to_remove</span>.<span class="ident">name</span>, <span class="ident">_removed</span>.<span class="ident">upgrade</span>());
+                        <span class="comment">// trace!(&quot;Removed symbol {}: {:?}&quot;, sec_to_remove.name, _removed.upgrade());</span>
                     }
                     <span class="prelude-val">None</span> =&gt; {
                         <span class="macro">error!</span>(<span class="string">&quot;NOTE: couldn&#39;t find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.&quot;</span>, <span class="ident">sec_to_remove</span>.<span class="ident">name</span>, <span class="ident">crate_locked</span>.<span class="ident">crate_name</span>, <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">name</span>());
@@ -3197,14 +3197,14 @@
     <span class="ident">dir</span>: <span class="ident">NamespaceDir</span>,
 
     <span class="doccomment">/// The list of all the crates loaded into this namespace,</span>
-    <span class="doccomment">/// stored as a map in which the crate&#39;s String name</span>
+    <span class="doccomment">/// stored as a map in which the crate&#39;s string name</span>
     <span class="doccomment">/// is the key that maps to the value, a strong reference to a crate.</span>
     <span class="doccomment">/// It is a strong reference because a crate must not be removed</span>
     <span class="doccomment">/// as long as it is part of any namespace,</span>
     <span class="doccomment">/// and a single crate can be part of multiple namespaces at once.</span>
     <span class="doccomment">/// For example, the &quot;core&quot; (Rust core library) crate is essentially</span>
     <span class="doccomment">/// part of every single namespace, simply because most other crates rely upon it. </span>
-    <span class="ident">crate_tree</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Trie</span><span class="op">&lt;</span><span class="ident">BString</span>, <span class="ident">StrongCrateRef</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">crate_tree</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Trie</span><span class="op">&lt;</span><span class="ident">StrRef</span>, <span class="ident">StrongCrateRef</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 
     <span class="doccomment">/// The &quot;system map&quot; of all symbols that are present in all of the crates in this `CrateNamespace`.</span>
     <span class="doccomment">/// Maps a fully-qualified symbol name string to a corresponding `LoadedSection`,</span>
@@ -3281,7 +3281,7 @@
     }
 
     <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">hidden</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crate_tree</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Trie</span><span class="op">&lt;</span><span class="ident">BString</span>, <span class="ident">StrongCrateRef</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crate_tree</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Trie</span><span class="op">&lt;</span><span class="ident">StrRef</span>, <span class="ident">StrongCrateRef</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">crate_tree</span>
     }
 
@@ -3302,9 +3302,9 @@
 
     <span class="doccomment">/// Returns a list of all of the crate names currently loaded into this `CrateNamespace`,</span>
     <span class="doccomment">/// including all crates in any recursive namespaces as well if `recursive` is `true`.</span>
-    <span class="doccomment">/// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crate_names</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">recursive</span>: <span class="ident">bool</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crates</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">keys</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">bstring</span><span class="op">|</span> <span class="ident">String::from</span>(<span class="ident">bstring</span>.<span class="ident">as_str</span>())).<span class="ident">collect</span>();
+    <span class="doccomment">/// This is a slow method mostly for debugging, since it allocates a new vector of crate names.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">crate_names</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">recursive</span>: <span class="ident">bool</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crates</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">keys</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> <span class="ident">n</span>.<span class="ident">clone</span>()).<span class="ident">collect</span>();
 
         <span class="kw">if</span> <span class="ident">recursive</span> {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="kw-2">mut</span> <span class="ident">crates_recursive</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">recursive_namespace</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">r_ns</span><span class="op">|</span> <span class="ident">r_ns</span>.<span class="ident">crate_names</span>(<span class="ident">recursive</span>)) {
@@ -3349,7 +3349,7 @@
     <span class="doccomment">/// that jointly exists in another namespace, they should invoke the </span>
     <span class="doccomment">/// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_crate</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">crate_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">StrongCrateRef</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">get_str</span>(<span class="ident">crate_name</span>)
+        <span class="self">self</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">get</span>(<span class="ident">crate_name</span>.<span class="ident">as_bytes</span>())
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="ident">CowArc::clone_shallow</span>(<span class="ident">c</span>))
             .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">recursive_namespace</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">r_ns</span><span class="op">|</span> <span class="ident">r_ns</span>.<span class="ident">get_crate</span>(<span class="ident">crate_name</span>)))
     }
@@ -3371,7 +3371,7 @@
         <span class="ident">namespace</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
         <span class="ident">crate_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>
     ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">StrongCrateRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>)<span class="op">&gt;</span> {
-        <span class="ident">namespace</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">get_str</span>(<span class="ident">crate_name</span>)
+        <span class="ident">namespace</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">get</span>(<span class="ident">crate_name</span>.<span class="ident">as_bytes</span>())
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> (<span class="ident">CowArc::clone_shallow</span>(<span class="ident">c</span>), <span class="ident">namespace</span>))
             .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">namespace</span>.<span class="ident">recursive_namespace</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">r_ns</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::get_crate_and_namespace</span>(<span class="ident">r_ns</span>, <span class="ident">crate_name</span>)))
     }
@@ -3396,11 +3396,11 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_crates_starting_with</span><span class="op">&lt;</span><span class="lifetime">&#39;n</span><span class="op">&gt;</span>(
         <span class="ident">namespace</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
         <span class="ident">crate_name_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>
-    ) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">StrongCrateRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>)<span class="op">&gt;</span> { 
+    ) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">StrRef</span>, <span class="ident">StrongCrateRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>)<span class="op">&gt;</span> { 
         <span class="comment">// First, we make a list of matching crates in this namespace. </span>
         <span class="kw">let</span> <span class="ident">crates</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crates_in_this_namespace</span> <span class="op">=</span> <span class="ident">crates</span>.<span class="ident">iter_prefix_str</span>(<span class="ident">crate_name_prefix</span>)
-            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">key</span>, <span class="ident">val</span>)<span class="op">|</span> (<span class="ident">key</span>.<span class="ident">clone</span>().<span class="ident">into</span>(), <span class="ident">val</span>.<span class="ident">clone_shallow</span>(), <span class="ident">namespace</span>))
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crates_in_this_namespace</span> <span class="op">=</span> <span class="ident">crates</span>.<span class="ident">iter_prefix</span>(<span class="ident">crate_name_prefix</span>.<span class="ident">as_bytes</span>())
+            .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">key</span>, <span class="ident">val</span>)<span class="op">|</span> (<span class="ident">key</span>.<span class="ident">clone</span>(), <span class="ident">val</span>.<span class="ident">clone_shallow</span>(), <span class="ident">namespace</span>))
             .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
 
         <span class="comment">// Second, we make a similar list for the recursive namespace.</span>
@@ -3437,7 +3437,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_crate_starting_with</span><span class="op">&lt;</span><span class="lifetime">&#39;n</span><span class="op">&gt;</span>(
         <span class="ident">namespace</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>,
         <span class="ident">crate_name_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>
-    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">StrongCrateRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>)<span class="op">&gt;</span> { 
+    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">StrRef</span>, <span class="ident">StrongCrateRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">CrateNamespace</span><span class="op">&gt;</span>)<span class="op">&gt;</span> { 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">crates_iter</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_crates_starting_with</span>(<span class="ident">namespace</span>, <span class="ident">crate_name_prefix</span>).<span class="ident">into_iter</span>();
         <span class="ident">crates_iter</span>.<span class="ident">next</span>().<span class="ident">filter</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">crates_iter</span>.<span class="ident">next</span>().<span class="ident">is_none</span>()) <span class="comment">// ensure single element</span>
     }
@@ -3546,7 +3546,7 @@
         {
             <span class="kw">let</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">new_crate_ref</span>.<span class="ident">lock_as_ref</span>();
             <span class="kw">let</span> <span class="ident">_new_syms</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">add_symbols</span>(<span class="ident">new_crate</span>.<span class="ident">sections</span>.<span class="ident">values</span>(), <span class="ident">verbose_log</span>);
-            <span class="ident">namespace</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">insert_str</span>(<span class="kw-2">&amp;</span><span class="ident">new_crate</span>.<span class="ident">crate_name</span>, <span class="ident">CowArc::clone_shallow</span>(<span class="kw-2">&amp;</span><span class="ident">new_crate_ref</span>));
+            <span class="ident">namespace</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">new_crate</span>.<span class="ident">crate_name</span>.<span class="ident">clone</span>(), <span class="ident">CowArc::clone_shallow</span>(<span class="kw-2">&amp;</span><span class="ident">new_crate_ref</span>));
             <span class="macro">info!</span>(<span class="string">&quot;loaded new application crate: {:?}, num sections: {}, added {} new symbols&quot;</span>, <span class="ident">new_crate</span>.<span class="ident">crate_name</span>, <span class="ident">new_crate</span>.<span class="ident">sections</span>.<span class="ident">len</span>(), <span class="ident">_new_syms</span>);
         }
         <span class="prelude-val">Ok</span>(<span class="ident">AppCrateRef</span> {
@@ -3588,7 +3588,7 @@
             
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span>
         <span class="macro">info!</span>(<span class="string">&quot;loaded new crate {:?}, num sections: {}, added {} new symbols.&quot;</span>, <span class="ident">new_crate_name</span>, <span class="ident">_num_sections</span>, <span class="ident">new_syms</span>);
-        <span class="self">self</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">new_crate_name</span>.<span class="ident">into</span>(), <span class="ident">new_crate_ref</span>.<span class="ident">clone_shallow</span>());
+        <span class="self">self</span>.<span class="ident">crate_tree</span>.<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">new_crate_name</span>, <span class="ident">new_crate_ref</span>.<span class="ident">clone_shallow</span>());
         <span class="prelude-val">Ok</span>((<span class="ident">new_crate_ref</span>, <span class="ident">new_syms</span>))
     }
 
@@ -3780,7 +3780,7 @@
         <span class="kw">let</span> <span class="ident">mapped_pages</span>  <span class="op">=</span> <span class="ident">crate_file</span>.<span class="ident">as_mapping</span>()<span class="question-mark">?</span>;
         <span class="kw">let</span> <span class="ident">size_in_bytes</span> <span class="op">=</span> <span class="ident">crate_file</span>.<span class="ident">len</span>();
         <span class="kw">let</span> <span class="ident">abs_path</span>      <span class="op">=</span> <span class="ident">Path::new</span>(<span class="ident">crate_file</span>.<span class="ident">get_absolute_path</span>());
-        <span class="kw">let</span> <span class="ident">crate_name</span>    <span class="op">=</span> <span class="ident">crate_name_from_path</span>(<span class="kw-2">&amp;</span><span class="ident">abs_path</span>).<span class="ident">to_string</span>();
+        <span class="kw">let</span> <span class="ident">crate_name</span>    <span class="op">=</span> <span class="ident">StrRef::from</span>(<span class="ident">crate_name_from_path</span>(<span class="kw-2">&amp;</span><span class="ident">abs_path</span>));
 
         <span class="comment">// First, check to make sure this crate hasn&#39;t already been loaded. </span>
         <span class="comment">// Application crates are now added to the CrateNamespace just like kernel crates,</span>
@@ -4011,7 +4011,7 @@
                 } <span class="kw">else</span> {
                     <span class="ident">name</span>
                 };
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">as_str</span>().<span class="ident">into</span>();
 
                 <span class="comment">// We already copied the content of all .text sections above, </span>
                 <span class="comment">// so here we just record the metadata into a new `LoadedSection` object.</span>
@@ -4050,7 +4050,7 @@
                 } <span class="kw">else</span> {
                     <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">TLS_DATA_PREFIX</span>)
                 };
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">as_str</span>().<span class="ident">into</span>();
 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
                     <span class="kw">let</span> (<span class="ident">mapped_pages_offset</span>, <span class="ident">sec_typ</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_bss</span> {
@@ -4119,7 +4119,7 @@
                         <span class="comment">//     }</span>
                         <span class="comment">// })</span>
                 };
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">as_str</span>().<span class="ident">into</span>();
                 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">dp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">dp</span>)) <span class="op">=</span> <span class="ident">read_write_pages_locked</span> {
                     <span class="comment">// here: we&#39;re ready to copy the data/bss section to the proper address</span>
@@ -4160,7 +4160,7 @@
             <span class="comment">// Fourth, if neither executable nor TLS nor writable, handle .rodata sections.</span>
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_name</span>.<span class="ident">starts_with</span>(<span class="ident">RODATA_PREFIX</span>) {
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">RODATA_PREFIX</span>);
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">as_str</span>().<span class="ident">into</span>();
 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
                     <span class="comment">// here: we&#39;re ready to copy the rodata section to the proper address</span>

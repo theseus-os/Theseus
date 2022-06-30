@@ -1646,7 +1646,7 @@
             <span class="kw">_</span> =&gt; <span class="kw">continue</span>,
         };
         <span class="comment">// Remove the old crate from the namespace that it was previously in, and remove its sections&#39; symbols too.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">old_crate_ref</span>) <span class="op">=</span> <span class="ident">old_namespace</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">remove_str</span>(<span class="ident">old_crate_name</span>) {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">old_crate_ref</span>) <span class="op">=</span> <span class="ident">old_namespace</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="ident">old_crate_name</span>.<span class="ident">as_bytes</span>()) {
             {
                 <span class="kw">let</span> <span class="ident">old_crate</span> <span class="op">=</span> <span class="ident">old_crate_ref</span>.<span class="ident">lock_as_ref</span>();
 
@@ -1709,7 +1709,7 @@
             
             <span class="kw">if</span> <span class="ident">cache_old_crates</span> {
                 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span>
-                <span class="ident">cached_crates</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">insert_str</span>(<span class="ident">old_crate_name</span>, <span class="ident">old_crate_ref</span>);
+                <span class="ident">cached_crates</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">old_crate_name</span>.<span class="ident">as_str</span>().<span class="ident">into</span>(), <span class="ident">old_crate_ref</span>);
             }
 
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">loscd_eval</span>)]</span>
@@ -1728,14 +1728,14 @@
     <span class="kw">for</span> ((<span class="ident">req</span>, <span class="ident">new_crate_name</span>), <span class="ident">is_old_crate_loaded</span>) <span class="kw">in</span> <span class="ident">swap_requests</span>.<span class="ident">iter</span>().<span class="ident">zip</span>(<span class="ident">new_crate_names</span>.<span class="ident">iter</span>()).<span class="ident">zip</span>(<span class="ident">old_crates_are_loaded</span>.<span class="ident">iter</span>()) {
         <span class="comment">// We only expect the new crate to have been loaded into the temp namespace if the old crate was actually loaded in the old namespace</span>
         <span class="kw">if</span> <span class="op">!</span><span class="ident">is_old_crate_loaded</span> { <span class="kw">continue</span>; }
-        <span class="kw">let</span> <span class="ident">new_crate_ref</span> <span class="op">=</span> <span class="ident">namespace_of_new_crates</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">remove_str</span>(<span class="ident">new_crate_name</span>)
+        <span class="kw">let</span> <span class="ident">new_crate_ref</span> <span class="op">=</span> <span class="ident">namespace_of_new_crates</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="ident">new_crate_name</span>.<span class="ident">as_bytes</span>())
             .<span class="ident">ok_or</span>(<span class="string">&quot;BUG: swap_crates(): new crate specified by swap request was not found in the new namespace&quot;</span>)<span class="question-mark">?</span>;
         
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span>
         <span class="macro">debug!</span>(<span class="string">&quot;swap_crates(): adding new crate {:?} to namespace {}&quot;</span>, <span class="ident">new_crate_ref</span>, <span class="ident">req</span>.<span class="ident">new_namespace</span>.<span class="ident">name</span>());
 
         <span class="ident">req</span>.<span class="ident">new_namespace</span>.<span class="ident">add_symbols</span>(<span class="ident">new_crate_ref</span>.<span class="ident">lock_as_ref</span>().<span class="ident">sections</span>.<span class="ident">values</span>(), <span class="ident">verbose_log</span>);
-        <span class="ident">req</span>.<span class="ident">new_namespace</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">insert_str</span>(<span class="ident">new_crate_name</span>, <span class="ident">new_crate_ref</span>.<span class="ident">clone</span>());
+        <span class="ident">req</span>.<span class="ident">new_namespace</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">new_crate_name</span>.<span class="ident">as_str</span>().<span class="ident">into</span>(), <span class="ident">new_crate_ref</span>.<span class="ident">clone</span>());
     }
     
     <span class="comment">// Other crates may have been loaded from their object files into the `namespace_of_new_crates` as dependendencies (required by the new crates specified by swap requests).</span>
@@ -1780,7 +1780,7 @@
             <span class="comment">// #[cfg(not(loscd_eval))]</span>
             <span class="comment">// warn!(&quot;swap_crates(): untested scenario of adding new non-requested (dependency) crate {:?} to namespace {}&quot;, new_crate_ref, target_ns.name());</span>
             <span class="ident">target_ns</span>.<span class="ident">add_symbols</span>(<span class="ident">new_crate_ref</span>.<span class="ident">lock_as_ref</span>().<span class="ident">sections</span>.<span class="ident">values</span>(), <span class="ident">verbose_log</span>);
-            <span class="ident">target_ns</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">insert_str</span>(<span class="ident">new_crate_name</span>, <span class="ident">new_crate_ref</span>.<span class="ident">clone</span>());
+            <span class="ident">target_ns</span>.<span class="ident">crate_tree</span>().<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">new_crate_name</span>.<span class="ident">into</span>(), <span class="ident">new_crate_ref</span>.<span class="ident">clone</span>());
         }
         <span class="kw">else</span> {
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">loscd_eval</span>))]</span> {
@@ -2067,7 +2067,7 @@
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">matching_crates</span> <span class="op">=</span> <span class="ident">CrateNamespace::get_crates_starting_with</span>(<span class="kw-2">&amp;</span><span class="ident">old_namespace</span>, <span class="ident">ocn</span>);
                 <span class="kw">if</span> <span class="ident">matching_crates</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">1</span> {
                     <span class="kw">let</span> (<span class="ident">old_crate_full_name</span>, <span class="ident">_ocr</span>, <span class="ident">real_old_namespace</span>) <span class="op">=</span> <span class="ident">matching_crates</span>.<span class="ident">remove</span>(<span class="number">0</span>);
-                    (<span class="prelude-val">Some</span>(<span class="ident">old_crate_full_name</span>), <span class="ident">real_old_namespace</span>)
+                    (<span class="prelude-val">Some</span>(<span class="ident">old_crate_full_name</span>.<span class="ident">to_string</span>()), <span class="ident">real_old_namespace</span>)
                 } <span class="kw">else</span> {
                     <span class="comment">// If we couldn&#39;t find a single loaded crate, then the old crate may not be loaded yet. </span>
                     <span class="comment">// Thus, we should instead look for a single crate **object file** that matches the `old_crate_name` prefix.</span>
@@ -2080,7 +2080,7 @@
                     } <span class="kw">else</span> {
                         <span class="comment">// Here, we couldn&#39;t find a single matching loaded crate or crate object file, so we return an error. </span>
                         <span class="kw">let</span> <span class="ident">matches_vec</span> <span class="op">=</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">matching_crates</span>.<span class="ident">is_empty</span>() {
-                            <span class="ident">matching_crates</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">c_name</span>, <span class="ident">_c_ref</span>, <span class="ident">ns</span>)<span class="op">|</span> (<span class="ident">c_name</span>, <span class="ident">Arc::clone</span>(<span class="ident">ns</span>))).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
+                            <span class="ident">matching_crates</span>.<span class="ident">into_iter</span>().<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">c_name</span>, <span class="ident">_c_ref</span>, <span class="ident">ns</span>)<span class="op">|</span> (<span class="ident">c_name</span>.<span class="ident">to_string</span>(), <span class="ident">Arc::clone</span>(<span class="ident">ns</span>))).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>()
                         } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="ident">matching_files</span>.<span class="ident">is_empty</span>() {
                             <span class="ident">matching_files</span>.<span class="ident">into_iter</span>()
                                 .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">file</span>, <span class="ident">ns</span>)<span class="op">|</span> (
