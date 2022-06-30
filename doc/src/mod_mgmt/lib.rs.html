@@ -2748,6 +2748,13 @@
 <span id="2743">2743</span>
 <span id="2744">2744</span>
 <span id="2745">2745</span>
+<span id="2746">2746</span>
+<span id="2747">2747</span>
+<span id="2748">2748</span>
+<span id="2749">2749</span>
+<span id="2750">2750</span>
+<span id="2751">2751</span>
+<span id="2752">2752</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="attribute">#[<span class="ident">macro_use</span>]</span> <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -2997,8 +3004,7 @@
 <span class="doccomment">/// A &quot;symbol map&quot; from a fully-qualified demangled symbol String  </span>
 <span class="doccomment">/// to weak reference to a `LoadedSection`.</span>
 <span class="doccomment">/// This is used for relocations, and for looking up function names.</span>
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">SymbolMap</span> <span class="op">=</span> <span class="ident">Trie</span><span class="op">&lt;</span><span class="ident">BString</span>, <span class="ident">WeakSectionRef</span><span class="op">&gt;</span>;
-<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">SymbolMapIter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">qp_trie::Iter</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">BString</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">WeakSectionRef</span><span class="op">&gt;</span>;
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">SymbolMap</span> <span class="op">=</span> <span class="ident">Trie</span><span class="op">&lt;</span><span class="ident">StrRef</span>, <span class="ident">WeakSectionRef</span><span class="op">&gt;</span>;
 
 
 <span class="doccomment">/// A wrapper around a `Directory` reference that offers special convenience functions</span>
@@ -3151,8 +3157,13 @@
             <span class="comment">// Second, remove all of the crate&#39;s global symbols from the namespace&#39;s symbol map.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">symbol_map</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">symbol_map</span>().<span class="ident">lock</span>();
             <span class="kw">for</span> <span class="ident">sec_to_remove</span> <span class="kw">in</span> <span class="ident">crate_locked</span>.<span class="ident">global_sections_iter</span>() {
-                <span class="kw">if</span> <span class="ident">symbol_map</span>.<span class="ident">remove_str</span>(<span class="kw-2">&amp;</span><span class="ident">sec_to_remove</span>.<span class="ident">name</span>).<span class="ident">is_none</span>() {
-                    <span class="macro">error!</span>(<span class="string">&quot;NOTE: couldn&#39;t find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.&quot;</span>, <span class="ident">sec_to_remove</span>.<span class="ident">name</span>, <span class="ident">crate_locked</span>.<span class="ident">crate_name</span>, <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">name</span>());
+                <span class="kw">match</span> <span class="ident">symbol_map</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">sec_to_remove</span>.<span class="ident">name</span>) {
+                    <span class="prelude-val">Some</span>(<span class="ident">_removed</span>) =&gt; {
+                        <span class="macro">trace!</span>(<span class="string">&quot;Removed symbol {}: {:?}&quot;</span>, <span class="ident">sec_to_remove</span>.<span class="ident">name</span>, <span class="ident">_removed</span>.<span class="ident">upgrade</span>());
+                    }
+                    <span class="prelude-val">None</span> =&gt; {
+                        <span class="macro">error!</span>(<span class="string">&quot;NOTE: couldn&#39;t find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.&quot;</span>, <span class="ident">sec_to_remove</span>.<span class="ident">name</span>, <span class="ident">crate_locked</span>.<span class="ident">crate_name</span>, <span class="self">self</span>.<span class="ident">namespace</span>.<span class="ident">name</span>());
+                    }
                 }
             }
         } <span class="kw">else</span> {
@@ -4000,7 +4011,7 @@
                 } <span class="kw">else</span> {
                     <span class="ident">name</span>
                 };
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
 
                 <span class="comment">// We already copied the content of all .text sections above, </span>
                 <span class="comment">// so here we just record the metadata into a new `LoadedSection` object.</span>
@@ -4039,7 +4050,7 @@
                 } <span class="kw">else</span> {
                     <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">TLS_DATA_PREFIX</span>)
                 };
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
                     <span class="kw">let</span> (<span class="ident">mapped_pages_offset</span>, <span class="ident">sec_typ</span>) <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_bss</span> {
@@ -4108,7 +4119,7 @@
                         <span class="comment">//     }</span>
                         <span class="comment">// })</span>
                 };
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
                 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">dp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">dp</span>)) <span class="op">=</span> <span class="ident">read_write_pages_locked</span> {
                     <span class="comment">// here: we&#39;re ready to copy the data/bss section to the proper address</span>
@@ -4128,7 +4139,7 @@
                         <span class="ident">shndx</span>,
                         <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
                             <span class="kw">if</span> <span class="ident">is_bss</span> { <span class="ident">SectionType::Bss</span> } <span class="kw">else</span> { <span class="ident">SectionType::Data</span> },
-                            <span class="ident">demangled</span>.<span class="ident">clone</span>(),
+                            <span class="ident">demangled</span>,
                             <span class="ident">Arc::clone</span>(<span class="ident">dp_ref</span>),
                             <span class="ident">data_offset</span>,
                             <span class="ident">dest_vaddr</span>,
@@ -4149,7 +4160,7 @@
             <span class="comment">// Fourth, if neither executable nor TLS nor writable, handle .rodata sections.</span>
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_name</span>.<span class="ident">starts_with</span>(<span class="ident">RODATA_PREFIX</span>) {
                 <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">RODATA_PREFIX</span>);
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>().<span class="ident">into</span>();
 
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
                     <span class="comment">// here: we&#39;re ready to copy the rodata section to the proper address</span>
@@ -4188,8 +4199,11 @@
 
             <span class="comment">// Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections</span>
             <span class="kw">else</span> <span class="kw">if</span> <span class="ident">sec_name</span>.<span class="ident">starts_with</span>(<span class="ident">GCC_EXCEPT_TABLE_PREFIX</span>) {
-                <span class="kw">let</span> <span class="ident">name</span> <span class="op">=</span> <span class="macro">try_get_symbol_name_after_prefix!</span>(<span class="ident">sec_name</span>, <span class="ident">RODATA_PREFIX</span>);
-                <span class="kw">let</span> <span class="ident">demangled</span> <span class="op">=</span> <span class="ident">demangle</span>(<span class="ident">name</span>).<span class="ident">to_string</span>();
+                <span class="comment">// We don&#39;t need to waste space keeping the name of the `.gcc_exept_table` section, </span>
+                <span class="comment">// because that name is irrelevant and will never be used.</span>
+                <span class="comment">//</span>
+                <span class="comment">// let name = try_get_symbol_name_after_prefix!(sec_name, GCC_EXCEPT_TABLE_PREFIX);</span>
+                <span class="comment">// let demangled = demangle(name).to_string().into();</span>
 
                 <span class="comment">// gcc_except_table sections are read-only, so we put them in the .rodata pages</span>
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="kw-2">ref</span> <span class="ident">rp_ref</span>, <span class="kw-2">ref</span> <span class="kw-2">mut</span> <span class="ident">rp</span>)) <span class="op">=</span> <span class="ident">read_only_pages_locked</span> {
@@ -4210,12 +4224,12 @@
                         <span class="ident">shndx</span>, 
                         <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
                             <span class="ident">SectionType::GccExceptTable</span>,
-                            <span class="ident">demangled</span>,
+                            <span class="ident">GCC_EXCEPT_TABLE_STR_REF</span>.<span class="ident">clone</span>(),
                             <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
                             <span class="ident">rodata_offset</span>,
                             <span class="ident">dest_vaddr</span>,
                             <span class="ident">sec_size</span>,
-                            <span class="bool-val">false</span>, <span class="comment">// .gcc_except_table sections are not globally visible,</span>
+                            <span class="bool-val">false</span>, <span class="comment">// .gcc_except_table sections are never globally visible,</span>
                             <span class="ident">new_crate_weak_ref</span>.<span class="ident">clone</span>(),
                         ))
                     );
@@ -4248,7 +4262,7 @@
                         <span class="ident">shndx</span>, 
                         <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
                             <span class="ident">SectionType::EhFrame</span>,
-                            <span class="ident">sec_name</span>.<span class="ident">to_string</span>(),
+                            <span class="ident">EH_FRAME_STR_REF</span>.<span class="ident">clone</span>(),
                             <span class="ident">Arc::clone</span>(<span class="ident">rp_ref</span>),
                             <span class="ident">rodata_offset</span>,
                             <span class="ident">dest_vaddr</span>,
@@ -4500,11 +4514,11 @@
     <span class="doccomment">/// Returns true if the symbol was added, and false if it already existed and thus was merely replaced.</span>
     <span class="kw">fn</span> <span class="ident">add_symbol</span>(
         <span class="ident">existing_symbol_map</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SymbolMap</span>,
-        <span class="ident">new_section_key</span>: <span class="ident">String</span>,
+        <span class="ident">new_section_key</span>: <span class="ident">StrRef</span>,
         <span class="ident">new_section</span>: <span class="kw-2">&amp;</span><span class="ident">StrongSectionRef</span>,
         <span class="ident">log_replacements</span>: <span class="ident">bool</span>,
     ) -&gt; <span class="ident">bool</span> {
-        <span class="kw">match</span> <span class="ident">existing_symbol_map</span>.<span class="ident">entry</span>(<span class="ident">new_section_key</span>.<span class="ident">into</span>()) {
+        <span class="kw">match</span> <span class="ident">existing_symbol_map</span>.<span class="ident">entry</span>(<span class="ident">new_section_key</span>) {
             <span class="ident">qp_trie::Entry::Occupied</span>(<span class="kw-2">mut</span> <span class="ident">old_val</span>) =&gt; {
                 <span class="kw">if</span> <span class="ident">log_replacements</span> {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">old_sec</span>) <span class="op">=</span> <span class="ident">old_val</span>.<span class="ident">get</span>().<span class="ident">upgrade</span>() {
@@ -4698,7 +4712,7 @@
 
     <span class="doccomment">/// Like [`get_symbol()`](#method.get_symbol), but also returns the exact `CrateNamespace` where the symbol was found.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_symbol_and_namespace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">demangled_full_symbol</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">WeakSectionRef</span>, <span class="kw-2">&amp;</span><span class="ident">CrateNamespace</span>)<span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">weak_symbol</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">symbol_map</span>.<span class="ident">lock</span>().<span class="ident">get_str</span>(<span class="ident">demangled_full_symbol</span>).<span class="ident">cloned</span>();
+        <span class="kw">let</span> <span class="ident">weak_symbol</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">symbol_map</span>.<span class="ident">lock</span>().<span class="ident">get</span>(<span class="ident">demangled_full_symbol</span>.<span class="ident">as_bytes</span>()).<span class="ident">cloned</span>();
         <span class="ident">weak_symbol</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">sym</span><span class="op">|</span> (<span class="ident">sym</span>, <span class="self">self</span>))
             <span class="comment">// search the recursive namespace if the symbol cannot be found in this namespace</span>
             .<span class="ident">or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">recursive_namespace</span>.<span class="ident">as_ref</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">rns</span><span class="op">|</span> <span class="ident">rns</span>.<span class="ident">get_symbol_and_namespace</span>(<span class="ident">demangled_full_symbol</span>)))
@@ -4952,7 +4966,7 @@
     <span class="doccomment">/// a vector containing both sections, which can then be iterated through.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_symbols_starting_with</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">symbol_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">WeakSectionRef</span>)<span class="op">&gt;</span> { 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">syms</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">WeakSectionRef</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">symbol_map</span>.<span class="ident">lock</span>()
-            .<span class="ident">iter_prefix_str</span>(<span class="ident">symbol_prefix</span>)
+            .<span class="ident">iter_prefix</span>(<span class="ident">symbol_prefix</span>.<span class="ident">as_bytes</span>())
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">k</span>, <span class="ident">v</span>)<span class="op">|</span> (<span class="ident">String::from</span>(<span class="ident">k</span>.<span class="ident">as_str</span>()), <span class="ident">v</span>.<span class="ident">clone</span>()))
             .<span class="ident">collect</span>();
 
@@ -4968,7 +4982,7 @@
     <span class="doccomment">/// where the matching symbol was found.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">find_symbols_starting_with_and_namespace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">symbol_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">WeakSectionRef</span>, <span class="kw-2">&amp;</span><span class="ident">CrateNamespace</span>)<span class="op">&gt;</span> { 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">syms</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">String</span>, <span class="ident">WeakSectionRef</span>, <span class="kw-2">&amp;</span><span class="ident">CrateNamespace</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">symbol_map</span>.<span class="ident">lock</span>()
-            .<span class="ident">iter_prefix_str</span>(<span class="ident">symbol_prefix</span>)
+            .<span class="ident">iter_prefix</span>(<span class="ident">symbol_prefix</span>.<span class="ident">as_bytes</span>())
             .<span class="ident">map</span>(<span class="op">|</span>(<span class="ident">k</span>, <span class="ident">v</span>)<span class="op">|</span> (<span class="ident">String::from</span>(<span class="ident">k</span>.<span class="ident">as_str</span>()), <span class="ident">v</span>.<span class="ident">clone</span>(), <span class="self">self</span>))
             .<span class="ident">collect</span>();
 
@@ -5015,7 +5029,7 @@
     <span class="kw">fn</span> <span class="ident">get_symbol_starting_with_internal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">symbol_prefix</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">WeakSectionRef</span><span class="op">&gt;</span> { 
         <span class="comment">// First, we see if there&#39;s a single matching symbol in this namespace. </span>
         <span class="kw">let</span> <span class="ident">map</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">symbol_map</span>.<span class="ident">lock</span>();
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">map</span>.<span class="ident">iter_prefix_str</span>(<span class="ident">symbol_prefix</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">tuple</span><span class="op">|</span> <span class="ident">tuple</span>.<span class="number">1</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">map</span>.<span class="ident">iter_prefix</span>(<span class="ident">symbol_prefix</span>.<span class="ident">as_bytes</span>()).<span class="ident">map</span>(<span class="op">|</span><span class="ident">tuple</span><span class="op">|</span> <span class="ident">tuple</span>.<span class="number">1</span>);
         <span class="kw">let</span> <span class="ident">symbol_in_this_namespace</span> <span class="op">=</span> <span class="ident">iter</span>.<span class="ident">next</span>()
             .<span class="ident">filter</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="ident">iter</span>.<span class="ident">next</span>().<span class="ident">is_none</span>()) <span class="comment">// ensure single element</span>
             .<span class="ident">cloned</span>();

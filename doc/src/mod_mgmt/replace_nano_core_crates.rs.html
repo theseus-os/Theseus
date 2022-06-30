@@ -216,7 +216,7 @@
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">constituent_crates</span> <span class="op">=</span> <span class="ident">BTreeSet::new</span>();
     <span class="kw">for</span> <span class="ident">sec</span> <span class="kw">in</span> <span class="ident">nano_core_crate</span>.<span class="ident">global_sections_iter</span>() {
-        <span class="kw">for</span> <span class="ident">n</span> <span class="kw">in</span> <span class="ident"><span class="kw">super</span>::get_containing_crate_name</span>(<span class="kw-2">&amp;</span><span class="ident">sec</span>.<span class="ident">name</span>) {
+        <span class="kw">for</span> <span class="ident">n</span> <span class="kw">in</span> <span class="ident"><span class="kw">super</span>::get_containing_crate_name</span>(<span class="ident">sec</span>.<span class="ident">name</span>.<span class="ident">as_str</span>()) {
             <span class="ident">constituent_crates</span>.<span class="ident">insert</span>(<span class="ident">String::from</span>(<span class="ident">n</span>));
         }
     }

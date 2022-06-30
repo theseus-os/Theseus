@@ -1111,7 +1111,6 @@
 <span id="1106">1106</span>
 <span id="1107">1107</span>
 <span id="1108">1108</span>
-<span id="1109">1109</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines functions and types for crate swapping, used in live evolution and fault recovery.</span>
 <span class="doccomment">//! </span>
 
@@ -1148,7 +1147,6 @@
 <span class="kw">use</span> <span class="ident">hashbrown::HashMap</span>;
 <span class="kw">use</span> <span class="ident">memory</span>::{<span class="ident">EntryFlags</span>, <span class="ident">MmiRef</span>};
 <span class="kw">use</span> <span class="ident">fs_node</span>::{<span class="ident">FsNode</span>, <span class="ident">FileOrDir</span>, <span class="ident">FileRef</span>, <span class="ident">DirRef</span>};
-<span class="kw">use</span> <span class="ident">qp_trie::wrapper::BString</span>;
 <span class="kw">use</span> <span class="ident">mod_mgmt</span>::{
     <span class="ident">CrateNamespace</span>,
     <span class="ident">NamespaceDir</span>,
@@ -1157,7 +1155,7 @@
     <span class="ident">crate_name_from_path</span>,
     <span class="ident">replace_containing_crate_name</span>,
     <span class="ident">StrongSectionRef</span>,
-    <span class="ident">WeakDependent</span>,
+    <span class="ident">WeakDependent</span>, <span class="ident">StrRef</span>,
 };
 <span class="kw">use</span> <span class="ident">path::Path</span>;
 <span class="kw">use</span> <span class="ident">by_address::ByAddress</span>;
@@ -1457,7 +1455,7 @@
                 <span class="comment">// This closure finds the section in the `new_crate` that corresponds to the given `old_sec` from the `old_crate`.</span>
                 <span class="comment">// And, if enabled, it will reexport that new section under the same name as the `old_sec`.</span>
                 <span class="comment">// We put this procedure in a closure because it&#39;s relatively expensive, allowing us to run it only when necessary.</span>
-                <span class="kw">let</span> <span class="ident">find_corresponding_new_section</span> <span class="op">=</span> <span class="op">|</span><span class="ident">new_crate_reexported_symbols</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span><span class="op">|</span> -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">StrongSectionRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+                <span class="kw">let</span> <span class="ident">find_corresponding_new_section</span> <span class="op">=</span> <span class="op">|</span><span class="ident">new_crate_reexported_symbols</span>: <span class="kw-2">&amp;mut</span> <span class="ident">BTreeSet</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span><span class="op">|</span> -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">StrongSectionRef</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
                     <span class="comment">// Use the new namespace to find the new source_sec that old target_sec should point to.</span>
                     <span class="comment">// The new source_sec must have the same name as the old one (old_sec here),</span>
                     <span class="comment">// otherwise it wouldn&#39;t be a valid swap -- the target_sec&#39;s parent crate should have also been swapped.</span>
@@ -1489,7 +1487,7 @@
                         <span class="comment">// reexport the new source section under the old sec&#39;s name, i.e., redirect the old mapping to the new source sec</span>
                         <span class="kw">let</span> <span class="ident">reexported_name</span> <span class="op">=</span> <span class="ident">old_sec</span>.<span class="ident">name</span>.<span class="ident">clone</span>();
                         <span class="ident">new_crate_reexported_symbols</span>.<span class="ident">insert</span>(<span class="ident">reexported_name</span>.<span class="ident">clone</span>());
-                        <span class="kw">let</span> <span class="ident">_old_val</span> <span class="op">=</span> <span class="ident">old_sec_ns</span>.<span class="ident">symbol_map</span>().<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">BString::from</span>(<span class="ident">reexported_name</span>), <span class="ident">Arc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">new_crate_source_sec</span>));
+                        <span class="kw">let</span> <span class="ident">_old_val</span> <span class="op">=</span> <span class="ident">old_sec_ns</span>.<span class="ident">symbol_map</span>().<span class="ident">lock</span>().<span class="ident">insert</span>(<span class="ident">reexported_name</span>, <span class="ident">Arc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">new_crate_source_sec</span>));
                         <span class="kw">if</span> <span class="ident">_old_val</span>.<span class="ident">is_none</span>() { 
                             <span class="macro">warn!</span>(<span class="string">&quot;swap_crates(): reexported new crate section that replaces old section {:?}, but that old section unexpectedly didn&#39;t exist in the symbol map&quot;</span>, <span class="ident">old_sec</span>.<span class="ident">name</span>);
                         }
@@ -1684,7 +1682,7 @@
                 <span class="kw">if</span> <span class="op">!</span><span class="ident">reexport_new_symbols_as_old</span> {
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">old_ns_symbol_map</span> <span class="op">=</span> <span class="ident">old_namespace</span>.<span class="ident">symbol_map</span>().<span class="ident">lock</span>();
                     <span class="kw">for</span> <span class="ident">old_sec</span> <span class="kw">in</span> <span class="ident">old_crate</span>.<span class="ident">global_sections_iter</span>() {
-                        <span class="kw">if</span> <span class="ident">old_ns_symbol_map</span>.<span class="ident">remove_str</span>(<span class="kw-2">&amp;</span><span class="ident">old_sec</span>.<span class="ident">name</span>).<span class="ident">is_none</span>() {
+                        <span class="kw">if</span> <span class="ident">old_ns_symbol_map</span>.<span class="ident">remove</span>(<span class="kw-2">&amp;</span><span class="ident">old_sec</span>.<span class="ident">name</span>).<span class="ident">is_none</span>() {
                             <span class="macro">error!</span>(<span class="string">&quot;swap_crates(): couldn&#39;t find old symbol {:?} in the old crate&#39;s namespace: {}.&quot;</span>, <span class="ident">old_sec</span>.<span class="ident">name</span>, <span class="ident">old_namespace</span>.<span class="ident">name</span>());
                             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t find old symbol {:?} in the old crate&#39;s namespace&quot;</span>);
                         }
@@ -1694,7 +1692,7 @@
                 <span class="comment">// If the old crate had reexported its symbols, we should remove those reexports here,</span>
                 <span class="comment">// because they&#39;re no longer active since the old crate is being removed. </span>
                 <span class="kw">for</span> <span class="ident">sym</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">old_crate</span>.<span class="ident">reexported_symbols</span> {
-                    <span class="kw">let</span> <span class="ident">_old_reexported_symbol</span> <span class="op">=</span> <span class="ident">old_namespace</span>.<span class="ident">symbol_map</span>().<span class="ident">lock</span>().<span class="ident">remove_str</span>(<span class="ident">sym</span>);
+                    <span class="kw">let</span> <span class="ident">_old_reexported_symbol</span> <span class="op">=</span> <span class="ident">old_namespace</span>.<span class="ident">symbol_map</span>().<span class="ident">lock</span>().<span class="ident">remove</span>(<span class="ident">sym</span>);
                     <span class="kw">if</span> <span class="ident">_old_reexported_symbol</span>.<span class="ident">is_none</span>() {
                         <span class="macro">warn!</span>(<span class="string">&quot;swap_crates(): the old_crate {:?}&#39;s reexported symbol was not in its old namespace, couldn&#39;t be removed.&quot;</span>, <span class="ident">sym</span>);
                     }
