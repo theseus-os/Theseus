@@ -185,7 +185,7 @@ impl CrateType {
 /// loaded and linked into at least one `CrateNamespace`.
 pub struct LoadedCrate {
     /// The name of this crate.
-    pub crate_name: String,
+    pub crate_name: StrRef,
     /// The object file that this crate was loaded from.
     pub object_file: FileRef,
     /// The file that contains debug symbols for this crate. 

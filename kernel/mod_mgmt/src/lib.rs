@@ -32,7 +32,7 @@ use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFla
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
-use qp_trie::{Trie, wrapper::BString};
+use qp_trie::Trie;
 use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
@@ -396,7 +396,7 @@ impl Drop for AppCrateRef {
         // trace!("### Dropping AppCrateRef {:?} from namespace {:?}", self.crate_ref, self.namespace.name());
         let crate_locked = self.crate_ref.lock_as_ref();
         // First, remove the actual crate from the namespace.
-        if let Some(_removed_app_crate) = self.namespace.crate_tree().lock().remove_str(&crate_locked.crate_name) {
+        if let Some(_removed_app_crate) = self.namespace.crate_tree().lock().remove(&crate_locked.crate_name) {
             // Second, remove all of the crate's global symbols from the namespace's symbol map.
             let mut symbol_map = self.namespace.symbol_map().lock();
             for sec_to_remove in crate_locked.global_sections_iter() {
@@ -440,14 +440,14 @@ pub struct CrateNamespace {
     dir: NamespaceDir,
 
     /// The list of all the crates loaded into this namespace,
-    /// stored as a map in which the crate's String name
+    /// stored as a map in which the crate's string name
     /// is the key that maps to the value, a strong reference to a crate.
     /// It is a strong reference because a crate must not be removed
     /// as long as it is part of any namespace,
     /// and a single crate can be part of multiple namespaces at once.
     /// For example, the "core" (Rust core library) crate is essentially
     /// part of every single namespace, simply because most other crates rely upon it. 
-    crate_tree: Mutex<Trie<BString, StrongCrateRef>>,
+    crate_tree: Mutex<Trie<StrRef, StrongCrateRef>>,
 
     /// The "system map" of all symbols that are present in all of the crates in this `CrateNamespace`.
     /// Maps a fully-qualified symbol name string to a corresponding `LoadedSection`,
@@ -524,7 +524,7 @@ impl CrateNamespace {
     }
 
     #[doc(hidden)]
-    pub fn crate_tree(&self) -> &Mutex<Trie<BString, StrongCrateRef>> {
+    pub fn crate_tree(&self) -> &Mutex<Trie<StrRef, StrongCrateRef>> {
         &self.crate_tree
     }
 
@@ -547,7 +547,7 @@ impl CrateNamespace {
     /// including all crates in any recursive namespaces as well if `recursive` is `true`.
     /// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.
     pub fn crate_names(&self, recursive: bool) -> Vec<String> {
-        let mut crates: Vec<String> = self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect();
+        let mut crates: Vec<String> = self.crate_tree.lock().keys().map(|n| String::from(n.as_str())).collect();
 
         if recursive {
             if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
@@ -592,7 +592,7 @@ impl CrateNamespace {
     /// that jointly exists in another namespace, they should invoke the 
     /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
-        self.crate_tree.lock().get_str(crate_name)
+        self.crate_tree.lock().get(crate_name.as_bytes())
             .map(|c| CowArc::clone_shallow(c))
             .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
@@ -614,7 +614,7 @@ impl CrateNamespace {
         namespace: &'n Arc<CrateNamespace>,
         crate_name: &str
     ) -> Option<(StrongCrateRef, &'n Arc<CrateNamespace>)> {
-        namespace.crate_tree.lock().get_str(crate_name)
+        namespace.crate_tree.lock().get(crate_name.as_bytes())
             .map(|c| (CowArc::clone_shallow(c), namespace))
             .or_else(|| namespace.recursive_namespace.as_ref().and_then(|r_ns| Self::get_crate_and_namespace(r_ns, crate_name)))
     }
@@ -639,11 +639,11 @@ impl CrateNamespace {
     pub fn get_crates_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name_prefix: &str
-    ) -> Vec<(String, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Vec<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
         // First, we make a list of matching crates in this namespace. 
         let crates = namespace.crate_tree.lock();
-        let mut crates_in_this_namespace = crates.iter_prefix_str(crate_name_prefix)
-            .map(|(key, val)| (key.clone().into(), val.clone_shallow(), namespace))
+        let mut crates_in_this_namespace = crates.iter_prefix(crate_name_prefix.as_bytes())
+            .map(|(key, val)| (key.clone(), val.clone_shallow(), namespace))
             .collect::<Vec<_>>();
 
         // Second, we make a similar list for the recursive namespace.
@@ -680,7 +680,7 @@ impl CrateNamespace {
     pub fn get_crate_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name_prefix: &str
-    ) -> Option<(String, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Option<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
         let mut crates_iter = Self::get_crates_starting_with(namespace, crate_name_prefix).into_iter();
         crates_iter.next().filter(|_| crates_iter.next().is_none()) // ensure single element
     }
@@ -789,7 +789,7 @@ impl CrateNamespace {
         {
             let new_crate = new_crate_ref.lock_as_ref();
             let _new_syms = namespace.add_symbols(new_crate.sections.values(), verbose_log);
-            namespace.crate_tree.lock().insert_str(&new_crate.crate_name, CowArc::clone_shallow(&new_crate_ref));
+            namespace.crate_tree.lock().insert(new_crate.crate_name.clone(), CowArc::clone_shallow(&new_crate_ref));
             info!("loaded new application crate: {:?}, num sections: {}, added {} new symbols", new_crate.crate_name, new_crate.sections.len(), _new_syms);
         }
         Ok(AppCrateRef {
@@ -1023,7 +1023,7 @@ impl CrateNamespace {
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.len();
         let abs_path      = Path::new(crate_file.get_absolute_path());
-        let crate_name    = crate_name_from_path(&abs_path).to_string();
+        let crate_name    = StrRef::from(crate_name_from_path(&abs_path));
 
         // First, check to make sure this crate hasn't already been loaded. 
         // Application crates are now added to the CrateNamespace just like kernel crates,

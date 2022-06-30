@@ -20,7 +20,7 @@ extern crate spin;
 
 use alloc::{
     collections::BTreeSet,
-    string::{String},
+    string::String,
     vec::Vec,
     sync::Arc,
 };
@@ -30,7 +30,7 @@ use getopts::{Matches, Options};
 use mod_mgmt::{
     StrongCrateRef,
     StrongSectionRef,
-    CrateNamespace,
+    CrateNamespace, StrRef,
 };
 use crate_name_utils::get_containing_crate_name;
 
@@ -372,7 +372,7 @@ fn sections_in_crate(crate_name: &str, all_sections: bool) -> Result<(), String>
 /// 
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching section names separated by the newline character `'\n'`.
-fn find_crate(crate_name: &str) -> Result<(String, StrongCrateRef), String> {
+fn find_crate(crate_name: &str) -> Result<(StrRef, StrongCrateRef), String> {
     let namespace = get_my_current_namespace();
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
     match matching_crates.len() {
@@ -381,7 +381,7 @@ fn find_crate(crate_name: &str) -> Result<(String, StrongCrateRef), String> {
             let mc = matching_crates.swap_remove(0);
             Ok((mc.0, mc.1)) 
         }
-        _ => Err(matching_crates.into_iter().map(|(crate_name, _crate_ref, _ns)| crate_name).collect::<Vec<String>>().join("\n")),
+        _ => Err(matching_crates.into_iter().map(|(crate_name, _crate_ref, _ns)| crate_name).collect::<Vec<_>>().join("\n")),
     }
 }
 
