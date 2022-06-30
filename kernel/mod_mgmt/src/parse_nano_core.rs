@@ -15,7 +15,7 @@ use xmas_elf::{self, ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_
 use rustc_demangle::demangle;
 use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
-use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType, Shndx, StrRef, EH_FRAME_STR_REF, GCC_EXCEPT_TABLE_STR_REF};
+use crate_metadata::*;
 use hashbrown::HashMap;
 use path::Path;
 use super::CrateNamespace;

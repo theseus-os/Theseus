@@ -1442,8 +1442,11 @@ impl CrateNamespace {
 
             // Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections
             else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
-                let name = try_get_symbol_name_after_prefix!(sec_name, GCC_EXCEPT_TABLE_PREFIX);
-                let demangled = demangle(name).to_string().into();
+                // We don't need to waste space keeping the name of the `.gcc_exept_table` section, 
+                // because that name is irrelevant and will never be used.
+                //
+                // let name = try_get_symbol_name_after_prefix!(sec_name, GCC_EXCEPT_TABLE_PREFIX);
+                // let demangled = demangle(name).to_string().into();
 
                 // gcc_except_table sections are read-only, so we put them in the .rodata pages
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -1464,12 +1467,12 @@ impl CrateNamespace {
                         shndx, 
                         Arc::new(LoadedSection::new(
                             SectionType::GccExceptTable,
-                            demangled,
+                            GCC_EXCEPT_TABLE_STR_REF.clone(),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,
                             sec_size,
-                            false, // .gcc_except_table sections are not globally visible,
+                            false, // .gcc_except_table sections are never globally visible,
                             new_crate_weak_ref.clone(),
                         ))
                     );
