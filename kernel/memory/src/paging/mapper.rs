@@ -414,47 +414,47 @@ impl MappedPages {
     }
 
     
-    // Removing this function for now since it's unused and untested.
-    // /// Creates a deep copy of this `MappedPages` memory region,
-    // /// by duplicating not only the virtual memory mapping
-    // /// but also the underlying physical memory frames. 
-    // /// 
-    // /// The caller can optionally specify new flags for the duplicated mapping,
-    // /// otherwise, the same flags as the existing `MappedPages` will be used. 
-    // /// This is useful for when you want to modify contents in the new pages,
-    // /// since it avoids extra `remap()` operations.
-    // /// 
-    // /// Returns a new `MappedPages` object with the same in-memory contents
-    // /// as this object, but at a completely new memory region.
-    // pub fn deep_copy(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper) -> Result<MappedPages, &'static str> {
-    //     let size_in_pages = self.size_in_pages();
+    /// Creates a deep copy of this `MappedPages` memory region,
+    /// by duplicating not only the virtual memory mapping
+    /// but also the underlying physical memory frames. 
+    /// 
+    /// The caller can optionally specify new flags for the duplicated mapping,
+    /// otherwise, the same flags as the existing `MappedPages` will be used. 
+    /// This is useful for when you want to modify contents in the new pages,
+    /// since it avoids extra `remap()` operations.
+    /// 
+    /// Returns a new `MappedPages` object with the same in-memory contents
+    /// as this object, but at a completely new memory region.
+    pub fn deep_copy(&self, new_flags: Option<EntryFlags>, active_table_mapper: &mut Mapper) -> Result<MappedPages, &'static str> {
+        warn!("MappedPages::deep_copy() has not been adequately tested yet.");
+        let size_in_pages = self.size_in_pages();
 
-    //     use paging::allocate_pages;
-    //     let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
+        use paging::allocate_pages;
+        let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
 
-    //     // we must temporarily map the new pages as Writable, since we're about to copy data into them
-    //     let new_flags = new_flags.unwrap_or(self.flags);
-    //     let needs_remapping = new_flags.is_writable(); 
-    //     let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
-    //         new_pages, 
-    //         new_flags | EntryFlags::WRITABLE, // force writable
-    //     )?;
+        // we must temporarily map the new pages as Writable, since we're about to copy data into them
+        let new_flags = new_flags.unwrap_or(self.flags);
+        let needs_remapping = !new_flags.is_writable(); 
+        let mut new_mapped_pages = active_table_mapper.map_allocated_pages(
+            new_pages, 
+            new_flags | EntryFlags::WRITABLE, // force writable
+        )?;
 
-    //     // perform the actual copy of in-memory content
-    //     // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
-    //     {
-    //         type PageContent = [u8; PAGE_SIZE];
-    //         let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
-    //         let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;
-    //         dest.copy_from_slice(source);
-    //     }
+        // perform the actual copy of in-memory content
+        // TODO: there is probably a better way to do this, e.g., `rep stosq/movsq` or something
+        {
+            type PageContent = [u8; PAGE_SIZE];
+            let source: &[PageContent] = self.as_slice(0, size_in_pages)?;
+            let dest: &mut [PageContent] = new_mapped_pages.as_slice_mut(0, size_in_pages)?;
+            dest.copy_from_slice(source);
+        }
 
-    //     if needs_remapping {
-    //         new_mapped_pages.remap(active_table_mapper, new_flags)?;
-    //     }
+        if needs_remapping {
+            new_mapped_pages.remap(active_table_mapper, new_flags)?;
+        }
         
-    //     Ok(new_mapped_pages)
-    // }
+        Ok(new_mapped_pages)
+    }
 
     
     /// Change the permissions (`new_flags`) of this `MappedPages`'s page table entries.
