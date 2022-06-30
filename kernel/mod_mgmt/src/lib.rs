@@ -831,7 +831,7 @@ impl CrateNamespace {
             
         #[cfg(not(loscd_eval))]
         info!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, _num_sections, new_syms);
-        self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref.clone_shallow());
+        self.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone_shallow());
         Ok((new_crate_ref, new_syms))
     }
 
@@ -1254,7 +1254,7 @@ impl CrateNamespace {
                 } else {
                     name
                 };
-                let demangled = demangle(name).to_string().into();
+                let demangled = demangle(name).to_string().as_str().into();
 
                 // We already copied the content of all .text sections above, 
                 // so here we just record the metadata into a new `LoadedSection` object.
@@ -1293,7 +1293,7 @@ impl CrateNamespace {
                 } else {
                     try_get_symbol_name_after_prefix!(sec_name, TLS_DATA_PREFIX)
                 };
-                let demangled = demangle(name).to_string().into();
+                let demangled = demangle(name).to_string().as_str().into();
 
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     let (mapped_pages_offset, sec_typ) = if is_bss {
@@ -1362,7 +1362,7 @@ impl CrateNamespace {
                         //     }
                         // })
                 };
-                let demangled = demangle(name).to_string().into();
+                let demangled = demangle(name).to_string().as_str().into();
                 
                 if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
                     // here: we're ready to copy the data/bss section to the proper address
@@ -1403,7 +1403,7 @@ impl CrateNamespace {
             // Fourth, if neither executable nor TLS nor writable, handle .rodata sections.
             else if sec_name.starts_with(RODATA_PREFIX) {
                 let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
-                let demangled = demangle(name).to_string().into();
+                let demangled = demangle(name).to_string().as_str().into();
 
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address

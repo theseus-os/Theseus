@@ -575,7 +575,7 @@ fn parse_nano_core_binary(
                         &new_crate_weak_ref,
                         &mut section_counter,
                         entry.shndx() as usize,
-                        demangled.into(),
+                        demangled.as_str().into(),
                         sec_size,
                         sec_vaddr_value,
                         global
