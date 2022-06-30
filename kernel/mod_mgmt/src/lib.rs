@@ -247,8 +247,7 @@ fn parse_extra_file(
 /// A "symbol map" from a fully-qualified demangled symbol String  
 /// to weak reference to a `LoadedSection`.
 /// This is used for relocations, and for looking up function names.
-pub type SymbolMap = Trie<BString, WeakSectionRef>;
-pub type SymbolMapIter<'a> = qp_trie::Iter<'a, &'a BString, &'a WeakSectionRef>;
+pub type SymbolMap = Trie<StrRef, WeakSectionRef>;
 
 
 /// A wrapper around a `Directory` reference that offers special convenience functions
@@ -401,8 +400,13 @@ impl Drop for AppCrateRef {
             // Second, remove all of the crate's global symbols from the namespace's symbol map.
             let mut symbol_map = self.namespace.symbol_map().lock();
             for sec_to_remove in crate_locked.global_sections_iter() {
-                if symbol_map.remove_str(&sec_to_remove.name).is_none() {
-                    error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", sec_to_remove.name, crate_locked.crate_name, self.namespace.name());
+                match symbol_map.remove(&sec_to_remove.name) {
+                    Some(_removed) => {
+                        trace!("Removed symbol {}: {:?}", sec_to_remove.name, _removed.upgrade());
+                    }
+                    None => {
+                        error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", sec_to_remove.name, crate_locked.crate_name, self.namespace.name());
+                    }
                 }
             }
         } else {
@@ -1250,7 +1254,7 @@ impl CrateNamespace {
                 } else {
                     name
                 };
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().into();
 
                 // We already copied the content of all .text sections above, 
                 // so here we just record the metadata into a new `LoadedSection` object.
@@ -1289,7 +1293,7 @@ impl CrateNamespace {
                 } else {
                     try_get_symbol_name_after_prefix!(sec_name, TLS_DATA_PREFIX)
                 };
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().into();
 
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     let (mapped_pages_offset, sec_typ) = if is_bss {
@@ -1358,7 +1362,7 @@ impl CrateNamespace {
                         //     }
                         // })
                 };
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().into();
                 
                 if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
                     // here: we're ready to copy the data/bss section to the proper address
@@ -1378,7 +1382,7 @@ impl CrateNamespace {
                         shndx,
                         Arc::new(LoadedSection::new(
                             if is_bss { SectionType::Bss } else { SectionType::Data },
-                            demangled.clone(),
+                            demangled,
                             Arc::clone(dp_ref),
                             data_offset,
                             dest_vaddr,
@@ -1399,7 +1403,7 @@ impl CrateNamespace {
             // Fourth, if neither executable nor TLS nor writable, handle .rodata sections.
             else if sec_name.starts_with(RODATA_PREFIX) {
                 let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().into();
 
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address
@@ -1438,8 +1442,8 @@ impl CrateNamespace {
 
             // Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections
             else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
-                let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
-                let demangled = demangle(name).to_string();
+                let name = try_get_symbol_name_after_prefix!(sec_name, GCC_EXCEPT_TABLE_PREFIX);
+                let demangled = demangle(name).to_string().into();
 
                 // gcc_except_table sections are read-only, so we put them in the .rodata pages
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -1498,7 +1502,7 @@ impl CrateNamespace {
                         shndx, 
                         Arc::new(LoadedSection::new(
                             SectionType::EhFrame,
-                            sec_name.to_string(),
+                            EH_FRAME_STR_REF.clone(),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,
@@ -1750,11 +1754,11 @@ impl CrateNamespace {
     /// Returns true if the symbol was added, and false if it already existed and thus was merely replaced.
     fn add_symbol(
         existing_symbol_map: &mut SymbolMap,
-        new_section_key: String,
+        new_section_key: StrRef,
         new_section: &StrongSectionRef,
         log_replacements: bool,
     ) -> bool {
-        match existing_symbol_map.entry(new_section_key.into()) {
+        match existing_symbol_map.entry(new_section_key) {
             qp_trie::Entry::Occupied(mut old_val) => {
                 if log_replacements {
                     if let Some(old_sec) = old_val.get().upgrade() {
@@ -1948,7 +1952,7 @@ impl CrateNamespace {
 
     /// Like [`get_symbol()`](#method.get_symbol), but also returns the exact `CrateNamespace` where the symbol was found.
     pub fn get_symbol_and_namespace(&self, demangled_full_symbol: &str) -> Option<(WeakSectionRef, &CrateNamespace)> {
-        let weak_symbol = self.symbol_map.lock().get_str(demangled_full_symbol).cloned();
+        let weak_symbol = self.symbol_map.lock().get(demangled_full_symbol.as_bytes()).cloned();
         weak_symbol.map(|sym| (sym, self))
             // search the recursive namespace if the symbol cannot be found in this namespace
             .or_else(|| self.recursive_namespace.as_ref().and_then(|rns| rns.get_symbol_and_namespace(demangled_full_symbol)))
@@ -2202,7 +2206,7 @@ impl CrateNamespace {
     /// a vector containing both sections, which can then be iterated through.
     pub fn find_symbols_starting_with(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef)> { 
         let mut syms: Vec<(String, WeakSectionRef)> = self.symbol_map.lock()
-            .iter_prefix_str(symbol_prefix)
+            .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone()))
             .collect();
 
@@ -2218,7 +2222,7 @@ impl CrateNamespace {
     /// where the matching symbol was found.
     pub fn find_symbols_starting_with_and_namespace(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef, &CrateNamespace)> { 
         let mut syms: Vec<(String, WeakSectionRef, &CrateNamespace)> = self.symbol_map.lock()
-            .iter_prefix_str(symbol_prefix)
+            .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone(), self))
             .collect();
 
@@ -2265,7 +2269,7 @@ impl CrateNamespace {
     fn get_symbol_starting_with_internal(&self, symbol_prefix: &str) -> Option<WeakSectionRef> { 
         // First, we see if there's a single matching symbol in this namespace. 
         let map = self.symbol_map.lock();
-        let mut iter = map.iter_prefix_str(symbol_prefix).map(|tuple| tuple.1);
+        let mut iter = map.iter_prefix(symbol_prefix.as_bytes()).map(|tuple| tuple.1);
         let symbol_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
             .cloned();

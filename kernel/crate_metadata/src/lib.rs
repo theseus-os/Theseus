@@ -42,32 +42,29 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
-extern crate spin; 
-extern crate memory;
-extern crate cow_arc;
-extern crate hashbrown;
-extern crate fs_node;
-extern crate xmas_elf;
-extern crate goblin;
+extern crate alloc;
 
 use core::convert::TryFrom;
 use core::fmt;
 use core::ops::Range;
+use lazy_static::lazy_static;
+use log::{error, debug, trace};
 use spin::{Mutex, RwLock};
 use alloc::{
     collections::BTreeSet,
+    format,
     string::String,
     sync::{Arc, Weak},
     vec::Vec,
 };
 use memory::{MappedPages, VirtualAddress, EntryFlags};
-#[cfg(internal_deps)] use memory::PageTable;
+#[cfg(internal_deps)]
+use memory::PageTable;
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
 use goblin::elf::reloc::*;
+pub use str_ref::StrRef;
 
 
 /// A Strong reference to a [`LoadedCrate`].
@@ -81,6 +78,13 @@ pub type WeakSectionRef = Weak<LoadedSection>;
 /// A Section Header iNDeX (SHNDX), as specified by the ELF format. 
 /// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.
 pub type Shndx = usize;
+
+lazy_static! {
+    /// ".eh_frame" as a single, system-wide allocated `StrRef`.
+    pub static ref EH_FRAME_STR_REF: StrRef = StrRef::from(".eh_frame");
+    /// ".gcc_except_table" as a single, system-wide allocated `StrRef`.
+    pub static ref GCC_EXCEPT_TABLE_STR_REF: StrRef = StrRef::from(".gcc_except_table");
+}
 
 /// `.text` sections are read-only and executable.
 pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
@@ -246,7 +250,7 @@ pub struct LoadedCrate {
     /// 
     /// When a crate is first loaded, this will be empty by default, 
     /// because this crate will only have populated its `global_sections` set during loading. 
-    pub reexported_symbols: BTreeSet<String>,
+    pub reexported_symbols: BTreeSet<StrRef>,
 }
 
 impl fmt::Debug for LoadedCrate {
@@ -274,7 +278,7 @@ impl LoadedCrate {
     pub fn get_function_section(&self, func_name: &str) -> Option<&StrongSectionRef> {
         self.find_section(|sec| 
             sec.get_type() == SectionType::Text &&
-            sec.name == func_name
+            sec.name.as_str() == func_name
         )
     }
 
@@ -421,7 +425,7 @@ impl LoadedCrate {
             rodata_pages:            new_rodata_pages_range,
             data_pages:              new_data_pages_range,
             global_sections:         self.global_sections.clone(),
-            tls_sections:            self.tss_sections.clone(),
+            tls_sections:            self.tls_sections.clone(),
             data_sections:           self.data_sections.clone(),
             reexported_symbols:      self.reexported_symbols.clone(),
         });
@@ -444,14 +448,16 @@ impl LoadedCrate {
                     new_text_pages_ref.clone().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
                     new_text_pages_locked.as_ref().and_then(|tp| tp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
-                SectionType::Rodata |
-                SectionType::GccExceptTable | 
-                SectionType::EhFrame => (
+                SectionType::Rodata
+                | SectionType::GccExceptTable
+                | SectionType::TlsBss
+                | SectionType::TlsData 
+                | SectionType::EhFrame => (
                     new_rodata_pages_ref.clone().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
                     new_rodata_pages_locked.as_ref().and_then(|rp| rp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
-                SectionType::Data |
-                SectionType::Bss => (
+                SectionType::Data
+                | SectionType::Bss => (
                     new_data_pages_ref.clone().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
                     new_data_pages_locked.as_ref().and_then(|dp| dp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
@@ -482,12 +488,20 @@ impl LoadedCrate {
         for new_sec in new_sections.values() {
             let mut new_sec_inner = new_sec.inner.write();
             let new_sec_mapped_pages = match new_sec.typ {
-                SectionType::Text    => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
-                SectionType::Rodata |
-                SectionType::GccExceptTable | 
-                SectionType::EhFrame => new_rodata_pages_locked.as_mut().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
-                SectionType::Data |
-                SectionType::Bss     => new_data_pages_locked.as_mut().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                SectionType::Text => new_text_pages_locked
+                    .as_mut()
+                    .ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                SectionType::Rodata
+                | SectionType::TlsBss
+                | SectionType::TlsData
+                | SectionType::GccExceptTable
+                | SectionType::EhFrame => new_rodata_pages_locked
+                    .as_mut()
+                    .ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
+                SectionType::Data
+                | SectionType::Bss => new_data_pages_locked
+                    .as_mut()
+                    .ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
 
@@ -637,7 +651,7 @@ pub struct LoadedSectionInner {
 /// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
 pub struct LoadedSection {
-    /// The full String name of this section, a fully-qualified symbol, 
+    /// The full string name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
     /// The unique hash is generated for each section by the Rust compiler,
     /// which can be used as a version identifier. 
@@ -646,7 +660,7 @@ pub struct LoadedSection {
     /// # Examples
     /// * `test_lib::MyStruct::new::h843a613894da0c24`
     /// * `my_crate::my_function::hbce878984534ceda`   
-    pub name: String,
+    pub name: StrRef,
     /// The type of this section, e.g., `.text`, `.rodata`, `.data`, `.bss`, etc.
     pub typ: SectionType,
     /// Whether or not this section's symbol was exported globally (is public)
@@ -674,7 +688,7 @@ impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
     pub fn new(
         typ: SectionType, 
-        name: String, 
+        name: StrRef, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -701,7 +715,7 @@ impl LoadedSection {
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
     pub fn with_dependencies(
         typ: SectionType, 
-        name: String, 
+        name: StrRef, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -749,7 +763,7 @@ impl LoadedSection {
     /// 
     /// See the identical associated function [`section_name_without_hash()`](#fn.section_name_without_hash.html) for more. 
     pub fn name_without_hash(&self) -> &str {
-        Self::section_name_without_hash(&self.name)
+        Self::section_name_without_hash(self.name.as_str())
     }
 
 

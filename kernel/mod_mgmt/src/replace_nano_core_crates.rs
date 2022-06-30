@@ -50,7 +50,7 @@ pub fn replace_nano_core_crates(
 
     let mut constituent_crates = BTreeSet::new();
     for sec in nano_core_crate.global_sections_iter() {
-        for n in super::get_containing_crate_name(&sec.name) {
+        for n in super::get_containing_crate_name(sec.name.as_str()) {
             constituent_crates.insert(String::from(n));
         }
     }

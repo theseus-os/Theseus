@@ -34,7 +34,6 @@ use alloc::{
 use hashbrown::HashMap;
 use memory::{EntryFlags, MmiRef};
 use fs_node::{FsNode, FileOrDir, FileRef, DirRef};
-use qp_trie::wrapper::BString;
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
@@ -43,7 +42,7 @@ use mod_mgmt::{
     crate_name_from_path,
     replace_containing_crate_name,
     StrongSectionRef,
-    WeakDependent,
+    WeakDependent, StrRef,
 };
 use path::Path;
 use by_address::ByAddress;
@@ -343,7 +342,7 @@ pub fn swap_crates(
                 // This closure finds the section in the `new_crate` that corresponds to the given `old_sec` from the `old_crate`.
                 // And, if enabled, it will reexport that new section under the same name as the `old_sec`.
                 // We put this procedure in a closure because it's relatively expensive, allowing us to run it only when necessary.
-                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<String>| -> Result<StrongSectionRef, &'static str> {
+                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<StrRef>| -> Result<StrongSectionRef, &'static str> {
                     // Use the new namespace to find the new source_sec that old target_sec should point to.
                     // The new source_sec must have the same name as the old one (old_sec here),
                     // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
@@ -375,7 +374,7 @@ pub fn swap_crates(
                         // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
                         let reexported_name = old_sec.name.clone();
                         new_crate_reexported_symbols.insert(reexported_name.clone());
-                        let _old_val = old_sec_ns.symbol_map().lock().insert(BString::from(reexported_name), Arc::downgrade(&new_crate_source_sec));
+                        let _old_val = old_sec_ns.symbol_map().lock().insert(reexported_name, Arc::downgrade(&new_crate_source_sec));
                         if _old_val.is_none() { 
                             warn!("swap_crates(): reexported new crate section that replaces old section {:?}, but that old section unexpectedly didn't exist in the symbol map", old_sec.name);
                         }
@@ -570,7 +569,7 @@ pub fn swap_crates(
                 if !reexport_new_symbols_as_old {
                     let mut old_ns_symbol_map = old_namespace.symbol_map().lock();
                     for old_sec in old_crate.global_sections_iter() {
-                        if old_ns_symbol_map.remove_str(&old_sec.name).is_none() {
+                        if old_ns_symbol_map.remove(&old_sec.name).is_none() {
                             error!("swap_crates(): couldn't find old symbol {:?} in the old crate's namespace: {}.", old_sec.name, old_namespace.name());
                             return Err("couldn't find old symbol {:?} in the old crate's namespace");
                         }
@@ -580,7 +579,7 @@ pub fn swap_crates(
                 // If the old crate had reexported its symbols, we should remove those reexports here,
                 // because they're no longer active since the old crate is being removed. 
                 for sym in &old_crate.reexported_symbols {
-                    let _old_reexported_symbol = old_namespace.symbol_map().lock().remove_str(sym);
+                    let _old_reexported_symbol = old_namespace.symbol_map().lock().remove(sym);
                     if _old_reexported_symbol.is_none() {
                         warn!("swap_crates(): the old_crate {:?}'s reexported symbol was not in its old namespace, couldn't be removed.", sym);
                     }

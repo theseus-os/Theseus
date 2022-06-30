@@ -15,7 +15,7 @@ use xmas_elf::{self, ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_
 use rustc_demangle::demangle;
 use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
-use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType, Shndx};
+use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType, Shndx, StrRef, EH_FRAME_STR_REF, GCC_EXCEPT_TABLE_STR_REF};
 use hashbrown::HashMap;
 use path::Path;
 use super::CrateNamespace;
@@ -248,7 +248,7 @@ fn parse_nano_core_symbol_file(
                 section_counter,
                 Arc::new(LoadedSection::new(
                     SectionType::EhFrame,
-                    String::from(".eh_frame"),
+                    EH_FRAME_STR_REF.clone(),
                     Arc::clone(&rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -268,7 +268,7 @@ fn parse_nano_core_symbol_file(
                 section_counter,
                 Arc::new(LoadedSection::new(
                     SectionType::GccExceptTable,
-                    String::from(".gcc_except_table"),
+                    GCC_EXCEPT_TABLE_STR_REF.clone(),
                     Arc::clone(&rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -380,7 +380,7 @@ fn parse_nano_core_symbol_file(
                 &new_crate_weak_ref,
                 &mut section_counter,
                 sec_ndx,
-                String::from(name),
+                StrRef::from(name),
                 sec_size,
                 sec_vaddr,
                 global
@@ -500,7 +500,7 @@ fn parse_nano_core_binary(
                     section_counter,
                     Arc::new(LoadedSection::new(
                         SectionType::GccExceptTable,
-                        String::from(".gcc_except_table"),
+                        GCC_EXCEPT_TABLE_STR_REF.clone(),
                         Arc::clone(&rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
@@ -520,7 +520,7 @@ fn parse_nano_core_binary(
                     section_counter,
                     Arc::new(LoadedSection::new(
                         SectionType::EhFrame,
-                        String::from(".eh_frame"),
+                        EH_FRAME_STR_REF.clone(),
                         Arc::clone(&rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
@@ -575,7 +575,7 @@ fn parse_nano_core_binary(
                         &new_crate_weak_ref,
                         &mut section_counter,
                         entry.shndx() as usize,
-                        demangled,
+                        demangled.into(),
                         sec_size,
                         sec_vaddr_value,
                         global
@@ -640,7 +640,7 @@ fn add_new_section(
     section_counter:     &mut Shndx,
     // crate-wide args above, section-specific stuff below
     sec_ndx: Shndx,
-    sec_name: String,
+    sec_name: StrRef,
     sec_size: usize,
     sec_vaddr: usize,
     global: bool,
@@ -750,7 +750,7 @@ fn add_new_section(
         Some(tls_section)
     }
     else {
-        crate_items.init_symbols.insert(sec_name, sec_vaddr);
+        crate_items.init_symbols.insert(String::from(sec_name.as_str()), sec_vaddr);
         None
     };
 
