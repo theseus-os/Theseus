@@ -35,7 +35,7 @@ impl Clone for StrRef {
 
 impl fmt::Debug for StrRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
+        write!(f, "{:?}", self.as_str())
     }
 }
 

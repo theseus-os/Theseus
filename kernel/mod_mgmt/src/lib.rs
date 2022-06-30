@@ -402,7 +402,7 @@ impl Drop for AppCrateRef {
             for sec_to_remove in crate_locked.global_sections_iter() {
                 match symbol_map.remove(&sec_to_remove.name) {
                     Some(_removed) => {
-                        trace!("Removed symbol {}: {:?}", sec_to_remove.name, _removed.upgrade());
+                        // trace!("Removed symbol {}: {:?}", sec_to_remove.name, _removed.upgrade());
                     }
                     None => {
                         error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", sec_to_remove.name, crate_locked.crate_name, self.namespace.name());
@@ -545,9 +545,9 @@ impl CrateNamespace {
 
     /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`,
     /// including all crates in any recursive namespaces as well if `recursive` is `true`.
-    /// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.
-    pub fn crate_names(&self, recursive: bool) -> Vec<String> {
-        let mut crates: Vec<String> = self.crate_tree.lock().keys().map(|n| String::from(n.as_str())).collect();
+    /// This is a slow method mostly for debugging, since it allocates a new vector of crate names.
+    pub fn crate_names(&self, recursive: bool) -> Vec<StrRef> {
+        let mut crates: Vec<StrRef> = self.crate_tree.lock().keys().map(|n| n.clone()).collect();
 
         if recursive {
             if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
