@@ -22,7 +22,7 @@ impl Drop for MyStruct {
 
 #[inline(never)]
 fn foo(cause_page_fault: bool) {
-    let _res = task::set_my_kill_handler(Box::new(|kill_reason| {
+    let _res = task::set_kill_handler(Box::new(|kill_reason| {
         info!("unwind_test: caught kill action at {}", kill_reason);
     }));
     

@@ -15,11 +15,11 @@ use alloc::boxed::Box;
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_panic::main(): at top");
 
-    let _res = task::set_my_kill_handler(Box::new(|kill_reason| {
+    let _res = task::set_kill_handler(Box::new(|kill_reason| {
         println!("test_panic: caught a kill action: {}", kill_reason);
     }));
 
-    info!("test_panic::main(): registering kill handler... {:?}.", _res);
+    info!("test_panic::main(): registered kill handler? {:?}.", _res);
 
     match _args.get(0).map(|s| &**s) {
         // indexing test
