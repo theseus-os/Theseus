@@ -167,19 +167,13 @@ fn kill_and_halt(
     let cause = task::KillReason::Exception(exception_number);
 
     // Call this task's kill handler, if it has one.
-    {
-        let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
-        if let Some(ref kh_func) = kill_handler {
-
-            #[cfg(not(downtime_eval))]
-            debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
-
-            kh_func(&cause);
-        }
-        else {
-            #[cfg(not(downtime_eval))]
-            debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
-        }
+    if let Some(ref kh_func) = task::take_kill_handler() {
+        #[cfg(not(downtime_eval))]
+        debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+        kh_func(&cause);
+    } else {
+        #[cfg(not(downtime_eval))]
+        debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
     }
 
     // Invoke the proper signal handler registered for this task, if one exists.

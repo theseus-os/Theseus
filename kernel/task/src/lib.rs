@@ -114,11 +114,33 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
 }
 
 
-/// Sets the kill handler function for the current `Task`
-pub fn set_my_kill_handler(handler: KillHandler) -> Result<(), &'static str> {
+/// Registers a kill handler function for the current `Task`.
+/// 
+/// [`KillHandler`]s are called when a `Task` panics or otherwise fails
+/// (e.g., due to a machine exception).
+///
+/// # Locking / Deadlock
+/// Obtains the lock on this `Task`'s inner state in order to mutate it.
+pub fn set_kill_handler(function: KillHandler) -> Result<(), &'static str> {
     get_my_current_task()
-        .ok_or("couldn't get_my_current_task")
-        .map(|taskref| taskref.set_kill_handler(handler))
+        .ok_or("couldn't get current task")
+        .map(|t| t.inner.lock().kill_handler = Some(function))
+}
+
+
+/// Takes ownership of the current `Task`'s [`KillHandler`] function.
+/// 
+/// The registered `KillHandler` function is removed from the current task,
+/// if it exists, and returned such that it can be invoked without holding
+/// the `Task`'s inner lock.
+/// 
+/// After invoking this, the current task's kill handler will be `None`.
+///
+/// # Locking / Deadlock
+/// Obtains the lock on this `Task`'s inner state in order to mutate it.
+pub fn take_kill_handler() -> Option<KillHandler> {
+    get_my_current_task()
+        .and_then(|t| t.inner.lock().kill_handler.take())
 }
 
 
@@ -568,27 +590,6 @@ impl Task {
         self.inner.lock().restart_info.is_some()
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics
-    /// or otherwise fails (e.g., due to a machine exception).
-    ///
-    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`'s inner state in order to mutate it.
-    pub fn set_kill_handler(&self, callback: KillHandler) {
-        self.inner.lock().kill_handler = Some(callback);
-    }
-
-    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
-    /// and returns it so it can be invoked without holding this `Task`'s inner lock.
-    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`'s inner state in order to mutate it.
-    pub fn take_kill_handler(&self) -> Option<KillHandler> {
-        self.inner.lock().kill_handler.take()
-    }
-
     /// Takes ownership of this `Task`'s exit value and returns it,
     /// if and only if this `Task` was in the `Exited` runstate.
     ///
@@ -831,7 +832,7 @@ impl Drop for Task {
         // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
         // then after the app crate is released, the kill handler will be dropped AFTER the app crate has been freed.
         // When it tries to drop the task's kill handler, a page fault will occur because the text section of the app crate has been unmapped.
-        if let Some(kill_handler) = self.take_kill_handler() {
+        if let Some(kill_handler) = self.inner.lock().kill_handler.take() {
             warn!("While dropping task {:?}, its kill handler callback was still present. Removing it now.", self);
             drop(kill_handler);
         }
