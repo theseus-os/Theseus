@@ -17,7 +17,7 @@ We are continually working to improve the OS, including its fault recovery abili
 On Linux (Debian-like distros), do the following:
  1. Obtain the Theseus repository (with all submodules):    
     ```
-    git clone --recurse-submodules https://github.com/theseus-os/Theseus.git
+    git clone --recurse-submodules --depth 1 https://github.com/theseus-os/Theseus.git
     ```
  2. Install Rust:
     ```
