@@ -1150,6 +1150,7 @@
 <span id="1145">1145</span>
 <span id="1146">1146</span>
 <span id="1147">1147</span>
+<span id="1148">1148</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, </span>
 <span class="doccomment">//! and the associated code for dealing with tasks.</span>
 <span class="doccomment">//! </span>
@@ -1266,11 +1267,33 @@
 }
 
 
-<span class="doccomment">/// Sets the kill handler function for the current `Task`</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_my_kill_handler</span>(<span class="ident">handler</span>: <span class="ident">KillHandler</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Registers a kill handler function for the current `Task`.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// [`KillHandler`]s are called when a `Task` panics or otherwise fails</span>
+<span class="doccomment">/// (e.g., due to a machine exception).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Locking / Deadlock</span>
+<span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_kill_handler</span>(<span class="ident">function</span>: <span class="ident">KillHandler</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
     <span class="ident">get_my_current_task</span>()
-        .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get_my_current_task&quot;</span>)
-        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">taskref</span><span class="op">|</span> <span class="ident">taskref</span>.<span class="ident">set_kill_handler</span>(<span class="ident">handler</span>))
+        .<span class="ident">ok_or</span>(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)
+        .<span class="ident">map</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kill_handler</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">function</span>))
+}
+
+
+<span class="doccomment">/// Takes ownership of the current `Task`&#39;s [`KillHandler`] function.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// The registered `KillHandler` function is removed from the current task,</span>
+<span class="doccomment">/// if it exists, and returned such that it can be invoked without holding</span>
+<span class="doccomment">/// the `Task`&#39;s inner lock.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// After invoking this, the current task&#39;s kill handler will be `None`.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// # Locking / Deadlock</span>
+<span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_kill_handler</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KillHandler</span><span class="op">&gt;</span> {
+    <span class="ident">get_my_current_task</span>()
+        .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">t</span><span class="op">|</span> <span class="ident">t</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kill_handler</span>.<span class="ident">take</span>())
 }
 
 
@@ -1720,27 +1743,6 @@
         <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">restart_info</span>.<span class="ident">is_some</span>()
     }
 
-    <span class="doccomment">/// Registers a function or closure that will be called if this `Task` panics</span>
-    <span class="doccomment">/// or otherwise fails (e.g., due to a machine exception).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The given `callback` will be invoked before the task is cleaned up via stack unwinding.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_kill_handler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">callback</span>: <span class="ident">KillHandler</span>) {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kill_handler</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">callback</span>);
-    }
-
-    <span class="doccomment">/// Takes ownership of this `Task`&#39;s `KillHandler` closure/function if one exists,</span>
-    <span class="doccomment">/// and returns it so it can be invoked without holding this `Task`&#39;s inner lock.</span>
-    <span class="doccomment">/// After invoking this, the `Task`&#39;s `kill_handler` will be `None`.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Locking / Deadlock</span>
-    <span class="doccomment">/// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take_kill_handler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">KillHandler</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kill_handler</span>.<span class="ident">take</span>()
-    }
-
     <span class="doccomment">/// Takes ownership of this `Task`&#39;s exit value and returns it,</span>
     <span class="doccomment">/// if and only if this `Task` was in the `Exited` runstate.</span>
     <span class="doccomment">///</span>
@@ -1983,7 +1985,7 @@
         <span class="comment">// This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,</span>
         <span class="comment">// then after the app crate is released, the kill handler will be dropped AFTER the app crate has been freed.</span>
         <span class="comment">// When it tries to drop the task&#39;s kill handler, a page fault will occur because the text section of the app crate has been unmapped.</span>
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">kill_handler</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">take_kill_handler</span>() {
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">kill_handler</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>().<span class="ident">kill_handler</span>.<span class="ident">take</span>() {
             <span class="macro">warn!</span>(<span class="string">&quot;While dropping task {:?}, its kill handler callback was still present. Removing it now.&quot;</span>, <span class="self">self</span>);
             <span class="ident">drop</span>(<span class="ident">kill_handler</span>);
         }
