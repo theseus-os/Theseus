@@ -13,6 +13,9 @@ target/
 # Build directory
 build/
 
+# Dynamically cloned git repo for wasmtime
+ports/wasmtime/
+
 # Generated documentation, used for GitHub Pages
 github_pages/book/
 github_pages/doc/
