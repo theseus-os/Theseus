@@ -3,13 +3,12 @@
 //! This is currently only used to parse the `nano_core` object file at compile time. After being
 //! parsed, it is serialized into an instance of [`SerializedCrate`] and included as a boot module.
 
-use crate::CrateNamespace;
+use crate::{CrateNamespace, mp_range};
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     string::String,
     sync::Arc,
 };
-use core::ops::Range;
 use cow_arc::CowArc;
 use crate_metadata::{
     LoadedCrate, LoadedSection, SectionType, Shndx, StrongCrateRef, WeakCrateRef,
@@ -188,10 +187,4 @@ impl SerializedSection {
 
         Ok(loaded_section)
     }
-}
-
-/// Convenience function for calculating the address range of a MappedPages object.
-fn mp_range(mp_ref: &Arc<Mutex<MappedPages>>) -> Range<VirtualAddress> {
-    let mp = mp_ref.lock();
-    mp.start_address()..(mp.start_address() + mp.size_in_bytes())
 }

@@ -2748,3 +2748,9 @@ impl PartialEq for StrongSectionRefWrapper {
 }
 impl Eq for StrongSectionRefWrapper { }
 
+/// Convenience function for calculating the address range of a MappedPages object.
+fn mp_range(mp_ref: &Arc<Mutex<MappedPages>>) -> Range<VirtualAddress> {
+    let mp = mp_ref.lock();
+    mp.start_address()..(mp.start_address() + mp.size_in_bytes())
+}
+
