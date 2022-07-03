@@ -160,7 +160,7 @@ pub extern "C" fn nano_core_start(
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::parse_nano_core(
+    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false
     ) {
         Ok((nano_core_crate_ref, init_symbols, _num_new_syms)) => {
@@ -183,7 +183,7 @@ pub extern "C" fn nano_core_start(
             // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
             // we have to make sure these mapped_pages aren't dropped.
             core::mem::forget(mapped_pages_array);
-            shutdown(format_args!("parsing_nano_core() failed! error: {}", msg));
+            shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
         }
     };
     println_raw!("nano_core_start(): finished parsing the nano_core crate."); 
@@ -191,7 +191,7 @@ pub extern "C" fn nano_core_start(
     // If in loadable mode, load each of the nano_core's constituent crates such that other crates loaded in the future
     // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
     #[cfg(loadable)] {
-        try_exit!(mod_mgmt::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
+        try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
     }
     #[cfg(not(loadable))] {
         drop(nano_core_crate_ref);

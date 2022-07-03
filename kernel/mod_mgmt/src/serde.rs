@@ -127,6 +127,7 @@ pub struct SerializedSection {
 }
 
 impl SerializedSection {
+    /// Load the section.
     pub fn load(
         self,
         parent_crate: WeakCrateRef,

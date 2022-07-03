@@ -1,3 +1,5 @@
+//! Tool that creates a serialized representation of the symbols in the `nano_core` object file.
+
 mod parse;
 
 use mod_mgmt::serde::SerializedCrate;
