@@ -570,10 +570,13 @@ dependencies = [
  "fs_node",
  "goblin",
  "hashbrown",
+ "lazy_static",
  "log",
  "memory",
+ "qp-trie",
  "serde",
  "spin 0.9.0",
+ "str_ref",
  "xmas-elf",
 ]
 
@@ -2381,8 +2384,9 @@ dependencies = [
 
 [[package]]
 name = "qp-trie"
-version = "0.7.3"
-source = "git+https://github.com/theseus-os/qp-trie-rs#847923565622e909795bfc96309bc69ed4aa6689"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a075ecba64154fed5429568c9c6a0e0eccc3276209e93e6133206413ea6834b4"
 dependencies = [
  "new_debug_unreachable",
  "unreachable",
@@ -2691,18 +2695,18 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.137"
+version = "1.0.138"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
+checksum = "1578c6245786b9d168c5447eeacfb96856573ca56c9d68fdcf394be134882a47"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.137"
+version = "1.0.138"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f26faba0c3959972377d3b2d306ee9f71faee9714294e41bb777f83f88578be"
+checksum = "023e9b1467aef8a10fb88f25611870ada9800ef7e22afce356bb0d2387b6f27c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3030,6 +3034,10 @@ dependencies = [
  "spin 0.9.0",
  "storage_device",
 ]
+
+[[package]]
+name = "str_ref"
+version = "0.1.0"
 
 [[package]]
 name = "swap"

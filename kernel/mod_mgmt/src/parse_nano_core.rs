@@ -5,12 +5,12 @@
 
 use crate::{CrateNamespace, mp_range, serde::SerializedCrate};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::String, sync::Arc};
-use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType, Shndx, WeakCrateRef};
 use path::Path;
 use spin::Mutex;
 use cow_arc::{CowArc, CowWeak};
 use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
+use crate_metadata::*;
 use hashbrown::HashMap;
 
 
@@ -82,7 +82,7 @@ pub fn parse_nano_core(
 
     let parse_result = match nano_core_file_path.extension() {
         Some("sym") => {
-            let crate_name = String::from(NANO_CORE_CRATE_NAME);
+            let crate_name = StrRef::from(NANO_CORE_CRATE_NAME);
             // Create the LoadedCrate instance to represent the nano_core. It will be properly
             // populated by parse_nano_core_symbol_file.
             let nano_core_crate_ref = CowArc::new(LoadedCrate {
@@ -262,7 +262,7 @@ fn parse_nano_core_symbol_file(
                 section_counter,
                 Arc::new(LoadedSection::new(
                     SectionType::EhFrame,
-                    String::from(".eh_frame"),
+                    EH_FRAME_STR_REF.clone(),
                     Arc::clone(rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -282,7 +282,7 @@ fn parse_nano_core_symbol_file(
                 section_counter,
                 Arc::new(LoadedSection::new(
                     SectionType::GccExceptTable,
-                    String::from(".gcc_except_table"),
+                    GCC_EXCEPT_TABLE_STR_REF.clone(),
                     Arc::clone(rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -394,7 +394,7 @@ fn parse_nano_core_symbol_file(
                 &new_crate_weak_ref,
                 &mut section_counter,
                 sec_ndx,
-                String::from(name),
+                StrRef::from(name),
                 sec_size,
                 sec_vaddr,
                 global
@@ -427,7 +427,6 @@ impl ParsedCrateItems {
     }
 }
 
-
 /// The section header indices (shndx) for the main sections:
 /// .text, .rodata, .data, and .bss.
 /// 
@@ -459,7 +458,7 @@ fn add_new_section(
     section_counter:     &mut Shndx,
     // crate-wide args above, section-specific stuff below
     sec_ndx: Shndx,
-    sec_name: String,
+    sec_name: StrRef,
     sec_size: usize,
     sec_vaddr: usize,
     global: bool,
@@ -569,7 +568,7 @@ fn add_new_section(
         Some(tls_section)
     }
     else {
-        crate_items.init_symbols.insert(sec_name, sec_vaddr);
+        crate_items.init_symbols.insert(String::from(sec_name.as_str()), sec_vaddr);
         None
     };
 

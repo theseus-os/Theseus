@@ -32,7 +32,7 @@ use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFla
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
-use qp_trie::{Trie, wrapper::BString};
+use qp_trie::Trie;
 use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
@@ -251,8 +251,7 @@ fn parse_extra_file(
 /// A "symbol map" from a fully-qualified demangled symbol String  
 /// to weak reference to a `LoadedSection`.
 /// This is used for relocations, and for looking up function names.
-pub type SymbolMap = Trie<BString, WeakSectionRef>;
-pub type SymbolMapIter<'a> = qp_trie::Iter<'a, &'a BString, &'a WeakSectionRef>;
+pub type SymbolMap = Trie<StrRef, WeakSectionRef>;
 
 
 /// A wrapper around a `Directory` reference that offers special convenience functions
@@ -401,12 +400,17 @@ impl Drop for AppCrateRef {
         // trace!("### Dropping AppCrateRef {:?} from namespace {:?}", self.crate_ref, self.namespace.name());
         let crate_locked = self.crate_ref.lock_as_ref();
         // First, remove the actual crate from the namespace.
-        if let Some(_removed_app_crate) = self.namespace.crate_tree().lock().remove_str(&crate_locked.crate_name) {
+        if let Some(_removed_app_crate) = self.namespace.crate_tree().lock().remove(&crate_locked.crate_name) {
             // Second, remove all of the crate's global symbols from the namespace's symbol map.
             let mut symbol_map = self.namespace.symbol_map().lock();
             for sec_to_remove in crate_locked.global_sections_iter() {
-                if symbol_map.remove_str(&sec_to_remove.name).is_none() {
-                    error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", sec_to_remove.name, crate_locked.crate_name, self.namespace.name());
+                match symbol_map.remove(&sec_to_remove.name) {
+                    Some(_removed) => {
+                        // trace!("Removed symbol {}: {:?}", sec_to_remove.name, _removed.upgrade());
+                    }
+                    None => {
+                        error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", sec_to_remove.name, crate_locked.crate_name, self.namespace.name());
+                    }
                 }
             }
         } else {
@@ -440,14 +444,14 @@ pub struct CrateNamespace {
     dir: NamespaceDir,
 
     /// The list of all the crates loaded into this namespace,
-    /// stored as a map in which the crate's String name
+    /// stored as a map in which the crate's string name
     /// is the key that maps to the value, a strong reference to a crate.
     /// It is a strong reference because a crate must not be removed
     /// as long as it is part of any namespace,
     /// and a single crate can be part of multiple namespaces at once.
     /// For example, the "core" (Rust core library) crate is essentially
     /// part of every single namespace, simply because most other crates rely upon it. 
-    crate_tree: Mutex<Trie<BString, StrongCrateRef>>,
+    crate_tree: Mutex<Trie<StrRef, StrongCrateRef>>,
 
     /// The "system map" of all symbols that are present in all of the crates in this `CrateNamespace`.
     /// Maps a fully-qualified symbol name string to a corresponding `LoadedSection`,
@@ -524,7 +528,7 @@ impl CrateNamespace {
     }
 
     #[doc(hidden)]
-    pub fn crate_tree(&self) -> &Mutex<Trie<BString, StrongCrateRef>> {
+    pub fn crate_tree(&self) -> &Mutex<Trie<StrRef, StrongCrateRef>> {
         &self.crate_tree
     }
 
@@ -545,9 +549,9 @@ impl CrateNamespace {
 
     /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`,
     /// including all crates in any recursive namespaces as well if `recursive` is `true`.
-    /// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.
-    pub fn crate_names(&self, recursive: bool) -> Vec<String> {
-        let mut crates: Vec<String> = self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect();
+    /// This is a slow method mostly for debugging, since it allocates a new vector of crate names.
+    pub fn crate_names(&self, recursive: bool) -> Vec<StrRef> {
+        let mut crates: Vec<StrRef> = self.crate_tree.lock().keys().map(|n| n.clone()).collect();
 
         if recursive {
             if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
@@ -592,7 +596,7 @@ impl CrateNamespace {
     /// that jointly exists in another namespace, they should invoke the 
     /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
-        self.crate_tree.lock().get_str(crate_name)
+        self.crate_tree.lock().get(crate_name.as_bytes())
             .map(|c| CowArc::clone_shallow(c))
             .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
@@ -614,7 +618,7 @@ impl CrateNamespace {
         namespace: &'n Arc<CrateNamespace>,
         crate_name: &str
     ) -> Option<(StrongCrateRef, &'n Arc<CrateNamespace>)> {
-        namespace.crate_tree.lock().get_str(crate_name)
+        namespace.crate_tree.lock().get(crate_name.as_bytes())
             .map(|c| (CowArc::clone_shallow(c), namespace))
             .or_else(|| namespace.recursive_namespace.as_ref().and_then(|r_ns| Self::get_crate_and_namespace(r_ns, crate_name)))
     }
@@ -639,11 +643,11 @@ impl CrateNamespace {
     pub fn get_crates_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name_prefix: &str
-    ) -> Vec<(String, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Vec<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
         // First, we make a list of matching crates in this namespace. 
         let crates = namespace.crate_tree.lock();
-        let mut crates_in_this_namespace = crates.iter_prefix_str(crate_name_prefix)
-            .map(|(key, val)| (key.clone().into(), val.clone_shallow(), namespace))
+        let mut crates_in_this_namespace = crates.iter_prefix(crate_name_prefix.as_bytes())
+            .map(|(key, val)| (key.clone(), val.clone_shallow(), namespace))
             .collect::<Vec<_>>();
 
         // Second, we make a similar list for the recursive namespace.
@@ -680,7 +684,7 @@ impl CrateNamespace {
     pub fn get_crate_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name_prefix: &str
-    ) -> Option<(String, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Option<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
         let mut crates_iter = Self::get_crates_starting_with(namespace, crate_name_prefix).into_iter();
         crates_iter.next().filter(|_| crates_iter.next().is_none()) // ensure single element
     }
@@ -789,7 +793,7 @@ impl CrateNamespace {
         {
             let new_crate = new_crate_ref.lock_as_ref();
             let _new_syms = namespace.add_symbols(new_crate.sections.values(), verbose_log);
-            namespace.crate_tree.lock().insert_str(&new_crate.crate_name, CowArc::clone_shallow(&new_crate_ref));
+            namespace.crate_tree.lock().insert(new_crate.crate_name.clone(), CowArc::clone_shallow(&new_crate_ref));
             info!("loaded new application crate: {:?}, num sections: {}, added {} new symbols", new_crate.crate_name, new_crate.sections.len(), _new_syms);
         }
         Ok(AppCrateRef {
@@ -831,7 +835,7 @@ impl CrateNamespace {
             
         #[cfg(not(loscd_eval))]
         info!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, _num_sections, new_syms);
-        self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref.clone_shallow());
+        self.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone_shallow());
         Ok((new_crate_ref, new_syms))
     }
 
@@ -1023,7 +1027,7 @@ impl CrateNamespace {
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.len();
         let abs_path      = Path::new(crate_file.get_absolute_path());
-        let crate_name    = crate_name_from_path(&abs_path).to_string();
+        let crate_name    = StrRef::from(crate_name_from_path(&abs_path));
 
         // First, check to make sure this crate hasn't already been loaded. 
         // Application crates are now added to the CrateNamespace just like kernel crates,
@@ -1254,7 +1258,7 @@ impl CrateNamespace {
                 } else {
                     name
                 };
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().as_str().into();
 
                 // We already copied the content of all .text sections above, 
                 // so here we just record the metadata into a new `LoadedSection` object.
@@ -1293,7 +1297,7 @@ impl CrateNamespace {
                 } else {
                     try_get_symbol_name_after_prefix!(sec_name, TLS_DATA_PREFIX)
                 };
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().as_str().into();
 
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     let (mapped_pages_offset, sec_typ) = if is_bss {
@@ -1362,7 +1366,7 @@ impl CrateNamespace {
                         //     }
                         // })
                 };
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().as_str().into();
                 
                 if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
                     // here: we're ready to copy the data/bss section to the proper address
@@ -1382,7 +1386,7 @@ impl CrateNamespace {
                         shndx,
                         Arc::new(LoadedSection::new(
                             if is_bss { SectionType::Bss } else { SectionType::Data },
-                            demangled.clone(),
+                            demangled,
                             Arc::clone(dp_ref),
                             data_offset,
                             dest_vaddr,
@@ -1403,7 +1407,7 @@ impl CrateNamespace {
             // Fourth, if neither executable nor TLS nor writable, handle .rodata sections.
             else if sec_name.starts_with(RODATA_PREFIX) {
                 let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
-                let demangled = demangle(name).to_string();
+                let demangled = demangle(name).to_string().as_str().into();
 
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address
@@ -1442,8 +1446,11 @@ impl CrateNamespace {
 
             // Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections
             else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
-                let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
-                let demangled = demangle(name).to_string();
+                // We don't need to waste space keeping the name of the `.gcc_exept_table` section, 
+                // because that name is irrelevant and will never be used.
+                //
+                // let name = try_get_symbol_name_after_prefix!(sec_name, GCC_EXCEPT_TABLE_PREFIX);
+                // let demangled = demangle(name).to_string().into();
 
                 // gcc_except_table sections are read-only, so we put them in the .rodata pages
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -1464,12 +1471,12 @@ impl CrateNamespace {
                         shndx, 
                         Arc::new(LoadedSection::new(
                             SectionType::GccExceptTable,
-                            demangled,
+                            GCC_EXCEPT_TABLE_STR_REF.clone(),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,
                             sec_size,
-                            false, // .gcc_except_table sections are not globally visible,
+                            false, // .gcc_except_table sections are never globally visible,
                             new_crate_weak_ref.clone(),
                         ))
                     );
@@ -1502,7 +1509,7 @@ impl CrateNamespace {
                         shndx, 
                         Arc::new(LoadedSection::new(
                             SectionType::EhFrame,
-                            sec_name.to_string(),
+                            EH_FRAME_STR_REF.clone(),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,
@@ -1754,11 +1761,11 @@ impl CrateNamespace {
     /// Returns true if the symbol was added, and false if it already existed and thus was merely replaced.
     fn add_symbol(
         existing_symbol_map: &mut SymbolMap,
-        new_section_key: String,
+        new_section_key: StrRef,
         new_section: &StrongSectionRef,
         log_replacements: bool,
     ) -> bool {
-        match existing_symbol_map.entry(new_section_key.into()) {
+        match existing_symbol_map.entry(new_section_key) {
             qp_trie::Entry::Occupied(mut old_val) => {
                 if log_replacements {
                     if let Some(old_sec) = old_val.get().upgrade() {
@@ -1952,7 +1959,7 @@ impl CrateNamespace {
 
     /// Like [`get_symbol()`](#method.get_symbol), but also returns the exact `CrateNamespace` where the symbol was found.
     pub fn get_symbol_and_namespace(&self, demangled_full_symbol: &str) -> Option<(WeakSectionRef, &CrateNamespace)> {
-        let weak_symbol = self.symbol_map.lock().get_str(demangled_full_symbol).cloned();
+        let weak_symbol = self.symbol_map.lock().get(demangled_full_symbol.as_bytes()).cloned();
         weak_symbol.map(|sym| (sym, self))
             // search the recursive namespace if the symbol cannot be found in this namespace
             .or_else(|| self.recursive_namespace.as_ref().and_then(|rns| rns.get_symbol_and_namespace(demangled_full_symbol)))
@@ -2206,7 +2213,7 @@ impl CrateNamespace {
     /// a vector containing both sections, which can then be iterated through.
     pub fn find_symbols_starting_with(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef)> { 
         let mut syms: Vec<(String, WeakSectionRef)> = self.symbol_map.lock()
-            .iter_prefix_str(symbol_prefix)
+            .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone()))
             .collect();
 
@@ -2222,7 +2229,7 @@ impl CrateNamespace {
     /// where the matching symbol was found.
     pub fn find_symbols_starting_with_and_namespace(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef, &CrateNamespace)> { 
         let mut syms: Vec<(String, WeakSectionRef, &CrateNamespace)> = self.symbol_map.lock()
-            .iter_prefix_str(symbol_prefix)
+            .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone(), self))
             .collect();
 
@@ -2269,7 +2276,7 @@ impl CrateNamespace {
     fn get_symbol_starting_with_internal(&self, symbol_prefix: &str) -> Option<WeakSectionRef> { 
         // First, we see if there's a single matching symbol in this namespace. 
         let map = self.symbol_map.lock();
-        let mut iter = map.iter_prefix_str(symbol_prefix).map(|tuple| tuple.1);
+        let mut iter = map.iter_prefix(symbol_prefix.as_bytes()).map(|tuple| tuple.1);
         let symbol_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
             .cloned();

@@ -166,14 +166,14 @@ fn update_and_insert_fault_entry_internal(
 
     // If task is from an application add application crate name. `None` if not 
     fe.running_app_crate = {
-        curr_task.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.clone())
+        curr_task.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.to_string())
     };
 
     if let Some(instruction_pointer) = instruction_pointer {
         let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
         fe.instruction_pointer = Some(instruction_pointer);
         fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
-                                        .map(|x| x.lock_as_ref().crate_name.clone());
+                                        .map(|x| x.lock_as_ref().crate_name.to_string());
     };
 
     // Push the fault entry.

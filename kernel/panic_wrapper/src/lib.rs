@@ -89,15 +89,11 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     error!("------------------------------------------------------------------");
 
     // Call this task's kill handler, if it has one.
-    {
-        let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
-        if let Some(ref kh_func) = kill_handler {
-            debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
-            kh_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
-        }
-        else {
-            debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
-        }
+    if let Some(ref kh_func) = task::take_kill_handler() {
+        debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+        kh_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
+    } else {
+        debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
     }
 
     // Start the unwinding process

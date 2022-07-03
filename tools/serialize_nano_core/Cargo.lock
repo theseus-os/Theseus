@@ -155,10 +155,13 @@ dependencies = [
  "fs_node",
  "goblin",
  "hashbrown",
+ "lazy_static",
  "log",
  "memory",
+ "qp-trie",
  "serde",
  "spin 0.9.3",
+ "str_ref",
  "xmas-elf",
 ]
 
@@ -587,9 +590,9 @@ dependencies = [
 
 [[package]]
 name = "qp-trie"
-version = "0.7.8"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cab00522f072da4be2bd198d3da4c09bc1b39c0b55a6002aa5b52771f91a4fa"
+checksum = "a075ecba64154fed5429568c9c6a0e0eccc3276209e93e6133206413ea6834b4"
 dependencies = [
  "new_debug_unreachable",
  "unreachable",
@@ -747,6 +750,10 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "str_ref"
+version = "0.1.0"
 
 [[package]]
 name = "syn"

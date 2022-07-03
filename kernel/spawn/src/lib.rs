@@ -35,7 +35,7 @@ extern crate thread_local_macro;
 use core::{marker::PhantomData, mem, ops::Deref};
 use alloc::{
     vec::Vec,
-    string::String,
+    string::{String, ToString},
     sync::Arc,
     boxed::Box,
 };
@@ -165,7 +165,7 @@ pub fn new_application_task_builder(
     // Create the underlying task builder. 
     // Give it a default name based on the app crate's name, but that can be changed later. 
     let mut tb = TaskBuilder::new(*main_func, MainFuncArg::default())
-        .name(app_crate_ref.lock_as_ref().crate_name.clone()); 
+        .name(app_crate_ref.lock_as_ref().crate_name.to_string()); 
 
     // Once the new application task is created (but before its scheduled in),
     // ensure it has the relevant app-specific fields set properly.

@@ -92,7 +92,8 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
             crate_items.sections.insert(
                 section_counter,
                 SerializedSection {
-                    name: String::from(".eh_frame"),
+                    // The name gets set to EH_FRAME_STR_REF when loading the section.
+                    name: String::from(""),
                     ty: SectionType::EhFrame,
                     global: false, // .eh_frame is not global
                     virtual_address,
@@ -109,7 +110,8 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
             crate_items.sections.insert(
                 section_counter,
                 SerializedSection {
-                    name: String::from(".gcc_except_table"),
+                    // The name gets set to GCC_EXCEPT_TABLE_STR_REF when loading the section.
+                    name: String::from(""),
                     ty: SectionType::GccExceptTable,
                     global: false, // .gcc_except_table is not global
                     virtual_address,

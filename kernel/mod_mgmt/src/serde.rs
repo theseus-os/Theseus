@@ -10,9 +10,7 @@ use alloc::{
     sync::Arc,
 };
 use cow_arc::CowArc;
-use crate_metadata::{
-    LoadedCrate, LoadedSection, SectionType, Shndx, StrongCrateRef, WeakCrateRef,
-};
+use crate_metadata::*;
 use fs_node::FileRef;
 use hashbrown::HashMap;
 use memory::{MappedPages, VirtualAddress};
@@ -50,11 +48,12 @@ impl SerializedCrate {
         data_pages: &Arc<Mutex<MappedPages>>,
         verbose_log: bool,
     ) -> Result<(StrongCrateRef, BTreeMap<String, usize>, usize), &'static str> {
+        let crate_name: StrRef = self.crate_name.as_str().into();
         
         // The sections need a weak reference back to the loaded_crate, and so we first create
         // the loaded_crate so we have something to reference when loading the sections.
         let loaded_crate = CowArc::new(LoadedCrate {
-            crate_name:          self.crate_name.clone(),
+            crate_name:          crate_name.clone(),
             debug_symbols_file:  Arc::downgrade(&object_file),
             object_file,
             sections:            HashMap::new(), // placeholder
@@ -98,7 +97,7 @@ impl SerializedCrate {
         namespace
             .crate_tree
             .lock()
-            .insert(self.crate_name.into(), loaded_crate.clone_shallow());
+            .insert(crate_name.clone(), loaded_crate.clone_shallow());
         info!(
             "Finished parsing nano_core crate, {} new symbols.",
             num_new_syms
@@ -149,7 +148,11 @@ impl SerializedSection {
             .ok_or("SerializedSection::load(): invalid virtual address")?;
 
         let loaded_section = Arc::new(LoadedSection {
-            name: self.name,
+            name: match self.ty {
+                SectionType::EhFrame => EH_FRAME_STR_REF.clone(),
+                SectionType::GccExceptTable => GCC_EXCEPT_TABLE_STR_REF.clone(),
+                _ => self.name.as_str().into(),
+            },
             typ: self.ty,
             global: self.global,
             // TLS BSS sections (.tbss) do not have any real loaded data in the ELF file,
