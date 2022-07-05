@@ -1,6 +1,5 @@
 use crate_metadata::{SectionType, Shndx};
 use hashbrown::HashMap;
-use log::{error, trace};
 use mod_mgmt::serde::SerializedSection;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -216,13 +215,13 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
 
             let global = bind == "GLOBAL" || bind == "WEAK";
             let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
-                error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                eprintln!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                 "parse_nano_core_symbol_file(): couldn't parse virtual address (value column)"
             })?;
             let sec_size = sec_size.parse::<usize>().or_else(|e| {
                 sec_size.get(2 ..).ok_or(e).and_then(|sec_size_hex| usize::from_str_radix(sec_size_hex, 16))
             }).map_err(|e| {
-                error!("parse_nano_core_symbol_file(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
+                eprintln!("parse_nano_core_symbol_file(): error parsing size at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
                 "parse_nano_core_symbol_file(): couldn't parse size column"
             })?;
 
@@ -232,11 +231,11 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 Ok(ndx) => ndx,
                 // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line).
                 _ => {
-                    trace!(
-                        "parse_nano_core_symbol_file(): skipping line {}: {}",
-                        _line_num + 1,
-                        line
-                    );
+                    // trace!(
+                    //     "parse_nano_core_symbol_file(): skipping line {}: {}",
+                    //     _line_num + 1,
+                    //     line
+                    // );
                     continue;
                 }
             };
@@ -258,7 +257,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
         } // end of loop over all lines
     }
 
-    trace!("parse_nano_core_symbol_file(): finished looping over symtab.");
+    // trace!("parse_nano_core_symbol_file(): finished looping over symtab.");
     Ok(crate_items)
 }
 

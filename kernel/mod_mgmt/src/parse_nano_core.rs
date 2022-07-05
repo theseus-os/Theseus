@@ -139,7 +139,7 @@ pub fn parse_nano_core(
                 )
             );
             drop(nano_core_file_locked);
-            deserialized.load(
+            deserialized.into_loaded_crate(
                 nano_core_file,
                 real_namespace,
                 &text_pages,

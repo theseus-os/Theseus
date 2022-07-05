@@ -38,8 +38,8 @@ pub struct SerializedCrate {
 }
 
 impl SerializedCrate {
-    /// Load the crate and its sections.
-    pub fn load(
+    /// Convert this into a [`LoadedCrate`] and its sections into [`LoadedSection`]s.
+    pub(crate) fn into_loaded_crate(
         self,
         object_file: FileRef,
         namespace: &Arc<CrateNamespace>,
@@ -70,7 +70,7 @@ impl SerializedCrate {
         for (shndx, section) in self.sections {
             sections.insert(
                 shndx,
-                section.load(
+                section.into_loaded_section(
                     CowArc::downgrade(&loaded_crate),
                     namespace,
                     text_pages,
@@ -102,6 +102,16 @@ impl SerializedCrate {
             "Finished parsing nano_core crate, {} new symbols.",
             num_new_syms
         );
+        
+        trace!("Printing loaded nano_core crate (this may take a while)");
+        let loaded_crate_ref = loaded_crate.lock_as_ref();
+        trace!("{:#?}", loaded_crate_ref);
+        trace!("crate_name: {:#?}", loaded_crate_ref.crate_name);
+        trace!("sections: {:#?}", loaded_crate_ref.sections);
+        trace!("global_sections: {:#?}", loaded_crate_ref.global_sections);
+        trace!("tls_sections: {:#?}", loaded_crate_ref.tls_sections);
+        trace!("data_sections: {:#?}", loaded_crate_ref.data_sections);
+        drop(loaded_crate_ref);
 
         Ok((loaded_crate, self.init_symbols, num_new_syms))
     }
@@ -114,7 +124,7 @@ impl SerializedCrate {
 pub struct SerializedSection {
     /// The full name of the section.
     pub name: String,
-    /// The type of the scetion.
+    /// The type of the section.
     pub ty: SectionType,
     /// Whether or not the section is global.
     pub global: bool,
@@ -127,8 +137,8 @@ pub struct SerializedSection {
 }
 
 impl SerializedSection {
-    /// Load the section.
-    pub fn load(
+    /// Convert this into a [`LoadedSection`].
+    pub(crate) fn into_loaded_section(
         self,
         parent_crate: WeakCrateRef,
         namespace: &Arc<CrateNamespace>,
