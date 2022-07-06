@@ -6,7 +6,7 @@
 	path = libs/object
 	url = https://github.com/theseus-os/object.git
 	shallow = true
-[submodule "libs/libc"]
+[submodule "ports/libc"]
 	path = ports/libc
 	url = https://github.com/theseus-os/libc.git
 	shallow = true
