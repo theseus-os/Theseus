@@ -263,6 +263,13 @@
 <span id="258">258</span>
 <span id="259">259</span>
 <span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! The `nano_core` is very simple, and only does the following things:</span>
@@ -523,6 +530,13 @@
 <span class="doccomment">/// This module is a hack to get around the issue of no_mangle symbols</span>
 <span class="doccomment">/// not being exported properly from the `libm` crate in no_std environments.</span>
 <span class="kw">mod</span> <span class="ident">libm</span>;
+
+<span class="doccomment">/// Implements OS support for GCC&#39;s stack smashing protection.</span>
+<span class="doccomment">/// This isn&#39;t used at the moment, but we make it available in case </span>
+<span class="doccomment">/// any foreign code (e.g., C code) wishes to use it.</span>
+<span class="doccomment">/// </span>
+<span class="doccomment">/// You can disable the need for this via the `-fno-stack-protection` GCC option.</span>
+<span class="kw">mod</span> <span class="ident">stack_smash_protection</span>;
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="nano_core" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
 </body></html>

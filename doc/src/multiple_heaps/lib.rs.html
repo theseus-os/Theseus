@@ -729,8 +729,8 @@
 <span class="doccomment">/// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.</span>
 <span class="kw">const</span> <span class="ident">EMPTY_PAGES_THRESHOLD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span> <span class="op">*</span> <span class="number">2</span>;
 
-<span class="doccomment">/// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 100 KiB.</span>
-<span class="kw">const</span> <span class="ident">PAGES_PER_SIZE_CLASS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">24</span>; 
+<span class="doccomment">/// The number of pages each size class in the ZoneAllocator is initialized with. It is approximately 512 KiB.</span>
+<span class="kw">const</span> <span class="ident">PAGES_PER_SIZE_CLASS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">128</span>; <span class="comment">// was 24 </span>
 
 <span class="doccomment">/// Starting size of each per-core heap. </span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PER_CORE_HEAP_INITIAL_SIZE_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">ZoneAllocator::MAX_BASE_SIZE_CLASSES</span> <span class="op">*</span>  <span class="ident">PAGES_PER_SIZE_CLASS</span>;

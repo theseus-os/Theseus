@@ -1222,7 +1222,7 @@
 
         <span class="kw">match</span> <span class="ident">alloc_pages_owned</span>.<span class="ident">split</span>(<span class="ident">at_page</span>) {
             <span class="prelude-val">Ok</span>((<span class="ident">first_ap</span>, <span class="ident">second_ap</span>)) =&gt; <span class="prelude-val">Ok</span>((
-                <span class="ident">MappedPages</span>{
+                <span class="ident">MappedPages</span> {
                     <span class="ident">page_table_p4</span>: <span class="self">self</span>.<span class="ident">page_table_p4</span>,
                     <span class="ident">pages</span>: <span class="ident">first_ap</span>,
                     <span class="ident">flags</span>: <span class="self">self</span>.<span class="ident">flags</span>,
