@@ -93,6 +93,7 @@ exclude = [
 	"applications/test_serial_echo",
 	"applications/test_std_fs",
 	"applications/test_wait_queue",
+	"applications/test_wasmtime",
 	"applications/tls_test",
 	"applications/unwind_test",
 ]
@@ -116,12 +117,12 @@ core2 = { path = "libs/core2" }
 
 ##############################################################################################
 #################### Below are patches for wasmtime-related crates. ##########################
-################# These are currently unused, but are available for use. #####################
 ##############################################################################################
-# object = { path = "libs/object" }
-# backtrace = { path = "ports/backtrace" }
-# region = { path = "ports/region" }
-# thiserror_core2 = { path = "libs/thiserror-core2" }
+wasmparser = { git = "https://github.com/theseus-os/wasm-tools", branch = "no-std-wasmparser" }
+backtrace = { path = "ports/backtrace" }
+region = { path = "ports/region" }
+thiserror_core2 = { path = "libs/thiserror-core2" }
+bincode = { path = "libs/bincode" }
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!

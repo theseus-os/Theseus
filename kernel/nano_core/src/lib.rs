@@ -258,3 +258,10 @@ extern {
 /// This module is a hack to get around the issue of no_mangle symbols
 /// not being exported properly from the `libm` crate in no_std environments.
 mod libm;
+
+/// Implements OS support for GCC's stack smashing protection.
+/// This isn't used at the moment, but we make it available in case 
+/// any foreign code (e.g., C code) wishes to use it.
+/// 
+/// You can disable the need for this via the `-fno-stack-protection` GCC option.
+mod stack_smash_protection;

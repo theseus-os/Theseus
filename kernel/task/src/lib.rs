@@ -74,16 +74,17 @@ use x86_64::registers::model_specific::{GsBase, FsBase};
 pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default)]
 pub struct PanicInfoOwned {
-    pub msg:    String,
-    pub file:   String,
-    pub line:   u32, 
-    pub column: u32,
+    pub payload:  Option<Box<dyn Any + Send>>,
+    pub msg:      String,
+    pub file:     String,
+    pub line:     u32, 
+    pub column:   u32,
 }
 impl fmt::Display for PanicInfoOwned {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{:?}:{}:{} -- {:?}", self.file, self.line, self.column, self.msg)
+        write!(f, "{}:{}:{} -- {:?}", self.file, self.line, self.column, self.msg)
     }
 }
 impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
@@ -97,7 +98,19 @@ impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
             (String::new(), 0, 0)
         };
 
-        PanicInfoOwned { msg, file, line, column }
+        PanicInfoOwned { payload: None, msg, file, line, column }
+    }
+}
+impl PanicInfoOwned {
+    /// Constructs a new `PanicInfoOwned` object containing only the given `payload`
+    /// without any location or message info.
+    /// 
+    /// Useful for forwarding panic payloads through a catch and resume unwinding sequence.
+    pub fn from_payload(payload: Box<dyn Any + Send>) -> PanicInfoOwned {
+        PanicInfoOwned {
+            payload: Some(payload),
+            ..Default::default()
+        }
     }
 }
 
