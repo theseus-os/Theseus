@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "bootloader_modules"
 description = "A type abstration for modules provided by a bootloader, e.g., multiboot"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies.memory_structs]
 path = "../memory_structs"

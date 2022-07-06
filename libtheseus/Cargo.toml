@@ -3,7 +3,6 @@ name = "libtheseus"
 version = "0.1.0"
 description = "The application-facing 'library' that exposes Theseus OS features, similar to a standard library."
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../build.rs"
 
 [dependencies]
 # getopts = "0.2.21"
@@ -45,8 +44,6 @@ spin = { git = "https://github.com/theseus-os/spin-rs" }
 volatile = { git = "https://github.com/theseus-os/volatile" }
 ### use our own no_std-compatilbe getopts
 getopts = { git = "https://github.com/theseus-os/getopts" }
-### use our own no_std-compatible qp trie
-qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 

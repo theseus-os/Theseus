@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "unwind"
 description = "Routines for unwinding the call stack and running cleanup handlers for Theseus tasks"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 fallible-iterator = { version = "0.2.0", default-features = false }

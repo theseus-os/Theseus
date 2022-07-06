@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "runqueue"
 description = "Functions and types for handling runqueues, i.e., lists of tasks for scheduling purposes"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 

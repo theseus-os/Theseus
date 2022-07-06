@@ -3,7 +3,6 @@ authors = ["Ramla Ijaz <ijazramla.com>"]
 name = "libtest"
 description = "A set of convenience functions that can be used for benchmarking within Theseus."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

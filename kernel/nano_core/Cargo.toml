@@ -3,7 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
 description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
 version = "0.1.0"
-build = "../../build.rs"
+build = "build.rs"
 
 
 [dependencies]
@@ -64,3 +64,7 @@ path = "../memory_initialization"
 # that we can jump to from the bootloader.
 crate-type = ["staticlib"]  
 
+
+## Currently not used; see the `build.rs` script.
+# [build-dependencies]
+# built = "0.5"

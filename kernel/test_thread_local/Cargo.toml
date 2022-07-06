@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "test_thread_local"
 description = "Test cases for thread-local storage (TLS) directly using the #[thread_local] attribute" 
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies.log]
 version = "0.4.8"

@@ -3,7 +3,6 @@ name = "channel_eval"
 version = "0.1.0"
 description = "Used for evaluating live evolution between sync/async channels in Theseus"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

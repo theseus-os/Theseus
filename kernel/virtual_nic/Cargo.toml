@@ -3,7 +3,6 @@ authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "virtual_nic"
 description = "A structure that contains a subset of physical NIC resources that are sufficient to send/receive packets without kernel mediation."
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 

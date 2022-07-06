@@ -20,16 +20,17 @@ extern crate spin;
 
 use alloc::{
     collections::BTreeSet,
-    string::{String},
+    string::String,
     vec::Vec,
     sync::Arc,
 };
+use memory::VirtualAddress;
 use spin::Once;
 use getopts::{Matches, Options};
 use mod_mgmt::{
     StrongCrateRef,
     StrongSectionRef,
-    CrateNamespace,
+    CrateNamespace, StrRef,
 };
 use crate_name_utils::get_containing_crate_name;
 
@@ -57,6 +58,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help",             "print this help menu");
     opts.optflag("v", "verbose",          "enable verbose output");
+    opts.optopt ("a", "address",          "output the section that contains the given ADDRESS",      "ADDRESS");
     opts.optopt ("s", "sections-in",      "output the sections that depend on the given SECTION (incoming weak dependents)",      "SECTION");
     opts.optopt ("S", "sections-out",     "output the sections that the given SECTION depends on (outgoing strong dependencies)", "SECTION");
     opts.optopt ("c", "crates-in",        "output the crates that depend on the given CRATE (incoming weak dependents)",          "CRATE");
@@ -98,7 +100,10 @@ pub fn main(args: Vec<String>) -> isize {
 fn rmain(matches: Matches) -> Result<(), String> {
     if verbose!() { println!("MATCHES: {:?}", matches.free); }
 
-    if let Some(sec_name) = matches.opt_str("s") {
+    if let Some(addr) = matches.opt_str("a") {
+        section_containing_address(&addr)
+    }
+    else if let Some(sec_name) = matches.opt_str("s") {
         sections_dependent_on_me(&sec_name)
     }
     else if let Some(sec_name) = matches.opt_str("S") {
@@ -130,6 +135,30 @@ fn rmain(matches: Matches) -> Result<(), String> {
     }
     else {
         Err(format!("no supported options/arguments found."))
+    }
+}
+
+
+
+/// Outputs the section containing the given address, i.e., symbolication.
+/// 
+fn section_containing_address(addr: &str) -> Result<(), String> {
+    let addr = if addr.starts_with("0x") || addr.starts_with("0X") {
+        &addr[2..]
+    } else {
+        addr
+    };
+    
+    let virt_addr = VirtualAddress::new(
+        usize::from_str_radix(addr, 16)
+            .map_err(|_| format!("Error: address {:?} is not a valid hexademical usize value", addr))?
+    ).ok_or_else(|| format!("Error: address {:?} is not a valid VirtualAddress", addr))?;
+
+    if let Some((sec, offset)) = get_my_current_namespace().get_section_containing_address(virt_addr, false) {
+        println!("Found {:>#018X} in {} + {:#X}, typ: {:?}", virt_addr, sec.name, offset, sec.typ);
+        Ok(())
+    } else {
+        Err(format!("Couldn't find section containing address {:>#018X}", virt_addr))
     }
 }
 
@@ -343,7 +372,7 @@ fn sections_in_crate(crate_name: &str, all_sections: bool) -> Result<(), String>
 /// 
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching section names separated by the newline character `'\n'`.
-fn find_crate(crate_name: &str) -> Result<(String, StrongCrateRef), String> {
+fn find_crate(crate_name: &str) -> Result<(StrRef, StrongCrateRef), String> {
     let namespace = get_my_current_namespace();
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
     match matching_crates.len() {
@@ -352,7 +381,7 @@ fn find_crate(crate_name: &str) -> Result<(String, StrongCrateRef), String> {
             let mc = matching_crates.swap_remove(0);
             Ok((mc.0, mc.1)) 
         }
-        _ => Err(matching_crates.into_iter().map(|(crate_name, _crate_ref, _ns)| crate_name).collect::<Vec<String>>().join("\n")),
+        _ => Err(matching_crates.into_iter().map(|(crate_name, _crate_ref, _ns)| crate_name).collect::<Vec<_>>().join("\n")),
     }
 }
 
@@ -396,7 +425,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
     if matching_sections.len() == 1 { 
         Ok(matching_sections.remove(0))
     } else {
-        Err(matching_sections.into_iter().map(|sec| sec.name.clone()).collect::<Vec<String>>().join("\n"))
+        Err(matching_sections.into_iter().map(|sec| sec.name.clone()).collect::<Vec<_>>().join("\n"))
     }
 }
 

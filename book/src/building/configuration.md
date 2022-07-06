@@ -54,26 +54,20 @@ Follow the links below to read more about how Rust supports cfg options:
 
 ## How `THESEUS_CONFIG` and `cfg` work together
 
-Theseus provides a single top-level [`build.rs`](https://github.com/theseus-os/Theseus/blob/theseus_main/build.rs) file that converts the cfg options specified by `THESEUS_CONFIG` into Rust-known `cfg` values that can be used with the standard Rust cfg attributes. 
-This is a standard approach that uses [Rust's build script functionality](https://doc.rust-lang.org/cargo/reference/build-scripts.html).
-
-If you want the Rust source code in a given crate to depend on any cfg values specified via `THESEUS_CONFIG`, you must include this `build.rs` file in that crate's `Cargo.toml` file. 
-This typically looks like so:
-```toml
-[package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "my_crate"
-description = "brief description of my_crate here"
-version = "0.1.0"
-build = "../../build.rs"
+A single line in the top-level `Makefile` converts the cfg options specified by `THESEUS_CONFIG` into Rust-known `--cfg` values that can be used with the standard Rust cfg attributes. 
+That line, shown below, simply adds the "--cfg" prefix onto each whitespace-separated value in `THESEUS_CONFIG` and appends them all to the `RUSTFLAGS` environment variable.
+```mk
+cargo : export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 ```
-The last line in the above TOML snippet is what informs cargo that it should run Theseus's top-level `build.rs` script before compiling `your_crate`, which ensures the cfg values specified in `THESEUS_CONFIG` will actually be activated.
+> Note: you can also add `--cfg XYZ` directly to `RUSTFLAGS` rather than use `THESEUS_CONFIG`.
 
-> **Warning:** if you do not include the `build = "../../build.rs"` line in a crate's `Cargo.toml` manifest file, then the source code of that crate *will not see* cfg values set by the `THESEUS_CONFIG` environment variable.
+This is a standard approach that avoids the overhead of our prior approach based on a global build script. 
+[Read more here](https://doc.rust-lang.org/rustc/command-line-arguments.html#--cfg-configure-the-compilation-environment).
 
 
 # Other Configuration Options
 
+TODO: describe the new `theseus_features` crate and how it allows one to include optional crates in a Theseus build.
 
 
 ## Debug vs. Release Mode

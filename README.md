@@ -17,7 +17,7 @@ We are continually working to improve the OS, including its fault recovery abili
 On Linux (Debian-like distros), do the following:
  1. Obtain the Theseus repository (with all submodules):    
     ```
-    git clone --recurse-submodules https://github.com/theseus-os/Theseus.git
+    git clone --recurse-submodules --depth 1 https://github.com/theseus-os/Theseus.git
     ```
  2. Install Rust:
     ```
@@ -45,7 +45,7 @@ git submodule update --init --recursive
 
 Currently, we support building Theseus on the following platforms:
  * Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04, 18.04, 20.04. 
-   - Arch Linux has also been reported to work correctly. 
+   - Arch Linux and Fedora have also been reported to work correctly. 
  * Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version of WSL and WSL2.
  * MacOS, tested on versions High Sierra (10.13) and Catalina (10.15.2).
  * Docker, atop any host OS that can run a Docker container.
@@ -60,13 +60,17 @@ curl https://sh.rustup.rs -sSf | sh
 
 ### Building on Linux or WSL (Windows Subsystem for Linux)
 Install the following dependencies using your package manager:
-```sh
+```bash
 sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm
 ```
 
-  * Or on Arch Linux:
+  * Or:
     ```bash
+    # Arch Linux
     sudo pacman -S make gcc nasm pkg-config grub mtools xorriso qemu
+
+    # Fedora
+    sudo dnf install make gcc nasm pkg-config grub2 mtools xorriso qemu
     ```
 
 If you're on WSL, also do the following steps:

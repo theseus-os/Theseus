@@ -3,7 +3,6 @@ name = "color"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>", "Kevin Boos <kevinaboos@gmail.com>"]
 description = "A simple representation of the standard RGB color model"
-build = "../../build.rs"
 
 [lib]
 crate-type = ["rlib"]

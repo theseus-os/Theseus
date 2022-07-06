@@ -3,7 +3,6 @@ name = "shapes"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "define the basic shapes used in display subsystem"
-build = "../../build.rs"
 
 [dependencies]
 

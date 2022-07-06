@@ -3,7 +3,6 @@ name = "hpet"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for the x86 HPET: High Precision Event Timer"
-build = "../../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

@@ -2,7 +2,6 @@
 name = "stdio"
 version = "0.1.0"
 authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

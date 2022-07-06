@@ -3,7 +3,6 @@ name = "print"
 version = "0.1.0"
 authors = ["Andrew Pham <apham727@gmail.com>"]
 description = "offers kernel crates the ability to print to the default terminal"
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

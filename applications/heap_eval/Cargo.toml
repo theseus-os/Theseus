@@ -3,10 +3,9 @@ name = "heap_eval"
 version = "0.1.0"
 description = "Benchmarks to evaluate Theseus's heap design"
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
-qp-trie = "0.7.3"
+qp-trie = "0.8.0"
 getopts = "0.2.21"
 
 [dependencies.terminal_print]

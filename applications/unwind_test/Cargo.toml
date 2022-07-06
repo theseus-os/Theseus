@@ -3,7 +3,6 @@ name = "unwind_test"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "a simple app for testing whether unwinding works"
-build = "../../build.rs"
 
 [dependencies]
 

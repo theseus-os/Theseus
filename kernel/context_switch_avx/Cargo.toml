@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "context_switch_avx"
 description = "Context switching routines and structs for AVX-enabled register sets"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 zerocopy = "0.5.0"

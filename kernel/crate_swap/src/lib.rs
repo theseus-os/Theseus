@@ -34,7 +34,6 @@ use alloc::{
 use hashbrown::HashMap;
 use memory::{EntryFlags, MmiRef};
 use fs_node::{FsNode, FileOrDir, FileRef, DirRef};
-use qp_trie::wrapper::BString;
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
@@ -43,7 +42,7 @@ use mod_mgmt::{
     crate_name_from_path,
     replace_containing_crate_name,
     StrongSectionRef,
-    WeakDependent,
+    WeakDependent, StrRef,
 };
 use path::Path;
 use by_address::ByAddress;
@@ -343,7 +342,7 @@ pub fn swap_crates(
                 // This closure finds the section in the `new_crate` that corresponds to the given `old_sec` from the `old_crate`.
                 // And, if enabled, it will reexport that new section under the same name as the `old_sec`.
                 // We put this procedure in a closure because it's relatively expensive, allowing us to run it only when necessary.
-                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<String>| -> Result<StrongSectionRef, &'static str> {
+                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<StrRef>| -> Result<StrongSectionRef, &'static str> {
                     // Use the new namespace to find the new source_sec that old target_sec should point to.
                     // The new source_sec must have the same name as the old one (old_sec here),
                     // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
@@ -375,7 +374,7 @@ pub fn swap_crates(
                         // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
                         let reexported_name = old_sec.name.clone();
                         new_crate_reexported_symbols.insert(reexported_name.clone());
-                        let _old_val = old_sec_ns.symbol_map().lock().insert(BString::from(reexported_name), Arc::downgrade(&new_crate_source_sec));
+                        let _old_val = old_sec_ns.symbol_map().lock().insert(reexported_name, Arc::downgrade(&new_crate_source_sec));
                         if _old_val.is_none() { 
                             warn!("swap_crates(): reexported new crate section that replaces old section {:?}, but that old section unexpectedly didn't exist in the symbol map", old_sec.name);
                         }
@@ -534,7 +533,7 @@ pub fn swap_crates(
             _ => continue,
         };
         // Remove the old crate from the namespace that it was previously in, and remove its sections' symbols too.
-        if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove_str(old_crate_name) {
+        if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove(old_crate_name.as_bytes()) {
             {
                 let old_crate = old_crate_ref.lock_as_ref();
 
@@ -570,7 +569,7 @@ pub fn swap_crates(
                 if !reexport_new_symbols_as_old {
                     let mut old_ns_symbol_map = old_namespace.symbol_map().lock();
                     for old_sec in old_crate.global_sections_iter() {
-                        if old_ns_symbol_map.remove_str(&old_sec.name).is_none() {
+                        if old_ns_symbol_map.remove(&old_sec.name).is_none() {
                             error!("swap_crates(): couldn't find old symbol {:?} in the old crate's namespace: {}.", old_sec.name, old_namespace.name());
                             return Err("couldn't find old symbol {:?} in the old crate's namespace");
                         }
@@ -580,7 +579,7 @@ pub fn swap_crates(
                 // If the old crate had reexported its symbols, we should remove those reexports here,
                 // because they're no longer active since the old crate is being removed. 
                 for sym in &old_crate.reexported_symbols {
-                    let _old_reexported_symbol = old_namespace.symbol_map().lock().remove_str(sym);
+                    let _old_reexported_symbol = old_namespace.symbol_map().lock().remove(sym);
                     if _old_reexported_symbol.is_none() {
                         warn!("swap_crates(): the old_crate {:?}'s reexported symbol was not in its old namespace, couldn't be removed.", sym);
                     }
@@ -597,7 +596,7 @@ pub fn swap_crates(
             
             if cache_old_crates {
                 #[cfg(not(loscd_eval))]
-                cached_crates.crate_tree().lock().insert_str(old_crate_name, old_crate_ref);
+                cached_crates.crate_tree().lock().insert(old_crate_name.as_str().into(), old_crate_ref);
             }
 
             #[cfg(loscd_eval)]
@@ -616,14 +615,14 @@ pub fn swap_crates(
     for ((req, new_crate_name), is_old_crate_loaded) in swap_requests.iter().zip(new_crate_names.iter()).zip(old_crates_are_loaded.iter()) {
         // We only expect the new crate to have been loaded into the temp namespace if the old crate was actually loaded in the old namespace
         if !is_old_crate_loaded { continue; }
-        let new_crate_ref = namespace_of_new_crates.crate_tree().lock().remove_str(new_crate_name)
+        let new_crate_ref = namespace_of_new_crates.crate_tree().lock().remove(new_crate_name.as_bytes())
             .ok_or("BUG: swap_crates(): new crate specified by swap request was not found in the new namespace")?;
         
         #[cfg(not(loscd_eval))]
         debug!("swap_crates(): adding new crate {:?} to namespace {}", new_crate_ref, req.new_namespace.name());
 
         req.new_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
-        req.new_namespace.crate_tree().lock().insert_str(new_crate_name, new_crate_ref.clone());
+        req.new_namespace.crate_tree().lock().insert(new_crate_name.as_str().into(), new_crate_ref.clone());
     }
     
     // Other crates may have been loaded from their object files into the `namespace_of_new_crates` as dependendencies (required by the new crates specified by swap requests).
@@ -668,7 +667,7 @@ pub fn swap_crates(
             // #[cfg(not(loscd_eval))]
             // warn!("swap_crates(): untested scenario of adding new non-requested (dependency) crate {:?} to namespace {}", new_crate_ref, target_ns.name());
             target_ns.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
-            target_ns.crate_tree().lock().insert_str(new_crate_name, new_crate_ref.clone());
+            target_ns.crate_tree().lock().insert(new_crate_name.into(), new_crate_ref.clone());
         }
         else {
             #[cfg(not(loscd_eval))] {
@@ -955,7 +954,7 @@ impl SwapRequest {
                 let mut matching_crates = CrateNamespace::get_crates_starting_with(&old_namespace, ocn);
                 if matching_crates.len() == 1 {
                     let (old_crate_full_name, _ocr, real_old_namespace) = matching_crates.remove(0);
-                    (Some(old_crate_full_name), real_old_namespace)
+                    (Some(old_crate_full_name.to_string()), real_old_namespace)
                 } else {
                     // If we couldn't find a single loaded crate, then the old crate may not be loaded yet. 
                     // Thus, we should instead look for a single crate **object file** that matches the `old_crate_name` prefix.
@@ -968,7 +967,7 @@ impl SwapRequest {
                     } else {
                         // Here, we couldn't find a single matching loaded crate or crate object file, so we return an error. 
                         let matches_vec = if !matching_crates.is_empty() {
-                            matching_crates.into_iter().map(|(c_name, _c_ref, ns)| (c_name, Arc::clone(ns))).collect::<Vec<_>>()
+                            matching_crates.into_iter().map(|(c_name, _c_ref, ns)| (c_name.to_string(), Arc::clone(ns))).collect::<Vec<_>>()
                         } else if !matching_files.is_empty() {
                             matching_files.into_iter()
                                 .map(|(file, ns)| (

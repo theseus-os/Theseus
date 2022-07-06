@@ -3,7 +3,6 @@ name = "test_mutex_sleep"
 version = "0.1.0"
 description = "Tests the blocking sleeping mutex with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies.log]
 version = "0.4.8"

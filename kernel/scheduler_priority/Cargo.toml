@@ -3,7 +3,6 @@ authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 name = "scheduler_priority"
 description = "Provides priority scheduling functionality and picks the next task"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 spin = "0.9.0"

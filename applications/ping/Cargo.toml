@@ -3,7 +3,6 @@ name = "ping"
 version = "0.1.0"
 description = "pings an IPv4 address and returns ping statistics"
 authors = ["Barry Shiberu <berketshiberu@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 byteorder = { version = "1.0", default-features = false }

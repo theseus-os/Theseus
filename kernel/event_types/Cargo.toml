@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "event_types"
 description = "Types of input and output events that flow throughout the system"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"

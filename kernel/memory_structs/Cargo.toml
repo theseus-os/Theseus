@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory_structs"
 description = "Common types used in the memory management subsystem"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 multiboot2 = "0.10.1"

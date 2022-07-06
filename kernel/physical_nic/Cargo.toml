@@ -3,7 +3,6 @@ authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "physical_nic"
 description = "A trait that defines functions a physical NIC has to implement to support virtualization"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 

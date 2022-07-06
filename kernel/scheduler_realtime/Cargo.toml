@@ -3,7 +3,6 @@ authors = ["Jacob Earle <earlejacobt@gmail.com>"]
 name = "scheduler_realtime"
 description = "Provides a realtime scheduler based on Rate Monotonic scheduling"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies.log]
 version = "0.4.8"

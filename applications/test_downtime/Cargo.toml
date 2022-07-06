@@ -3,7 +3,6 @@ name = "test_downtime"
 version = "0.1.0"
 description = "Measure the downtime when various subsystems crash"
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
-build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"

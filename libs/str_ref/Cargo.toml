@@ -1,0 +1,6 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "str_ref"
+description = "A shared immutable reference to a `str`, essentially `Arc<str>` that is borrowable as a byte slice"
+version = "0.1.0"
+

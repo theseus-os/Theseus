@@ -3,7 +3,6 @@ name = "text_terminal"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "A text-based terminal emulator that supports ANSI, VT100, xterm, and other standards."
-build = "../../build.rs"
 
 [dependencies]
 bitflags = "1.1.0"

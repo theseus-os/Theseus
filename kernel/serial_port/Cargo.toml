@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "serial_port"
 description = "Advanced support for serial ports (e.g., COM1, COM2) with full interrupt support"
 version = "0.1.0"
-build = "../../build.rs"
 
 [dependencies]
 log = "0.4.8"

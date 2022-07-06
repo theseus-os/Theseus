@@ -3,7 +3,6 @@ name = "iommu"
 version = "0.1.0"
 authors = ["Nicholas Lindsay <nlindsay747@gmail.com>"]
 description = "Intel VT-d IOMMU support"
-build = "../../build.rs"
 
 [dependencies]
 log = "0.4.8"

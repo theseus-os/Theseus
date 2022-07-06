@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "interrupts"
 description = "Interrupt configuration and handlers for Theseus"
 version = "0.1.0"
-build = "../../build.rs"
 edition = "2018"
 
 [dependencies]

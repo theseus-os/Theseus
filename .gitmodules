@@ -1,34 +1,44 @@
 [submodule "libs/dfqueue"]
 	path = libs/dfqueue
 	url = https://github.com/theseus-os/DFQueue
-	ignore = dirty
-[submodule "libs/wasmtime"]
+	shallow = true
+[submodule "ports/wasmtime"]
 	path = ports/wasmtime
-	url = git@github.com:theseus-os/wasmtime.git
+	url = https://github.com/theseus-os/wasmtime.git
+	shallow = true
 [submodule "libs/wasm-tools"]
 	path = libs/wasm-tools
-	url = git@github.com:theseus-os/wasm-tools.git
+	url = https://github.com/theseus-os/wasm-tools.git
+	shallow = true
 [submodule "libs/object"]
 	path = libs/object
 	url = https://github.com/theseus-os/object.git
-[submodule "libs/libc"]
+	shallow = true
+[submodule "ports/libc"]
 	path = ports/libc
 	url = https://github.com/theseus-os/libc.git
+	shallow = true
 [submodule "libs/indexmap"]
 	path = libs/indexmap
 	url = https://github.com/theseus-os/indexmap
+	shallow = true
 [submodule "ports/region"]
 	path = ports/region
 	url = https://github.com/theseus-os/region-rs
+	shallow = true
 [submodule "ports/backtrace"]
 	path = ports/backtrace
 	url = https://github.com/theseus-os/backtrace-rs.git
+	shallow = true
 [submodule "libs/thiserror-core2"]
 	path = libs/thiserror-core2
 	url = https://github.com/theseus-os/thiserror-core2.git
+	shallow = true
 [submodule "libs/bincode"]
 	path = libs/bincode
-	url = git@github.com:theseus-os/bincode.git
+	url = https://github.com/theseus-os/bincode.git
+	shallow = true
 [submodule "libs/core2"]
 	path = libs/core2
 	url = https://github.com/theseus-os/core2.git
+	shallow = true

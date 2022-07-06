@@ -3,7 +3,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "signal_handler"
 description = "Support for registering POSIX-style signal handlers or trap handlers"
 version = "0.1.0"
-build = "../../build.rs"
 edition = "2018"
 
 [dependencies]
