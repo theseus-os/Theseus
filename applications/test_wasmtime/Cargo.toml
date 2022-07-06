@@ -3,7 +3,6 @@ name = "test_wasmtime"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Basic test cases for running `wasmtime` on Theseus"
-build = "../../build.rs"
 edition = "2018"
 
 [dependencies]

@@ -587,6 +587,9 @@ help:
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
 
+	@echo -e "   wasmtime:"
+	@echo -e "\t Same as 'run', but includes the 'wasmtime' crates in the build."
+
 	@echo -e "   run_pause:"
 	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
 	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
@@ -796,6 +799,11 @@ orun_pause:
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
 loadable : export override THESEUS_CONFIG += loadable
 loadable: run
+
+
+### builds and runs Theseus with wasmtime enabled.
+wasmtime : export override CARGOFLAGS += --features wasmtime
+wasmtime: run
 
 
 ### builds and runs Theseus in QEMU
