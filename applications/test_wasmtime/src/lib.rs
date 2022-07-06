@@ -29,7 +29,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(args: Vec<String>) -> Result<(), String> {
-    let path_to_hello_cwasm = Path::new(args.get(0).cloned().unwrap_or("/extra_files/hello.cwasm".to_string()));
+    let path_to_hello_cwasm = Path::new(args.get(0).cloned().unwrap_or("/extra_files/wasm/hello.cwasm".to_string()));
     let curr_dir = task::get_my_current_task()
         .map(|t| t.get_env().lock().working_dir.clone())
         .ok_or_else(|| format!("Failed to get task's current working dir"))?;
