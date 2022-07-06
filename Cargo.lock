@@ -3877,6 +3877,7 @@ dependencies = [
 [[package]]
 name = "wasmparser"
 version = "0.81.0"
+source = "git+https://github.com/theseus-os/wasm-tools?branch=no-std-wasmparser#7b0eb0d074606c8a49027e60e452862f5fe183b4"
 dependencies = [
  "hashbrown",
 ]

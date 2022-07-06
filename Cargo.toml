@@ -118,7 +118,7 @@ core2 = { path = "libs/core2" }
 ##############################################################################################
 #################### Below are patches for wasmtime-related crates. ##########################
 ##############################################################################################
-wasmparser = { path = "libs/wasm-tools/crates/wasmparser" }
+wasmparser = { git = "https://github.com/theseus-os/wasm-tools", branch = "no-std-wasmparser" }
 backtrace = { path = "ports/backtrace" }
 region = { path = "ports/region" }
 thiserror_core2 = { path = "libs/thiserror-core2" }

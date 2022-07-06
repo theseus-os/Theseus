@@ -6,10 +6,6 @@
 	path = ports/wasmtime
 	url = https://github.com/theseus-os/wasmtime.git
 	shallow = true
-[submodule "libs/wasm-tools"]
-	path = libs/wasm-tools
-	url = https://github.com/theseus-os/wasm-tools.git
-	shallow = true
 [submodule "ports/libc"]
 	path = ports/libc
 	url = https://github.com/theseus-os/libc.git
