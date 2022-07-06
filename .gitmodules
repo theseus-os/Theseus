@@ -10,10 +10,6 @@
 	path = libs/wasm-tools
 	url = https://github.com/theseus-os/wasm-tools.git
 	shallow = true
-[submodule "libs/object"]
-	path = libs/object
-	url = https://github.com/theseus-os/object.git
-	shallow = true
 [submodule "ports/libc"]
 	path = ports/libc
 	url = https://github.com/theseus-os/libc.git

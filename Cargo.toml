@@ -119,7 +119,6 @@ core2 = { path = "libs/core2" }
 #################### Below are patches for wasmtime-related crates. ##########################
 ##############################################################################################
 wasmparser = { path = "libs/wasm-tools/crates/wasmparser" }
-object = { path = "libs/object" }
 backtrace = { path = "ports/backtrace" }
 region = { path = "ports/region" }
 thiserror_core2 = { path = "libs/thiserror-core2" }
