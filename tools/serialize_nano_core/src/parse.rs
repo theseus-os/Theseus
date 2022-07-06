@@ -239,6 +239,9 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                     continue;
                 }
             };
+            
+            // Print sec_vaddr as if it's a virtual address not a usize.
+            eprintln!("{name}|v{sec_vaddr:#0X}|{global}");
 
             // debug!("parse_nano_core_symbol_file(): name: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", name, sec_vaddr, sec_size, sec_ndx);
 
@@ -371,12 +374,20 @@ fn add_new_section(
         .tls_bss_shndx
         .map_or(false, |(shndx, _)| sec_ndx == shndx)
     {
+        // TLS sections encode their TLS offset in the virtual address field,
+        // which is necessary to properly calculate relocation entries that depend upon them.
+        let tls_offset = virtual_address;
+        // We do need to calculate the real virtual address so we can use that
+        // to calculate the real mapped_pages_offset where its data exists.
+        // so we can use that to calculate the real virtual address where it's loaded.
+        let tls_sec_bss_vaddr = shndxs.tls_bss_shndx.unwrap().1 + tls_offset;
+
         Some(SerializedSection {
             name,
             ty: SectionType::TlsBss,
             global,
-            virtual_address,
-            offset: virtual_address,
+            virtual_address: tls_offset,
+            offset: tls_sec_bss_vaddr,
             size,
         })
     } else {

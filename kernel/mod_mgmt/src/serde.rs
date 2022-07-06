@@ -103,14 +103,10 @@ impl SerializedCrate {
             num_new_syms
         );
         
-        trace!("Printing loaded nano_core crate (this may take a while)");
         let loaded_crate_ref = loaded_crate.lock_as_ref();
-        trace!("{:#?}", loaded_crate_ref);
-        trace!("crate_name: {:#?}", loaded_crate_ref.crate_name);
-        trace!("sections: {:#?}", loaded_crate_ref.sections);
-        trace!("global_sections: {:#?}", loaded_crate_ref.global_sections);
-        trace!("tls_sections: {:#?}", loaded_crate_ref.tls_sections);
-        trace!("data_sections: {:#?}", loaded_crate_ref.data_sections);
+        for (_, section) in loaded_crate_ref.sections.iter() {
+            trace!("{}|{}|{}", section.name, section.address_range.start, section.global);
+        }
         drop(loaded_crate_ref);
 
         Ok((loaded_crate, self.init_symbols, num_new_syms))
@@ -130,7 +126,7 @@ pub struct SerializedSection {
     pub global: bool,
     /// The starting [`VirtualAddress`] of the range covered by this section.
     pub virtual_address: usize,
-    /// This field is identical to `self.virtual_address` unless `self.ty == SectionType::TlsData`.
+    /// This field is identical to `self.virtual_address` unless this is a thread local section.
     pub offset: usize,
     /// The size of the section.
     pub size: usize,
