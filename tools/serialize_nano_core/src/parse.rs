@@ -240,9 +240,6 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 }
             };
             
-            // Print sec_vaddr as if it's a virtual address not a usize.
-            eprintln!("{name}|v{sec_vaddr:#0X}|{global}");
-
             // debug!("parse_nano_core_symbol_file(): name: {}, vaddr: {:#X}, size: {:#X}, sec_ndx {}", name, sec_vaddr, sec_size, sec_ndx);
 
             add_new_section(

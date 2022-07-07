@@ -105,7 +105,7 @@ impl SerializedCrate {
         
         let loaded_crate_ref = loaded_crate.lock_as_ref();
         for (_, section) in loaded_crate_ref.sections.iter() {
-            trace!("{}|{}|{}", section.name, section.address_range.start, section.global);
+            trace!("{:016x} {}", section.address_range.start.value(), section.name);
         }
         drop(loaded_crate_ref);
 

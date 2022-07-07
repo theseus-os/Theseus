@@ -277,6 +277,10 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(DEPS_DIR)
 
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+## Dump readelf output:
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
+ 		>  $(ROOT_DIR)/readelf_output
 ## run "readelf" on the nano_core binary, remove irrelevant LOCAL symbols from the ELF file, demangle it, serialize it, and then output to a serde file
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/serialize_nano_core/Cargo.toml \
 		<(cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
