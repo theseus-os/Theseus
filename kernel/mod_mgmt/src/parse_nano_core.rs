@@ -53,7 +53,7 @@ pub fn parse_nano_core(
     let data_pages = Arc::new(Mutex::new(data_pages));
 
     /// Just like Rust's `try!()` macro, but packages up the given error message in a tuple
-    /// with an array of the above 3 MappedPages objected.
+    /// with an array of the above 3 MappedPages objects.
     macro_rules! try_mp {
         ($expr:expr) => {
             match $expr {

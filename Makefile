@@ -277,17 +277,17 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(DEPS_DIR)
 
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
-## Dump readelf output:
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
-		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
- 		>  $(ROOT_DIR)/readelf_output
+## Dump readelf output for verification. See pull request #542 for more details:
+##	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
+##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
+## 		>  $(ROOT_DIR)/readelf_output
 ## run "readelf" on the nano_core binary, remove irrelevant LOCAL symbols from the ELF file, demangle it, serialize it, and then output to a serde file
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/serialize_nano_core/Cargo.toml \
 		<(cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<($(CROSS)readelf -S -s -W $(nano_core_binary) \
 		| sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;')) \
 		> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.serde
-## `.sys`: this doesn't parse the object file at compile time, instead including the modified output of "readelf" as a boot module so it can then
+## `.sym`: this doesn't parse the object file at compile time, instead including the modified output of "readelf" as a boot module so it can then
 ## be parsed during boot. See pull request #542 for more details.
 ##	@cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \

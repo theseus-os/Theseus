@@ -81,14 +81,14 @@ impl SerializedCrate {
         }
 
         trace!(
-            "SerializedCrate::load(): adding symbols to namespace {:?}...",
+            "SerializedCrate::into_loaded_crate(): adding symbols to namespace {:?}...",
             namespace.name
         );
         let num_new_syms = namespace.add_symbols(sections.values(), verbose_log);
-        trace!("SerializedCrate::load(): finished adding symbols.");
+        trace!("SerializedCrate::into_loaded_crate(): finished adding symbols.");
 
         let mut loaded_crate_mut = loaded_crate.lock_as_mut().ok_or(
-            "BUG: SerializedCrate::load(): couldn't get exclusive mutable access to loaded_crate",
+            "BUG: SerializedCrate::into_loaded_crate(): couldn't get exclusive mutable access to loaded_crate",
         )?;
         loaded_crate_mut.sections = sections;
         drop(loaded_crate_mut);
@@ -103,11 +103,12 @@ impl SerializedCrate {
             num_new_syms
         );
         
-        let loaded_crate_ref = loaded_crate.lock_as_ref();
-        for (_, section) in loaded_crate_ref.sections.iter() {
-            trace!("{:016x} {}", section.address_range.start.value(), section.name);
-        }
-        drop(loaded_crate_ref);
+        // Dump loaded sections for verification. See pull request #542 for more details:
+        // let loaded_crate_ref = loaded_crate.lock_as_ref();
+        // for (_, section) in loaded_crate_ref.sections.iter() {
+        //     trace!("{:016x} {}", section.address_range.start.value(), section.name);
+        // }
+        // drop(loaded_crate_ref);
 
         Ok((loaded_crate, self.init_symbols, num_new_syms))
     }
@@ -152,7 +153,7 @@ impl SerializedSection {
             SectionType::Data | SectionType::Bss => Arc::clone(data_pages),
         };
         let virtual_address = VirtualAddress::new(self.virtual_address)
-            .ok_or("SerializedSection::load(): invalid virtual address")?;
+            .ok_or("SerializedSection::into_loaded_section(): invalid virtual address")?;
 
         let loaded_section = Arc::new(LoadedSection {
             name: match self.ty {
@@ -172,7 +173,7 @@ impl SerializedSection {
                     .lock()
                     .offset_of_address(
                         VirtualAddress::new(self.offset)
-                            .ok_or("SerializedSection::load(): invalid offset")?,
+                            .ok_or("SerializedSection::into_loaded_section(): invalid offset")?,
                     )
                     .ok_or("nano_core section wasn't covered by its mapped pages")?,
             },
