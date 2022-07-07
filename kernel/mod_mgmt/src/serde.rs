@@ -1,7 +1,14 @@
-//! Module containing structs necessary for serializing and deserializing crates.
+//! Serializable versions of crate and section metadata types.
 //!
-//! This is currently only used to parse the `nano_core` object file at compile time. After being
-//! parsed, it is serialized into an instance of [`SerializedCrate`] and included as a boot module.
+//! The primary reason this exists is because [`LoadedCrate`] and [`LoadedSection`]
+//! make copious usage of `Arc` and `Weak` reference-counted pointer types,
+//! which cannot be properly (de)serialized by `serde`. 
+//! The types in this module remove those refcount types and then reconstruct them
+//! individually at runtime after deserialization.
+//!
+//! This is currently only used to parse and serialize the `nano_core` binary at compile time.
+//! The `nano_core`'s [`SerializedCrate`] is then included as a boot module
+//! so it can be deserialized into a [`LoadedCrate`] at runtime.
 
 use crate::{CrateNamespace, mp_range};
 use alloc::{
@@ -17,7 +24,7 @@ use memory::{MappedPages, VirtualAddress};
 use serde::{Deserialize, Serialize};
 use spin::Mutex;
 
-/// A serialized representation of a crate.
+/// A (de)serializable representation of a loaded crate that is `serde`-compatible.
 ///
 /// See [`LoadedCrate`] for more detail on the fields of this struct.
 #[derive(Debug, Serialize, Deserialize)]
@@ -114,7 +121,7 @@ impl SerializedCrate {
     }
 }
 
-/// A serialized representation of a section.
+/// A (de)serializable representation of a loaded section that is `serde`-compatible.
 ///
 /// See [`LoadedSection`] for more detail on the fields of this struct.
 #[derive(Debug, Serialize, Deserialize)]
