@@ -393,7 +393,7 @@ impl MappedPages {
 
         match alloc_pages_owned.split(at_page) {
             Ok((first_ap, second_ap)) => Ok((
-                MappedPages{
+                MappedPages {
                     page_table_p4: self.page_table_p4,
                     pages: first_ap,
                     flags: self.flags,
