@@ -4,14 +4,17 @@
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
 use crate::{CrateNamespace, mp_range, serde::SerializedCrate};
-use alloc::{collections::{BTreeMap, BTreeSet}, string::String, sync::Arc};
+use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
+use fs_node::FileRef;
 use path::Path;
+use rustc_demangle::demangle;
 use spin::Mutex;
 use cow_arc::{CowArc, CowWeak};
 use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
 use crate_metadata::*;
 use hashbrown::HashMap;
+use xmas_elf::{ElfFile, sections::{SectionData, ShType, SHF_ALLOC, SHF_WRITE, SHF_EXECINSTR, SHF_TLS}};
 
 
 /// The file name (without extension) that we expect to see in the namespace's kernel crate directory.
@@ -82,53 +85,29 @@ pub fn parse_nano_core(
 
     let parse_result = match nano_core_file_path.extension() {
         Some("sym") => {
-            let crate_name = StrRef::from(NANO_CORE_CRATE_NAME);
-            // Create the LoadedCrate instance to represent the nano_core. It will be properly
-            // populated by parse_nano_core_symbol_file.
-            let nano_core_crate_ref = CowArc::new(LoadedCrate {
-                crate_name:          crate_name.clone(),
-                object_file:         nano_core_file.clone(),
-                debug_symbols_file:  Arc::downgrade(&nano_core_file),
-                sections:            HashMap::new(),
-                text_pages:          Some((text_pages.clone(),   mp_range(&text_pages))),
-                rodata_pages:        Some((rodata_pages.clone(), mp_range(&rodata_pages))),
-                data_pages:          Some((data_pages.clone(),   mp_range(&data_pages))),
-                global_sections:     BTreeSet::new(),
-                tls_sections:        BTreeSet::new(),
-                data_sections:       BTreeSet::new(),
-                reexported_symbols:  BTreeSet::new(),
-            });
-            let parsed_crate_items = try_mp!(
-                parse_nano_core_symbol_file(
-                    &bytes,
-                    real_namespace, 
-                    CowArc::downgrade(&nano_core_crate_ref), 
-                    &text_pages, 
-                    &rodata_pages, 
-                    &data_pages
-                )
-            );
-
-            // Access and propertly set the new_crate's sections list and other items.
-            let mut new_crate_mut = try_mp!(
-                nano_core_crate_ref.lock_as_mut()
-                    .ok_or("BUG: parse_nano_core(): couldn't get exclusive mutable access to new_crate")
-            );
-
-            trace!("parse_nano_core(): adding symbols to namespace {:?}...", real_namespace.name);
-            let new_syms = real_namespace.add_symbols(parsed_crate_items.sections.values(), verbose_log);
-            trace!("parse_nano_core(): finished adding symbols.");
-
-            new_crate_mut.sections        = parsed_crate_items.sections;
-            new_crate_mut.global_sections = parsed_crate_items.global_sections;
-            new_crate_mut.data_sections   = parsed_crate_items.data_sections;
-            drop(new_crate_mut);
-
-            // Add the newly-parsed nano_core crate to the kernel namespace.
-            real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
-            info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
-            Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
-        },
+            parse_nano_core_symbol_file_or_binary(
+                parse_nano_core_symbol_file,
+                bytes,
+                Arc::clone(&nano_core_file),
+                real_namespace,
+                &text_pages,
+                &rodata_pages,
+                &data_pages,
+                verbose_log
+            )
+        }
+        Some("bin") => {
+            parse_nano_core_symbol_file_or_binary(
+                parse_nano_core_binary,
+                bytes,
+                Arc::clone(&nano_core_file),
+                real_namespace,
+                &text_pages,
+                &rodata_pages,
+                &data_pages,
+                verbose_log
+            )
+        }
         Some("serde") => {
             let (deserialized, _): (SerializedCrate, _) = try_mp!(
                 bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(
@@ -149,11 +128,76 @@ pub fn parse_nano_core(
             )
         },
         _ => Err(
-            "nano_core object file had unexpected file extension. Expected \".serde\" or \".sym\"",
+            "nano_core object file had unexpected file extension. Expected \".bin\", \".sym\" or \".serde\"",
         ),
     };
 
     Ok(try_mp!(parse_result))
+}
+
+fn parse_nano_core_symbol_file_or_binary(
+    f: fn(
+        &[u8],
+        &Arc<CrateNamespace>,
+        WeakCrateRef,
+        &Arc<Mutex<MappedPages>>,
+        &Arc<Mutex<MappedPages>>,
+        &Arc<Mutex<MappedPages>>,
+    ) -> Result<ParsedCrateItems, &'static str>,
+    bytes: &[u8],
+    nano_core_file: FileRef,
+    real_namespace: &Arc<CrateNamespace>,
+    text_pages: &Arc<Mutex<MappedPages>>,
+    rodata_pages: &Arc<Mutex<MappedPages>>,
+    data_pages: &Arc<Mutex<MappedPages>>,
+    verbose_log: bool,
+) -> Result<
+    (StrongCrateRef, BTreeMap<String, usize>, usize),
+    &'static str,
+> {
+    let crate_name = StrRef::from(NANO_CORE_CRATE_NAME);
+    // Create the LoadedCrate instance to represent the nano_core. It will be properly
+    // populated by parse_nano_core_symbol_file.
+    let nano_core_crate_ref = CowArc::new(LoadedCrate {
+        crate_name:          crate_name.clone(),
+        debug_symbols_file:  Arc::downgrade(&nano_core_file),
+        object_file:         nano_core_file,
+        sections:            HashMap::new(),
+        text_pages:          Some((text_pages.clone(),   mp_range(&text_pages))),
+        rodata_pages:        Some((rodata_pages.clone(), mp_range(&rodata_pages))),
+        data_pages:          Some((data_pages.clone(),   mp_range(&data_pages))),
+        global_sections:     BTreeSet::new(),
+        tls_sections:        BTreeSet::new(),
+        data_sections:       BTreeSet::new(),
+        reexported_symbols:  BTreeSet::new(),
+    });
+
+    let parsed_crate_items = f(
+        &bytes,
+        real_namespace, 
+        CowArc::downgrade(&nano_core_crate_ref), 
+        &text_pages, 
+        &rodata_pages, 
+        &data_pages
+    )?;
+
+    // Access and propertly set the new_crate's sections list and other items.
+    let mut new_crate_mut = nano_core_crate_ref.lock_as_mut()
+            .ok_or("BUG: parse_nano_core(): couldn't get exclusive mutable access to new_crate")?;
+
+    trace!("parse_nano_core(): adding symbols to namespace {:?}...", real_namespace.name);
+    let new_syms = real_namespace.add_symbols(parsed_crate_items.sections.values(), verbose_log);
+    trace!("parse_nano_core(): finished adding symbols.");
+
+    new_crate_mut.sections        = parsed_crate_items.sections;
+    new_crate_mut.global_sections = parsed_crate_items.global_sections;
+    new_crate_mut.data_sections   = parsed_crate_items.data_sections;
+    drop(new_crate_mut);
+
+    // Add the newly-parsed nano_core crate to the kernel namespace.
+    real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
+    info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
+    Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }
 
 /// Parses the nano_core symbol file that represents the already loaded (and currently running) nano_core code.
@@ -402,8 +446,191 @@ fn parse_nano_core_symbol_file(
 
         } // end of loop over all lines
     }
-
+    
     trace!("parse_nano_core_symbol_file(): finished looping over symtab.");
+    Ok(crate_items)
+}
+
+/// Parses the nano_core ELF binary file, which is already loaded and running.  
+/// Thus, we simply search for its global symbols, and add them to the system map and the crate metadata.
+/// 
+/// Drops the given `mapped_pages` that hold the nano_core binary file itself.
+fn parse_nano_core_binary(
+    bytes: &[u8],
+    namespace:     &Arc<CrateNamespace>,
+    new_crate_weak_ref: WeakCrateRef,
+    text_pages:    &Arc<Mutex<MappedPages>>,
+    rodata_pages:  &Arc<Mutex<MappedPages>>,
+    data_pages:    &Arc<Mutex<MappedPages>>,
+) -> Result<ParsedCrateItems, &'static str> {
+    let elf_file = ElfFile::new(bytes)?; // returns Err(&str) if ELF parse fails
+
+    // For us to properly load the ELF file, it must NOT have been stripped,
+    // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
+    let sssec = elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::SymTab)).next();
+    let symtab = match sssec.ok_or("no symtab section").and_then(|s| s.get_data(&elf_file)) {
+        Ok(SectionData::SymbolTable64(symtab)) => symtab,
+        _ => {
+            error!("parse_nano_core_binary(): can't load file: no symbol table found. Was file stripped?");
+            return Err("cannot load nano_core: no symbol table found. Was file stripped?");
+        }
+    };
+    
+    // find the .text, .data, and .rodata sections
+    let mut text_shndx:     Option<Shndx> = None;
+    let mut rodata_shndx:   Option<Shndx> = None;
+    let mut data_shndx:     Option<Shndx> = None;
+    let mut bss_shndx:      Option<Shndx> = None;
+    let mut tls_data_shndx: Option<(Shndx, VirtualAddress)> = None;
+    let mut tls_bss_shndx:  Option<(Shndx, VirtualAddress)> = None;
+
+
+    // We will fill in these crate items while parsing the symbol file.
+    let mut crate_items = ParsedCrateItems::empty();
+    // As the nano_core doesn't have one section per function/data/rodata, we fake it here with an arbitrary section counter
+    let mut section_counter = 0;
+    
+    for (shndx, sec) in elf_file.section_iter().enumerate() {
+        // trace!("parse_nano_core_binary(): looking at sec[{}]: {:?}", shndx, sec);
+        // skip null section and any empty sections
+        let sec_size = sec.size() as usize;
+        if sec_size == 0 { continue; }
+               
+        match sec.get_name(&elf_file) {
+            Ok(".text") => {
+                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR)) {
+                    return Err(".text section had wrong flags!");
+                }
+                text_shndx = Some(shndx);
+            }
+            Ok(".rodata") => {
+                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC)) {
+                    return Err(".rodata section had wrong flags!");
+                }
+                rodata_shndx = Some(shndx);
+            }
+            Ok(".data") => {
+                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE)) {
+                    return Err(".data section had wrong flags!");
+                }
+                data_shndx = Some(shndx);
+            }
+            Ok(".bss") => {
+                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE)) {
+                    return Err(".bss section had wrong flags!");
+                }
+                bss_shndx = Some(shndx);
+            }
+            Ok(".tdata") => {
+                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | SHF_TLS) == (SHF_ALLOC | SHF_WRITE | SHF_TLS)) {
+                    return Err(".tdata section had wrong flags!");
+                }
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .tdata section had an invalid virtual address")?;
+                tls_data_shndx = Some((shndx, sec_vaddr));
+            }
+            Ok(".tbss") => {
+                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | SHF_TLS) == (SHF_ALLOC | SHF_WRITE | SHF_TLS)) {
+                    return Err(".tbss section had wrong flags!");
+                }
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .tbss section had an invalid virtual address")?;
+                tls_bss_shndx = Some((shndx, sec_vaddr));
+            }
+            Ok(".gcc_except_table") => {
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .gcc_except_table section had an invalid virtual address")?;
+                let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
+                    .ok_or("the nano_core .gcc_except_table section wasn't covered by the read-only mapped pages!")?;
+                crate_items.sections.insert(
+                    section_counter,
+                    Arc::new(LoadedSection::new(
+                        SectionType::GccExceptTable,
+                        GCC_EXCEPT_TABLE_STR_REF.clone(),
+                        Arc::clone(&rodata_pages),
+                        mapped_pages_offset,
+                        sec_vaddr,
+                        sec_size,
+                        false, // .gcc_except_table is not global
+                        new_crate_weak_ref.clone(),
+                    ))
+                );
+                section_counter += 1;
+            }
+            Ok(".eh_frame") => {
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .eh_frame section had an invalid virtual address")?;
+                let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
+                    .ok_or("the nano_core .eh_frame section wasn't covered by the read-only mapped pages!")?;
+                crate_items.sections.insert(
+                    section_counter,
+                    Arc::new(LoadedSection::new(
+                        SectionType::EhFrame,
+                        EH_FRAME_STR_REF.clone(),
+                        Arc::clone(&rodata_pages),
+                        mapped_pages_offset,
+                        sec_vaddr,
+                        sec_size,
+                        false, // .eh_frame is not global
+                        new_crate_weak_ref.clone(),
+                    ))
+                );
+                section_counter += 1;
+            }
+            _ => {
+                continue;
+            }
+        }
+    }
+
+    let text_shndx   = text_shndx.ok_or("couldn't find .text section in nano_core ELF")?;
+    let rodata_shndx = rodata_shndx.ok_or("couldn't find .rodata section in nano_core ELF")?;
+    let data_shndx   = data_shndx.ok_or("couldn't find .data section in nano_core ELF")?;
+    let bss_shndx    = bss_shndx.ok_or("couldn't find .bss section in nano_core ELF")?;
+    let shndxs = MainShndx { text_shndx, rodata_shndx, data_shndx, bss_shndx, tls_data_shndx, tls_bss_shndx };
+    
+    {
+        let text_pages_locked = text_pages.lock();
+        let rodata_pages_locked = rodata_pages.lock();
+        let data_pages_locked = data_pages.lock();
+
+        // Iterate through the symbol table so we can find which sections are global (publicly visible).
+        use xmas_elf::symbol_table::{Entry, Binding};
+        for entry in symtab.iter() {
+            if let (Ok(bind), Ok(typ)) = (entry.get_binding(), entry.get_type()) {
+                // public symbols can have any visibility setting, but it's the binding that matters (GLOBAL/WEAK vs. LOCAL)
+                let global = bind == Binding::Global || bind == Binding::Weak;
+                if (typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object) || global {
+                    let sec_vaddr_value = entry.value() as usize;
+                    let sec_size = entry.size() as usize;
+                    let name = entry.get_name(&elf_file)?;
+
+                    let demangled = demangle(name).to_string();
+                    // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_value, sec_size);
+
+                    add_new_section(
+                        namespace,
+                        &shndxs, 
+                        &mut crate_items, 
+                        text_pages, 
+                        rodata_pages, 
+                        data_pages, 
+                        &text_pages_locked,
+                        &rodata_pages_locked,
+                        &data_pages_locked,
+                        &new_crate_weak_ref,
+                        &mut section_counter,
+                        entry.shndx() as usize,
+                        demangled.as_str().into(),
+                        sec_size,
+                        sec_vaddr_value,
+                        global
+                    )?;
+                }
+            }
+        }
+    }
+
     Ok(crate_items)
 }
 
