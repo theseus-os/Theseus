@@ -114,6 +114,8 @@ smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 libc = { path = "ports/libc" }
 ### Patch `core2` with newer functions from `std::io`, e.g., additional `Seek` trait functions
 core2 = { path = "libs/core2" }
+### Patch `bincode` because the version on crates.io doesn't handle no_std features correctly.
+bincode = { git = "https://github.com/bincode-org/bincode" }
 
 ##############################################################################################
 #################### Below are patches for wasmtime-related crates. ##########################
@@ -122,7 +124,6 @@ wasmparser = { git = "https://github.com/theseus-os/wasm-tools", branch = "no-st
 backtrace = { path = "ports/backtrace" }
 region = { path = "ports/region" }
 thiserror_core2 = { path = "libs/thiserror-core2" }
-bincode = { path = "libs/bincode" }
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!
@@ -136,4 +137,3 @@ incremental = false
 [profile.release]
 codegen-units = 1
 incremental = false
-
