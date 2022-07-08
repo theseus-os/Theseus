@@ -596,7 +596,8 @@ help:
 	@echo -e "   iso:"
 	@echo -e "\t The default and most basic target. Builds Theseus OS with the default feature set and creates a bootable ISO image."
 
-	@echo -e "   full (all):"
+	@echo -e "   all:"
+	@echo -e "   full:"
 	@echo -e "\t Same as 'iso', but builds all Theseus OS crates by enabling all Cargo features ('--all-features')."
 
 	@echo -e "   run:"
