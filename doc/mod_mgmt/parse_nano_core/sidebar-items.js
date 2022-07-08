@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["parse_nano_core","Parses the nano_core object file that represents the already loaded (and currently running) nano_core code."]]});
+initSidebarItems({"fn":[["parse_nano_core","Deserializes the file containing the [`SerializedCrate`] representation of the already loaded (and currently running) `nano_core` code."]]});
