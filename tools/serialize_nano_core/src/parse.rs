@@ -3,8 +3,11 @@ use hashbrown::HashMap;
 use mod_mgmt::serde::SerializedSection;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Parses the nano_core symbol file that represents the already loaded (and currently running) nano_core code.
-/// Basically, just searches the section list for offsets, size, and flag data,
+/// Parses the nano_core symbol file that represents the sections and symbols
+/// in the initially running code (the kernel base image, i.e., "nano_core"),
+/// which are loaded into the running system by the bootloader.
+///
+/// Basically, this parses the section list for offsets, size, and flag data,
 /// and parses the symbol table to populate the list of sections.
 pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItems, &'static str> {
     let mut text_shndx: Option<Shndx> = None;
