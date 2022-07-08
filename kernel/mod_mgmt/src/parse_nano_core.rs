@@ -112,8 +112,8 @@ pub fn parse_nano_core(
             let (deserialized, _): (SerializedCrate, _) = try_mp!(
                 bincode::serde::decode_from_slice(bytes, bincode::config::standard()).map_err(
                     |e| {
-                        error!("parse_nano_core(): error parsing nano_core: {e}");
-                        "parse_nano_core(): error parsing nano_core"
+                        error!("parse_nano_core(): error deserializing nano_core: {e}");
+                        "parse_nano_core(): error deserializing nano_core"
                     }
                 )
             );
