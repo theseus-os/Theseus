@@ -580,7 +580,7 @@ impl LoadedCrate {
 
 
 /// The possible types of sections that can be loaded from a crate object file.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SectionType {
     /// A `text` section contains executable code, i.e., functions. 
     Text,

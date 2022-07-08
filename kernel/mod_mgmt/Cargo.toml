@@ -50,7 +50,7 @@ path = "../fs_node"
 
 [dependencies.hashbrown]
 version = "0.11.2"
-features = ["nightly"]
+features = ["nightly", "serde"]
 
 [dependencies.vfs_node]
 path = "../vfs_node"
@@ -60,6 +60,16 @@ path = "../path"
 
 [dependencies.memfs]
 path = "../memfs"
+
+[dependencies.serde]
+version = "1.0.137"
+default-features = false
+features = ["derive", "alloc"]
+
+[dependencies.bincode]
+version = "2.0.0-rc.1"
+default-features = false
+features = ["serde", "alloc"]
 
 [lib]
 crate-type = ["rlib"]

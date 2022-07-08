@@ -45,6 +45,7 @@ pub use crate_metadata::*;
 
 pub mod parse_nano_core;
 pub mod replace_nano_core_crates;
+pub mod serde;
 
 
 /// The name of the directory that contains all of the CrateNamespace files.
@@ -2750,3 +2751,10 @@ impl PartialEq for StrongSectionRefWrapper {
     }
 }
 impl Eq for StrongSectionRefWrapper { }
+
+/// Convenience function for calculating the address range of a MappedPages object.
+fn mp_range(mp_ref: &Arc<Mutex<MappedPages>>) -> Range<VirtualAddress> {
+    let mp = mp_ref.lock();
+    mp.start_address()..(mp.start_address() + mp.size_in_bytes())
+}
+
