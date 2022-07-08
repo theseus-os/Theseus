@@ -140,9 +140,14 @@ Notes on Docker usage:
 
 
 ## Building and Running
-To build and run Theseus in QEMU, simply run:   
-```
+Build the default Theseus OS image and run it in QEMU:   
+```sh
 make run
+```
+
+Build a full Theseus OS image with all features and crates enabled:
+```sh
+make full   ## or `make all`
 ```
 
 Run `make help` to see other make targets and the various command-line options.

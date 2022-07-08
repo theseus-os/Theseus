@@ -1,7 +1,6 @@
 ### This makefile is the top-level build script that builds all the crates in subdirectories 
 ### and combines them into the final OS .iso image.
 ### It also provides convenient targets for running and debugging Theseus and using GDB on your host computer.
-.DEFAULT_GOAL := all
 SHELL := /bin/bash
 
 ## Disable parallelism for this Makefile since it breaks the build,
@@ -12,7 +11,8 @@ SHELL := /bin/bash
 ## most of the variables used below are defined in Config.mk
 include cfg/Config.mk
 
-all: iso
+## By default, we just build the standard OS image via the `iso` target.
+.DEFAULT_GOAL := iso
 
 ## Default values for various configuration options.
 debug ?= none
@@ -20,7 +20,6 @@ net ?= none
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
-
 
 
 ## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
@@ -119,7 +118,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
-.PHONY: all \
+.PHONY: all full \
 		check-rustc check-usb \
 		clean clean-doc clean-old-build \
 		run run_pause iso build cargo grub extra_files \
@@ -137,6 +136,10 @@ ifneq (,$(findstring avx,$(TARGET)))
 export override CFLAGS+=-DENABLE_AVX
 endif
 
+### Convenience targets for building Theseus with all features enabled.
+all: full
+full : export override CARGOFLAGS += --all-features
+full: iso
 
 
 ### Convenience target for building the ISO using the below $(iso) target
@@ -591,10 +594,13 @@ clean-doc:
 help: 
 	@echo -e "\nThe following make targets are available:"
 	@echo -e "   iso:"
-	@echo -e "\t The default and most basic target. Builds the full Theseus OS and creates a bootable ISO image."
+	@echo -e "\t The default and most basic target. Builds Theseus OS with the default feature set and creates a bootable ISO image."
+
+	@echo -e "   full (all):"
+	@echo -e "\t Same as 'iso', but builds all Theseus OS crates by enabling all Cargo features ('--all-features')."
 
 	@echo -e "   run:"
-	@echo -e "\t Builds Theseus (like the 'iso' target) and runs it using QEMU."
+	@echo -e "\t Builds Theseus (via the 'iso' target) and runs it using QEMU."
 
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
