@@ -10,46 +10,45 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Basically, this parses the section list for offsets, size, and flag data,
 /// and parses the symbol table to populate the list of sections.
 pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItems, &'static str> {
-    let mut text_shndx: Option<Shndx> = None;
-    let mut rodata_shndx: Option<Shndx> = None;
-    let mut data_shndx: Option<Shndx> = None;
-    let mut bss_shndx: Option<Shndx> = None;
-    let mut tls_data_shndx: Option<(Shndx, usize)> = None;
-    let mut tls_bss_shndx: Option<(Shndx, usize)> = None;
+    // We don't care about the .init sections index.
+    let mut init_vaddr: Option<usize> = None;
+    let mut text: Option<(Shndx, usize)> = None;
+    let mut rodata: Option<(Shndx, usize)> = None;
+    let mut data: Option<(Shndx, usize)> = None;
+    let mut bss: Option<(Shndx, usize)> = None;
+    let mut tls_data: Option<(Shndx, usize)> = None;
+    let mut tls_bss: Option<(Shndx, usize)> = None;
 
-    /// An internal function that parses a section header's index (e.g., "[7]") out of the given str.
-    /// Returns a tuple of the parsed `Shndx` and the rest of the unparsed str after the shndx.
-    fn parse_section_ndx(str_ref: &str) -> Option<(Shndx, &str)> {
+    /// An internal function that parses a section header's index, address and size.
+    fn parse_section(str_ref: &str) -> Option<(Shndx, usize, usize)> {
         let open = str_ref.find('[');
         let close = str_ref.find(']');
-        open.and_then(|start| {
+        let (shndx, the_rest) = open.and_then(|start| {
             close.and_then(|end| {
                 str_ref
                     .get(start + 1..end)
                     .and_then(|t| t.trim().parse::<usize>().ok())
                     .and_then(|shndx| str_ref.get(end + 1..).map(|the_rest| (shndx, the_rest)))
             })
-        })
-    }
+        })?;
 
-    /// An internal function that parses a section header's address and size
-    /// from a string that starts at the `Name` field of a line.
-    fn parse_section_vaddr_size(sec_hdr_line_starting_at_name: &str) -> Option<(usize, usize)> {
-        let mut tokens = sec_hdr_line_starting_at_name.split_whitespace();
+        let mut tokens = the_rest.split_whitespace();
         tokens.next(); // skip Name
         tokens.next(); // skip Type
         let addr_hex_str = tokens.next();
         tokens.next(); // skip Off (offset)
         let size_hex_str = tokens.next();
         // parse both the Address and Size fields as hex strings
-        addr_hex_str
+        let (vaddr, size) = addr_hex_str
             .and_then(|a| usize::from_str_radix(a, 16).ok())
             // .and_then(VirtualAddress::new)
             .and_then(|vaddr| {
                 size_hex_str
                     .and_then(|s| usize::from_str_radix(s, 16).ok())
                     .map(|size| (vaddr, size))
-            })
+            })?;
+        
+        Some((shndx, vaddr, size))
     }
 
     // We will fill in these crate items while parsing the symbol file.
@@ -71,24 +70,24 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
         }
         // debug!("Looking at line: {:?}", line);
 
-        if line.contains(".text ") && line.contains("PROGBITS") {
-            text_shndx = parse_section_ndx(line).map(|(shndx, _)| shndx);
+        if line.contains(".init") && line.contains("PROGBITS") {
+            init_vaddr = parse_section(line).map(|(_, vaddr, _)| vaddr);  
+        } else if line.contains(".text ") && line.contains("PROGBITS") {
+            text = parse_section(line).map(|(shndx, _, _)| {
+                (shndx, kernel_config::memory::KERNEL_OFFSET + init_vaddr.expect(".text parsed before .init"))
+            });
         } else if line.contains(".rodata ") && line.contains("PROGBITS") {
-            rodata_shndx = parse_section_ndx(line).map(|(shndx, _)| shndx);
+            rodata = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
         } else if line.contains(".tdata ") && line.contains("PROGBITS") {
-            tls_data_shndx = parse_section_ndx(line).and_then(|(shndx, rest_of_line)| {
-                parse_section_vaddr_size(rest_of_line).map(|(vaddr, _)| (shndx, vaddr))
-            });
+            tls_data = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
         } else if line.contains(".tbss ") && line.contains("NOBITS") {
-            tls_bss_shndx = parse_section_ndx(line).and_then(|(shndx, rest_of_line)| {
-                parse_section_vaddr_size(rest_of_line).map(|(vaddr, _)| (shndx, vaddr))
-            });
+            tls_bss = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
         } else if line.contains(".data ") && line.contains("PROGBITS") {
-            data_shndx = parse_section_ndx(line).map(|(shndx, _)| shndx);
+            data = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
         } else if line.contains(".bss ") && line.contains("NOBITS") {
-            bss_shndx = parse_section_ndx(line).map(|(shndx, _)| shndx);
-        } else if let Some(start) = line.find(".eh_frame ") {
-            let (virtual_address, size) = parse_section_vaddr_size(&line[start..])
+            bss = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
+        } else if line.contains(".eh_frame ") && line.contains("X86_64_UNWIND") {
+            let (_, virtual_address, size) = parse_section(line)
                 .ok_or("Failed to parse the .eh_frame section header's address and size")?;
 
             crate_items.sections.insert(
@@ -99,14 +98,16 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                     ty: SectionType::EhFrame,
                     global: false, // .eh_frame is not global
                     virtual_address,
-                    offset: virtual_address,
+                    // .eh_frame is contained in .rodata and so its .symtab entry is guaranteed to be
+                    // after.
+                    offset: virtual_address - rodata.expect(".eh_frame parsed before .rodata").1,
                     size,
                 },
             );
 
             section_counter += 1;
-        } else if let Some(start) = line.find(".gcc_except_table ") {
-            let (virtual_address, size) = parse_section_vaddr_size(&line[start..])
+        } else if line.contains(".gcc_except_table") && line.contains("PROGBITS") {
+            let (_, virtual_address, size) = parse_section(line)
                 .ok_or("Failed to parse the .gcc_except_table section header's address and size")?;
 
             crate_items.sections.insert(
@@ -117,7 +118,9 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                     ty: SectionType::GccExceptTable,
                     global: false, // .gcc_except_table is not global
                     virtual_address,
-                    offset: virtual_address,
+                    // .gcc_except_table is contained in .rodata and so its .symtab entry is guaranteed to be
+                    // after.
+                    offset: virtual_address - rodata.expect(".gcc_except_table parsed before .rodata").1,
                     size,
                 },
             );
@@ -126,21 +129,21 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
         }
     }
 
-    let text_shndx =
-        text_shndx.ok_or("parse_nano_core_symbol_file(): couldn't find .text section index")?;
-    let rodata_shndx =
-        rodata_shndx.ok_or("parse_nano_core_symbol_file(): couldn't find .rodata section index")?;
-    let data_shndx =
-        data_shndx.ok_or("parse_nano_core_symbol_file(): couldn't find .data section index")?;
-    let bss_shndx =
-        bss_shndx.ok_or("parse_nano_core_symbol_file(): couldn't find .bss section index")?;
-    let shndxs = MainShndx {
-        text_shndx,
-        rodata_shndx,
-        data_shndx,
-        bss_shndx,
-        tls_data_shndx,
-        tls_bss_shndx,
+    let text =
+        text.ok_or("parse_nano_core_symbol_file(): couldn't find .text section index")?;
+    let rodata =
+        rodata.ok_or("parse_nano_core_symbol_file(): couldn't find .rodata section index")?;
+    let data =
+        data.ok_or("parse_nano_core_symbol_file(): couldn't find .data section index")?;
+    let bss =
+        bss.ok_or("parse_nano_core_symbol_file(): couldn't find .bss section index")?;
+    let shndxs = MainSections {
+        text,
+        rodata,
+        data,
+        bss,
+        tls_data,
+        tls_bss,
     };
 
     // second, skip ahead to the start of the symbol table: a line which contains ".symtab" but does NOT contain "SYMTAB"
@@ -275,18 +278,18 @@ pub struct ParsedCrateItems {
     pub init_symbols: BTreeMap<String, usize>,
 }
 
-/// The section header indices (shndx) for the main sections:
+/// The section header indices (shndx) and starting virtual addresses for the main sections:
 /// .text, .rodata, .data, and .bss.
 ///
-/// If TLS sections are present, e.g., .tdata or .tbss,
-/// their `shndx`s and starting virtul addresses are also included here.
-struct MainShndx {
-    text_shndx: Shndx,
-    rodata_shndx: Shndx,
-    data_shndx: Shndx,
-    bss_shndx: Shndx,
-    tls_data_shndx: Option<(Shndx, usize)>,
-    tls_bss_shndx: Option<(Shndx, usize)>,
+/// If TLS sections are present, e.g., .tdata or .tbss, their `shndx`s and starting virtual
+/// addresses are also included.
+struct MainSections {
+    text: (Shndx, usize),
+    rodata: (Shndx, usize),
+    data: (Shndx, usize),
+    bss: (Shndx, usize),
+    tls_data: Option<(Shndx, usize)>,
+    tls_bss: Option<(Shndx, usize)>,
 }
 
 struct IndexMeta {
@@ -301,7 +304,7 @@ struct IndexMeta {
 /// of actually creating and adding a new LoadedSection instance
 /// after it has been parsed.
 fn add_new_section(
-    shndxs: &MainShndx,
+    main_sections: &MainSections,
     crate_items: &mut ParsedCrateItems,
     section_counter: &mut Shndx,
     meta: IndexMeta,
@@ -314,44 +317,46 @@ fn add_new_section(
         global,
     } = meta;
 
-    let new_section = if sec_ndx == shndxs.text_shndx {
+    let new_section = if sec_ndx == main_sections.text.0 {
         Some(SerializedSection {
             name,
             ty: SectionType::Text,
             global,
             virtual_address,
-            offset: virtual_address,
+            offset: virtual_address - main_sections.text.1,
             size,
         })
-    } else if sec_ndx == shndxs.rodata_shndx {
+    } else if sec_ndx == main_sections.rodata.0 {
         Some(SerializedSection {
             name,
             ty: SectionType::Rodata,
             global,
             virtual_address,
-            offset: virtual_address,
+            offset: virtual_address - main_sections.rodata.1,
             size,
         })
-    } else if sec_ndx == shndxs.data_shndx {
+    } else if sec_ndx == main_sections.data.0 {
         Some(SerializedSection {
             name,
             ty: SectionType::Data,
             global,
             virtual_address,
-            offset: virtual_address,
+            offset: virtual_address - main_sections.data.1,
             size,
         })
-    } else if sec_ndx == shndxs.bss_shndx {
+    } else if sec_ndx == main_sections.bss.0 {
         Some(SerializedSection {
             name,
             ty: SectionType::Bss,
             global,
             virtual_address,
-            offset: virtual_address,
+            // BSS sections are stored in the .data pages and so the offset is taken from the start
+            // of the .data section.
+             offset: virtual_address - main_sections.data.1,
             size,
         })
-    } else if shndxs
-        .tls_data_shndx
+    } else if main_sections
+        .tls_data
         .map_or(false, |(shndx, _)| sec_ndx == shndx)
     {
         // TLS sections encode their TLS offset in the virtual address field,
@@ -360,34 +365,39 @@ fn add_new_section(
         // We do need to calculate the real virtual address so we can use that
         // to calculate the real mapped_pages_offset where its data exists.
         // so we can use that to calculate the real virtual address where it's loaded.
-        let tls_sec_data_vaddr = shndxs.tls_data_shndx.unwrap().1 + tls_offset;
+        let tls_sec_data_vaddr = main_sections.tls_data.unwrap().1 + tls_offset;
+
+        let rodata_pages_start = main_sections.rodata.1;
+        let rodata_offset = tls_sec_data_vaddr - rodata_pages_start;
 
         Some(SerializedSection {
             name,
             ty: SectionType::TlsData,
             global,
             virtual_address: tls_offset,
-            offset: tls_sec_data_vaddr,
+            offset: rodata_offset,
             size,
         })
-    } else if shndxs
-        .tls_bss_shndx
+    } else if main_sections
+        .tls_bss
         .map_or(false, |(shndx, _)| sec_ndx == shndx)
     {
         // TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
         let tls_offset = virtual_address;
-        // We do need to calculate the real virtual address so we can use that
-        // to calculate the real mapped_pages_offset where its data exists.
-        // so we can use that to calculate the real virtual address where it's loaded.
-        let tls_sec_bss_vaddr = shndxs.tls_bss_shndx.unwrap().1 + tls_offset;
+        
+        // TLS BSS sections (.tbss) do not have any real loaded data in the ELF file,
+        // since they are read-only initializer sections that would hold all zeroes.
+        // Thus, we just use a max-value mapped pages offset as a canary value here,
+        // as that value should never be used anyway.
+        let rodata_offset = usize::MAX;
 
         Some(SerializedSection {
             name,
             ty: SectionType::TlsBss,
             global,
             virtual_address: tls_offset,
-            offset: tls_sec_bss_vaddr,
+            offset: rodata_offset,
             size,
         })
     } else {
