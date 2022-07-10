@@ -1,85 +1,87 @@
-//! Sample test of a dynamically-linked library atop Theseus kernel crates.
+//! The application-facing 'library' that exposes Theseus OS features, similar
+//! to a standard library.
 
 #![no_std]
-// #![feature(allocator_api)]
-// #![feature(alloc_error_handler)]
-// #![feature(lang_items)]
-// #![feature(panic_info_message)]
 
-extern crate panic_entry;
-extern crate heap;
+pub mod fs {
+    use fs_node::{File, FileRef};
+    use io::{LockableIo, ReaderWriter};
+    // TODO: Maybe use OS mutex?
+    use spin::Mutex;
 
-#[macro_use] extern crate alloc;
-// #[macro_use] extern crate terminal_print;
-extern crate logger;
+    /// This is a typedef for a Theseus-native [`FileRef`] (`Arc<Mutex<dyn
+    /// File>>`) that is wrapped in a series of wrapper types, described
+    /// below from inner to outer.
+    ///
+    /// 1. The [`FileRef`] is wrapped in a [`LockableIo`] object
+    ///    in order to forward the various I/O traits (`ByteReader` +
+    /// `ByteWriter`)    through the `Arc<Mutex<_>>` wrappers.
+    /// 2. Then, that [`LockableIo`] <Arc<Mutex<File>>>` is wrapped in a
+    /// `ReaderWriter`    to provide standard "stateful" I/O that advances a
+    /// file offset. 3. Then, that [`ReaderWriter`] is wrapped in another
+    /// `Mutex` to provide    interior mutability, as the `Read` and `Write`
+    /// traits requires a mutable reference    (`&mut self`) but Rust
+    /// standard library allows you to call those methods on    an immutable
+    /// reference to its file, `&std::fs::File`. 4. That [`Mutex`] is then
+    /// wrapped in another [`LockableIo`] wrapper    to ensure that the IO
+    /// traits are forwarded, similar to step 1.
+    ///
+    /// In summary, the total type looks like this:
+    /// ```rust
+    /// LockableIo<Mutex<ReaderWriter<LockableIo<Arc<Mutex<dyn File>>>>>>
+    /// ```
+    ///
+    /// ... Then we take *that* and wrap it in an authentic parisian crepe
+    /// filled with egg, gruyere, merguez sausage, and portabello mushroom
+    /// ... [tacoooo townnnnn!!!!](https://www.youtube.com/watch?v=evUWersr7pc).
+    ///
+    /// TODO: redesign this to avoid the double Mutex. Options include:
+    /// * Change the Theseus [`FileRef`] type to always be wrapped by a
+    ///   [`ReaderWriter`].
+    /// * Use a different wrapper for interior mutability, though Mutex is
+    ///   probably required.
+    /// * Devise another set of `Read` and `Write` traits that *don't* need
+    ///   `&mut self`.
+    pub type OpenFileRef = LockableIo<
+        'static,
+        ReaderWriter<LockableFileRef>,
+        Mutex<ReaderWriter<LockableFileRef>>,
+        Mutex<ReaderWriter<LockableFileRef>>,
+    >;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-
-pub mod my_mod;
-
-pub fn main() {
-    libtheseus_hello(vec![String::from("hisss"), String::from("there")]);
-    panic!("hello from my main");
+    /// See the documentation for [`OpenFileRef`].
+    pub type LockableFileRef =
+        LockableIo<'static, dyn File + Send, Mutex<dyn File + Send>, FileRef>;
 }
 
+pub mod mem {
+    use core::alloc::{GlobalAlloc, Layout};
+    use heap::GLOBAL_ALLOCATOR;
 
-#[inline(never)]
-pub fn libtheseus_hello(_args: Vec<String>) -> isize {
-    // println!("Hello from an example dylib main function!");
-    logger::write_fmt(format_args!("\n\nHello from libtheseus: args: {:?}", _args)).unwrap();
-    0
-}
-
-
-
-////////////////////////////////////////////////
-////// Dummy lang items 
-////////////////////////////////////////////////
-
-/*
-
-#[panic_handler] // same as:  #[lang = "panic_impl"]
-fn panic_entry_point(_info: &core::panic::PanicInfo) -> ! {
-    // println!("panic: {:?}", info);
-    loop { }
-}
-
-/// This is the callback entry point that gets invoked when the heap allocator runs out of memory.
-#[alloc_error_handler]
-fn oom(_layout: core::alloc::Layout) -> ! {
-    panic!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
-    // loop { }
-}
-
-#[lang = "eh_personality"]
-#[no_mangle]
-extern "C" fn rust_eh_personality() -> ! {
-    // println!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
-    loop { }
-}
-
-#[global_allocator]
-pub static GLOBAL_ALLOCATOR: DummyHeap = DummyHeap{};
-
-pub struct DummyHeap;
-
-use alloc::alloc::{GlobalAlloc, Layout};
-
-unsafe impl GlobalAlloc for DummyHeap {
-    unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-        core::ptr::null_mut()
+    pub unsafe fn alloc(layout: Layout) -> *mut u8 {
+        GLOBAL_ALLOCATOR.alloc(layout)
     }
 
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
+    pub unsafe fn alloc_zeroed(layout: Layout) -> *mut u8 {
+        GLOBAL_ALLOCATOR.alloc_zeroed(layout)
     }
 
+    pub unsafe fn dealloc(ptr: *mut u8, layout: Layout) {
+        GLOBAL_ALLOCATOR.dealloc(ptr, layout);
+    }
+
+    pub unsafe fn realloc(ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        GLOBAL_ALLOCATOR.realloc(ptr, layout, new_size)
+    }
 }
 
-
-#[no_mangle]
-extern "C" fn _Unwind_Resume(_arg: usize) -> ! {
-    panic!("_Unwind_Resume invoked");
+pub mod sync {
+    // TODO: Do we want to expose Mutex/Locks. If so, a basic mutex (manual
+    // locking/unlocking) or a Mutex<T>?
+    // pub use semaphore::Semaphore;
+    pub use wait_queue::WaitQueue;
 }
 
-*/
+pub mod time {
+    // TODO: Add changes in PR #569 when merged.
+}

@@ -1,49 +1,23 @@
 [package]
 name = "libtheseus"
 version = "0.1.0"
+edition = "2021"
 description = "The application-facing 'library' that exposes Theseus OS features, similar to a standard library."
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
 
 [dependencies]
-# getopts = "0.2.21"
+# fs
+fs_node = { path = "../kernel/fs_node" }
+io = { path = "../kernel/io" }
+spin = "0.9.0"
 
-[dependencies.logger]
-path = "../kernel/logger"
+# mem
+heap = { path = "../kernel/heap" }
 
-[dependencies.panic_entry]
-path = "../kernel/panic_entry"
+# sync
+# semaphore = { path = "../kernel/semaphore" }
+wait_queue = { path = "../kernel/wait_queue" }
 
-[dependencies.heap]
-path = "../kernel/heap"
-
-
-# [dependencies.terminal_print]
-# path = "../kernel/terminal_print"
-
-# [lib]
-# crate-type = [ "rlib", "staticlib" ]
-# crate-type = ["rlib", "staticlib", "dylib"]
-# crate-type = ["staticlib"]
-# crate-type = ["dylib"]
-# crate-type = ["cdylib"]
-
-[profile.dev]
-codegen-units = 1
-incremental = false
-
-[profile.release]
-codegen-units = 1
-incremental = false
-
-
-[patch.crates-io]
-### Patch `spin` to use the `pause` asm instruction in busy-wait loops,
-### because the `core::hint::spin_loop()` only uses it if "sse2" is enabled.
-spin = { git = "https://github.com/theseus-os/spin-rs" }
-### use our own version of volatile which supports zerocopy
-volatile = { git = "https://github.com/theseus-os/volatile" }
-### use our own no_std-compatilbe getopts
-getopts = { git = "https://github.com/theseus-os/getopts" }
-### use the latest version of smoltcp from github; the one on crates.io is out of date
-smoltcp = { git = "https://github.com/m-labs/smoltcp" }
-
+# time
+pit_clock = { path = "../kernel/pit_clock" }
+kernel_config = { path = "../kernel/kernel_config" }
