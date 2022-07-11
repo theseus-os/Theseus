@@ -110,12 +110,12 @@ impl SerializedCrate {
             num_new_syms
         );
         
-        // Dump loaded sections for verification. See pull request #542/#559 for more details:
-        let loaded_crate_ref = loaded_crate.lock_as_ref();
-        for (_, section) in loaded_crate_ref.sections.iter() {
-            trace!("{:016x} {} {}", section.address_range.start.value(), section.name, section.mapped_pages_offset);
-        }
-        drop(loaded_crate_ref);
+        // // Dump loaded sections for verification. See pull request #542/#559 for more details:
+        // let loaded_crate_ref = loaded_crate.lock_as_ref();
+        // for (_, section) in loaded_crate_ref.sections.iter() {
+        //     trace!("{:016x} {} {}", section.address_range.start.value(), section.name, section.mapped_pages_offset);
+        // }
+        // drop(loaded_crate_ref);
 
         Ok((loaded_crate, self.init_symbols, num_new_syms))
     }
