@@ -100,8 +100,6 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                     ty: SectionType::EhFrame,
                     global: false, // .eh_frame is not global
                     virtual_address,
-                    // .eh_frame is contained in .rodata and so its .symtab entry is guaranteed to be
-                    // after.
                     offset: virtual_address - rodata.expect(".eh_frame parsed before .rodata").1,
                     size,
                 },
@@ -120,8 +118,6 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                     ty: SectionType::GccExceptTable,
                     global: false, // .gcc_except_table is not global
                     virtual_address,
-                    // .gcc_except_table is contained in .rodata and so its .symtab entry is guaranteed to be
-                    // after.
                     offset: virtual_address - rodata.expect(".gcc_except_table parsed before .rodata").1,
                     size,
                 },
@@ -281,10 +277,7 @@ pub struct ParsedCrateItems {
 }
 
 /// The section header indices (shndx) and starting virtual addresses for the main sections:
-/// .text, .rodata, .data, and .bss.
-///
-/// If TLS sections are present, e.g., .tdata or .tbss, their `shndx`s and starting virtual
-/// addresses are also included.
+/// .text, .rodata, .data, .bss, .tdata, and .tbss, if they exist
 struct MainSections {
     text: (Shndx, usize),
     rodata: (Shndx, usize),
