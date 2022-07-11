@@ -198,19 +198,6 @@
 <span id="193">193</span>
 <span id="194">194</span>
 <span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Serializable versions of crate and section metadata types.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The primary reason this exists is because [`LoadedCrate`] and [`LoadedSection`]</span>
@@ -323,10 +310,10 @@
             <span class="ident">num_new_syms</span>
         );
         
-        <span class="comment">// Dump loaded sections for verification. See pull request #542 for more details:</span>
+        <span class="comment">// // Dump loaded sections for verification. See pull request #542/#559 for more details:</span>
         <span class="comment">// let loaded_crate_ref = loaded_crate.lock_as_ref();</span>
         <span class="comment">// for (_, section) in loaded_crate_ref.sections.iter() {</span>
-        <span class="comment">//     trace!(&quot;{:016x} {}&quot;, section.address_range.start.value(), section.name);</span>
+        <span class="comment">//     trace!(&quot;{:016x} {} {}&quot;, section.address_range.start.value(), section.name, section.mapped_pages_offset);</span>
         <span class="comment">// }</span>
         <span class="comment">// drop(loaded_crate_ref);</span>
 
@@ -347,7 +334,7 @@
     <span class="kw">pub</span> <span class="ident">global</span>: <span class="ident">bool</span>,
     <span class="doccomment">/// The starting [`VirtualAddress`] of the range covered by this section.</span>
     <span class="kw">pub</span> <span class="ident">virtual_address</span>: <span class="ident">usize</span>,
-    <span class="doccomment">/// This field is identical to `self.virtual_address` unless this is a thread local section.</span>
+    <span class="doccomment">/// The offset into the [`MappedPages`] where this section starts.</span>
     <span class="kw">pub</span> <span class="ident">offset</span>: <span class="ident">usize</span>,
     <span class="doccomment">/// The size of the section.</span>
     <span class="kw">pub</span> <span class="ident">size</span>: <span class="ident">usize</span>,
@@ -383,20 +370,7 @@
             },
             <span class="ident">typ</span>: <span class="self">self</span>.<span class="ident">ty</span>,
             <span class="ident">global</span>: <span class="self">self</span>.<span class="ident">global</span>,
-            <span class="comment">// TLS BSS sections (.tbss) do not have any real loaded data in the ELF file,</span>
-            <span class="comment">// since they are read-only initializer sections that would hold all zeroes.</span>
-            <span class="comment">// Thus, we just use a max-value mapped pages offset as a canary value here,</span>
-            <span class="comment">// as that value should never be used anyway.</span>
-            <span class="ident">mapped_pages_offset</span>: <span class="kw">match</span> <span class="self">self</span>.<span class="ident">ty</span> {
-                <span class="ident">SectionType::TlsBss</span> =&gt; <span class="ident">usize::MAX</span>,
-                <span class="kw">_</span> =&gt; <span class="ident">mapped_pages</span>
-                    .<span class="ident">lock</span>()
-                    .<span class="ident">offset_of_address</span>(
-                        <span class="ident">VirtualAddress::new</span>(<span class="self">self</span>.<span class="ident">offset</span>)
-                            .<span class="ident">ok_or</span>(<span class="string">&quot;SerializedSection::into_loaded_section(): invalid offset&quot;</span>)<span class="question-mark">?</span>,
-                    )
-                    .<span class="ident">ok_or</span>(<span class="string">&quot;nano_core section wasn&#39;t covered by its mapped pages&quot;</span>)<span class="question-mark">?</span>,
-            },
+            <span class="ident">mapped_pages_offset</span>: <span class="self">self</span>.<span class="ident">offset</span>,
             <span class="ident">mapped_pages</span>,
             <span class="ident">address_range</span>: <span class="ident">virtual_address</span>..(<span class="ident">virtual_address</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">size</span>),
             <span class="ident">parent_crate</span>,

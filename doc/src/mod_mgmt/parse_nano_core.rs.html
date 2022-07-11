@@ -818,6 +818,12 @@
 <span id="813">813</span>
 <span id="814">814</span>
 <span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,</span>
 <span class="doccomment">//! in other words, the code that is currently executing.</span>
 <span class="doccomment">//! As such, it performs no loading, but rather just creates metadata that represents</span>
@@ -1012,6 +1018,12 @@
     <span class="ident">new_crate_mut</span>.<span class="ident">sections</span>        <span class="op">=</span> <span class="ident">parsed_crate_items</span>.<span class="ident">sections</span>;
     <span class="ident">new_crate_mut</span>.<span class="ident">global_sections</span> <span class="op">=</span> <span class="ident">parsed_crate_items</span>.<span class="ident">global_sections</span>;
     <span class="ident">new_crate_mut</span>.<span class="ident">data_sections</span>   <span class="op">=</span> <span class="ident">parsed_crate_items</span>.<span class="ident">data_sections</span>;
+    
+    <span class="comment">// // Dump loaded sections for verification. See pull request #559 for more details:</span>
+    <span class="comment">// for (_, section) in new_crate_mut.sections.iter() {</span>
+    <span class="comment">//     trace!(&quot;{:016x} {} {}&quot;, section.address_range.start.value(), section.name, section.mapped_pages_offset);</span>
+    <span class="comment">// }</span>
+
     <span class="ident">drop</span>(<span class="ident">new_crate_mut</span>);
 
     <span class="comment">// Add the newly-parsed nano_core crate to the kernel namespace.</span>
