@@ -10,14 +10,16 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Basically, this parses the section list for offsets, size, and flag data,
 /// and parses the symbol table to populate the list of sections.
 pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItems, &'static str> {
-    // We don't care about the .init sections index.
+    // We don't care about the .init sections shndx.
     let mut init_vaddr: Option<usize> = None;
     let mut text: Option<(Shndx, usize)> = None;
     let mut rodata: Option<(Shndx, usize)> = None;
     let mut data: Option<(Shndx, usize)> = None;
-    let mut bss: Option<(Shndx, usize)> = None;
-    let mut tls_data: Option<(Shndx, usize)> = None;
-    let mut tls_bss: Option<(Shndx, usize)> = None;
+    // .bss is part of .data, so we don't need its vaddr
+    let mut bss: Option<Shndx> = None;
+    let mut tls_data: Option<(Shndx, usize)> = None; 
+    // .tbss does not exist anywhere in memory, so we don't need its vaddr
+    let mut tls_bss: Option<Shndx> = None;
 
     /// An internal function that parses a section header's index, address and size.
     fn parse_section(str_ref: &str) -> Option<(Shndx, usize, usize)> {
@@ -81,11 +83,11 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
         } else if line.contains(".tdata ") && line.contains("PROGBITS") {
             tls_data = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
         } else if line.contains(".tbss ") && line.contains("NOBITS") {
-            tls_bss = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
+            tls_bss = parse_section(line).map(|(shndx, ..)| shndx);
         } else if line.contains(".data ") && line.contains("PROGBITS") {
             data = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
         } else if line.contains(".bss ") && line.contains("NOBITS") {
-            bss = parse_section(line).map(|(shndx, vaddr, _)| (shndx, vaddr));
+            bss = parse_section(line).map(|(shndx, ..)| shndx);
         } else if line.contains(".eh_frame ") && line.contains("X86_64_UNWIND") {
             let (_, virtual_address, size) = parse_section(line)
                 .ok_or("Failed to parse the .eh_frame section header's address and size")?;
@@ -94,7 +96,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 section_counter,
                 SerializedSection {
                     // The name gets set to EH_FRAME_STR_REF when loading the section.
-                    name: String::from(""),
+                    name: String::new(),
                     ty: SectionType::EhFrame,
                     global: false, // .eh_frame is not global
                     virtual_address,
@@ -114,7 +116,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 section_counter,
                 SerializedSection {
                     // The name gets set to GCC_EXCEPT_TABLE_STR_REF when loading the section.
-                    name: String::from(""),
+                    name: String::new(),
                     ty: SectionType::GccExceptTable,
                     global: false, // .gcc_except_table is not global
                     virtual_address,
@@ -287,9 +289,9 @@ struct MainSections {
     text: (Shndx, usize),
     rodata: (Shndx, usize),
     data: (Shndx, usize),
-    bss: (Shndx, usize),
+    bss: Shndx,
     tls_data: Option<(Shndx, usize)>,
-    tls_bss: Option<(Shndx, usize)>,
+    tls_bss: Option<Shndx>,
 }
 
 struct IndexMeta {
@@ -344,14 +346,14 @@ fn add_new_section(
             offset: virtual_address - main_sections.data.1,
             size,
         })
-    } else if sec_ndx == main_sections.bss.0 {
+    } else if sec_ndx == main_sections.bss {
         Some(SerializedSection {
             name,
             ty: SectionType::Bss,
             global,
             virtual_address,
-            // BSS sections are stored in the .data pages and so the offset is taken from the start
-            // of the .data section.
+            // BSS sections are stored in the .data pages,
+            // so the offset is from the start of the .data section.
              offset: virtual_address - main_sections.data.1,
             size,
         })
@@ -363,24 +365,24 @@ fn add_new_section(
         // which is necessary to properly calculate relocation entries that depend upon them.
         let tls_offset = virtual_address;
         // We do need to calculate the real virtual address so we can use that
-        // to calculate the real mapped_pages_offset where its data exists.
-        // so we can use that to calculate the real virtual address where it's loaded.
+        // to calculate the real mapped_pages_offset where its data exists,
+        // which we can then use to calculate the real virtual address where it's loaded.
         let tls_sec_data_vaddr = main_sections.tls_data.unwrap().1 + tls_offset;
 
-        let rodata_pages_start = main_sections.rodata.1;
-        let rodata_offset = tls_sec_data_vaddr - rodata_pages_start;
+        // The initial data image for .tdata sections exists in the rodata mapped pages
+        let offset_from_rodata_start = tls_sec_data_vaddr - main_sections.rodata.1;
 
         Some(SerializedSection {
             name,
             ty: SectionType::TlsData,
             global,
             virtual_address: tls_offset,
-            offset: rodata_offset,
+            offset: offset_from_rodata_start,
             size,
         })
     } else if main_sections
         .tls_bss
-        .map_or(false, |(shndx, _)| sec_ndx == shndx)
+        .map_or(false, |shndx| sec_ndx == shndx)
     {
         // TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
@@ -390,14 +392,14 @@ fn add_new_section(
         // since they are read-only initializer sections that would hold all zeroes.
         // Thus, we just use a max-value mapped pages offset as a canary value here,
         // as that value should never be used anyway.
-        let rodata_offset = usize::MAX;
+        let canary_offset = usize::MAX;
 
         Some(SerializedSection {
             name,
             ty: SectionType::TlsBss,
             global,
             virtual_address: tls_offset,
-            offset: rodata_offset,
+            offset: canary_offset,
             size,
         })
     } else {
