@@ -718,6 +718,7 @@ dependencies = [
  "bincode",
  "crate_metadata",
  "hashbrown",
+ "kernel_config",
  "memory",
  "mod_mgmt",
  "serde",

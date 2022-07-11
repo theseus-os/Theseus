@@ -192,6 +192,12 @@ fn parse_nano_core_symbol_file_or_binary(
     new_crate_mut.sections        = parsed_crate_items.sections;
     new_crate_mut.global_sections = parsed_crate_items.global_sections;
     new_crate_mut.data_sections   = parsed_crate_items.data_sections;
+    
+    // // Dump loaded sections for verification. See pull request #559 for more details:
+    // for (_, section) in new_crate_mut.sections.iter() {
+    //     trace!("{:016x} {} {}", section.address_range.start.value(), section.name, section.mapped_pages_offset);
+    // }
+
     drop(new_crate_mut);
 
     // Add the newly-parsed nano_core crate to the kernel namespace.

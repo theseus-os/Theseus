@@ -110,10 +110,10 @@ impl SerializedCrate {
             num_new_syms
         );
         
-        // Dump loaded sections for verification. See pull request #542 for more details:
+        // // Dump loaded sections for verification. See pull request #542/#559 for more details:
         // let loaded_crate_ref = loaded_crate.lock_as_ref();
         // for (_, section) in loaded_crate_ref.sections.iter() {
-        //     trace!("{:016x} {}", section.address_range.start.value(), section.name);
+        //     trace!("{:016x} {} {}", section.address_range.start.value(), section.name, section.mapped_pages_offset);
         // }
         // drop(loaded_crate_ref);
 
@@ -134,7 +134,7 @@ pub struct SerializedSection {
     pub global: bool,
     /// The starting [`VirtualAddress`] of the range covered by this section.
     pub virtual_address: usize,
-    /// This field is identical to `self.virtual_address` unless this is a thread local section.
+    /// The offset into the [`MappedPages`] where this section starts.
     pub offset: usize,
     /// The size of the section.
     pub size: usize,
@@ -170,20 +170,7 @@ impl SerializedSection {
             },
             typ: self.ty,
             global: self.global,
-            // TLS BSS sections (.tbss) do not have any real loaded data in the ELF file,
-            // since they are read-only initializer sections that would hold all zeroes.
-            // Thus, we just use a max-value mapped pages offset as a canary value here,
-            // as that value should never be used anyway.
-            mapped_pages_offset: match self.ty {
-                SectionType::TlsBss => usize::MAX,
-                _ => mapped_pages
-                    .lock()
-                    .offset_of_address(
-                        VirtualAddress::new(self.offset)
-                            .ok_or("SerializedSection::into_loaded_section(): invalid offset")?,
-                    )
-                    .ok_or("nano_core section wasn't covered by its mapped pages")?,
-            },
+            mapped_pages_offset: self.offset,
             mapped_pages,
             address_range: virtual_address..(virtual_address + self.size),
             parent_crate,
