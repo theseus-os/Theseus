@@ -66,53 +66,8 @@ impl timer::Timer for RtcTimer {
     ///
     /// [IEEE 1003.1-2017 Base Definitions 4.16]: https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/
     fn value() -> Timespec {
-        const MINUTE_MULTIPLIER: u64 = 60;
-        const HOUR_MULTIPLIER: u64 = 60 * MINUTE_MULTIPLIER;
-        const DAY_MULTIPLIER: u64 = 24 * HOUR_MULTIPLIER;
-        // Non-leap year
-        const YEAR_MULTIPLIER: u64 = 356 * DAY_MULTIPLIER;
-        
         let time = read_rtc();
-        let mut secs = time.seconds as u64;
-        secs += time.minutes as u64 * MINUTE_MULTIPLIER;
-        secs += time.hours as u64 * HOUR_MULTIPLIER;
-
-        const DAYS_IN_MONTH: [u16; 12] = [
-            31,
-            28,
-            31,
-            30,
-            31,
-            30,
-            31,
-            31,
-            30,
-            31,
-            30,
-            31,  
-        ];
-        let mut days_in_year: u16 = DAYS_IN_MONTH[0..(time.months as usize - 1)].iter().sum();
-        days_in_year += time.days as u16;
-        // Leap years
-        if time.months >= 3 && (time.years % 4 == 0) {
-            days_in_year += 1;
-        }
-        secs += days_in_year as u64 * DAY_MULTIPLIER;
-        secs += (time.years as u64 + 30) * YEAR_MULTIPLIER;        
-
-        let years_since_1900 = time.years as u64 + 100;
-        
-        // Adds a day every 4 years starting in 1973.
-        secs += ((years_since_1900 - 69)/4) * DAY_MULTIPLIER;
-        // Subtracts a day back out every 100 years starting in 2001.
-        secs += ((years_since_1900 - 1)/100) * DAY_MULTIPLIER;
-        // Adds a day back in every 400 years starting in 2001.        
-        secs += ((years_since_1900 + 299)/400) * DAY_MULTIPLIER;
-        
-        Timespec {
-            secs,
-            nanos: 0,
-        }
+        time.into()
     }
 }
 
@@ -180,9 +135,68 @@ impl fmt::Display for RtcTime {
     }
 }
 
-//call this function to print RTC's date and time
+impl From<RtcTime> for Timespec {
+    /// Time since 12:00am January 1st 1970 (i.e. Unix time).
+    ///
+    /// The algorithm is based on [IEEE 1003.1-2017 Base Definitions 4.16].
+    ///
+    /// [IEEE 1003.1-2017 Base Definitions 4.16]: https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/
+    fn from(time: RtcTime) -> Self {
+        const MINUTE_MULTIPLIER: u64 = 60;
+        const HOUR_MULTIPLIER: u64 = 60 * MINUTE_MULTIPLIER;
+        const DAY_MULTIPLIER: u64 = 24 * HOUR_MULTIPLIER;
+        // Non-leap year
+        const YEAR_MULTIPLIER: u64 = 365 * DAY_MULTIPLIER;
+
+        let mut secs = time.seconds as u64;
+        secs += time.minutes as u64 * MINUTE_MULTIPLIER;
+        secs += time.hours as u64 * HOUR_MULTIPLIER;
+
+        const DAYS_IN_MONTH: [u16; 12] = [
+            31,
+            28,
+            31,
+            30,
+            31,
+            30,
+            31,
+            31,
+            30,
+            31,
+            30,
+            31,
+        ];
+        let mut days_in_year: u16 = DAYS_IN_MONTH[0..(time.months as usize - 1)].iter().sum();
+        // time.days is guaranteed to be >= 1
+        days_in_year += time.days as u16 - 1;
+        // Leap years
+        if time.months >= 3 && (time.years % 4 == 0) {
+            days_in_year += 1;
+        }
+        secs += days_in_year as u64 * DAY_MULTIPLIER;
+        secs += (time.years as u64 + 30) * YEAR_MULTIPLIER;
+
+        // TODO: This assumes we are in the 21st century.
+        let years_since_1900 = time.years as u64 + 100;
+
+        // Adds a day every 4 years starting in 1973.
+        secs += ((years_since_1900 - 69)/4) * DAY_MULTIPLIER;
+        // Subtracts a day back out every 100 years starting in 2001.
+        secs += ((years_since_1900 - 1)/100) * DAY_MULTIPLIER;
+        // Adds a day back in every 400 years starting in 2001.
+        secs -= ((years_since_1900 + 299)/400) * DAY_MULTIPLIER;
+
+        Timespec {
+            secs,
+            nanos: 0,
+        }
+    }
+}
+
+// Reads and returns the [`RtcTime`] from the RTC CMOS.
 pub fn read_rtc() -> RtcTime {
-    // calls read register function which writes to port 0x70 to set RTC then reads from 0x71 which outputs correct value
+    // Calls read register function which writes to port 0x70 to set RTC then reads from 0x71 which
+    // outputs correct value
     let seconds = read_register(0x00);
     let minutes = read_register(0x02);
     let hours = read_register(0x04);
@@ -276,4 +290,115 @@ pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
     Ok(())
     
     // here: _held_interrupts falls out of scope, re-enabling interrupts if they were previously enabled.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RtcTime;
+    use timer::Timespec;
+
+    #[test]
+    fn test_rtc_time_to_unix() {
+        let time: Timespec = RtcTime {
+            seconds: 0,
+            minutes: 0,
+            hours: 0,
+            days: 1,
+            months: 1,
+            years: 0,
+        }
+        .into();
+        assert_eq!(
+            time,
+            Timespec {
+                secs: 946_684_800,
+                nanos: 0
+            }
+        );
+
+        let time: Timespec = RtcTime {
+            seconds: 40,
+            minutes: 46,
+            hours: 1,
+            days: 9,
+            months: 9,
+            years: 1,
+        }
+        .into();
+        assert_eq!(
+            time,
+            Timespec {
+                secs: 1_000_000_000,
+                nanos: 0
+            }
+        );
+
+        let time: Timespec = RtcTime {
+            seconds: 30,
+            minutes: 31,
+            hours: 23,
+            days: 13,
+            months: 2,
+            years: 9,
+        }
+        .into();
+        assert_eq!(
+            time,
+            Timespec {
+                secs: 1_234_567_890,
+                nanos: 0
+            }
+        );
+
+        let time: Timespec = RtcTime {
+            seconds: 20,
+            minutes: 33,
+            hours: 3,
+            days: 18,
+            months: 5,
+            years: 33,
+        }
+        .into();
+        assert_eq!(
+            time,
+            Timespec {
+                secs: 2_000_000_000,
+                nanos: 0
+            }
+        );
+
+        let time: Timespec = RtcTime {
+            seconds: 49,
+            minutes: 6,
+            hours: 9,
+            days: 16,
+            months: 6,
+            years: 34,
+        }
+        .into();
+        assert_eq!(
+            time,
+            Timespec {
+                secs: 2_034_061_609,
+                nanos: 0
+            }
+        );
+
+        let time: Timespec = RtcTime {
+            seconds: 0,
+            minutes: 20,
+            hours: 5,
+            days: 24,
+            months: 1,
+            years: 65,
+        }
+        .into();
+        assert_eq!(
+            time,
+            Timespec {
+                secs: 3_000_000_000,
+                nanos: 0
+            }
+        );
+    }
 }

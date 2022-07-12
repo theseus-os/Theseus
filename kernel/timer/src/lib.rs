@@ -4,7 +4,7 @@ pub trait Timer {
     // TODO: enable, period/frequency, and accuracy
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Timespec {
     pub secs: u64,
     pub nanos: u32,
