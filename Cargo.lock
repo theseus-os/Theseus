@@ -2621,6 +2621,7 @@ dependencies = [
  "port_io",
  "spin 0.9.0",
  "state_store",
+ "timer",
  "x86_64",
 ]
 
@@ -3564,6 +3565,10 @@ version = "0.1.0"
 dependencies = [
  "static_assertions",
 ]
+
+[[package]]
+name = "timer"
+version = "0.1.0"
 
 [[package]]
 name = "tlb_shootdown"

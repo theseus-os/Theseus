@@ -1,6 +1,7 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "rtc"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2021"
 description = "Support for the Real-time Clock chip on x86 processors"
 version = "0.1.0"
 
@@ -27,6 +28,9 @@ path = "../kernel_config"
 
 [dependencies.state_store]
 path = "../state_store"
+
+[dependencies.timer]
+path = "../timer"
 
 
 # [build]

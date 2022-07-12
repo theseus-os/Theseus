@@ -18,6 +18,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 // use spin::Once;
 use state_store::{get_state, insert_state, SSCached};
+use timer::Timespec;
 
 
 //standard port to write to on CMOS to select registers
@@ -55,6 +56,65 @@ pub type RtcInterruptFunction = fn(Option<usize>);
 //     let res = set_rtc_frequency(rtc_freq);
 //     res.map( |_| rtc_interrupt_handler as HandlerFunc )
 // }
+
+pub struct RtcTimer;
+
+impl timer::Timer for RtcTimer {
+    /// Time since 12:00am January 1st 1970 (i.e. Unix time).
+    ///
+    /// The algorithm is based on [IEEE 1003.1-2017 Base Definitions 4.16].
+    ///
+    /// [IEEE 1003.1-2017 Base Definitions 4.16]: https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/
+    fn value() -> Timespec {
+        const MINUTE_MULTIPLIER: u64 = 60;
+        const HOUR_MULTIPLIER: u64 = 60 * MINUTE_MULTIPLIER;
+        const DAY_MULTIPLIER: u64 = 24 * HOUR_MULTIPLIER;
+        // Non-leap year
+        const YEAR_MULTIPLIER: u64 = 356 * DAY_MULTIPLIER;
+        
+        let time = read_rtc();
+        let mut secs = time.seconds as u64;
+        secs += time.minutes as u64 * MINUTE_MULTIPLIER;
+        secs += time.hours as u64 * HOUR_MULTIPLIER;
+
+        const DAYS_IN_MONTH: [u16; 12] = [
+            31,
+            28,
+            31,
+            30,
+            31,
+            30,
+            31,
+            31,
+            30,
+            31,
+            30,
+            31,  
+        ];
+        let mut days_in_year: u16 = DAYS_IN_MONTH[0..(time.months as usize - 1)].iter().sum();
+        days_in_year += time.days as u16;
+        // Leap years
+        if time.months >= 3 && (time.years % 4 == 0) {
+            days_in_year += 1;
+        }
+        secs += days_in_year as u64 * DAY_MULTIPLIER;
+        secs += (time.years as u64 + 30) * YEAR_MULTIPLIER;        
+
+        let years_since_1900 = time.years as u64 + 100;
+        
+        // Adds a day every 4 years starting in 1973.
+        secs += ((years_since_1900 - 69)/4) * DAY_MULTIPLIER;
+        // Subtracts a day back out every 100 years starting in 2001.
+        secs += ((years_since_1900 - 1)/100) * DAY_MULTIPLIER;
+        // Adds a day back in every 400 years starting in 2001.        
+        secs += ((years_since_1900 + 299)/400) * DAY_MULTIPLIER;
+        
+        Timespec {
+            secs,
+            nanos: 0,
+        }
+    }
+}
 
 
 //write a u8 to the CMOS port (0x70)
@@ -97,13 +157,21 @@ fn read_register(register: u8) -> u8{
 /// A timestamp obtained from the real-time clock.
 #[derive(Debug)]
 pub struct RtcTime {
+    // The second of the minute (0-59).
     pub seconds: u8,
+    /// The minute of the hour (0-59).
     pub minutes: u8,
+    /// The hour of the day (0-23).
+    // TODO: Are we in 12 or 24 hour mode.
     pub hours: u8,
+    /// The day of the month (1-31).
     pub days: u8,
+    /// The month of the year (1-12).
     pub months: u8,
+    /// The year of the century (0-99).
     pub years: u8,
 }
+
 use core::fmt;
 impl fmt::Display for RtcTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
@@ -114,22 +182,21 @@ impl fmt::Display for RtcTime {
 
 //call this function to print RTC's date and time
 pub fn read_rtc() -> RtcTime {
-
-    //calls read register function which writes to port 0x70 to set RTC then reads from 0x71 which outputs correct value
-    let second = read_register(0x00);
-    let minute = read_register(0x02);
-    let hour = read_register(0x04);
-    let day = read_register(0x07);
-    let month = read_register(0x08);
-    let year = read_register(0x09);
+    // calls read register function which writes to port 0x70 to set RTC then reads from 0x71 which outputs correct value
+    let seconds = read_register(0x00);
+    let minutes = read_register(0x02);
+    let hours = read_register(0x04);
+    let days = read_register(0x07);
+    let months = read_register(0x08);
+    let years = read_register(0x09);
 
     RtcTime {
-        seconds: second, 
-        minutes: minute, 
-        hours: hour, 
-        days: day, 
-        months: month, 
-        years: year
+        seconds, 
+        minutes, 
+        hours, 
+        days, 
+        months, 
+        years, 
     }
 }
 
