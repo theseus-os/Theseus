@@ -59,7 +59,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = AP_STACKS.lock().remove(&apic_id)
-        .expect(&format!("BUG: kstart_ap(): couldn't get stack created for AP with apic_id: {}", apic_id));
+        .unwrap_or_else(|| panic!("BUG: kstart_ap(): couldn't get stack created for AP with apic_id: {}", apic_id));
 
     // initialize interrupts (including TSS/GDT) for this AP
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");

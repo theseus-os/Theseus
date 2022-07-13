@@ -82,7 +82,7 @@ impl TaskFs {
         let parent_dir = self.get_self_pointer().ok_or("BUG: tasks directory wasn't in root")?;
         let dir_name = task_ref.id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
-        let task_dir = TaskDir::new(dir_name, &parent_dir, task_ref.clone())?;        
+        let task_dir = TaskDir::new(dir_name, &parent_dir, task_ref)?;        
         let boxed_task_dir = Arc::new(Mutex::new(task_dir)) as DirRef;
         Ok(FileOrDir::Dir(boxed_task_dir))
     }
@@ -187,9 +187,7 @@ impl Directory for TaskDir {
 
     /// Returns a string listing all the children in the directory
     fn list(&self) -> Vec<String> {
-        let mut children = Vec::new();
-        children.push("mmi".to_string());
-        children.push("taskInfo".to_string());
+        let children = vec!["mmi".to_string(), "taskInfo".to_string()];
         children
     }
 
@@ -239,8 +237,8 @@ impl TaskFile {
     /// Generates the task info string.
     fn generate(&self) -> String {
         // Print all tasks
-        let cpu = self.taskref.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &self.taskref.pinned_core().map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
+        let cpu = self.taskref.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
+        let pinned = &self.taskref.pinned_core().map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
         let task_type = if self.taskref.is_an_idle_task {
             "I"
         } else if self.taskref.is_application() {
@@ -355,8 +353,7 @@ impl Directory for MmiDir {
 
     /// Returns a string listing all the children in the directory
     fn list(&self) -> Vec<String> {
-        let mut children = Vec::new();
-        children.push("MmiInfo".to_string());
+        let children = vec!["MmiInfo".to_string()];
         children
     }
 

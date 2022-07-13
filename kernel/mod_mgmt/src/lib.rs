@@ -1156,7 +1156,7 @@ impl CrateNamespace {
         }
 
         let new_crate = CowArc::new(LoadedCrate {
-            crate_name:              crate_name.clone(),
+            crate_name:              crate_name,
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
             sections:                HashMap::new(),
