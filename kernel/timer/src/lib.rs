@@ -1,7 +1,10 @@
+#![no_std]
+
+/// A hardware timer.
 pub trait Timer {
     fn value() -> Timespec;
 
-    // TODO: enable, period/frequency, and accuracy
+    // TODO: enable, configure, period/frequency, and accuracy
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
