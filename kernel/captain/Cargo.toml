@@ -94,5 +94,8 @@ path = "../task_fs"
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
 
+[dependencies.timer]
+path = "../timer"
+
 [lib]
 crate-type = ["rlib"]

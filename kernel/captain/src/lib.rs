@@ -46,6 +46,7 @@ extern crate window_manager;
 extern crate multiple_heaps;
 extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
+extern crate timer;
 
 
 
@@ -56,6 +57,7 @@ use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 use stack::Stack;
+use timer::Timer;
 
 
 
@@ -85,7 +87,8 @@ pub fn init(
 
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
-    let _tsc_freq = tsc::get_tsc_frequency()?;
+    tsc::TscTimer::calibrate()?;
+
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
@@ -136,7 +139,6 @@ pub fn init(
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;
     task_fs::init()?;
-
 
     // We can drop and unmap the identity mappings after the initial bootstrap is complete.
     // We could probably do this earlier, but we definitely can't do it until after the APs boot.

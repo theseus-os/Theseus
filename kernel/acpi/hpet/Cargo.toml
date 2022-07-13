@@ -1,6 +1,7 @@
 [package]
 name = "hpet"
 version = "0.1.0"
+edition = "2021"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for the x86 HPET: High Precision Event Timer"
 
@@ -18,6 +19,9 @@ path = "../../kernel_config"
 
 [dependencies.memory]
 path = "../../memory"
+
+[dependencies.timer]
+path = "../../timer"
 
 [dependencies.sdt]
 path = "../sdt"

@@ -1,3 +1,5 @@
+use timer::{Timer, Duration};
+use tsc::TscTimer;
 use super::*;
 
 /// The cursor structure used in the terminal.
@@ -6,10 +8,10 @@ use super::*;
 pub struct Cursor {
     /// Whether the cursor is enabled in the terminal.
     enabled: bool,
-    /// The blinking frequency.
-    freq: u128,
-    /// The last time it blinks.
-    time: TscTicks,
+    /// The time that the cursor remains "on" and "off" while blinking.
+    period: Duration,
+    /// The last time the cursor blinked.
+    time: Duration,
     /// The current blinking state show/hidden
     show: bool,
     /// The color of the cursor
@@ -25,7 +27,7 @@ impl Cursor {
     /// Reset the state of the cursor as unseen
     pub fn reset(&mut self) {
         self.show = true;
-        self.time = tsc_ticks();
+        self.time = TscTimer::value();
     }
 
     /// Enable a cursor
@@ -42,15 +44,12 @@ impl Cursor {
     /// Let a cursor blink. It is invoked in a loop.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
-            let time = tsc_ticks();
-            if let Some(duration) = time.sub(&(self.time)) {
-                if let Some(ns) = duration.to_ns() {
-                    if ns >= self.freq {
-                        self.time = time;
-                        self.show = !self.show;
-                        return true;
-                    }
-                }
+            // TODO: Use default timer supplied by system.
+            let time = TscTimer::value();
+            if time - self.time >= self.period {
+                self.time = time;
+                self.show = !self.show;
+                return true;
             }
         }
         true
@@ -141,8 +140,8 @@ impl Default for Cursor  {
     fn default() -> Self {
         Cursor {
             enabled: true,
-            freq: DEFAULT_CURSOR_FREQ,
-            time: tsc_ticks(),
+            period: DEFAULT_CURSOR_PERIOD,
+            time: TscTimer::value(),
             show: true,
             color: FONT_FOREGROUND_COLOR,
             offset_from_end: 0,

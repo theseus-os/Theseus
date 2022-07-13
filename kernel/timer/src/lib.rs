@@ -1,23 +1,29 @@
 #![no_std]
 
+pub use core::time::Duration;
+
 /// A hardware timer.
 pub trait Timer {
-    fn value() -> Timespec;
+    fn calibrate() -> Result<(), &'static str>;
+    fn value() -> Duration;
 
-    // TODO: enable, configure, period/frequency, and accuracy
+    // TODO: configure, period/frequency, and accuracy
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Timespec {
-    pub secs: u64,
-    pub nanos: u32,
-}
+// pub trait ToggleableTimer: Timer {
+//     fn enable();
+//     fn disable();
+//     fn is_enabled() -> bool;
 
-impl Timespec {
-    pub fn zero() -> Self {
-        Self {
-            secs: 0,
-            nanos: 0,
-        }
-    }
-}
+//     fn is_disabled() -> bool {
+//         !Self::is_enabled()
+//     }
+
+//     fn toggle() {
+//         if Self::is_enabled() {
+//             Self::disable();
+//         } else {
+//             Self::enable();
+//         }
+//     }
+// }

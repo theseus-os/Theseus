@@ -36,16 +36,15 @@ use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use framebuffer::{Framebuffer, Pixel};
-use color::{Color};
+use color::Color;
 use shapes::{Coord, Rectangle};
-use tsc::{tsc_ticks, TscTicks};
 use window::Window;
 
 pub mod cursor;
 
 pub const FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
 pub const FONT_BACKGROUND_COLOR: Color = color::BLACK;
-const DEFAULT_CURSOR_FREQ: u128 = 400000000;
+const DEFAULT_CURSOR_PERIOD: timer::Duration = timer::Duration::from_millis(400);
 
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.

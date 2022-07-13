@@ -14,11 +14,14 @@ extern crate x86_64;
 
 use port_io::Port;
 use irq_safety::hold_interrupts;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    fmt,
+    sync::atomic::{AtomicUsize, Ordering}
+};
 use spin::Mutex;
 // use spin::Once;
 use state_store::{get_state, insert_state, SSCached};
-use timer::Timespec;
+use timer::Duration;
 
 
 //standard port to write to on CMOS to select registers
@@ -60,12 +63,17 @@ pub type RtcInterruptFunction = fn(Option<usize>);
 pub struct RtcTimer;
 
 impl timer::Timer for RtcTimer {
+    /// This function does nothing as the RTC does not need to be calibrated.
+    fn calibrate() -> Result<(), &'static str> {
+        Ok(())
+    }
+
     /// Time since 12:00am January 1st 1970 (i.e. Unix time).
     ///
     /// The algorithm is based on [IEEE 1003.1-2017 Base Definitions 4.16].
     ///
     /// [IEEE 1003.1-2017 Base Definitions 4.16]: https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/
-    fn value() -> Timespec {
+    fn value() -> Duration {
         let time = read_rtc();
         time.into()
     }
@@ -127,7 +135,6 @@ pub struct RtcTime {
     pub years: u8,
 }
 
-use core::fmt;
 impl fmt::Display for RtcTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "RTC Time: {}/{}/{} {}:{}:{}", 
@@ -135,7 +142,7 @@ impl fmt::Display for RtcTime {
     }
 }
 
-impl From<RtcTime> for Timespec {
+impl From<RtcTime> for Duration {
     /// Time since 12:00am January 1st 1970 (i.e. Unix time).
     ///
     /// The algorithm is based on [IEEE 1003.1-2017 Base Definitions 4.16].
@@ -186,10 +193,7 @@ impl From<RtcTime> for Timespec {
         // Adds a day back in every 400 years starting in 2001.
         secs -= ((years_since_1900 + 299)/400) * DAY_MULTIPLIER;
 
-        Timespec {
-            secs,
-            nanos: 0,
-        }
+        Duration::from_secs(secs)
     }
 }
 
@@ -282,7 +286,7 @@ pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
     let prev = read_cmos();
     write_cmos(0x8A); 
 
-    unsafe{
+    unsafe {
         CMOS_WRITE_SETTINGS.lock().write((prev & 0xF0) | dividor);
     }
 

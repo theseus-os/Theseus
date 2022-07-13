@@ -376,6 +376,7 @@ dependencies = [
  "stack",
  "task",
  "task_fs",
+ "timer",
  "tsc",
  "window_manager",
 ]
@@ -1239,6 +1240,7 @@ dependencies = [
  "owning_ref",
  "sdt",
  "spin 0.9.0",
+ "timer",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1543,6 +1545,7 @@ dependencies = [
  "root",
  "shapes",
  "text_display",
+ "timer",
  "tsc",
  "window",
  "window_manager",
@@ -3598,6 +3601,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "pit_clock",
+ "timer",
 ]
 
 [[package]]

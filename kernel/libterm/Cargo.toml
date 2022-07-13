@@ -1,6 +1,7 @@
 [package]
 name = "libterm"
 version = "0.1.0"
+edition = "2021"
 authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
 
 [dependencies]
@@ -53,6 +54,9 @@ path = "../window"
 
 [dependencies.tsc]
 path = "../tsc"
+
+[dependencies.timer]
+path = "../timer"
 
 [dependencies.font]
 path = "../font"
