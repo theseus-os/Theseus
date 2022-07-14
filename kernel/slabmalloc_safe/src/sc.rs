@@ -114,7 +114,7 @@ impl SCAllocator {
     }
 
     fn remove_empty(&mut self) -> Option<MappedPages8k> {
-        self.empty_slabs.pop().and_then(|mp| {self.empty_count -= 1; Some(mp)} )
+        self.empty_slabs.pop().map(|mp| {self.empty_count -= 1; mp} )
     }
 
     fn remove_partial(&mut self, id: usize) -> MappedPages8k {
@@ -210,7 +210,7 @@ impl SCAllocator {
 
     /// Returns an empty page from the allocator if available.
     pub fn retrieve_empty_page(&mut self) -> Option<MappedPages8k> {
-        self.remove_empty().and_then(|mp| {self.page_count -= 1; Some(mp)} )
+        self.remove_empty().map(|mp| {self.page_count -= 1; mp} )
     }
 
     /// Allocates a block of memory descriped by `layout`.

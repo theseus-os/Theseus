@@ -689,13 +689,8 @@ fn window_manager_loop(
                     let mut x = (mouse_displacement.x as i8) as isize;
                     let mut y = (mouse_displacement.y as i8) as isize;
                     // need to combine mouse events if there pending a lot
-                    loop {
-                        let next_event = match mouse_consumer.pop() {
-                            Some(ev) => ev,
-                            _ => {
-                                break;
-                            }
-                        };
+
+                    while let Some(next_event) = mouse_consumer.pop() {
                         match next_event {
                             Event::MouseMovementEvent(ref next_mouse_event) => {
                                 if next_mouse_event.mousemove.scrolling_up
