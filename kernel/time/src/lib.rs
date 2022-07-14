@@ -1,3 +1,4 @@
+#![cfg_attr(feature = "hpet", feature(abi_x86_interrupt))]
 #![no_std]
 
 #[cfg(feature = "apic")]

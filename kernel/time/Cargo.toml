@@ -15,6 +15,10 @@ version = "0.4.8"
 path = "../acpi/hpet"
 optional = true
 
+[dependencies.interrupts]
+path = "../interrupts"
+optional = true
+
 [dependencies.ioapic]
 path = "../ioapic"
 optional = true
@@ -30,7 +34,7 @@ optional = true
 [features]
 default = ["apic", "hpet", "pit", "rtc", "tsc"]
 apic = []
-hpet = ["hpet-acpi", "ioapic"]
+hpet = ["hpet-acpi", "interrupts", "ioapic"]
 pit = []
 rtc = ["port_io", "spin"]
 tsc = []

@@ -6,9 +6,10 @@
 #![allow(dead_code)]
 
 pub use pic::IRQ_BASE_OFFSET;
+pub use x86_64::structures::idt::InterruptStackFrame;
 
 use ps2::handle_mouse_packet;
-use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc, InterruptDescriptorTable};
+use x86_64::structures::idt::{HandlerFunc, InterruptDescriptorTable};
 use spin::Once;
 use kernel_config::time::CONFIG_PIT_FREQUENCY_HZ; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
@@ -150,7 +151,7 @@ pub fn init_ap(
 
 /// Establishes the default interrupt handlers that are statically known.
 fn set_handlers(idt: &mut InterruptDescriptorTable) {
-    idt[0x20].set_handler_fn(pit_timer_handler);
+    // idt[0x20].set_handler_fn(pit_timer_handler);
     idt[0x21].set_handler_fn(ps2_keyboard_handler);
     idt[0x22].set_handler_fn(lapic_timer_handler);
     idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
@@ -287,11 +288,10 @@ pub fn eoi(irq: Option<u8>) {
 
 
 /// 0x20
-extern "x86-interrupt" fn pit_timer_handler(_stack_frame: InterruptStackFrame) {
-    pit_clock::handle_timer_interrupt();
-
-	eoi(Some(IRQ_BASE_OFFSET + 0x0));
-}
+// extern "x86-interrupt" fn pit_timer_handler(_stack_frame: InterruptStackFrame) {
+//     pit_clock::handle_timer_interrupt();
+// 	   eoi(Some(IRQ_BASE_OFFSET + 0x0));
+// }
 
 
 // see this: https://forum.osdev.org/viewtopic.php?f=1&t=32655

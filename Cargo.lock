@@ -3539,6 +3539,7 @@ name = "time"
 version = "0.1.0"
 dependencies = [
  "hpet-acpi",
+ "interrupts",
  "ioapic",
  "log",
  "port_io",
