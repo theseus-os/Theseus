@@ -287,7 +287,8 @@ impl Terminal {
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end {
-            return;} 
+            return;
+        } 
         prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
