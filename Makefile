@@ -81,7 +81,6 @@ THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES := $(ROOT_DIR)/extra_files
 
-
 ## This is the default output path defined by cargo.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
@@ -195,7 +194,7 @@ build: $(nano_core_binary)
 ## This includes the target file, host OS dependencies (proc macros, etc)., 
 ## and most importantly, a TOML file to describe these and other config variables.
 	@rm -rf $(THESEUS_BUILD_TOML)
-	@cp -vf $(CFG_DIR)/$(TARGET).json  $(DEPS_DIR)/
+	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_DIR)/
 	@mkdir -p $(HOST_DEPS_DIR)
 	@cp -f ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
@@ -210,20 +209,20 @@ ifeq ($(debug),full)
 # don't strip any files
 else ifeq ($(debug),none)
 # strip all files
-	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o $(nano_core_binary); do \
-		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg ; \
-		cp $${f} $${dbg_file} ; \
-		$(CROSS)strip  --only-keep-debug  $${dbg_file} ; \
-		$(CROSS)strip  --strip-debug      $${f} ; \
-	done
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o $(nano_core_binary) ; do \
+		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg           \
+			&& cp $${f} $${dbg_file}                                 \
+			&& $(CROSS)strip  --only-keep-debug  $${dbg_file}        \
+			&& $(CROSS)strip  --strip-debug      $${f}             & \
+	done; wait
 else ifeq ($(debug),base)
 # strip all object files but the base kernel
-	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do \
-		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg ; \
-		cp $${f} $${dbg_file} ; \
-		$(CROSS)strip  --only-keep-debug  $${dbg_file} ; \
-		$(CROSS)strip  --strip-debug      $${f} ; \
-	done
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do                     \
+		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg           \
+			&& cp $${f} $${dbg_file}                                 \
+			&& $(CROSS)strip  --only-keep-debug  $${dbg_file}        \
+			&& $(CROSS)strip  --strip-debug      $${f}             & \
+	done; wait
 else
 $(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
@@ -332,8 +331,8 @@ grub:
 extra_files:
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@for f in $(shell cd $(EXTRA_FILES) && find * -type f); do \
-		ln -v -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//?/g'` ; \
-	done
+		ln -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//?/g'`  & \
+	done; wait
 
 
 ### Target for building tlibc, Theseus's libc.
