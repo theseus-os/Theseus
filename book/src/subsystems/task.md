@@ -99,7 +99,7 @@ Thus, context switching (with preemption) allows for multiple untrusted and unco
 ### Implementing context switching
 
 The implementation for context switching in Theseus is split across several crates, with each crate corresponding to a particular subset of SIMD instructions being enabled.
-The the top-level [`context_switch`] crate automatically selects the correct version based on which subset of SIMD functionality is chosen by the target hardware platform's specification.
+The top-level [`context_switch`] crate automatically selects the correct version based on which subset of SIMD functionality is chosen by the target hardware platform's specification.
 For example, if SSE2 was enabled, `#[cfg(target_feature = "sse2")]` would be true and the `context_switch_sse2` crate would be used as the context switching implementation.
 Currently, one can select this target by using the `x86_64-theseus-sse` target while building Theseus:
 ```sh
