@@ -1,5 +1,5 @@
 # Papers and Presentations about Theseus
-Over the years, Kevin Boos and other Theseus collaborators have given many presentations about Theseus OS and related topics.
+Over the years, Kevin Boos, Ramla Ijaz, and other Theseus collaborators have given many presentations about Theseus OS and related topics.
 This page offers a selected collection of the slide decks from those talks (including some video recordings), as well as a list of selected peer-reviewed academic publications and theses.
 
 
@@ -11,13 +11,15 @@ This page offers a selected collection of the slide decks from those talks (incl
       [OSDI 2020 Video Talk](https://www.youtube.com/watch?v=i1pLDZKtlBI) — 
       [OSDI 2020 Short Video](https://www.youtube.com/watch?v=T0Du5vps9aU) — 
       [Slides (PDF)](https://www.usenix.org/sites/default/files/conference/protected-files/osdi20_slides_boos.pdf)
+* \[OSDI 2022\] Poster: [Correct and Performant Device Drivers via Intralingual Design](https://www.usenix.org/conference/osdi22/poster-session)
+    * An overview of in-progress work to use formal verification + intralingual design for better device drivers.
+    * [Poster PDF](https://www.theseus-os.com/kevinaboos/docs/OSDI%202022%20Poster.pdf)
 * Kevin Boos PhD Dissertation: [Theseus: Rethinking Operating Systems Structure and State Management](https://scholarship.rice.edu/handle/1911/109201)
 * Ramla Ijaz Master's Thesis: [Exploring Intralingual Design in Operating Systems](https://scholarship.rice.edu/handle/1911/109609)
-
-
+ 
 ### Older papers
-* \[PLOS 2017\] [Theseus: A State Spill-free Operating System]()
-    * A shorter, outdated ideas paper about early Theseus design.
+* \[PLOS 2017\] [Theseus: A State Spill-free Operating System](https://www.sigops.org/s/conferences/sosp/2017/workshops.html)
+    * [Paper PDF](https://www.theseus-os.com/kevinaboos/docs/theseus_plos2017.pdf) — a shorter, outdated ideas paper about early Theseus design.
     * Superseded by the OSDI 2020 paper. 
 * \[EuroSys 2017\] [A Characterization of State Spill in Modern Operating Systems](https://dl.acm.org/doi/10.1145/3064176.3064205)
     * Introduces and studies the concept of state spill.
