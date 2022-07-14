@@ -2333,8 +2333,8 @@ struct SectionPages {
 fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result<SectionPages, &'static str> {
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types.
     //
-    // Since all executable .text sections come at the beginning of the object file, we can simply find 
-    // the end of the last .text section and then use it as the end bounds.
+    // If there are multiple .text sections, they will all exist at the beginning of the object file,
+    // so we simply find the end of the last .text section and use that as the end bounds.
     let (exec_bytes, ro_bytes, rw_bytes): (usize, usize, usize) = {
         let mut text_max_offset = 0;
         let mut ro_bytes = 0;
@@ -2350,9 +2350,11 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             // but only if they have the same offset.
             // The empty .text section at the start of each object file should be ignored. 
             let sec = if (sec.size() == 0) && (sec.get_name(elf_file) != Ok(".text")) {
+                warn!("Unlikely scenario: found zero-sized sec {:?}", sec);
                 let next_sec = elf_file.section_header((shndx + 1) as u16)
                     .map_err(|_| "couldn't get next section for a zero-sized section")?;
                 if next_sec.offset() == sec.offset() {
+                    warn!("Using next_sec {:?} instead of zero-sized sec {:?}", next_sec, sec);
                     next_sec
                 } else {
                     sec
