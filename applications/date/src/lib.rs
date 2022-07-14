@@ -2,18 +2,14 @@
 // #![feature(plugin)]
 // #![plugin(application_main_fn)]
 
-
 extern crate alloc;
-#[macro_use] extern crate terminal_print;
-extern crate rtc;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+use chrono::naive::NaiveDateTime;
+use alloc::{string::String, vec::Vec};
+use terminal_print::println;
 
-
-pub fn main(_args: Vec<String>) -> isize {
-    let now = rtc::read_rtc();
+pub fn main(_args: Vec<String>) {
+    let now = time::now::<time::Realtime>();
+    let now = NaiveDateTime::from_timestamp(now.as_secs() as i64, now.subsec_nanos());
     println!("{}", now);
-
-    0
 }

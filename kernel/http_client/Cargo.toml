@@ -16,6 +16,9 @@ path = "../network_manager"
 [dependencies.percent-encoding]
 path = "../../libs/percent_encoding"
 
+[dependencies.time]
+path = "../time"
+
 [dependencies.smoltcp]
 version = "0.5.0"
 default-features = false

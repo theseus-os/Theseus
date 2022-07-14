@@ -31,7 +31,6 @@ extern crate stack;
 extern crate apic; 
 extern crate mod_mgmt;
 extern crate spawn;
-extern crate tsc;
 extern crate task; 
 extern crate interrupts;
 extern crate acpi;
@@ -46,7 +45,7 @@ extern crate window_manager;
 extern crate multiple_heaps;
 extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
-extern crate timer;
+extern crate time;
 
 
 
@@ -85,14 +84,10 @@ pub fn init(
         logger::mirror_to_vga(mirror_to_vga_cb);
     }
 
-    // calculate TSC period and initialize it
-    // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
-    tsc::TscTimer::calibrate()?;
-
-    // info!("TSC frequency calculated: {}", _tsc_freq);
-
     // now we initialize early driver stuff, like APIC/ACPI
     device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
+
+    time::init();
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {

@@ -8,19 +8,19 @@
 extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
-extern crate hpet;
 extern crate httparse;
-#[macro_use] extern crate smoltcp_helper;
+extern crate smoltcp_helper;
+extern crate time;
 
 use core::str;
 use alloc::vec::Vec;
 use alloc::string::String;
-use hpet::get_hpet;
 use smoltcp::{
     socket::{SocketSet, TcpSocket, SocketHandle},
 };
 use network_manager::{NetworkInterfaceRef};
-use smoltcp_helper::{millis_since, poll_iface};
+use smoltcp_helper::{poll_iface, millis_since};
+use time::Monotonic;
 
 /// The states that implement the finite state machine for 
 /// sending and receiving the HTTP request and response, respectively.
@@ -121,8 +121,8 @@ impl<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> ConnectedTcpSocket<'i, 's, 'soc
         }
 
         Ok(ConnectedTcpSocket {
-            iface: iface,
-            sockets: sockets,
+            iface,
+            sockets,
             handle: tcp_socket_handle,
         })
     }
@@ -159,7 +159,7 @@ pub fn send_request(
     let mut response_status_code: Option<u16> = None;
     let mut response_reason:      Option<String> = None;
 
-    let startup_time = hpet_ticks!();
+    let startup_time = time::now::<Monotonic>();
     let mut latest_packet_timestamp = startup_time;
 
     // in the loop below, we do the actual work of sending the request and receiving the response 
@@ -170,7 +170,7 @@ pub fn send_request(
 
         // check if we have timed out
         if let Some(t) = timeout_millis {
-            if millis_since(latest_packet_timestamp)? > t {
+            if millis_since(latest_packet_timestamp) as u64 > t {
                 error!("http_client: timed out after {} ms, in state {:?}", t, state);
                 return Err("http_client: timed out");
             }
@@ -182,7 +182,7 @@ pub fn send_request(
             HttpState::Requesting if socket.can_send() => {
                 debug!("http_client: sending HTTP request: {:?}", request);
                 socket.send_slice(request.as_ref()).expect("http_client: cannot send request");
-                latest_packet_timestamp = hpet_ticks!();
+                latest_packet_timestamp = time::now::<Monotonic>();
                 HttpState::ReceivingResponse
             }
 
@@ -289,7 +289,7 @@ pub fn send_request(
 
                 // if we just received another packet (the packet buffer changed size), then update the timeout deadline
                 if orig_packet_length != packet_byte_buffer.len() {
-                    latest_packet_timestamp = hpet_ticks!();
+                    latest_packet_timestamp = time::now::<Monotonic>();
                 }
                 
                 new_state

@@ -20,9 +20,12 @@ use log::warn;
 
 pub use core::time::Duration;
 
-static MONOTONIC_TIMER_FUNCTION: AtomicUsize = AtomicUsize::new(0);
-static REALTIME_TIMER_FUNCTION: AtomicUsize = AtomicUsize::new(0);
+static MONOTONIC_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
+static REALTIME_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
 
+/// Discover and initialise best available montonic and realtime clocks.
+///
+/// This function should be called after parsing ACPI tables.
 pub fn init() -> Result<(), ()> {
     init_monotonic_timer()?;
     init_realtime_timer()?;
@@ -37,11 +40,11 @@ fn init_monotonic_timer() -> Result<(), ()> {
     {
         // TODO: Check if TSC reliable?
         addr = if tsc::exists() {
-            if tsc::calibrate().is_err() {
+            if tsc::calibrate().is_ok() {
+                tsc::now as usize
+            } else {
                 warn!("tsc calibration failed");
                 0
-            } else {
-                tsc::now as usize
             }
         } else {
             0
@@ -51,11 +54,11 @@ fn init_monotonic_timer() -> Result<(), ()> {
     #[cfg(feature = "hpet")]
     {
         if addr == 0 && hpet::exists() {
-            addr = if hpet::init().is_err() {
+            addr = if hpet::init().is_ok() {
+                hpet::now as usize
+            } else {
                 warn!("hpet initialisation failed");
                 0
-            } else {
-                hpet::now as usize
             };
         }
     }
@@ -75,7 +78,7 @@ fn init_monotonic_timer() -> Result<(), ()> {
     }
 
     if addr != 0 {
-        MONOTONIC_TIMER_FUNCTION.store(addr, Ordering::SeqCst);
+        MONOTONIC_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
         Ok(())
     } else {
         Err(())
@@ -94,50 +97,50 @@ fn init_realtime_timer() -> Result<(), ()> {
     }
 
     if addr != 0 {
-        REALTIME_TIMER_FUNCTION.store(addr, Ordering::SeqCst);
+        REALTIME_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
         Ok(())
     } else {
         Err(())
     }
 }
 
-pub fn monotonic_time() -> Duration {
-    let addr = MONOTONIC_TIMER_FUNCTION.load(Ordering::SeqCst);
-    // TODO: Check if address == 0?
-    unsafe { transmute::<_, fn() -> Duration>(addr)() }
+pub fn now<T>() -> Duration
+where
+    T: ClockType,
+{
+    let addr = <T as ClockType>::func_addr();
+    let f = unsafe { transmute::<_, fn() -> Duration>(addr) };
+    f()
 }
 
-pub fn real_time() -> Duration {
-    let addr = REALTIME_TIMER_FUNCTION.load(Ordering::SeqCst);
-    // TODO: Check if address == 0?
-    unsafe { transmute::<_, fn() -> Duration>(addr)() }
+/// Either a [`Monotonic`] or [`Realtime`] clock.
+///
+/// This trait is sealed and so cannot be implemented outside of this crate.
+pub trait ClockType: private::Sealed {
+    #[doc(hidden)]
+    fn func_addr() -> usize;
 }
 
-// TODO: Do we need really need a trait?
+pub struct Monotonic;
 
-// /// A hardware timer.
-// pub trait Timer {
-//     // fn exists() -> bool;
-//     fn calibrate() -> Result<(), &'static str>;
-//     fn value() -> Duration;
+impl private::Sealed for Monotonic {}
 
-//     // TODO: configure, period/frequency, and accuracy
-// }
+impl ClockType for Monotonic {
+    fn func_addr() -> usize {
+        MONOTONIC_CLOCK_FUNCTION.load(Ordering::SeqCst)
+    }
+}
 
-// pub trait ToggleableTimer: Timer {
-//     fn enable();
-//     fn disable();
-//     fn is_enabled() -> bool;
+pub struct Realtime;
 
-//     fn is_disabled() -> bool {
-//         !Self::is_enabled()
-//     }
+impl private::Sealed for Realtime {}
 
-//     fn toggle() {
-//         if Self::is_enabled() {
-//             Self::disable();
-//         } else {
-//             Self::enable();
-//         }
-//     }
-// }
+impl ClockType for Realtime {
+    fn func_addr() -> usize {
+        REALTIME_CLOCK_FUNCTION.load(Ordering::SeqCst)
+    }
+}
+
+mod private {
+    pub trait Sealed {}
+}

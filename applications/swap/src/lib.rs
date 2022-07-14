@@ -1,4 +1,3 @@
-
 //! This application is for performing crate management, such as swapping.
 
 
@@ -13,10 +12,10 @@ extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate crate_swap;
-extern crate hpet;
 extern crate task;
 extern crate path;
 extern crate fs_node;
+extern crate time;
 
 use alloc::{
     string::{String, ToString},
@@ -26,9 +25,9 @@ use alloc::{
 use getopts::{Options, Matches};
 use mod_mgmt::{NamespaceDir, IntoCrateObjectFile};
 use crate_swap::SwapRequest;
-use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, DirRef};
+use time::Monotonic;
 
 
 pub fn main(args: Vec<String>) -> isize {
@@ -192,7 +191,7 @@ fn do_swap(
         requests
     };
     
-    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let start = time::now::<Monotonic>();
 
     let swap_result = crate_swap::swap_crates(
         &namespace,
@@ -204,16 +203,12 @@ fn do_swap(
         cache_old_crates,
     );
     
-    let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
+    let end = time::now::<Monotonic>();
+    let period = start - end;
 
-    let elapsed_ticks = end - start;
-    
-    
     match swap_result {
         Ok(()) => {
-            println!("Swap operation complete. Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
-                elapsed_ticks, hpet_period);
+            println!("Swap operation completed in {} ns", period.as_nanos());
             Ok(())
         }
         Err(e) => Err(e.to_string())

@@ -35,5 +35,8 @@ path = "../runqueue_round_robin"
 [dependencies.runqueue_priority]
 path = "../runqueue_priority"
 
+[dependencies.time]
+path = "../time"
+
 [lib]
 crate-type = ["rlib"]

@@ -8,7 +8,7 @@ extern crate mod_mgmt;
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate task;
-extern crate hpet;
+extern crate time;
 
 extern crate runqueue_round_robin;
 extern crate runqueue_priority;
@@ -44,9 +44,7 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
     }
 
     #[cfg(loscd_eval)]
-    let hpet = hpet::get_hpet().ok_or("couldn't get HPET timer")?;
-    #[cfg(loscd_eval)]
-    let hpet_start_state_transfer = hpet.get_counter();
+    let start_time = time::now::<time::Monotonic>();
 
     // __lazy_static_create!(RQEMPTY, AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>>);
     // lazy_static! { static ref RQEMPTY: AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>> = AtomicMap::new(); }
@@ -67,13 +65,10 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
         }
     }
 
-    #[cfg(loscd_eval)] {
-        let hpet_end_state_transfer = hpet.get_counter();
-        warn!("Measured time in units of HPET ticks:
-            state transfer, {}
-            ",
-            hpet_end_state_transfer - hpet_start_state_transfer,
-        );
+    #[cfg(loscd_eval)]
+    {
+        let end_time = time::now::<time::Monotonic>();
+        warn!("Measured time for state transfer: {} ns", (start_time - end_time).as_nanoseconds())
     }
 
     core::mem::drop(once_rq);

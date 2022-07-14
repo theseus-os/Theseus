@@ -2,6 +2,7 @@
 name = "date"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2021"
 
 [dependencies]
 
@@ -10,6 +11,10 @@ path = "../../kernel/terminal_print"
 
 [dependencies.time]
 path = "../../kernel/time"
+
+[dependencies.chrono]
+version = "0.4"
+default-features = false
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

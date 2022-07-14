@@ -61,7 +61,8 @@ path = "fadt"
 [dependencies.madt]
 path = "madt"
 
-[dependencies.hpet-acpi]
+[dependencies.hpet]
+package = "hpet-acpi"
 path = "hpet"
 
 [dependencies.dmar]

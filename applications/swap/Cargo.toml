@@ -30,3 +30,6 @@ path = "../../kernel/fs_node"
 
 [dependencies.path]
 path = "../../kernel/path"
+
+[dependencies.time]
+path = "../../kernel/time"

@@ -445,6 +445,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono"
+version = "0.4.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "color"
 version = "0.1.0"
 
@@ -672,6 +682,7 @@ checksum = "7313c0d620d0cb4dbd9d019e461a4beb501071ff46ec0ab933efb4daa76d73e3"
 name = "date"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "terminal_print",
  "time",
 ]
@@ -1249,6 +1260,7 @@ dependencies = [
  "percent-encoding",
  "smoltcp",
  "smoltcp_helper",
+ "time",
 ]
 
 [[package]]
@@ -1426,6 +1438,7 @@ dependencies = [
  "runqueue",
  "spin 0.9.0",
  "static_assertions",
+ "time",
  "virtual_nic",
  "volatile 0.2.7",
  "x86_64",
@@ -2960,6 +2973,7 @@ dependencies = [
  "network_manager",
  "smoltcp",
  "spin 0.9.0",
+ "time",
 ]
 
 [[package]]
@@ -3063,6 +3077,7 @@ dependencies = [
  "runqueue_round_robin",
  "spin 0.9.0",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -3122,6 +3137,7 @@ dependencies = [
  "path",
  "task",
  "terminal_print",
+ "time",
 ]
 
 [[package]]

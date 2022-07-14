@@ -31,7 +31,6 @@ extern crate volatile;
 extern crate mpmc;
 extern crate owning_ref;
 extern crate rand;
-extern crate hpet;
 extern crate runqueue;
 extern crate network_interface_card;
 extern crate nic_initialization;
@@ -42,6 +41,7 @@ extern crate physical_nic;
 extern crate virtual_nic;
 extern crate zerocopy;
 extern crate hashbrown;
+extern crate time;
 
 mod regs;
 mod queue_registers;
@@ -63,7 +63,6 @@ use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation
 use bit_field::BitField;
 use interrupts::register_msi_interrupt;
 use x86_64::structures::idt::HandlerFunc;
-use hpet::get_hpet;
 use network_interface_card::NetworkInterfaceCard;
 use nic_initialization::*;
 use intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};    
@@ -77,6 +76,7 @@ use rand::{
 };
 use core::mem::ManuallyDrop;
 use hashbrown::HashMap;
+use time::{Duration, Monotonic};
 
 /// Vendor ID for Intel
 pub const INTEL_VEND:                   u16 = 0x8086;  
@@ -571,21 +571,19 @@ impl IxgbeNic {
     fn acquire_semaphore(regs: &mut IntelIxgbeRegisters3) -> Result<bool, &'static str> {
         // femtoseconds per millisecond
         const FS_PER_MS: u64 = 1_000_000_000_000;
-        let hpet = get_hpet();
-        let hpet_ref = hpet.as_ref().ok_or("ixgbe::acquire_semaphore: couldn't get HPET timer")?;
-        let period_fs: u64 = hpet_ref.counter_period_femtoseconds() as u64;        
 
         // check that some other sofware is not using the semaphore
         // 1. poll SWSM.SMBI bit until reads as 0 or 10ms timer expires
-        let start = hpet_ref.get_counter();
+        let start = time::now::<Monotonic>();
         let mut timer_expired_smbi = false;
         let mut smbi_bit = 1;
         while smbi_bit != 0 {
-            smbi_bit = regs.swsm.read() & SWSM_SMBI;
-            let end = hpet_ref.get_counter();
+            const TIMEOUT: Duration = Duration::from_millis(10);
 
-            let expiration_time = 10;
-            if (end-start) * period_fs / FS_PER_MS == expiration_time {
+            smbi_bit = regs.swsm.read() & SWSM_SMBI;
+            let end = time::now::<Monotonic>();
+
+            if (end - start) >= TIMEOUT {
                 timer_expired_smbi = true;
                 break;
             }
@@ -598,15 +596,16 @@ impl IxgbeNic {
         regs.swsm.write(set_swesmbi);
 
         // 2. poll SWSM.SWESMBI bit until reads as 1 or 3s timer expires
-        let start = hpet_ref.get_counter();
+        let start = time::now::<Monotonic>();
         let mut swesmbi_bit = 0;
         let mut timer_expired_swesmbi = false;
         while swesmbi_bit == 0 {
-            swesmbi_bit = (regs.swsm.read() & SWSM_SWESMBI) >> 1;
-            let end = hpet_ref.get_counter();
+            const TIMEOUT: Duration = Duration::from_secs(3);
 
-            let expiration_time = 3000;
-            if (end-start) * period_fs / FS_PER_MS == expiration_time {
+            swesmbi_bit = (regs.swsm.read() & SWSM_SWESMBI) >> 1;
+            let end = time::now::<Monotonic>();
+
+            if (end - start) >= TIMEOUT {
                 timer_expired_swesmbi = true;
                 break;
             }
@@ -950,8 +949,13 @@ impl IxgbeNic {
         // right now we're using the udp port and ipv4 address.
         regs3.mrqc.write(MRQC_MRQE_RSS | MRQC_UDPIPV4 ); 
 
-        //set the random keys for the hash function
-        let seed = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        // Set the random keys for the hash function
+        let mut seed = 0;
+        // TODO: Extract this into a seperate rand crate?
+        let res = unsafe { core::arch::x86_64::_rdseed64_step(&mut seed) };
+        if res == 0 {
+            return Err("Failed to generate seed");
+        }
         let mut rng = SmallRng::seed_from_u64(seed);
         for rssrk in regs3.rssrk.iter_mut() {
             rssrk.write(rng.next_u32());
