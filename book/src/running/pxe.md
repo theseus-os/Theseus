@@ -58,22 +58,30 @@ filename "pxelinux.0";
 ```
 
 Restart the DHCP server and check to see if it's running:
-`sudo systemctl restart isc-dhcp-server`
-`sudo systemctl status isc-dhcp-server`
+```
+sudo systemctl restart isc-dhcp-server
+sudo systemctl status isc-dhcp-server
+```
 
 ## Loading the Theseus ISO Into the TFTP Server
 In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.
-`wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz`
-`tar -xzvf syslinux-*.tar.gz`
+```
+wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz
+tar -xzvf syslinux-*.tar.gz
+```
 
 Then navigate to the memdisk folder and compile.
-`cd syslinux-*/memdisk`
-`make memdisk`
+```
+cd syslinux-*/memdisk
+make memdisk
+```
 
 Next, make a TFTP boot folder for Theseus and copy the memdisk binary into it along with the Theseus ISO:
-`sudo mkdir /var/lib/tftpboot/theseus`
-`sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/`
-`sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/`
+```
+sudo mkdir /var/lib/tftpboot/theseus
+sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/
+sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
+```
 
 Navigate to the PXE configuration file:
 `sudo nano /var/lib/tftpboot/pxelinux.cfg/default`
@@ -86,8 +94,10 @@ label theseus
     append iso initrd=theseus/theseus-x86_64.iso raw
 ```
 Finally, restart the DHCP server one more time and make sure it's running:
-`sudo systemctl restart isc-dhcp-server`
-`sudo systemctl status isc-dhcp-server`
+```
+sudo systemctl restart isc-dhcp-server
+sudo systemctl status isc-dhcp-server
+```
 
 On the target computer, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the target computer is restarted, it should boot into a menu which displays booting into Theseus as an option.
 
