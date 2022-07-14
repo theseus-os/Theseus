@@ -276,7 +276,7 @@
         <span class="comment">// A task has been selected</span>
         <span class="prelude-val">Some</span>(<span class="ident">task</span>) =&gt; {
             <span class="comment">// If the selected task is idle task we begin a new scheduling epoch</span>
-            <span class="kw">if</span> <span class="ident">task</span>.<span class="ident">idle_task</span> <span class="op">==</span> <span class="bool-val">true</span> {
+            <span class="kw">if</span> <span class="ident">task</span>.<span class="ident">idle_task</span> {
                 <span class="ident">assign_tokens</span>(<span class="ident">apic_id</span>);
                 <span class="ident">select_next_task_priority</span>(<span class="ident">apic_id</span>).<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> <span class="ident">m</span>.<span class="ident">taskref</span>)
             }

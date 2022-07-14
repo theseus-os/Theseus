@@ -1059,7 +1059,6 @@
 <span id="1054">1054</span>
 <span id="1055">1055</span>
 <span id="1056">1056</span>
-<span id="1057">1057</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! ## Representing dependencies between sections</span>
@@ -1367,8 +1366,7 @@
         <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="ident">LoadedSection</span>) -&gt; <span class="ident">bool</span>
     {
         <span class="self">self</span>.<span class="ident">sections</span>.<span class="ident">values</span>()
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">sec</span><span class="op">|</span> <span class="ident">predicate</span>(<span class="ident">sec</span>))
-            .<span class="ident">next</span>()
+            .<span class="ident">find</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">sec</span><span class="op">|</span> <span class="ident">predicate</span>(<span class="ident">sec</span>))
     }
 
     <span class="doccomment">/// Returns the substring of this crate&#39;s name that excludes the trailing hash. </span>

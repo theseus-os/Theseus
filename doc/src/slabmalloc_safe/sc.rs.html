@@ -452,7 +452,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">remove_empty</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages8k</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">pop</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> {<span class="self">self</span>.<span class="ident">empty_count</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>; <span class="prelude-val">Some</span>(<span class="ident">mp</span>)} )
+        <span class="self">self</span>.<span class="ident">empty_slabs</span>.<span class="ident">pop</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> {<span class="self">self</span>.<span class="ident">empty_count</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>; <span class="ident">mp</span>} )
     }
 
     <span class="kw">fn</span> <span class="ident">remove_partial</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">id</span>: <span class="ident">usize</span>) -&gt; <span class="ident">MappedPages8k</span> {
@@ -548,7 +548,7 @@
 
     <span class="doccomment">/// Returns an empty page from the allocator if available.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">retrieve_empty_page</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MappedPages8k</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">remove_empty</span>().<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> {<span class="self">self</span>.<span class="ident">page_count</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>; <span class="prelude-val">Some</span>(<span class="ident">mp</span>)} )
+        <span class="self">self</span>.<span class="ident">remove_empty</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">mp</span><span class="op">|</span> {<span class="self">self</span>.<span class="ident">page_count</span> <span class="op">-</span><span class="op">=</span> <span class="number">1</span>; <span class="ident">mp</span>} )
     }
 
     <span class="doccomment">/// Allocates a block of memory descriped by `layout`.</span>

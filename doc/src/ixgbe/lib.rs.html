@@ -1570,7 +1570,7 @@
         <span class="ident">num_tx_descriptors</span>: <span class="ident">u16</span>
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">MutexIrqSafe</span><span class="op">&lt;</span><span class="ident">IxgbeNic</span><span class="op">&gt;</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="comment">// Series of checks to determine if starting parameters are acceptable</span>
-        <span class="kw">if</span> (<span class="ident">enable_virtualization</span> <span class="op">&amp;&amp;</span> <span class="ident">interrupts</span>.<span class="ident">is_some</span>()) <span class="op">|</span><span class="op">|</span> (<span class="ident">enable_virtualization</span> <span class="op">&amp;&amp;</span> <span class="ident">enable_rss</span>) {
+        <span class="kw">if</span> <span class="ident">enable_virtualization</span> <span class="op">&amp;&amp;</span> (<span class="ident">interrupts</span>.<span class="ident">is_some</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">enable_rss</span>) {
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;Cannot enable virtualization when interrupts or RSS are enabled&quot;</span>);
         }
 
@@ -2359,7 +2359,7 @@
         <span class="kw">let</span> <span class="ident">enabled_filters</span> <span class="op">=</span> <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">l34_5_tuple_filters</span>;
 
         <span class="comment">// find a free filter</span>
-        <span class="kw">let</span> <span class="ident">filter_num</span> <span class="op">=</span> <span class="ident">enabled_filters</span>.<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">r</span><span class="op">|</span> <span class="ident">r</span> <span class="op">==</span> <span class="bool-val">false</span>).<span class="ident">ok_or</span>(<span class="string">&quot;Ixgbe: No filter available&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let</span> <span class="ident">filter_num</span> <span class="op">=</span> <span class="ident">enabled_filters</span>.<span class="ident">iter</span>().<span class="ident">position</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">r</span><span class="op">|</span> <span class="op">!</span><span class="ident">r</span>).<span class="ident">ok_or</span>(<span class="string">&quot;Ixgbe: No filter available&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// start off with the filter mask set for all the filters, and clear bits for filters that are enabled</span>
         <span class="comment">// bits 29:25 are set to 1.</span>
@@ -2623,7 +2623,7 @@
         <span class="prelude-val">Ok</span>(<span class="kw-2">ref</span> <span class="ident">ixgbe_nic_ref</span>) =&gt; {
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ixgbe_nic</span> <span class="op">=</span> <span class="ident">ixgbe_nic_ref</span>.<span class="ident">lock</span>();
             <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="ident">ixgbe_nic</span>.<span class="ident">rx_queues</span>[<span class="ident">qid</span> <span class="kw">as</span> <span class="ident">usize</span>].<span class="ident">poll_queue_and_store_received_packets</span>();
-            <span class="ident">ixgbe_nic</span>.<span class="ident">interrupt_num</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">qid</span>).<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">int</span><span class="op">|</span> <span class="prelude-val">Some</span>(<span class="kw-2">*</span><span class="ident">int</span>))
+            <span class="ident">ixgbe_nic</span>.<span class="ident">interrupt_num</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">qid</span>).<span class="ident">map</span>(<span class="op">|</span><span class="ident">int</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">int</span>)
         }
         <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: ixgbe_handler_{}(): {}&quot;</span>, <span class="ident">qid</span>, <span class="ident">e</span>);

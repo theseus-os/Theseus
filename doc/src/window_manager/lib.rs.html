@@ -827,11 +827,6 @@
 <span id="822">822</span>
 <span id="823">823</span>
 <span id="824">824</span>
-<span id="825">825</span>
-<span id="826">826</span>
-<span id="827">827</span>
-<span id="828">828</span>
-<span id="829">829</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. </span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.</span>
@@ -1523,13 +1518,8 @@
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">x</span> <span class="op">=</span> (<span class="ident">mouse_displacement</span>.<span class="ident">x</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">y</span> <span class="op">=</span> (<span class="ident">mouse_displacement</span>.<span class="ident">y</span> <span class="kw">as</span> <span class="ident">i8</span>) <span class="kw">as</span> <span class="ident">isize</span>;
                     <span class="comment">// need to combine mouse events if there pending a lot</span>
-                    <span class="kw">loop</span> {
-                        <span class="kw">let</span> <span class="ident">next_event</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">mouse_consumer</span>.<span class="ident">pop</span>() {
-                            <span class="prelude-val">Some</span>(<span class="ident">ev</span>) =&gt; <span class="ident">ev</span>,
-                            <span class="kw">_</span> =&gt; {
-                                <span class="kw">break</span>;
-                            }
-                        };
+
+                    <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">next_event</span>) <span class="op">=</span> <span class="ident">mouse_consumer</span>.<span class="ident">pop</span>() {
                         <span class="kw">match</span> <span class="ident">next_event</span> {
                             <span class="ident">Event::MouseMovementEvent</span>(<span class="kw-2">ref</span> <span class="ident">next_mouse_event</span>) =&gt; {
                                 <span class="kw">if</span> <span class="ident">next_mouse_event</span>.<span class="ident">mousemove</span>.<span class="ident">scrolling_up</span>

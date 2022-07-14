@@ -959,7 +959,6 @@
 <span id="954">954</span>
 <span id="955">955</span>
 <span id="956">956</span>
-<span id="957">957</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.</span>
@@ -1669,8 +1668,7 @@
     <span class="kw">let</span> <span class="ident">krate</span> <span class="op">=</span> <span class="ident">crate_ref</span>.<span class="ident">lock_as_ref</span>();
 
     <span class="kw">let</span> <span class="ident">eh_frame_sec</span> <span class="op">=</span> <span class="ident">krate</span>.<span class="ident">sections</span>.<span class="ident">values</span>()
-        .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">SectionType::EhFrame</span>)
-        .<span class="ident">next</span>()<span class="question-mark">?</span>;
+        .<span class="ident">find</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">typ</span> <span class="op">==</span> <span class="ident">SectionType::EhFrame</span>)<span class="question-mark">?</span>;
     
     <span class="kw">let</span> <span class="ident">eh_frame_vaddr</span> <span class="op">=</span> <span class="ident">eh_frame_sec</span>.<span class="ident">start_address</span>().<span class="ident">value</span>();
     <span class="kw">let</span> <span class="ident">text_pages_vaddr</span> <span class="op">=</span> <span class="ident">krate</span>.<span class="ident">text_pages</span>.<span class="ident">as_ref</span>()<span class="question-mark">?</span>.<span class="number">1</span>.<span class="ident">start</span>.<span class="ident">value</span>();

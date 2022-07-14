@@ -510,10 +510,6 @@
 <span id="505">505</span>
 <span id="506">506</span>
 <span id="507">507</span>
-<span id="508">508</span>
-<span id="509">509</span>
-<span id="510">510</span>
-<span id="511">511</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A `Window` object should be owned by an application. It can display a `Displayable` object in its framebuffer. See `applications/new_window` as a demo to use this library.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This library will create a window with default title bar and border. It handles the commonly used interactions like moving</span>
@@ -715,12 +711,8 @@
         <span class="comment">// we simply return that event from this function such that the application can handle it. </span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">unhandled_event</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Event</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
 
-        <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">event</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>.<span class="ident">event_consumer</span>.<span class="ident">pop</span>() {
-                <span class="prelude-val">Some</span>(<span class="ident">ev</span>) =&gt; <span class="ident">ev</span>,
-                <span class="prelude-val">None</span> =&gt; <span class="kw">break</span>,
-            };
-            
+        
+        <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">event</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">event_consumer</span>.<span class="ident">pop</span>() {
             <span class="comment">// TODO FIXME: for a performant design, the goal is to AVOID holding the lock on `inner` as much as possible. </span>
             <span class="comment">//             That means that most of the drawing logic should be moved into the `window_inner` crate itself.</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">inner</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">lock</span>();

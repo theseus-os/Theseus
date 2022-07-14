@@ -662,6 +662,7 @@
 <span id="657">657</span>
 <span id="658">658</span>
 <span id="659">659</span>
+<span id="660">660</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic terminal emulator library.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The terminal has several main responsibilities: </span>
@@ -950,8 +951,9 @@
         <span class="kw">let</span> <span class="ident">buffer_width</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_text_dimensions</span>().<span class="number">0</span>;
         <span class="kw">let</span> <span class="ident">prev_start_idx</span>;
         <span class="comment">// Prevents the user from scrolling down if already at the bottom of the page</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_scroll_end</span> <span class="op">==</span> <span class="bool-val">true</span> {
-            <span class="kw">return</span>;} 
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_scroll_end</span> {
+            <span class="kw">return</span>;
+        } 
         <span class="ident">prev_start_idx</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scroll_start_idx</span>;
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">calc_end_idx</span>(<span class="ident">prev_start_idx</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_idx</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">result</span> {
