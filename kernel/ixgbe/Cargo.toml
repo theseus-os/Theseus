@@ -58,9 +58,6 @@ version = "0.8"
 default-features = false 
 features = [ "alloc", "small_rng" ]
 
-[dependencies.hpet]
-path = "../acpi/hpet"
-
 [dependencies.runqueue]
 path = "../runqueue"
 

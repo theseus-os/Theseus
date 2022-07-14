@@ -46,9 +46,6 @@ path = "../apic"
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.tsc]
-path = "../tsc"
-
 [dependencies.interrupts]
 path = "../interrupts"
 
@@ -94,8 +91,8 @@ path = "../task_fs"
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
 
-[dependencies.timer]
-path = "../timer"
+[dependencies.time]
+path = "../time"
 
 [lib]
 crate-type = ["rlib"]

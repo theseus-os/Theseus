@@ -12,7 +12,7 @@ dependencies = [
  "apic",
  "dmar",
  "fadt",
- "hpet",
+ "hpet-acpi",
  "ioapic",
  "iommu",
  "irq_safety",
@@ -47,7 +47,7 @@ dependencies = [
  "acpi_table",
  "dmar",
  "fadt",
- "hpet",
+ "hpet-acpi",
  "log",
  "madt",
  "memory",
@@ -157,7 +157,6 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
  "debugit",
- "hpet",
  "log",
  "mpmc",
  "spin 0.9.0",
@@ -305,7 +304,6 @@ dependencies = [
  "fs_node",
  "getopts",
  "heapfile",
- "hpet",
  "libtest",
  "log",
  "memory",
@@ -376,8 +374,7 @@ dependencies = [
  "stack",
  "task",
  "task_fs",
- "timer",
- "tsc",
+ "time",
  "window_manager",
 ]
 
@@ -628,7 +625,6 @@ dependencies = [
  "by_address",
  "fs_node",
  "hashbrown",
- "hpet",
  "lazy_static",
  "log",
  "memory",
@@ -676,8 +672,8 @@ checksum = "7313c0d620d0cb4dbd9d019e461a4beb501071ff46ec0ab933efb4daa76d73e3"
 name = "date"
 version = "0.1.0"
 dependencies = [
- "rtc",
  "terminal_print",
+ "time",
 ]
 
 [[package]]
@@ -1200,7 +1196,6 @@ dependencies = [
  "getopts",
  "hashbrown",
  "heap",
- "hpet",
  "libtest",
  "log",
  "qp-trie",
@@ -1230,7 +1225,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hpet"
+name = "hpet-acpi"
 version = "0.1.0"
 dependencies = [
  "acpi_table",
@@ -1240,7 +1235,6 @@ dependencies = [
  "owning_ref",
  "sdt",
  "spin 0.9.0",
- "timer",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1249,7 +1243,6 @@ dependencies = [
 name = "http_client"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "httparse",
  "log",
  "network_manager",
@@ -1412,7 +1405,6 @@ dependencies = [
  "apic",
  "bit_field 0.7.0",
  "hashbrown",
- "hpet",
  "intel_ethernet",
  "interrupts",
  "irq_safety",
@@ -1545,8 +1537,7 @@ dependencies = [
  "root",
  "shapes",
  "text_display",
- "timer",
- "tsc",
+ "time",
  "window",
  "window_manager",
 ]
@@ -1558,7 +1549,6 @@ dependencies = [
  "apic",
  "bit_field 0.10.1",
  "hashbrown",
- "hpet",
  "libm",
  "log",
  "memory",
@@ -1865,7 +1855,6 @@ dependencies = [
  "apic",
  "cfg-if 0.1.10",
  "getopts",
- "hpet",
  "kernel_config",
  "libm",
  "libtest",
@@ -1875,7 +1864,6 @@ dependencies = [
  "memory_structs",
  "runqueue",
  "terminal_print",
- "tsc",
 ]
 
 [[package]]
@@ -2199,7 +2187,6 @@ checksum = "51ecbcb821e1bd256d456fe858aaa7f380b63863eab2eb86eee1bd9f33dd6682"
 name = "ota_update_client"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "http_client",
  "httparse",
  "irq_safety",
@@ -2341,7 +2328,6 @@ dependencies = [
  "byteorder",
  "getopts",
  "hashbrown",
- "hpet",
  "log",
  "network_manager",
  "ota_update_client",
@@ -2548,7 +2534,6 @@ name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "debugit",
- "hpet",
  "irq_safety",
  "log",
  "scheduler",
@@ -2586,7 +2571,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "getopts",
- "hpet",
  "libtest",
  "log",
  "runqueue",
@@ -2611,21 +2595,6 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
-]
-
-[[package]]
-name = "rtc"
-version = "0.1.0"
-dependencies = [
- "irq_safety",
- "kernel_config",
- "lazy_static",
- "log",
- "port_io",
- "spin 0.9.0",
- "state_store",
- "timer",
- "x86_64",
 ]
 
 [[package]]
@@ -2987,7 +2956,6 @@ dependencies = [
 name = "smoltcp_helper"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "log",
  "network_manager",
  "smoltcp",
@@ -3086,7 +3054,6 @@ name = "state_transfer"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
- "hpet",
  "irq_safety",
  "lazy_static",
  "log",
@@ -3149,7 +3116,6 @@ dependencies = [
  "crate_swap",
  "fs_node",
  "getopts",
- "hpet",
  "itertools",
  "memory",
  "mod_mgmt",
@@ -3283,7 +3249,6 @@ dependencies = [
  "framebuffer",
  "framebuffer_drawer",
  "getopts",
- "hpet",
  "lazy_static",
  "log",
  "rendezvous",
@@ -3570,8 +3535,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "timer"
+name = "time"
 version = "0.1.0"
+dependencies = [
+ "hpet-acpi",
+ "ioapic",
+ "log",
+ "port_io",
+ "spin 0.9.0",
+]
 
 [[package]]
 name = "tlb_shootdown"
@@ -3593,15 +3565,6 @@ dependencies = [
  "terminal_print",
  "test_thread_local",
  "thread_local_macro",
-]
-
-[[package]]
-name = "tsc"
-version = "0.1.0"
-dependencies = [
- "log",
- "pit_clock",
- "timer",
 ]
 
 [[package]]

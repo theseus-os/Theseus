@@ -20,6 +20,7 @@ path = "../rsdt"
 path = "../fadt"
 
 [dependencies.hpet]
+package = "hpet-acpi"
 path = "../hpet"
 
 [dependencies.madt]

@@ -25,9 +25,6 @@ path = "../../kernel/memory"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.hpet]
-path = "../../kernel/acpi/hpet"
-
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
 

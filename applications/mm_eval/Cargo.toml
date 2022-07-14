@@ -12,12 +12,6 @@ libm = "0.2.1"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.hpet]
-path = "../../kernel/acpi/hpet"
-
-[dependencies.tsc]
-path = "../../kernel/tsc"
-
 [dependencies.kernel_config]
 path = "../../kernel/kernel_config"
 

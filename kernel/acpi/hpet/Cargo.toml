@@ -1,5 +1,5 @@
 [package]
-name = "hpet"
+name = "hpet-acpi"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
@@ -19,9 +19,6 @@ path = "../../kernel_config"
 
 [dependencies.memory]
 path = "../../memory"
-
-[dependencies.timer]
-path = "../../timer"
 
 [dependencies.sdt]
 path = "../sdt"

@@ -50,7 +50,12 @@ fn init_monotonic_timer() -> Result<(), ()> {
     #[cfg(feature = "hpet")]
     {
         if addr == 0 && hpet::exists() {
-            addr = hpet::now as usize;
+            addr = if hpet::init().is_err() {
+                warn!("hpet initialisation failed");
+                0
+            } else {
+                hpet::now as usize
+            };
         }
     }
 

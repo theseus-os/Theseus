@@ -18,9 +18,6 @@ path = "../../kernel/terminal_print"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.hpet]
-path = "../../kernel/acpi/hpet"
-
 [dependencies.apic]
 path = "../../kernel/apic"
 

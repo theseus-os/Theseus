@@ -7,7 +7,6 @@ version = "0.1.0"
 [dependencies]
 spin = "0.9.0"
 
-
 [dependencies.log]
 version = "0.4.8"
 
@@ -35,9 +34,6 @@ path = "../runqueue_round_robin"
 
 [dependencies.runqueue_priority]
 path = "../runqueue_priority"
-
-[dependencies.hpet]
-path = "../acpi/hpet"
 
 [lib]
 crate-type = ["rlib"]

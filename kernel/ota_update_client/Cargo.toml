@@ -19,9 +19,6 @@ git = "https://github.com/theseus-os/irq_safety"
 [dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.hpet]
-path = "../acpi/hpet"
-
 [dependencies.spawn]
 path = "../spawn"
 

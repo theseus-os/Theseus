@@ -5,12 +5,11 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 
 [dependencies]
 
-
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
 
-[dependencies.rtc]
-path = "../../kernel/rtc"
+[dependencies.time]
+path = "../../kernel/time"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"

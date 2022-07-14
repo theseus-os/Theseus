@@ -3,7 +3,6 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
 extern crate kernel_config;
 extern crate memory;
 extern crate volatile;
@@ -13,7 +12,6 @@ extern crate acpi_table;
 extern crate spin;
 extern crate owning_ref;
 
-use core::sync::atomic::{AtomicU64, Ordering};
 use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
 use owning_ref::BoxRefMut;
@@ -22,22 +20,17 @@ use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use memory::{MappedPages, allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags};
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
-use timer::Duration;
 
 /// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
 static HPET: Once<RwLock<BoxRefMut<MappedPages, Hpet>>> = Once::new();
-
-/// The number of times the [`HPET`]'s main counter has overflowed.
-static HPET_OVERFLOWS: AtomicU64 = AtomicU64::new(0);
-
 
 /// Returns a reference to the HPET timer structure, wrapped in an Option,
 /// because it is not guaranteed that HPET exists or has been initialized.
 /// # Example
 /// ```
-/// let counter_val = get_hpet().as_ref().unwrap().get_counter();
+/// let counter_val = hpet().as_ref().unwrap().get_counter();
 /// ```
-pub fn get_hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
+pub fn hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
     HPET.get().map(|h| h.read())
 }
 
@@ -45,44 +38,10 @@ pub fn get_hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet
 /// because it is not guaranteed that HPET exists or has been initialized.
 /// # Example
 /// ```
-/// get_hpet_mut().as_mut().unwrap().enable_counter(true);
+/// hpet_mut().as_mut().unwrap().enable_counter(true);
 /// ```
-pub fn get_hpet_mut() -> Option<RwLockWriteGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
+pub fn hpet_mut() -> Option<RwLockWriteGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
     HPET.get().map(|h| h.write())
-}
-
-// TODO: Is only using the primary counter ok?
-pub struct MainHpetTimer;
-
-impl timer::Timer for MainHpetTimer {
-    /// This function does nothing as the HPET timer does not need to be calibrated.
-    fn calibrate() -> Result<(), &'static str> {
-        Ok(())
-    }
-
-    /// Returns the [`Timespec`] representing the time elapsed according to the HPET.
-    ///
-    /// # Safety
-    /// TODO
-    fn value() -> Duration {
-        const FEMTOS_PER_NANO: u32 = 1_000_000;
-
-        // TODO: Make sure nothing overflows.
-
-        // TODO: Is this panic ok?
-        let hpet = get_hpet().expect("hpet not initialised");
-
-        let counter_value = hpet.get_counter();
-        let overflows = HPET_OVERFLOWS.load(Ordering::Acquire);
-
-        let counter_period_femtoseconds = hpet.counter_period_femtoseconds() as u64;
-        let counter_period_nanoseconds = counter_period_femtoseconds / (FEMTOS_PER_NANO as u64);
-
-        let nanos_per_overflow: u64 = u32::MAX as u64 * counter_period_nanoseconds as u64;
-
-        let nanos = (counter_value * counter_period_nanoseconds) + (overflows * nanos_per_overflow);
-        Duration::from_nanos(nanos)
-    }
 }
 
 /// A structure that offers access to HPET through its I/O registers, 
@@ -221,44 +180,7 @@ impl HpetAcpiTable {
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
         )?;
 
-        let mut hpet = BoxRefMut::new(Box::new(hpet_mp)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(phys_addr.frame_offset()))?;
-        // enable the main counter
-        {
-            hpet.enable_counter(true);
-            debug!("Initialized HPET, period: {}, counter val: {}, num timers: {}, vendor_id: {}", 
-                hpet.counter_period_femtoseconds(), hpet.get_counter(), hpet.num_timers(), hpet.vendor_id()
-            );
-
-            if (hpet.general_configuration.read() | 0x8000) == 0 {
-                // TODO: Return error
-                panic!("hpet doesn't support legacy remapping");
-            }
-
-            hpet.general_configuration.update(|value| {
-            //     // Set bit 2 (enable legacy mapping)
-                *value |= 0x2;
-            });
-
-            // TODO: Document timer 0 is being used by OS.
-            // The HPET is guaranteed to have at least three timers.
-            let overflow_timer = &mut hpet.timers[0];
-            // TODO: From OS Dev Wiki: "If the timer is set to 32 bit mode, it will also generate an
-            // interrupt when the counter wraps around." Will this trigger a double interrupt?
-            overflow_timer.comparator_value.write(0);
-
-            overflow_timer.configuration_and_capability.update(|value| {
-                // Clear bit 14 (use standard interrupt mapping)
-                *value &= !(0x4000);
-                // Set bit 8 (force 32-bit mode)
-                // TODO: Alternatively we can read bit 5 and account for whether timer is 32 or
-                // 64-bit.
-                *value |= 0x100;
-                // TODO: We don't need to set non-periodic mode right?
-                // Set bit 2 (enable interrupts)
-                *value |= 0x4;
-            });
-        }
-
+        let hpet = BoxRefMut::new(Box::new(hpet_mp)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(phys_addr.frame_offset()))?;
         Ok(HPET.call_once(|| RwLock::new(hpet)))
     }
 }

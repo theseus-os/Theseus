@@ -56,8 +56,5 @@ path = "../../kernel/framebuffer_drawer"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.hpet]
-path = "../../kernel/acpi/hpet"
-
 [dependencies.unified_channel]
 path = "../../kernel/unified_channel" 

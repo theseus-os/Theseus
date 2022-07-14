@@ -24,9 +24,6 @@ path = "../task"
 [dependencies.runqueue]
 path = "../runqueue"
 
-[dependencies.hpet]
-path = "../acpi/hpet"
-
 [dependencies.pmu_x86]
 path = "../pmu_x86"
 

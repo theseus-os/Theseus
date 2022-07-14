@@ -14,9 +14,6 @@ version = "0.4.8"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.hpet]
-path = "../../kernel/acpi/hpet"
-
 [dependencies.task]
 path = "../../kernel/task"
 
