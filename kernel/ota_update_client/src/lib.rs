@@ -8,7 +8,6 @@
 #[macro_use] extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
-extern crate hpet;
 extern crate owning_ref;
 extern crate spawn;
 extern crate task;
@@ -17,7 +16,8 @@ extern crate percent_encoding;
 extern crate rand;
 extern crate http_client;
 extern crate itertools;
-#[macro_use] extern crate smoltcp_helper;
+extern crate smoltcp_helper;
+extern crate time;
 
 
 use core::str;
@@ -27,14 +27,13 @@ use alloc::{
     string::{String, ToString},
 };
 use itertools::Itertools;
-use hpet::get_hpet;
 use smoltcp::{
     wire::{Ipv4Address, IpEndpoint},
     socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
 };
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
-use network_manager::{NetworkInterfaceRef};
+use network_manager::NetworkInterfaceRef;
 use rand::{
     SeedableRng,
     RngCore,
@@ -42,6 +41,7 @@ use rand::{
 };
 use http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_request};
 use smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
+use time::Monotonic;
 
 /// The IP address of the update server.
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [10, 0, 2, 2]; // the IP of the host machine when running on QEMU.
@@ -323,8 +323,16 @@ fn download_files<S: AsRef<str>>(
         return Err("no download paths given");
     }
 
-    let startup_time = hpet_ticks!();
-    let mut rng = SmallRng::seed_from_u64(startup_time);
+    let startup_time = time::now::<Monotonic>();
+
+    // Set the random keys for the hash function
+    let mut seed = 0;
+    // TODO: Extract this into a seperate rand crate?
+    let res = unsafe { core::arch::x86_64::_rdseed64_step(&mut seed) };
+    if res == 0 {
+        return Err("Failed to generate seed");
+    }
+    let mut rng = SmallRng::seed_from_u64(seed);
     let rng_upper_bound = u16::max_value() - STARTING_FREE_PORT;
 
     // the below items may be overwritten on each loop iteration, if the socket was closed and we need to create a new one
@@ -408,7 +416,7 @@ fn download_files<S: AsRef<str>>(
     let mut _loop_ctr = 0;
     let mut issued_close = false;
     let timeout_millis = 3000; // 3 second timeout
-    let start = hpet_ticks!();
+    let start = time::now::<Monotonic>();
     loop {
         _loop_ctr += 1;
 
@@ -433,7 +441,7 @@ fn download_files<S: AsRef<str>>(
         }
 
         // check to make sure we haven't timed out
-        if millis_since(start)? > timeout_millis {
+        if millis_since(start) > timeout_millis {
             debug!("ota_update_client: timed out waiting to close socket, closing it manually with an abort.");
             socket.abort();
             // Don't break out of the loop here!  we need to let this socket actually send the close msg

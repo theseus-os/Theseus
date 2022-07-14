@@ -20,12 +20,12 @@ extern crate font;
 extern crate framebuffer;
 extern crate framebuffer_drawer;
 extern crate framebuffer_printer;
-extern crate tsc;
 extern crate window_manager;
 extern crate window;
 extern crate text_display;
 extern crate shapes;
 extern crate color;
+extern crate time;
 
 use core::ops::DerefMut;
 use alloc::string::{String, ToString};
@@ -44,7 +44,7 @@ pub mod cursor;
 
 pub const FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
 pub const FONT_BACKGROUND_COLOR: Color = color::BLACK;
-const DEFAULT_CURSOR_PERIOD: timer::Duration = timer::Duration::from_millis(400);
+const DEFAULT_CURSOR_PERIOD: time::Duration = time::Duration::from_millis(400);
 
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.

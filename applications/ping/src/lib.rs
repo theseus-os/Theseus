@@ -12,11 +12,11 @@
 extern crate smoltcp;
 extern crate network_manager;
 extern crate byteorder;
-extern crate hpet;
 extern crate smoltcp_helper;
 extern crate hashbrown;
 extern crate ota_update_client;
 extern crate getopts;
+extern crate time;
 
 
 use getopts::{Matches, Options};
@@ -24,7 +24,6 @@ use core::str::FromStr;
 use hashbrown::HashMap;
 use alloc::vec::Vec;        
 use alloc::string::String;
-use hpet::get_hpet;
 use smoltcp::{
     socket::{SocketSet, IcmpSocket, IcmpSocketBuffer, IcmpPacketMetadata, IcmpEndpoint},
     wire::{IpAddress, Icmpv4Repr, Icmpv4Packet},
@@ -32,21 +31,11 @@ use smoltcp::{
 };
 use network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
 use byteorder::{ByteOrder, NetworkEndian};
-use smoltcp_helper::{millis_since, poll_iface};
-
-
-macro_rules! hpet_ticks {
-    () => {
-        match get_hpet().as_ref().ok_or("coudln't get HPET timer") {
-            Ok(time) => time.get_counter(),
-            Err(_) => return println!("couldnt get HPET timer"),
-        }
-    };
-}
+use smoltcp_helper::{poll_iface};
+use time::{Duration, Monotonic};
 
 
 pub fn main(args: Vec<String>) -> isize {
-
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "a more detailed view of packets sent and received");
@@ -132,7 +121,7 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
     }
     
     if did_work { 
-        ping(address, count, interval, timeout, verbose, buffer_size);
+        ping(address, count, Duration::from_millis(interval), Duration::from_millis(timeout), verbose, buffer_size);
         Ok(())
     }
     else {
@@ -150,28 +139,27 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 }
 
 // Retrieves the echo reply contained in the receive buffer and prints data pertaining to the packet
-fn get_icmp_pong (waiting_queue: &mut HashMap<u16, u64>, times: &mut Vec<u64>, total_time: &mut u64, 
-    repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: u64)  {
+fn get_icmp_pong (waiting_queue: &mut HashMap<u16, Duration>, times: &mut Vec<Duration>, total_time: &mut Duration, 
+    repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: Duration)  {
     
     if let Icmpv4Repr::EchoReply { seq_no, data, ..} = repr {
         if let Some(_) = waiting_queue.get(&seq_no) {
-            let packet_timestamp_ms = NetworkEndian::read_i64(data) as u64;
+            let packet_timestamp_ms = Duration::from_millis(NetworkEndian::read_i64(data) as u64);
             
             println!("{} bytes from {}: icmp_seq={}, time={}ms",
                         data.len(), remote_addr, seq_no,
-                        timestamp - packet_timestamp_ms);
+                        (timestamp - packet_timestamp_ms).as_millis());
             
             waiting_queue.remove(&seq_no);
             *received += 1;
-            times.push((timestamp - packet_timestamp_ms) as u64);
+            times.push(timestamp - packet_timestamp_ms);
             *total_time += timestamp - packet_timestamp_ms;
         }
     } 
 }
 
-fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: bool, buffer_size: usize) {
-
-    let startup_time = hpet_ticks!() as u64;
+fn ping(address: IpAddress, count: usize, interval: Duration, timeout: Duration, verbose: bool, buffer_size: usize) {
+    let startup_time = time::now::<Monotonic>();
     let remote_addr = address;
     let mut times = Vec::new();
     
@@ -195,14 +183,11 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     let mut sockets = SocketSet::new(vec![]);
     let icmp_handle = sockets.add(icmp_socket);
     
-    let mut send_at = match millis_since(startup_time as u64) {
-        Ok(time) => time,
-        Err(err) => return println!("couldn't get time since start_up: {}", err),
-    };
+    let mut send_at = time::now::<Monotonic>() - startup_time;
     
     let mut seq_no = 0;
     let mut received: u16 = 0;
-    let mut total_time: u64 = 0;
+    let mut total_time = Duration::ZERO;
     let mut echo_payload = vec![0xffu8; buffer_size];
     let mut timeout_loop = false;
 
@@ -227,10 +212,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
             }
         }
         {
-            let timestamp = match millis_since(startup_time as u64) {
-                Ok(time) => time,
-                Err(err) => return println!("couldn't get timestamp:{}", err),
-            };
+            let timestamp = time::now::<Monotonic>() - startup_time;
             let mut socket = sockets.get::<IcmpSocket>(icmp_handle); 
             
             // Checks if the icmp socket is open, and only bind the identifier icmp to it if 
@@ -247,13 +229,13 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
             // Checks if the icmp sockett can send an echo request
             if socket.can_send() && seq_no < count as u16 && send_at <= timestamp {
                 
-                NetworkEndian::write_i64(&mut echo_payload, timestamp as i64);
+                NetworkEndian::write_i64(&mut echo_payload, timestamp.as_millis() as i64);
 
-                let icmp_repr = Icmpv4Repr::EchoRequest{
-                        ident: ident,
-                        seq_no: seq_no,
-                        data: &echo_payload
-                    };
+                let icmp_repr = Icmpv4Repr::EchoRequest {
+                    ident,
+                    seq_no,
+                    data: &echo_payload,
+                };
 
                 let icmp_payload = match socket.send(icmp_repr.buffer_len(), remote_addr) {
                     Ok(payload) => payload,
@@ -328,29 +310,26 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     
     // Computes ping min/avg/max
     let avg_ping = if received != 0 {
-        total_time as f64 / (received as f64)
+        total_time / received as u32
     } else {
-        0 as f64
+        Duration::ZERO
     };
      
     let min_ping = match times.iter().min() {
-            Some(min) => min,
-            None => &(0 as u64),
+        Some(min) => min,
+        None => &Duration::ZERO,
     };
 
     let max_ping = match times.iter().max() {
-            Some(max) => max,
-            None => &(0 as u64),
+        Some(max) => max,
+        None => &Duration::ZERO,
     };
         
-    
-    
-    
     println!("\n--- {} ping statistics ---", remote_addr);
     println!("{} packets transmitted, {} received, {:.0}% packet loss \nrtt min/avg/max = {}/{}/{}",
-            seq_no, received, 100.0 * (seq_no - (received)) as f64 / seq_no as f64, min_ping, avg_ping , max_ping);
-    if received == 0{         
-            println!("\nwarning: Ping/ICMP will not work in QEMU unless you specifically enable it. If you are able to ping  \nthe qemu gateway address 10.0.2.2 and not other addresses, your ICMP is most likely disabled");
+            seq_no, received, 100.0 * (seq_no - (received)) as f64 / seq_no as f64, min_ping.as_millis(), avg_ping.as_millis(), max_ping.as_millis());
+    if received == 0 {         
+        println!("\nwarning: Ping/ICMP will not work in QEMU unless you specifically enable it. If you are able to ping  \nthe qemu gateway address 10.0.2.2 and not other addresses, your ICMP is most likely disabled");
     }
 
 

@@ -16,7 +16,7 @@ use core::{
     mem::transmute,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use log::warn;
+use log::{info, warn};
 
 pub use core::time::Duration;
 
@@ -41,6 +41,7 @@ fn init_monotonic_timer() -> Result<(), ()> {
         // TODO: Check if TSC reliable?
         addr = if tsc::exists() {
             if tsc::calibrate().is_ok() {
+                info!("using tsc as monotonic time source");
                 tsc::now as usize
             } else {
                 warn!("tsc calibration failed");
@@ -55,6 +56,7 @@ fn init_monotonic_timer() -> Result<(), ()> {
     {
         if addr == 0 && hpet::exists() {
             addr = if hpet::init().is_ok() {
+                info!("using hpet as monotonic time source");
                 hpet::now as usize
             } else {
                 warn!("hpet initialisation failed");
@@ -66,6 +68,7 @@ fn init_monotonic_timer() -> Result<(), ()> {
     #[cfg(feature = "apic")]
     {
         if addr == 0 && apic::exists() {
+            info!("using apic as monotonic time source");
             addr = apic::now as usize;
         }
     }
@@ -73,6 +76,7 @@ fn init_monotonic_timer() -> Result<(), ()> {
     #[cfg(feature = "pit")]
     {
         if addr == 0 && pit::exists() {
+            info!("using pit as monotonic time source");
             addr = pit::now as usize;
         }
     }
@@ -92,6 +96,7 @@ fn init_realtime_timer() -> Result<(), ()> {
     #[cfg(feature = "rtc")]
     {
         if rtc::exists() {
+            info!("using rtc as realtime time source");
             addr = rtc::now as usize;
         }
     }

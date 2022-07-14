@@ -56,7 +56,6 @@ use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 use stack::Stack;
-use timer::Timer;
 
 
 
@@ -87,7 +86,7 @@ pub fn init(
     // now we initialize early driver stuff, like APIC/ACPI
     device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
 
-    time::init();
+    time::init().map_err(|_| "initialising timekeeping failed")?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {

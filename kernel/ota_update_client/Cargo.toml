@@ -50,5 +50,8 @@ version = "0.8"
 default-features = false 
 features = [ "alloc", "small_rng" ]
 
+[dependencies.time]
+path = "../time"
+
 [dependencies.smoltcp_helper]
 path = "../smoltcp_helper"

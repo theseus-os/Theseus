@@ -1,5 +1,4 @@
-use timer::{Timer, Duration};
-use tsc::TscTimer;
+use time::{Duration, Monotonic};
 use super::*;
 
 /// The cursor structure used in the terminal.
@@ -27,7 +26,7 @@ impl Cursor {
     /// Reset the state of the cursor as unseen
     pub fn reset(&mut self) {
         self.show = true;
-        self.time = TscTimer::value();
+        self.time = time::now::<Monotonic>();
     }
 
     /// Enable a cursor
@@ -44,9 +43,9 @@ impl Cursor {
     /// Let a cursor blink. It is invoked in a loop.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
-            // TODO: Use default timer supplied by system.
-            let time = TscTimer::value();
+            let time = time::now::<Monotonic>();
             if time - self.time >= self.period {
+                trace!("cursor blinked: {}", time.as_millis());
                 self.time = time;
                 self.show = !self.show;
                 return true;
@@ -108,7 +107,7 @@ impl Cursor {
                 (line * CHARACTER_HEIGHT) as isize,
             );
         let bounding_box = Rectangle {
-            top_left: top_left,
+            top_left,
             bottom_right: top_left + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
         };
 
@@ -141,7 +140,7 @@ impl Default for Cursor  {
         Cursor {
             enabled: true,
             period: DEFAULT_CURSOR_PERIOD,
-            time: TscTimer::value(),
+            time: time::now::<Monotonic>(),
             show: true,
             color: FONT_FOREGROUND_COLOR,
             offset_from_end: 0,

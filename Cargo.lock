@@ -2214,6 +2214,7 @@ dependencies = [
  "smoltcp_helper",
  "spawn",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -2347,6 +2348,7 @@ dependencies = [
  "smoltcp",
  "smoltcp_helper",
  "terminal_print",
+ "time",
  "upd",
 ]
 
