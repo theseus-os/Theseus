@@ -254,7 +254,7 @@ Number 4 above is similar to number 3, but is trigger by the hardware rather tha
 Thus, context switching (with preemption) allows for multiple untrusted and uncooperative tasks to transparently share the CPU, while maintaining the idealistic model that they each are the only task executing in the entire system and have exclusive access to the CPU.</p>
 <h3 id="implementing-context-switching"><a class="header" href="#implementing-context-switching">Implementing context switching</a></h3>
 <p>The implementation for context switching in Theseus is split across several crates, with each crate corresponding to a particular subset of SIMD instructions being enabled.
-The the top-level <a href="https://theseus-os.github.io/Theseus/doc/context_switch/index.html"><code>context_switch</code></a> crate automatically selects the correct version based on which subset of SIMD functionality is chosen by the target hardware platform's specification.
+The top-level <a href="https://theseus-os.github.io/Theseus/doc/context_switch/index.html"><code>context_switch</code></a> crate automatically selects the correct version based on which subset of SIMD functionality is chosen by the target hardware platform's specification.
 For example, if SSE2 was enabled, <code>#[cfg(target_feature = &quot;sse2&quot;)]</code> would be true and the <code>context_switch_sse2</code> crate would be used as the context switching implementation.
 Currently, one can select this target by using the <code>x86_64-theseus-sse</code> target while building Theseus:</p>
 <pre><code class="language-sh">make run TARGET=x86_64-theseus-sse

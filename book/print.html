@@ -1200,7 +1200,7 @@ Number 4 above is similar to number 3, but is trigger by the hardware rather tha
 Thus, context switching (with preemption) allows for multiple untrusted and uncooperative tasks to transparently share the CPU, while maintaining the idealistic model that they each are the only task executing in the entire system and have exclusive access to the CPU.</p>
 <h3 id="implementing-context-switching"><a class="header" href="#implementing-context-switching">Implementing context switching</a></h3>
 <p>The implementation for context switching in Theseus is split across several crates, with each crate corresponding to a particular subset of SIMD instructions being enabled.
-The the top-level <a href="https://theseus-os.github.io/Theseus/doc/context_switch/index.html"><code>context_switch</code></a> crate automatically selects the correct version based on which subset of SIMD functionality is chosen by the target hardware platform's specification.
+The top-level <a href="https://theseus-os.github.io/Theseus/doc/context_switch/index.html"><code>context_switch</code></a> crate automatically selects the correct version based on which subset of SIMD functionality is chosen by the target hardware platform's specification.
 For example, if SSE2 was enabled, <code>#[cfg(target_feature = &quot;sse2&quot;)]</code> would be true and the <code>context_switch_sse2</code> crate would be used as the context switching implementation.
 Currently, one can select this target by using the <code>x86_64-theseus-sse</code> target while building Theseus:</p>
 <pre><code class="language-sh">make run TARGET=x86_64-theseus-sse
@@ -1385,7 +1385,7 @@ For example, the <code>make run</code> target automatically runs Theseus in a QE
 <p>The top-level Makefile specifies the configuration parameters for Theseus in QEMU, such as system memory, attached storage devices, serial log output, and more. 
 All of these parameters start with <code>QEMU_</code> and can be overridden on the command line, or indirectly by setting environment variables such as <code>net</code> or <code>host</code>, or by editing the Makefile itself.</p>
 <h2 id="bochs"><a class="header" href="#bochs">Bochs</a></h2>
-<p>In older versions of Theseus, we used both both <a href="https://bochs.sourceforge.io/">Bochs</a> and QEMU for testing. Bochs is supported but its configuration may be out of date; the configuration is found in the <code>bochsrc.txt</code> (<a href="https://github.com/theseus-os/Theseus/blob/theseus_main/bochsrc.txt">direct link</a>) file in the root repository directory.</p>
+<p>In older versions of Theseus, we used both <a href="https://bochs.sourceforge.io/">Bochs</a> and QEMU for testing. Bochs is supported but its configuration may be out of date; the configuration is found in the <code>bochsrc.txt</code> (<a href="https://github.com/theseus-os/Theseus/blob/theseus_main/bochsrc.txt">direct link</a>) file in the root repository directory.</p>
 <p>Bochs runs quite slowly and supports virtualization of far fewer hardware devices than QEMU; thus, we do not recommend using it. However, you can try running Theseus in Bochs using the Makefile target for it:</p>
 <pre><code class="language-sh">make bochs
 </code></pre>
@@ -1481,7 +1481,7 @@ Below is sample output for a Mellanox ethernet card we'd like to access using PC
 <p>In the above example, this would look like:</p>
 <pre><code class="language-sh">echo 0000:59:00.0 &gt; /sys/bus/pci/drivers/mlx5_core/unbind
 </code></pre>
-<p>If you run <code>lspci -v</code> now, you'll see that a kernel driver is longer attached to this device.</p>
+<p>If you run <code>lspci -v</code> now, you'll see that a kernel driver is no longer attached to this device.</p>
 <h3 id="attach-device-to-vfio-driver"><a class="header" href="#attach-device-to-vfio-driver">Attach device to VFIO driver</a></h3>
 <p>First, load the VFIO driver by doing:</p>
 <pre><code class="language-sh">modprobe vfio-pci
@@ -1589,9 +1589,10 @@ OPTIONS=&quot;-l -s /var/lib/tftpboot&quot;
 <code>sudo nano /etc/inetd.conf</code>
 And adding:
 <code>tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot</code></p>
-<p>Restart the TFTP server and check to see if it's running:
-<code>sudo systemctl restart tftpd-hpa</code>
-<code>sudo systemctl status tftpd-hpa</code></p>
+<p>Restart the TFTP server and check to see if it's running:</p>
+<pre><code class="language-sh">sudo systemctl restart tftpd-hpa
+sudo systemctl status tftpd-hpa
+</code></pre>
 <p>If the TFTP server is unable to start and mentions an in-use socket, reopen the tftp-hpa configuration file,set the line that has <code>TFTP_ADDRESS=&quot;:69&quot;</code> to be equal to <code>6969</code> instead and restart the TFTP server.</p>
 <h2 id="setting-up-the-dhcp-server"><a class="header" href="#setting-up-the-dhcp-server">Setting up the DHCP Server</a></h2>
 <p>First, install package for DHCP server:
@@ -1617,20 +1618,24 @@ option option-129 code 129 = text;
 next-server 192.168.1.105;
 filename &quot;pxelinux.0&quot;;
 </code></pre>
-<p>Restart the DHCP server and check to see if it's running:
-<code>sudo systemctl restart isc-dhcp-server</code>
-<code>sudo systemctl status isc-dhcp-server</code></p>
+<p>Restart the DHCP server and check to see if it's running:</p>
+<pre><code class="language-sh">sudo systemctl restart isc-dhcp-server
+sudo systemctl status isc-dhcp-server
+</code></pre>
 <h2 id="loading-the-theseus-iso-into-the-tftp-server"><a class="header" href="#loading-the-theseus-iso-into-the-tftp-server">Loading the Theseus ISO Into the TFTP Server</a></h2>
-<p>In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.
-<code>wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz</code>
-<code>tar -xzvf syslinux-*.tar.gz</code></p>
-<p>Then navigate to the memdisk folder and compile.
-<code>cd syslinux-*/memdisk</code>
-<code>make memdisk</code></p>
-<p>Next, make a TFTP boot folder for Theseus and copy the memdisk binary into it along with the Theseus ISO:
-<code>sudo mkdir /var/lib/tftpboot/theseus</code>
-<code>sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/</code>
-<code>sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/</code></p>
+<p>In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.</p>
+<pre><code class="language-sh">wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz
+tar -xzvf syslinux-*.tar.gz
+</code></pre>
+<p>Then navigate to the memdisk folder and compile.</p>
+<pre><code class="language-sh">cd syslinux-*/memdisk
+make memdisk
+</code></pre>
+<p>Next, make a TFTP boot folder for Theseus and copy the memdisk binary into it along with the Theseus ISO:</p>
+<pre><code class="language-sh">sudo mkdir /var/lib/tftpboot/theseus
+sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/
+sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
+</code></pre>
 <p>Navigate to the PXE configuration file:
 <code>sudo nano /var/lib/tftpboot/pxelinux.cfg/default</code>
 And add Theseus as a menu option by adding the following:</p>
@@ -1640,9 +1645,10 @@ And add Theseus as a menu option by adding the following:</p>
     kernel theseus/memdisk
     append iso initrd=theseus/theseus-x86_64.iso raw
 </code></pre>
-<p>Finally, restart the DHCP server one more time and make sure it's running:
-<code>sudo systemctl restart isc-dhcp-server</code>
-<code>sudo systemctl status isc-dhcp-server</code></p>
+<p>Finally, restart the DHCP server one more time and make sure it's running:</p>
+<pre><code class="language-sh">sudo systemctl restart isc-dhcp-server
+sudo systemctl status isc-dhcp-server
+</code></pre>
 <p>On the target computer, boot into the BIOS, turn on Legacy boot mode, and select network booting as the top boot option. Once the target computer is restarted, it should boot into a menu which displays booting into Theseus as an option.</p>
 <h2 id="subsequent-pxe-uses"><a class="header" href="#subsequent-pxe-uses">Subsequent PXE Uses</a></h2>
 <p>After setting up PXE the first time, you can run <code>make pxe</code> to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier:

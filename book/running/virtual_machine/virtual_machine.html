@@ -151,7 +151,7 @@ For example, the <code>make run</code> target automatically runs Theseus in a QE
 <p>The top-level Makefile specifies the configuration parameters for Theseus in QEMU, such as system memory, attached storage devices, serial log output, and more. 
 All of these parameters start with <code>QEMU_</code> and can be overridden on the command line, or indirectly by setting environment variables such as <code>net</code> or <code>host</code>, or by editing the Makefile itself.</p>
 <h2 id="bochs"><a class="header" href="#bochs">Bochs</a></h2>
-<p>In older versions of Theseus, we used both both <a href="https://bochs.sourceforge.io/">Bochs</a> and QEMU for testing. Bochs is supported but its configuration may be out of date; the configuration is found in the <code>bochsrc.txt</code> (<a href="https://github.com/theseus-os/Theseus/blob/theseus_main/bochsrc.txt">direct link</a>) file in the root repository directory.</p>
+<p>In older versions of Theseus, we used both <a href="https://bochs.sourceforge.io/">Bochs</a> and QEMU for testing. Bochs is supported but its configuration may be out of date; the configuration is found in the <code>bochsrc.txt</code> (<a href="https://github.com/theseus-os/Theseus/blob/theseus_main/bochsrc.txt">direct link</a>) file in the root repository directory.</p>
 <p>Bochs runs quite slowly and supports virtualization of far fewer hardware devices than QEMU; thus, we do not recommend using it. However, you can try running Theseus in Bochs using the Makefile target for it:</p>
 <pre><code class="language-sh">make bochs
 </code></pre>

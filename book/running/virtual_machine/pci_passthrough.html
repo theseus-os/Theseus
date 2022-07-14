@@ -174,7 +174,7 @@ Below is sample output for a Mellanox ethernet card we'd like to access using PC
 <p>In the above example, this would look like:</p>
 <pre><code class="language-sh">echo 0000:59:00.0 &gt; /sys/bus/pci/drivers/mlx5_core/unbind
 </code></pre>
-<p>If you run <code>lspci -v</code> now, you'll see that a kernel driver is longer attached to this device.</p>
+<p>If you run <code>lspci -v</code> now, you'll see that a kernel driver is no longer attached to this device.</p>
 <h3 id="attach-device-to-vfio-driver"><a class="header" href="#attach-device-to-vfio-driver">Attach device to VFIO driver</a></h3>
 <p>First, load the VFIO driver by doing:</p>
 <pre><code class="language-sh">modprobe vfio-pci
