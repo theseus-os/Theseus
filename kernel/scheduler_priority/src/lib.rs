@@ -46,7 +46,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef>  {
         // A task has been selected
         Some(task) => {
             // If the selected task is idle task we begin a new scheduling epoch
-            if task.idle_task == true {
+            if task.idle_task {
                 assign_tokens(apic_id);
                 select_next_task_priority(apic_id).and_then(|m| m.taskref)
             }

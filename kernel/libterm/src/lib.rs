@@ -286,8 +286,9 @@ impl Terminal {
         let buffer_width = self.get_text_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
-        if self.is_scroll_end == true {
-            return;} 
+        if self.is_scroll_end {
+            return;
+        } 
         prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {

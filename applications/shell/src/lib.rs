@@ -545,7 +545,7 @@ impl Shell {
                 return Ok(());
             } else { // start a new job
                 self.terminal.lock().print_to_terminal("\n".to_string());
-                self.command_history.push(cmdline.clone());
+                self.command_history.push(cmdline);
                 self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
 
@@ -561,7 +561,6 @@ impl Shell {
                         if last == "&" {
                             self.terminal.lock().print_to_terminal(
                                 format!("[{}] [running] {}\n", new_job_num, self.cmdline)
-                                .to_string()
                             );
                             self.fg_job_num = None;
                             self.clear_cmdline(false)?;
@@ -694,7 +693,7 @@ impl Shell {
         let cmdline = self.cmdline.clone();
         let mut task_refs = Vec::new();
 
-        for single_task_cmd in cmdline.split("|") {
+        for single_task_cmd in cmdline.split('|') {
             let mut args: Vec<String> = single_task_cmd.split_whitespace().map(|s| s.to_string()).collect();
             let command = args.remove(0);
 
@@ -758,7 +757,7 @@ impl Shell {
 
                     // Insert print event producer to `terminal_print` to support legacy output.
                     if let Err(msg) = terminal_print::add_child(*task_id, self.print_producer.obtain_producer()) {
-                        self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
+                        self.terminal.lock().print_to_terminal(format!("{}\n", msg));
                         return Err(msg);
                     }
                 }
@@ -807,7 +806,7 @@ impl Shell {
                 };
                 self.terminal.lock().print_to_terminal(err_msg);
                 if let Err(msg) = self.clear_cmdline(false) {
-                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
+                    self.terminal.lock().print_to_terminal(format!("{}\n", msg));
                 }
                 self.redisplay_prompt();
                 Err("Failed to evaluate command line.")
@@ -844,7 +843,7 @@ impl Shell {
         // Drop the extension name and hash value.
         let mut clean_name = String::new();
         for name in names.iter_mut() {
-            if let Some(prefix) = name.split("-").next() {
+            if let Some(prefix) = name.split('-').next() {
                 clean_name = prefix.to_string();
             }
             if !clean_name.is_empty() {
@@ -880,7 +879,7 @@ impl Shell {
         };
 
         // Split the path by slash and filter out consecutive slashes.
-        let mut nodes: Vec<_> = incomplete_cmd.split("/").filter(|node| { node.len() > 0 }).collect();
+        let mut nodes: Vec<_> = incomplete_cmd.split('/').filter(|node| { node.len() > 0 }).collect();
 
         // Get the last node in the path, which is to be completed.
         let incomplete_node = {
@@ -889,10 +888,7 @@ impl Shell {
             if slash_ending {
                 ""
             } else {
-                match nodes.pop() {
-                    Some(node) => node,
-                    None => ""
-                }
+                nodes.pop().unwrap_or("")
             }
         };
 
@@ -1005,13 +1001,13 @@ impl Shell {
 
         // Get the last string slice in the pipe chain.
         let cmdline = self.cmdline[0..self.cmdline.len()-self.terminal.lock().get_cursor_offset_from_end()].to_string();
-        let last_cmd_in_pipe = match cmdline.split("|").last() {
+        let last_cmd_in_pipe = match cmdline.split('|').last() {
             Some(cmd) => cmd,
             None => return Ok(())
         };
 
         // Get the last word in the args (or maybe the command name itself).
-        let last_word_in_cmd = match last_cmd_in_pipe.split(" ").last() {
+        let last_word_in_cmd = match last_cmd_in_pipe.split(' ').last() {
             Some(word) => word.to_string(),
             None => return Ok(())
         };
@@ -1378,7 +1374,7 @@ impl Shell {
     fn is_internal_command(&self) -> bool {
         let mut iter = self.cmdline.split_whitespace();
         if let Some(cmd) = iter.next() {
-            match cmd.as_ref() {
+            match cmd {
                 "jobs" => return true,
                 "fg" => return true,
                 "bg" => return true,
@@ -1395,7 +1391,7 @@ impl Shell {
         let cmdline_copy = self.cmdline.clone();
         let mut iter = cmdline_copy.split_whitespace();
         if let Some(cmd) = iter.next() {
-            match cmd.as_ref() {
+            match cmd {
                 "jobs" => self.execute_internal_jobs(),
                 "fg" => self.execute_internal_fg(),
                 "bg" => self.execute_internal_bg(),
@@ -1438,7 +1434,7 @@ impl Shell {
                     self.redisplay_prompt();
                     return Ok(());
                 }
-                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num));
                 return Ok(());
             }
         }
@@ -1469,7 +1465,7 @@ impl Shell {
                     }
                     return Ok(());
                 }
-                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num));
                 return Ok(());
             }
         }

@@ -128,11 +128,11 @@ static RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU
 
 lazy_static!{
     /// PMU version supported by the current hardware. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref PMU_VERSION: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.version_id())).unwrap_or(0);
+    static ref PMU_VERSION: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.version_id()).unwrap_or(0);
     /// The number of general purpose PMCs that can be used. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_PMC: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.number_of_counters())).unwrap_or(0);
+    static ref NUM_PMC: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.number_of_counters()).unwrap_or(0);
     /// The number of fixed function counters. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_FIXED_FUNC_COUNTERS: u8 = CpuId::new().get_performance_monitoring_info().and_then(|pmi| Some(pmi.fixed_function_counters())).unwrap_or(0);
+    static ref NUM_FIXED_FUNC_COUNTERS: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.fixed_function_counters()).unwrap_or(0);
     /// Set to store the cores that the PMU has already been initialized on
     static ref CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
     /// The sampling information for each core

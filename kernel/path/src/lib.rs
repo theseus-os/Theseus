@@ -95,8 +95,7 @@ impl Path {
     pub fn file_stem<'a>(&'a self) -> &'a str {
         self.basename()
             .split(EXTENSION_DELIMITER)
-            .filter(|&x| x != "")
-            .next()
+            .find(|&x| x != "")
             .unwrap_or_else(|| &self.path)
     }
 
@@ -106,8 +105,7 @@ impl Path {
     pub fn extension<'a>(&'a self) -> Option<&'a str> {
         self.basename()
             .rsplit(EXTENSION_DELIMITER)
-            .filter(|&x| x != "")
-            .next()
+            .find(|&x| x != "")
     }
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
@@ -119,9 +117,9 @@ impl Path {
         new_components.extend(current_path.components());
         // Push components of the path to the components of the new path
         for component in self.components() {
-            if component == String::from(".") {
+            if component == "." {
                 continue;
-            } else if component == String::from("..") {
+            } else if component == ".." {
                 new_components.pop();
             } else {
                 new_components.push(component);

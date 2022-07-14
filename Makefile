@@ -73,10 +73,11 @@ iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
-DEPS_DIR := $(BUILD_DIR)/deps
-HOST_DEPS_DIR := $(DEPS_DIR)/host_deps
-DEPS_SYSROOT_DIR := $(DEPS_DIR)/sysroot
-THESEUS_BUILD_TOML := $(DEPS_DIR)/TheseusBuild.toml
+TARGET_DEPS_DIR := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps
+DEPS_BUILD_DIR := $(BUILD_DIR)/deps
+HOST_DEPS_DIR := $(DEPS_BUILD_DIR)/host_deps
+DEPS_SYSROOT_DIR := $(DEPS_BUILD_DIR)/sysroot
+THESEUS_BUILD_TOML := $(DEPS_BUILD_DIR)/TheseusBuild.toml
 THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES := $(ROOT_DIR)/extra_files
@@ -168,23 +169,23 @@ build: $(nano_core_binary)
 ## First, if an .rlib archive contains multiple object files, we need to extract them all out of the archive
 ## and combine them into one object file using partial linking (`ld -r ...`), overwriting the rustc-emitted .o file.
 ## Note: we skip "normal" .rlib archives that have 2 members: a single .o object file and a single .rmeta file.
-## Note: the below line with the `cut` invocations simply removes the `lib` prefix and the `.rlib` suffix from the file name.
-	@for f in $(shell find ./target/$(TARGET)/$(BUILD_MODE)/deps/ -name "*.rlib"); do \
-		if [ "`$(CROSS)ar -t $${f} | wc -l`" != "2" ]; then \
-			echo -e "\033[1;34mUnarchiving multi-file rlib: \033[0m $${f}"   ; \
-			mkdir -p "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" ; \
-			$(CROSS)ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}   ; \
-			$(CROSS)ld -r  \
-				--output "./target/$(TARGET)/$(BUILD_MODE)/deps/`basename $${f} | cut -c 4- | rev | cut -c 6- | rev`.o"  \
-				$$(find $(BUILD_DIR)/extracted_rlibs/$$(basename $${f})-unpacked/ -name "*.o")  ; \
-		fi ; \
-	done
+## Note: the below line with `cut` simply removes the `lib` prefix and the `.rlib` suffix from the file name.
+	@for f in $(shell find $(TARGET_DEPS_DIR)/ -name "*.rlib"); do                                          \
+		if [ "`$(CROSS)ar -t $${f} | wc -l`" != "2" ]; then                                                 \
+			echo -e "\033[1;34mUnarchiving multi-file rlib: \033[0m $${f}"                                  \
+				&& mkdir -p "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/"                       \
+				&& $(CROSS)ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}  \
+				&& $(CROSS)ld -r                                                                            \
+					--output "$(TARGET_DEPS_DIR)/`basename $${f} | cut -c 4- | rev | cut -c 6- | rev`.o"    \
+					$$(find $(BUILD_DIR)/extracted_rlibs/$$(basename $${f})-unpacked/ -name "*.o")        ; \
+		fi  &                                                                                               \
+	done; wait
 
 ## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
-		-i ./target/$(TARGET)/$(BUILD_MODE)/deps \
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+		-i "$(TARGET_DEPS_DIR)" \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
-		--output-deps $(DEPS_DIR) \
+		--output-deps $(DEPS_BUILD_DIR) \
 		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
 		-k ./kernel \
 		-a ./applications \
@@ -205,7 +206,7 @@ build: $(nano_core_binary)
 ## This includes the target file, host OS dependencies (proc macros, etc)., 
 ## and most importantly, a TOML file to describe these and other config variables.
 	@rm -rf $(THESEUS_BUILD_TOML)
-	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_DIR)/
+	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
 	@mkdir -p $(HOST_DEPS_DIR)
 	@cp -f ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
@@ -287,7 +288,7 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@mkdir -p $(DEPS_DIR)
+	@mkdir -p $(DEPS_BUILD_DIR)
 
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
@@ -389,7 +390,7 @@ c_test:
 libtheseus: theseus_cargo $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
 	@( \
 		cd $(ROOT_DIR)/libtheseus && \
-		$(THESEUS_CARGO_BIN) --input $(DEPS_DIR) build; \
+		$(THESEUS_CARGO_BIN) --input $(DEPS_BUILD_DIR) build; \
 	)
 
 
@@ -412,7 +413,7 @@ clean:
 ### All other build files are left intact.
 clean-old-build:
 	@rm -rf $(OBJECT_FILES_BUILD_DIR)
-	@rm -rf $(DEPS_DIR)
+	@rm -rf $(DEPS_BUILD_DIR)
 	@rm -rf $(DEBUG_SYMBOLS_DIR)
 
 

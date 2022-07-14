@@ -473,7 +473,7 @@ fn parse_nano_core_binary(
 
     // For us to properly load the ELF file, it must NOT have been stripped,
     // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
-    let sssec = elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::SymTab)).next();
+    let sssec = elf_file.section_iter().find(|sec| sec.get_type() == Ok(ShType::SymTab));
     let symtab = match sssec.ok_or("no symtab section").and_then(|s| s.get_data(&elf_file)) {
         Ok(SectionData::SymbolTable64(symtab)) => symtab,
         _ => {
@@ -504,31 +504,31 @@ fn parse_nano_core_binary(
                
         match sec.get_name(&elf_file) {
             Ok(".text") => {
-                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_EXECINSTR)) {
+                if sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_EXECINSTR) {
                     return Err(".text section had wrong flags!");
                 }
                 text_shndx = Some(shndx);
             }
             Ok(".rodata") => {
-                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC)) {
+                if sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC) {
                     return Err(".rodata section had wrong flags!");
                 }
                 rodata_shndx = Some(shndx);
             }
             Ok(".data") => {
-                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE)) {
+                if sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                     return Err(".data section had wrong flags!");
                 }
                 data_shndx = Some(shndx);
             }
             Ok(".bss") => {
-                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) == (SHF_ALLOC | SHF_WRITE)) {
+                if sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
                     return Err(".bss section had wrong flags!");
                 }
                 bss_shndx = Some(shndx);
             }
             Ok(".tdata") => {
-                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | SHF_TLS) == (SHF_ALLOC | SHF_WRITE | SHF_TLS)) {
+                if sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | SHF_TLS) != (SHF_ALLOC | SHF_WRITE | SHF_TLS) {
                     return Err(".tdata section had wrong flags!");
                 }
                 let sec_vaddr = VirtualAddress::new(sec.address() as usize)
@@ -536,7 +536,7 @@ fn parse_nano_core_binary(
                 tls_data_shndx = Some((shndx, sec_vaddr));
             }
             Ok(".tbss") => {
-                if !(sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | SHF_TLS) == (SHF_ALLOC | SHF_WRITE | SHF_TLS)) {
+                if sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | SHF_TLS) != (SHF_ALLOC | SHF_WRITE | SHF_TLS) {
                     return Err(".tbss section had wrong flags!");
                 }
                 let sec_vaddr = VirtualAddress::new(sec.address() as usize)

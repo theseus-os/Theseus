@@ -263,9 +263,9 @@ impl WindowManager {
                 src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
-        }).collect::<Vec<_>>();
+        });
         
-        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist.into_iter());
+        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist);
         FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, bounding_box)?;
         
         Ok(())
@@ -314,9 +314,9 @@ impl WindowManager {
                 src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
-        }).collect::<Vec<_>>();
+        });
 
-        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box)
+        FRAME_COMPOSITOR.lock().composite(bufferlist, &mut self.final_fb, bounding_box)
     }
 
 
@@ -689,13 +689,8 @@ fn window_manager_loop(
                     let mut x = (mouse_displacement.x as i8) as isize;
                     let mut y = (mouse_displacement.y as i8) as isize;
                     // need to combine mouse events if there pending a lot
-                    loop {
-                        let next_event = match mouse_consumer.pop() {
-                            Some(ev) => ev,
-                            _ => {
-                                break;
-                            }
-                        };
+
+                    while let Some(next_event) = mouse_consumer.pop() {
                         match next_event {
                             Event::MouseMovementEvent(ref next_mouse_event) => {
                                 if next_mouse_event.mousemove.scrolling_up

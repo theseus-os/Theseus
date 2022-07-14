@@ -11,7 +11,7 @@ All of these parameters start with `QEMU_` and can be overridden on the command 
 
 
 ## Bochs
-In older versions of Theseus, we used both both [Bochs](https://bochs.sourceforge.io/) and QEMU for testing. Bochs is supported but its configuration may be out of date; the configuration is found in the `bochsrc.txt` ([direct link](https://github.com/theseus-os/Theseus/blob/theseus_main/bochsrc.txt)) file in the root repository directory.
+In older versions of Theseus, we used both [Bochs](https://bochs.sourceforge.io/) and QEMU for testing. Bochs is supported but its configuration may be out of date; the configuration is found in the `bochsrc.txt` ([direct link](https://github.com/theseus-os/Theseus/blob/theseus_main/bochsrc.txt)) file in the root repository directory.
 
 Bochs runs quite slowly and supports virtualization of far fewer hardware devices than QEMU; thus, we do not recommend using it. However, you can try running Theseus in Bochs using the Makefile target for it:
 ```sh

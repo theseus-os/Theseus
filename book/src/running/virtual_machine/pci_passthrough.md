@@ -36,7 +36,7 @@ In the above example, this would look like:
 echo 0000:59:00.0 > /sys/bus/pci/drivers/mlx5_core/unbind
 ```
 
-If you run `lspci -v` now, you'll see that a kernel driver is longer attached to this device.
+If you run `lspci -v` now, you'll see that a kernel driver is no longer attached to this device.
 
 ### Attach device to VFIO driver
 First, load the VFIO driver by doing:

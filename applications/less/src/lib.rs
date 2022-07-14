@@ -68,14 +68,14 @@ fn get_content_string(file_path: String) -> Result<String, String> {
                         Ok(num) => num,
                         Err(e) => {
                             return Err(format!("Failed to read {:?}, error {:?}",
-                                               file_locked.get_name(), e).to_string())
+                                               file_locked.get_name(), e))
                         }
                     };
                     let read_string = match str::from_utf8(&string_slice_as_bytes) {
                         Ok(string_slice) => string_slice,
                         Err(utf8_err) => {
                             return Err(format!("File {:?} was not a printable UTF-8 text file: {}",
-                                               file_locked.get_name(), utf8_err).to_string())
+                                               file_locked.get_name(), utf8_err))
                         }
                     };
                     Ok(read_string.to_string())
@@ -83,7 +83,7 @@ fn get_content_string(file_path: String) -> Result<String, String> {
             }
         },
         _ => {
-            Err(format!("Couldn't find file at path {}", path).to_string())
+            Err(format!("Couldn't find file at path {}", path))
         }
     }
 }

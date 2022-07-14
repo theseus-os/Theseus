@@ -730,7 +730,7 @@ impl CommandQueue {
 
     /// Find an command queue entry that is not in use
     fn find_free_command_entry(&self) -> Option<usize> {
-        self.available_entries.iter().position(|&x| x == true)
+        self.available_entries.iter().position(|&x| x)
     }
 
     /// Find an command queue entry that is not in use
@@ -746,7 +746,7 @@ impl CommandQueue {
     fn create_command(&mut self, parameters: CommandBuilder) -> Result<Command<{CmdState::Initialized}>, CommandQueueError> 
     {
         let entry_num = self.find_free_command_entry().ok_or(CommandQueueError::NoCommandEntryAvailable)?; 
-        let num_pages = parameters.allocated_pages.as_ref().and_then(|pages| Some(pages.len())); 
+        let num_pages = parameters.allocated_pages.as_ref().map(|pages| pages.len()); 
 
         #[cfg(mlx_verbose_log)]
         {
