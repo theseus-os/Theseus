@@ -22,8 +22,10 @@ And adding:
 `tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot`
 
 Restart the TFTP server and check to see if it's running:
-`sudo systemctl restart tftpd-hpa`
-`sudo systemctl status tftpd-hpa`
+```sh
+sudo systemctl restart tftpd-hpa
+sudo systemctl status tftpd-hpa
+```
 
 If the TFTP server is unable to start and mentions an in-use socket, reopen the tftp-hpa configuration file,set the line that has `TFTP_ADDRESS=":69"` to be equal to `6969` instead and restart the TFTP server.
 
@@ -58,26 +60,26 @@ filename "pxelinux.0";
 ```
 
 Restart the DHCP server and check to see if it's running:
-```
+```sh
 sudo systemctl restart isc-dhcp-server
 sudo systemctl status isc-dhcp-server
 ```
 
 ## Loading the Theseus ISO Into the TFTP Server
 In order for the TFTP server to load Theseus, we need the Theseus ISO and a memdisk file in the boot folder. To get the memdisk file first download syslinux which contains it.
-```
+```sh
 wget https://www.kernel.org/pub/linux/utils/boot/syslinux/syslinux-5.10.tar.gz
 tar -xzvf syslinux-*.tar.gz
 ```
 
 Then navigate to the memdisk folder and compile.
-```
+```sh
 cd syslinux-*/memdisk
 make memdisk
 ```
 
 Next, make a TFTP boot folder for Theseus and copy the memdisk binary into it along with the Theseus ISO:
-```
+```sh
 sudo mkdir /var/lib/tftpboot/theseus
 sudo cp /root/syslinux-*/memdisk/memdisk /var/lib/tftpboot/theseus/
 sudo cp /Theseus/build/theseus-x86_64.iso /var/lib/tftpboot/theseus/
@@ -94,7 +96,7 @@ label theseus
     append iso initrd=theseus/theseus-x86_64.iso raw
 ```
 Finally, restart the DHCP server one more time and make sure it's running:
-```
+```sh
 sudo systemctl restart isc-dhcp-server
 sudo systemctl status isc-dhcp-server
 ```
