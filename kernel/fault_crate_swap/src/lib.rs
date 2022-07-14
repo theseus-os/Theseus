@@ -318,9 +318,7 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
     let verbose = false;
     let state_transfer_functions: Vec<String> = Vec::new();
 
-    let mut tuples: Vec<(&str, &str, bool)> = Vec::new();
-
-    tuples.push((crate_name, crate_name , false));
+    let tuples: Vec<(&str, &str, bool)> = vec![(crate_name, crate_name , false)];
 
     #[cfg(not(downtime_eval))]
     debug!("tuples: {:?}", tuples);
@@ -344,7 +342,7 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
         }
         Err(e) => {
             debug!("SWAP FAILED at do_self_swap");
-            return Err(e.to_string())
+            return Err(e)
         }
     };
 

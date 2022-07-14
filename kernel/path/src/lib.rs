@@ -119,9 +119,9 @@ impl Path {
         new_components.extend(current_path.components());
         // Push components of the path to the components of the new path
         for component in self.components() {
-            if component == String::from(".") {
+            if component == "." {
                 continue;
-            } else if component == String::from("..") {
+            } else if component == ".." {
                 new_components.pop();
             } else {
                 new_components.push(component);

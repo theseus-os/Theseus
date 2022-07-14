@@ -73,7 +73,7 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
     // The RSDT/XSDT tells us where all of the rest of the ACPI tables exist.
     {
         let mut acpi_tables = ACPI_TABLES.lock();
-        for sdt_paddr in sdt_addresses.clone() {
+        for sdt_paddr in sdt_addresses {
             // debug!("RXSDT entry: {:#X}", sdt_paddr);
             let (sdt_signature, sdt_total_length) = acpi_tables.map_new_table(sdt_paddr, page_table)?;
             acpi_table_handler(&mut acpi_tables, sdt_signature, sdt_total_length, sdt_paddr)?;

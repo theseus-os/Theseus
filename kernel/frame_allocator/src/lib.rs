@@ -108,7 +108,7 @@ pub fn init<F, R, P>(
 
     // Insert all of the reserved memory areas into the list of free reserved regions,
     // while de-duplicating overlapping areas by merging them.
-    for reserved in reserved_physical_memory_areas.clone().into_iter() {
+    for reserved in reserved_physical_memory_areas.into_iter() {
         let reserved = reserved.borrow();
         let mut reserved_was_merged = false;
         for existing in reserved_list[..reserved_list_idx].iter_mut().flatten() {
@@ -489,8 +489,8 @@ impl<'list> DeferredAllocAction<'list> {
         where F1: Into<Option<Chunk>>,
               F2: Into<Option<Chunk>>,
     {
-        let free1 = free1.into().unwrap_or(Chunk::empty());
-        let free2 = free2.into().unwrap_or(Chunk::empty());
+        let free1 = free1.into().unwrap_or_else(Chunk::empty);
+        let free2 = free2.into().unwrap_or_else(Chunk::empty);
         DeferredAllocAction {
             free_list: &FREE_GENERAL_FRAMES_LIST,
             reserved_list: &FREE_RESERVED_FRAMES_LIST,
@@ -566,7 +566,7 @@ fn find_specific_chunk(
             if let Some(chunk) = cursor_mut.get().map(|w| w.deref().clone()) {
                 if chunk.contains(&requested_frame) {
                     if requested_end_frame <= *chunk.end() {
-                        return allocate_from_chosen_chunk(requested_frame, num_frames, &chunk.clone(), ValueRefMut::RBTree(cursor_mut));
+                        return allocate_from_chosen_chunk(requested_frame, num_frames, &chunk, ValueRefMut::RBTree(cursor_mut));
                     } else {
                         // We found the chunk containing the requested address, but it was too small to cover all of the requested frames.
                         // Let's try to merge the next-highest contiguous chunk to see if those two chunks together 
@@ -884,7 +884,7 @@ pub fn allocate_frames_deferred(
                 !frame_is_in_list(&g, &start_frame) && !frame_is_in_list(&g, &end_frame)
             } {
                 let frames = FrameRange::new(start_frame, end_frame);
-                let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames.clone())?;
+                let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames)?;
                 // If we successfully added a new reserved region,
                 // then add those frames to the actual list of *available* reserved regions.
                 let _new_free_reserved_frames = add_reserved_region(&mut free_reserved_frames_list, new_reserved_frames.clone())?;

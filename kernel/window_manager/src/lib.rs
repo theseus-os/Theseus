@@ -263,9 +263,9 @@ impl WindowManager {
                 src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
-        }).collect::<Vec<_>>();
+        });
         
-        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist.into_iter());
+        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist);
         FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, bounding_box)?;
         
         Ok(())
@@ -314,9 +314,9 @@ impl WindowManager {
                 src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
-        }).collect::<Vec<_>>();
+        });
 
-        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box)
+        FRAME_COMPOSITOR.lock().composite(bufferlist, &mut self.final_fb, bounding_box)
     }
 
 

@@ -104,7 +104,7 @@ impl SerializedCrate {
         namespace
             .crate_tree
             .lock()
-            .insert(crate_name.clone(), loaded_crate.clone_shallow());
+            .insert(crate_name, loaded_crate.clone_shallow());
         info!(
             "Finished parsing nano_core crate, {} new symbols.",
             num_new_syms
