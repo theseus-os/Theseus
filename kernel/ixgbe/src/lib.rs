@@ -251,7 +251,7 @@ impl IxgbeNic {
         num_tx_descriptors: u16
     ) -> Result<MutexIrqSafe<IxgbeNic>, &'static str> {
         // Series of checks to determine if starting parameters are acceptable
-        if (enable_virtualization && interrupts.is_some()) || (enable_virtualization && enable_rss) {
+        if enable_virtualization && (interrupts.is_some() || enable_rss) {
             return Err("Cannot enable virtualization when interrupts or RSS are enabled");
         }
 
@@ -1040,7 +1040,7 @@ impl IxgbeNic {
         let enabled_filters = &mut self.l34_5_tuple_filters;
 
         // find a free filter
-        let filter_num = enabled_filters.iter().position(|&r| r == false).ok_or("Ixgbe: No filter available")?;
+        let filter_num = enabled_filters.iter().position(|&r| !r).ok_or("Ixgbe: No filter available")?;
 
         // start off with the filter mask set for all the filters, and clear bits for filters that are enabled
         // bits 29:25 are set to 1.
@@ -1304,7 +1304,7 @@ fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
         Ok(ref ixgbe_nic_ref) => {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
-            ixgbe_nic.interrupt_num.get(&qid).and_then(|int| Some(*int))
+            ixgbe_nic.interrupt_num.get(&qid).map(|int| *int)
         }
         Err(e) => {
             error!("BUG: ixgbe_handler_{}(): {}", qid, e);

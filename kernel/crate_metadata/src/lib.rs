@@ -305,8 +305,7 @@ impl LoadedCrate {
         where F: Fn(&LoadedSection) -> bool
     {
         self.sections.values()
-            .filter(|&sec| predicate(sec))
-            .next()
+            .find(|&sec| predicate(sec))
     }
 
     /// Returns the substring of this crate's name that excludes the trailing hash. 

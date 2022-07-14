@@ -889,10 +889,7 @@ impl Shell {
             if slash_ending {
                 ""
             } else {
-                match nodes.pop() {
-                    Some(node) => node,
-                    None => ""
-                }
+                nodes.pop().unwrap_or("")
             }
         };
 
@@ -1378,7 +1375,7 @@ impl Shell {
     fn is_internal_command(&self) -> bool {
         let mut iter = self.cmdline.split_whitespace();
         if let Some(cmd) = iter.next() {
-            match cmd.as_ref() {
+            match cmd {
                 "jobs" => return true,
                 "fg" => return true,
                 "bg" => return true,
@@ -1395,7 +1392,7 @@ impl Shell {
         let cmdline_copy = self.cmdline.clone();
         let mut iter = cmdline_copy.split_whitespace();
         if let Some(cmd) = iter.next() {
-            match cmd.as_ref() {
+            match cmd {
                 "jobs" => self.execute_internal_jobs(),
                 "fg" => self.execute_internal_fg(),
                 "bg" => self.execute_internal_bg(),

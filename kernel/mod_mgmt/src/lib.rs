@@ -2461,8 +2461,7 @@ pub fn find_symbol_table<'e>(elf_file: &'e ElfFile)
     {
     use xmas_elf::sections::SectionData::SymbolTable64;
     let symtab_data = elf_file.section_iter()
-        .filter(|sec| sec.get_type() == Ok(ShType::SymTab))
-        .next()
+        .find(|sec| sec.get_type() == Ok(ShType::SymTab))
         .ok_or("no symtab section")
         .and_then(|s| s.get_data(&elf_file));
 
