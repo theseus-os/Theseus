@@ -3921,7 +3921,7 @@
         }
 
         <span class="kw">let</span> <span class="ident">new_crate</span> <span class="op">=</span> <span class="ident">CowArc::new</span>(<span class="ident">LoadedCrate</span> {
-            <span class="ident">crate_name</span>:              <span class="ident">crate_name</span>.<span class="ident">clone</span>(),
+            <span class="ident">crate_name</span>:              <span class="ident">crate_name</span>,
             <span class="ident">debug_symbols_file</span>:      <span class="ident">Arc::downgrade</span>(<span class="kw-2">&amp;</span><span class="ident">crate_object_file</span>),
             <span class="ident">object_file</span>:             <span class="ident">crate_object_file</span>, 
             <span class="ident">sections</span>:                <span class="ident">HashMap::new</span>(),

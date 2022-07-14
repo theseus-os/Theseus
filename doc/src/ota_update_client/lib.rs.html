@@ -663,14 +663,14 @@
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">state_transfer_functions</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
     <span class="kw">for</span> <span class="ident">diff</span> <span class="kw">in</span> <span class="ident">diffs</span> {
         <span class="comment">// addition of new crate</span>
-        <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&quot;+&quot;</span>) {
+        <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&#39;+&#39;</span>) {
             <span class="ident">pairs</span>.<span class="ident">push</span>((
                 <span class="ident">String::new</span>(), 
                 <span class="ident">diff</span>.<span class="ident">get</span>(<span class="number">1</span>..).<span class="ident">ok_or</span>(<span class="string">&quot;error parsing (+) diff line&quot;</span>)<span class="question-mark">?</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(),
             ));
         } 
         <span class="comment">// removal of old crate</span>
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&quot;-&quot;</span>) {
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&#39;-&#39;</span>) {
             <span class="ident">pairs</span>.<span class="ident">push</span>((
                 <span class="ident">diff</span>.<span class="ident">get</span>(<span class="number">1</span>..).<span class="ident">ok_or</span>(<span class="string">&quot;error parsing (-) diff line&quot;</span>)<span class="question-mark">?</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(), 
                 <span class="ident">String::new</span>()
@@ -681,7 +681,7 @@
             <span class="ident">pairs</span>.<span class="ident">push</span>((<span class="ident">old</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(), <span class="ident">new</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>()));
         }
         <span class="comment">// state transfer function</span>
-        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&quot;@&quot;</span>) {
+        <span class="kw">else</span> <span class="kw">if</span> <span class="ident">diff</span>.<span class="ident">starts_with</span>(<span class="string">&#39;@&#39;</span>) {
             <span class="ident">state_transfer_functions</span>.<span class="ident">push</span>(
                 <span class="ident">diff</span>.<span class="ident">get</span>(<span class="number">1</span>..).<span class="ident">ok_or</span>(<span class="string">&quot;error parsing (@state_transfer) diff line&quot;</span>)<span class="question-mark">?</span>.<span class="ident">trim</span>().<span class="ident">to_string</span>(),
             )

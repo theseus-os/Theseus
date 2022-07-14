@@ -252,7 +252,7 @@
             <span class="comment">// Currently supports `wasi_snapshot_preview1`.</span>
             <span class="kw">if</span> <span class="ident">wasm_interface</span>.<span class="ident">eq</span>(<span class="string">&quot;wasi_snapshot_preview1&quot;</span>) {
                 <span class="kw">let</span> <span class="ident">system_call</span> <span class="op">=</span> <span class="ident">SystemCall::from_str</span>(<span class="ident">fn_name</span>)
-                    .<span class="ident">expect</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;Unknown WASI function {}&quot;</span>, <span class="ident">fn_name</span>));
+                    .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">panic!</span>(<span class="string">&quot;Unknown WASI function {}&quot;</span>, <span class="ident">fn_name</span>));
                 <span class="comment">// Verify that signature of system call matches expected signature.</span>
                 <span class="kw">if</span> <span class="ident">fn_signature</span>.<span class="ident">eq</span>(<span class="kw-2">&amp;</span><span class="ident">system_call</span>.<span class="ident">into</span>()) {
                     <span class="kw">return</span> <span class="prelude-val">Ok</span>(<span class="ident">system_call</span>.<span class="ident">into</span>());

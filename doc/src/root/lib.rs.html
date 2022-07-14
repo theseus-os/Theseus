@@ -193,7 +193,7 @@
 <span class="kw">impl</span> <span class="ident">FsNode</span> <span class="kw">for</span> <span class="ident">RootDirectory</span> {
     <span class="doccomment">/// Recursively gets the absolute pathname as a String</span>
     <span class="kw">fn</span> <span class="ident">get_absolute_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
-        <span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>, <span class="ident">ROOT_DIRECTORY_NAME</span>.<span class="ident">to_string</span>()).<span class="ident">to_string</span>()
+        <span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>, <span class="ident">ROOT_DIRECTORY_NAME</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {

@@ -227,7 +227,7 @@
     <span class="comment">// The RSDT/XSDT tells us where all of the rest of the ACPI tables exist.</span>
     {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">acpi_tables</span> <span class="op">=</span> <span class="ident">ACPI_TABLES</span>.<span class="ident">lock</span>();
-        <span class="kw">for</span> <span class="ident">sdt_paddr</span> <span class="kw">in</span> <span class="ident">sdt_addresses</span>.<span class="ident">clone</span>() {
+        <span class="kw">for</span> <span class="ident">sdt_paddr</span> <span class="kw">in</span> <span class="ident">sdt_addresses</span> {
             <span class="comment">// debug!(&quot;RXSDT entry: {:#X}&quot;, sdt_paddr);</span>
             <span class="kw">let</span> (<span class="ident">sdt_signature</span>, <span class="ident">sdt_total_length</span>) <span class="op">=</span> <span class="ident">acpi_tables</span>.<span class="ident">map_new_table</span>(<span class="ident">sdt_paddr</span>, <span class="ident">page_table</span>)<span class="question-mark">?</span>;
             <span class="ident">acpi_table_handler</span>(<span class="kw-2">&amp;mut</span> <span class="ident">acpi_tables</span>, <span class="ident">sdt_signature</span>, <span class="ident">sdt_total_length</span>, <span class="ident">sdt_paddr</span>)<span class="question-mark">?</span>;

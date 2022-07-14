@@ -304,7 +304,7 @@
         <span class="ident">namespace</span>
             .<span class="ident">crate_tree</span>
             .<span class="ident">lock</span>()
-            .<span class="ident">insert</span>(<span class="ident">crate_name</span>.<span class="ident">clone</span>(), <span class="ident">loaded_crate</span>.<span class="ident">clone_shallow</span>());
+            .<span class="ident">insert</span>(<span class="ident">crate_name</span>, <span class="ident">loaded_crate</span>.<span class="ident">clone_shallow</span>());
         <span class="macro">info!</span>(
             <span class="string">&quot;Finished parsing nano_core crate, {} new symbols.&quot;</span>,
             <span class="ident">num_new_syms</span>

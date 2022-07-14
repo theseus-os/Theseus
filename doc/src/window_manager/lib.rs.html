@@ -1097,9 +1097,9 @@
                 <span class="ident">src_framebuffer</span>: <span class="ident">window</span>.<span class="ident">framebuffer</span>(),
                 <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">window</span>.<span class="ident">get_position</span>(),
             }
-        }).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        });
         
-        <span class="kw">let</span> <span class="ident">buffer_iter</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">bottom_fb_area</span>).<span class="ident">into_iter</span>().<span class="ident">chain</span>(<span class="ident">window_bufferlist</span>.<span class="ident">into_iter</span>());
+        <span class="kw">let</span> <span class="ident">buffer_iter</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">bottom_fb_area</span>).<span class="ident">into_iter</span>().<span class="ident">chain</span>(<span class="ident">window_bufferlist</span>);
         <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">buffer_iter</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)<span class="question-mark">?</span>;
         
         <span class="prelude-val">Ok</span>(())
@@ -1148,9 +1148,9 @@
                 <span class="ident">src_framebuffer</span>: <span class="ident">window</span>.<span class="ident">framebuffer</span>(),
                 <span class="ident">coordinate_in_dest_framebuffer</span>: <span class="ident">window</span>.<span class="ident">get_position</span>(),
             }
-        }).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>();
+        });
 
-        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">bufferlist</span>.<span class="ident">into_iter</span>(), <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
+        <span class="ident">FRAME_COMPOSITOR</span>.<span class="ident">lock</span>().<span class="ident">composite</span>(<span class="ident">bufferlist</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">final_fb</span>, <span class="ident">bounding_box</span>)
     }
 
 

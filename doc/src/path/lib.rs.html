@@ -402,9 +402,9 @@
         <span class="ident">new_components</span>.<span class="ident">extend</span>(<span class="ident">current_path</span>.<span class="ident">components</span>());
         <span class="comment">// Push components of the path to the components of the new path</span>
         <span class="kw">for</span> <span class="ident">component</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">components</span>() {
-            <span class="kw">if</span> <span class="ident">component</span> <span class="op">==</span> <span class="ident">String::from</span>(<span class="string">&quot;.&quot;</span>) {
+            <span class="kw">if</span> <span class="ident">component</span> <span class="op">==</span> <span class="string">&quot;.&quot;</span> {
                 <span class="kw">continue</span>;
-            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">component</span> <span class="op">==</span> <span class="ident">String::from</span>(<span class="string">&quot;..&quot;</span>) {
+            } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">component</span> <span class="op">==</span> <span class="string">&quot;..&quot;</span> {
                 <span class="ident">new_components</span>.<span class="ident">pop</span>();
             } <span class="kw">else</span> {
                 <span class="ident">new_components</span>.<span class="ident">push</span>(<span class="ident">component</span>);

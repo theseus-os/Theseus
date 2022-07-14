@@ -1049,8 +1049,8 @@
 			  <span class="ident">F2</span>: <span class="ident">Into</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 	{
 		<span class="kw">let</span> <span class="ident">free_list</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">FREE_PAGE_LIST</span>;
-		<span class="kw">let</span> <span class="ident">free1</span> <span class="op">=</span> <span class="ident">free1</span>.<span class="ident">into</span>().<span class="ident">unwrap_or</span>(<span class="ident">Chunk::empty</span>());
-		<span class="kw">let</span> <span class="ident">free2</span> <span class="op">=</span> <span class="ident">free2</span>.<span class="ident">into</span>().<span class="ident">unwrap_or</span>(<span class="ident">Chunk::empty</span>());
+		<span class="kw">let</span> <span class="ident">free1</span> <span class="op">=</span> <span class="ident">free1</span>.<span class="ident">into</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">Chunk::empty</span>);
+		<span class="kw">let</span> <span class="ident">free2</span> <span class="op">=</span> <span class="ident">free2</span>.<span class="ident">into</span>().<span class="ident">unwrap_or_else</span>(<span class="ident">Chunk::empty</span>);
 		<span class="ident">DeferredAllocAction</span> { <span class="ident">free_list</span>, <span class="ident">free1</span>, <span class="ident">free2</span> }
 	}
 }
