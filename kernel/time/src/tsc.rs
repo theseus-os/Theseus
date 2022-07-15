@@ -28,6 +28,7 @@ pub(crate) fn init() -> Result<(), &'static str> {
 ///
 /// Returns the frequency of the TSC in hertz.
 fn native_calibrate() -> Result<u64, &'static str> {
+    // TODO: Check if invariant TSC supported.
     // let x = unsafe { __cpuid(0x80000007)};
     // trace!("{x:#?}");
 
@@ -82,7 +83,8 @@ fn backup_calibrate() -> Result<u64, &'static str> {
     let diff = end
         .checked_sub(&start)
         .ok_or("tsc ticks did not act monotonically during calibration")?;
-    let tsc_freq = u64::from(diff) * 500; // multiplied by 500 because we measured a 50ms interval
+    // Multiplied by 20 because we measured a 50ms interval i.e. 1/20th of a second.
+    let tsc_freq = u64::from(diff) * 20;
 
     info!("TSC frequency calculated by PIT is: {}", tsc_freq);
 

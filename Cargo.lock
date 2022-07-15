@@ -3511,6 +3511,7 @@ dependencies = [
  "unified_channel",
  "unwind_test",
  "upd",
+ "uptime",
  "wasm",
 ]
 
@@ -3559,6 +3560,7 @@ dependencies = [
  "hpet-acpi",
  "interrupts",
  "ioapic",
+ "kernel_config",
  "log",
  "port_io",
  "spin 0.9.0",
@@ -3684,6 +3686,14 @@ dependencies = [
  "task",
  "terminal_print",
  "vfs_node",
+]
+
+[[package]]
+name = "uptime"
+version = "0.1.0"
+dependencies = [
+ "terminal_print",
+ "time",
 ]
 
 [[package]]

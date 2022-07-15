@@ -69,8 +69,7 @@ pub(crate) fn init() -> Result<(), &'static str> {
 /// The duration must be no greater than 1 / [`PIT_MINIMUM_FREQ`] seconds.
 /// Uses a separate PIT clock channel, so it doesn't affect the regular PIT interrupts on PIT channel 0.
 pub(crate) fn wait(duration: Duration) -> Result<(), &'static str> {
-    let divisor = PIT_DEFAULT_DIVIDEND_HZ as u128 / (NANOS_IN_SEC as u128 / duration.as_nanos());
-    if divisor > (u16::max_value() as u128) {
+    if duration.as_nanos() > NANOS_IN_SEC as u128 / PIT_MINIMUM_FREQ as u128 {
         error!(
             "time::pit::wait(): the chosen wait time {} ns is too large, max value is {} ns",
             duration.as_nanos(),
@@ -78,6 +77,7 @@ pub(crate) fn wait(duration: Duration) -> Result<(), &'static str> {
         );
         return Err("chosen wait time too large");
     }
+    let divisor = PIT_DEFAULT_DIVIDEND_HZ as u128 / (NANOS_IN_SEC as u128 / duration.as_nanos());
 
     let port_60 = Port::<u8>::new(0x60);
     let port_61 = Port::<u8>::new(0x61);

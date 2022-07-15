@@ -1,5 +1,5 @@
 [package]
-name = "monotonic_time"
+name = "uptime"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
 version = "0.1.0"
 edition = "2021"
