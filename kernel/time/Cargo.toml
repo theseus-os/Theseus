@@ -23,6 +23,10 @@ optional = true
 path = "../ioapic"
 optional = true
 
+[dependencies.kernel_config]
+path = "../kernel_config"
+optional = true
+
 [dependencies.port_io]
 path = "../../libs/port_io"
 optional = true
@@ -35,6 +39,6 @@ optional = true
 default = ["apic", "hpet", "pit", "rtc", "tsc"]
 apic = []
 hpet = ["hpet-acpi", "interrupts", "ioapic"]
-pit = []
+pit = ["interrupts", "kernel_config", "port_io", "spin"]
 rtc = ["port_io", "spin"]
 tsc = []

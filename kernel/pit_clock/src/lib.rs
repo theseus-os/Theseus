@@ -13,12 +13,11 @@ use spin::Mutex;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 
-/// the main interrupt channel
+/// The main interrupt channel
 const CHANNEL0: u16 = 0x40;
 /// DO NOT USE
 const _CHANNEL1: u16 = 0x41;
-/// the speaker for beeping.
-/// also used for one-shot waits.
+/// The channel used for one-shot timers.
 const CHANNEL2: u16 = 0x42;
 
 const COMMAND_REGISTER: u16 = 0x43;

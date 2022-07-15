@@ -3,7 +3,7 @@ use core::{
     arch::x86_64::{CpuidResult, __cpuid},
     sync::atomic::{AtomicUsize, Ordering},
 };
-use log::info;
+use log::{info, warn, trace};
 
 static TSC_FREQUENCY: AtomicUsize = AtomicUsize::new(0);
 
@@ -12,11 +12,11 @@ pub(crate) fn exists() -> bool {
     true
 }
 
-pub(crate) fn calibrate() -> Result<(), ()> {
+pub(crate) fn init() -> Result<(), &'static str> {
     let tsc_freq = match native_calibrate() {
         Ok(f) => f,
-        Err(_) => {
-            info!("native tsc calibration failed");
+        Err(e) => {
+            warn!("native tsc calibration failed: {e}");
             backup_calibrate()?
         },
     };
@@ -27,12 +27,9 @@ pub(crate) fn calibrate() -> Result<(), ()> {
 /// Attempt to calibrate the TSC using information from the CPUID instruction.
 ///
 /// Returns the frequency of the TSC in hertz.
-fn native_calibrate() -> Result<u64, ()> {
-    let CpuidResult { eax: max_level, .. } = unsafe { __cpuid(0x0) };
-
-    if max_level < 0x15 {
-        return Err(());
-    }
+fn native_calibrate() -> Result<u64, &'static str> {
+    // let x = unsafe { __cpuid(0x80000007)};
+    // trace!("{x:#?}");
 
     let CpuidResult {
         eax: denominator,
@@ -40,39 +37,52 @@ fn native_calibrate() -> Result<u64, ()> {
         ecx: hertz,
         ..
     } = unsafe { __cpuid(0x15) };
+    trace!("{denominator}, {numerator}, {hertz}");
     let (denominator, numerator, mut hertz) = (denominator as u64, numerator as u64, hertz as u64);
 
     if numerator == 0 || denominator == 0 {
-        return Err(());
+        return Err("numerator and/or denominator is not enumerated");
     }
 
-    if hertz == 0 && max_level >= 0x16 {
+    let CpuidResult { eax: max_level, .. } = unsafe { __cpuid(0x0) };
+    log::trace!("cpuid max level: {max_level}");
+
+    if hertz == 0  && max_level >= 0x16 {
         let CpuidResult { eax: base_mhz, .. } = unsafe { __cpuid(0x16) };
-        // Yes, according to the Linux source code it's denominator / numerator.
-        hertz = base_mhz as u64 * 1000 * (denominator / numerator)
+        if base_mhz == 0 {
+            return Err("CPU base clock not enumerated");
+        } else {
+            hertz = base_mhz as u64 * 1_000_000;
+            trace!("tsc frequency set to cpu base clock of {base_mhz} Mhz" );
+            return Ok(hertz)
+        }
     }
 
     if hertz == 0 {
-        return Err(());
+        return Err("hertz in not enumerated");
     }
-
-    Ok(hertz * (numerator / denominator))
+    
+    let tsc_freq = hertz * (numerator / denominator);
+    log::trace!("tsc: {tsc_freq}");
+    
+    Ok(tsc_freq)
+    // Ok(hertz * 1000000)
 }
 
 /// Calibrate the TSC using the PIT timer.
 ///
 /// Returns the frequency of the TSC in hertz.
-fn backup_calibrate() -> Result<u64, ()> {
+fn backup_calibrate() -> Result<u64, &'static str> {
     let start = TscTicks::now();
-    // wait 10000 us (10 ms)
-    // pit_clock::pit_wait(10000)?;
-    // FIXME: Wait on pit_clock
+    // TODO: What if pit feature disabled
+    // TODO: Use HPET?
+    crate::pit::wait(Duration::from_millis(50))?;
     let end = TscTicks::now();
 
     let diff = end
         .checked_sub(&start)
-        .ok_or(())?;
-    let tsc_freq = u64::from(diff) * 100; // multiplied by 100 because we measured a 10ms interval
+        .ok_or("tsc ticks did not act monotonically during calibration")?;
+    let tsc_freq = u64::from(diff) * 500; // multiplied by 500 because we measured a 50ms interval
 
     info!("TSC frequency calculated by PIT is: {}", tsc_freq);
 

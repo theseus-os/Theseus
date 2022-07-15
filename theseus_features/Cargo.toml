@@ -40,6 +40,7 @@ shell = { path = "../applications/shell", optional = true }
 swap = { path = "../applications/swap", optional = true }
 upd = { path = "../applications/upd", optional = true }
 wasm = { path = "../applications/wasm", optional = true }
+monotonic_time = { path = "../applications/monotonic_time", optional = true }
 
 
 ## Kernel crates used for only testing purposes.
@@ -122,6 +123,7 @@ theseus_apps = [
     "swap",
     "upd",
     "wasm",
+    "monotonic_time",
 ]
 
 ## Includes all benchmark application crates in the build.

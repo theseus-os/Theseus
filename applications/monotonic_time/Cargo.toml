@@ -1,0 +1,11 @@
+[package]
+name = "monotonic_time"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.time]
+path = "../../kernel/time"

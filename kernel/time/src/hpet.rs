@@ -8,8 +8,8 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use hpet_acpi::{hpet, hpet_mut};
 use log::debug;
 
-const IRQ_NUM: u8 = 0x10;
-const INTERRUPT_NUM: u8 = interrupts::IRQ_BASE_OFFSET + IRQ_NUM;
+// const IRQ_NUM: u8 = 0x10;
+// const INTERRUPT_NUM: u8 = interrupts::IRQ_BASE_OFFSET + IRQ_NUM;
 
 /// The number of times the [`HPET`]'s main counter has overflowed.
 static HPET_OVERFLOWS: AtomicU64 = AtomicU64::new(0);
@@ -25,63 +25,68 @@ pub(crate) fn exists() -> bool {
 pub(crate) fn init() -> Result<(), &'static str> {
     let mut hpet = hpet_mut().expect("HPET does not exist");
 
-    hpet.general_configuration.update(|value| {
-        // Clear bit 1 (disable legacy mapping)
-        *value &= !(1 << 1);
-    });
+    // hpet.general_configuration.update(|value| {
+    //     // Clear bit 1 (disable legacy mapping)
+    //     *value &= !(1 << 1);
+    // });
 
-    // TODO: Document timer 0 is being used by OS.
-    // The HPET is guaranteed to have at least three timers.
-    let overflow_timer = &mut hpet.timers[0];
-    // TODO: From OS Dev Wiki: "If the timer is set to 32 bit mode, it will also generate an
-    // interrupt when the counter wraps around." Will this trigger a double interrupt?
-    overflow_timer.comparator_value.write(0);
+    // // TODO: Document timer 0 is being used by OS.
+    // // The HPET is guaranteed to have at least three timers.
+    // let overflow_timer = &mut hpet.timers[0];
+    // // TODO: From OS Dev Wiki: "If the timer is set to 32 bit mode, it will also generate an
+    // // interrupt when the counter wraps around." Will this trigger a double interrupt?
 
-    let routing_capabilities = overflow_timer.configuration_and_capability.read() >> 32u32;
-    let mut io_apic_line: u8 = 32;
-    // let mut io_apic_lines = [false; 32];
-    for i in 0..32 {
-        // if the ith bit is set.
-        if ((routing_capabilities >> i) & 0x1) == 1 {
-            io_apic_line = i;
-            break;
-            // io_apic_lines[i] = true;
-        }
-    }
-    // FIXME: Check for the intersection between unused I/O APIC lines and io_apic_lines.
-    if io_apic_line == 32 {
-        return Err("Couldn't find suitable I/O APIC line for HPET");
-    }
+    // let routing_capabilities = overflow_timer.configuration_and_capability.read() >> 32u32;
+    // let mut io_apic_line: u8 = 32;
+    // // let mut io_apic_lines = [false; 32];
+    // for i in 0..32 {
+    //     // if the ith bit is set.
+    //     if ((routing_capabilities >> i) & 0x1) == 1 {
+    //         io_apic_line = i;
+    //         break;
+    //         // io_apic_lines[i] = true;
+    //     }
+    // }
+    // // FIXME: Check for the intersection between unused I/O APIC lines and io_apic_lines.
+    // if io_apic_line == 32 {
+    //     return Err("Couldn't find suitable I/O APIC line for HPET");
+    // }
 
-    // FIXME: Which I/O APIC number?
-    ioapic::get_ioapic(0)
-        .ok_or("couldn't get I/O APIC")?
-        .set_irq(io_apic_line, 0, INTERRUPT_NUM);
+    // // FIXME: Which I/O APIC number?
+    // ioapic::get_ioapic(0)
+    //     .ok_or("couldn't get I/O APIC")?
+    //     .set_irq(io_apic_line, 0, INTERRUPT_NUM);
 
-    overflow_timer.configuration_and_capability.update(|value| {
-        // Clear bit 14 (use standard interrupt mapping)
-        *value &= !(1 << 14);
-        // Write to bytes 9-13 (I/O APIC line to use)
-        // TODO: I'm not sure if clearing the bits first is necessary.
-        for i in 9..=13 {
-            *value &= !(1 << i);
-        }
-        // io_apic_line is guaranteed to be <= 31 and so it won't overwrite more than five
-        // bytes.
-        *value |= (io_apic_line as u64) << 9;
-        // Set bit 8 (force 32-bit mode)
-        // TODO: Alternatively we can read bit 5 and account for whether timer is 32 or
-        // 64-bit.
-        *value |= 1 << 8;
-        // Clear bit 3 (enable non-periodic mode)
-        *value &= !(1 << 3);
-        // FIXME: Tn_INT_TYPE_CNF
-        // Set bit 2 (enable interrupts)
-        *value |= 1 << 2;
-    });
+    // overflow_timer.configuration_and_capability.update(|value| {
+    //     // Clear bit 14 (use standard interrupt mapping)
+    //     // *value &= !(1 << 14);
+    //     // Write to bytes 9-13 (I/O APIC line to use)
+    //     // TODO: I'm not sure if clearing the bits first is necessary.
+    //     // for i in 9..=13 {
+    //     //     *value &= !(1 << i);
+    //     // }
+    //     // io_apic_line is guaranteed to be <= 31 and so it won't overwrite more than five
+    //     // bytes.
+    //     *value |= (io_apic_line as u64) << 9;
+    //     // Set bit 8 (force 32-bit mode)
+    //     // TODO: Alternatively we can read bit 5 and account for whether timer is 32 or
+    //     // 64-bit.
+    //     // *value |= 1 << 8;
+    //     // Clear bit 3 (enable non-periodic mode)
+    //     // *value &= !(1 << 3);
+    //     *value |= 1 << 3;
+    //     // FIXME: Tn_INT_TYPE_CNF
+    //     // Clear bit 1 
+    //     // *value &= !(1 << 1);
+    //     // Set bit 2 (enable interrupts)
+    //     *value |= 1 << 2;
+    // });
 
-    interrupts::register_interrupt(INTERRUPT_NUM, hpet_overflow_handler)
-        .map_err(|_| "0x30 interrupt number already in use")?;
+    // overflow_timer.comparator_value.write(0_000_000_000u64);
+    // // overflow_timer.comparator_value.write(1_000_000_000u64);
+
+    // interrupts::register_interrupt(INTERRUPT_NUM, hpet_overflow_handler)
+    //     .map_err(|_| "0x30 interrupt number already in use")?;
 
     hpet.enable_counter(true);
     debug!(
@@ -110,7 +115,10 @@ pub(crate) fn now() -> Duration {
     Duration::from_nanos(nanos)
 }
 
-extern "x86-interrupt" fn hpet_overflow_handler(_: interrupts::InterruptStackFrame) {
-    HPET_OVERFLOWS.fetch_add(1, Ordering::SeqCst);
-    interrupts::eoi(Some(INTERRUPT_NUM))
-}
+// extern "x86-interrupt" fn hpet_overflow_handler(_: interrupts::InterruptStackFrame) {
+//     // hpet_mut().unwrap().general_interrupt_status.update(|value| {
+//     //     *value |= 1;
+//     // });
+//     HPET_OVERFLOWS.fetch_add(1, Ordering::SeqCst);
+//     interrupts::eoi(Some(INTERRUPT_NUM));
+// }

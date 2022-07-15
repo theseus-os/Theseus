@@ -44,8 +44,8 @@ impl Cursor {
     pub fn blink(&mut self) -> bool {
         if self.enabled {
             let time = time::now::<Monotonic>();
+            // trace!("cursor blinked: {}", time.as_millis());
             if time - self.time >= self.period {
-                trace!("cursor blinked: {}", time.as_millis());
                 self.time = time;
                 self.show = !self.show;
                 return true;

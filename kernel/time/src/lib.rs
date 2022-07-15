@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "hpet", feature(abi_x86_interrupt))]
+#![feature(stmt_expr_attributes)]
 #![no_std]
 
 #[cfg(feature = "apic")]
@@ -34,54 +35,74 @@ pub fn init() -> Result<(), ()> {
 
 fn init_monotonic_timer() -> Result<(), ()> {
     #[allow(unused_assignments)]
-    let mut addr = 0;
+    let mut addr = None;
 
+    // TODO: Check if TSC reliable?
     #[cfg(feature = "tsc")]
-    {
-        // TODO: Check if TSC reliable?
-        addr = if tsc::exists() {
-            if tsc::calibrate().is_ok() {
-                info!("using tsc as monotonic time source");
-                tsc::now as usize
-            } else {
-                warn!("tsc calibration failed");
-                0
+    addr = addr.or_else(|| {
+        if tsc::exists() {
+            match tsc::init() {
+                Ok(_) => {
+                    info!("using tsc as monotonic time source");
+                    Some(tsc::now as usize)
+                }
+                Err(e) => {
+                    warn!("tsc initialisation failed: {e}");
+                    None
+                }
             }
         } else {
-            0
-        };
-    }
+            None
+        }
+    });
 
     #[cfg(feature = "hpet")]
-    {
-        if addr == 0 && hpet::exists() {
-            addr = if hpet::init().is_ok() {
-                info!("using hpet as monotonic time source");
-                hpet::now as usize
-            } else {
-                warn!("hpet initialisation failed");
-                0
-            };
+    addr = addr.or_else(|| {
+        if hpet::exists() {
+            match hpet::init() {
+                Ok(_) => {
+                    info!("using hpet as monotonic time source");
+                    Some(hpet::now as usize)
+                }
+                Err(e) => {
+                    warn!("hpet initialisation failed: {e}");
+                    None
+                }
+            }
+        } else {
+            None
         }
-    }
+    });
 
     #[cfg(feature = "apic")]
-    {
-        if addr == 0 && apic::exists() {
+    addr = addr.or_else(|| {
+        if apic::exists() {
             info!("using apic as monotonic time source");
-            addr = apic::now as usize;
+            Some(apic::now as usize)
+        } else {
+            None
         }
-    }
+    });
 
     #[cfg(feature = "pit")]
-    {
-        if addr == 0 && pit::exists() {
-            info!("using pit as monotonic time source");
-            addr = pit::now as usize;
+    addr = addr.or_else(|| {
+        if pit::exists() {
+            match pit::init() {
+                Ok(_) => {
+                    info!("using pit as monotonic time source");
+                    Some(pit::now as usize)
+                }
+                Err(e) => {
+                    warn!("pit initialisation failed: {e}");
+                    None
+                }
+            }
+        } else {
+            None
         }
-    }
+    });
 
-    if addr != 0 {
+    if let Some(addr) = addr {
         MONOTONIC_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
         Ok(())
     } else {
