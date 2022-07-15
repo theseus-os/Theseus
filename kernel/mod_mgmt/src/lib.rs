@@ -1147,16 +1147,105 @@ impl CrateNamespace {
         // the set of Shndxes for TLS sections (.tdata, .tbss)
         let mut tls_sections: BTreeSet<Shndx> = BTreeSet::new();
 
-        let mut text_pages_locked       = text_pages  .as_ref().map(|(tp, _)| (tp.clone(), tp.lock()));
-        let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
-        let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
+        let mut text_pages_locked       = text_pages  .as_ref().map(|(tp, _)| tp.lock());
+        let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| rp.lock());
+        let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| dp.lock());
 
-        /*
+        let mut read_only_start = None;
+        let mut read_write_start = None;
+        // Iterate over all "allocated" sections to copy their data from the object file into the above `MappedPages`s.
+        // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, etc.
+        //
+        // We currently perform eager copying because MappedPages doesn't yet support backing files or demand paging.
+        for sec in elf_file.section_iter() {
+            let sec_flags = sec.flags();
+            // Skip non-allocated sections, because they don't appear in the loaded object file.
+            if sec_flags & SHF_ALLOC == 0 {
+                continue; 
+            }
+
+            // get the relevant section info, i.e., size, alignment, and data contents
+            let sec_size  = sec.size()  as usize;
+            let sec_offset = sec.offset() as usize;
+            let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
+
+            let dest_pages: &mut MappedPages;
+            let dest_offset: usize;
+
+            // If executable, copy the .text section data into `text_pages`.
+            if is_exec {
+                dest_offset = sec.offset() as usize;
+                dest_pages = text_pages_locked.as_mut()
+                    .ok_or("BUG: ELF file contained a .text section, but no text_pages were allocated")?;
+            } 
+
+            // If writable (excluding TLS), copy the .data/.bss section into `data_pages`.
+            else if is_write && !is_tls {
+                let start_of_data = read_write_start.get_or_insert(sec_offset);
+                dest_offset = sec_offset - *start_of_data;
+                dest_pages = read_write_pages_locked.as_mut()
+                    .ok_or("BUG: ELF file contained a .data/.bss section, but no data_pages were allocated")?;
+            }
+
+            // Otherwise, we have a read-only section that should be copied into `rodata_pages`.
+            // This includes .rodata, .eh_frame, .gcc_except_table, and also .tdata sections.
+            // Although TLS sections have "WAT" flags (write, alloc, TLS),
+            // we load TLS sections into the same read-only pages as other read-only sections
+            // because they contain thread-local storage initializer data that is only read from.
+            else if is_tls || {
+                let sec_name = sec.get_name(&elf_file).map_err(|e| {
+                    error!("BUG: couldn't get section name for {:?}", sec);
+                    "BUG: couldn't get section name"
+                })?;
+                sec_name == SectionType::Rodata.name()
+                    || sec_name == SectionType::EhFrame.name()
+                    || sec_name == SectionType::GccExceptTable.name()
+            } {
+                // Explicitly skip .tbss sections because they don't have any data
+                // in the object file nor do they occupy any space in loaded memory.
+                let is_tbss = sec.get_type() == Ok(ShType::NoBits);
+                if is_tbss {
+                    continue;
+                } 
+
+                let start_of_rodata = read_only_start.get_or_insert(sec_offset);
+                dest_offset = sec_offset - *start_of_rodata;
+                dest_pages = read_only_pages_locked.as_mut()
+                    .ok_or("BUG: ELF file contained a read-only section, but no rodata_pages were allocated")?;
+            }
+
+            // Finally, any other section type is considered unhandled, so return an error!
+            else {
+                // .debug_* sections are handled separately, and are loaded on demand.
+                let sec_name = sec.get_name(&elf_file);
+                if sec_name.map_or(false, |n| n.starts_with(".debug")) {
+                    continue;
+                }
+                error!("unhandled sec, name: {:?}, {:X?}", sec_name, sec);
+                return Err("load_crate_with_merged_sections(): section with unhandled type, name, or flags!");
+            }
+
+            // Perform the actual copying of section data
+            {
+                let dest_slice: &mut [u8] = dest_pages.as_slice_mut(dest_offset, sec_size)?;
+                match sec.get_data(&elf_file) {
+                    Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                    Ok(SectionData::Empty) => dest_slice.fill(0),
+                    _other => {
+                        error!("Couldn't get section data for merged .text section: {:?}", _other);
+                        return Err("couldn't get section data for merged .text section");
+                    }
+                }
+            }
+        }
+
+
+        TODO: left off here
 
         // Use the symbol table itself to populate the set of sections in a given crate.
         {
-            let mut new_loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
-
             let symtab = find_symbol_table(&elf_file)?;
             use xmas_elf::symbol_table::Entry;
             for (sym_num, entry) in symtab.iter().enumerate() {
@@ -1167,18 +1256,18 @@ impl CrateNamespace {
                     entry.get_name(&elf_file).unwrap(), sym_num, entry.value(), entry.size(), entry.get_type().unwrap(), entry.get_binding().unwrap(), entry.get_other(), entry.shndx()
                 );
 
-                let sec = entry.get_section_header(&elf_file, entry.shndx().into()).unwrap();
-                trace!("\t\t sec: {:?}", sec);
+                let sec = entry.get_section_header(&elf_file, entry.shndx().into()).map_err(|e| {
+                    error!("BUG: {:?}: couldn't get section header for {}", e, entry as &dyn Entry);
+                    "BUG: couldn't get section header for symtab entry"
+                })?;
+
                 // get the relevant section info, i.e., size, alignment, and data contents
                 let sec_size  = sec.size()  as u64;
-                assert!(sec_size == entry.size());
                 let sec_align = sec.align() as usize;
                 let sec_flags = sec.flags();
                 let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
                 let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
                 let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
-
-                assert!(sec.get_name(&elf_file).unwrap() == entry.get_name(&elf_file).unwrap());
 
                 // First, check for executable sections, which can only be .text sections.
                 if is_exec && !is_write {

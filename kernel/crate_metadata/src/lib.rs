@@ -616,6 +616,18 @@ pub enum SectionType {
     EhFrame,
 }
 impl SectionType {
+    pub const fn name(&self) -> &'static str {
+        match self {
+            &Self::Text => ".text",
+            &Self::Rodata => ".rodata",
+            &Self::Data => ".data",
+            &Self::Bss => ".bss",
+            &Self::TlsData => "tdata.",
+            &Self::TlsBss => ".tbss",
+            &Self::GccExceptTable => ".gcc_except_table",
+            &Self::EhFrame => ".eh_frame",
+        }
+    }
     /// Returns `true` if `Data` or `Bss`, otherwise `false`.
     pub fn is_data_or_bss(&self) -> bool {
         match self {
