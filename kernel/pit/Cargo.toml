@@ -1,0 +1,13 @@
+[package]
+name = "pit"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+edition = "2021"
+description = "Abstractions for the x86 PIT"
+
+[dependencies]
+interrupts = { path = "../interrupts" }
+kernel_config = { path = "../kernel_config" }
+port_io = { path = "../../libs/port_io" }
+spin = "0.9.0"
+time = { path = "../time" }

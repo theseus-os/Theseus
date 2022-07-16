@@ -1,153 +1,9 @@
-#![cfg_attr(feature = "hpet", feature(abi_x86_interrupt))]
-#![feature(stmt_expr_attributes)]
-#![no_std]
-
-// #[cfg(feature = "apic")]
-// mod apic;
-#[cfg(feature = "hpet")]
-mod hpet;
-#[cfg(feature = "pit")]
-mod pit;
-// #[cfg(feature = "rtc")]
-// mod rtc;
-// #[cfg(feature = "tsc")]
-// mod tsc;
-
-use core::{
-    mem::transmute,
-    sync::atomic::{AtomicUsize, Ordering},
-};
-use log::{info, warn};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 pub use core::time::Duration;
-// TODO: Use something other than PIT?
-#[cfg(feature = "pit")]
-pub use pit::wait;
 
 static MONOTONIC_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
 static REALTIME_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
-
-/// Discover and initialise best available montonic and realtime clocks.
-///
-/// This function must be called after parsing ACPI tables and initialising APICs.
-pub fn init() -> Result<(), &'static str> {
-    init_monotonic_timer()?;
-    init_realtime_timer()?;
-    Ok(())
-}
-
-fn init_monotonic_timer() -> Result<(), &'static str> {
-    #[allow(unused_assignments)]
-    let mut addr = None;
-
-    // // TODO: Check if TSC reliable?
-    // #[cfg(feature = "tsc")]
-    // addr = addr.or_else(|| {
-    //     if tsc::exists() {
-    //         match tsc::init() {
-    //             Ok(_) => {
-    //                 info!("using tsc as monotonic time source");
-    //                 Some(tsc::now as usize)
-    //             }
-    //             Err(e) => {
-    //                 warn!("tsc initialisation failed: {e}");
-    //                 None
-    //             }
-    //         }
-    //     } else {
-    //         None
-    //     }
-    // });
-
-    #[cfg(feature = "hpet")]
-    addr = addr.or_else(|| {
-        if hpet::exists() {
-            match hpet::init() {
-                Ok(_) => {
-                    info!("using hpet as monotonic time source");
-                    Some(hpet::now as usize)
-                }
-                Err(e) => {
-                    warn!("hpet initialisation failed: {e}");
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    });
-
-    // #[cfg(feature = "apic")]
-    // {
-    //     // We want to initialised the APIC timer regardless of whether it's being used as the time
-    //     // source or not.
-    //     if apic::exists() {
-    //         match apic::init() {
-    //             Ok(_) => {
-    //                 info!("successfully initialised APIC timer");
-    //             }
-    //             Err(e) => {
-    //                 error!("APIC timer initialisation failed: {e}");
-    //                 return Err("Failed to initialise APIC timer");
-    //             }
-    //         }
-    //     } 
-    // }
-
-    #[cfg(feature = "pit")]
-    addr = addr.or_else(|| {
-        if pit::exists() {
-            match pit::init() {
-                Ok(_) => {
-                    info!("using pit as monotonic time source");
-                    Some(pit::now as usize)
-                }
-                Err(e) => {
-                    warn!("pit initialisation failed: {e}");
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    });
-
-    if let Some(addr) = addr {
-        MONOTONIC_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
-        Ok(())
-    } else {
-        Err("no suitable monotonic timer found")
-    }
-}
-
-fn init_realtime_timer() -> Result<(), &'static str> {
-    #[allow(unused_assignments)]
-    let addr = None;
-
-    // #[cfg(feature = "rtc")]
-    // {
-    //     if rtc::exists() {
-    //         info!("using rtc as realtime time source");
-    //         addr = Some(rtc::now as usize);
-    //     }
-    // }
-
-    if let Some(addr) = addr {
-        REALTIME_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
-        Ok(())
-    } else {
-        Err("no suitable realtime timer found")
-    }
-}
-
-pub fn now<T>() -> Duration
-where
-    T: ClockType,
-{
-    let addr = <T as ClockType>::func_addr();
-    let f = unsafe { transmute::<_, fn() -> Duration>(addr) };
-    f()
-}
 
 /// A hardware clock.
 pub trait Clock {
@@ -156,7 +12,7 @@ pub trait Clock {
 
     /// Whether the clock exists on the system.
     fn exists() -> bool;
-    
+
     /// Initialise the clock.
     fn init() -> Result<(), &'static str>;
 
@@ -165,8 +21,17 @@ pub trait Clock {
     /// For monotonic clocks this is usually the time since boot, and for realtime clocks its the
     /// time since 12:00am January 1st 1970 (i.e. Unix time).
     ///
-    /// This function must only be called after `Clock::init`.
+    /// This function must only be called after [`init`](Clock::init).
     fn now() -> Duration;
+    
+    /// Sleep for the given `duration`.
+    ///
+    /// This function must only be called after [`init`](Clock::init). Furthermore, it should only
+    /// be used if the `sleep` crate is unavailable e.g. during boot.
+    fn sleep(duration: Duration) {
+        let start = Self::now();
+        while Self::now() < start + duration {}
+    }
 }
 
 /// Either a [`Monotonic`] or [`Realtime`] clock.

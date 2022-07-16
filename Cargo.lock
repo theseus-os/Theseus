@@ -2349,6 +2349,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pit"
+version = "0.1.0"
+dependencies = [
+ "interrupts",
+ "kernel_config",
+ "port_io",
+ "spin 0.9.0",
+ "time",
+]
+
+[[package]]
 name = "pit_clock"
 version = "0.1.0"
 dependencies = [
