@@ -24,9 +24,6 @@ path = "../stack"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
-
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
@@ -45,6 +42,8 @@ path = "../acpi/madt"
 [dependencies.pause]
 path = "../pause"
 
+[dependencies.time]
+path = "../time"
 
 [lib]
 crate-type = ["rlib"]

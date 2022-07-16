@@ -14,7 +14,6 @@ extern crate spin;
 extern crate memory;
 extern crate kernel_config;
 extern crate ioapic;
-extern crate pit_clock;
 extern crate ap_start;
 extern crate pic; 
 extern crate apic;

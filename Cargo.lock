@@ -1318,7 +1318,6 @@ dependencies = [
  "exceptions_early",
  "gdt",
  "irq_safety",
- "kernel_config",
  "keyboard",
  "lazy_static",
  "locked_idt",
@@ -1326,7 +1325,6 @@ dependencies = [
  "memory",
  "mouse",
  "pic",
- "pit_clock",
  "port_io",
  "ps2",
  "scheduler",
@@ -1433,7 +1431,6 @@ dependencies = [
  "pci",
  "physical_nic",
  "pic",
- "pit_clock",
  "rand",
  "runqueue",
  "spin 0.9.0",
@@ -1964,9 +1961,9 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "pause",
- "pit_clock",
  "spin 0.9.0",
  "stack",
+ "time",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -2398,7 +2395,6 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "msr",
- "pit_clock",
  "port_io",
  "raw-cpuid",
  "spin 0.9.0",
@@ -2892,7 +2888,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "pit_clock",
  "spawn",
  "task",
 ]
@@ -2904,7 +2899,6 @@ dependencies = [
  "cfg-if 0.1.10",
  "core_simd",
  "log",
- "pit_clock",
 ]
 
 [[package]]
@@ -3557,13 +3551,16 @@ dependencies = [
 name = "time"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "hpet-acpi",
  "interrupts",
  "ioapic",
  "kernel_config",
+ "lockable",
  "log",
  "port_io",
  "spin 0.9.0",
+ "x86_64",
 ]
 
 [[package]]

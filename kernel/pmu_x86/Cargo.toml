@@ -25,9 +25,6 @@ version = "0.4.8"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
-
 [dependencies.port_io]
 path = "../../libs/port_io"
 

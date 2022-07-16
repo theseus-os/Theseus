@@ -11,8 +11,6 @@ pub use x86_64::structures::idt::InterruptStackFrame;
 use ps2::handle_mouse_packet;
 use x86_64::structures::idt::{HandlerFunc, InterruptDescriptorTable};
 use spin::Once;
-use kernel_config::time::CONFIG_PIT_FREQUENCY_HZ; //, CONFIG_RTC_FREQUENCY_HZ};
-// use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
@@ -182,7 +180,6 @@ pub fn init_handlers_pic() {
     let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
     PIC.call_once(|| pic::ChainedPics::init(master_pic_mask, slave_pic_mask));
 
-    pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     // let rtc_handler = rtc::init(CONFIG_RTC_FREQUENCY_HZ, rtc_interrupt_func);
     // IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
 }
@@ -287,13 +284,6 @@ pub fn eoi(irq: Option<u8>) {
 }
 
 
-/// 0x20
-// extern "x86-interrupt" fn pit_timer_handler(_stack_frame: InterruptStackFrame) {
-//     pit_clock::handle_timer_interrupt();
-// 	   eoi(Some(IRQ_BASE_OFFSET + 0x0));
-// }
-
-
 // see this: https://forum.osdev.org/viewtopic.php?f=1&t=32655
 static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
@@ -368,6 +358,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 }
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
+
 /// 0x22
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);

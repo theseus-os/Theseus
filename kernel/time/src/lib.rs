@@ -2,8 +2,8 @@
 #![feature(stmt_expr_attributes)]
 #![no_std]
 
-#[cfg(feature = "apic")]
-mod apic;
+// #[cfg(feature = "apic")]
+// mod apic;
 #[cfg(feature = "hpet")]
 mod hpet;
 #[cfg(feature = "pit")]
@@ -17,23 +17,26 @@ use core::{
     mem::transmute,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use log::{info, warn};
+use log::{error, info, warn};
 
 pub use core::time::Duration;
+// TODO: Use something other than PIT?
+#[cfg(feature = "pit")]
+pub use pit::wait;
 
 static MONOTONIC_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
 static REALTIME_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
 
 /// Discover and initialise best available montonic and realtime clocks.
 ///
-/// This function should be called after parsing ACPI tables.
-pub fn init() -> Result<(), ()> {
+/// This function must be called after parsing ACPI tables and initialising APICs.
+pub fn init() -> Result<(), &'static str> {
     init_monotonic_timer()?;
     init_realtime_timer()?;
     Ok(())
 }
 
-fn init_monotonic_timer() -> Result<(), ()> {
+fn init_monotonic_timer() -> Result<(), &'static str> {
     #[allow(unused_assignments)]
     let mut addr = None;
 
@@ -74,15 +77,22 @@ fn init_monotonic_timer() -> Result<(), ()> {
         }
     });
 
-    #[cfg(feature = "apic")]
-    addr = addr.or_else(|| {
-        if apic::exists() {
-            info!("using apic as monotonic time source");
-            Some(apic::now as usize)
-        } else {
-            None
-        }
-    });
+    // #[cfg(feature = "apic")]
+    // {
+    //     // We want to initialised the APIC timer regardless of whether it's being used as the time
+    //     // source or not.
+    //     if apic::exists() {
+    //         match apic::init() {
+    //             Ok(_) => {
+    //                 info!("successfully initialised APIC timer");
+    //             }
+    //             Err(e) => {
+    //                 error!("APIC timer initialisation failed: {e}");
+    //                 return Err("Failed to initialise APIC timer");
+    //             }
+    //         }
+    //     } 
+    // }
 
     #[cfg(feature = "pit")]
     addr = addr.or_else(|| {
@@ -106,27 +116,27 @@ fn init_monotonic_timer() -> Result<(), ()> {
         MONOTONIC_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
         Ok(())
     } else {
-        Err(())
+        Err("no suitable monotonic timer found")
     }
 }
 
-fn init_realtime_timer() -> Result<(), ()> {
+fn init_realtime_timer() -> Result<(), &'static str> {
     #[allow(unused_assignments)]
-    let mut addr = 0;
+    let mut addr = None;
 
     #[cfg(feature = "rtc")]
     {
         if rtc::exists() {
             info!("using rtc as realtime time source");
-            addr = rtc::now as usize;
+            addr = Some(rtc::now as usize);
         }
     }
 
-    if addr != 0 {
+    if let Some(addr) = addr {
         REALTIME_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
         Ok(())
     } else {
-        Err(())
+        Err("no suitable realtime timer found")
     }
 }
 

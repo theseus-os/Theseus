@@ -59,8 +59,8 @@ pub(crate) fn init() -> Result<(), &'static str> {
         PIT_CHANNEL_0.lock().write((divisor >> 8) as u8);
     }
 
-    interrupts::register_interrupt(interrupts::IRQ_BASE_OFFSET, pit_interrupt)
-        .map_err(|_| "failed to register pit interrupt handler")?;
+    // interrupts::register_interrupt(interrupts::IRQ_BASE_OFFSET, pit_interrupt)
+    //     .map_err(|_| "failed to register pit interrupt handler")?;
     Ok(())
 }
 
@@ -68,7 +68,7 @@ pub(crate) fn init() -> Result<(), &'static str> {
 ///
 /// The duration must be no greater than 1 / [`PIT_MINIMUM_FREQ`] seconds.
 /// Uses a separate PIT clock channel, so it doesn't affect the regular PIT interrupts on PIT channel 0.
-pub(crate) fn wait(duration: Duration) -> Result<(), &'static str> {
+pub fn wait(duration: Duration) -> Result<(), &'static str> {
     if duration.as_nanos() > NANOS_IN_SEC as u128 / PIT_MINIMUM_FREQ as u128 {
         error!(
             "time::pit::wait(): the chosen wait time {} ns is too large, max value is {} ns",
@@ -117,7 +117,7 @@ pub(crate) fn now() -> Duration {
 
 // pub(crate) fn wait(Duration)
 
-extern "x86-interrupt" fn pit_interrupt(_: interrupts::InterruptStackFrame) {
-    let ticks = PIT_TICKS.fetch_add(1, Ordering::SeqCst);
-    trace!("PIT timer interrupt, ticks: {}", ticks);
-}
+// extern "x86-interrupt" fn pit_interrupt(_: interrupts::InterruptStackFrame) {
+//     let ticks = PIT_TICKS.fetch_add(1, Ordering::SeqCst);
+//     trace!("PIT timer interrupt, ticks: {}", ticks);
+// }

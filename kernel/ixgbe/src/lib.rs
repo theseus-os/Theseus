@@ -20,7 +20,6 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
-extern crate pit_clock;
 extern crate bit_field;
 extern crate interrupts;
 extern crate x86_64;
@@ -375,7 +374,7 @@ impl IxgbeNic {
         }
 
         // wait 10 seconds for the link to come up, as seen in other ixgbe drivers
-        Self::wait_for_link(&mapped_registers2, 10_000_000);
+        Self::wait_for_link(&mapped_registers2, Duration::from_secs(10));
 
         let ixgbe_nic = IxgbeNic {
             dev_id: dev_id,
@@ -681,8 +680,8 @@ impl IxgbeNic {
         regs1.ctrl.write(val|CTRL_RST|CTRL_LRST);
 
         //wait 10 ms
-        let wait_time = 10_000;
-        let _ =pit_clock::pit_wait(wait_time);
+        let wait_time = Duration::from_millis(10);
+        let _ = time::wait(wait_time);
 
         //disable flow control.. write 0 TO FCTTV, FCRTL, FCRTH, FCRTV and FCCFG
         for fcttv in regs2.fcttv.iter_mut() {
@@ -719,7 +718,7 @@ impl IxgbeNic {
 
         while Self::acquire_semaphore(regs3)? {
             //wait 10 ms
-            let _ =pit_clock::pit_wait(wait_time);
+            let _ = time::wait(wait_time);
         }
 
         // setup PHY and the link 
@@ -749,15 +748,15 @@ impl IxgbeNic {
     }
 
     /// Wait for link to be up for upto 10 seconds.
-    fn wait_for_link(regs2: &IntelIxgbeRegisters2, total_wait_time_in_us: u32) {
+    fn wait_for_link(regs2: &IntelIxgbeRegisters2, total_wait_time: Duration) {
         // wait 10 ms between tries
-        let wait_time = 10_000;
+        let wait_time = Duration::from_millis(10);
         // wait for a total of 10 s
-        let total_tries = total_wait_time_in_us / wait_time;
+        let total_tries = total_wait_time.as_millis() / wait_time.as_millis();
         let mut tries = 0;
 
         while (regs2.links.read() & LINKS_SPEED_MASK == 0) && (tries < total_tries) {
-            let _ = pit_clock::pit_wait(wait_time);
+            let _ = time::wait(wait_time);
             tries += 1;
         }
     }

@@ -7,9 +7,6 @@ version = "0.1.0"
 [dependencies]
 cfg-if = "0.1.6"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
-
 [dependencies.log]
 version = "0.4.8"
 

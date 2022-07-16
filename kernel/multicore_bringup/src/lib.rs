@@ -12,7 +12,7 @@ extern crate volatile;
 extern crate zerocopy;
 extern crate irq_safety;
 extern crate memory;
-extern crate pit_clock;
+extern crate time;
 extern crate stack;
 extern crate kernel_config;
 extern crate apic;
@@ -37,6 +37,7 @@ use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 use pause::spin_loop_hint;
+use time::Duration;
 
 
 /// The physical address that an AP jumps to when it first is booted by the BSP.
@@ -310,7 +311,7 @@ fn bring_up_ap(
     }
 
     debug!("waiting 10 ms...");
-    pit_clock::pit_wait(10000).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 10 ms. Error: {:?}", _e); });
+    time::wait(Duration::from_millis(10)).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 10 ms. Error: {:?}", _e); });
     debug!("done waiting.");
 
     // // Send DEASSERT INIT IPI
@@ -347,8 +348,8 @@ fn bring_up_ap(
         bsp_lapic.set_icr(icr);
     }
 
-    pit_clock::pit_wait(300).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 300 us. Error {:?}", _e); });
-    pit_clock::pit_wait(200).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 200 us. Error {:?}", _e); });
+    time::wait(Duration::from_micros(300)).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to wait 300 us. Error {:?}", _e); });
+    time::wait(Duration::from_micros(200)).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to wait 200 us. Error {:?}", _e); });
 
     bsp_lapic.clear_error();
     let esr = bsp_lapic.error();
