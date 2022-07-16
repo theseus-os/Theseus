@@ -1,0 +1,10 @@
+[package]
+name = "tsc"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+edition = "2021"
+description = "Abstractions for the x86 TSC"
+
+[dependencies]
+time = { path = "../time" }
+log = "0.4.8"

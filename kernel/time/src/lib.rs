@@ -10,8 +10,8 @@ mod hpet;
 mod pit;
 // #[cfg(feature = "rtc")]
 // mod rtc;
-#[cfg(feature = "tsc")]
-mod tsc;
+// #[cfg(feature = "tsc")]
+// mod tsc;
 
 use core::{
     mem::transmute,
@@ -40,24 +40,24 @@ fn init_monotonic_timer() -> Result<(), &'static str> {
     #[allow(unused_assignments)]
     let mut addr = None;
 
-    // TODO: Check if TSC reliable?
-    #[cfg(feature = "tsc")]
-    addr = addr.or_else(|| {
-        if tsc::exists() {
-            match tsc::init() {
-                Ok(_) => {
-                    info!("using tsc as monotonic time source");
-                    Some(tsc::now as usize)
-                }
-                Err(e) => {
-                    warn!("tsc initialisation failed: {e}");
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    });
+    // // TODO: Check if TSC reliable?
+    // #[cfg(feature = "tsc")]
+    // addr = addr.or_else(|| {
+    //     if tsc::exists() {
+    //         match tsc::init() {
+    //             Ok(_) => {
+    //                 info!("using tsc as monotonic time source");
+    //                 Some(tsc::now as usize)
+    //             }
+    //             Err(e) => {
+    //                 warn!("tsc initialisation failed: {e}");
+    //                 None
+    //             }
+    //         }
+    //     } else {
+    //         None
+    //     }
+    // });
 
     #[cfg(feature = "hpet")]
     addr = addr.or_else(|| {
@@ -159,10 +159,13 @@ pub trait Clock {
     
     /// Initialise the clock.
     fn init() -> Result<(), &'static str>;
+
     /// The current time according to the clock.
     ///
     /// For monotonic clocks this is usually the time since boot, and for realtime clocks its the
     /// time since 12:00am January 1st 1970 (i.e. Unix time).
+    ///
+    /// This function must only be called after `Clock::init`.
     fn now() -> Duration;
 }
 
