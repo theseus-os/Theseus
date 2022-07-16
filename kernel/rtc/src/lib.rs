@@ -1,6 +1,10 @@
-use crate::Duration;
-use spin::Mutex;
+//! This crate provides abstractions for the x86 RTC.
+
+#![no_std]
+
 use port_io::Port;
+use spin::Mutex;
+use time::Duration;
 
 // CMOS port number used to select registers.
 const CMOS_WRITE_PORT: u16 = 0x70;
@@ -12,18 +16,30 @@ static CMOS_WRITE: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_WRITE_PORT));
 // CMOS port used to read register values.
 static CMOS_READ: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_READ_PORT));
 
-pub(crate) fn exists() -> bool {
-    // FIXME
-    true
-}
+pub struct RtcClock;
 
-/// Time since 12:00am January 1st 1970 (i.e. Unix time).
-///
-/// The algorithm is based on [IEEE 1003.1-2017 Base Definitions 4.16].
-///
-/// [IEEE 1003.1-2017 Base Definitions 4.16]: https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/
-pub(crate) fn now() -> Duration {
-    RtcTime::now().into()
+impl time::Clock for RtcClock {
+    type ClockType = time::Realtime;
+
+    fn exists() -> bool {
+        // FIXME
+        true
+    }
+
+    /// This function does nothing as using the RTC as a monotonic time source doesn't require
+    /// initialisation.
+    fn init() -> Result<(), &'static str> {
+        Ok(())
+    }
+
+    /// Time since 12:00am January 1st 1970 (i.e. Unix time).
+    ///
+    /// The algorithm is based on [IEEE 1003.1-2017 Base Definitions 4.16].
+    ///
+    /// [IEEE 1003.1-2017 Base Definitions 4.16]: https://pubs.opengroup.org/onlinepubs/9699919799.2018edition/
+    fn now() -> Duration {
+        RtcTime::now().into()
+    }
 }
 
 /// A timestamp obtained from the real-time clock.
@@ -47,8 +63,6 @@ pub struct RtcTime {
 impl RtcTime {
     // Reads and returns the current [`RtcTime`] from the RTC CMOS.
     fn now() -> Self {
-        // Calls read register function which writes to port 0x70 to set RTC then reads from 0x71 which
-        // outputs correct value
         let seconds = read_register(0x00);
         let minutes = read_register(0x02);
         let hours = read_register(0x04);
@@ -121,7 +135,7 @@ fn read_cmos() -> u8 {
 
 // Returns true if an update is in progress, false otherwise.
 fn is_update_in_progress() -> bool {
-    //writing to this register causes cmos to output 1 if rtc update in progress
+    // Writing to this register causes the CMOS to output 1 if an update is in progress.
     write_cmos(0x0A);
     let is_in_progress: bool = read_cmos() == 1;
     is_in_progress
@@ -166,7 +180,6 @@ fn read_register(register: u8) -> u8 {
 //     let res = set_rtc_frequency(rtc_freq);
 //     res.map( |_| rtc_interrupt_handler as HandlerFunc )
 // }
-
 
 // pub fn rtc_ticks() -> Result<usize, ()> {
 //      if let Some(ticks) = RTC_TICKS.get() {
@@ -253,7 +266,7 @@ mod tests {
     use crate::Duration;
 
     #[test]
-    fn test_rtc_time_to_unix() {
+    fn test_rtc_time_to_unix_time() {
         let time: Duration = RtcTime {
             seconds: 0,
             minutes: 0,

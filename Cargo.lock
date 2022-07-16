@@ -23,7 +23,6 @@ dependencies = [
  "memory",
  "pause",
  "pic",
- "pit_clock",
  "rsdp",
  "rsdt",
  "spin 0.9.0",
@@ -2606,6 +2605,15 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
+]
+
+[[package]]
+name = "rtc"
+version = "0.1.0"
+dependencies = [
+ "port_io",
+ "spin 0.9.0",
+ "time",
 ]
 
 [[package]]

@@ -8,8 +8,8 @@
 mod hpet;
 #[cfg(feature = "pit")]
 mod pit;
-#[cfg(feature = "rtc")]
-mod rtc;
+// #[cfg(feature = "rtc")]
+// mod rtc;
 #[cfg(feature = "tsc")]
 mod tsc;
 
@@ -17,7 +17,7 @@ use core::{
     mem::transmute,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use log::{error, info, warn};
+use log::{info, warn};
 
 pub use core::time::Duration;
 // TODO: Use something other than PIT?
@@ -122,15 +122,15 @@ fn init_monotonic_timer() -> Result<(), &'static str> {
 
 fn init_realtime_timer() -> Result<(), &'static str> {
     #[allow(unused_assignments)]
-    let mut addr = None;
+    let addr = None;
 
-    #[cfg(feature = "rtc")]
-    {
-        if rtc::exists() {
-            info!("using rtc as realtime time source");
-            addr = Some(rtc::now as usize);
-        }
-    }
+    // #[cfg(feature = "rtc")]
+    // {
+    //     if rtc::exists() {
+    //         info!("using rtc as realtime time source");
+    //         addr = Some(rtc::now as usize);
+    //     }
+    // }
 
     if let Some(addr) = addr {
         REALTIME_CLOCK_FUNCTION.store(addr, Ordering::SeqCst);
@@ -147,6 +147,23 @@ where
     let addr = <T as ClockType>::func_addr();
     let f = unsafe { transmute::<_, fn() -> Duration>(addr) };
     f()
+}
+
+/// A hardware clock.
+pub trait Clock {
+    /// The type of clock (either [`Monotonic`] or [`Realtime`]).
+    type ClockType: ClockType;
+
+    /// Whether the clock exists on the system.
+    fn exists() -> bool;
+    
+    /// Initialise the clock.
+    fn init() -> Result<(), &'static str>;
+    /// The current time according to the clock.
+    ///
+    /// For monotonic clocks this is usually the time since boot, and for realtime clocks its the
+    /// time since 12:00am January 1st 1970 (i.e. Unix time).
+    fn now() -> Duration;
 }
 
 /// Either a [`Monotonic`] or [`Realtime`] clock.
