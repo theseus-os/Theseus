@@ -182,7 +182,7 @@ build: $(nano_core_binary)
 	done; wait
 
 ## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i "$(TARGET_DEPS_DIR)" \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
 		--output-deps $(DEPS_BUILD_DIR) \

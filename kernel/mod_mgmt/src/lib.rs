@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(let_chains)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -26,7 +27,7 @@ extern crate rangemap;
 use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
 use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
 use spin::{Mutex, Once};
-use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}};
+use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use bootloader_modules::BootloaderModule;
@@ -1139,25 +1140,40 @@ impl CrateNamespace {
         data_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
     ) -> Result<SectionMetadata, &'static str> {
         
-        // this maps section header index (shndx) to LoadedSection
-        let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
-        let global_sections: BTreeSet<Shndx> = BTreeSet::new();
-        // the set of Shndxes for .data and .bss sections
-        let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
-        // the set of Shndxes for TLS sections (.tdata, .tbss)
-        let mut tls_sections: BTreeSet<Shndx> = BTreeSet::new();
+        let mut text_pages_locked       = text_pages  .as_ref().map(|(tp, tp_range)| (tp.clone(), tp.lock(), tp_range.start));
+        let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, rp_range)| (rp.clone(), rp.lock(), rp_range.start));
+        let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, dp_range)| (dp.clone(), dp.lock(), dp_range.start));
 
-        let mut text_pages_locked       = text_pages  .as_ref().map(|(tp, _)| tp.lock());
-        let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| rp.lock());
-        let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| dp.lock());
+        // The section header offset of the first (and only) executable section, which is .text
+        let mut exec_offset:   Option<usize> = None;
+        // The section header offset of the first read-only section, which is, in order of existence:
+        // .rodata, .eh_frame, .gcc_except_table, .tdata
+        let mut read_only_offset: Option<usize> = None;
+        // The section header offset of the first read-write section, which is .data or .bss
+        let mut read_write_offset:   Option<usize> = None;
+ 
+        // We need to track various section `shndx`s to differentiate between 
+        // the different types of "OBJECT" symbols and "TLS" symbols.
+        //
+        // For example, we use the `.rodata` shndx in order to determine whether
+        // an "OBJECT" symbol is read-only (.rodata) or read-write (.data or .bss).
+        //
+        // Note: we *could* just get the section header for each symtab entry, 
+        //       but that is MUCH slower than tracking them here.
+        let mut rodata_shndx_and_offset: Option<(Shndx, usize)> = None;
+        let mut data_shndx_and_offset:   Option<(Shndx, usize)> = None;
+        let mut bss_shndx_and_offset:    Option<(Shndx, usize)> = None;
+        let mut tdata_shndx_and_offset:  Option<(Shndx, usize)> = None;
+        let mut tbss_shndx_and_offset:   Option<(Shndx, usize)> = None;
 
-        let mut read_only_start = None;
-        let mut read_write_start = None;
+        // The set of `LoadedSections` that will be parsed and populated into this `new_crate`.
+        let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new(); 
+
         // Iterate over all "allocated" sections to copy their data from the object file into the above `MappedPages`s.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, etc.
         //
         // We currently perform eager copying because MappedPages doesn't yet support backing files or demand paging.
-        for sec in elf_file.section_iter() {
+        for (shndx, sec) in elf_file.section_iter().enumerate() {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
@@ -1165,27 +1181,43 @@ impl CrateNamespace {
             }
 
             // get the relevant section info, i.e., size, alignment, and data contents
-            let sec_size  = sec.size()  as usize;
+            let sec_size   = sec.size()   as usize;
             let sec_offset = sec.offset() as usize;
-            let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write   = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let is_exec    = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
+            let is_tls     = sec_flags & SHF_TLS       == SHF_TLS;
+
+            let mut is_rodata = false;
+            let mut is_eh_frame = false;
+            let mut is_gcc_except_table = false;
 
             let dest_pages: &mut MappedPages;
             let dest_offset: usize;
 
             // If executable, copy the .text section data into `text_pages`.
             if is_exec {
-                dest_offset = sec.offset() as usize;
+                let starting_offset_of_text = exec_offset.get_or_insert(sec_offset);
+                dest_offset = sec_offset - *starting_offset_of_text;
                 dest_pages = text_pages_locked.as_mut()
+                    .map(|tp| &mut tp.1)
                     .ok_or("BUG: ELF file contained a .text section, but no text_pages were allocated")?;
-            } 
+            }
 
-            // If writable (excluding TLS), copy the .data/.bss section into `data_pages`.
+            // Otherwise, if writable (excluding TLS), copy the .data/.bss section into `data_pages`.
             else if is_write && !is_tls {
-                let start_of_data = read_write_start.get_or_insert(sec_offset);
-                dest_offset = sec_offset - *start_of_data;
+                match sec.get_type() {
+                    Ok(ShType::ProgBits) => data_shndx_and_offset.get_or_insert((shndx, sec_offset)),
+                    Ok(ShType::NoBits)   => bss_shndx_and_offset.get_or_insert((shndx, sec_offset)),
+                    _ => {
+                        error!("BUG: writable section was neither PROGBITS (.data) nor NOBITS (.bss): {:X?}", sec);
+                        return Err("BUG: writable section was neither PROGBITS (.data) nor NOBITS (.bss)");
+                    }
+                };
+
+                let starting_offset_of_data = read_write_offset.get_or_insert(sec_offset);
+                dest_offset = sec_offset - *starting_offset_of_data;
                 dest_pages = read_write_pages_locked.as_mut()
+                    .map(|dp| &mut dp.1)
                     .ok_or("BUG: ELF file contained a .data/.bss section, but no data_pages were allocated")?;
             }
 
@@ -1194,31 +1226,78 @@ impl CrateNamespace {
             // Although TLS sections have "WAT" flags (write, alloc, TLS),
             // we load TLS sections into the same read-only pages as other read-only sections
             // because they contain thread-local storage initializer data that is only read from.
+            //
+            // The below if-conditional is a bit complex, but it boils down to:
+            // `if sec is .rodata or .eh_frame or .gcc_except_table or TLS`
             else if is_tls || {
-                let sec_name = sec.get_name(&elf_file).map_err(|e| {
-                    error!("BUG: couldn't get section name for {:?}", sec);
+                let sec_name = sec.get_name(&elf_file).map_err(|_e| {
+                    error!("BUG: Error: {:?}, couldn't get section name for {:?}", _e, sec);
                     "BUG: couldn't get section name"
                 })?;
-                sec_name == SectionType::Rodata.name()
-                    || sec_name == SectionType::EhFrame.name()
-                    || sec_name == SectionType::GccExceptTable.name()
+                match sec_name {
+                    RODATA_SECTION_NAME           => is_rodata           = true,
+                    EH_FRAME_SECTION_NAME         => is_eh_frame         = true,
+                    GCC_EXCEPT_TABLE_SECTION_NAME => is_gcc_except_table = true,
+                    _ => { /* do nothing */ }
+                }
+                is_rodata || is_eh_frame || is_gcc_except_table
             } {
-                // Explicitly skip .tbss sections because they don't have any data
-                // in the object file nor do they occupy any space in loaded memory.
-                let is_tbss = sec.get_type() == Ok(ShType::NoBits);
-                if is_tbss {
+                let sec_type = sec.get_type();
+                if is_tls && sec_type == Ok(ShType::ProgBits) {
+                    tdata_shndx_and_offset.get_or_insert((shndx, sec_offset));
+                } else if is_tls && sec_type == Ok(ShType::NoBits) {
+                    // Explicitly skip .tbss sections because they don't have any data
+                    // in the object file nor do they occupy any space in loaded memory.
+                    tbss_shndx_and_offset.get_or_insert((shndx, sec_offset));
                     continue;
-                } 
+                }
 
-                let start_of_rodata = read_only_start.get_or_insert(sec_offset);
-                dest_offset = sec_offset - *start_of_rodata;
-                dest_pages = read_only_pages_locked.as_mut()
+                if is_rodata {
+                    rodata_shndx_and_offset = Some((shndx, sec_offset));
+                }
+
+                let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                dest_offset = sec_offset - *read_only_start;
+                let (rp_ref, rp, rp_start_vaddr) = read_only_pages_locked.as_mut()
                     .ok_or("BUG: ELF file contained a read-only section, but no rodata_pages were allocated")?;
+                dest_pages = rp;
+
+                // Add an explicit .eh_frame or .gcc_except_table section here,
+                // as they may need to be located by name for the purpose of stack unwinding/backtrace.
+                if is_eh_frame {
+                    loaded_sections.insert(0,
+                        Arc::new(LoadedSection::new(
+                            SectionType::EhFrame,
+                            EH_FRAME_STR_REF.clone(),
+                            Arc::clone(rp_ref),
+                            dest_offset,
+                            *rp_start_vaddr + dest_offset,
+                            sec_size,
+                            false, // .eh_frame section is not globally visible
+                            new_crate.clone(),
+                        ))
+                    );
+                } else if is_gcc_except_table {
+                    loaded_sections.insert(1,
+                        Arc::new(LoadedSection::new(
+                            SectionType::GccExceptTable,
+                            GCC_EXCEPT_TABLE_STR_REF.clone(),
+                            Arc::clone(rp_ref),
+                            dest_offset,
+                            *rp_start_vaddr + dest_offset,
+                            sec_size,
+                            false, // .gcc_except_table section is not globally visible
+                            new_crate.clone(),
+                        ))
+                    );
+                } else {
+                    // do nothing here, as other sections will be added while iterating over the symbol table.
+                }
             }
 
             // Finally, any other section type is considered unhandled, so return an error!
             else {
-                // .debug_* sections are handled separately, and are loaded on demand.
+                // .debug_* sections are handled separately and loaded on demand later.
                 let sec_name = sec.get_name(&elf_file);
                 if sec_name.map_or(false, |n| n.starts_with(".debug")) {
                     continue;
@@ -1227,345 +1306,191 @@ impl CrateNamespace {
                 return Err("load_crate_with_merged_sections(): section with unhandled type, name, or flags!");
             }
 
+            let dbg = format!("{:?}", dest_pages);
             // Perform the actual copying of section data
-            {
-                let dest_slice: &mut [u8] = dest_pages.as_slice_mut(dest_offset, sec_size)?;
-                match sec.get_data(&elf_file) {
-                    Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                    Ok(SectionData::Empty) => dest_slice.fill(0),
-                    _other => {
-                        error!("Couldn't get section data for merged .text section: {:?}", _other);
-                        return Err("couldn't get section data for merged .text section");
-                    }
+            let dest_slice: &mut [u8] = dest_pages.as_slice_mut(dest_offset, sec_size)?;
+            match sec.get_data(&elf_file) {
+                Ok(SectionData::Undefined(sec_data)) => {
+                    debug!("Copying {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, dest_offset, dbg);
+                    dest_slice.copy_from_slice(sec_data)
+                }
+                Ok(SectionData::Empty) => {
+                    debug!("Zero-filling {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, dest_offset, dbg);
+                    dest_slice.fill(0)
+                }
+                _other => {
+                    error!("Couldn't get section data for merged section: {:?}", _other);
+                    return Err("couldn't get section data for merged section");
                 }
             }
         }
 
+        // Now that we've copied all the section data from the object file to the various mapped pages,
+        // we can populate the crate's sets of sections by iterating over the symbol table.
+        let mut global_sections: BTreeSet<usize> = BTreeSet::new();
+        let mut data_sections:   BTreeSet<usize> = BTreeSet::new();
+        let mut tls_sections:    BTreeSet<usize> = BTreeSet::new();
 
-        TODO: left off here
+        let symtab = find_symbol_table(&elf_file)?;
+        use xmas_elf::symbol_table::Entry;
+        for (sym_num, symbol_entry) in symtab.iter().enumerate() {
+            let sec_size = symbol_entry.size() as usize;
+            if sec_size == 0 {
+                continue;
+            }
+            trace!("Symtab entry {:?}\n\tnum: {}, value: {:#X}, size: {}, type: {:?}, bind: {:?}, vis: {:?}, shndx: {}", 
+                symbol_entry.get_name(&elf_file).unwrap(), sym_num, symbol_entry.value(), symbol_entry.size(), symbol_entry.get_type().unwrap(), symbol_entry.get_binding().unwrap(), symbol_entry.get_other(), symbol_entry.shndx()
+            );
 
-        // Use the symbol table itself to populate the set of sections in a given crate.
-        {
-            let symtab = find_symbol_table(&elf_file)?;
-            use xmas_elf::symbol_table::Entry;
-            for (sym_num, entry) in symtab.iter().enumerate() {
-                if entry.size() == 0 {
-                    continue;
-                }
-                trace!("Symtab entry {:?}\n\tnum: {}, value: {:#X}, size: {}, type: {:?}, bind: {:?}, vis: {:?}, shndx: {}", 
-                    entry.get_name(&elf_file).unwrap(), sym_num, entry.value(), entry.size(), entry.get_type().unwrap(), entry.get_binding().unwrap(), entry.get_other(), entry.shndx()
-                );
+            // Get the relevant section info from the symtab entry
+            let sec_value = symbol_entry.value() as usize;
+            let sec_name = symbol_entry.get_name(&elf_file).map_err(|_e| {
+                error!("BUG: Error: {:?}, couldn't get symtab entry name: {}", _e, symbol_entry as &dyn Entry);
+                "BUG: couldn't get symtab entry name"
+            })?;
+            let sec_type = symbol_entry.get_type().map_err(|_e| {
+                error!("BUG: Error: {:?}, couldn't get symtab entry type: {}", _e, symbol_entry as &dyn Entry);
+                "BUG: couldn't get symtab entry type"
+            })?;
+            let sec_binding = symbol_entry.get_binding().map_err(|_e| {
+                error!("BUG: Error: {:?}, couldn't get symtab entry binding: {}", _e, symbol_entry as &dyn Entry);
+                "BUG: couldn't get symtab entry binding"
+            })?;
+            let is_global = sec_binding == Binding::Global;
+            let is_tls = sec_type == Type::Tls;
+            let demangled = demangle(sec_name).to_string().as_str().into();
 
-                let sec = entry.get_section_header(&elf_file, entry.shndx().into()).map_err(|e| {
-                    error!("BUG: {:?}: couldn't get section header for {}", e, entry as &dyn Entry);
-                    "BUG: couldn't get section header for symtab entry"
-                })?;
+            // Declare the items we need to create a new `LoadedSection`.
+            let typ: SectionType;
+            let mapped_pages: &Arc<Mutex<MappedPages>>;
+            let mapped_pages_offset: usize;
+            let virt_addr: VirtualAddress;
 
-                // get the relevant section info, i.e., size, alignment, and data contents
-                let sec_size  = sec.size()  as u64;
-                let sec_align = sec.align() as usize;
-                let sec_flags = sec.flags();
-                let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
-                let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-                let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
+            // Handle a "FUNC" symbol, which exists in .text
+            if sec_type == Type::Func {
+                let (tp_ref, tp_start_vaddr) = text_pages_locked.as_ref()
+                    .map(|(mp_arc, _, mp_vaddr)| (mp_arc, *mp_vaddr))
+                    .ok_or("BUG: found FUNC symbol but no text_pages were allocated")?;
+                let exec_start = exec_offset.ok_or("BUG: found FUNC symbol but `text_offset` was unknown")?;
 
-                // First, check for executable sections, which can only be .text sections.
-                if is_exec && !is_write {
-                    let is_global = global_sections.contains(&shndx);
-                    let name = try_get_symbol_name_after_prefix!(sec_name, TEXT_PREFIX);
-                    // Handle cold sections, which have a section prefix of ".text.unlikely."
-                    // Currently, we ignore the cold/hot designation in terms of placing a section in memory.
-                    // Note: we only *truly* have to do this for global sections, because other crates
-                    //       might depend on their correct section name after the ".text.unlikely." prefix.
-                    let name = if is_global && name.starts_with(UNLIKELY_PREFIX) {
-                        name.get(UNLIKELY_PREFIX.len() ..).ok_or_else(|| {
-                            error!("Failed to get the .text.unlikely. section's name: {:?}", sec_name);
-                            "Failed to get the .text.unlikely. section's name after the prefix"
-                        })?
-                    } else {
-                        name
-                    };
-                    let demangled = demangle(name).to_string().as_str().into();
+                typ = SectionType::Text;
+                mapped_pages = tp_ref;
+                // use an additional offset below because `text_pages` starts at 0x0, not `exec_start`.
+                mapped_pages_offset = sec_value + exec_start;
+                virt_addr = tp_start_vaddr + mapped_pages_offset;
+            }
 
-                    // We already copied the content of all .text sections above, 
-                    // so here we just record the metadata into a new `LoadedSection` object.
-                    if let Some((ref tp_ref, ref tp_range)) = text_pages {
-                        let text_offset = sec.offset() as usize;
-                        let dest_vaddr = tp_range.start + text_offset;
+            // Handle an "OBJECT" symbol, which exists in .rodata, .data, or .bss
+            else if sec_type == Type::Object {
+                let sym_shndx = symbol_entry.shndx() as Shndx;
+                // Handle .rodata symbol
+                if Some(sym_shndx) == rodata_shndx_and_offset.map(|(shndx, _)| shndx) {
+                    let (rp_ref, rp_start_vaddr) = read_only_pages_locked.as_ref()
+                        .map(|(mp_arc, _, mp_vaddr)| (mp_arc, *mp_vaddr))
+                        .ok_or("BUG: found OBJECT symbol in .rodata but no rodata_pages were allocated")?;
 
-                        loaded_sections.insert(
-                            shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::Text,
-                                demangled,
-                                Arc::clone(tp_ref),
-                                text_offset,
-                                dest_vaddr,
-                                sec_size,
-                                is_global,
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-                    }
-                    else {
-                        return Err("BUG: ELF file contained a .text* section, but no text_pages were allocated");
-                    }
-                }
-
-                // Second, if not executable, handle TLS sections.
-                // Although TLS sections have "WAT" flags (write, alloc, TLS),
-                // we load TLS sections into the same read-only pages as other read-only sections (e.g., .rodata)
-                // because they contain thread-local storage initializer data that is only read from.
-                else if is_tls {
-                    // check if this TLS section is .bss or .data
-                    let is_bss = sec.get_type() == Ok(ShType::NoBits);
-                    let name = if is_bss {
-                        try_get_symbol_name_after_prefix!(sec_name, TLS_BSS_PREFIX)
-                    } else {
-                        try_get_symbol_name_after_prefix!(sec_name, TLS_DATA_PREFIX)
-                    };
-                    let demangled = demangle(name).to_string().as_str().into();
-
-                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                        let (mapped_pages_offset, sec_typ) = if is_bss {
-                            // Here: a TLS .tbss section has no actual content, so we use a max-value offset
-                            // as a canary value to ensure it cannot be used to index into a MappedPages.
-                            (usize::MAX, SectionType::TlsBss)
-                        } else {
-                            // Here: copy the TLS .tdata section's contents to the proper address in the read-only pages.
-                            let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
-                            match sec.get_data(&elf_file) {
-                                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                                _other => {
-                                    error!("load_crate_sections(): Couldn't get section data for TLS .tdata section [{}] {}: {:?}", shndx, sec_name, _other);
-                                    return Err("couldn't get section data in TLS .tdata section");
-                                }
-                            };
-                            // As with all other normal sections, use the current offset for these read-only pages.
-                            (rodata_offset, SectionType::TlsData)
-                        };
-
-                        let new_tls_section = LoadedSection::new(
-                            sec_typ,
-                            demangled,
-                            Arc::clone(rp_ref),
-                            mapped_pages_offset,
-                            VirtualAddress::zero(), // will be replaced in `add_new_dynamic_tls_section()` below
-                            sec_size,
-                            global_sections.contains(&shndx),
-                            new_crate_weak_ref.clone(),
-                        );
-                        // trace!("Loaded new TLS section: {:?}", new_tls_section);
-                        
-                        // Add the new TLS section to this namespace's initial TLS area,
-                        // which will reserve/obtain a new offset into that TLS area which holds this section's data.
-                        // This will also update the section's virtual address field to hold that offset value,
-                        // which is used for relocation entries that ask for a section's offset from the TLS base.
-                        let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                            .add_new_dynamic_tls_section(new_tls_section, sec_align)
-                            .map_err(|_| "Failed to add new TLS section")?;
-
-                        // trace!("\t --> updated new TLS section: {:?}", new_tls_section);
-                        loaded_sections.insert(shndx, new_tls_section);
-                        tls_sections.insert(shndx);
-
-                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
-                    }
-                    else {
-                        return Err("no rodata_pages were allocated when handling TLS section");
-                    }
-                }
-
-                // Third, if not executable nor TLS, handle writable .data/.bss sections.
-                else if is_write {
-                    // check if this section is .bss or .data
-                    let is_bss = sec.get_type() == Ok(ShType::NoBits);
-                    let name = if is_bss {
-                        try_get_symbol_name_after_prefix!(sec_name, BSS_PREFIX)
-                    } else {
-                        try_get_symbol_name_after_prefix!(sec_name, DATA_PREFIX)
-                            // Currently, .rel.ro sections no longer exist in object files compiled for Theseus.
-                            // .and_then(|name| {
-                            //     if name.starts_with(RELRO_PREFIX) {
-                            //         name.get(RELRO_PREFIX.len() ..)
-                            //     } else {
-                            //         Some(name)
-                            //     }
-                            // })
-                    };
-                    let demangled = demangle(name).to_string().as_str().into();
-                    
-                    if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
-                        // here: we're ready to copy the data/bss section to the proper address
-                        let dest_vaddr = dp.address_at_offset(data_offset)
-                            .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
-                        let dest_slice: &mut [u8] = dp.as_slice_mut(data_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
-                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => dest_slice.fill(0),
-                            _other => {
-                                error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, _other);
-                                return Err("couldn't get section data in .data section");
-                            }
-                        }
-                        
-                        loaded_sections.insert(
-                            shndx,
-                            Arc::new(LoadedSection::new(
-                                if is_bss { SectionType::Bss } else { SectionType::Data },
-                                demangled,
-                                Arc::clone(dp_ref),
-                                data_offset,
-                                dest_vaddr,
-                                sec_size,
-                                global_sections.contains(&shndx),
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-                        data_sections.insert(shndx);
-
-                        data_offset += round_up_power_of_two(sec_size, sec_align);
-                    }
-                    else {
-                        return Err("no data_pages were allocated for .data/.bss section");
-                    }
-                }
-
-                // Fourth, if neither executable nor TLS nor writable, handle .rodata sections.
-                else if sec_name.starts_with(RODATA_PREFIX) {
-                    let name = try_get_symbol_name_after_prefix!(sec_name, RODATA_PREFIX);
-                    let demangled = demangle(name).to_string().as_str().into();
-
-                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                        // here: we're ready to copy the rodata section to the proper address
-                        let dest_vaddr = rp.address_at_offset(rodata_offset)
-                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
-                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => dest_slice.fill(0),
-                            _other => {
-                                error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, _other);
-                                return Err("couldn't get section data in .rodata section");
-                            }
-                        }
-                        
-                        loaded_sections.insert(
-                            shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::Rodata,
-                                demangled,
-                                Arc::clone(rp_ref),
-                                rodata_offset,
-                                dest_vaddr,
-                                sec_size,
-                                global_sections.contains(&shndx),
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-
-                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
-                    }
-                    else {
-                        return Err("no rodata_pages were allocated when handling .rodata section");
-                    }
-                }
-
-                // Fifth, if neither executable nor TLS nor writable nor .rodata, handle the `.gcc_except_table` sections
-                else if sec_name.starts_with(GCC_EXCEPT_TABLE_PREFIX) {
-                    // We don't need to waste space keeping the name of the `.gcc_exept_table` section, 
-                    // because that name is irrelevant and will never be used.
-                    //
-                    // let name = try_get_symbol_name_after_prefix!(sec_name, GCC_EXCEPT_TABLE_PREFIX);
-                    // let demangled = demangle(name).to_string().into();
-
-                    // gcc_except_table sections are read-only, so we put them in the .rodata pages
-                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                        // here: we're ready to copy the rodata section to the proper address
-                        let dest_vaddr = rp.address_at_offset(rodata_offset)
-                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
-                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => dest_slice.fill(0),
-                            _other => {
-                                error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, _other);
-                                return Err("couldn't get section data in .gcc_except_table section");
-                            }
-                        }
-
-                        loaded_sections.insert(
-                            shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::GccExceptTable,
-                                GCC_EXCEPT_TABLE_STR_REF.clone(),
-                                Arc::clone(rp_ref),
-                                rodata_offset,
-                                dest_vaddr,
-                                sec_size,
-                                false, // .gcc_except_table sections are never globally visible,
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-
-                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
-                    }
-                    else {
-                        return Err("no rodata_pages were allocated when handling .gcc_except_table");
-                    }
-                }
-
-                // Fifth, if neither executable nor TLS nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
-                else if sec_name == EH_FRAME_NAME {
-                    // The eh_frame section is read-only, so we put it in the .rodata pages
-                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
-                        // here: we're ready to copy the rodata section to the proper address
-                        let dest_vaddr = rp.address_at_offset(rodata_offset)
-                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
-                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => dest_slice.fill(0),
-                            _other => {
-                                error!("load_crate_sections(): Couldn't get section data for .eh_frame section [{}] {}: {:?}", shndx, sec_name, _other);
-                                return Err("couldn't get section data in .eh_frame section");
-                            }
-                        }
-
-                        loaded_sections.insert(
-                            shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::EhFrame,
-                                EH_FRAME_STR_REF.clone(),
-                                Arc::clone(rp_ref),
-                                rodata_offset,
-                                dest_vaddr,
-                                sec_size,
-                                false, // .eh_frame section is not globally visible,
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-
-                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
-                    }
-                    else {
-                        return Err("no rodata_pages were allocated when handling .eh_frame");
-                    }
-                }
-
-                // Finally, any other section type is considered unhandled, so return an error!
+                    typ = SectionType::Rodata;
+                    mapped_pages = rp_ref;
+                    // no additional offset below, because .rodata is always the first read-only section.
+                    mapped_pages_offset = sec_value; 
+                    virt_addr = rp_start_vaddr + mapped_pages_offset;
+                } 
+                // Handle .data/.bss symbol
                 else {
-                    // .debug_* sections are handled separately, and are loaded on demand.
-                    if sec_name.starts_with(".debug") {
-                        continue;
-                    }
-                    error!("unhandled section [{}], name: {}, sec: {:?}", shndx, sec_name, sec);
-                    return Err("load_crate_sections(): section with unhandled type, name, or flags!");
+                    data_sections.insert(sym_num);
+
+                    let (dp_ref, dp_start_vaddr) = read_write_pages_locked.as_ref()
+                        .map(|(mp_arc, _, mp_vaddr)| (mp_arc, *mp_vaddr))
+                        .ok_or("BUG: found OBJECT symbol in .data/.bss but no data_pages were allocated")?;
+                    let read_write_start = read_write_offset.ok_or("BUG: found OBJECT symbol in .data/.bss but `data_offset` was unknown")?;
+
+                    if Some(sym_shndx) == data_shndx_and_offset.map(|(shndx, _)| shndx) {
+                        typ = SectionType::Data;
+                        // no additional offset below, because .data is always the first read-write section.
+                        mapped_pages_offset = sec_value;
+                    } else if let Some((bss_shndx, bss_offset)) = bss_shndx_and_offset && sym_shndx == bss_shndx {
+                        typ = SectionType::Bss;
+                        mapped_pages_offset = sec_value + (bss_offset - read_write_start);
+                    } else {
+                        error!("BUG: found OBJECT symbol with an shndx that wasn't in .rodata, .data, or .bss: {}", symbol_entry as &dyn Entry);
+                        return Err("BUG: found OBJECT symbol with an shndx that wasn't in .rodata, .data, or .bss");
+                    };
+                    mapped_pages = dp_ref;
+                    virt_addr = dp_start_vaddr + mapped_pages_offset;
                 }
             }
-        }
 
-        */
+            // Handle a "TLS" symbol, which exists in .tdata or .tbss
+            else if is_tls {
+                // TLS sections have been copied into the read-only pages,
+                // but we don't need its virt_addr because TLS sections are assigned one dynamically.
+                let rp_ref = read_only_pages_locked.as_ref()
+                    .map(|(mp_arc, ..)| mp_arc)
+                    .ok_or("BUG: found TLS symbol but no rodata_pages were allocated")?;
+                let read_only_start = read_only_offset.unwrap_or(0);
+
+                let sym_shndx = symbol_entry.shndx() as Shndx;
+                if let Some((tdata_shndx, tdata_offset)) = tdata_shndx_and_offset && sym_shndx == tdata_shndx {
+                    typ = SectionType::TlsData;
+                    mapped_pages_offset = sec_value + (tdata_offset - read_only_start);
+                } else if Some(sym_shndx) == tbss_shndx_and_offset.map(|(shndx, _)| shndx) {
+                    typ = SectionType::TlsBss;
+                    // Here: a TLS .tbss section has no actual content, so we use a max-value offset
+                    // as a canary value to ensure it cannot be used to index into a MappedPages.
+                    mapped_pages_offset = usize::MAX;
+                } else {
+                    error!("BUG: found OBJECT symbol with an shndx that wasn't in .rodata, .data, or .bss: {}", symbol_entry as &dyn Entry);
+                    return Err("BUG: found OBJECT symbol with an shndx that wasn't in .rodata, .data, or .bss");
+                };
+                mapped_pages = rp_ref;
+                virt_addr = VirtualAddress::zero(); // will be replaced in `add_new_dynamic_tls_section()` below
+            }
+
+            else {
+                todo!("error on unexpected symtab entry: double check if there are any .eh_frame or .gcc_except_table symbols possible in .symtab");
+            }
+
+            // Create the new `LoadedSection`
+            let new_section = LoadedSection::new(
+                typ,
+                demangled,
+                Arc::clone(mapped_pages),
+                mapped_pages_offset,
+                virt_addr,
+                sec_size,
+                is_global,
+                new_crate.clone(),
+            );
+
+            let new_section_ref = if is_tls {
+                // trace!("Loaded new TLS section: {:?}", new_section);
+
+                // In merged object files, the alignment of a TLS symbol is unavailable,
+                // as it has already been aligned. So we just use it's size instead.
+                let tls_sec_align = sec_size;
+
+                // Add the new TLS section to this namespace's initial TLS area,
+                // which will reserve/obtain a new offset into that TLS area which holds this section's data.
+                // This will also update the section's virtual address field to hold that offset value,
+                // which is used for relocation entries that ask for a section's offset from the TLS base.
+                let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
+                    .add_new_dynamic_tls_section(new_section, tls_sec_align)
+                    .map_err(|_| "Failed to add new TLS section")?;
+
+                // trace!("\t --> updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
+                tls_sections.insert(sym_num);
+                new_tls_section
+            } else {
+                Arc::new(new_section)
+            };
+
+            loaded_sections.insert(sym_num, new_section_ref);
+
+            if is_global {
+                global_sections.insert(sym_num);
+            }
+        
+        } // end of iterating over all symbol table entries
 
         Ok(SectionMetadata { 
             loaded_sections,
@@ -2083,8 +2008,7 @@ impl CrateNamespace {
 
             // Debug sections are handled separately
             if let Ok(name) = sec.get_name(&elf_file) {
-                if name.starts_with(".rela.debug")         // ignore debug special sections for now
-                {
+                if name.starts_with(".rela.debug") { // ignore debug special sections for now
                     continue;
                 }
             }

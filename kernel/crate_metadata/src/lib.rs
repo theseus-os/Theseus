@@ -578,6 +578,16 @@ impl LoadedCrate {
 }
 
 
+pub const TEXT_SECTION_NAME            : &str = ".text";
+pub const RODATA_SECTION_NAME          : &str = ".rodata";
+pub const DATA_SECTION_NAME            : &str = ".data";
+pub const BSS_SECTION_NAME             : &str = ".bss";
+pub const TLS_DATA_SECTION_NAME        : &str = ".tdata";
+pub const TLS_BSS_SECTION_NAME         : &str = ".tbss";
+pub const GCC_EXCEPT_TABLE_SECTION_NAME: &str = ".gcc_except_table";
+pub const EH_FRAME_SECTION_NAME        : &str = ".eh_frame";
+
+
 /// The possible types of sections that can be loaded from a crate object file.
 #[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SectionType {
@@ -616,18 +626,6 @@ pub enum SectionType {
     EhFrame,
 }
 impl SectionType {
-    pub const fn name(&self) -> &'static str {
-        match self {
-            &Self::Text => ".text",
-            &Self::Rodata => ".rodata",
-            &Self::Data => ".data",
-            &Self::Bss => ".bss",
-            &Self::TlsData => "tdata.",
-            &Self::TlsBss => ".tbss",
-            &Self::GccExceptTable => ".gcc_except_table",
-            &Self::EhFrame => ".eh_frame",
-        }
-    }
     /// Returns `true` if `Data` or `Bss`, otherwise `false`.
     pub fn is_data_or_bss(&self) -> bool {
         match self {
