@@ -35,14 +35,17 @@ impl From<&'static str> for RegisterError {
 ///
 /// The provided clock will overwrite the previous clock.
 ///
-/// Returns an error if the clock doesn't exist.
+/// Returns an error if the clock doesn't exist or if
+/// [`INIT_REQUIRED`](EarlySleeper::INIT_REQUIRED) is `true` and [`Clock::init`]
+/// returned an error.
 pub fn register_early_sleeper<T>() -> Result<(), RegisterError>
 where
     T: EarlySleeper,
 {
     if T::exists() {
         if T::INIT_REQUIRED {
-            // FIXME: The clock may be double initialised: once here and once in register_clock.
+            // FIXME: The clock may be double initialised: once here and once in
+            // register_clock.
             T::init()?;
         }
         EARLY_SLEEP_FUNCTION.store(T::sleep as usize, Ordering::SeqCst);
@@ -57,6 +60,7 @@ where
 /// This function can be used even when interrupts are disabled.
 ///
 /// # Panics
+///
 /// This function will panic if called prior to [`register_early_sleeper`].
 pub fn early_sleep(duration: Duration) {
     let addr = EARLY_SLEEP_FUNCTION.load(Ordering::SeqCst);
@@ -72,7 +76,8 @@ pub fn early_sleep(duration: Duration) {
 ///
 /// The provided clock will overwrite the previous clock.
 ///
-/// Returns an error if the clock doesn't exist.
+/// Returns an error if the clock doesn't exist or if [`init`](Clock::init)
+/// returns an error.
 pub fn register_clock<T>() -> Result<(), RegisterError>
 where
     T: Clock,
@@ -90,13 +95,14 @@ where
 
 /// Returns the current time.
 ///
-/// For monotonic clocks this is usually the time since boot, and for realtime clocks its the
-/// time since 12:00am January 1st 1970 (i.e. Unix time).
+/// For monotonic clocks this is usually the time since boot, and for realtime
+/// clocks it's the time since 12:00am January 1st 1970 (i.e. Unix time).
 ///
 /// # Panics
-/// This function will panic if called prior to registering a clock using [`register_clock`].
-/// [`register_clock`] must return [`Ok`] and the [`ClockType`] of the registered clock must be the
-/// same as `T`.
+///
+/// This function will panic if called prior to registering a clock using
+/// [`register_clock`]. [`register_clock`] must return [`Ok`] and the
+/// [`ClockType`] of the registered clock must be the same as `T`.
 pub fn now<T>() -> Duration
 where
     T: ClockType,
@@ -123,8 +129,9 @@ pub trait Clock {
 
     /// The current time according to the clock.
     ///
-    /// For monotonic clocks this is usually the time since boot, and for realtime clocks its the
-    /// time since 12:00am January 1st 1970 (i.e. Unix time).
+    /// For monotonic clocks this is usually the time since boot, and for
+    /// realtime clocks it's the time since 12:00am January 1st 1970 (i.e.
+    /// Unix time).
     ///
     /// This function must only be called after [`init`](Clock::init).
     fn now() -> Duration;
@@ -137,6 +144,11 @@ pub trait EarlySleeper: Clock {
     const INIT_REQUIRED: bool;
 
     /// Sleep for the specified duration.
+    ///
+    /// # Note to Implementors
+    ///
+    /// The default implementation of this function uses [`Clock::now`] - it can
+    /// only be used if [`Clock::now`] doesn't rely on interrupts.
     fn sleep(duration: Duration) {
         let start = Self::now();
         while Self::now() < start + duration {}
@@ -172,5 +184,9 @@ impl ClockType for Realtime {
 }
 
 mod private {
+    /// This trait is a supertrait of [`Clocktype`](super::ClockType).
+    ///
+    /// Since it's in a private module, it can't be implemented by types outside
+    /// this crate and thus neither can [`Clocktype`](super::ClockType)
     pub trait Sealed {}
 }

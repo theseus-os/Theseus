@@ -26,8 +26,8 @@ impl time::Clock for RtcClock {
         true
     }
 
-    /// This function does nothing as using the RTC as a monotonic time source doesn't require
-    /// initialisation.
+    /// This function does nothing as using the RTC as a monotonic time source
+    /// doesn't require initialisation.
     fn init() -> Result<(), &'static str> {
         Ok(())
     }
@@ -135,7 +135,8 @@ fn read_cmos() -> u8 {
 
 // Returns true if an update is in progress, false otherwise.
 fn is_update_in_progress() -> bool {
-    // Writing to this register causes the CMOS to output 1 if an update is in progress.
+    // Writing to this register causes the CMOS to output 1 if an update is in
+    // progress.
     write_cmos(0x0A);
     let is_in_progress: bool = read_cmos() == 1;
     is_in_progress
@@ -143,7 +144,8 @@ fn is_update_in_progress() -> bool {
 
 // Read the given `register` of the RTC CMOS.
 fn read_register(register: u8) -> u8 {
-    // Wait for the "update in progress" signal to finish in order to read correct values.
+    // Wait for the "update in progress" signal to finish in order to read correct
+    // values.
     while is_update_in_progress() {}
     write_cmos(register);
 
@@ -173,21 +175,21 @@ fn read_register(register: u8) -> u8 {
 // /// Initialize the RTC interrupt with the given frequency
 // /// and the given closure that will run on each RTC interrupt.
 // /// The closure is provided with the current number of RTC ticks since boot,
-// /// in the form of an `Option<usize>` because it is not guaranteed that the number of ticks can be retrieved.
+// /// in the form of an `Option<usize>` because it is not guaranteed that the
+// /// number of ticks can be retrieved.
 // pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(HandlerFunc), ()> {
 //     RTC_INTERRUPT_FUNC.call_once(|| interrupt_func);
 //     enable_rtc_interrupt();
 //     let res = set_rtc_frequency(rtc_freq);
-//     res.map( |_| rtc_interrupt_handler as HandlerFunc )
+//     res.map(|_| rtc_interrupt_handler as HandlerFunc)
 // }
 
 // pub fn rtc_ticks() -> Result<usize, ()> {
-//      if let Some(ticks) = RTC_TICKS.get() {
-//          Ok(ticks.load(Ordering::Acquire))
-//      }
-//      else {
+//     if let Some(ticks) = RTC_TICKS.get() {
+//         Ok(ticks.load(Ordering::Acquire))
+//     } else {
 //         Err(())
-//      }
+//     }
 // }
 
 // /// Turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts
@@ -205,14 +207,16 @@ fn read_register(register: u8) -> u8 {
 //     //we want it to go back to register 0x8B, it was reset when read
 //     write_cmos(0x8B);
 
-//     //here we don't use the cmos_write function because that only writes to port 0x70, in this case we need to write to 0x71
-//     //writing to 0x71 because not selecting register, setting rtc
+//     //here we don't use the cmos_write function because that only writes to port
+//     // 0x70, in this case we need to write to 0x71 writing to 0x71 because not
+//     // selecting register, setting rtc
 //     unsafe {
 //         CMOS_WRITE_SETTINGS.lock().write(prev | 0x40);
 //     }
 
 //     trace!("RTC interrupts enabled");
-//     // here: _held_interrupts falls out of scope, re-enabling interrupts if they were previously enabled.
+//     // here: _held_interrupts falls out of scope, re-enabling interrupts if they
+//     // were previously enabled.
 // }
 
 // /// the log base 2 of an integer value
@@ -245,7 +249,8 @@ fn read_register(register: u8) -> u8 {
 
 //     let _held_interrupts = hold_interrupts();
 
-//     // bottom 4 bits of register A are the "rate dividor", setting them to rate we want without altering top 4 bits
+//     // bottom 4 bits of register A are the "rate dividor", setting them to rate we
+//     // want without altering top 4 bits
 //     write_cmos(0x8A);
 //     let prev = read_cmos();
 //     write_cmos(0x8A);
@@ -257,7 +262,8 @@ fn read_register(register: u8) -> u8 {
 //     trace!("RTC frequency changed to {} Hz!", rate);
 //     Ok(())
 
-//     // here: _held_interrupts falls out of scope, re-enabling interrupts if they were previously enabled.
+//     // here: _held_interrupts falls out of scope, re-enabling interrupts if they
+//     // were previously enabled.
 // }
 
 #[cfg(test)]

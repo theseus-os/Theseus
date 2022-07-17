@@ -17,8 +17,8 @@ impl time::Clock for TscClock {
     type ClockType = time::Monotonic;
 
     fn exists() -> bool {
-        // TODO: Where should we check whether the TSC is reliable and how should we encode that
-        // in the trait?
+        // TODO: Where should we check whether the TSC is reliable and how should we
+        // encode that in the trait?
         // FIXME
         true
     }
@@ -122,14 +122,16 @@ impl TscTicks {
         match TSC_FREQUENCY.load(Ordering::SeqCst) {
             0 => Err(()),
             freq => {
-                // NOTE: This is guaranteed to not overflow as u64::max * NANOS_IN_SEC < u128::max.
+                // NOTE: This is guaranteed to not overflow as u64::max * NANOS_IN_SEC <
+                // u128::max.
                 let nanos = (self.0 as u128) * NANOS_IN_SEC as u128;
                 Ok((nanos / freq as u128) as u64)
             }
         }
     }
 
-    /// Checked subtraction. Computes `self - other`, returning `None` if underflow occurred.
+    /// Checked subtraction. Computes `self - other`, returning `None` if
+    /// underflow occurred.
     fn checked_sub(&self, other: &Self) -> Option<Self> {
         let checked_sub = self.0.checked_sub(other.0);
         checked_sub.map(TscTicks)
