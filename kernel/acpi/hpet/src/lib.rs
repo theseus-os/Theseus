@@ -28,7 +28,7 @@ static HPET: Once<RwLock<BoxRefMut<MappedPages, Hpet>>> = Once::new();
 /// because it is not guaranteed that HPET exists or has been initialized.
 /// # Example
 /// ```
-/// let counter_val = hpet().as_ref().unwrap().get_counter();
+/// let counter_val = hpet().as_ref().unwrap().counter();
 /// ```
 pub fn hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
     HPET.get().map(|h| h.read())
@@ -69,7 +69,7 @@ pub struct Hpet {
 
 impl Hpet {
     /// Returns the HPET's main counter value
-    pub fn get_counter(&self) -> u64 {
+    pub fn counter(&self) -> u64 {
         self.main_counter_value.read()
     }
 
@@ -96,6 +96,15 @@ impl Hpet {
         let caps = self.general_capabilities_and_id.read();
         let period = caps >> 32;
         period as u32
+    }
+
+    /// Whether the main counter is 64 bits wide.
+    ///
+    /// If this returns false, the counter is 32 bits.
+    pub fn is_64_bit(&self) -> bool {
+        let caps = self.general_capabilities_and_id.read();
+        // Is the 13th bit set?
+        (caps >> 13) & 1 == 1
     }
 
     pub fn vendor_id(&self) -> u16 {
@@ -130,7 +139,7 @@ pub struct HpetTimer {
     _padding:                         u64,
 }
 
-pub const HPET_SIGNATURE: &'static [u8; 4] = b"HPET";
+pub const HPET_SIGNATURE: &[u8; 4] = b"HPET";
 
 /// The handler for parsing the HPET table and adding it to the ACPI tables list.
 pub fn handle(
@@ -159,8 +168,8 @@ pub struct HpetAcpiTable {
 
 impl HpetAcpiTable {
     /// Finds the HPET in the given `AcpiTables` and returns a reference to it.
-    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t HpetAcpiTable> {
-        acpi_tables.table(&HPET_SIGNATURE).ok()
+    pub fn get(acpi_tables: &AcpiTables) -> Option<&HpetAcpiTable> {
+        acpi_tables.table(HPET_SIGNATURE).ok()
     }
 
     /// Initializes the HPET counter-based timer

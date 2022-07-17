@@ -1,0 +1,13 @@
+[package]
+name = "hpet"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+edition = "2021"
+description = "Abstractions for the x86 HPET"
+
+[dependencies]
+hpet-acpi = { path = "../acpi/hpet" }
+# interrupts = { path = "../interrupts" }
+# ioapic = { path = "../ioapic" }
+log = "0.4.3"
+time = { path = "../time" }

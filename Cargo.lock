@@ -1235,6 +1235,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hpet"
+version = "0.1.0"
+dependencies = [
+ "hpet-acpi",
+ "log",
+ "time",
+]
+
+[[package]]
 name = "hpet-acpi"
 version = "0.1.0"
 dependencies = [
@@ -3569,18 +3578,6 @@ dependencies = [
 [[package]]
 name = "time"
 version = "0.1.0"
-dependencies = [
- "apic",
- "hpet-acpi",
- "interrupts",
- "ioapic",
- "kernel_config",
- "lockable",
- "log",
- "port_io",
- "spin 0.9.0",
- "x86_64",
-]
 
 [[package]]
 name = "tlb_shootdown"
