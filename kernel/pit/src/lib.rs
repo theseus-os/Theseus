@@ -69,6 +69,12 @@ impl time::Clock for PitClock {
         )
     }
 
+}
+
+impl time::EarlySleeper for PitClock {
+    // FIXME: Is this right?
+    const INIT_REQUIRED: bool = false;
+
     /// Sleep for the given `duration`.
     ///
     /// This implementation does not rely on interrupts.
