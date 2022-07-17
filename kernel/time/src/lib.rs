@@ -10,12 +10,33 @@ static EARLY_SLEEP_FUNCTION: AtomicUsize = AtomicUsize::new(0);
 static MONOTONIC_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
 static REALTIME_CLOCK_FUNCTION: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Clone, Copy, Debug)]
+pub enum RegisterError {
+    Init(&'static str),
+    NonExistent,
+}
+
+impl core::fmt::Display for RegisterError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            RegisterError::Init(e) => f.write_fmt(format_args!("error initialising clock: {e}")),
+            RegisterError::NonExistent => f.write_str("clock doesn't exist"),
+        }
+    }
+}
+
+impl From<&'static str> for RegisterError {
+    fn from(e: &'static str) -> Self {
+        Self::Init(e)
+    }
+}
+
 /// Register the clock that can be used to sleep when interrupts are disabled.
 ///
 /// The provided clock will overwrite the previous clock.
 ///
 /// Returns an error if the clock doesn't exist.
-pub fn register_early_sleeper<T>() -> Result<(), &'static str>
+pub fn register_early_sleeper<T>() -> Result<(), RegisterError>
 where
     T: EarlySleeper,
 {
@@ -27,7 +48,7 @@ where
         EARLY_SLEEP_FUNCTION.store(T::sleep as usize, Ordering::SeqCst);
         Ok(())
     } else {
-        Err("clock doesn't exist")
+        Err(RegisterError::NonExistent)
     }
 }
 
@@ -40,7 +61,7 @@ where
 pub fn early_sleep(duration: Duration) {
     let addr = EARLY_SLEEP_FUNCTION.load(Ordering::SeqCst);
     if addr == 0 {
-        panic!("early wait function not set");
+        panic!("early sleep function not set");
     } else {
         let f: fn(Duration) = unsafe { core::mem::transmute(addr) };
         f(duration)
@@ -52,7 +73,7 @@ pub fn early_sleep(duration: Duration) {
 /// The provided clock will overwrite the previous clock.
 ///
 /// Returns an error if the clock doesn't exist.
-pub fn register_clock<T>() -> Result<(), &'static str>
+pub fn register_clock<T>() -> Result<(), RegisterError>
 where
     T: Clock,
 {
@@ -63,7 +84,7 @@ where
         func_addr.store(T::now as usize, Ordering::SeqCst);
         Ok(())
     } else {
-        Err("clock doesn't exist")
+        Err(RegisterError::NonExistent)
     }
 }
 
@@ -73,7 +94,7 @@ where
 /// time since 12:00am January 1st 1970 (i.e. Unix time).
 ///
 /// # Panics
-/// This function panics if called prior to registering a clock using [`register_clock`].
+/// This function will panic if called prior to registering a clock using [`register_clock`].
 /// [`register_clock`] must return [`Ok`] and the [`ClockType`] of the registered clock must be the
 /// same as `T`.
 pub fn now<T>() -> Duration
