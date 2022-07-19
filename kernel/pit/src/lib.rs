@@ -30,9 +30,9 @@ static PIT_TICKS: AtomicU64 = AtomicU64::new(0);
 // 4.3 > 0.05 therefore a u32 is large enough
 static PIT_PERIOD: AtomicU32 = AtomicU32::new(0);
 
-pub struct PitClock;
+pub struct Pit;
 
-impl time::Clock for PitClock {
+impl time::ClockSource for Pit {
     type ClockType = time::Monotonic;
 
     fn exists() -> bool {
@@ -72,7 +72,7 @@ impl time::Clock for PitClock {
     }
 }
 
-impl time::EarlySleeper for PitClock {
+impl time::EarlySleeper for Pit {
     // FIXME: Is this right?
     const INIT_REQUIRED: bool = false;
 

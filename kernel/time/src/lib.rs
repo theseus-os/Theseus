@@ -31,21 +31,22 @@ impl From<&'static str> for RegisterError {
     }
 }
 
-/// Register the clock that can be used to sleep when interrupts are disabled.
+/// Register the clock source that can be used to sleep when interrupts are
+/// disabled.
 ///
-/// The provided clock will overwrite the previous clock.
+/// The provided clock source will overwrite the previous clock source
 ///
 /// Returns an error if the clock doesn't exist or if
-/// [`INIT_REQUIRED`](EarlySleeper::INIT_REQUIRED) is `true` and [`Clock::init`]
-/// returned an error.
+/// [`INIT_REQUIRED`](EarlySleeper::INIT_REQUIRED) is `true` and
+/// [`ClockSource::init`] returned an error.
 pub fn register_early_sleeper<T>() -> Result<(), RegisterError>
 where
     T: EarlySleeper,
 {
     if T::exists() {
         if T::INIT_REQUIRED {
-            // FIXME: The clock may be double initialised: once here and once in
-            // register_clock.
+            // FIXME: The source may be double initialised: once here and once in
+            // register_source.
             T::init()?;
         }
         EARLY_SLEEP_FUNCTION.store(T::sleep as usize, Ordering::SeqCst);
@@ -72,17 +73,17 @@ pub fn early_sleep(duration: Duration) {
     }
 }
 
-/// Register a hardware clock.
+/// Register a clock source.
 ///
-/// The provided clock will overwrite the previous clock.
+/// The provided source will overwrite the previous source.
 ///
-/// Returns an error if the clock doesn't exist or if [`init`](Clock::init)
-/// returns an error.
-pub fn register_clock<T>() -> Result<(), RegisterError>
+/// Returns an error if the source doesn't exist or if
+/// [`init`](ClockSource::init) returns an error.
+pub fn register_clock_source<T>() -> Result<(), RegisterError>
 where
-    T: Clock,
+    T: ClockSource,
 {
-    // TODO: Check if clock is better than current clock?
+    // TODO: Check if source is better than current source?
     if T::exists() {
         T::init()?;
         let func_addr = T::ClockType::func_addr();
@@ -101,8 +102,8 @@ where
 /// # Panics
 ///
 /// This function will panic if called prior to registering a clock using
-/// [`register_clock`]. [`register_clock`] must return [`Ok`] and the
-/// [`ClockType`] of the registered clock must be the same as `T`.
+/// [`register_clock_source`]. [`register_clock_source`] must return [`Ok`] and
+/// the [`ClockType`] of the registered clock must be the same as `T`.
 pub fn now<T>() -> Duration
 where
     T: ClockType,
@@ -116,15 +117,15 @@ where
     }
 }
 
-/// A hardware clock.
-pub trait Clock {
+/// A clock source.
+pub trait ClockSource {
     /// The type of clock (either [`Monotonic`] or [`Realtime`]).
     type ClockType: ClockType;
 
-    /// Whether the clock exists on the system.
+    /// Whether the clock source exists on the system.
     fn exists() -> bool;
 
-    /// Initialise the clock.
+    /// Initialise the clock source.
     fn init() -> Result<(), &'static str>;
 
     /// The current time according to the clock.
@@ -133,7 +134,7 @@ pub trait Clock {
     /// realtime clocks it's the time since 12:00am January 1st 1970 (i.e.
     /// Unix time).
     ///
-    /// This function must only be called after [`init`](Clock::init).
+    /// This function must only be called after [`init`](ClockSource::init).
     fn now() -> Duration;
 }
 
@@ -141,17 +142,18 @@ pub trait Clock {
 // the sleep won't cause undefined behaviour, but it'll probably hang.
 // Relevant: https://www.reddit.com/r/rust/comments/3unm6u/marking_a_function_unsafe_without_using_any/
 /// A hardware clock that can sleep without relying on interrupts.
-pub trait EarlySleeper: Clock {
-    /// Whether the clock must be initialised using [`Clock::init`] prior to
-    /// [`sleep`](EarlySleeper::sleep) being called.
+pub trait EarlySleeper: ClockSource {
+    /// Whether the clock must be initialised using [`ClockSource::init`] prior
+    /// to [`sleep`](EarlySleeper::sleep) being called.
     const INIT_REQUIRED: bool;
 
     /// Sleep for the specified duration.
     ///
     /// # Note to Implementors
     ///
-    /// The default implementation of this function uses [`Clock::now`] - it can
-    /// only be used if [`Clock::now`] doesn't rely on interrupts.
+    /// The default implementation of this function uses [`ClockSource::now`] -
+    /// it can only be used if [`ClockSource::now`] doesn't rely on
+    /// interrupts.
     fn sleep(duration: Duration) {
         let start = Self::now();
         while Self::now() < start + duration {}

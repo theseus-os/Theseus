@@ -16,9 +16,9 @@ static CMOS_WRITE: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_WRITE_PORT));
 // CMOS port used to read register values.
 static CMOS_READ: Mutex<Port<u8>> = Mutex::new(Port::new(CMOS_READ_PORT));
 
-pub struct RtcClock;
+pub struct Rtc;
 
-impl time::Clock for RtcClock {
+impl time::ClockSource for Rtc {
     type ClockType = time::Realtime;
 
     fn exists() -> bool {

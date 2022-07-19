@@ -88,18 +88,18 @@ pub fn init(
     }
 
     // This must be called before device_manager::early_init and time::init.
-    time::register_early_sleeper::<pit::PitClock>().expect("couldn't set PIT as early sleeper");
+    time::register_early_sleeper::<pit::Pit>().expect("couldn't set PIT as early sleeper");
 
     // now we initialize early driver stuff, like APIC/ACPI
     device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
 
-    if let Err(e) = time::register_early_sleeper::<hpet::HpetClock>() {
+    if let Err(e) = time::register_early_sleeper::<hpet::Hpet>() {
         warn!("failed to set HPET as early sleeper: {e}");
     }
-    time::register_clock::<rtc::RtcClock>().expect("failed to initialise a realtime clock");
-    time::register_clock::<tsc::TscClock>()
-        .or_else(|_| time::register_clock::<hpet::HpetClock>())
-        .or_else(|_| time::register_clock::<pit::PitClock>())
+    time::register_clock_source::<rtc::Rtc>().expect("failed to initialise a realtime clock");
+    time::register_clock_source::<tsc::Tsc>()
+        .or_else(|_| time::register_clock_source::<hpet::Hpet>())
+        .or_else(|_| time::register_clock_source::<pit::Pit>())
         .expect("failed to initialise a monotonic clock");
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT

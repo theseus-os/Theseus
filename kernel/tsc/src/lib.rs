@@ -11,9 +11,9 @@ use time::Duration;
 
 static TSC_FREQUENCY: AtomicUsize = AtomicUsize::new(0);
 
-pub struct TscClock;
+pub struct Tsc;
 
-impl time::Clock for TscClock {
+impl time::ClockSource for Tsc {
     type ClockType = time::Monotonic;
 
     fn exists() -> bool {
