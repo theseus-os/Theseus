@@ -97,7 +97,6 @@ pub fn init(
         warn!("failed to set HPET as early sleeper: {e}");
     }
     time::register_clock::<rtc::RtcClock>().expect("failed to initialise a realtime clock");
-    // Err(time::RegisterError::NonExistent)
     time::register_clock::<tsc::TscClock>()
         .or_else(|_| time::register_clock::<hpet::HpetClock>())
         .or_else(|_| time::register_clock::<pit::PitClock>())

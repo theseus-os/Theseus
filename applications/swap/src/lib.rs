@@ -204,7 +204,7 @@ fn do_swap(
     );
     
     let end = time::now::<Monotonic>();
-    let period = start - end;
+    let period = end - start;
 
     match swap_result {
         Ok(()) => {
