@@ -164,8 +164,8 @@ impl SerializedSection {
 
         let loaded_section = Arc::new(LoadedSection {
             name: match self.ty {
-                SectionType::EhFrame => EH_FRAME_STR_REF.clone(),
-                SectionType::GccExceptTable => GCC_EXCEPT_TABLE_STR_REF.clone(),
+                SectionType::EhFrame
+                | SectionType::GccExceptTable => self.ty.name_str_ref(),
                 _ => self.name.as_str().into(),
             },
             typ: self.ty,

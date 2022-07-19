@@ -1106,6 +1106,12 @@ impl CrateNamespace {
             rodata_pages,
             data_pages,
         )?;
+
+        trace!("Crate {} has LoadedSections:\n", new_crate.lock_as_ref().crate_name);
+        loaded_sections.iter().for_each(|(k, sec)| trace!("{:03}: {:?}, {:?}, MP_off: {:#X}, vaddr {:#X}, size: {:#X}", k, sec.name, sec.typ, sec.mapped_pages_offset, sec.start_address(), sec.size()));
+        debug!("Crate {} has global_sections:\n{:?}", new_crate.lock_as_ref().crate_name, global_sections);
+        debug!("Crate {} has tls_sections:\n{:?}", new_crate.lock_as_ref().crate_name, tls_sections);
+        debug!("Crate {} has data_sections:\n{:?}", new_crate.lock_as_ref().crate_name, data_sections);
     
         // Set up the new_crate's sections, since we couldn't do it when `new_crate` was created.
         {
@@ -1168,6 +1174,7 @@ impl CrateNamespace {
 
         // The set of `LoadedSections` that will be parsed and populated into this `new_crate`.
         let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new(); 
+        let mut last_shndx = 0;
 
         // Iterate over all "allocated" sections to copy their data from the object file into the above `MappedPages`s.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, etc.
@@ -1191,45 +1198,81 @@ impl CrateNamespace {
             let mut is_eh_frame = false;
             let mut is_gcc_except_table = false;
 
-            let dest_pages: &mut MappedPages;
-            let dest_offset: usize;
+            // Declare the items needed to populate/create a new `LoadedSection`.
+            let typ: SectionType;
+            let mapped_pages: &mut MappedPages;
+            let mapped_pages_ref: &Arc<Mutex<MappedPages>>;
+            let mapped_pages_offset: usize;
+            let virt_addr: VirtualAddress;
 
             // If executable, copy the .text section data into `text_pages`.
             if is_exec {
+                typ = SectionType::Text;
                 let starting_offset_of_text = exec_offset.get_or_insert(sec_offset);
-                dest_offset = sec_offset - *starting_offset_of_text;
-                dest_pages = text_pages_locked.as_mut()
-                    .map(|tp| &mut tp.1)
+                // mapped_pages_offset = sec_offset; // there is only one text section, so no offset math is needed
+                mapped_pages_offset = sec_offset - *starting_offset_of_text;
+                // warn!("sec {:?}, offset: {sec_offset:#X}, starting_offset_of_text: {starting_offset_of_text:#X}, mpo: {mapped_pages_offset:#X}", sec.get_name(&elf_file));
+                (mapped_pages_ref, mapped_pages, virt_addr) = text_pages_locked.as_mut()
+                    .map(|(tp_ref, tp, tp_start_vaddr)| (tp_ref, tp, *tp_start_vaddr + mapped_pages_offset))
                     .ok_or("BUG: ELF file contained a .text section, but no text_pages were allocated")?;
             }
 
             // Otherwise, if writable (excluding TLS), copy the .data/.bss section into `data_pages`.
             else if is_write && !is_tls {
                 match sec.get_type() {
-                    Ok(ShType::ProgBits) => data_shndx_and_offset.get_or_insert((shndx, sec_offset)),
-                    Ok(ShType::NoBits)   => bss_shndx_and_offset.get_or_insert((shndx, sec_offset)),
-                    _ => {
-                        error!("BUG: writable section was neither PROGBITS (.data) nor NOBITS (.bss): {:X?}", sec);
+                    Ok(ShType::ProgBits) => {
+                        typ = SectionType::Data;
+                        data_shndx_and_offset.get_or_insert((shndx, sec_offset));
+                    }
+                    Ok(ShType::NoBits) => {
+                        typ = SectionType::Bss;
+                        bss_shndx_and_offset.get_or_insert((shndx, sec_offset));
+                    }
+                    _other => {
+                        error!("BUG: writable section was neither PROGBITS (.data) nor NOBITS (.bss): type: {:?}, {:X?}", _other, sec);
                         return Err("BUG: writable section was neither PROGBITS (.data) nor NOBITS (.bss)");
                     }
                 };
 
                 let starting_offset_of_data = read_write_offset.get_or_insert(sec_offset);
-                dest_offset = sec_offset - *starting_offset_of_data;
-                dest_pages = read_write_pages_locked.as_mut()
-                    .map(|dp| &mut dp.1)
+                mapped_pages_offset = sec_offset - *starting_offset_of_data;
+                (mapped_pages_ref, mapped_pages, virt_addr) = read_write_pages_locked.as_mut()
+                    .map(|(dp_ref, dp, dp_start_vaddr)| (dp_ref, dp, *dp_start_vaddr + mapped_pages_offset))
                     .ok_or("BUG: ELF file contained a .data/.bss section, but no data_pages were allocated")?;
             }
 
-            // Otherwise, we have a read-only section that should be copied into `rodata_pages`.
-            // This includes .rodata, .eh_frame, .gcc_except_table, and also .tdata sections.
+            // Otherwise, if TLS section, copy its data into `rodata_pages`.
             // Although TLS sections have "WAT" flags (write, alloc, TLS),
             // we load TLS sections into the same read-only pages as other read-only sections
             // because they contain thread-local storage initializer data that is only read from.
-            //
-            // The below if-conditional is a bit complex, but it boils down to:
-            // `if sec is .rodata or .eh_frame or .gcc_except_table or TLS`
-            else if is_tls || {
+            else if is_tls {
+                match sec.get_type() {
+                    Ok(ShType::ProgBits) => {
+                        typ = SectionType::TlsData;
+                        tdata_shndx_and_offset.get_or_insert((shndx, sec_offset));
+                    }
+                    Ok(ShType::NoBits) => {
+                        // Explicitly skip .tbss sections because they don't have any data
+                        // in the object file nor do they occupy any space in loaded memory.
+                        tbss_shndx_and_offset.get_or_insert((shndx, sec_offset));
+                        continue;
+                    }
+                    _other => {
+                        error!("BUG: TLS section was neither PROGBITS (.tdata) nor NOBITS (.tbss): type: {:?}, {:X?}", _other, sec);
+                        return Err("BUG: TLS section was neither PROGBITS (.tdata) nor NOBITS (.tbss)");
+                    }
+                };
+
+                let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                mapped_pages_offset = sec_offset - *read_only_start;
+                (mapped_pages_ref, mapped_pages, virt_addr) = read_only_pages_locked.as_mut()
+                    .map(|(rp_ref, rp, rp_start_vaddr)| (rp_ref, rp, *rp_start_vaddr + mapped_pages_offset))
+                    .ok_or("BUG: ELF file contained a .tdata (TLS data) section, but no rodata_pages were allocated")?;
+                
+            }
+
+            // Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
+            else if {
                 let sec_name = sec.get_name(&elf_file).map_err(|_e| {
                     error!("BUG: Error: {:?}, couldn't get section name for {:?}", _e, sec);
                     "BUG: couldn't get section name"
@@ -1242,57 +1285,22 @@ impl CrateNamespace {
                 }
                 is_rodata || is_eh_frame || is_gcc_except_table
             } {
-                let sec_type = sec.get_type();
-                if is_tls && sec_type == Ok(ShType::ProgBits) {
-                    tdata_shndx_and_offset.get_or_insert((shndx, sec_offset));
-                } else if is_tls && sec_type == Ok(ShType::NoBits) {
-                    // Explicitly skip .tbss sections because they don't have any data
-                    // in the object file nor do they occupy any space in loaded memory.
-                    tbss_shndx_and_offset.get_or_insert((shndx, sec_offset));
-                    continue;
-                }
-
                 if is_rodata {
+                    typ = SectionType::Rodata;
                     rodata_shndx_and_offset = Some((shndx, sec_offset));
+                } else if is_eh_frame {
+                    typ = SectionType::EhFrame;
+                } else if is_gcc_except_table {
+                    typ = SectionType::GccExceptTable;
+                } else {
+                    unreachable!()
                 }
 
                 let read_only_start = read_only_offset.get_or_insert(sec_offset);
-                dest_offset = sec_offset - *read_only_start;
-                let (rp_ref, rp, rp_start_vaddr) = read_only_pages_locked.as_mut()
-                    .ok_or("BUG: ELF file contained a read-only section, but no rodata_pages were allocated")?;
-                dest_pages = rp;
-
-                // Add an explicit .eh_frame or .gcc_except_table section here,
-                // as they may need to be located by name for the purpose of stack unwinding/backtrace.
-                if is_eh_frame {
-                    loaded_sections.insert(0,
-                        Arc::new(LoadedSection::new(
-                            SectionType::EhFrame,
-                            EH_FRAME_STR_REF.clone(),
-                            Arc::clone(rp_ref),
-                            dest_offset,
-                            *rp_start_vaddr + dest_offset,
-                            sec_size,
-                            false, // .eh_frame section is not globally visible
-                            new_crate.clone(),
-                        ))
-                    );
-                } else if is_gcc_except_table {
-                    loaded_sections.insert(1,
-                        Arc::new(LoadedSection::new(
-                            SectionType::GccExceptTable,
-                            GCC_EXCEPT_TABLE_STR_REF.clone(),
-                            Arc::clone(rp_ref),
-                            dest_offset,
-                            *rp_start_vaddr + dest_offset,
-                            sec_size,
-                            false, // .gcc_except_table section is not globally visible
-                            new_crate.clone(),
-                        ))
-                    );
-                } else {
-                    // do nothing here, as other sections will be added while iterating over the symbol table.
-                }
+                mapped_pages_offset = sec_offset - *read_only_start;
+                (mapped_pages_ref, mapped_pages, virt_addr) = read_only_pages_locked.as_mut()
+                    .map(|(rp_ref, rp, rp_start_vaddr)| (rp_ref, rp, *rp_start_vaddr + mapped_pages_offset))
+                    .ok_or("BUG: ELF file contained a .tdata (TLS data) section, but no rodata_pages were allocated")?;
             }
 
             // Finally, any other section type is considered unhandled, so return an error!
@@ -1306,16 +1314,16 @@ impl CrateNamespace {
                 return Err("load_crate_with_merged_sections(): section with unhandled type, name, or flags!");
             }
 
-            let dbg = format!("{:?}", dest_pages);
-            // Perform the actual copying of section data
-            let dest_slice: &mut [u8] = dest_pages.as_slice_mut(dest_offset, sec_size)?;
+            // Actually copy the section data from the ELF file to the given destination MappedPages.
+            let dbg = format!("{:?}", mapped_pages);
+            let dest_slice: &mut [u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)?;
             match sec.get_data(&elf_file) {
                 Ok(SectionData::Undefined(sec_data)) => {
-                    debug!("Copying {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, dest_offset, dbg);
+                    debug!("Copying {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, mapped_pages_offset, dbg);
                     dest_slice.copy_from_slice(sec_data)
                 }
                 Ok(SectionData::Empty) => {
-                    debug!("Zero-filling {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, dest_offset, dbg);
+                    debug!("Zero-filling {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, mapped_pages_offset, dbg);
                     dest_slice.fill(0)
                 }
                 _other => {
@@ -1323,6 +1331,21 @@ impl CrateNamespace {
                     return Err("couldn't get section data for merged section");
                 }
             }
+
+            // Create a new `LoadedSection` to represent this section.
+            loaded_sections.insert(shndx,
+                Arc::new(LoadedSection::new(
+                    typ,
+                    typ.name_str_ref(),
+                    Arc::clone(mapped_pages_ref),
+                    mapped_pages_offset,
+                    virt_addr,
+                    sec_size,
+                    false, // no merged sections are global
+                    new_crate.clone(),
+                ))
+            );
+            last_shndx = shndx + 1;
         }
 
         // Now that we've copied all the section data from the object file to the various mapped pages,
@@ -1333,24 +1356,25 @@ impl CrateNamespace {
 
         let symtab = find_symbol_table(&elf_file)?;
         use xmas_elf::symbol_table::Entry;
-        for (sym_num, symbol_entry) in symtab.iter().enumerate() {
-            let sec_size = symbol_entry.size() as usize;
-            if sec_size == 0 {
+        for (_sym_num, symbol_entry) in symtab.iter().enumerate() {
+            let sec_type = symbol_entry.get_type().map_err(|_e| {
+                error!("BUG: Error: {:?}, couldn't get symtab entry type: {}", _e, symbol_entry as &dyn Entry);
+                "BUG: couldn't get symtab entry type"
+            })?;
+            // Skip irrelevant symbols, e.g., NOTYPE, SECTION, etc.
+            if let Type::NoType | Type::Section = sec_type {
                 continue;
             }
-            trace!("Symtab entry {:?}\n\tnum: {}, value: {:#X}, size: {}, type: {:?}, bind: {:?}, vis: {:?}, shndx: {}", 
-                symbol_entry.get_name(&elf_file).unwrap(), sym_num, symbol_entry.value(), symbol_entry.size(), symbol_entry.get_type().unwrap(), symbol_entry.get_binding().unwrap(), symbol_entry.get_other(), symbol_entry.shndx()
-            );
+            // trace!("Symtab entry {:?}\n\tnum: {}, value: {:#X}, size: {}, type: {:?}, bind: {:?}, vis: {:?}, shndx: {}", 
+            //     symbol_entry.get_name(&elf_file).unwrap(), _sym_num, symbol_entry.value(), symbol_entry.size(), symbol_entry.get_type().unwrap(), symbol_entry.get_binding().unwrap(), symbol_entry.get_other(), symbol_entry.shndx()
+            // );
 
             // Get the relevant section info from the symtab entry
+            let sec_size = symbol_entry.size() as usize;
             let sec_value = symbol_entry.value() as usize;
             let sec_name = symbol_entry.get_name(&elf_file).map_err(|_e| {
                 error!("BUG: Error: {:?}, couldn't get symtab entry name: {}", _e, symbol_entry as &dyn Entry);
                 "BUG: couldn't get symtab entry name"
-            })?;
-            let sec_type = symbol_entry.get_type().map_err(|_e| {
-                error!("BUG: Error: {:?}, couldn't get symtab entry type: {}", _e, symbol_entry as &dyn Entry);
-                "BUG: couldn't get symtab entry type"
             })?;
             let sec_binding = symbol_entry.get_binding().map_err(|_e| {
                 error!("BUG: Error: {:?}, couldn't get symtab entry binding: {}", _e, symbol_entry as &dyn Entry);
@@ -1371,12 +1395,12 @@ impl CrateNamespace {
                 let (tp_ref, tp_start_vaddr) = text_pages_locked.as_ref()
                     .map(|(mp_arc, _, mp_vaddr)| (mp_arc, *mp_vaddr))
                     .ok_or("BUG: found FUNC symbol but no text_pages were allocated")?;
-                let exec_start = exec_offset.ok_or("BUG: found FUNC symbol but `text_offset` was unknown")?;
+                // let exec_start = exec_offset.ok_or("BUG: found FUNC symbol but `text_offset` was unknown")?;
 
                 typ = SectionType::Text;
                 mapped_pages = tp_ref;
-                // use an additional offset below because `text_pages` starts at 0x0, not `exec_start`.
-                mapped_pages_offset = sec_value + exec_start;
+                // no additional offset below, because .text is always the first (and only) exec section.
+                mapped_pages_offset = sec_value;
                 virt_addr = tp_start_vaddr + mapped_pages_offset;
             }
 
@@ -1397,7 +1421,7 @@ impl CrateNamespace {
                 } 
                 // Handle .data/.bss symbol
                 else {
-                    data_sections.insert(sym_num);
+                    data_sections.insert(last_shndx);
 
                     let (dp_ref, dp_start_vaddr) = read_write_pages_locked.as_ref()
                         .map(|(mp_arc, _, mp_vaddr)| (mp_arc, *mp_vaddr))
@@ -1478,18 +1502,19 @@ impl CrateNamespace {
                     .map_err(|_| "Failed to add new TLS section")?;
 
                 // trace!("\t --> updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
-                tls_sections.insert(sym_num);
+                tls_sections.insert(last_shndx);
                 new_tls_section
             } else {
                 Arc::new(new_section)
             };
 
-            loaded_sections.insert(sym_num, new_section_ref);
+            loaded_sections.insert(last_shndx, new_section_ref);
 
             if is_global {
-                global_sections.insert(sym_num);
+                global_sections.insert(last_shndx);
             }
         
+            last_shndx += 1;
         } // end of iterating over all symbol table entries
 
         Ok(SectionMetadata { 
@@ -1902,11 +1927,12 @@ impl CrateNamespace {
                         }
                     }
 
+                    let typ = SectionType::GccExceptTable;
                     loaded_sections.insert(
                         shndx, 
                         Arc::new(LoadedSection::new(
-                            SectionType::GccExceptTable,
-                            GCC_EXCEPT_TABLE_STR_REF.clone(),
+                            typ,
+                            typ.name_str_ref(),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,
@@ -1940,11 +1966,12 @@ impl CrateNamespace {
                         }
                     }
 
+                    let typ = SectionType::EhFrame;
                     loaded_sections.insert(
                         shndx, 
                         Arc::new(LoadedSection::new(
-                            SectionType::EhFrame,
-                            EH_FRAME_STR_REF.clone(),
+                            typ,
+                            typ.name_str_ref(),
                             Arc::clone(rp_ref),
                             rodata_offset,
                             dest_vaddr,
@@ -1992,6 +2019,15 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
+        let verbose_log = {
+            if new_crate_ref.lock_as_ref().crate_name_without_hash() == "acpi" {
+                true
+            } else {
+                verbose_log
+            }
+        };
+
+
         let mut new_crate = new_crate_ref.lock_as_mut()
             .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
@@ -2051,10 +2087,11 @@ impl CrateNamespace {
                     use xmas_elf::symbol_table::Entry;
                     let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
                     let source_sec_shndx = source_sec_entry.shndx() as usize; 
+                    let source_sec_value = source_sec_entry.value() as usize;
                     if verbose_log { 
                         let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
                             .and_then(|s| s.get_name(&elf_file));
-                        trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
+                        trace!("             relevant section [{}]: {:?}, value: {:#X}", source_sec_shndx, source_sec_header_name, source_sec_value);
                         // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
                         //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
                         //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
@@ -2103,7 +2140,7 @@ impl CrateNamespace {
                         relocation_entry,
                         &mut target_sec_mapped_pages,
                         target_sec.mapped_pages_offset,
-                        source_sec.start_address(),
+                        source_sec.start_address() + source_sec_value,
                         verbose_log
                     )?;
                     target_sec_data_was_modified = true;

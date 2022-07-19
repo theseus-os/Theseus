@@ -308,11 +308,12 @@ fn parse_nano_core_symbol_file(
                 .ok_or("Failed to parse the .eh_frame section header's address and size")?;
             let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                 .ok_or("the nano_core .eh_frame section wasn't covered by the read-only mapped pages!")?;
+            let typ = SectionType::EhFrame;
             crate_items.sections.insert(
                 section_counter,
                 Arc::new(LoadedSection::new(
-                    SectionType::EhFrame,
-                    EH_FRAME_STR_REF.clone(),
+                    typ,
+                    typ.name_str_ref(),
                     Arc::clone(rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -328,11 +329,12 @@ fn parse_nano_core_symbol_file(
                 .ok_or("Failed to parse the .gcc_except_table section header's address and size")?;
             let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                 .ok_or("the nano_core .gcc_except_table section wasn't covered by the read-only mapped pages!")?;
+            let typ = SectionType::GccExceptTable;
             crate_items.sections.insert(
                 section_counter,
                 Arc::new(LoadedSection::new(
-                    SectionType::GccExceptTable,
-                    GCC_EXCEPT_TABLE_STR_REF.clone(),
+                    typ,
+                    typ.name_str_ref(),
                     Arc::clone(rodata_pages),
                     mapped_pages_offset,
                     sec_vaddr,
@@ -548,11 +550,12 @@ fn parse_nano_core_binary(
                     .ok_or("the nano_core .gcc_except_table section had an invalid virtual address")?;
                 let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                     .ok_or("the nano_core .gcc_except_table section wasn't covered by the read-only mapped pages!")?;
+                let typ = SectionType::GccExceptTable;
                 crate_items.sections.insert(
                     section_counter,
                     Arc::new(LoadedSection::new(
-                        SectionType::GccExceptTable,
-                        GCC_EXCEPT_TABLE_STR_REF.clone(),
+                        typ,
+                        typ.name_str_ref(),
                         Arc::clone(&rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
@@ -568,11 +571,12 @@ fn parse_nano_core_binary(
                     .ok_or("the nano_core .eh_frame section had an invalid virtual address")?;
                 let mapped_pages_offset = rodata_pages.lock().offset_of_address(sec_vaddr)
                     .ok_or("the nano_core .eh_frame section wasn't covered by the read-only mapped pages!")?;
+                let typ = SectionType::EhFrame;
                 crate_items.sections.insert(
                     section_counter,
                     Arc::new(LoadedSection::new(
-                        SectionType::EhFrame,
-                        EH_FRAME_STR_REF.clone(),
+                        typ,
+                        typ.name_str_ref(),
                         Arc::clone(&rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,

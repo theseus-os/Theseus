@@ -16,10 +16,6 @@ path = "../../libs/str_ref"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.4.0"
-
 ### used for linker relocation typedefs
 [dependencies.goblin]
 version = "0.0.19"

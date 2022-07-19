@@ -47,9 +47,8 @@ extern crate alloc;
 use core::convert::TryFrom;
 use core::fmt;
 use core::ops::Range;
-use lazy_static::lazy_static;
 use log::{error, debug, trace};
-use spin::{Mutex, RwLock};
+use spin::{Mutex, RwLock, Once};
 use alloc::{
     collections::BTreeSet,
     format,
@@ -79,12 +78,6 @@ pub type WeakSectionRef = Weak<LoadedSection>;
 /// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.
 pub type Shndx = usize;
 
-lazy_static! {
-    /// ".eh_frame" as a single, system-wide allocated `StrRef`.
-    pub static ref EH_FRAME_STR_REF: StrRef = StrRef::from(".eh_frame");
-    /// ".gcc_except_table" as a single, system-wide allocated `StrRef`.
-    pub static ref GCC_EXCEPT_TABLE_STR_REF: StrRef = StrRef::from(".gcc_except_table");
-}
 
 /// `.text` sections are read-only and executable.
 pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
@@ -601,7 +594,7 @@ pub enum SectionType {
     Bss,
     /// A `.tdata` section is a read-only section that holds the initial data "image" 
     /// for a thread-local storage (TLS) area.
-    TlsData, 
+    TlsData,
     /// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
     /// This is is effectively an empty placeholder: the all-zero data section doesn't actually exist in memory.
     TlsBss,
@@ -626,6 +619,49 @@ pub enum SectionType {
     EhFrame,
 }
 impl SectionType {
+    /// Returns the name of this `SectionType` as a [`StrRef`].
+    /// 
+    /// This is useful for deduplicating section name strings in memory,
+    /// as the returned `StrRef` will point back to a single instance 
+    /// of that section name string that can be shared across the system.
+    pub fn name_str_ref(&self) -> StrRef {
+        static TEXT: Once<StrRef> = Once::new();
+        static RODATA: Once<StrRef> = Once::new();
+        static DATA: Once<StrRef> = Once::new();
+        static BSS: Once<StrRef> = Once::new();
+        static TLS_DATA: Once<StrRef> = Once::new();
+        static TLS_BSS: Once<StrRef> = Once::new();
+        static GCC_EXCEPT_TABLE: Once<StrRef> = Once::new();
+        static EH_FRAME: Once<StrRef> = Once::new();
+
+        let init = || StrRef::from(self.name());
+
+        match self {
+            Self::Text           => TEXT.call_once(|| init()).clone(),
+            Self::Rodata         => RODATA.call_once(|| init()).clone(),
+            Self::Data           => DATA.call_once(|| init()).clone(),
+            Self::Bss            => BSS.call_once(|| init()).clone(),
+            Self::TlsData        => TLS_DATA.call_once(|| init()).clone(),
+            Self::TlsBss         => TLS_BSS.call_once(|| init()).clone(),
+            Self::GccExceptTable => GCC_EXCEPT_TABLE.call_once(|| init()).clone(),
+            Self::EhFrame        => EH_FRAME.call_once(|| init()).clone(),
+        }
+    }
+    
+    /// Returns the const `&str` name of this `SectionType`.
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Text           => TEXT_SECTION_NAME,
+            Self::Rodata         => RODATA_SECTION_NAME,
+            Self::Data           => DATA_SECTION_NAME, 
+            Self::Bss            => BSS_SECTION_NAME,
+            Self::TlsData        => TLS_DATA_SECTION_NAME,
+            Self::TlsBss         => TLS_BSS_SECTION_NAME,
+            Self::GccExceptTable => GCC_EXCEPT_TABLE_SECTION_NAME,
+            Self::EhFrame        => EH_FRAME_SECTION_NAME,
+        }
+    } 
+
     /// Returns `true` if `Data` or `Bss`, otherwise `false`.
     pub fn is_data_or_bss(&self) -> bool {
         match self {

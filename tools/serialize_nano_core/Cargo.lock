@@ -157,7 +157,6 @@ dependencies = [
  "fs_node",
  "goblin",
  "hashbrown",
- "lazy_static",
  "log",
  "memory",
  "qp-trie",
