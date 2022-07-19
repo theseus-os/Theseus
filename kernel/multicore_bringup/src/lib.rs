@@ -311,7 +311,7 @@ fn bring_up_ap(
     }
 
     debug!("waiting 10 ms...");
-    time::wait(Duration::from_millis(10)).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to pit_wait 10 ms. Error: {:?}", _e); });
+    time::early_sleep(Duration::from_millis(10));
     debug!("done waiting.");
 
     // // Send DEASSERT INIT IPI
@@ -348,8 +348,8 @@ fn bring_up_ap(
         bsp_lapic.set_icr(icr);
     }
 
-    time::wait(Duration::from_micros(300)).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to wait 300 us. Error {:?}", _e); });
-    time::wait(Duration::from_micros(200)).unwrap_or_else(|_e| { error!("bring_up_ap(): failed to wait 200 us. Error {:?}", _e); });
+    time::early_sleep(Duration::from_micros(300));
+    time::early_sleep(Duration::from_micros(200));
 
     bsp_lapic.clear_error();
     let esr = bsp_lapic.error();

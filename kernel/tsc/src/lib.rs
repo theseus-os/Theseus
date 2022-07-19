@@ -45,40 +45,44 @@ impl time::Clock for TscClock {
 ///
 /// Returns the frequency of the TSC in hertz.
 fn native_calibrate() -> Result<u64, &'static str> {
-    let CpuidResult {
-        eax: denominator,
-        ebx: numerator,
-        ecx: hertz,
-        ..
-    } = unsafe { __cpuid(0x15) };
-    let (denominator, numerator, mut hertz) = (denominator as u64, numerator as u64, hertz as u64);
+    // FIXME: This does not work on QEMU. It returns a numerator, denominator, and
+    // hertz but they are wrong.
+    Err("not implemented")
+    // let CpuidResult {
+    //     eax: denominator,
+    //     ebx: numerator,
+    //     ecx: hertz,
+    //     ..
+    // } = unsafe { __cpuid(0x15) };
+    // let (denominator, numerator, mut hertz) = (denominator as u64, numerator
+    // as u64, hertz as u64);
 
-    if numerator == 0 || denominator == 0 {
-        return Err("numerator and/or denominator is not enumerated");
-    }
+    // if numerator == 0 || denominator == 0 {
+    //     return Err("numerator and/or denominator is not enumerated");
+    // }
 
-    let CpuidResult { eax: max_level, .. } = unsafe { __cpuid(0x0) };
-    trace!("cpuid max level: {max_level}");
+    // let CpuidResult { eax: max_level, .. } = unsafe { __cpuid(0x0) };
+    // trace!("cpuid max level: {max_level}");
 
-    // TODO: I think this should only be done for Intel CPUs
-    if hertz == 0 && max_level >= 0x16 {
-        let CpuidResult { eax: base_mhz, .. } = unsafe { __cpuid(0x16) };
-        if base_mhz == 0 {
-            return Err("CPU base clock not enumerated");
-        } else {
-            hertz = base_mhz as u64 * 1_000_000;
-            info!("TSC frequency set to cpu base clock of {base_mhz} MHz");
-            return Ok(hertz);
-        }
-    }
+    // // TODO: I think this should only be done for Intel CPUs
+    // if hertz == 0 && max_level >= 0x16 {
+    //     let CpuidResult { eax: base_mhz, .. } = unsafe { __cpuid(0x16) };
+    //     if base_mhz == 0 {
+    //         return Err("CPU base clock not enumerated");
+    //     } else {
+    //         hertz = base_mhz as u64 * 1_000_000;
+    //         info!("TSC frequency set to cpu base clock of {base_mhz} MHz");
+    //         return Ok(hertz);
+    //     }
+    // }
 
-    if hertz == 0 {
-        return Err("hertz in not enumerated");
-    }
+    // if hertz == 0 {
+    //     return Err("hertz in not enumerated");
+    // }
 
-    let tsc_freq = hertz * (numerator / denominator);
+    // let tsc_freq = hertz * (numerator / denominator);
 
-    Ok(tsc_freq)
+    // Ok(tsc_freq)
 }
 
 /// Calibrate the TSC using the PIT timer.
@@ -86,9 +90,7 @@ fn native_calibrate() -> Result<u64, &'static str> {
 /// Returns the frequency of the TSC in hertz.
 fn backup_calibrate() -> Result<u64, &'static str> {
     let start = TscTicks::now();
-    // FIXME
-    // TODO: Use HPET?
-    // crate::pit::wait(Duration::from_millis(50))?;
+    time::early_sleep(Duration::from_millis(50));
     let end = TscTicks::now();
 
     let diff = end

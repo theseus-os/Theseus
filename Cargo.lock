@@ -117,10 +117,10 @@ dependencies = [
  "memory",
  "msr",
  "owning_ref",
- "pit_clock",
  "raw-cpuid",
  "spin 0.9.0",
  "static_assertions",
+ "time",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -355,6 +355,7 @@ dependencies = [
  "e1000",
  "exceptions_full",
  "first_application",
+ "hpet",
  "interrupts",
  "irq_safety",
  "kernel_config",
@@ -366,7 +367,9 @@ dependencies = [
  "multiple_heaps",
  "network_manager",
  "ota_update_client",
+ "pit",
  "print",
+ "rtc",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -374,6 +377,7 @@ dependencies = [
  "task",
  "task_fs",
  "time",
+ "tsc",
  "window_manager",
 ]
 
@@ -2366,15 +2370,6 @@ dependencies = [
  "port_io",
  "spin 0.9.0",
  "time",
-]
-
-[[package]]
-name = "pit_clock"
-version = "0.1.0"
-dependencies = [
- "log",
- "port_io",
- "spin 0.9.0",
 ]
 
 [[package]]

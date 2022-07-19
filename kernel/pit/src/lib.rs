@@ -10,7 +10,7 @@ use time::Duration;
 
 // The timer's default frequency in hertz.
 const PIT_DEFAULT_FREQUENCY: u32 = 1193182;
-/// THE timer's minimum frequency in hertz.
+/// The timer's minimum frequency in hertz.
 const PIT_MINIMUM_FREQUENCY: u32 = 19;
 
 const CHANNEL_0_PORT: u16 = 0x40;
@@ -43,7 +43,7 @@ impl time::Clock for PitClock {
     fn init() -> Result<(), &'static str> {
         let divisor = PIT_DEFAULT_FREQUENCY / CONFIG_PIT_FREQUENCY_HZ;
         // TODO: const assert
-        assert!(divisor > (u16::max_value() as u32));
+        assert!(divisor <= (u16::max_value() as u32));
 
         PIT_PERIOD.store(NANOS_IN_SEC / CONFIG_PIT_FREQUENCY_HZ, Ordering::SeqCst);
 

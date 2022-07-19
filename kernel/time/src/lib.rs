@@ -137,6 +137,9 @@ pub trait Clock {
     fn now() -> Duration;
 }
 
+// TODO: Should this trait be marked unsafe? If the clock depends on interrupts,
+// the sleep won't cause undefined behaviour, but it'll probably hang.
+// Relevant: https://www.reddit.com/r/rust/comments/3unm6u/marking_a_function_unsafe_without_using_any/
 /// A hardware clock that can sleep without relying on interrupts.
 pub trait EarlySleeper: Clock {
     /// Whether the clock must be initialised using [`Clock::init`] prior to
@@ -187,6 +190,6 @@ mod private {
     /// This trait is a supertrait of [`Clocktype`](super::ClockType).
     ///
     /// Since it's in a private module, it can't be implemented by types outside
-    /// this crate and thus neither can [`Clocktype`](super::ClockType)
+    /// this crate and thus neither can [`Clocktype`](super::ClockType).
     pub trait Sealed {}
 }

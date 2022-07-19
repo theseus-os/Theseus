@@ -46,6 +46,10 @@ extern crate multiple_heaps;
 extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
 extern crate time;
+extern crate hpet;
+extern crate pit;
+extern crate rtc;
+extern crate tsc;
 
 
 
@@ -83,10 +87,21 @@ pub fn init(
         logger::mirror_to_vga(mirror_to_vga_cb);
     }
 
+    // This must be called before device_manager::early_init and time::init.
+    time::register_early_sleeper::<pit::PitClock>().expect("couldn't set PIT as early sleeper");
+
     // now we initialize early driver stuff, like APIC/ACPI
     device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
 
-    time::init().map_err(|_| "initialising timekeeping failed")?;
+    if let Err(e) = time::register_early_sleeper::<hpet::HpetClock>() {
+        warn!("failed to set HPET as early sleeper: {e}");
+    }
+    time::register_clock::<rtc::RtcClock>().expect("failed to initialise a realtime clock");
+    // Err(time::RegisterError::NonExistent)
+    time::register_clock::<tsc::TscClock>()
+        .or_else(|_| time::register_clock::<hpet::HpetClock>())
+        .or_else(|_| time::register_clock::<pit::PitClock>())
+        .expect("failed to initialise a monotonic clock");
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {

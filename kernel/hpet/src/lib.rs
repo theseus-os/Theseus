@@ -16,7 +16,7 @@ use time::Duration;
 /// The number of times the [`HPET`]'s main counter has overflowed.
 static HPET_OVERFLOWS: AtomicU64 = AtomicU64::new(0);
 
-struct HpetClock;
+pub struct HpetClock;
 
 impl time::Clock for HpetClock {
     type ClockType = time::Monotonic;

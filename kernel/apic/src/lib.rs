@@ -16,7 +16,7 @@ extern crate spin;
 extern crate kernel_config;
 extern crate raw_cpuid;
 extern crate x86_64;
-extern crate pit_clock;
+extern crate time;
 extern crate crossbeam_utils;
 extern crate bit_field;
 extern crate msr;
@@ -33,7 +33,7 @@ use memory::{PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
-use pit_clock::pit_wait;
+use time::{early_sleep, Duration};
 use bit_field::BitField;
 
 
@@ -404,8 +404,8 @@ impl LocalApic {
     }
 
 
-    /// Returns the number of APIC ticks that occurred during the given number of `microseconds`.
-    fn calibrate_apic_timer(&mut self, microseconds: u32) -> Result<u32, &'static str> {
+    /// Returns the number of APIC ticks that occurred during the given `duration`.
+    fn calibrate_apic_timer(&mut self, duration: Duration) -> Result<u32, &'static str> {
         assert!(!has_x2apic(), "an x2apic system must not use calibrate_apic_timer(), it should use calibrate_apic_timer_x2() instead.");
         
         if let Some(ref mut regs) = self.regs {
@@ -415,7 +415,7 @@ impl LocalApic {
             regs.timer_initial_count.write(INITIAL_COUNT); // set counter to max value
 
             // wait or the given period using the PIT clock
-            pit_wait(microseconds).unwrap();
+            early_sleep(duration);
 
             regs.lvt_timer.write(APIC_DISABLE); // stop apic timer
             let after = regs.timer_current_count.read();
@@ -429,8 +429,8 @@ impl LocalApic {
     }
 
 
-    /// Returns the number of APIC ticks that occurred during the given number of `microseconds`.
-    fn calibrate_x2apic_timer(&mut self, microseconds: u32) -> u64 {
+    /// Returns the number of APIC ticks that occurred during the given `duration`.
+    fn calibrate_x2apic_timer(&mut self, duration: Duration) -> u64 {
         assert!(has_x2apic(), "an apic/xapic system must not use calibrate_x2apic_timer(), it should use calibrate_apic_timer_x2() instead.");
         unsafe { wrmsr(IA32_X2APIC_DIV_CONF, 3); } // set divide value to 16
         const INITIAL_COUNT: u64 = 0xFFFF_FFFF;
@@ -438,7 +438,7 @@ impl LocalApic {
         unsafe { wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT); } // set counter to max value
 
         // wait or the given period using the PIT clock
-        pit_wait(microseconds).unwrap();
+        early_sleep(duration);
 
         unsafe { wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64); } // stop apic timer
         let after = rdmsr(IA32_X2APIC_CUR_COUNT);
@@ -453,7 +453,7 @@ impl LocalApic {
             info!("apic_timer_fixed config: overriding APIC timer period to {}", 0x10000);
             0x10000 // for bochs, which doesn't do apic periods right
         } else {
-            self.calibrate_apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)?
+            self.calibrate_apic_timer(Duration::from_micros(CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64))?
         };
         trace!("APIC {}, timer period count: {}({:#X})", self.apic_id, apic_period, apic_period);
 
@@ -484,7 +484,7 @@ impl LocalApic {
             info!("apic_timer_fixed config: overriding X2APIC timer period to {}", 0x10000);
             0x10000 // for bochs, which doesn't do x2apic periods right
         } else {
-            self.calibrate_x2apic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
+            self.calibrate_x2apic_timer(Duration::from_micros(CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64))
         };
         trace!("X2APIC {}, timer period count: {}({:#X})", self.apic_id, x2apic_period, x2apic_period);
 

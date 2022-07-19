@@ -671,6 +671,8 @@ impl IxgbeNic {
         regs3: &mut IntelIxgbeRegisters3, 
         regs_mac: &mut IntelIxgbeMacRegisters,
     ) -> Result<(), &'static str> {
+        const WAIT_TIME: Duration = Duration::from_millis(10);
+
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
         regs1.eimc.write(DISABLE_INTERRUPTS);
 
@@ -679,9 +681,7 @@ impl IxgbeNic {
         let val = regs1.ctrl.read();
         regs1.ctrl.write(val|CTRL_RST|CTRL_LRST);
 
-        //wait 10 ms
-        let wait_time = Duration::from_millis(10);
-        let _ = time::wait(wait_time);
+        time::early_sleep(WAIT_TIME);
 
         //disable flow control.. write 0 TO FCTTV, FCRTL, FCRTH, FCRTV and FCCFG
         for fcttv in regs2.fcttv.iter_mut() {
@@ -717,8 +717,7 @@ impl IxgbeNic {
         }
 
         while Self::acquire_semaphore(regs3)? {
-            //wait 10 ms
-            let _ = time::wait(wait_time);
+            time::early_sleep(WAIT_TIME);
         }
 
         // setup PHY and the link 
@@ -750,13 +749,14 @@ impl IxgbeNic {
     /// Wait for link to be up for upto 10 seconds.
     fn wait_for_link(regs2: &IntelIxgbeRegisters2, total_wait_time: Duration) {
         // wait 10 ms between tries
-        let wait_time = Duration::from_millis(10);
+        const WAIT_TIME: Duration = Duration::from_millis(10);
+
         // wait for a total of 10 s
-        let total_tries = total_wait_time.as_millis() / wait_time.as_millis();
+        let total_tries = total_wait_time.as_millis() / WAIT_TIME.as_millis();
         let mut tries = 0;
 
         while (regs2.links.read() & LINKS_SPEED_MASK == 0) && (tries < total_tries) {
-            let _ = time::wait(wait_time);
+            time::early_sleep(WAIT_TIME);
             tries += 1;
         }
     }

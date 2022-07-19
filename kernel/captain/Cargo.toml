@@ -94,5 +94,17 @@ path = "../multiple_heaps"
 [dependencies.time]
 path = "../time"
 
+[dependencies.hpet]
+path = "../hpet"
+
+[dependencies.pit]
+path = "../pit"
+
+[dependencies.rtc]
+path = "../rtc"
+
+[dependencies.tsc]
+path = "../tsc"
+
 [lib]
 crate-type = ["rlib"]

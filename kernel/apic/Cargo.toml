@@ -30,8 +30,8 @@ path = "../../libs/atomic_linked_list"
 [dependencies.msr]
 path = "../../libs/msr"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.time]
+path = "../time"
 
 [dependencies.memory]
 path = "../memory"
