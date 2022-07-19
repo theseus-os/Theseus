@@ -1108,7 +1108,7 @@ impl CrateNamespace {
         )?;
 
         trace!("Crate {} has LoadedSections:\n", new_crate.lock_as_ref().crate_name);
-        loaded_sections.iter().for_each(|(k, sec)| trace!("{:03}: {:?}, {:?}, MP_off: {:#X}, vaddr {:#X}, size: {:#X}", k, sec.name, sec.typ, sec.mapped_pages_offset, sec.start_address(), sec.size()));
+        // loaded_sections.iter().for_each(|(k, sec)| trace!("{:03}: {:?}, {:?}, MP_off: {:#X}, vaddr {:#X}, size: {:#X}", k, sec.name, sec.typ, sec.mapped_pages_offset, sec.start_address(), sec.size()));
         debug!("Crate {} has global_sections:\n{:?}", new_crate.lock_as_ref().crate_name, global_sections);
         debug!("Crate {} has tls_sections:\n{:?}", new_crate.lock_as_ref().crate_name, tls_sections);
         debug!("Crate {} has data_sections:\n{:?}", new_crate.lock_as_ref().crate_name, data_sections);
@@ -1150,8 +1150,6 @@ impl CrateNamespace {
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, rp_range)| (rp.clone(), rp.lock(), rp_range.start));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, dp_range)| (dp.clone(), dp.lock(), dp_range.start));
 
-        // The section header offset of the first (and only) executable section, which is .text
-        let mut exec_offset:   Option<usize> = None;
         // The section header offset of the first read-only section, which is, in order of existence:
         // .rodata, .eh_frame, .gcc_except_table, .tdata
         let mut read_only_offset: Option<usize> = None;
@@ -1208,10 +1206,8 @@ impl CrateNamespace {
             // If executable, copy the .text section data into `text_pages`.
             if is_exec {
                 typ = SectionType::Text;
-                let starting_offset_of_text = exec_offset.get_or_insert(sec_offset);
-                // mapped_pages_offset = sec_offset; // there is only one text section, so no offset math is needed
-                mapped_pages_offset = sec_offset - *starting_offset_of_text;
-                // warn!("sec {:?}, offset: {sec_offset:#X}, starting_offset_of_text: {starting_offset_of_text:#X}, mpo: {mapped_pages_offset:#X}", sec.get_name(&elf_file));
+                // There is only one text section, so no offset is needed
+                mapped_pages_offset = 0;
                 (mapped_pages_ref, mapped_pages, virt_addr) = text_pages_locked.as_mut()
                     .map(|(tp_ref, tp, tp_start_vaddr)| (tp_ref, tp, *tp_start_vaddr + mapped_pages_offset))
                     .ok_or("BUG: ELF file contained a .text section, but no text_pages were allocated")?;
@@ -2019,15 +2015,6 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
-        let verbose_log = {
-            if new_crate_ref.lock_as_ref().crate_name_without_hash() == "acpi" {
-                true
-            } else {
-                verbose_log
-            }
-        };
-
-
         let mut new_crate = new_crate_ref.lock_as_mut()
             .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
