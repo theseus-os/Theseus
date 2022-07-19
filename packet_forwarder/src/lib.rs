@@ -1,5 +1,10 @@
 //! Basic Packet Forwarder that receives as many packets as the PACKETS_LIMIT variable allows, changes the address by 1, and then forwards all the recieved packets back 
 
+// TODO: Ring Buffer?
+// TODO: Break up the code structure and tighten the loop to resemble other impls 
+// TODO: Make it so it works on only one queue instead of having to iter through all of the avaliable ones
+// Specifying Rx and Tx Devices
+// slowing down poll times
 
 #![no_std]
 #[macro_use] extern crate alloc;
@@ -12,6 +17,7 @@ extern crate getopts;
 extern crate nic_buffers;
 extern crate memory;
 extern crate memory_structs;
+extern crate pci;
 
 use core::ops::Add;
 
@@ -26,6 +32,7 @@ use getopts::{Matches, Options};
 use nic_buffers::{ReceivedFrame, TransmitBuffer, ReceiveBuffer};
 use memory::{MappedPages};
 use memory_structs::{PhysicalAddress};
+use pci::{PciLocation};
 
 const PACKETS_LIMIT: usize = 16;
 
@@ -63,6 +70,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
     println!("Waiting to receive packets...");
+
     let (dev_id, mac_address) = {
         let ixgbe_devs = get_ixgbe_nics_list().ok_or("IXGBE NICs list not initialized")?;
         if ixgbe_devs.is_empty() {
@@ -73,52 +81,75 @@ fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
     };
 
     if matches.opt_present("commence") {
+        let received_frames: Vec<TransmitBuffer> = Vec::with_capacity(PACKETS_LIMIT);
 
         if IXGBE_NUM_RX_QUEUES_ENABLED != IXGBE_NUM_TX_QUEUES_ENABLED {
             return Err("Unequal number of Rx and Tx queues enabled")
         }
-
-        // receving data
-
-        let mut received_frames: Vec<TransmitBuffer> = Vec::with_capacity(PACKETS_LIMIT);
-        
-        'receive: loop {
-            for qid in 0..IXGBE_NUM_RX_QUEUES_ENABLED { 
-                if let Ok(buffer) = rx_poll_mq(qid as usize, dev_id) {
-                    println!("Received packet on queue {}", qid);
-                    let mut frame = buffer.0;
-                    if received_frames.len() == PACKETS_LIMIT {
-                        break 'receive; 
-                    } else {
-                        let mut frame = frame.remove(0);
-                        let mut old_mp = core::mem::replace(& mut frame.mp, MappedPages::empty());
-                        let m: &mut [u8] = old_mp.as_slice_mut(0, 16)?;
-
-                        // we offset by 1
-                        m[0] += 1; 
-
-                        let mut frame = TransmitBuffer { 
-                            mp: old_mp, 
-                            phys_addr: frame.phys_addr,
-                            length: frame.length
-                        };
-                        
-                        received_frames.push(frame);
-                    }
-
-                } 
-            }
-        }
-
-        // sending what was received
-
-        println!("Sending received frames..");
-
-        while !received_frames.is_empty() {
-            if let Ok(_frame) = tx_send_mq(1, dev_id, Some(received_frames.remove(0))) {
-                println!("Sent packet on queue {}", 1)
-            }           
-        }
+    
+        forward(received_frames, 0, dev_id, 1)?;
     }
     Ok(())
+}
+
+fn forward(
+    mut buffer: Vec<TransmitBuffer>,
+    _tx_queue: usize,
+    dev_id: PciLocation,
+    _qid: usize
+) -> Result<(), &'static str> {
+    batch_rx(PACKETS_LIMIT, &mut buffer, dev_id)?;
+    batch_tx(& mut buffer, 1, dev_id);
+    Ok(())
+}
+
+fn batch_rx
+(
+    packets_limit: usize,
+    buffer: &mut Vec<TransmitBuffer>,
+    dev_id: PciLocation,
+) -> Result<& mut Vec<TransmitBuffer>, &'static str> 
+
+{
+    for qid in 0..IXGBE_NUM_RX_QUEUES_ENABLED {
+        'receive: loop {
+            if let Ok(b) = rx_poll_mq(qid as usize, dev_id) {
+                println!("Received packet on queue {}", qid);
+                let mut frame = b.0;
+                if buffer.len() != packets_limit {
+                    let mut frame = frame.remove(0);
+                    let mut old_mp = core::mem::replace(& mut frame.mp, MappedPages::empty());
+                    let m: &mut [u8] = old_mp.as_slice_mut(0, 16)?;
+
+                    // we offset by 1
+                    m[0] += 1; 
+
+                    let frame = TransmitBuffer { 
+                        mp: old_mp, 
+                        phys_addr: frame.phys_addr,
+                        length: frame.length
+                    };
+                    
+                    buffer.push(frame);
+                } else {
+                    println!("Done Receiving Packets");
+                    break 'receive;
+                }
+            }
+        }  
+    } 
+    Ok(buffer)
+}
+
+fn batch_tx (
+    buffer: &mut Vec<TransmitBuffer>,
+    qid: usize,
+    dev_id: PciLocation,
+) {
+    println!("Sending received frames..");
+    while !buffer.is_empty() {
+        if let Ok(_frame) = tx_send_mq(qid, dev_id, Some(buffer.remove(0))) {
+            println!("Sent packet on queue {}", 1);
+        }           
+    } 
 }

@@ -33,3 +33,6 @@ path = "../../kernel/memory"
 
 [dependencies.memory_structs]
 path = "../../kernel/memory_structs"
+
+[dependencies.pci]
+path = "../../kernel/pci"
