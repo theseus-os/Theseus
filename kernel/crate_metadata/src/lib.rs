@@ -254,7 +254,7 @@ impl fmt::Debug for LoadedCrate {
                 .map(|f| f.get_absolute_path())
                 .unwrap_or_else(|| format!("<Locked>"))
             )
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -925,9 +925,43 @@ impl LoadedSection {
     }
 }
 
+impl fmt::Display for LoadedSection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "LoadedSection({:?}, typ: {:?}, vaddr: {:#X}, size: {})", 
+            self.name,
+            self.typ,
+            self.start_address(),
+            self.size(),
+        )
+    }
+}
+
 impl fmt::Debug for LoadedSection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X}, size: {})", self.name, self.start_address(), self.size())
+        let mut dbg = f.debug_struct("LoadedSection");
+        dbg.field("name", &self.name);
+        dbg.field("typ", &self.typ);
+
+        // Try to get the parent_crate's name
+        if let Some(parent_crate_name) = self.parent_crate
+            .upgrade()
+            .and_then(|cref| 
+                cref.try_lock_as_ref()
+                    .map(|c| c.crate_name.clone())
+            )
+        {
+            dbg.field("parent", &parent_crate_name);
+        }
+        else {
+            dbg.field("parent", &"<locked>");
+        }
+
+        // Add the rest of the typical fields
+        dbg.field("vaddr", &self.start_address())
+            .field("size", &self.size())
+            .finish_non_exhaustive()
     }
 }
 

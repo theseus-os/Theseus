@@ -326,8 +326,21 @@ fn crates_dependent_on_me(_crate_name: &str) -> Result<(), String> {
 /// 
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching crate names separated by the newline character `'\n'`.
-fn crates_i_depend_on(_crate_name: &str) -> Result<(), String> {
-    Err(format!("unimplemented"))
+fn crates_i_depend_on(crate_prefix: &str) -> Result<(), String> {
+    let (crate_name, crate_ref) = find_crate(crate_prefix)?;
+    let mut crate_list = crate_ref
+        .lock_as_ref()
+        .crates_i_depend_on()
+        .iter()
+        .filter_map(|wc| wc.upgrade().map(|c| c.lock_as_ref().crate_name.clone()))
+        .collect::<Vec<_>>();
+
+    crate_list.sort_unstable();
+    crate_list.dedup();
+
+
+    println!("Crate {} has direct dependences:\n  {}", crate_name, crate_list.join("\n  "));
+    Ok(())
 }
 
 

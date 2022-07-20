@@ -17,6 +17,7 @@ include cfg/Config.mk
 ## Default values for various configuration options.
 debug ?= none
 net ?= none
+merge_sections ?= yes
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -196,11 +197,17 @@ build: $(nano_core_binary)
 ## Third, perform partial linking on each object file, which shrinks their size 
 ## and most importantly, accelerates their loading and linking at runtime.
 ## We also remove the unnecessary GCC_except_table* symbols from the symbol tables.
+ifeq ($(merge_sections),yes)
 	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do                                  \
 		$(CROSS)ld -r -T $(partial_relinking_script) $${f} -o $${f}_relinked      \
 			&& mv $${f}_relinked $${f}                                            \
 			&& $(CROSS)strip --wildcard --strip-symbol=GCC_except_table* $${f}  & \
 	done; wait
+else ifeq ($(merge_sections),no)
+# do nothing, leave the object files as is, with separate function/data sections
+else
+$(error Error: unsupported option "merge_sections=$(merge_sections)". Options are 'yes' or 'no')
+endif
 
 ## Fourth, create the items needed for future out-of-tree builds that depend upon the parameters of this current build. 
 ## This includes the target file, host OS dependencies (proc macros, etc)., 
@@ -655,6 +662,11 @@ help:
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
 	@echo -e "\nThe following key-value options are available to customize the build process:"
+	@echo -e "   merge_sections=yes|no"
+	@echo -e "\t Choose whether sections in crate object files are merged together."
+	@echo -e "\t This *significantly* improves crate load times and reduces memory usage,"
+	@echo -e "\t though it may present problems for crate swapping for evolution and fault recovery."
+	@echo -e "\t This is strictly a post-compilation action, it doesn't affect how code is compiled."
 	@echo -e "   debug=full|base|none"
 	@echo -e "\t Configure which debug symbols are stripped from the build artifacts."
 	@echo -e "\t Stripped symbols are placed into files ending with \".dbg\" in \"$(DEBUG_SYMBOLS_DIR)\"."

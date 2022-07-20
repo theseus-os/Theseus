@@ -87,12 +87,7 @@ impl SerializedCrate {
             );
         }
 
-        trace!(
-            "SerializedCrate::into_loaded_crate(): adding symbols to namespace {:?}...",
-            namespace.name
-        );
         let num_new_syms = namespace.add_symbols(sections.values(), verbose_log);
-        trace!("SerializedCrate::into_loaded_crate(): finished adding symbols.");
 
         let mut loaded_crate_mut = loaded_crate.lock_as_mut().ok_or(
             "BUG: SerializedCrate::into_loaded_crate(): couldn't get exclusive mutable access to loaded_crate",
@@ -106,7 +101,7 @@ impl SerializedCrate {
             .lock()
             .insert(crate_name, loaded_crate.clone_shallow());
         info!(
-            "Finished parsing nano_core crate, {} new symbols.",
+            "Finished parsing nano_core crate, added {} new symbols.",
             num_new_syms
         );
         

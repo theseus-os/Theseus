@@ -1062,9 +1062,6 @@ impl CrateNamespace {
             .map(|sec| sec.get_name(&elf_file) == Ok(THESEUS_MERGED_SEC_NAME))
             .unwrap_or(false);
 
-        #[cfg(not(loscd_eval))]
-        debug!("Parsing Elf object file: {:?}, size {:#x}({})", abs_path, size_in_bytes, size_in_bytes);
-
         // Allocate enough space to load the sections
         let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
         let text_pages   = section_pages.executable_pages.map(|(tp, range)| (Arc::new(Mutex::new(tp)), range));
@@ -1107,12 +1104,6 @@ impl CrateNamespace {
             data_pages,
         )?;
 
-        trace!("Crate {} has LoadedSections:\n", new_crate.lock_as_ref().crate_name);
-        // loaded_sections.iter().for_each(|(k, sec)| trace!("{:03}: {:?}, {:?}, MP_off: {:#X}, vaddr {:#X}, size: {:#X}", k, sec.name, sec.typ, sec.mapped_pages_offset, sec.start_address(), sec.size()));
-        debug!("Crate {} has global_sections:\n{:?}", new_crate.lock_as_ref().crate_name, global_sections);
-        debug!("Crate {} has tls_sections:\n{:?}", new_crate.lock_as_ref().crate_name, tls_sections);
-        debug!("Crate {} has data_sections:\n{:?}", new_crate.lock_as_ref().crate_name, data_sections);
-    
         // Set up the new_crate's sections, since we couldn't do it when `new_crate` was created.
         {
             let mut new_crate_mut = new_crate.lock_as_mut()
@@ -1315,17 +1306,10 @@ impl CrateNamespace {
             }
 
             // Actually copy the section data from the ELF file to the given destination MappedPages.
-            let dbg = format!("{:?}", mapped_pages);
             let dest_slice: &mut [u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)?;
             match sec.get_data(&elf_file) {
-                Ok(SectionData::Undefined(sec_data)) => {
-                    debug!("Copying {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, mapped_pages_offset, dbg);
-                    dest_slice.copy_from_slice(sec_data)
-                }
-                Ok(SectionData::Empty) => {
-                    debug!("Zero-filling {:?} data ({:#X} bytes) to offset {:#X} in {:?}", sec.get_name(&elf_file).unwrap(), sec_size, mapped_pages_offset, dbg);
-                    dest_slice.fill(0)
-                }
+                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                Ok(SectionData::Empty) => dest_slice.fill(0),
                 _other => {
                     error!("Couldn't get section data for merged section: {:?}", _other);
                     return Err("couldn't get section data for merged section");
@@ -1345,8 +1329,6 @@ impl CrateNamespace {
             );
 
             let new_section_ref = if is_tls {
-                trace!("Loaded new TLS section: {:?}", new_section);
-
                 // Add the new TLS section to this namespace's initial TLS area,
                 // which will reserve/obtain a new offset into that TLS area which holds this section's data.
                 // This will also update the section's virtual address field to hold that offset value,
@@ -1355,13 +1337,12 @@ impl CrateNamespace {
                     .add_new_dynamic_tls_section(new_section, sec.align() as usize)
                     .map_err(|_| "Failed to add new dynamic TLS section")?;
 
-                trace!("\t --> updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
+                // trace!("Updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
                 if new_tls_section.typ == SectionType::TlsData {
                     tdata_shndx_and_section = Some((shndx, Arc::clone(&new_tls_section)));
                 } else {
                     tbss_shndx_and_section = Some((shndx, Arc::clone(&new_tls_section)));
                 }
-
                 new_tls_section
             } else {
                 Arc::new(new_section)
@@ -1495,7 +1476,8 @@ impl CrateNamespace {
             }
 
             else {
-                todo!("error on unexpected symtab entry: double check if there are any .eh_frame or .gcc_except_table symbols possible in .symtab");
+                error!("Found unexpected symbol type: {}", symbol_entry as &dyn Entry);
+                return Err("Found unexpected symbol type");
             }
 
             // Create the new `LoadedSection`
@@ -1519,6 +1501,45 @@ impl CrateNamespace {
         
             last_shndx += 1;
         } // end of iterating over all symbol table entries
+
+
+        // // Quick test to ensure that all .data and .bss sections are fully covered 
+        // // by overlapping OBJECT symbols.
+        // if !data_sections.is_empty() {
+        //     warn!("Data sections for {:?}: {:?}", new_crate.upgrade().unwrap().lock_as_ref().crate_name, data_sections);
+        //     if let Some(data_sec) = data_shndx.and_then(|i| loaded_sections.get(&i)) {
+        //         warn!("\t .data sec size: {:#X}", data_sec.size());
+        //         let mut data_symbols_start_vaddr = usize::MAX;
+        //         let mut data_symbols_end_vaddr = 0;
+        //         for sec in loaded_sections.values() {
+        //             if sec.typ == SectionType::Data && sec.name.as_str() != SectionType::Data.name() {
+        //                 warn!("\t\t data symbol: {:?}", sec);
+        //                 data_symbols_start_vaddr = core::cmp::min(data_symbols_start_vaddr, sec.address_range.start.value());
+        //                 data_symbols_end_vaddr = core::cmp::max(data_symbols_end_vaddr, sec.address_range.end.value());
+        //             }
+        //         }
+        //         let total_size_of_data_symbols = data_symbols_end_vaddr - data_symbols_start_vaddr;
+        //         if total_size_of_data_symbols != data_sec.size() {
+        //             error!(".data section size {:#X} does not match total size of data symbols {:#X}", data_sec.size(), total_size_of_data_symbols);
+        //         }
+        //     }
+        //     if let Some(bss_sec) = bss_shndx_and_offset.and_then(|(i, _off)| loaded_sections.get(&i)) {
+        //         warn!("\t .bss sec size: {:#X}", bss_sec.size());
+        //         let mut bss_symbols_start_vaddr = usize::MAX;
+        //         let mut bss_symbols_end_vaddr = 0;
+        //         for sec in loaded_sections.values() {
+        //             if sec.typ == SectionType::Bss && sec.name.as_str() != SectionType::Bss.name() {
+        //                 warn!("\t\t bss symbol: {:?}", sec);
+        //                 bss_symbols_start_vaddr = core::cmp::min(bss_symbols_start_vaddr, sec.address_range.start.value());
+        //                 bss_symbols_end_vaddr = core::cmp::max(bss_symbols_end_vaddr, sec.address_range.end.value());
+        //             }
+        //         }
+        //         let total_size_of_bss_symbols = bss_symbols_end_vaddr - bss_symbols_start_vaddr;
+        //         if total_size_of_bss_symbols != bss_sec.size() {
+        //             error!(".bss section size {:#X} does not match total size of bss symbols {:#X}", bss_sec.size(), total_size_of_bss_symbols);
+        //         }
+        //     }
+        // }
 
         Ok(SectionMetadata { 
             loaded_sections,
@@ -2373,7 +2394,7 @@ impl CrateNamespace {
 
     /// Finds the section that contains the given `VirtualAddress` in its loaded code.
     /// 
-    /// By default, only executable sections (`.text`) are searched, since typically the only use case 
+    /// By default, only executable sections (`.text`) are searched, since the typical use case 
     /// for this function is to search for an instruction pointer (program counter) address.
     /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
@@ -2384,7 +2405,7 @@ impl CrateNamespace {
     /// but gives the section itself rather than the line of code.
     /// 
     /// # Locking
-    /// This can obtain the lock on every crate and every section, 
+    /// This can obtain the lock on every crate in this namespace and its recursive namespaces, 
     /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
     /// 
     /// # Note
@@ -2402,6 +2423,13 @@ impl CrateNamespace {
         let containing_crate = self.get_crate_containing_address(virt_addr, search_all_section_types)?;
         let crate_locked = containing_crate.lock_as_ref();
 
+        // We try to find the *most specific* section that contains the `virt_addr`.
+        // If sections have been merged, there will be a merged section that contains `virt_addr`,
+        // but also potentially a section for an individual symbol that is a better, more descriptive match.
+        // For example, `my_crate::foo()` will exist in `my_crate`'s `.text` section, 
+        // but may also contained in `my_crate`'s `foo` section, which is a better return value here.
+        let mut merged_section_and_offset = None;
+
         // Second, we find the section in that crate that contains the address.
         for sec in crate_locked.sections.values() {
             // .text sections are always included, other sections are included if requested.
@@ -2411,10 +2439,21 @@ impl CrateNamespace {
             // Only a single section can contain the address, so it's safe to stop once we've found a match.
             if eligible_section && sec.address_range.contains(&virt_addr) {
                 let offset = virt_addr.value() - sec.start_address().value();
-                return Some((sec.clone(), offset));
+                merged_section_and_offset = Some((sec.clone(), offset));
+                
+                if sec.name.as_str() == sec.typ.name() {
+                    // If this section is a merged section, it will have the standard name
+                    // for its section type, e.g., ".text", ".data", ".rodata", etc.
+                    // Thus, we should keep looking to find a better, more specific symbol section.
+                } else {
+                    // If the name is *not* that standard name, then we have found the
+                    // "more specific" symbol's section that contains this `virt_addr`.
+                    // We can stop looking because only one symbol section can possibly contain it.
+                    break;
+                }
             }
         }
-        None
+        merged_section_and_offset
     }
 
     /// Like [`get_symbol()`](#method.get_symbol), but also returns the exact `CrateNamespace` where the symbol was found.
@@ -2868,7 +2907,7 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
         (text_max_offset, ro_bytes, rw_bytes)
     };
 
-    trace!("\n\texec_bytes: {exec_bytes} {exec_bytes:#X}\n\tro_bytes:   {ro_bytes} {ro_bytes:#X}\n\trw_bytes:   {rw_bytes} {rw_bytes:#X}");
+    // trace!("\n\texec_bytes: {exec_bytes} {exec_bytes:#X}\n\tro_bytes:   {ro_bytes} {ro_bytes:#X}\n\trw_bytes:   {rw_bytes} {rw_bytes:#X}");
 
     // Allocate contiguous virtual memory pages for each section and map them to random frames as writable.
     // We must allocate these pages separately because they will have different flags later.
