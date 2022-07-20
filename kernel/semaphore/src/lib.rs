@@ -1,6 +1,6 @@
 //! This crate contains a semaphore implementation.
 //!
-//! The implementation is based off the following sources:
+//! The implementation is based on the following sources:
 //! - [https://people.mpi-sws.org/~druschel/courses/os/lectures/proc4.pdf]
 //! - [https://www.cs.cornell.edu/courses/cs4410/2018su/lectures/lec07-sema.html]
 //! - [https://www.cs.brandeis.edu/~cs146a/rust/doc-02-21-2015/nightly/std/sync/struct.Semaphore.html]
@@ -27,14 +27,16 @@ pub struct Semaphore(MutexIrqSafe<State>);
 #[derive(Default)]
 struct State {
     count: isize,
+    limit: isize,
     queue: VecDeque<&'static TaskRef>,
 }
 
 impl Semaphore {
-    /// Creates a new semaphore with the given `count`
-    pub fn new(count: isize) -> Self {
+    /// Creates a new semaphore with the given `count` and optional `limit`.
+    pub fn new(count: isize, limit: Option<isize>) -> Self {
         Self(MutexIrqSafe::new(State {
             count,
+            limit: limit.unwrap_or(isize::MAX),
             queue: VecDeque::new(),
         }))
     }
@@ -63,7 +65,7 @@ impl Semaphore {
     /// This function is commonly referred to as `v` in literature.
     pub fn release(&self) {
         let mut state = self.0.lock();
-        if state.queue.is_empty() {
+        if state.queue.is_empty() && state.count < state.limit {
             state.count += 1;
         } else {
             // FIXME: Unwrap

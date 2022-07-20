@@ -459,6 +459,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "condvar"
+version = "0.1.0"
+dependencies = [
+ "semaphore",
+]
+
+[[package]]
 name = "console"
 version = "0.1.0"
 dependencies = [

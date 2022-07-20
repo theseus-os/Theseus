@@ -17,13 +17,14 @@ use task::TaskRef;
 pub struct WaitGuard {
     task: TaskRef,
 }
+
 impl WaitGuard {
     /// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
     pub fn new(task: TaskRef) -> WaitGuard {
         task.block();
         WaitGuard {
-            task: task,
+            task,
         }
     }
 
