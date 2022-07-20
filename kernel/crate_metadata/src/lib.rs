@@ -625,14 +625,14 @@ impl SectionType {
     /// as the returned `StrRef` will point back to a single instance 
     /// of that section name string that can be shared across the system.
     pub fn name_str_ref(&self) -> StrRef {
-        static TEXT: Once<StrRef> = Once::new();
-        static RODATA: Once<StrRef> = Once::new();
-        static DATA: Once<StrRef> = Once::new();
-        static BSS: Once<StrRef> = Once::new();
-        static TLS_DATA: Once<StrRef> = Once::new();
-        static TLS_BSS: Once<StrRef> = Once::new();
-        static GCC_EXCEPT_TABLE: Once<StrRef> = Once::new();
-        static EH_FRAME: Once<StrRef> = Once::new();
+        static TEXT             : Once<StrRef> = Once::new();
+        static RODATA           : Once<StrRef> = Once::new();
+        static DATA             : Once<StrRef> = Once::new();
+        static BSS              : Once<StrRef> = Once::new();
+        static TLS_DATA         : Once<StrRef> = Once::new();
+        static TLS_BSS          : Once<StrRef> = Once::new();
+        static GCC_EXCEPT_TABLE : Once<StrRef> = Once::new();
+        static EH_FRAME         : Once<StrRef> = Once::new();
 
         let init = || StrRef::from(self.name());
 

@@ -31,7 +31,7 @@ use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE,
 use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, EntryFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use bootloader_modules::BootloaderModule;
-use cow_arc::{CowArc, CowWeak};
+use cow_arc::CowArc;
 use rustc_demangle::demangle;
 use qp_trie::Trie;
 use fs_node::{FileOrDir, File, FileRef, DirRef};
@@ -1131,7 +1131,7 @@ impl CrateNamespace {
     fn load_crate_with_merged_sections(
         &self,
         elf_file:     &ElfFile,
-        new_crate:    CowWeak<LoadedCrate>,
+        new_crate:    WeakCrateRef,
         text_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
         rodata_pages: Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
         data_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
@@ -1291,7 +1291,7 @@ impl CrateNamespace {
                 mapped_pages_offset = sec_offset - *read_only_start;
                 (mapped_pages_ref, mapped_pages, virt_addr) = read_only_pages_locked.as_mut()
                     .map(|(rp_ref, rp, rp_start_vaddr)| (rp_ref, rp, *rp_start_vaddr + mapped_pages_offset))
-                    .ok_or("BUG: ELF file contained a .tdata (TLS data) section, but no rodata_pages were allocated")?;
+                    .ok_or("BUG: ELF file contained a read-only section, but no rodata_pages were allocated")?;
             }
 
             // Finally, any other section type is considered unhandled, so return an error!
@@ -1398,7 +1398,6 @@ impl CrateNamespace {
                 let (tp_ref, tp_start_vaddr) = text_pages_locked.as_ref()
                     .map(|(mp_arc, _, mp_vaddr)| (mp_arc, *mp_vaddr))
                     .ok_or("BUG: found FUNC symbol but no text_pages were allocated")?;
-                // let exec_start = exec_offset.ok_or("BUG: found FUNC symbol but `text_offset` was unknown")?;
 
                 typ = SectionType::Text;
                 mapped_pages = tp_ref;
@@ -1561,7 +1560,7 @@ impl CrateNamespace {
     fn load_crate_with_separate_sections(
         &self,
         elf_file:     &ElfFile,
-        new_crate:    CowWeak<LoadedCrate>,
+        new_crate:    WeakCrateRef,
         text_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
         rodata_pages: Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
         data_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
@@ -1602,7 +1601,7 @@ impl CrateNamespace {
         // (+) It's way faster to load the sections, since we can just bulk copy all .text sections at once 
         //     instead of copying them individually on a per-section basis (or just remap their pages directly).
         // (-) It ends up wasting a some bytes here and there, but almost always under 100 bytes.
-        //     If object file sections have been merged, it wastes only 64 (0x40) bytes.
+        //     If object file sections have been merged, no memory is wasted.
         if let Some((ref tp, ref tp_range)) = text_pages {
             let text_size = tp_range.end.value() - tp_range.start.value();
             let mut tp_locked = tp.lock();
@@ -2815,7 +2814,8 @@ impl CrateNamespace {
 }
 
 
-/// A convenience wrapper around the section data that is loaded into a crate.
+/// A convenience wrapper around a new crate's data items that are generated
+/// when iterating over and loading its sections.
 struct SectionMetadata {
     loaded_sections: HashMap<usize, Arc<LoadedSection>>,
     global_sections: BTreeSet<usize>,
