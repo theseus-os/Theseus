@@ -189,9 +189,7 @@ impl Shell {
         // this function call will do nothing. 
         print::set_default_print_output(print_producer.obtain_producer());
 
-        let env = Environment {
-            working_dir: Arc::clone(root::get_root()), 
-        };
+        let env = Environment::default();
 
         let terminal = Arc::new(Mutex::new(Terminal::new()?));
 
