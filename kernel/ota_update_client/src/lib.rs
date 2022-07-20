@@ -192,14 +192,14 @@ pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
     let mut state_transfer_functions: Vec<String> = Vec::new();
     for diff in diffs {
         // addition of new crate
-        if diff.starts_with("+") {
+        if diff.starts_with('+') {
             pairs.push((
                 String::new(), 
                 diff.get(1..).ok_or("error parsing (+) diff line")?.trim().to_string(),
             ));
         } 
         // removal of old crate
-        else if diff.starts_with("-") {
+        else if diff.starts_with('-') {
             pairs.push((
                 diff.get(1..).ok_or("error parsing (-) diff line")?.trim().to_string(), 
                 String::new()
@@ -210,7 +210,7 @@ pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
             pairs.push((old.trim().to_string(), new.trim().to_string()));
         }
         // state transfer function
-        else if diff.starts_with("@") {
+        else if diff.starts_with('@') {
             state_transfer_functions.push(
                 diff.get(1..).ok_or("error parsing (@state_transfer) diff line")?.trim().to_string(),
             )

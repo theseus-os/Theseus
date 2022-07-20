@@ -323,8 +323,8 @@ impl<'list> DeferredAllocAction<'list> {
 			  F2: Into<Option<Chunk>>,
 	{
 		let free_list = &FREE_PAGE_LIST;
-		let free1 = free1.into().unwrap_or(Chunk::empty());
-		let free2 = free2.into().unwrap_or(Chunk::empty());
+		let free1 = free1.into().unwrap_or_else(Chunk::empty);
+		let free2 = free2.into().unwrap_or_else(Chunk::empty);
 		DeferredAllocAction { free_list, free1, free2 }
 	}
 }

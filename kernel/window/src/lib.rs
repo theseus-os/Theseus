@@ -199,12 +199,8 @@ impl Window {
         // we simply return that event from this function such that the application can handle it. 
         let mut unhandled_event: Option<Event> = None;
 
-        loop {
-            let event = match self.event_consumer.pop() {
-                Some(ev) => ev,
-                None => break,
-            };
-            
+        
+        while let Some(event) = self.event_consumer.pop() {
             // TODO FIXME: for a performant design, the goal is to AVOID holding the lock on `inner` as much as possible. 
             //             That means that most of the drawing logic should be moved into the `window_inner` crate itself.
             let mut inner = self.inner.lock();

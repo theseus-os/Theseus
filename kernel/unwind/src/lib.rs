@@ -707,8 +707,7 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
     let krate = crate_ref.lock_as_ref();
 
     let eh_frame_sec = krate.sections.values()
-        .filter(|s| s.typ == SectionType::EhFrame)
-        .next()?;
+        .find(|s| s.typ == SectionType::EhFrame)?;
     
     let eh_frame_vaddr = eh_frame_sec.start_address().value();
     let text_pages_vaddr = krate.text_pages.as_ref()?.1.start.value();
