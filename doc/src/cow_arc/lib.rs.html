@@ -183,6 +183,18 @@
 <span id="178">178</span>
 <span id="179">179</span>
 <span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -239,11 +251,23 @@
 
     <span class="doccomment">/// This acquires the lock on the inner `Mutex` wrapping the data `T`,</span>
     <span class="doccomment">/// and always succeeds because an `CowArc` always allows immutable access to the data,</span>
-    <span class="doccomment">/// whether the data is `Shared` or `Exclusive`.</span>
+    <span class="doccomment">/// regardless of whether the data is `Shared` or `Exclusive`.</span>
     <span class="doccomment">/// </span>
     <span class="doccomment">/// The returned value derefs to and can be used exactly like `&amp;T`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lock_as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuardRef</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
         <span class="ident">MutexGuardRef::new</span>(<span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">lock</span>())
+    }
+
+    <span class="doccomment">/// This attempts to acquire the lock on the inner `Mutex` wrapping the data `T`.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This returns `None` if the lock is currently held, </span>
+    <span class="doccomment">/// but will always succeed if the lock is not held</span>
+    <span class="doccomment">/// because an `CowArc` always allows immutable access to the data,</span>
+    <span class="doccomment">/// regardless of whether the data is `Shared` or `Exclusive`.</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// The returned value derefs to and can be used exactly like `&amp;T`.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">try_lock_as_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MutexGuardRef</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">arc</span>.<span class="ident">inner_arc</span>.<span class="ident">try_lock</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">guard</span><span class="op">|</span> <span class="ident">MutexGuardRef::new</span>(<span class="ident">guard</span>))
     }
 
     <span class="doccomment">/// This acquires the lock on the inner `Mutex` wrapping the data `T` if it succeeds,</span>

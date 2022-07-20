@@ -193,11 +193,6 @@
 <span id="188">188</span>
 <span id="189">189</span>
 <span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Serializable versions of crate and section metadata types.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! The primary reason this exists is because [`LoadedCrate`] and [`LoadedSection`]</span>
@@ -287,12 +282,7 @@
             );
         }
 
-        <span class="macro">trace!</span>(
-            <span class="string">&quot;SerializedCrate::into_loaded_crate(): adding symbols to namespace {:?}...&quot;</span>,
-            <span class="ident">namespace</span>.<span class="ident">name</span>
-        );
         <span class="kw">let</span> <span class="ident">num_new_syms</span> <span class="op">=</span> <span class="ident">namespace</span>.<span class="ident">add_symbols</span>(<span class="ident">sections</span>.<span class="ident">values</span>(), <span class="ident">verbose_log</span>);
-        <span class="macro">trace!</span>(<span class="string">&quot;SerializedCrate::into_loaded_crate(): finished adding symbols.&quot;</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">loaded_crate_mut</span> <span class="op">=</span> <span class="ident">loaded_crate</span>.<span class="ident">lock_as_mut</span>().<span class="ident">ok_or</span>(
             <span class="string">&quot;BUG: SerializedCrate::into_loaded_crate(): couldn&#39;t get exclusive mutable access to loaded_crate&quot;</span>,
@@ -306,7 +296,7 @@
             .<span class="ident">lock</span>()
             .<span class="ident">insert</span>(<span class="ident">crate_name</span>, <span class="ident">loaded_crate</span>.<span class="ident">clone_shallow</span>());
         <span class="macro">info!</span>(
-            <span class="string">&quot;Finished parsing nano_core crate, {} new symbols.&quot;</span>,
+            <span class="string">&quot;Finished parsing nano_core crate, added {} new symbols.&quot;</span>,
             <span class="ident">num_new_syms</span>
         );
         
@@ -364,8 +354,8 @@
 
         <span class="kw">let</span> <span class="ident">loaded_section</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">LoadedSection</span> {
             <span class="ident">name</span>: <span class="kw">match</span> <span class="self">self</span>.<span class="ident">ty</span> {
-                <span class="ident">SectionType::EhFrame</span> =&gt; <span class="ident">EH_FRAME_STR_REF</span>.<span class="ident">clone</span>(),
-                <span class="ident">SectionType::GccExceptTable</span> =&gt; <span class="ident">GCC_EXCEPT_TABLE_STR_REF</span>.<span class="ident">clone</span>(),
+                <span class="ident">SectionType::EhFrame</span>
+                <span class="op">|</span> <span class="ident">SectionType::GccExceptTable</span> =&gt; <span class="self">self</span>.<span class="ident">ty</span>.<span class="ident">name_str_ref</span>(),
                 <span class="kw">_</span> =&gt; <span class="self">self</span>.<span class="ident">name</span>.<span class="ident">as_str</span>().<span class="ident">into</span>(),
             },
             <span class="ident">typ</span>: <span class="self">self</span>.<span class="ident">ty</span>,

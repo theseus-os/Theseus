@@ -824,6 +824,10 @@
 <span id="819">819</span>
 <span id="820">820</span>
 <span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,</span>
 <span class="doccomment">//! in other words, the code that is currently executing.</span>
 <span class="doccomment">//! As such, it performs no loading, but rather just creates metadata that represents</span>
@@ -1134,11 +1138,12 @@
                 .<span class="ident">ok_or</span>(<span class="string">&quot;Failed to parse the .eh_frame section header&#39;s address and size&quot;</span>)<span class="question-mark">?</span>;
             <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                 .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">typ</span> <span class="op">=</span> <span class="ident">SectionType::EhFrame</span>;
             <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
                 <span class="ident">section_counter</span>,
                 <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-                    <span class="ident">SectionType::EhFrame</span>,
-                    <span class="ident">EH_FRAME_STR_REF</span>.<span class="ident">clone</span>(),
+                    <span class="ident">typ</span>,
+                    <span class="ident">typ</span>.<span class="ident">name_str_ref</span>(),
                     <span class="ident">Arc::clone</span>(<span class="ident">rodata_pages</span>),
                     <span class="ident">mapped_pages_offset</span>,
                     <span class="ident">sec_vaddr</span>,
@@ -1154,11 +1159,12 @@
                 .<span class="ident">ok_or</span>(<span class="string">&quot;Failed to parse the .gcc_except_table section header&#39;s address and size&quot;</span>)<span class="question-mark">?</span>;
             <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                 .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">typ</span> <span class="op">=</span> <span class="ident">SectionType::GccExceptTable</span>;
             <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
                 <span class="ident">section_counter</span>,
                 <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-                    <span class="ident">SectionType::GccExceptTable</span>,
-                    <span class="ident">GCC_EXCEPT_TABLE_STR_REF</span>.<span class="ident">clone</span>(),
+                    <span class="ident">typ</span>,
+                    <span class="ident">typ</span>.<span class="ident">name_str_ref</span>(),
                     <span class="ident">Arc::clone</span>(<span class="ident">rodata_pages</span>),
                     <span class="ident">mapped_pages_offset</span>,
                     <span class="ident">sec_vaddr</span>,
@@ -1374,11 +1380,12 @@
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .gcc_except_table section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">typ</span> <span class="op">=</span> <span class="ident">SectionType::GccExceptTable</span>;
                 <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
                     <span class="ident">section_counter</span>,
                     <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-                        <span class="ident">SectionType::GccExceptTable</span>,
-                        <span class="ident">GCC_EXCEPT_TABLE_STR_REF</span>.<span class="ident">clone</span>(),
+                        <span class="ident">typ</span>,
+                        <span class="ident">typ</span>.<span class="ident">name_str_ref</span>(),
                         <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>),
                         <span class="ident">mapped_pages_offset</span>,
                         <span class="ident">sec_vaddr</span>,
@@ -1394,11 +1401,12 @@
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
                 <span class="kw">let</span> <span class="ident">mapped_pages_offset</span> <span class="op">=</span> <span class="ident">rodata_pages</span>.<span class="ident">lock</span>().<span class="ident">offset_of_address</span>(<span class="ident">sec_vaddr</span>)
                     .<span class="ident">ok_or</span>(<span class="string">&quot;the nano_core .eh_frame section wasn&#39;t covered by the read-only mapped pages!&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">typ</span> <span class="op">=</span> <span class="ident">SectionType::EhFrame</span>;
                 <span class="ident">crate_items</span>.<span class="ident">sections</span>.<span class="ident">insert</span>(
                     <span class="ident">section_counter</span>,
                     <span class="ident">Arc::new</span>(<span class="ident">LoadedSection::new</span>(
-                        <span class="ident">SectionType::EhFrame</span>,
-                        <span class="ident">EH_FRAME_STR_REF</span>.<span class="ident">clone</span>(),
+                        <span class="ident">typ</span>,
+                        <span class="ident">typ</span>.<span class="ident">name_str_ref</span>(),
                         <span class="ident">Arc::clone</span>(<span class="kw-2">&amp;</span><span class="ident">rodata_pages</span>),
                         <span class="ident">mapped_pages_offset</span>,
                         <span class="ident">sec_vaddr</span>,

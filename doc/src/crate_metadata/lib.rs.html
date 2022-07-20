@@ -1059,6 +1059,86 @@
 <span id="1054">1054</span>
 <span id="1055">1055</span>
 <span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
+<span id="1094">1094</span>
+<span id="1095">1095</span>
+<span id="1096">1096</span>
+<span id="1097">1097</span>
+<span id="1098">1098</span>
+<span id="1099">1099</span>
+<span id="1100">1100</span>
+<span id="1101">1101</span>
+<span id="1102">1102</span>
+<span id="1103">1103</span>
+<span id="1104">1104</span>
+<span id="1105">1105</span>
+<span id="1106">1106</span>
+<span id="1107">1107</span>
+<span id="1108">1108</span>
+<span id="1109">1109</span>
+<span id="1110">1110</span>
+<span id="1111">1111</span>
+<span id="1112">1112</span>
+<span id="1113">1113</span>
+<span id="1114">1114</span>
+<span id="1115">1115</span>
+<span id="1116">1116</span>
+<span id="1117">1117</span>
+<span id="1118">1118</span>
+<span id="1119">1119</span>
+<span id="1120">1120</span>
+<span id="1121">1121</span>
+<span id="1122">1122</span>
+<span id="1123">1123</span>
+<span id="1124">1124</span>
+<span id="1125">1125</span>
+<span id="1126">1126</span>
+<span id="1127">1127</span>
+<span id="1128">1128</span>
+<span id="1129">1129</span>
+<span id="1130">1130</span>
+<span id="1131">1131</span>
+<span id="1132">1132</span>
+<span id="1133">1133</span>
+<span id="1134">1134</span>
+<span id="1135">1135</span>
+<span id="1136">1136</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! ## Representing dependencies between sections</span>
@@ -1108,9 +1188,8 @@
 <span class="kw">use</span> <span class="ident">core::convert::TryFrom</span>;
 <span class="kw">use</span> <span class="ident">core::fmt</span>;
 <span class="kw">use</span> <span class="ident">core::ops::Range</span>;
-<span class="kw">use</span> <span class="ident">lazy_static::lazy_static</span>;
 <span class="kw">use</span> <span class="ident">log</span>::{<span class="ident">error</span>, <span class="ident">debug</span>, <span class="ident">trace</span>};
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">RwLock</span>};
+<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">RwLock</span>, <span class="ident">Once</span>};
 <span class="kw">use</span> <span class="ident">alloc</span>::{
     <span class="ident">collections::BTreeSet</span>,
     <span class="ident">format</span>,
@@ -1140,12 +1219,6 @@
 <span class="doccomment">/// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.</span>
 <span class="kw">pub</span> <span class="kw">type</span> <span class="ident">Shndx</span> <span class="op">=</span> <span class="ident">usize</span>;
 
-<span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// &quot;.eh_frame&quot; as a single, system-wide allocated `StrRef`.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">EH_FRAME_STR_REF</span>: <span class="ident">StrRef</span> <span class="op">=</span> <span class="ident">StrRef::from</span>(<span class="string">&quot;.eh_frame&quot;</span>);
-    <span class="doccomment">/// &quot;.gcc_except_table&quot; as a single, system-wide allocated `StrRef`.</span>
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">GCC_EXCEPT_TABLE_STR_REF</span>: <span class="ident">StrRef</span> <span class="op">=</span> <span class="ident">StrRef::from</span>(<span class="string">&quot;.gcc_except_table&quot;</span>);
-}
 
 <span class="doccomment">/// `.text` sections are read-only and executable.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TEXT_SECTION_FLAGS</span>:     <span class="ident">EntryFlags</span> <span class="op">=</span> <span class="ident">EntryFlags::PRESENT</span>;
@@ -1322,7 +1395,7 @@
                 .<span class="ident">map</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="ident">f</span>.<span class="ident">get_absolute_path</span>())
                 .<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="macro">format!</span>(<span class="string">&quot;&lt;Locked&gt;&quot;</span>))
             )
-            .<span class="ident">finish</span>()
+            .<span class="ident">finish_non_exhaustive</span>()
     }
 }
 
@@ -1639,6 +1712,16 @@
 }
 
 
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TEXT_SECTION_NAME</span>            : <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.text&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">RODATA_SECTION_NAME</span>          : <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.rodata&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DATA_SECTION_NAME</span>            : <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.data&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BSS_SECTION_NAME</span>             : <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.bss&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TLS_DATA_SECTION_NAME</span>        : <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.tdata&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">TLS_BSS_SECTION_NAME</span>         : <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.tbss&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GCC_EXCEPT_TABLE_SECTION_NAME</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.gcc_except_table&quot;</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">EH_FRAME_SECTION_NAME</span>        : <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;.eh_frame&quot;</span>;
+
+
 <span class="doccomment">/// The possible types of sections that can be loaded from a crate object file.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">PartialEq</span>, <span class="ident">serde::Serialize</span>, <span class="ident">serde::Deserialize</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">SectionType</span> {
@@ -1652,7 +1735,7 @@
     <span class="ident">Bss</span>,
     <span class="doccomment">/// A `.tdata` section is a read-only section that holds the initial data &quot;image&quot; </span>
     <span class="doccomment">/// for a thread-local storage (TLS) area.</span>
-    <span class="ident">TlsData</span>, 
+    <span class="ident">TlsData</span>,
     <span class="doccomment">/// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.</span>
     <span class="doccomment">/// This is is effectively an empty placeholder: the all-zero data section doesn&#39;t actually exist in memory.</span>
     <span class="ident">TlsBss</span>,
@@ -1677,6 +1760,49 @@
     <span class="ident">EhFrame</span>,
 }
 <span class="kw">impl</span> <span class="ident">SectionType</span> {
+    <span class="doccomment">/// Returns the name of this `SectionType` as a [`StrRef`].</span>
+    <span class="doccomment">/// </span>
+    <span class="doccomment">/// This is useful for deduplicating section name strings in memory,</span>
+    <span class="doccomment">/// as the returned `StrRef` will point back to a single instance </span>
+    <span class="doccomment">/// of that section name string that can be shared across the system.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">name_str_ref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">StrRef</span> {
+        <span class="kw">static</span> <span class="ident">TEXT</span>             : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+        <span class="kw">static</span> <span class="ident">RODATA</span>           : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+        <span class="kw">static</span> <span class="ident">DATA</span>             : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+        <span class="kw">static</span> <span class="ident">BSS</span>              : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+        <span class="kw">static</span> <span class="ident">TLS_DATA</span>         : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+        <span class="kw">static</span> <span class="ident">TLS_BSS</span>          : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+        <span class="kw">static</span> <span class="ident">GCC_EXCEPT_TABLE</span> : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+        <span class="kw">static</span> <span class="ident">EH_FRAME</span>         : <span class="ident">Once</span><span class="op">&lt;</span><span class="ident">StrRef</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Once::new</span>();
+
+        <span class="kw">let</span> <span class="ident">init</span> <span class="op">=</span> <span class="op">|</span><span class="op">|</span> <span class="ident">StrRef::from</span>(<span class="self">self</span>.<span class="ident">name</span>());
+
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident"><span class="self">Self</span>::Text</span>           =&gt; <span class="ident">TEXT</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+            <span class="ident"><span class="self">Self</span>::Rodata</span>         =&gt; <span class="ident">RODATA</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+            <span class="ident"><span class="self">Self</span>::Data</span>           =&gt; <span class="ident">DATA</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+            <span class="ident"><span class="self">Self</span>::Bss</span>            =&gt; <span class="ident">BSS</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+            <span class="ident"><span class="self">Self</span>::TlsData</span>        =&gt; <span class="ident">TLS_DATA</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+            <span class="ident"><span class="self">Self</span>::TlsBss</span>         =&gt; <span class="ident">TLS_BSS</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+            <span class="ident"><span class="self">Self</span>::GccExceptTable</span> =&gt; <span class="ident">GCC_EXCEPT_TABLE</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+            <span class="ident"><span class="self">Self</span>::EhFrame</span>        =&gt; <span class="ident">EH_FRAME</span>.<span class="ident">call_once</span>(<span class="op">|</span><span class="op">|</span> <span class="ident">init</span>()).<span class="ident">clone</span>(),
+        }
+    }
+    
+    <span class="doccomment">/// Returns the const `&amp;str` name of this `SectionType`.</span>
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident"><span class="self">Self</span>::Text</span>           =&gt; <span class="ident">TEXT_SECTION_NAME</span>,
+            <span class="ident"><span class="self">Self</span>::Rodata</span>         =&gt; <span class="ident">RODATA_SECTION_NAME</span>,
+            <span class="ident"><span class="self">Self</span>::Data</span>           =&gt; <span class="ident">DATA_SECTION_NAME</span>, 
+            <span class="ident"><span class="self">Self</span>::Bss</span>            =&gt; <span class="ident">BSS_SECTION_NAME</span>,
+            <span class="ident"><span class="self">Self</span>::TlsData</span>        =&gt; <span class="ident">TLS_DATA_SECTION_NAME</span>,
+            <span class="ident"><span class="self">Self</span>::TlsBss</span>         =&gt; <span class="ident">TLS_BSS_SECTION_NAME</span>,
+            <span class="ident"><span class="self">Self</span>::GccExceptTable</span> =&gt; <span class="ident">GCC_EXCEPT_TABLE_SECTION_NAME</span>,
+            <span class="ident"><span class="self">Self</span>::EhFrame</span>        =&gt; <span class="ident">EH_FRAME_SECTION_NAME</span>,
+        }
+    } 
+
     <span class="doccomment">/// Returns `true` if `Data` or `Bss`, otherwise `false`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_data_or_bss</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">match</span> <span class="self">self</span> {
@@ -1940,9 +2066,43 @@
     }
 }
 
+<span class="kw">impl</span> <span class="ident">fmt::Display</span> <span class="kw">for</span> <span class="ident">LoadedSection</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
+        <span class="macro">write!</span>(
+            <span class="ident">f</span>,
+            <span class="string">&quot;LoadedSection({:?}, typ: {:?}, vaddr: {:#X}, size: {})&quot;</span>, 
+            <span class="self">self</span>.<span class="ident">name</span>,
+            <span class="self">self</span>.<span class="ident">typ</span>,
+            <span class="self">self</span>.<span class="ident">start_address</span>(),
+            <span class="self">self</span>.<span class="ident">size</span>(),
+        )
+    }
+}
+
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">LoadedSection</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span>) -&gt; <span class="ident">fmt::Result</span> {
-        <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;LoadedSection(name: {:?}, vaddr: {:#X}, size: {})&quot;</span>, <span class="self">self</span>.<span class="ident">name</span>, <span class="self">self</span>.<span class="ident">start_address</span>(), <span class="self">self</span>.<span class="ident">size</span>())
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">dbg</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;LoadedSection&quot;</span>);
+        <span class="ident">dbg</span>.<span class="ident">field</span>(<span class="string">&quot;name&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">name</span>);
+        <span class="ident">dbg</span>.<span class="ident">field</span>(<span class="string">&quot;typ&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">typ</span>);
+
+        <span class="comment">// Try to get the parent_crate&#39;s name</span>
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">parent_crate_name</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">parent_crate</span>
+            .<span class="ident">upgrade</span>()
+            .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">cref</span><span class="op">|</span> 
+                <span class="ident">cref</span>.<span class="ident">try_lock_as_ref</span>()
+                    .<span class="ident">map</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="ident">c</span>.<span class="ident">crate_name</span>.<span class="ident">clone</span>())
+            )
+        {
+            <span class="ident">dbg</span>.<span class="ident">field</span>(<span class="string">&quot;parent&quot;</span>, <span class="kw-2">&amp;</span><span class="ident">parent_crate_name</span>);
+        }
+        <span class="kw">else</span> {
+            <span class="ident">dbg</span>.<span class="ident">field</span>(<span class="string">&quot;parent&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;&lt;locked&gt;&quot;</span>);
+        }
+
+        <span class="comment">// Add the rest of the typical fields</span>
+        <span class="ident">dbg</span>.<span class="ident">field</span>(<span class="string">&quot;vaddr&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">start_address</span>())
+            .<span class="ident">field</span>(<span class="string">&quot;size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">size</span>())
+            .<span class="ident">finish_non_exhaustive</span>()
     }
 }
 
