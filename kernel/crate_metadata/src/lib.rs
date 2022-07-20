@@ -47,9 +47,8 @@ extern crate alloc;
 use core::convert::TryFrom;
 use core::fmt;
 use core::ops::Range;
-use lazy_static::lazy_static;
 use log::{error, debug, trace};
-use spin::{Mutex, RwLock};
+use spin::{Mutex, RwLock, Once};
 use alloc::{
     collections::BTreeSet,
     format,
@@ -79,12 +78,6 @@ pub type WeakSectionRef = Weak<LoadedSection>;
 /// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.
 pub type Shndx = usize;
 
-lazy_static! {
-    /// ".eh_frame" as a single, system-wide allocated `StrRef`.
-    pub static ref EH_FRAME_STR_REF: StrRef = StrRef::from(".eh_frame");
-    /// ".gcc_except_table" as a single, system-wide allocated `StrRef`.
-    pub static ref GCC_EXCEPT_TABLE_STR_REF: StrRef = StrRef::from(".gcc_except_table");
-}
 
 /// `.text` sections are read-only and executable.
 pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
@@ -261,7 +254,7 @@ impl fmt::Debug for LoadedCrate {
                 .map(|f| f.get_absolute_path())
                 .unwrap_or_else(|| format!("<Locked>"))
             )
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -578,6 +571,16 @@ impl LoadedCrate {
 }
 
 
+pub const TEXT_SECTION_NAME            : &str = ".text";
+pub const RODATA_SECTION_NAME          : &str = ".rodata";
+pub const DATA_SECTION_NAME            : &str = ".data";
+pub const BSS_SECTION_NAME             : &str = ".bss";
+pub const TLS_DATA_SECTION_NAME        : &str = ".tdata";
+pub const TLS_BSS_SECTION_NAME         : &str = ".tbss";
+pub const GCC_EXCEPT_TABLE_SECTION_NAME: &str = ".gcc_except_table";
+pub const EH_FRAME_SECTION_NAME        : &str = ".eh_frame";
+
+
 /// The possible types of sections that can be loaded from a crate object file.
 #[derive(Debug, Copy, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SectionType {
@@ -591,7 +594,7 @@ pub enum SectionType {
     Bss,
     /// A `.tdata` section is a read-only section that holds the initial data "image" 
     /// for a thread-local storage (TLS) area.
-    TlsData, 
+    TlsData,
     /// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
     /// This is is effectively an empty placeholder: the all-zero data section doesn't actually exist in memory.
     TlsBss,
@@ -616,6 +619,49 @@ pub enum SectionType {
     EhFrame,
 }
 impl SectionType {
+    /// Returns the name of this `SectionType` as a [`StrRef`].
+    /// 
+    /// This is useful for deduplicating section name strings in memory,
+    /// as the returned `StrRef` will point back to a single instance 
+    /// of that section name string that can be shared across the system.
+    pub fn name_str_ref(&self) -> StrRef {
+        static TEXT             : Once<StrRef> = Once::new();
+        static RODATA           : Once<StrRef> = Once::new();
+        static DATA             : Once<StrRef> = Once::new();
+        static BSS              : Once<StrRef> = Once::new();
+        static TLS_DATA         : Once<StrRef> = Once::new();
+        static TLS_BSS          : Once<StrRef> = Once::new();
+        static GCC_EXCEPT_TABLE : Once<StrRef> = Once::new();
+        static EH_FRAME         : Once<StrRef> = Once::new();
+
+        let init = || StrRef::from(self.name());
+
+        match self {
+            Self::Text           => TEXT.call_once(|| init()).clone(),
+            Self::Rodata         => RODATA.call_once(|| init()).clone(),
+            Self::Data           => DATA.call_once(|| init()).clone(),
+            Self::Bss            => BSS.call_once(|| init()).clone(),
+            Self::TlsData        => TLS_DATA.call_once(|| init()).clone(),
+            Self::TlsBss         => TLS_BSS.call_once(|| init()).clone(),
+            Self::GccExceptTable => GCC_EXCEPT_TABLE.call_once(|| init()).clone(),
+            Self::EhFrame        => EH_FRAME.call_once(|| init()).clone(),
+        }
+    }
+    
+    /// Returns the const `&str` name of this `SectionType`.
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::Text           => TEXT_SECTION_NAME,
+            Self::Rodata         => RODATA_SECTION_NAME,
+            Self::Data           => DATA_SECTION_NAME, 
+            Self::Bss            => BSS_SECTION_NAME,
+            Self::TlsData        => TLS_DATA_SECTION_NAME,
+            Self::TlsBss         => TLS_BSS_SECTION_NAME,
+            Self::GccExceptTable => GCC_EXCEPT_TABLE_SECTION_NAME,
+            Self::EhFrame        => EH_FRAME_SECTION_NAME,
+        }
+    } 
+
     /// Returns `true` if `Data` or `Bss`, otherwise `false`.
     pub fn is_data_or_bss(&self) -> bool {
         match self {
@@ -879,9 +925,43 @@ impl LoadedSection {
     }
 }
 
+impl fmt::Display for LoadedSection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "LoadedSection({:?}, typ: {:?}, vaddr: {:#X}, size: {})", 
+            self.name,
+            self.typ,
+            self.start_address(),
+            self.size(),
+        )
+    }
+}
+
 impl fmt::Debug for LoadedSection {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X}, size: {})", self.name, self.start_address(), self.size())
+        let mut dbg = f.debug_struct("LoadedSection");
+        dbg.field("name", &self.name);
+        dbg.field("typ", &self.typ);
+
+        // Try to get the parent_crate's name
+        if let Some(parent_crate_name) = self.parent_crate
+            .upgrade()
+            .and_then(|cref| 
+                cref.try_lock_as_ref()
+                    .map(|c| c.crate_name.clone())
+            )
+        {
+            dbg.field("parent", &parent_crate_name);
+        }
+        else {
+            dbg.field("parent", &"<locked>");
+        }
+
+        // Add the rest of the typical fields
+        dbg.field("vaddr", &self.start_address())
+            .field("size", &self.size())
+            .finish_non_exhaustive()
     }
 }
 

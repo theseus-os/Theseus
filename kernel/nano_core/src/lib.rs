@@ -188,10 +188,12 @@ pub extern "C" fn nano_core_start(
     };
     println_raw!("nano_core_start(): finished parsing the nano_core crate."); 
 
-    // If in loadable mode, load each of the nano_core's constituent crates such that other crates loaded in the future
-    // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
     #[cfg(loadable)] {
-        try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
+        // This isn't currently necessary; we can always add it in back later if/when needed.
+        // // If in loadable mode, load each of the nano_core's constituent crates such that other crates loaded in the future
+        // // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
+        // try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
+        drop(nano_core_crate_ref);
     }
     #[cfg(not(loadable))] {
         drop(nano_core_crate_ref);
