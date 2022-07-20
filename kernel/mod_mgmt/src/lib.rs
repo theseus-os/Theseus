@@ -1164,14 +1164,16 @@ impl CrateNamespace {
         //
         // Note: we *could* just get the section header for each symtab entry, 
         //       but that is MUCH slower than tracking them here.
-        let mut rodata_shndx_and_offset: Option<(Shndx, usize)> = None;
-        let mut data_shndx_and_offset:   Option<(Shndx, usize)> = None;
-        let mut bss_shndx_and_offset:    Option<(Shndx, usize)> = None;
-        let mut tdata_shndx_and_offset:  Option<(Shndx, usize)> = None;
-        let mut tbss_shndx_and_offset:   Option<(Shndx, usize)> = None;
+        let mut rodata_shndx:            Option<Shndx>                     = None;
+        let mut data_shndx:              Option<Shndx>                     = None;
+        let mut bss_shndx_and_offset:    Option<(Shndx, usize)>            = None;
+        let mut tdata_shndx_and_section: Option<(Shndx, StrongSectionRef)> = None;
+        let mut tbss_shndx_and_section:  Option<(Shndx, StrongSectionRef)> = None;
 
         // The set of `LoadedSections` that will be parsed and populated into this `new_crate`.
         let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new(); 
+        let mut data_sections:   BTreeSet<usize> = BTreeSet::new();
+        let mut tls_sections:    BTreeSet<usize> = BTreeSet::new();
         let mut last_shndx = 0;
 
         // Iterate over all "allocated" sections to copy their data from the object file into the above `MappedPages`s.
@@ -1218,7 +1220,7 @@ impl CrateNamespace {
                 match sec.get_type() {
                     Ok(ShType::ProgBits) => {
                         typ = SectionType::Data;
-                        data_shndx_and_offset.get_or_insert((shndx, sec_offset));
+                        data_shndx.get_or_insert(shndx);
                     }
                     Ok(ShType::NoBits) => {
                         typ = SectionType::Bss;
@@ -1235,6 +1237,7 @@ impl CrateNamespace {
                 (mapped_pages_ref, mapped_pages, virt_addr) = read_write_pages_locked.as_mut()
                     .map(|(dp_ref, dp, dp_start_vaddr)| (dp_ref, dp, *dp_start_vaddr + mapped_pages_offset))
                     .ok_or("BUG: ELF file contained a .data/.bss section, but no data_pages were allocated")?;
+                data_sections.insert(shndx);
             }
 
             // Otherwise, if TLS section, copy its data into `rodata_pages`.
@@ -1245,13 +1248,14 @@ impl CrateNamespace {
                 match sec.get_type() {
                     Ok(ShType::ProgBits) => {
                         typ = SectionType::TlsData;
-                        tdata_shndx_and_offset.get_or_insert((shndx, sec_offset));
+                        let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                        mapped_pages_offset = sec_offset - *read_only_start;
                     }
                     Ok(ShType::NoBits) => {
-                        // Explicitly skip .tbss sections because they don't have any data
-                        // in the object file nor do they occupy any space in loaded memory.
-                        tbss_shndx_and_offset.get_or_insert((shndx, sec_offset));
-                        continue;
+                        typ = SectionType::TlsBss;
+                        // Here: a TLS .tbss section has no actual content, so we use a max-value offset
+                        // as a canary value to ensure it cannot be used to index into a MappedPages.
+                        mapped_pages_offset = usize::MAX;
                     }
                     _other => {
                         error!("BUG: TLS section was neither PROGBITS (.tdata) nor NOBITS (.tbss): type: {:?}, {:X?}", _other, sec);
@@ -1259,31 +1263,31 @@ impl CrateNamespace {
                     }
                 };
 
-                let read_only_start = read_only_offset.get_or_insert(sec_offset);
-                mapped_pages_offset = sec_offset - *read_only_start;
-                (mapped_pages_ref, mapped_pages, virt_addr) = read_only_pages_locked.as_mut()
-                    .map(|(rp_ref, rp, rp_start_vaddr)| (rp_ref, rp, *rp_start_vaddr + mapped_pages_offset))
-                    .ok_or("BUG: ELF file contained a .tdata (TLS data) section, but no rodata_pages were allocated")?;
-                
+                (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
+                    .map(|(rp_ref, rp, _)| (rp_ref, rp))
+                    .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
+                // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
+                virt_addr = VirtualAddress::zero(); 
+                tls_sections.insert(shndx);
             }
 
             // Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
             else if {
-                let sec_name = sec.get_name(&elf_file).map_err(|_e| {
-                    error!("BUG: Error: {:?}, couldn't get section name for {:?}", _e, sec);
-                    "BUG: couldn't get section name"
-                })?;
-                match sec_name {
-                    RODATA_SECTION_NAME           => is_rodata           = true,
-                    EH_FRAME_SECTION_NAME         => is_eh_frame         = true,
-                    GCC_EXCEPT_TABLE_SECTION_NAME => is_gcc_except_table = true,
-                    _ => { /* do nothing */ }
+                match sec.get_name(&elf_file) {
+                    Ok(RODATA_SECTION_NAME)           => is_rodata           = true,
+                    Ok(EH_FRAME_SECTION_NAME)         => is_eh_frame         = true,
+                    Ok(GCC_EXCEPT_TABLE_SECTION_NAME) => is_gcc_except_table = true,
+                    Ok(_other)                        => { /* fall through to next `else if` block */ }
+                    Err(_e)                           => {
+                        error!("BUG: Error: {:?}, couldn't get section name for {:?}", _e, sec);
+                        return Err("BUG: couldn't get section name");
+                    }
                 }
                 is_rodata || is_eh_frame || is_gcc_except_table
             } {
                 if is_rodata {
                     typ = SectionType::Rodata;
-                    rodata_shndx_and_offset = Some((shndx, sec_offset));
+                    rodata_shndx = Some(shndx);
                 } else if is_eh_frame {
                     typ = SectionType::EhFrame;
                 } else if is_gcc_except_table {
@@ -1329,26 +1333,48 @@ impl CrateNamespace {
             }
 
             // Create a new `LoadedSection` to represent this section.
-            loaded_sections.insert(shndx,
-                Arc::new(LoadedSection::new(
-                    typ,
-                    typ.name_str_ref(),
-                    Arc::clone(mapped_pages_ref),
-                    mapped_pages_offset,
-                    virt_addr,
-                    sec_size,
-                    false, // no merged sections are global
-                    new_crate.clone(),
-                ))
+            let new_section = LoadedSection::new(
+                typ,
+                typ.name_str_ref(),
+                Arc::clone(mapped_pages_ref),
+                mapped_pages_offset,
+                virt_addr,
+                sec_size,
+                false, // no merged sections are global
+                new_crate.clone(),
             );
+
+            let new_section_ref = if is_tls {
+                trace!("Loaded new TLS section: {:?}", new_section);
+
+                // Add the new TLS section to this namespace's initial TLS area,
+                // which will reserve/obtain a new offset into that TLS area which holds this section's data.
+                // This will also update the section's virtual address field to hold that offset value,
+                // which is used for relocation entries that ask for a section's offset from the TLS base.
+                let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
+                    .add_new_dynamic_tls_section(new_section, sec.align() as usize)
+                    .map_err(|_| "Failed to add new dynamic TLS section")?;
+
+                trace!("\t --> updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
+                if new_tls_section.typ == SectionType::TlsData {
+                    tdata_shndx_and_section = Some((shndx, Arc::clone(&new_tls_section)));
+                } else {
+                    tbss_shndx_and_section = Some((shndx, Arc::clone(&new_tls_section)));
+                }
+
+                new_tls_section
+            } else {
+                Arc::new(new_section)
+            };
+
+            loaded_sections.insert(shndx, new_section_ref);
             last_shndx = shndx + 1;
         }
 
         // Now that we've copied all the section data from the object file to the various mapped pages,
-        // we can populate the crate's sets of sections by iterating over the symbol table.
+        // we can populate the crate's sets of global sections by iterating over the symbol table.
+        // The above loop just handled the merged sections, none of which should be made global.
         let mut global_sections: BTreeSet<usize> = BTreeSet::new();
-        let mut data_sections:   BTreeSet<usize> = BTreeSet::new();
-        let mut tls_sections:    BTreeSet<usize> = BTreeSet::new();
 
         let symtab = find_symbol_table(&elf_file)?;
         use xmas_elf::symbol_table::Entry;
@@ -1404,7 +1430,7 @@ impl CrateNamespace {
             else if sec_type == Type::Object {
                 let sym_shndx = symbol_entry.shndx() as Shndx;
                 // Handle .rodata symbol
-                if Some(sym_shndx) == rodata_shndx_and_offset.map(|(shndx, _)| shndx) {
+                if Some(sym_shndx) == rodata_shndx {
                     let (rp_ref, rp_start_vaddr) = read_only_pages_locked.as_ref()
                         .map(|(mp_arc, _, mp_vaddr)| (mp_arc, *mp_vaddr))
                         .ok_or("BUG: found OBJECT symbol in .rodata but no rodata_pages were allocated")?;
@@ -1424,7 +1450,7 @@ impl CrateNamespace {
                         .ok_or("BUG: found OBJECT symbol in .data/.bss but no data_pages were allocated")?;
                     let read_write_start = read_write_offset.ok_or("BUG: found OBJECT symbol in .data/.bss but `data_offset` was unknown")?;
 
-                    if Some(sym_shndx) == data_shndx_and_offset.map(|(shndx, _)| shndx) {
+                    if Some(sym_shndx) == data_shndx {
                         typ = SectionType::Data;
                         // no additional offset below, because .data is always the first read-write section.
                         mapped_pages_offset = sec_value;
@@ -1442,28 +1468,30 @@ impl CrateNamespace {
 
             // Handle a "TLS" symbol, which exists in .tdata or .tbss
             else if is_tls {
-                // TLS sections have been copied into the read-only pages,
-                // but we don't need its virt_addr because TLS sections are assigned one dynamically.
+                // TLS sections have been copied into the read-only pages.
+                // The merged TLS sections have already been dynamically assigned a virtual address above,
+                // so we can calculate a TLS symbol's vaddr and mapped_pages_offset by adding 
+                // the symbol's value (`sec_value`) to that of the corresponding merged section.
                 let rp_ref = read_only_pages_locked.as_ref()
                     .map(|(mp_arc, ..)| mp_arc)
                     .ok_or("BUG: found TLS symbol but no rodata_pages were allocated")?;
-                let read_only_start = read_only_offset.unwrap_or(0);
 
                 let sym_shndx = symbol_entry.shndx() as Shndx;
-                if let Some((tdata_shndx, tdata_offset)) = tdata_shndx_and_offset && sym_shndx == tdata_shndx {
+                if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
                     typ = SectionType::TlsData;
-                    mapped_pages_offset = sec_value + (tdata_offset - read_only_start);
-                } else if Some(sym_shndx) == tbss_shndx_and_offset.map(|(shndx, _)| shndx) {
+                    mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
+                    virt_addr = tdata_sec.start_address() + sec_value;
+                } else if let Some((tbss_shndx, ref tbss_sec)) = tbss_shndx_and_section && sym_shndx == tbss_shndx {
                     typ = SectionType::TlsBss;
                     // Here: a TLS .tbss section has no actual content, so we use a max-value offset
                     // as a canary value to ensure it cannot be used to index into a MappedPages.
                     mapped_pages_offset = usize::MAX;
+                    virt_addr = tbss_sec.start_address() + sec_value;
                 } else {
-                    error!("BUG: found OBJECT symbol with an shndx that wasn't in .rodata, .data, or .bss: {}", symbol_entry as &dyn Entry);
-                    return Err("BUG: found OBJECT symbol with an shndx that wasn't in .rodata, .data, or .bss");
+                    error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
+                    return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
                 };
                 mapped_pages = rp_ref;
-                virt_addr = VirtualAddress::zero(); // will be replaced in `add_new_dynamic_tls_section()` below
             }
 
             else {
@@ -1471,40 +1499,19 @@ impl CrateNamespace {
             }
 
             // Create the new `LoadedSection`
-            let new_section = LoadedSection::new(
-                typ,
-                demangled,
-                Arc::clone(mapped_pages),
-                mapped_pages_offset,
-                virt_addr,
-                sec_size,
-                is_global,
-                new_crate.clone(),
+            loaded_sections.insert(
+                last_shndx,
+                Arc::new(LoadedSection::new(
+                    typ,
+                    demangled,
+                    Arc::clone(mapped_pages),
+                    mapped_pages_offset,
+                    virt_addr,
+                    sec_size,
+                    is_global,
+                    new_crate.clone(),
+                ))
             );
-
-            let new_section_ref = if is_tls {
-                // trace!("Loaded new TLS section: {:?}", new_section);
-
-                // In merged object files, the alignment of a TLS symbol is unavailable,
-                // as it has already been aligned. So we just use it's size instead.
-                let tls_sec_align = sec_size;
-
-                // Add the new TLS section to this namespace's initial TLS area,
-                // which will reserve/obtain a new offset into that TLS area which holds this section's data.
-                // This will also update the section's virtual address field to hold that offset value,
-                // which is used for relocation entries that ask for a section's offset from the TLS base.
-                let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                    .add_new_dynamic_tls_section(new_section, tls_sec_align)
-                    .map_err(|_| "Failed to add new TLS section")?;
-
-                // trace!("\t --> updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
-                tls_sections.insert(last_shndx);
-                new_tls_section
-            } else {
-                Arc::new(new_section)
-            };
-
-            loaded_sections.insert(last_shndx, new_section_ref);
 
             if is_global {
                 global_sections.insert(last_shndx);
