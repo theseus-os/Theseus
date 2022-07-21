@@ -75,7 +75,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 }
 
-fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
+fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     
     let (dev_id, mac_address) = {
         let ixgbe_devs = get_ixgbe_nics_list().ok_or("Ixgbe NICs list not initialized")?;
