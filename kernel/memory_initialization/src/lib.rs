@@ -117,13 +117,17 @@ pub fn init_memory_management(
 
     // Because bootloader modules may overlap with the actual boot information, 
     // we need to preserve those records here in a separate list,
-    // such that we can unmap the boot info pages & frames here but still access that info in the future .
+    // such that we can unmap the boot info pages & frames here but still access that info in the future.
     let bootloader_modules: Vec<BootloaderModule> = boot_info.module_tags()
-        .map(|m| BootloaderModule::new(
-            PhysicalAddress::new_canonical(m.start_address() as usize),
-            PhysicalAddress::new_canonical(m.end_address()   as usize),
-            String::from(m.name()),
-        )).collect();
+        .map(|m| m.cmdline().map(|module_name| 
+            BootloaderModule::new(
+                PhysicalAddress::new_canonical(m.start_address() as usize),
+                PhysicalAddress::new_canonical(m.end_address()   as usize),
+                String::from(module_name),
+            )
+        ))
+        .collect::<Result<Vec<_>, _>>() // collect the `Vec<Result<...>>` into `Result<Vec<...>>`
+        .map_err(|_e| "BUG: Bootloader module had invalid non-UTF8 name (cmdline) string")?;
 
     // Now that we've recorded the rest of the necessary boot info, we can drop the boot_info_mapped_pages.
     // This frees up those frames such that future code can exclusively map and access those pages/frames.

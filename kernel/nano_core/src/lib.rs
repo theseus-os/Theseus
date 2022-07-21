@@ -121,8 +121,13 @@ pub extern "C" fn nano_core_start(
     if VirtualAddress::new(multiboot_information_virtual_address).is_none() {
         try_exit!(Err("multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
-    let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
-    println_raw!("nano_core_start(): booted via multiboot2 with info at {:#X}.", multiboot_information_virtual_address); 
+    let boot_info = try_exit!(
+        unsafe { multiboot2::load(multiboot_information_virtual_address) }.map_err(|e| {
+            error!("Error loading multiboot2 info: {:?}", e);
+            "Error loading multiboot2 info"
+        })
+    );
+    println_raw!("nano_core_start(): booted via multiboot2 with boot info at {:#X}.", multiboot_information_virtual_address); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
