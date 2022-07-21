@@ -153,7 +153,7 @@ impl PosixNode {
                 .unwrap()
                 .get_env()
                 .lock()
-                .get_wd_path(),
+                .cwd(),
         );
 
         let relative_path: Path = absolute_path.relative(&wd_path).unwrap();

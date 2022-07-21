@@ -12,7 +12,7 @@ pub fn current_dir() -> io::Result<DirRef> {
         )
         .and_then(|task| 
             match theseus_path::Path::get_absolute(
-                &task.get_env().lock().get_wd_path().into()
+                &task.get_env().lock().cwd().into()
             ) {
                 Some(FileOrDir::File(_)) => Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -30,7 +30,7 @@ pub fn current_dir_path() -> io::Result<PathBuf> {
         .ok_or(io::Error::new(io::ErrorKind::Other, "failed to get Theseus current task"))
         .map(|task| task.get_env()
             .lock()
-            .get_wd_path()
+            .cwd()
             .into()
         )
 }

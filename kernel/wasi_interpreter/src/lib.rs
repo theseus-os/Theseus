@@ -107,7 +107,7 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
         .unwrap()
         .get_env()
         .lock()
-        .get_wd_path();
+        .cwd();
 
     let mut theseus_env_vars: Vec<String> = Vec::new();
     theseus_env_vars.push(format!("PWD={}", pwd));
@@ -117,7 +117,7 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
         memory: state_machine.memory,
         exit_code: 0,
         fd_table: FileDescriptorTable::new(),
-        theseus_env_vars: theseus_env_vars,
+        theseus_env_vars,
         theseus_args: args,
     };
 
