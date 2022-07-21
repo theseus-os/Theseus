@@ -41,34 +41,71 @@
 <span id="36">36</span>
 <span id="37">37</span>
 <span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
 </pre><pre class="rust"><code><span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">fs_node</span>;
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">root</span>;
 
 <span class="kw">use</span> <span class="ident">alloc</span>::{
     <span class="ident">string::String</span>,
     <span class="ident">sync::Arc</span>,
 };
 <span class="kw">use</span> <span class="ident">fs_node::DirRef</span>;
+<span class="kw">use</span> <span class="ident">hashbrown::HashMap</span>;
 
 <span class="doccomment">/// A structure that contains environment state for a given `Task` or group of `Task`s.</span>
 <span class="doccomment">/// </span>
 <span class="doccomment">/// A default environment can be created with the following state:</span>
 <span class="doccomment">/// * The working directory is the `root` directory.</span>
-<span class="doccomment">///</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Environment</span> {
     <span class="doccomment">/// The &quot;current working directory&quot;, i.e., </span>
     <span class="doccomment">/// where a task&#39;s relative path begins upon first execution.</span>
     <span class="kw">pub</span> <span class="ident">working_dir</span>: <span class="ident">DirRef</span>, 
+    <span class="kw">pub</span> <span class="ident">variables</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">String</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Environment</span> {
-    <span class="doccomment">/// Gets the absolute file path of the working directory</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_wd_path</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
+    <span class="doccomment">/// Returns the absolute file path of the current working directory.</span>
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span>(<span class="string">&quot;working&quot;</span>, <span class="string">&quot;dir&quot;</span>, <span class="string">&quot;current&quot;</span>, <span class="string">&quot;getcwd&quot;</span>))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cwd</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
         <span class="kw">let</span> <span class="ident">wd</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">working_dir</span>.<span class="ident">lock</span>();
         <span class="ident">wd</span>.<span class="ident">get_absolute_path</span>()
+    }
+
+    <span class="doccomment">/// Returns the value of the environment variable with the given `key`.</span>
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span>(<span class="string">&quot;var&quot;</span>))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">String</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">variables</span>.<span class="ident">get</span>(<span class="ident">key</span>)
+    }
+
+    <span class="doccomment">/// Sets an environment variable with the given `key` and `value`.</span>
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span>(<span class="string">&quot;set_var&quot;</span>))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="ident">String</span>, <span class="ident">value</span>: <span class="ident">String</span>) {
+        <span class="self">self</span>.<span class="ident">variables</span>.<span class="ident">insert</span>(<span class="ident">key</span>, <span class="ident">value</span>);
+    }
+
+    <span class="doccomment">/// Unsets the environment variable with the given `key`.</span>
+    <span class="attribute">#[<span class="ident">doc</span>(<span class="ident">alias</span>(<span class="string">&quot;remove_var&quot;</span>))]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">key</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) {
+        <span class="self">self</span>.<span class="ident">variables</span>.<span class="ident">remove</span>(<span class="ident">key</span>);
     }
 }
 
@@ -76,8 +113,10 @@
     <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="ident">Environment</span> {
         <span class="ident">Environment</span> {
             <span class="ident">working_dir</span>: <span class="ident">Arc::clone</span>(<span class="ident">root::get_root</span>()),
+            <span class="ident">variables</span>: <span class="ident">HashMap::new</span>(),
         }
     }
-}</code></pre></div>
+}
+</code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="environment" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.61.0-nightly (c84f39e6c 2022-03-20)" ></div>
 </body></html>

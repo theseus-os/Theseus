@@ -661,7 +661,7 @@
                 .<span class="ident">unwrap</span>()
                 .<span class="ident">get_env</span>()
                 .<span class="ident">lock</span>()
-                .<span class="ident">get_wd_path</span>(),
+                .<span class="ident">cwd</span>(),
         );
 
         <span class="kw">let</span> <span class="ident">relative_path</span>: <span class="ident">Path</span> <span class="op">=</span> <span class="ident">absolute_path</span>.<span class="ident">relative</span>(<span class="kw-2">&amp;</span><span class="ident">wd_path</span>).<span class="ident">unwrap</span>();

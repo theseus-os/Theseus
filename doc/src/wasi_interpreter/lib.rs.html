@@ -268,7 +268,7 @@
         .<span class="ident">unwrap</span>()
         .<span class="ident">get_env</span>()
         .<span class="ident">lock</span>()
-        .<span class="ident">get_wd_path</span>();
+        .<span class="ident">cwd</span>();
 
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">theseus_env_vars</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
     <span class="ident">theseus_env_vars</span>.<span class="ident">push</span>(<span class="macro">format!</span>(<span class="string">&quot;PWD={}&quot;</span>, <span class="ident">pwd</span>));
@@ -278,7 +278,7 @@
         <span class="ident">memory</span>: <span class="ident">state_machine</span>.<span class="ident">memory</span>,
         <span class="ident">exit_code</span>: <span class="number">0</span>,
         <span class="ident">fd_table</span>: <span class="ident">FileDescriptorTable::new</span>(),
-        <span class="ident">theseus_env_vars</span>: <span class="ident">theseus_env_vars</span>,
+        <span class="ident">theseus_env_vars</span>,
         <span class="ident">theseus_args</span>: <span class="ident">args</span>,
     };
 
