@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["select_next_task","This defines the round robin scheduler policy. Returns None if there is no schedule-able task"]]});
+window.SIDEBAR_ITEMS = {"fn":[["select_next_task","This defines the round robin scheduler policy. Returns None if there is no schedule-able task"]]};

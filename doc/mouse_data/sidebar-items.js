@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ButtonAction",""],["Displacement",""],["MouseEvent",""],["MouseMovement",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["ButtonAction",""],["Displacement",""],["MouseEvent",""],["MouseMovement",""]]};

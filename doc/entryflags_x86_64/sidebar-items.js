@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["EntryFlags","Page table entry flags on the x86_64 architecture. "]]});
+window.SIDEBAR_ITEMS = {"struct":[["EntryFlags","Page table entry flags on the x86_64 architecture. "]]};

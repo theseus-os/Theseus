@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["replace_nano_core_crates","See the module-level documentation for how this works. "]]});
+window.SIDEBAR_ITEMS = {"fn":[["replace_nano_core_crates","See the module-level documentation for how this works. "]]};

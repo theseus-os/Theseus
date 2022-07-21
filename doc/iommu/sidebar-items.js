@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["init","Initialize the IOMMU hardware."],["iommu_present","Returns `true` if an IOMMU exists and has been initialized."]],"struct":[["IntelIommu","Struct representing IOMMU (TODO: rename since this is specific to Intel VT-d)"]]});
+window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the IOMMU hardware."],["iommu_present","Returns `true` if an IOMMU exists and has been initialized."]],"struct":[["IntelIommu","Struct representing IOMMU (TODO: rename since this is specific to Intel VT-d)"]]};

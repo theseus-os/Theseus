@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Environment","A structure that contains environment state for a given `Task` or group of `Task`s."]]});
+window.SIDEBAR_ITEMS = {"struct":[["Environment","A structure that contains environment state for a given `Task` or group of `Task`s."]]};

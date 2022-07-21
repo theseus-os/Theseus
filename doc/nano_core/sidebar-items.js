@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["nano_core_start","The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. "]]});
+window.SIDEBAR_ITEMS = {"fn":[["nano_core_start","The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. "]]};

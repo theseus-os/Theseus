@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["SendQueueState","The possible states the SQ can be in."]],"struct":[["SendQueue","A data structure that contains the SQ ring of descriptors  and is used to interact with the SQ once initialized."]]});
+window.SIDEBAR_ITEMS = {"enum":[["SendQueueState","The possible states the SQ can be in."]],"struct":[["SendQueue","A data structure that contains the SQ ring of descriptors  and is used to interact with the SQ once initialized."]]};

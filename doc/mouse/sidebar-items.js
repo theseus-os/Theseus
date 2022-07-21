@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["handle_mouse_input","return a Mouse Event according to the data"],["init","Initialize the mouse driver."],["mouse_to_print","print the mouse actions"]]});
+window.SIDEBAR_ITEMS = {"fn":[["handle_mouse_input","return a Mouse Event according to the data"],["init","Initialize the mouse driver."],["mouse_to_print","print the mouse actions"]]};

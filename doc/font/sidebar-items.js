@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["CHARACTER_HEIGHT","The height of a character."],["CHARACTER_WIDTH","The width of a character."]],"static":[["FONT_BASIC","The bitmap array of characters."]]});
+window.SIDEBAR_ITEMS = {"constant":[["CHARACTER_HEIGHT","The height of a character."],["CHARACTER_WIDTH","The width of a character."]],"static":[["FONT_BASIC","The bitmap array of characters."]]};

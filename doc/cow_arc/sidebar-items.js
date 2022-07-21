@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["CowArc","A special form of an `Arc` reference that uses two nested `Arc`s to support a  mechanism similar to copy-on-write or clone-on-write."],["CowWeak","A weak reference to a `CowArc`, just like a `Weak` is to an `Arc`."]]});
+window.SIDEBAR_ITEMS = {"struct":[["CowArc","A special form of an `Arc` reference that uses two nested `Arc`s to support a  mechanism similar to copy-on-write or clone-on-write."],["CowWeak","A weak reference to a `CowArc`, just like a `Weak` is to an `Arc`."]]};

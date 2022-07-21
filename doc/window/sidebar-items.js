@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Window","This struct is the application-facing representation of a window."]]});
+window.SIDEBAR_ITEMS = {"struct":[["Window","This struct is the application-facing representation of a window."]]};

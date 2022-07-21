@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["context_switch","Switches context from an SSE Task to another SSE Task."]],"struct":[["Context","The registers saved before a context switch and restored after a context switch for SSE-enabled Tasks."]]});
+window.SIDEBAR_ITEMS = {"fn":[["context_switch","Switches context from an SSE Task to another SSE Task."]],"struct":[["Context","The registers saved before a context switch and restored after a context switch for SSE-enabled Tasks."]]};

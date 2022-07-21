@@ -1,4 +1,4 @@
-var N = null;var sourcesIndex = {};
+var sourcesIndex = {};
 sourcesIndex["___Theseus_Crates___"] = {"name":"","files":["_doc_root.rs"]};
 sourcesIndex["acpi"] = {"name":"","files":["lib.rs"]};
 sourcesIndex["acpi_table"] = {"name":"","files":["lib.rs"]};

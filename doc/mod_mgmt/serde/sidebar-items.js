@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SerializedCrate","A (de)serializable representation of a loaded crate that is `serde`-compatible."],["SerializedSection","A (de)serializable representation of a loaded section that is `serde`-compatible."]]});
+window.SIDEBAR_ITEMS = {"struct":[["SerializedCrate","A (de)serializable representation of a loaded crate that is `serde`-compatible."],["SerializedSection","A (de)serializable representation of a loaded section that is `serde`-compatible."]]};

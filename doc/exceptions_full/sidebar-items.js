@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["init","Initialize the given `idt` with fully-featured exception handlers."]]});
+window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the given `idt` with fully-featured exception handlers."]]};

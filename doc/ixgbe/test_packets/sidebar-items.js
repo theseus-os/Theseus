@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_dhcp_test_packet","Creates a `TransmitBuffer` containing a dhcp packet."],["create_raw_packet","Creates a `TransmitBuffer` that contains a packet with only the ethernet header."],["dhcp_request_packet","Sends a dhcp request packet on the ixgbe NIC."]]});
+window.SIDEBAR_ITEMS = {"fn":[["create_dhcp_test_packet","Creates a `TransmitBuffer` containing a dhcp packet."],["create_raw_packet","Creates a `TransmitBuffer` that contains a packet with only the ethernet header."],["dhcp_request_packet","Sends a dhcp request packet on the ixgbe NIC."]]};

@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AtomicMap",""],["AtomicMapIter",""],["AtomicMapIterMut",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["AtomicMap",""],["AtomicMapIter",""],["AtomicMapIterMut",""]]};

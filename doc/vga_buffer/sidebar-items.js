@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Color",""]],"macro":[["print_raw",""],["println_raw",""]],"struct":[["ColorCode",""],["ScreenChar",""]]});
+window.SIDEBAR_ITEMS = {"enum":[["Color",""]],"macro":[["print_raw",""],["println_raw",""]],"struct":[["ColorCode",""],["ScreenChar",""]]};

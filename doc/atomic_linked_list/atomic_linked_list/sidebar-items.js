@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["AtomicLinkedList",""],["AtomicLinkedListIter",""],["AtomicLinkedListIterMut",""]]});
+window.SIDEBAR_ITEMS = {"struct":[["AtomicLinkedList",""],["AtomicLinkedListIter",""],["AtomicLinkedListIterMut",""]]};

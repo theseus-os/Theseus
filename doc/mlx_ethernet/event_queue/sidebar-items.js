@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["EventQueue","A data structure that contains the EQ buffer  and is used to interact with the EQ once initialized."],["EventQueueEntry","The layout of an entry in the EQ buffer."]]});
+window.SIDEBAR_ITEMS = {"struct":[["EventQueue","A data structure that contains the EQ buffer  and is used to interact with the EQ once initialized."],["EventQueueEntry","The layout of an entry in the EQ buffer."]]};

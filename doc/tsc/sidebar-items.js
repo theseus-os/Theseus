@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["get_tsc_frequency","Returns the frequency of the TSC for the system,  currently measured using the PIT clock for calibration."],["tsc_ticks","Returns the current number of ticks from the TSC, i.e., `rdtscp`. "]],"struct":[["TscTicks",""]]});
+window.SIDEBAR_ITEMS = {"fn":[["get_tsc_frequency","Returns the frequency of the TSC for the system,  currently measured using the PIT clock for calibration."],["tsc_ticks","Returns the current number of ticks from the TSC, i.e., `rdtscp`. "]],"struct":[["TscTicks",""]]};

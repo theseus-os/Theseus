@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["new_channel","Create a new channel that requires a sender a receiver to rendezvous in order to exchange a message. "]],"struct":[["Receiver","The receiver side of a channel."],["Sender","The sender (transmit) side of a channel."]]});
+window.SIDEBAR_ITEMS = {"fn":[["new_channel","Create a new channel that requires a sender a receiver to rendezvous in order to exchange a message. "]],"struct":[["Receiver","The receiver side of a channel."],["Sender","The sender (transmit) side of a channel."]]};

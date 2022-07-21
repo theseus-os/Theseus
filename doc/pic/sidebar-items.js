@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["IRQ_BASE_OFFSET","The offset added to the first IRQ: `0x20`."]],"struct":[["ChainedPics","A pair of chained PIC chips, which represents the standard x86 configuration."],["IrqStatusRegisters","The set of status registers for both PIC chips."]]});
+window.SIDEBAR_ITEMS = {"constant":[["IRQ_BASE_OFFSET","The offset added to the first IRQ: `0x20`."]],"struct":[["ChainedPics","A pair of chained PIC chips, which represents the standard x86 configuration."],["IrqStatusRegisters","The set of status registers for both PIC chips."]]};

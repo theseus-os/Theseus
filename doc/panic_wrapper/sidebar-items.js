@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["panic_wrapper","Performs the standard panic handling routine, which involves the following:"]]});
+window.SIDEBAR_ITEMS = {"fn":[["panic_wrapper","Performs the standard panic handling routine, which involves the following:"]]};

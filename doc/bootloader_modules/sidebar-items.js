@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["BootloaderModule","A record of a bootloader module’s name and location in physical memory."]]});
+window.SIDEBAR_ITEMS = {"struct":[["BootloaderModule","A record of a bootloader module’s name and location in physical memory."]]};
