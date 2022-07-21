@@ -8,7 +8,6 @@
 //! 
 
 #![no_std]
-#![feature(toowned_clone_into)]
 #![feature(extend_one)]
 #![feature(trait_alias)]
 
