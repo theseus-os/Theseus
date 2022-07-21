@@ -1,0 +1,11 @@
+[package]
+name = "limine_compress_modules"
+version = "0.1.0"
+authors = [
+    "Nathan Royer <nathan.royer.pro@gmail.com>",
+]
+description = "Compresses a file in the LZ4 format and prepend the compressed data with its original size"
+
+[dependencies]
+getopts = "0.2"
+lz4_flex = "0.9.3"

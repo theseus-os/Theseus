@@ -18,6 +18,7 @@ include cfg/Config.mk
 debug ?= none
 net ?= none
 merge_sections ?= yes
+bootloader ?= grub
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -38,13 +39,19 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 
-## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
-ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
-	GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
-else ifneq (,$(shell command -v $(GRUB_CROSS)grub2-mkrescue))
-	GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
+ifeq ($(bootloader),grub)
+	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
+	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
+		GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
+	else ifneq (,$(shell command -v $(GRUB_CROSS)grub2-mkrescue))
+		GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
+	else
+$(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
+	endif
+else ifeq ($(bootloader),limine-iso)
+export override CARGOFLAGS += --features mod_unpack
 else
-	$(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
+$(error Error: invalid value for `bootloader`, must be `grub` or `limine-iso`; value: `$(bootloader)`.)
 endif
 
 
@@ -71,8 +78,8 @@ check-rustc:
 BUILD_DIR := $(ROOT_DIR)/build
 NANO_CORE_BUILD_DIR := $(BUILD_DIR)/nano_core
 iso := $(BUILD_DIR)/theseus-$(ARCH).iso
-GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
-OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
+ISOFILES := $(BUILD_DIR)/isofiles
+OBJECT_FILES_BUILD_DIR := $(ISOFILES)/modules
 DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
 TARGET_DEPS_DIR := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps
 DEPS_BUILD_DIR := $(BUILD_DIR)/deps
@@ -124,7 +131,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 .PHONY: all full \
 		check-rustc check-usb \
 		clean clean-doc clean-old-build \
-		run run_pause iso build cargo grub extra_files \
+		run run_pause iso build cargo $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
@@ -148,14 +155,13 @@ full: iso
 ### Convenience target for building the ISO using the below $(iso) target
 iso: $(iso)
 
-
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): clean-old-build build extra_files
-# after building kernel and application modules, copy the kernel boot image files
-	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-	$(MAKE) grub
+$(iso): clean-old-build build extra_files copy_kernel $(bootloader)
 
+copy_kernel:
+# after building kernel and application modules, copy the kernel boot image files
+	@mkdir -p $(ISOFILES)/boot/
+	@cp $(nano_core_binary) $(ISOFILES)/boot/kernel.bin
 
 
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
@@ -337,13 +343,36 @@ endif
 
 
 ### This target auto-generates a new grub.cfg file and uses grub to build a bootable ISO.
-### This target should be invoked when all of contents of `GRUB_ISOFILES` are ready to be packaged into an ISO.
+### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
 grub:
-	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	@mkdir -p $(ISOFILES)/boot/grub
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(ISOFILES)/modules/ -o $(ISOFILES)/boot/grub/grub.cfg
+	@$(GRUB_MKRESCUE) -o $(iso) $(ISOFILES)  2> /dev/null
+
+### This target uses limine to build a bootable ISO.
+### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
+limine-iso:
+	@test -d limine/ || echo "Missing ./limine/ directory! Did you follow the Readme?"
+	@cd $(OBJECT_FILES_BUILD_DIR)/ && ls | cpio --no-absolute-filenames -o > $(ISOFILES)/modules.cpio
+	@cargo run -r --manifest-path $(ROOT_DIR)/tools/limine_compress_modules/Cargo.toml -- -i $(ISOFILES)/modules.cpio -o $(ISOFILES)/modules.cpio.lz4
+	@rm -r $(OBJECT_FILES_BUILD_DIR)
+	@rm $(ISOFILES)/modules.cpio
+	@cp cfg/limine.cfg $(ISOFILES)/
+	@cp limine/limine-cd.bin $(ISOFILES)/
+	@cp limine/limine-cd-efi.bin $(ISOFILES)/
+	@cp limine/limine.sys $(ISOFILES)/
+	tree $(ISOFILES)/
+	@rm -f $(iso)
+	@xorriso -as mkisofs \
+		-b limine-cd.bin -no-emul-boot -boot-load-size 4 \
+		-boot-info-table --efi-boot limine-cd-efi.bin \
+		-efi-boot-part --efi-boot-image --protective-msdos-label \
+		$(ISOFILES)/ -o $(iso)
+	@$(MAKE) -C limine
+	@limine/limine-deploy $(iso)
 
 
-### This target copies all extra files into the `GRUB_ISOFILES` directory,
+### This target copies all extra files into the `ISOFILES` directory,
 ### collapsing their directory structure into a single file name with `?` as the directory delimiter.
 ### The contents of the EXTRA_FILES directory will be available at runtime within Theseus's root fs, too.
 ### See the `README.md` in the `extra_files` directory for more info.
@@ -368,7 +397,7 @@ tlibc:
 		$(CROSS)strip  --strip-debug  $${f} ; \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(APP_PREFIX)\1/p'`   2> /dev/null ; \
 	done
-	$(MAKE) grub
+	$(MAKE) bootloader=$(bootloader) $(bootloader)
 	@echo -e "\n\033[1;32m The build of tlibc finished successfully and was packaged into the Theseus ISO.\033[0m"
 	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run', that will overwrite tlibc)"
 	@echo -e "    --> In Theseus, run 'ns --load /namespaces/_applications/tlibc.o' to load tlibc."
@@ -386,7 +415,7 @@ c_test:
 		$(CROSS)strip  --strip-debug  $${f} ; \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(EXECUTABLE_PREFIX)\1/p'`   2> /dev/null ; \
 	done
-	$(MAKE) grub
+	$(MAKE) bootloader=$(bootloader) $(bootloader)
 	@echo -e "\n\033[1;32m The build of $(C_TEST_TARGET) finished successfully and was packaged into the Theseus ISO.\033[0m"
 	@echo -e "    --> Use 'make orun' to run it now (don't use 'make run')"
 	@echo -e "    --> In Theseus, run 'loadc /namespaces/_executables/$(C_TEST_TARGET)' to load and run the C program."
@@ -430,9 +459,9 @@ clean-old-build:
 # 	@echo -e "\n======== BUILDING USERSPACE ========"
 # 	@$(MAKE) -C old_crates/userspace all
 # ## copy userspace binary files and add the __u_ prefix
-# 	@mkdir -p $(GRUB_ISOFILES)/modules
+# 	@mkdir -p $(ISOFILES)/modules
 # 	@for f in `find $(ROOT_DIR)/old_crates/userspace/build -type f` ; do \
-# 		cp -vf $${f}  $(GRUB_ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
+# 		cp -vf $${f}  $(ISOFILES)/modules/`basename $${f} | sed -n -e 's/\(.*\)/__u_\1/p'` 2> /dev/null ; \
 # 	done
 
 
@@ -464,10 +493,7 @@ simd_personality_sse : export override THESEUS_CONFIG += simd_personality simd_p
 simd_personality_sse: clean-old-build build_sse build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
-	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-## autogenerate the grub.cfg file
-	$(MAKE) grub
+	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -484,10 +510,7 @@ simd_personality_avx : export override CFLAGS += -DENABLE_AVX
 simd_personality_avx: clean-old-build build_avx build
 ## after building all the modules, copy the kernel boot image files
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
-	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-## autogenerate the grub.cfg file
-	$(MAKE) grub
+	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -638,9 +661,9 @@ help:
 	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
 
-	@echo -e "   boot:"
+	@echo -e "   usb:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
-	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make boot usb=sdc',"
+	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make usb usb=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
 
 	@echo -e "   pxe:"
@@ -661,6 +684,12 @@ help:
 	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
+	@echo -e "\nThe following key-value options are available to select a bootloader:"
+	@echo -e "   bootloader=grub|limine-iso"
+	@echo -e "\t Configure which bootloader to pack into the final \".iso\" file."
+	@echo -e "\t    'grub':       Use the GRUB bootloader. Default value."
+	@echo -e "\t    'limine-iso': Use the Limine bootloader. See specific paragraph in the Readme."
+
 	@echo -e "\nThe following key-value options are available to customize the build process:"
 	@echo -e "   merge_sections=yes|no"
 	@echo -e "\t Choose whether sections in crate object files are merged together."
@@ -893,8 +922,8 @@ endif  ## end of checking for WSL
 
 
 ### Creates a bootable USB drive that can be inserted into a real PC based on the compiled .iso. 
-boot : export override THESEUS_CONFIG += mirror_log_to_vga
-boot: check-usb $(iso)
+usb : export override THESEUS_CONFIG += mirror_log_to_vga
+usb: check-usb $(iso)
 ifneq ($(IS_WSL), )
 ## building on WSL
 	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."

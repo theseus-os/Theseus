@@ -32,7 +32,7 @@ On Linux (Debian-like distros), do the following:
     cd Theseus
     make run
     ```
-    To exit QEMU, press <kbd>Ctrl</kbd> + <kbd>A</kbd>, then <kbd>X</kbd>. 
+    To exit QEMU, press <kbd>Ctrl</kbd> + <kbd>A</kbd>, then <kbd>X</kbd>.
 
 See below for more detailed instructions.
 
@@ -151,6 +151,15 @@ make full   ## or `make all`
 ```
 
 Run `make help` to see other make targets and the various command-line options.
+
+
+## Using the Limine bootloader instead of GRUB
+To use Limine instead of GRUB, clone pre-built limine and pass `bootloader=limine-iso` to make:
+```
+git clone https://github.com/limine-bootloader/limine.git --branch=v3.6-binary --depth=1
+make run bootloader=limine-iso
+```
+Feel free to try newer versions, however they may not work.
 
 
 ## Using QEMU
