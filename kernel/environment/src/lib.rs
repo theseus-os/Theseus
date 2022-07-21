@@ -22,22 +22,26 @@ pub struct Environment {
 
 impl Environment {
     /// Returns the absolute file path of the current working directory.
+    #[doc(alias("working", "dir", "current", "getcwd"))]
     pub fn cwd(&self) -> String {
         let wd = self.working_dir.lock();
         wd.get_absolute_path()
     }
 
     /// Returns the value of the environment variable with the given `key`.
+    #[doc(alias("var"))]
     pub fn get(&self, key: &str) -> Option<&String> {
         self.variables.get(key)
     }
 
-    /// Sets an environment varible with the given `key` and `value`.
+    /// Sets an environment variable with the given `key` and `value`.
+    #[doc(alias("set_var"))]
     pub fn set(&mut self, key: String, value: String) {
         self.variables.insert(key, value);
     }
 
     /// Unsets the environment variable with the given `key`.
+    #[doc(alias("remove_var"))]
     pub fn unset(&mut self, key: &str) {
         self.variables.remove(key);
     }
