@@ -1,0 +1,15 @@
+name: Clippy Checks
+on:
+  pull_request:
+    types: [edited, synchronize, opened, reopened]
+jobs:
+  run-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+        printf "cargo clippy -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- " > cmd.txt; 
+        gh issue view 526 -R https://github.com/theseus-os/Theseus | grep -- "^  - \[x\] [[:lower:][:upper:]_]*" | sed 's/_/-/g' | sed 's/  - \[x\] /-D clippy::/g' | tr -d '\r' | tr '\n' ' '  >> cmd.txt; 
+        bash cmd.txt;
