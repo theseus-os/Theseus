@@ -10,6 +10,7 @@ jobs:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          git submodule update --init --recursive
           (echo "rustup toolchain install "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;"; echo "rustup component add clippy --toolchain "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;") | tr -d "\r" | tr -d "\n" > cmd.txt
           bash cmd.txt;
           printf "cargo clippy -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- " > cmd.txt; 
