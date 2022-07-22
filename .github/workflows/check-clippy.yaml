@@ -7,12 +7,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Initialize git submodules"
         run: |
           git submodule update --init --recursive
+      - name: "Install Rust toolchain"
+        run: |
           (echo "rustup toolchain install "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;"; echo "rustup component add clippy rust-src --toolchain "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;") | tr -d "\r" | tr -d "\n" > cmd.txt
           bash cmd.txt;
-          printf "cargo clippy -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- " > cmd.txt; 
+      - name: "Run Clippy"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf "cargo clippy -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- -A clippy::all " > cmd.txt; 
           gh issue view 526 -R https://github.com/theseus-os/Theseus | grep -- "^  - \[x\] [[:lower:][:upper:]_]*" | sed 's/_/-/g' | sed 's/  - \[x\] /-D clippy::/g' | tr -d '\r' | tr '\n' ' '  >> cmd.txt; 
           bash cmd.txt;
