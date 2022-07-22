@@ -5,7 +5,7 @@ description = "The memory subsystem interfaces on x86_64."
 version = "0.1.0"
 
 [dependencies]
-multiboot2 = "0.10.1"
+multiboot2 = "0.14.0"
 x86_64 = "0.14.8"
 
 [dependencies.log]

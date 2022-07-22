@@ -2,7 +2,6 @@
 //! which includes interrupt and multicore info.
 
 #![no_std]
-#![allow(unaligned_references)]
 
 #[macro_use] extern crate log;
 extern crate irq_safety;
@@ -355,15 +354,17 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 if ioapic_ref.handles_irq(int_src.gsi) {
                     // using BSP for now, but later we could redirect the IRQ to more (or all) cores
                     ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + IRQ_BASE_OFFSET); 
-                    trace!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}.",
-                    int_src.bus_source, int_src.irq_source, int_src.gsi, int_src.flags, ioapic_ref.id);
+                    trace!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}",
+                        int_src.bus_source, int_src.irq_source, &{ int_src.gsi }, &{ int_src.flags }, ioapic_ref.id
+                    );
                     handled = true;
                 }
             }
 
             if !handled {
                 error!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) not handled by any IoApic!",
-                    int_src.bus_source, int_src.irq_source, int_src.gsi, int_src.flags);
+                    int_src.bus_source, int_src.irq_source, &{ int_src.gsi }, &{ int_src.flags}
+                );
             }
         }
     }

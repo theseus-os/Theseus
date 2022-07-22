@@ -8,7 +8,7 @@ build = "build.rs"
 
 [dependencies]
 spin = "0.9.0"
-multiboot2 = "0.10.1"
+multiboot2 = "0.14.0"
 libm = "0.2.1"
 
 

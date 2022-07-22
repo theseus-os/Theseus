@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(let_chains)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
