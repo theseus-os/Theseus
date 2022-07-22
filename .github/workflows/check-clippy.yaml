@@ -10,7 +10,7 @@ jobs:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          (echo "rustup toolchain install "; cat rust-toolchain; echo ";" echo "rustup component add clippy --toolchain "; cat rust-toolchain) | tr -d "\r" | tr -d "\n" > cmd.txt
+          (echo "rustup toolchain install "; cat rust-toolchain; printf "-x86_64-unknown-linux-gnu;"; echo "rustup component add clippy --toolchain "; cat rust-toolchain; printf "-x86_64-unknown-linux-gnu;") | tr -d "\r" | tr -d "\n" > cmd.txt
           bash cmd.txt;
           printf "cargo clippy -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- " > cmd.txt; 
           gh issue view 526 -R https://github.com/theseus-os/Theseus | grep -- "^  - \[x\] [[:lower:][:upper:]_]*" | sed 's/_/-/g' | sed 's/  - \[x\] /-D clippy::/g' | tr -d '\r' | tr '\n' ' '  >> cmd.txt; 
