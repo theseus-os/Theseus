@@ -1,21 +1,11 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "wait_queue"
-description = "The WaitQueue type that can block/sleep and wake up tasks"
 version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+edition = "2021"
+description = "A wait queue implementation"
 
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.scheduler]
-path = "../scheduler"
-
-[lib]
-crate-type = ["rlib"]
+[dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+scheduler = { path = "../scheduler" }
+task = { path = "../task" }

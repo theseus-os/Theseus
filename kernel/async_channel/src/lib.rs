@@ -53,7 +53,7 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
     });
     (
         Sender   { channel: channel.clone() },
-        Receiver { channel: channel }
+        Receiver { channel }
     )
 }
 
@@ -179,10 +179,10 @@ impl <T: Send> Sender<T> {
             
         };
 
-        // When `wait_until_mut` returns it can be either a successful send marked as  Ok(Ok()), 
+        // When `wait_until` returns it can be either a successful send marked as  Ok(Ok()), 
         // Error in the condition (channel disconnection) marked as Ok(Err()),
         // or the wait_until runs into error (Err()) 
-        let res =  match self.channel.waiting_senders.wait_until_mut(&mut closure) {
+        let res =  match self.channel.waiting_senders.wait_until(&mut closure) {
             Ok(r) => r,
             Err(wait_error) => Err(ChannelError::WaitError(wait_error)),
         };
