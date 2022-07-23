@@ -6,7 +6,7 @@
 pub mod fs {
     use fs_node::{File, FileRef};
     use io::{LockableIo, ReaderWriter};
-    // TODO: Maybe use OS mutex?
+    // TODO: Use OS mutex?
     use spin::Mutex;
 
     /// This is a typedef for a Theseus-native [`FileRef`] (`Arc<Mutex<dyn
@@ -78,7 +78,7 @@ pub mod mem {
 pub mod sync {
     // TODO: Do we want to expose Mutex/Locks. If so, a basic mutex (manual
     // locking/unlocking) or a Mutex<T>?
-    // pub use semaphore::Semaphore;
+    pub use semaphore::Semaphore;
     pub use wait_queue::WaitQueue;
 }
 
