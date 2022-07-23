@@ -14,6 +14,8 @@ use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use task::{get_my_current_task, TaskRef};
 
+// FIXME: THIS IS ALL WRONG. IT ASSUMES SINGLE THREAD :).
+
 /// A counting, blocking, semaphore.
 ///
 /// Semaphores are a form of atomic counter where access is only granted if the

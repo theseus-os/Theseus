@@ -459,6 +459,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "condvar"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "mutex",
+ "scheduler",
+ "task",
+]
+
+[[package]]
 name = "console"
 version = "0.1.0"
 dependencies = [
@@ -1986,6 +1996,15 @@ dependencies = [
  "slabmalloc_unsafe",
  "spin 0.9.0",
  "static_assertions",
+]
+
+[[package]]
+name = "mutex"
+version = "0.1.0"
+dependencies = [
+ "scheduler",
+ "spin 0.9.0",
+ "task",
 ]
 
 [[package]]

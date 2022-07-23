@@ -1,0 +1,12 @@
+[package]
+name = "condvar"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A condition variable implementation"
+edition = "2021"
+
+[dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+mutex = { path = "../mutex" }
+scheduler = { path = "../scheduler" }
+task = { path = "../task" }
