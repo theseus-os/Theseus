@@ -27,16 +27,14 @@ pub struct Semaphore(MutexIrqSafe<State>);
 #[derive(Default)]
 struct State {
     count: isize,
-    limit: isize,
     queue: VecDeque<&'static TaskRef>,
 }
 
 impl Semaphore {
-    /// Creates a new semaphore with the given `count` and optional `limit`.
-    pub fn new(count: isize, limit: Option<isize>) -> Self {
+    /// Creates a new semaphore with the given `count`.
+    pub fn new(count: isize) -> Self {
         Self(MutexIrqSafe::new(State {
             count,
-            limit: limit.unwrap_or(isize::MAX),
             queue: VecDeque::new(),
         }))
     }
@@ -46,6 +44,7 @@ impl Semaphore {
     /// This function is commonly referred to as `p` in literature.
     pub fn acquire(&self) {
         // TODO: crossbeam_utils::Backoff
+        // TODO: use kernel::wait_queue
 
         let mut state = self.0.lock();
         if state.count > 0 {
@@ -58,6 +57,8 @@ impl Semaphore {
         state.queue.push_back(current_task);
         drop(state);
         current_task.block();
+        
+        scheduler::schedule();
     }
 
     /// Release a resource from this semaphore.
@@ -65,7 +66,7 @@ impl Semaphore {
     /// This function is commonly referred to as `v` in literature.
     pub fn release(&self) {
         let mut state = self.0.lock();
-        if state.queue.is_empty() && state.count < state.limit {
+        if state.queue.is_empty() {
             state.count += 1;
         } else {
             // FIXME: Unwrap

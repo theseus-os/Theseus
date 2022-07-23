@@ -7,4 +7,5 @@ description = "A semaphore implementation"
 
 [dependencies]
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+scheduler = { path = "../scheduler" }
 task = { path = "../task" }
