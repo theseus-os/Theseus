@@ -1,14 +1,9 @@
-//! This crate contains a mutex implementation.
-//!
-//! The implementation is based on [https://www.cs.princeton.edu/courses/archive/fall16/cos318/lectures/6.MutexImplementation.pdf].
-
-#![no_std]
-
-extern crate alloc;
-
 use alloc::collections::VecDeque;
 use task::TaskRef;
 
+/// A raw mutex.
+///
+/// The implementation is based on <https://www.cs.princeton.edu/courses/archive/fall16/cos318/lectures/6.MutexImplementation.pdf>.
 #[derive(Debug, Default)]
 pub struct Mutex {
     state: spin::Mutex<State>,
@@ -38,6 +33,7 @@ impl Mutex {
         }
     }
 
+    /// Locks the mutex blocking the current thread until it is available.
     pub fn lock(&self) {
         let mut state = self.state.lock();
 
@@ -53,11 +49,17 @@ impl Mutex {
         drop(state);
         scheduler::schedule();
 
-        // NOTE: We only return from the function when the mutex is released by
+        // NOTE: We only reach here after the thread has been unblocked by
         // another thread.
     }
 
-    pub fn unlock(&self) {
+    /// Unlocks the mutex.
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined if the current thread does not actually hold the
+    /// mutex.
+    pub unsafe fn unlock(&self) {
         let mut state = self.state.lock();
         debug_assert!(
             state.is_locked,
@@ -70,6 +72,8 @@ impl Mutex {
         }
     }
 
+    /// Attempts to lock the mutex without blocking, returning whether it was
+    /// successfully acquired or not.
     pub fn try_lock(&self) -> bool {
         let mut state = self.state.lock();
         if state.is_locked {

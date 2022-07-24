@@ -1,8 +1,8 @@
 [package]
-name = "mutex"
+name = "raw_sync"
 version = "0.1.0"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
-description = "A mutex implementation"
+description = "Raw synchronisation primitive implementations"
 edition = "2021"
 
 [dependencies]

@@ -199,7 +199,7 @@ dependencies = [
  "libc",
  "memory",
  "miniz_oxide",
- "mutex_sleep",
+ "mutex",
  "object",
  "rustc-demangle",
  "spin 0.9.0",
@@ -2002,22 +2002,8 @@ dependencies = [
 name = "mutex"
 version = "0.1.0"
 dependencies = [
- "scheduler",
- "spin 0.9.0",
- "task",
-]
-
-[[package]]
-name = "mutex_sleep"
-version = "0.1.0"
-dependencies = [
  "lockable",
- "log",
- "owning_ref",
- "spin 0.9.0",
- "stable_deref_trait",
- "task",
- "wait_queue",
+ "raw_sync",
 ]
 
 [[package]]
@@ -2537,6 +2523,15 @@ dependencies = [
  "bitflags",
  "cc",
  "rustc_version",
+]
+
+[[package]]
+name = "raw_sync"
+version = "0.1.0"
+dependencies = [
+ "scheduler",
+ "spin 0.9.0",
+ "task",
 ]
 
 [[package]]
@@ -3194,6 +3189,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync"
+version = "0.1.0"
+dependencies = [
+ "raw_sync",
+]
+
+[[package]]
 name = "synstructure"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3364,12 +3366,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_mutex_sleep"
+name = "test_mutex"
 version = "0.1.0"
 dependencies = [
  "apic",
  "log",
- "mutex_sleep",
+ "mutex",
  "scheduler",
  "spawn",
  "task",
@@ -3538,7 +3540,7 @@ dependencies = [
  "test_ixgbe",
  "test_libc",
  "test_mlx5",
- "test_mutex_sleep",
+ "test_mutex",
  "test_panic",
  "test_realtime",
  "test_restartable",
@@ -3937,7 +3939,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "mutex_sleep",
+ "mutex",
  "object",
  "paste",
  "psm",
@@ -4018,7 +4020,7 @@ dependencies = [
  "memoffset 0.6.5",
  "memory",
  "more-asserts",
- "mutex_sleep",
+ "mutex",
  "rand",
  "region",
  "signal_handler",

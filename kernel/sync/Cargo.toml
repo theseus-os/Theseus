@@ -1,0 +1,10 @@
+[package]
+name = "sync"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Higher level synchronisation primitves equivalent to the ones found in std::sync"
+edition = "2021"
+
+[dependencies]
+raw_sync = { path = "../raw_sync" }
+# lockable = { path = "../../libs/lockable" }
