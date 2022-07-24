@@ -2,17 +2,23 @@ use crate::Mutex;
 use alloc::collections::VecDeque;
 use task::TaskRef;
 
+/// A condition variable.
+///
+/// The implementation is based on [a UCSD lecture][lecture].
+///
+/// [lecture]: https://cseweb.ucsd.edu/classes/sp17/cse120-a/applications/ln/lecture7.html
 #[derive(Debug)]
 pub struct Condvar {
     queue: spin::Mutex<VecDeque<&'static TaskRef>>,
-    mutex_lock: spin::Mutex<()>,
+    /// Ensures the mutex unlocking and thread blocking are done atomically.
+    atomic_unlock_and_block: spin::Mutex<()>,
 }
 
 impl Default for Condvar {
     fn default() -> Self {
         Self {
             queue: spin::Mutex::new(VecDeque::new()),
-            mutex_lock: spin::Mutex::new(()),
+            atomic_unlock_and_block: spin::Mutex::new(()),
         }
     }
 }
@@ -22,19 +28,23 @@ impl Condvar {
     pub fn new() -> Self {
         Self {
             queue: spin::Mutex::new(VecDeque::new()),
-            mutex_lock: spin::Mutex::new(()),
+            atomic_unlock_and_block: spin::Mutex::new(()),
         }
     }
 
     pub fn notify_one(&self) -> bool {
         let mut queue = self.queue.lock();
-        let _lock = self.mutex_lock.lock();
+        // We have to take the lock here to ensure no other thread is in the middle of
+        // unlocking a mutex and blocking the thread.
+        let _lock = self.atomic_unlock_and_block.lock();
         queue.pop_front().inspect(|task| task.unblock()).is_some()
     }
 
     pub fn notify_all(&self) {
         let mut queue = self.queue.lock();
-        let _lock = self.mutex_lock.lock();
+        // We have to take the lock here to ensure no other thread is in the middle of
+        // unlocking a mutex and blocking the thread.
+        let _lock = self.atomic_unlock_and_block.lock();
 
         for task in queue.drain(..) {
             task.unblock();
@@ -53,11 +63,12 @@ impl Condvar {
         queue.push_back(current_task);
         drop(queue);
 
-        let lock = self.mutex_lock.lock();
+        let atomic_unlock_and_block = self.atomic_unlock_and_block.lock();
         // SAFETY: Safety guaranteed by caller.
         unsafe { mutex.unlock() };
         current_task.block();
-        drop(lock);
+        drop(atomic_unlock_and_block);
+
         scheduler::schedule();
 
         // NOTE: We only reach here after the thread has been unblocked by another
@@ -91,11 +102,12 @@ impl Condvar {
         queue.push_back(current_task);
         drop(queue);
 
-        let lock = self.mutex_lock.lock();
+        let atomic_unlock_and_block = self.atomic_unlock_and_block.lock();
         // Unlock the mutex.
         drop(guard);
         current_task.block();
-        drop(lock);
+        drop(atomic_unlock_and_block);
+
         scheduler::schedule();
 
         // NOTE: We only reach here after the thread has been unblocked by another

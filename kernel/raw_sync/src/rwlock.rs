@@ -1,9 +1,9 @@
-//! Based on sgx and hermit implementations of reader-writer locks in
-//! `std::sys`.
-
 use crate::Condvar;
 
 /// A writer-preferred reader-writer lock.
+///
+/// The implementation is based on the sgx and hermit implementations of
+/// reader-writer locks in `std::sys`.
 #[derive(Debug, Default)]
 pub struct RwLock {
     state: spin::Mutex<State>,

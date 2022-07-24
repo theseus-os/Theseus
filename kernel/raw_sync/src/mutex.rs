@@ -1,9 +1,11 @@
 use alloc::collections::VecDeque;
 use task::TaskRef;
 
-/// A raw mutex.
+/// A mutex.
 ///
-/// The implementation is based on <https://www.cs.princeton.edu/courses/archive/fall16/cos318/lectures/6.MutexImplementation.pdf>.
+/// The implementation is based on [a Princeton University lecture][lecture].
+///
+/// [lecture]: https://www.cs.princeton.edu/courses/archive/fall16/cos318/lectures/6.MutexImplementation.pdf
 #[derive(Debug, Default)]
 pub struct Mutex {
     state: spin::Mutex<State>,
