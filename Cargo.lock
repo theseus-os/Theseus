@@ -199,11 +199,11 @@ dependencies = [
  "libc",
  "memory",
  "miniz_oxide",
- "mutex",
  "object",
  "rustc-demangle",
  "spin 0.9.0",
  "stack_trace",
+ "sync",
  "theseus_std",
  "thread_local_macro",
 ]
@@ -456,16 +456,6 @@ version = "0.1.0"
 dependencies = [
  "framebuffer",
  "shapes",
-]
-
-[[package]]
-name = "condvar"
-version = "0.1.0"
-dependencies = [
- "irq_safety",
- "mutex",
- "scheduler",
- "task",
 ]
 
 [[package]]
@@ -1999,14 +1989,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mutex"
-version = "0.1.0"
-dependencies = [
- "lockable",
- "raw_sync",
-]
-
-[[package]]
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
@@ -2792,15 +2774,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "semaphore"
-version = "0.1.0"
-dependencies = [
- "irq_safety",
- "scheduler",
- "task",
-]
-
-[[package]]
 name = "semver"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3371,9 +3344,9 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "log",
- "mutex",
  "scheduler",
  "spawn",
+ "sync",
  "task",
 ]
 
@@ -3939,13 +3912,13 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "mutex",
  "object",
  "paste",
  "psm",
  "region",
  "rustc-demangle",
  "serde",
+ "sync",
  "target-lexicon",
  "theseus_std",
  "wasmparser",
@@ -4020,11 +3993,11 @@ dependencies = [
  "memoffset 0.6.5",
  "memory",
  "more-asserts",
- "mutex",
  "rand",
  "region",
  "signal_handler",
  "spin 0.9.0",
+ "sync",
  "task",
  "theseus_std",
  "thiserror_core2",

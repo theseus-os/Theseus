@@ -15,7 +15,6 @@ spin = "0.9.0"
 heap = { path = "../kernel/heap" }
 
 # sync
-semaphore = { path = "../kernel/semaphore" }
-wait_queue = { path = "../kernel/wait_queue" }
+raw_sync = { path = "../raw_sync" }
 
 # time

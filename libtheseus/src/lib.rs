@@ -76,10 +76,7 @@ pub mod mem {
 }
 
 pub mod sync {
-    // TODO: Do we want to expose Mutex/Locks. If so, a basic mutex (manual
-    // locking/unlocking) or a Mutex<T>?
-    pub use semaphore::Semaphore;
-    pub use wait_queue::WaitQueue;
+    pub use raw_sync::{Condvar, Mutex, RwLock};
 }
 
 pub mod time {

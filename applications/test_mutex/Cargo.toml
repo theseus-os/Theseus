@@ -1,5 +1,5 @@
 [package]
-name = "test_mutex_sleep"
+name = "test_mutex"
 version = "0.1.0"
 description = "Tests the blocking sleeping mutex with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
@@ -19,5 +19,5 @@ path = "../../kernel/apic"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.mutex_sleep]
-path = "../../kernel/mutex_sleep"
+[dependencies.sync]
+path = "../../kernel/sync"
