@@ -65,6 +65,16 @@ impl Condvar {
         mutex.lock();
     }
 
+    /// Waits for a signal on the specified mutex with a timeout duration
+    /// specified by `dur` (a relative time into the future).
+    ///
+    /// # Safety
+    ///
+    /// Behavior is undefined if the mutex is not locked by the current thread.
+    pub unsafe fn wait_timeout(&self, _mutex: &Mutex, _dur: core::time::Duration) -> bool {
+        todo!();
+    }
+
     /// Wait on a [`spin::Mutex`].
     ///
     /// # Safety
