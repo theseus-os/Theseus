@@ -17,11 +17,12 @@ jobs:
       - name: "Run Clippy"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: .
         run: >
           (
             echo -- 
             "cargo clippy -q -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- " 
-            "$(grep -v "#" ./lints.txt  | sed 's/^/-D clippy::/g' | tr -d '\r' | tr '\n' ' ')"
+            "$(grep -v "#" lints.txt  | sed 's/^/-D clippy::/g' | tr -d '\r' | tr '\n' ' ')"
           ) 
           > cmd.txt;
           bash cmd.txt;
