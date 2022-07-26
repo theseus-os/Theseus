@@ -1,0 +1,9 @@
+[package]
+name = "mutex"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A mutex implementation"
+edition = "2021"
+
+[dependencies]
+raw_mutex = { path = "../raw_mutex" }

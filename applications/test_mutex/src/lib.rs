@@ -5,7 +5,7 @@
 extern crate task;
 extern crate spawn;
 extern crate scheduler;
-extern crate mutex_sleep;
+extern crate mutex;
 extern crate apic;
 
 use core::ops::Deref;
@@ -15,7 +15,7 @@ use alloc::{
     string::String,
     sync::Arc,
 };
-use mutex_sleep::MutexSleep;
+use mutex::Mutex;
 
 
 pub fn main(_args: Vec<String>) -> isize {    
@@ -37,7 +37,7 @@ pub fn main(_args: Vec<String>) -> isize {
 fn test_contention() -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
-    let shared_lock = Arc::new(MutexSleep::new(0usize));
+    let shared_lock = Arc::new(Mutex::new(0usize));
 
     let t1 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_1"))
@@ -70,7 +70,7 @@ fn test_contention() -> Result<(), &'static str> {
 }
 
 
-fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
+fn mutex_sleep_task(lock: Arc<Mutex<usize>>) -> Result<(), &'static str> {
     let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
     let curr_task = format!("{}", curr_task.deref());
     warn!("ENTERED TASK {}", curr_task);
@@ -78,7 +78,7 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
     for _i in 0..1000 {
         scheduler::schedule(); // give other tasks a chance to acquire the lock
         warn!("{} trying to acquire lock...", curr_task);
-        let mut locked = lock.lock()?;
+        let mut locked = lock.lock();
         warn!("{} acquired lock!", curr_task);
         *locked += 1;
         warn!("{} incremented shared_lock value to {}.  Releasing lock.", curr_task, &*locked);
@@ -93,7 +93,7 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
 fn test_lockstep() -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
-    let shared_lock = Arc::new(MutexSleep::new(0usize));
+    let shared_lock = Arc::new(Mutex::new(0usize));
 
     let t1 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 0))
         .name(String::from("lockstep_task_1"))
@@ -126,7 +126,7 @@ fn test_lockstep() -> Result<(), &'static str> {
 }
 
 
-fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(), &'static str> {
+fn lockstep_task((lock, remainder): (Arc<Mutex<usize>>, usize)) -> Result<(), &'static str> {
     let curr_task = {
         let t = task::get_my_current_task().ok_or("couldn't get current task")?;
         format!("{}", t.deref())
@@ -137,7 +137,7 @@ fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(
         loop { 
             warn!("{} top of loop, remainder {}", curr_task, remainder);
             scheduler::schedule(); // give other tasks a chance to acquire the lock
-            let mut locked = lock.lock()?;
+            let mut locked = lock.lock();
             scheduler::schedule();
             if *locked % 3 == remainder {
                 warn!("Task {} Time to shine, value is {}!", curr_task, *locked);

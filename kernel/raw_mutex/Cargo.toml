@@ -1,0 +1,11 @@
+[package]
+name = "raw_mutex"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A raw mutex implementation"
+edition = "2021"
+
+[dependencies]
+scheduler = { path = "../scheduler" }
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+task = { path = "../task" }

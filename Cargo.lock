@@ -1989,6 +1989,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mutex"
+version = "0.1.0"
+dependencies = [
+ "raw_mutex",
+]
+
+[[package]]
 name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
@@ -2518,6 +2525,15 @@ dependencies = [
  "bitflags",
  "cc",
  "rustc_version",
+]
+
+[[package]]
+name = "raw_mutex"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "scheduler",
+ "task",
 ]
 
 [[package]]
@@ -3336,12 +3352,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_mutex_sleep"
+name = "test_mutex"
 version = "0.1.0"
 dependencies = [
  "apic",
  "log",
- "mutex_sleep",
+ "mutex",
  "scheduler",
  "spawn",
  "task",
@@ -3510,7 +3526,7 @@ dependencies = [
  "test_ixgbe",
  "test_libc",
  "test_mlx5",
- "test_mutex_sleep",
+ "test_mutex",
  "test_panic",
  "test_realtime",
  "test_restartable",
