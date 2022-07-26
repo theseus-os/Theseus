@@ -165,7 +165,7 @@ enum-clike-unportable-variant
 # while-immutable-condition
 # wrong-transmute
 # zst-offset
-# # Style
+# Style
 # assertions-on-constants
 # assign-op-pattern
 # blacklisted-name
@@ -290,7 +290,7 @@ enum-clike-unportable-variant
 # panicking-unwrap
 # range-plus-one
 # unnecessary-unwrap
-# # Perf
+# Perf
 # box-collection
 # boxed-local
 cmp-owned
