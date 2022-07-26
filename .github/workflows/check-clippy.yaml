@@ -19,6 +19,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: .
         run: |
-          printf "cargo clippy -q -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- " > cmd.txt;
+          printf "cargo clippy -q -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-theseus.json --workspace --all-features -- -A clippy::all " > cmd.txt;
           grep -v "#" lints.txt | sed 's/^/-D clippy::/g' | tr -d '\r' | tr '\n' ' ' >> cmd.txt
           bash cmd.txt;
