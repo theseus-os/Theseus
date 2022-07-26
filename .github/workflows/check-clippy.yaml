@@ -24,9 +24,6 @@ jobs:
           --target cfg/x86_64-theseus.json 
           --workspace --all-features -- 
           -A clippy::all 
-
-          # Complexity
-
           -D clippy::bind-instead-of-map
           -D clippy::bool-comparison
           # -D clippy::borrowed-box
