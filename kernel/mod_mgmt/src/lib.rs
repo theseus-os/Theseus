@@ -47,9 +47,9 @@ use rangemap::RangeMap;
 pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
 pub use crate_metadata::*;
 
-#[cfg(feature = "mod_unpack")]
+#[cfg(feature = "extract_boot_modules")]
 use lz4_flex::block::decompress_size_prepended;
-#[cfg(feature = "mod_unpack")]
+#[cfg(feature = "extract_boot_modules")]
 use cpio_reader::iter_files;
 
 
@@ -210,7 +210,7 @@ fn parse_bootloader_modules_into_files(
         if name.as_str() == "modules.cpio.lz4" {
             // modules are zipped
 
-            #[cfg(feature = "mod_unpack")]
+            #[cfg(feature = "extract_boot_modules")]
             {
                 let bytes = mp.as_slice(0, size)?;
                 let tar = decompress_size_prepended(bytes).ok()
@@ -234,8 +234,12 @@ fn parse_bootloader_modules_into_files(
                 }
                 continue;
             }
-            #[cfg(not(feature = "mod_unpack"))]
-            debug!("modmgmt: WARNING! `modules.cpio.lz4` encountered but the `mod_unpack` feature is disabled!");
+            #[cfg(not(feature = "extract_boot_modules"))]
+            {
+                let err_msg = "modmgmt: `modules.cpio.lz4` encountered but the `mod_unpack` feature is disabled!";
+                error!("{}", err_msg);
+                return Err(err_msg);
+            }
         }
 
         process_module(name, size, mp)?;
