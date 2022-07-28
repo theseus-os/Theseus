@@ -48,10 +48,10 @@ ifeq ($(bootloader),grub)
 	else
 $(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
 	endif
-else ifeq ($(bootloader),limine-iso)
-export override CARGOFLAGS += --features mod_unpack
+else ifeq ($(bootloader),limine)
+export override CARGOFLAGS += --features extract_boot_modules
 else
-$(error Error: invalid value for `bootloader`, must be `grub` or `limine-iso`; value: `$(bootloader)`.)
+$(error Error: invalid value for `bootloader`, must be `grub` or `limine`; value: `$(bootloader)`.)
 endif
 
 
@@ -89,6 +89,7 @@ THESEUS_BUILD_TOML := $(DEPS_BUILD_DIR)/TheseusBuild.toml
 THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES := $(ROOT_DIR)/extra_files
+LIMINE_DIR := $(ROOT_DIR)/limine-prebuilt
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
@@ -351,25 +352,20 @@ grub:
 
 ### This target uses limine to build a bootable ISO.
 ### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
-limine-iso:
-	@test -d limine/ || echo "Missing ./limine/ directory! Did you follow the Readme?"
+limine:
+	@test -d $(LIMINE_DIR)/ || echo "Missing ./limine-prebuilt/ directory! Did you follow the Readme?"
 	@cd $(OBJECT_FILES_BUILD_DIR)/ && ls | cpio --no-absolute-filenames -o > $(ISOFILES)/modules.cpio
 	@cargo run -r --manifest-path $(ROOT_DIR)/tools/limine_compress_modules/Cargo.toml -- -i $(ISOFILES)/modules.cpio -o $(ISOFILES)/modules.cpio.lz4
-	@rm -r $(OBJECT_FILES_BUILD_DIR)
 	@rm $(ISOFILES)/modules.cpio
-	@cp cfg/limine.cfg $(ISOFILES)/
-	@cp limine/limine-cd.bin $(ISOFILES)/
-	@cp limine/limine-cd-efi.bin $(ISOFILES)/
-	@cp limine/limine.sys $(ISOFILES)/
-	tree $(ISOFILES)/
+	@cp cfg/limine.cfg $(LIMINE_DIR)/limine-cd.bin $(LIMINE_DIR)/limine-cd-efi.bin $(LIMINE_DIR)/limine.sys $(ISOFILES)/
 	@rm -f $(iso)
 	@xorriso -as mkisofs \
 		-b limine-cd.bin -no-emul-boot -boot-load-size 4 \
 		-boot-info-table --efi-boot limine-cd-efi.bin \
 		-efi-boot-part --efi-boot-image --protective-msdos-label \
 		$(ISOFILES)/ -o $(iso)
-	@$(MAKE) -C limine
-	@limine/limine-deploy $(iso)
+	@$(MAKE) -C $(LIMINE_DIR)
+	@$(LIMINE_DIR)/limine-deploy $(iso)
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
@@ -663,7 +659,7 @@ help:
 
 	@echo -e "   usb:"
 	@echo -e "\t Builds Theseus as a bootable .iso and writes it to the specified USB drive."
-	@echo -e "\t The USB drive is specified as usb=<dev-name>, e.g., 'make usb usb=sdc',"
+	@echo -e "\t The USB drive is specified as drive=<dev-name>, e.g., 'make usb drive=sdc',"
 	@echo -e "\t in which the USB drive is connected as /dev/sdc. This target requires sudo."
 
 	@echo -e "   pxe:"
@@ -685,10 +681,10 @@ help:
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
 	@echo -e "\nThe following key-value options are available to select a bootloader:"
-	@echo -e "   bootloader=grub|limine-iso"
+	@echo -e "   bootloader=grub|limine"
 	@echo -e "\t Configure which bootloader to pack into the final \".iso\" file."
 	@echo -e "\t    'grub':       Use the GRUB bootloader. Default value."
-	@echo -e "\t    'limine-iso': Use the Limine bootloader. See specific paragraph in the Readme."
+	@echo -e "\t    'limine': Use the Limine bootloader. See specific paragraph in the Readme."
 
 	@echo -e "\nThe following key-value options are available to customize the build process:"
 	@echo -e "   merge_sections=yes|no"
@@ -910,14 +906,14 @@ check-usb:
 ## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app.
 ifeq ($(IS_WSL), ) ## if we're not on WSL...
 ## now we need to check that the user has specified a USB drive that actually exists, not a partition of a USB drive.
-ifeq (,$(findstring $(usb),$(USB_DRIVES)))
+ifeq (,$(findstring $(drive),$(USB_DRIVES)))
 	@echo -e "\nError: please specify a USB drive that exists, e.g., \"sdc\" (not a partition like \"sdc1\")."
 	@echo -e "For example, run the following command:"
-	@echo -e "   make boot usb=sdc\n"
+	@echo -e "   make boot drive=sdc\n"
 	@echo -e "The following USB drives are currently attached to this system:\n$(USB_DRIVES)"
 	@echo ""
 	@exit 1
-endif  ## end of checking that the 'usb' variable is a USB drive that exists
+endif  ## end of checking that the 'drive' variable is a USB drive that exists
 endif  ## end of checking for WSL
 
 
@@ -930,8 +926,8 @@ ifneq ($(IS_WSL), )
 	@echo -e "The ISO file is available at \"$(iso)\"."
 else
 ## building on Linux or macOS
-	@$(UNMOUNT) /dev/$(usb)* 2> /dev/null  |  true  ## force it to return true
-	@sudo dd bs=4194304 if=$(iso) of=/dev/$(usb)    ## use 4194304 instead of 4M because macOS doesn't support 4M
+	@$(UNMOUNT) /dev/$(drive)* 2> /dev/null  |  true  ## force it to return true
+	@sudo dd bs=4194304 if=$(iso) of=/dev/$(drive)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync
 endif
 	
