@@ -3357,6 +3357,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_preemption_disable"
+version = "0.1.0"
+dependencies = [
+ "scheduler",
+ "sleep",
+ "terminal_print",
+]
+
+[[package]]
 name = "test_realtime"
 version = "0.1.0"
 dependencies = [
@@ -3512,6 +3521,7 @@ dependencies = [
  "test_mlx5",
  "test_mutex_sleep",
  "test_panic",
+ "test_preemption_disable",
  "test_realtime",
  "test_restartable",
  "test_serial_echo",

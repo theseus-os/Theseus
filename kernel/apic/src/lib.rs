@@ -503,6 +503,25 @@ impl LocalApic {
         }
     }
 
+    pub fn enable_timer(&mut self) {
+        if has_x2apic() {
+            unsafe { wrmsr(IA32_X2APIC_LVT_TIMER, 0x22 | APIC_TIMER_PERIODIC as u64) };
+        } else {
+            if let Some(ref mut regs) = self.regs {
+                regs.lvt_timer.write(0x22 | APIC_TIMER_PERIODIC);
+            }
+        }
+    }
+
+    pub fn disable_timer(&mut self) {
+        if has_x2apic() {
+            unsafe { wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64) };
+        } else {
+            if let Some(ref mut regs) = self.regs {
+                regs.lvt_timer.write(APIC_DISABLE);
+            }
+        }
+    }
     
     pub fn id(&self) -> u8 {
         let id: u8 = if has_x2apic() {

@@ -1,3 +1,4 @@
+#![deny(unsafe_op_in_unsafe_fn)]
 #![no_std]
 
 extern crate alloc;
@@ -17,10 +18,84 @@ cfg_if! {
     }
 }
 
+use apic::{get_my_apic_id, get_my_apic};
 use core::ops::Deref;
 use irq_safety::hold_interrupts;
-use apic::get_my_apic_id;
 use task::{get_my_current_task, TaskRef};
+
+static mut PREEMPTION_COUNTERS: [u8; u8::MAX as usize] = [0; u8::MAX as usize];
+
+/// A guard that reenables preemption when dropped.
+pub struct PreemptionGuard(bool);
+
+impl PreemptionGuard {
+    /// Configures the guard to reenable preemption when dropped.
+    pub fn enable(&mut self) {
+        self.0 = true;
+    }
+
+    /// Configures the guard to not reenable preemption when dropped.
+    pub fn disable(&mut self) {
+        self.0 = false;
+    }
+}
+
+impl Drop for PreemptionGuard {
+    fn drop(&mut self) {
+        if self.0 {
+            enable_preemption();
+        }
+    }
+}
+
+/// Disables preemption.
+///
+/// Returns a [`PreemptionGuard`] that automatically calls [`enable_preemption`]
+/// when dropped.
+pub fn disable_preemption() -> PreemptionGuard {
+    let id: u8 = get_my_apic_id();
+    // SAFETY: PREEMPTION_COUNTERS[id] is only used by this core.
+    match unsafe { PREEMPTION_COUNTERS[id as usize].checked_add(1) } {
+        Some(counter) => {
+            unsafe { PREEMPTION_COUNTERS[id as usize] = counter };
+            if counter == 1 {
+                trace!("disable_preemption(): disabling apic timer");
+                let mut apic = get_my_apic().unwrap().write();
+                apic.disable_timer();
+            }
+        }
+        None => {
+            // The current thread called disable_preemption u8::MAX more times than
+            // enable_preempt.
+            error!("disable_preemption(): preemption recursion overflowed");
+        }
+    }
+    PreemptionGuard(true)
+}
+
+/// Enables preemption.
+///
+/// This function isn't guaranteed to enable preemption. If `disable_preemption`
+/// has been called n times, `enable_preemption` will reenable preemption only
+/// after it has been called n times.
+pub fn enable_preemption() {
+    let id: u8 = get_my_apic_id();
+    // SAFETY: PREEMPTION_COUNTERS[id] is only used by this core.
+    match unsafe { PREEMPTION_COUNTERS[id as usize].checked_sub(1) } {
+        Some(counter) => {
+            unsafe { PREEMPTION_COUNTERS[id as usize] = counter };
+            if counter == 0 {
+                trace!("enable_preemption(): enabling apic timer");
+                let mut apic = get_my_apic().unwrap().write();
+                apic.enable_timer();
+            }
+        }
+        None => {
+            // NOTE: This is not a bug if preemption recursion overflowed.
+            error!("BUG: enable_preemption(): tried to enable preemption when already enabled");
+        }
+    }
+}
 
 /// Yields the current CPU by selecting a new `Task` to run 
 /// and then performs a task switch to that new `Task`.

@@ -1,0 +1,15 @@
+[package]
+name = "test_preemption_disable"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+edition = "2021"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.sleep]
+path = "../../kernel/sleep"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+

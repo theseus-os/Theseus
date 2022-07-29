@@ -66,6 +66,7 @@ test_libc = { path = "../applications/test_libc", optional = true }
 test_mlx5 = { path = "../applications/test_mlx5", optional = true }
 test_mutex_sleep = { path = "../applications/test_mutex_sleep", optional = true }
 test_panic = { path = "../applications/test_panic", optional = true }
+test_preemption_disable = { path = "../applications/test_preemption_disable", optional = true }
 test_realtime = { path = "../applications/test_realtime", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
@@ -151,6 +152,7 @@ theseus_tests = [
     "test_mlx5",
     "test_mutex_sleep",
     "test_panic",
+    "test_preemption_disable",
     "test_realtime",
     "test_restartable",
     "test_serial_echo",
