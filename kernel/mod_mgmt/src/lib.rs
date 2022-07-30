@@ -178,7 +178,7 @@ fn parse_bootloader_modules_into_files(
         let name = m.name();
         let size = m.size_in_bytes();
 
-        if name.as_str() == "modules.cpio.lz4" {
+        if name == "modules.cpio.lz4" {
             // The bootloader modules were compressed/archived into one large module at build time,
             // so we must extract them here.
 
