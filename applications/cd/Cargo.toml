@@ -5,9 +5,7 @@ authors = ["Christine Wang <chrissywang54@gmail.com>"]
 
 [dependencies]
 getopts = "0.2.21"
-
-[dependencies.log]
-version = "0.4.8"
+log = "0.4.8"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
@@ -23,6 +21,9 @@ path = "../../kernel/fs_node"
 
 [dependencies.root]
 path = "../../kernel/root"
+
+[dependencies.environment]
+path = "../../kernel/environment"
 
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
