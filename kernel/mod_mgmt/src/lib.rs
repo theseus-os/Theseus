@@ -3,30 +3,6 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
-extern crate spin;
-extern crate xmas_elf;
-extern crate memory;
-extern crate bootloader_modules;
-extern crate kernel_config;
-extern crate util;
-extern crate crate_name_utils;
-extern crate crate_metadata;
-extern crate rustc_demangle;
-extern crate cow_arc;
-extern crate qp_trie;
-extern crate root;
-extern crate vfs_node;
-extern crate fs_node;
-extern crate path;
-extern crate memfs;
-extern crate cstr_core;
-extern crate hashbrown;
-extern crate rangemap;
-
-#[cfg(feature = "mod_unpack")]
-extern crate lz4_flex;
-#[cfg(feature = "mod_unpack")]
-extern crate cpio_reader;
 
 use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
 use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
@@ -46,11 +22,6 @@ use hashbrown::HashMap;
 use rangemap::RangeMap;
 pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
 pub use crate_metadata::*;
-
-#[cfg(feature = "extract_boot_modules")]
-use lz4_flex::block::decompress_size_prepended;
-#[cfg(feature = "extract_boot_modules")]
-use cpio_reader::iter_files;
 
 
 pub mod parse_nano_core;
@@ -170,16 +141,16 @@ fn parse_bootloader_modules_into_files(
         VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
     };
 
-    let mut process_module = |name: String, size, pages| -> Result<_, &'static str> {
-        let (crate_type, prefix, file_name) = if let Ok((c, p, f)) = CrateType::from_module_name(&name) {
+    let mut process_module = |name: &str, size, pages| -> Result<_, &'static str> {
+        let (crate_type, prefix, file_name) = if let Ok((c, p, f)) = CrateType::from_module_name(name) {
             (c, p, f)
         } else {
-            parse_extra_file(&name, size, pages, Arc::clone(&extra_files_dir))?;
+            parse_extra_file(name, size, pages, Arc::clone(&extra_files_dir))?;
             return Ok(());
         };
 
         let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
-        // debug!("Module: {:?}, size {}, mp: {:?}", m.name(), m.size_in_bytes(), mp);
+        // debug!("Module: {:?}, size {}, mp: {:?}", name, size, pages);
 
         let create_file = |dir: &DirRef| {
             MemFile::from_mapped_pages(pages, file_name.to_string(), size, dir)
@@ -196,7 +167,7 @@ fn parse_bootloader_modules_into_files(
         let frames = allocate_frames_by_bytes_at(m.start_address(), m.size_in_bytes())
             .map_err(|_e| "Failed to allocate frames for bootloader module")?;
         let pages = allocate_pages_by_bytes(m.size_in_bytes())
-            .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
+            .ok_or("Couldn't allocate virtual pages for bootloader module")?;
         let mp = kernel_mmi.page_table.map_allocated_pages_to(
             pages,
             frames,
@@ -204,26 +175,31 @@ fn parse_bootloader_modules_into_files(
             EntryFlags::PRESENT | EntryFlags::NO_EXECUTE,
         )?;
 
-        let name = m.name().clone();
+        let name = m.name();
         let size = m.size_in_bytes();
 
         if name.as_str() == "modules.cpio.lz4" {
-            // modules are zipped
+            // The bootloader modules were compressed/archived into one large module at build time,
+            // so we must extract them here.
 
             #[cfg(feature = "extract_boot_modules")]
             {
                 let bytes = mp.as_slice(0, size)?;
-                let tar = decompress_size_prepended(bytes).ok()
-                    .ok_or("lz4 decompression failed")?;
-                for entry in iter_files(&tar) {
-                    let name = entry.name().to_string();
+                let tar = lz4_flex::block::decompress_size_prepended(bytes)
+                    .map_err(|_e| "lz4 decompression of bootloader modules failed")?;
+                /*
+                 * TODO: avoid using tons of heap space for decompression by
+                 *       allocating a separate MappedPages instance and using `decompress_into()`.
+                 *       We can determined the uncompressed size ahead of time using the following:
+                 */
+                let _uncompressed_size = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+                for entry in cpio_reader::iter_files(&tar) {
+                    let name = entry.name();
                     let bytes = entry.file();
                     let size = bytes.len();
-                    debug!("extracting {} ({}B)", &name, size);
                     let mut mp = {
-                        let err_msg = "couldn't allocate pages";
                         let flags = EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::PRESENT;
-                        let allocated_pages = allocate_pages_by_bytes(size).ok_or(err_msg)?;
+                        let allocated_pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
                         kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags)?
                     };
                     {
@@ -236,7 +212,7 @@ fn parse_bootloader_modules_into_files(
             }
             #[cfg(not(feature = "extract_boot_modules"))]
             {
-                let err_msg = "modmgmt: `modules.cpio.lz4` encountered but the `mod_unpack` feature is disabled!";
+                let err_msg = "BUG: found `modules.cpio.lz4` bootloader module, but the `extract_boot_modules` feature was disabled!";
                 error!("{}", err_msg);
                 return Err(err_msg);
             }

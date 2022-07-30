@@ -24,7 +24,27 @@ bootloader ?= grub
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 
 
-## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
+###################################################################################################
+### Basic directory/file path definitions used throughout the makefile.
+###################################################################################################
+BUILD_DIR               := $(ROOT_DIR)/build
+NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
+iso                     := $(BUILD_DIR)/theseus-$(ARCH).iso
+ISOFILES                := $(BUILD_DIR)/isofiles
+OBJECT_FILES_BUILD_DIR  := $(ISOFILES)/modules
+DEBUG_SYMBOLS_DIR       := $(BUILD_DIR)/debug_symbols
+TARGET_DEPS_DIR         := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps
+DEPS_BUILD_DIR          := $(BUILD_DIR)/deps
+HOST_DEPS_DIR           := $(DEPS_BUILD_DIR)/host_deps
+DEPS_SYSROOT_DIR        := $(DEPS_BUILD_DIR)/sysroot
+THESEUS_BUILD_TOML      := $(DEPS_BUILD_DIR)/TheseusBuild.toml
+THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
+THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
+EXTRA_FILES             := $(ROOT_DIR)/extra_files
+LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
+
+
+### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
 	CROSS = x86_64-elf-
@@ -39,6 +59,7 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 
+### Handle multiple bootloader options and ensure the corresponding tools are installed.
 ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
 	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
@@ -49,9 +70,14 @@ ifeq ($(bootloader),grub)
 $(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
 	endif
 else ifeq ($(bootloader),limine)
-export override CARGOFLAGS += --features extract_boot_modules
+	## Check if the limine directory exists. 
+	ifneq (,$(wildcard $(LIMINE_DIR)/.))
+		export override CARGOFLAGS += --features extract_boot_modules
+	else
+$(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
+	endif
 else
-$(error Error: invalid value for `bootloader`, must be `grub` or `limine`; value: `$(bootloader)`.)
+$(error Error: unsupported option "bootloader=$(bootloader)". Options are 'grub' or 'limine')
 endif
 
 
@@ -74,22 +100,6 @@ check-rustc:
 ###################################################################################################
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
-
-BUILD_DIR := $(ROOT_DIR)/build
-NANO_CORE_BUILD_DIR := $(BUILD_DIR)/nano_core
-iso := $(BUILD_DIR)/theseus-$(ARCH).iso
-ISOFILES := $(BUILD_DIR)/isofiles
-OBJECT_FILES_BUILD_DIR := $(ISOFILES)/modules
-DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
-TARGET_DEPS_DIR := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps
-DEPS_BUILD_DIR := $(BUILD_DIR)/deps
-HOST_DEPS_DIR := $(DEPS_BUILD_DIR)/host_deps
-DEPS_SYSROOT_DIR := $(DEPS_BUILD_DIR)/sysroot
-THESEUS_BUILD_TOML := $(DEPS_BUILD_DIR)/TheseusBuild.toml
-THESEUS_CARGO := $(ROOT_DIR)/tools/theseus_cargo
-THESEUS_CARGO_BIN := $(THESEUS_CARGO)/bin/theseus_cargo
-EXTRA_FILES := $(ROOT_DIR)/extra_files
-LIMINE_DIR := $(ROOT_DIR)/limine-prebuilt
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
@@ -159,8 +169,10 @@ iso: $(iso)
 ### This target builds an .iso OS image from all of the compiled crates.
 $(iso): clean-old-build build extra_files copy_kernel $(bootloader)
 
+
+## Copy the kernel boot image into the proper ISOFILES directory.
+## Should be invoked after building all Theseus kernel/application crates.
 copy_kernel:
-# after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(ISOFILES)/boot/
 	@cp $(nano_core_binary) $(ISOFILES)/boot/kernel.bin
 
@@ -350,10 +362,10 @@ grub:
 	@cargo run --release --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(ISOFILES)/modules/ -o $(ISOFILES)/boot/grub/grub.cfg
 	@$(GRUB_MKRESCUE) -o $(iso) $(ISOFILES)  2> /dev/null
 
+
 ### This target uses limine to build a bootable ISO.
 ### This target should be invoked when all of contents of `ISOFILES` are ready to be packaged into an ISO.
 limine:
-	@test -d $(LIMINE_DIR)/ || echo "Missing ./limine-prebuilt/ directory! Did you follow the Readme?"
 	@cd $(OBJECT_FILES_BUILD_DIR)/ && ls | cpio --no-absolute-filenames -o > $(ISOFILES)/modules.cpio
 	@cargo run -r --manifest-path $(ROOT_DIR)/tools/limine_compress_modules/Cargo.toml -- -i $(ISOFILES)/modules.cpio -o $(ISOFILES)/modules.cpio.lz4
 	@rm $(ISOFILES)/modules.cpio
@@ -683,8 +695,8 @@ help:
 	@echo -e "\nThe following key-value options are available to select a bootloader:"
 	@echo -e "   bootloader=grub|limine"
 	@echo -e "\t Configure which bootloader to pack into the final \".iso\" file."
-	@echo -e "\t    'grub':       Use the GRUB bootloader. Default value."
-	@echo -e "\t    'limine': Use the Limine bootloader. See specific paragraph in the Readme."
+	@echo -e "\t    'grub':    Use the GRUB bootloader. Default value."
+	@echo -e "\t    'limine':  Use the Limine bootloader. See setup instructions in the README."
 
 	@echo -e "\nThe following key-value options are available to customize the build process:"
 	@echo -e "   merge_sections=yes|no"

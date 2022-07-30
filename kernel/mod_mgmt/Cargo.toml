@@ -17,9 +17,9 @@ lz4_flex = { version = "0.9.3", default-features = false, optional = true }
 cpio_reader = { version = "0.1.0", optional = true }
 
 [features]
-# If this is enabled and a "modules.cpio.lz4" module
-# is encountered, mod_mgmt will try to extract this
-# file and will process the modules it contains.
+# Enable this to support extracting/unarchiving bootloader modules
+# from a compressed "modules.cpio.lz4" module.
+# Currently this is enabled when building for the 'limine' bootloader.
 extract_boot_modules = ["lz4_flex", "cpio_reader"]
 
 [dependencies.lazy_static]
