@@ -142,7 +142,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 .PHONY: all full \
 		check-rustc check-usb \
 		clean clean-doc clean-old-build \
-		run run_pause iso build cargo $(bootloader) extra_files \
+		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
