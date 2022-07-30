@@ -40,6 +40,7 @@
 //! [`B.sections_dependent_on_me`]: LoadedSectionInner::sections_dependent_on_me
 //! 
 
+#![deny(unsafe_op_in_unsafe_fn)]
 #![no_std]
 
 extern crate alloc;
@@ -873,6 +874,9 @@ impl LoadedSection {
     /// Returns a reference to the function that is formed from the underlying memory region,
     /// with a lifetime dependent upon the lifetime of this section.
     ///
+    /// # Safety
+    /// The type signature of `F` must match the type signature of the function.
+    ///
     /// # Locking
     /// Obtains the lock on this section's `MappedPages` object.
     ///
@@ -888,11 +892,11 @@ impl LoadedSection {
     /// ```
     /// type MyPrintFuncSignature = fn(&str) -> Result<(), &'static str>;
     /// let section = mod_mgmt::get_symbol_starting_with("my_crate::print::").upgrade().unwrap();
-    /// let print_func: &MyPrintFuncSignature = section.as_func().unwrap();
+    /// let print_func: &MyPrintFuncSignature = unsafe { section.as_func() }.unwrap();
     /// print_func("hello there");
     /// ```
     /// 
-    pub fn as_func<F>(&self) -> Result<&F, &'static str> {
+    pub unsafe fn as_func<F>(&self) -> Result<&F, &'static str> {
         if false {
             debug!("Requested LoadedSection {:#X?} as function {:?}", self, core::any::type_name::<F>());
         }
@@ -915,8 +919,10 @@ impl LoadedSection {
             return Err("requested type and offset would not fit within the MappedPages bounds");
         }
 
-        // SAFE: above, we check the section type, executability, and size bounds of its underlying MappedPages
-        //       and tie the lifetime of the returned function reference to this section's lifetime.
+        // SAFETY: We checked the section type, executability, and size bounds of the
+        // underlying MappedPages above. The lifetime of the returned function
+        // reference is tied to this section's lifetime. The caller guarantees
+        // that the function signature matches.
         Ok(unsafe { 
             core::mem::transmute(
                 &(mp.start_address().value() + self.mapped_pages_offset)
