@@ -13,6 +13,14 @@ qp-trie = "0.8.0"
 cstr_core = "0.2.3"
 rangemap = "0.1.13"
 const_format = "0.2.2"
+lz4_flex = { version = "0.9.3", default-features = false, optional = true }
+cpio_reader = { version = "0.1.0", optional = true }
+
+[features]
+# Enable this to support extracting/unarchiving bootloader modules
+# from a compressed "modules.cpio.lz4" module.
+# Currently this is enabled when building for the 'limine' bootloader.
+extract_boot_modules = ["lz4_flex", "cpio_reader"]
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

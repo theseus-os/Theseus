@@ -3,25 +3,6 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
-extern crate spin;
-extern crate xmas_elf;
-extern crate memory;
-extern crate bootloader_modules;
-extern crate kernel_config;
-extern crate util;
-extern crate crate_name_utils;
-extern crate crate_metadata;
-extern crate rustc_demangle;
-extern crate cow_arc;
-extern crate qp_trie;
-extern crate root;
-extern crate vfs_node;
-extern crate fs_node;
-extern crate path;
-extern crate memfs;
-extern crate cstr_core;
-extern crate hashbrown;
-extern crate rangemap;
 
 use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
 use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
@@ -160,36 +141,84 @@ fn parse_bootloader_modules_into_files(
         VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
     };
 
-    for m in bootloader_modules {
-        let frames = allocate_frames_by_bytes_at(m.start_address(), m.size_in_bytes())
-            .map_err(|_e| "Failed to allocate frames for bootloader module")?;
-        let pages = allocate_pages_by_bytes(m.size_in_bytes())
-            .ok_or("Couldn't allocate virtual pages for bootloader module area")?;
-        let mp = kernel_mmi.page_table.map_allocated_pages_to(
-            pages, 
-            frames, 
-            EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
-        )?;
-
-        let (crate_type, prefix, file_name) = if let Ok((c, p, f)) = CrateType::from_module_name(m.name().as_str()) {
+    let mut process_module = |name: &str, size, pages| -> Result<_, &'static str> {
+        let (crate_type, prefix, file_name) = if let Ok((c, p, f)) = CrateType::from_module_name(name) {
             (c, p, f)
         } else {
-            parse_extra_file(&m, mp, Arc::clone(&extra_files_dir))?;
-            continue;
+            parse_extra_file(name, size, pages, Arc::clone(&extra_files_dir))?;
+            return Ok(());
         };
 
         let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
-        // debug!("Module: {:?}, size {}, mp: {:?}", m.name(), m.size_in_bytes(), mp);
+        // debug!("Module: {:?}, size {}, mp: {:?}", name, size, pages);
 
         let create_file = |dir: &DirRef| {
-            MemFile::from_mapped_pages(mp, file_name.to_string(), m.size_in_bytes(), dir)
+            MemFile::from_mapped_pages(pages, file_name.to_string(), size, dir)
         };
-
         // Get the existing (or create a new) namespace directory corresponding to the given directory name.
         let _new_file = match prefix_map.entry(dir_name.clone()) {
             btree_map::Entry::Vacant(vacant) => create_file( vacant.insert(create_dir(&dir_name)?) )?,
             btree_map::Entry::Occupied(occ)  => create_file( occ.get() )?,
         };
+        Ok(())
+    };
+
+    for m in bootloader_modules {
+        let frames = allocate_frames_by_bytes_at(m.start_address(), m.size_in_bytes())
+            .map_err(|_e| "Failed to allocate frames for bootloader module")?;
+        let pages = allocate_pages_by_bytes(m.size_in_bytes())
+            .ok_or("Couldn't allocate virtual pages for bootloader module")?;
+        let mp = kernel_mmi.page_table.map_allocated_pages_to(
+            pages,
+            frames,
+            // we never need to write to bootloader-provided modules
+            EntryFlags::PRESENT | EntryFlags::NO_EXECUTE,
+        )?;
+
+        let name = m.name();
+        let size = m.size_in_bytes();
+
+        if name == "modules.cpio.lz4" {
+            // The bootloader modules were compressed/archived into one large module at build time,
+            // so we must extract them here.
+
+            #[cfg(feature = "extract_boot_modules")]
+            {
+                let bytes = mp.as_slice(0, size)?;
+                let tar = lz4_flex::block::decompress_size_prepended(bytes)
+                    .map_err(|_e| "lz4 decompression of bootloader modules failed")?;
+                /*
+                 * TODO: avoid using tons of heap space for decompression by
+                 *       allocating a separate MappedPages instance and using `decompress_into()`.
+                 *       We can determined the uncompressed size ahead of time using the following:
+                 */
+                let _uncompressed_size = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
+                for entry in cpio_reader::iter_files(&tar) {
+                    let name = entry.name();
+                    let bytes = entry.file();
+                    let size = bytes.len();
+                    let mut mp = {
+                        let flags = EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE | EntryFlags::PRESENT;
+                        let allocated_pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
+                        kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags)?
+                    };
+                    {
+                        let slice = mp.as_slice_mut(0, size)?;
+                        slice.copy_from_slice(bytes);
+                    }
+                    process_module(name, size, mp)?;
+                }
+                continue;
+            }
+            #[cfg(not(feature = "extract_boot_modules"))]
+            {
+                let err_msg = "BUG: found `modules.cpio.lz4` bootloader module, but the `extract_boot_modules` feature was disabled!";
+                error!("{}", err_msg);
+                return Err(err_msg);
+            }
+        }
+
+        process_module(name, size, mp)?;
     }
 
     debug!("Created namespace directories: {:?}", prefix_map.keys().map(|s| &**s).collect::<Vec<&str>>().join(", "));
@@ -211,22 +240,23 @@ fn parse_bootloader_modules_into_files(
 /// Thus, for example, a file named `"foo?bar?me?test.txt"` will be placed at the path
 /// `/extra_files/foo/bar/me/test.txt`.
 fn parse_extra_file(
-    extra_file: &BootloaderModule,
+    extra_file_name: &str,
+    extra_file_size: usize,
     extra_file_mp: MappedPages,
     extra_files_dir: DirRef
 ) -> Result<FileRef, &'static str> {
 
-    let mut file_name = extra_file.name().as_str();
+    let mut file_name = extra_file_name;
     
     let mut parent_dir = extra_files_dir;
-    let mut iter = extra_file.name().as_str().split(EXTRA_FILES_DIRECTORY_DELIMITER).peekable();
+    let mut iter = extra_file_name.split(EXTRA_FILES_DIRECTORY_DELIMITER).peekable();
     while let Some(path_component) = iter.next() {
         if iter.peek().is_some() {
             let existing_dir = parent_dir.lock().get_dir(path_component);
             parent_dir = existing_dir
                 .or_else(|| VFSDirectory::new(path_component.to_string(), &parent_dir).ok())
                 .ok_or_else(|| {
-                    error!("Failed to get or create directory {:?} for extra file {:?}", path_component, extra_file);
+                    error!("Failed to get or create directory {:?} for extra file {:?}", path_component, extra_file_name);
                     "Failed to get or create directory for extra file"
                 })?;
         } else {
@@ -238,7 +268,7 @@ fn parse_extra_file(
     MemFile::from_mapped_pages(
         extra_file_mp,
         file_name.to_string(),
-        extra_file.size_in_bytes(),
+        extra_file_size,
         &parent_dir
     )
 }
