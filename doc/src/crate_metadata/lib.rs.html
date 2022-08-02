@@ -1140,6 +1140,12 @@
 <span id="1134">1134</span>
 <span id="1135">1135</span>
 <span id="1136">1136</span>
+<span id="1137">1137</span>
+<span id="1138">1138</span>
+<span id="1139">1139</span>
+<span id="1140">1140</span>
+<span id="1141">1141</span>
+<span id="1142">1142</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.</span>
 <span class="doccomment">//! </span>
 <span class="doccomment">//! ## Representing dependencies between sections</span>
@@ -1182,6 +1188,7 @@
 <span class="doccomment">//! [`B.sections_dependent_on_me`]: LoadedSectionInner::sections_dependent_on_me</span>
 <span class="doccomment">//! </span>
 
+<span class="attribute">#![<span class="ident">deny</span>(<span class="ident">unsafe_op_in_unsafe_fn</span>)]</span>
 <span class="attribute">#![<span class="ident">no_std</span>]</span>
 
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">alloc</span>;
@@ -2015,6 +2022,9 @@
     <span class="doccomment">/// Returns a reference to the function that is formed from the underlying memory region,</span>
     <span class="doccomment">/// with a lifetime dependent upon the lifetime of this section.</span>
     <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// The type signature of `F` must match the type signature of the function.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// # Locking</span>
     <span class="doccomment">/// Obtains the lock on this section&#39;s `MappedPages` object.</span>
     <span class="doccomment">///</span>
@@ -2030,11 +2040,11 @@
     <span class="doccomment">/// ```</span>
     <span class="doccomment">/// type MyPrintFuncSignature = fn(&amp;str) -&gt; Result&lt;(), &amp;&#39;static str&gt;;</span>
     <span class="doccomment">/// let section = mod_mgmt::get_symbol_starting_with(&quot;my_crate::print::&quot;).upgrade().unwrap();</span>
-    <span class="doccomment">/// let print_func: &amp;MyPrintFuncSignature = section.as_func().unwrap();</span>
+    <span class="doccomment">/// let print_func: &amp;MyPrintFuncSignature = unsafe { section.as_func() }.unwrap();</span>
     <span class="doccomment">/// print_func(&quot;hello there&quot;);</span>
     <span class="doccomment">/// ```</span>
     <span class="doccomment">/// </span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">as_func</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">F</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">as_func</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">F</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="bool-val">false</span> {
             <span class="macro">debug!</span>(<span class="string">&quot;Requested LoadedSection {:#X?} as function {:?}&quot;</span>, <span class="self">self</span>, <span class="ident">core::any::type_name</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>());
         }
@@ -2057,8 +2067,10 @@
             <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="string">&quot;requested type and offset would not fit within the MappedPages bounds&quot;</span>);
         }
 
-        <span class="comment">// SAFE: above, we check the section type, executability, and size bounds of its underlying MappedPages</span>
-        <span class="comment">//       and tie the lifetime of the returned function reference to this section&#39;s lifetime.</span>
+        <span class="comment">// SAFETY: We checked the section type, executability, and size bounds of the</span>
+        <span class="comment">// underlying MappedPages above. The lifetime of the returned function</span>
+        <span class="comment">// reference is tied to this section&#39;s lifetime. The caller guarantees</span>
+        <span class="comment">// that the function signature matches.</span>
         <span class="prelude-val">Ok</span>(<span class="kw">unsafe</span> { 
             <span class="ident">core::mem::transmute</span>(
                 <span class="kw-2">&amp;</span>(<span class="ident">mp</span>.<span class="ident">start_address</span>().<span class="ident">value</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">mapped_pages_offset</span>)

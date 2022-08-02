@@ -180,7 +180,7 @@
                         .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">namespace</span><span class="op">|</span> <span class="ident">namespace</span>.<span class="ident">get_symbol_starting_with</span>(<span class="ident">PANIC_WRAPPER_SYMBOL</span>).<span class="ident">upgrade</span>())
                         .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get single symbol matching \&quot;panic_wrapper::panic_wrapper::\&quot;&quot;</span>)<span class="question-mark">?</span>
                 };
-                <span class="kw">let</span> <span class="ident">func</span>: <span class="kw-2">&amp;</span><span class="ident">PanicWrapperFunc</span> <span class="op">=</span> <span class="ident">section</span>.<span class="ident">as_func</span>()<span class="question-mark">?</span>;
+                <span class="kw">let</span> <span class="ident">func</span>: <span class="kw-2">&amp;</span><span class="ident">PanicWrapperFunc</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">section</span>.<span class="ident">as_func</span>() }<span class="question-mark">?</span>;
                 <span class="ident">func</span>(<span class="ident">info</span>)
             }
 
@@ -242,7 +242,7 @@
                     .<span class="ident">and_then</span>(<span class="op">|</span><span class="ident">namespace</span><span class="op">|</span> <span class="ident">namespace</span>.<span class="ident">get_symbol_starting_with</span>(<span class="ident">UNWIND_RESUME_SYMBOL</span>).<span class="ident">upgrade</span>())
                     .<span class="ident">ok_or</span>(<span class="string">&quot;Couldn&#39;t get single symbol matching \&quot;unwind::unwind_resume::\&quot;&quot;</span>)<span class="question-mark">?</span>
             };
-            <span class="kw">let</span> <span class="ident">func</span>: <span class="kw-2">&amp;</span><span class="ident">UnwindResumeFunc</span> <span class="op">=</span> <span class="ident">section</span>.<span class="ident">as_func</span>()<span class="question-mark">?</span>;
+            <span class="kw">let</span> <span class="ident">func</span>: <span class="kw-2">&amp;</span><span class="ident">UnwindResumeFunc</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">section</span>.<span class="ident">as_func</span>() }<span class="question-mark">?</span>;
             <span class="ident">func</span>(<span class="ident">arg</span>)
         }
         <span class="kw">match</span> <span class="ident">invoke_unwind_resume</span>(<span class="ident">arg</span>) {
