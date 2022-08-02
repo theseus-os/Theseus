@@ -160,7 +160,8 @@ pub fn new_application_task_builder(
     };
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
         --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)")?;
-    let main_func = main_func_sec.as_func::<MainFunc>()?;
+    // SAFETY: None. There is a lint in compiler_plugins/application_main_fn.rs, but it's currently disabled.
+    let main_func = unsafe { main_func_sec.as_func::<MainFunc>() }?;
 
     // Create the underlying task builder. 
     // Give it a default name based on the app crate's name, but that can be changed later. 

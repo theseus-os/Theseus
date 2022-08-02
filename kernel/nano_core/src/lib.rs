@@ -236,7 +236,7 @@ pub extern "C" fn nano_core_start(
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
         type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, stack::Stack, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
-        let func: &CaptainInitFunc = try_exit!(section.as_func());
+        let func: &CaptainInitFunc = try_exit!(unsafe { section.as_func() });
 
         try_exit!(
             func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end)

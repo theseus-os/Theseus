@@ -159,7 +159,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let section_ref1 = simd_app_namespace.get_symbol_starting_with("simd_test::test1::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test1\"")?;
-	let func1: &SimdTestFunc = section_ref1.as_func()?;
+	let func1: &SimdTestFunc = unsafe { section_ref1.as_func() }?;
 	let _task1 = spawn::new_task_builder(*func1, ())
 		.name(format!("simd_test_1-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
@@ -171,7 +171,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let section_ref2 = simd_app_namespace.get_symbol_starting_with("simd_test::test2::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test2\"")?;
-	let func2: &SimdTestFunc = section_ref2.as_func()?;
+	let func2: &SimdTestFunc = unsafe { section_ref2.as_func() }?;
 	let _task2 = spawn::new_task_builder(*func2, ())
 		.name(format!("simd_test_2-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
@@ -183,7 +183,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let section_ref3 = simd_app_namespace.get_symbol_starting_with("simd_test::test_short::")
 		.upgrade()
 		.ok_or("no single symbol matching \"simd_test::test_short\"")?;
-	let func3: &SimdTestFunc = section_ref3.as_func()?;
+	let func3: &SimdTestFunc = unsafe { section_ref3.as_func() }?;
 	let _task3 = spawn::new_task_builder(*func3, ())
 		.name(format!("simd_test_short-{}", simd_app_namespace.name()))
 		.pin_on_core(this_core)
